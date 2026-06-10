@@ -7,6 +7,9 @@ export default function Home() {
       <p className="mt-4 text-lg sm:text-xl text-zinc-500">
         La mappa social del food &amp; beverage
       </p>
+      <p className="mt-2 text-sm text-zinc-400">
+        Beta in arrivo
+      </p>
     </div>
   );
 }
