@@ -16,6 +16,9 @@ export default async function SiteHeader() {
       <nav className="flex items-center gap-4 text-sm">
         {user ? (
           <>
+            <Link href="/miei-locali" className="text-zinc-700 hover:underline">
+              I miei locali
+            </Link>
             <Link href="/me" className="text-zinc-700 hover:underline">
               {user.email}
             </Link>

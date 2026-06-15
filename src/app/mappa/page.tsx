@@ -13,5 +13,7 @@ export default async function MappaPage() {
     console.error("Errore nel caricamento di places:", error);
   }
 
-  return <MapView places={places ?? []} />;
+  const { data: userData } = await supabase.auth.getUser();
+
+  return <MapView places={places ?? []} userId={userData?.user?.id ?? null} />;
 }
