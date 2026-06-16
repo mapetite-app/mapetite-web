@@ -260,6 +260,8 @@ function SearchPanel({
   );
 }
 
+type ViewMode = "all" | "saved";
+
 export default function MapView({
   places: initialPlaces,
   userId,
@@ -270,6 +272,9 @@ export default function MapView({
   const [places, setPlaces] = useState<Place[]>(initialPlaces);
   const [selected, setSelected] = useState<Place | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<ViewMode>("all");
+  const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -288,6 +293,28 @@ export default function MapView({
       });
   }, [userId]);
 
+  useEffect(() => {
+    if (view !== "saved" || !userId) return;
+
+    setLoadingSaved(true);
+    const supabase = createClient();
+    supabase
+      .from("saved_places")
+      .select("places(id, name, category, lat, lng)")
+      .eq("user_id", userId)
+      .then(({ data, error }) => {
+        setLoadingSaved(false);
+        if (error) {
+          console.error("Errore nel caricamento dei locali salvati:", error);
+          return;
+        }
+        const fetched = (data ?? [])
+          .map((row) => row.places as unknown as Place | null)
+          .filter((p): p is Place => p !== null && p.lat != null && p.lng != null);
+        setSavedPlaces(fetched);
+      });
+  }, [view, userId]);
+
   const handleToggle = (placeId: string, saved: boolean) => {
     setSavedIds((prev) => {
       const next = new Set(prev);
@@ -298,14 +325,74 @@ export default function MapView({
       }
       return next;
     });
+    if (!saved && view === "saved") {
+      setSavedPlaces((prev) => prev.filter((p) => p.id !== placeId));
+      setSelected(null);
+    }
   };
 
   const handlePlaceAdded = (place: Place) => {
     setPlaces((prev) => (prev.some((p) => p.id === place.id) ? prev : [...prev, place]));
   };
 
+  const displayedPlaces = view === "all" ? places : savedPlaces;
+
   return (
     <div className="fixed inset-0">
+      {/* Toggle vista */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
+        <button
+          type="button"
+          onClick={() => { setView("all"); setSelected(null); }}
+          className={
+            view === "all"
+              ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
+              : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+          }
+        >
+          Tutti i locali
+        </button>
+        <button
+          type="button"
+          onClick={() => { setView("saved"); setSelected(null); }}
+          className={
+            view === "saved"
+              ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
+              : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+          }
+        >
+          I miei salvati
+        </button>
+      </div>
+
+      {/* Messaggio se non loggato e vista "salvati" */}
+      {view === "saved" && !userId && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-xs pointer-events-auto">
+            <p className="text-2xl mb-2">🔒</p>
+            <p className="text-zinc-800 font-semibold">Accesso richiesto</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              Accedi per vedere la tua mappa personale
+            </p>
+            <a
+              href="/login"
+              className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700"
+            >
+              Accedi
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Spinner caricamento salvati */}
+      {view === "saved" && userId && loadingSaved && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white rounded-lg shadow px-4 py-2 text-sm text-zinc-600">
+            Caricamento...
+          </div>
+        </div>
+      )}
+
       <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -317,7 +404,7 @@ export default function MapView({
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
       >
-        {places.map((place) => (
+        {displayedPlaces.map((place) => (
           <Marker
             key={place.id}
             longitude={place.lng}
