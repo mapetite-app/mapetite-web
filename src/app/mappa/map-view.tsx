@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -112,13 +112,162 @@ function SaveButton({
   );
 }
 
+type SearchResult = {
+  id: string;
+  name: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+};
+
+function SearchPanel({
+  userId,
+  onPlaceAdded,
+}: {
+  userId: string | null;
+  onPlaceAdded: (place: Place) => void;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setIsSearching(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/places/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Errore nella ricerca.");
+        setResults([]);
+        return;
+      }
+
+      setResults(data.results ?? []);
+    } catch {
+      setError("Errore nella ricerca.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAdd = async (result: SearchResult) => {
+    if (!userId) {
+      router.push("/login");
+      return;
+    }
+
+    if (result.lat == null || result.lng == null) return;
+
+    setAddingId(result.id);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/places/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          googlePlaceId: result.id,
+          name: result.name,
+          address: result.address,
+          lat: result.lat,
+          lng: result.lng,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Errore nell'aggiunta del locale.");
+        return;
+      }
+
+      onPlaceAdded({
+        id: data.place.id,
+        name: data.place.name,
+        category: data.place.category,
+        lat: data.place.lat,
+        lng: data.place.lng,
+      });
+      setAddedIds((prev) => new Set(prev).add(result.id));
+    } catch {
+      setError("Errore nell'aggiunta del locale.");
+    } finally {
+      setAddingId(null);
+    }
+  };
+
+  return (
+    <div className="absolute left-4 top-4 z-10 w-80 max-w-[90vw] rounded-md bg-white p-3 shadow-lg">
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Cerca un locale..."
+          className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+        />
+        <button
+          type="submit"
+          disabled={isSearching}
+          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isSearching ? "..." : "Cerca"}
+        </button>
+      </form>
+
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+      {results.length > 0 && (
+        <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+          {results.map((result) => (
+            <li key={result.id} className="rounded-md border border-zinc-200 p-2">
+              <p className="text-sm font-semibold text-zinc-900">{result.name}</p>
+              <p className="text-xs text-zinc-500">{result.address}</p>
+              <button
+                type="button"
+                onClick={() => handleAdd(result)}
+                disabled={addingId === result.id || addedIds.has(result.id)}
+                className={
+                  addedIds.has(result.id)
+                    ? "mt-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                    : "mt-1 rounded-md bg-zinc-900 px-2 py-1 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                }
+              >
+                {addedIds.has(result.id)
+                  ? "Aggiunta ✓"
+                  : addingId === result.id
+                  ? "..."
+                  : "Aggiungi alla mappa"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function MapView({
-  places,
+  places: initialPlaces,
   userId,
 }: {
   places: Place[];
   userId: string | null;
 }) {
+  const [places, setPlaces] = useState<Place[]>(initialPlaces);
   const [selected, setSelected] = useState<Place | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
@@ -151,8 +300,13 @@ export default function MapView({
     });
   };
 
+  const handlePlaceAdded = (place: Place) => {
+    setPlaces((prev) => (prev.some((p) => p.id === place.id) ? prev : [...prev, place]));
+  };
+
   return (
     <div className="fixed inset-0">
+      <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         initialViewState={{
