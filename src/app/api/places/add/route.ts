@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
+  console.log("[add/route] env check — NEXT_PUBLIC_SUPABASE_URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL, "| SUPABASE_SECRET_KEY:", !!process.env.SUPABASE_SECRET_KEY);
+
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
 
@@ -54,6 +56,12 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
+    console.error("[add/route] insertError:", {
+      message: insertError.message,
+      details: insertError.details,
+      hint: insertError.hint,
+      code: insertError.code,
+    });
     return NextResponse.json({ error: "Errore nel salvataggio del locale." }, { status: 500 });
   }
 
