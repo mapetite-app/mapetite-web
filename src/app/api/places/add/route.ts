@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const { googlePlaceId, name, address, lat, lng } = body ?? {};
+  const { googlePlaceId, name, address, lat, lng, category } = body ?? {};
 
   if (
     typeof googlePlaceId !== "string" ||
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const { data: inserted, error: insertError } = await admin
     .from("places")
-    .insert({ google_place_id: googlePlaceId, name, address, lat, lng })
+    .insert({ google_place_id: googlePlaceId, name, address, lat, lng, category: category ?? null })
     .select("id, name, category, address, lat, lng, google_place_id")
     .single();
 

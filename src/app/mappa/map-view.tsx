@@ -134,27 +134,28 @@ type Place = {
   note: string | null;
 };
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  pizzeria: "🍕",
-  ristorante: "🍝",
-  trattoria: "🍝",
-  osteria: "🍝",
-  bar: "☕",
-  caffè: "☕",
-  caffetteria: "☕",
-  sushi: "🍣",
-  enoteca: "🍷",
-};
+const EMOJI_RULES: [string[], string][] = [
+  [["pizza", "pizzeria"], "🍕"],
+  [["sushi", "giappones", "japanese"], "🍣"],
+  [["pesce", "fish", "seafood", "frutti di mare"], "🐟"],
+  [["gelat", "ice cream", "ice_cream"], "🍦"],
+  [["forno", "panific", "panetteria", "bakery", "pasticc", "pastry"], "🥐"],
+  [["caff", "cafe", "coffee"], "☕️"],
+  [["enotec", "wine"], "🍷"],
+  [["bar", "pub", "birrer", "brewery"], "🍺"],
+  [["burger", "hamburger", "panino", "paninote"], "🍔"],
+  [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian"], "🍜"],
+  [["steak", "grill", "brace", "carne", "macelleria"], "🥩"],
+  [["ristorante", "restaurant", "trattoria", "osteria"], "🍝"],
+];
 
 function getCategoryEmoji(category: string | null): string {
-  if (!category) return "📍";
-
-  const normalized = category.toLowerCase();
-  for (const [key, emoji] of Object.entries(CATEGORY_EMOJI)) {
-    if (normalized.includes(key)) return emoji;
+  if (!category) return "🍴";
+  const c = category.toLowerCase();
+  for (const [keywords, emoji] of EMOJI_RULES) {
+    if (keywords.some((kw) => c.includes(kw))) return emoji;
   }
-
-  return "📍";
+  return "🍴";
 }
 
 function SaveButton({
@@ -231,6 +232,7 @@ type SearchResult = {
   address: string;
   lat: number | null;
   lng: number | null;
+  category: string | null;
 };
 
 function SearchPanel({
@@ -313,6 +315,7 @@ function SearchPanel({
           address: result.address,
           lat: result.lat,
           lng: result.lng,
+          category: result.category,
         }),
       });
       const data = await res.json();

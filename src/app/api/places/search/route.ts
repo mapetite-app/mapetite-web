@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
-const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location";
+const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType";
 
 type GooglePlace = {
   id: string;
   displayName?: { text: string };
   formattedAddress?: string;
   location?: { latitude: number; longitude: number };
+  primaryType?: string;
 };
 
 type GoogleSearchTextResponse = {
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
     address: place.formattedAddress ?? "",
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
+    category: place.primaryType ?? null,
   }));
 
   return NextResponse.json({ results });
