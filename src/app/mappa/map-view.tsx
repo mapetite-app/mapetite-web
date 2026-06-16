@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -11,16 +11,22 @@ const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "S
 function SaveModal({
   placeId,
   userId,
+  mode = "save",
+  initialTags = [],
+  initialNote = "",
   onSaved,
   onCancel,
 }: {
   placeId: string;
   userId: string;
-  onSaved: () => void;
+  mode?: "save" | "edit";
+  initialTags?: string[];
+  initialNote?: string;
+  onSaved: (tags: string[] | null, note: string | null) => void;
   onCancel: () => void;
 }) {
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [note, setNote] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
+  const [note, setNote] = useState(initialNote);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
 
@@ -34,25 +40,33 @@ function SaveModal({
     setError(false);
     startTransition(async () => {
       const supabase = createClient();
-      const { error } = await supabase.from("saved_places").insert({
-        user_id: userId,
-        place_id: placeId,
-        tags: selectedTags.length > 0 ? selectedTags : null,
-        note: note.trim() || null,
-      });
+      const tags = selectedTags.length > 0 ? selectedTags : null;
+      const noteValue = note.trim() || null;
 
-      if (error && error.code !== "23505") {
-        setError(true);
-        return;
+      if (mode === "edit") {
+        const { error } = await supabase
+          .from("saved_places")
+          .update({ tags, note: noteValue })
+          .eq("user_id", userId)
+          .eq("place_id", placeId);
+        if (error) { setError(true); return; }
+      } else {
+        const { error } = await supabase
+          .from("saved_places")
+          .insert({ user_id: userId, place_id: placeId, tags, note: noteValue });
+        if (error && error.code !== "23505") { setError(true); return; }
       }
-      onSaved();
+
+      onSaved(tags, noteValue);
     });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-80 max-w-[90vw] rounded-xl bg-white p-5 shadow-xl">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900">Salva locale</h2>
+        <h2 className="mb-3 text-base font-semibold text-zinc-900">
+          {mode === "edit" ? "Modifica locale" : "Salva locale"}
+        </h2>
 
         <p className="mb-2 text-xs text-zinc-500">Tag</p>
         <div className="mb-4 flex flex-wrap gap-2">
@@ -433,6 +447,16 @@ export default function MapView({
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
+  const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  const availableTags = useMemo(() => {
+    const seen = new Set<string>();
+    for (const p of savedPlaces) {
+      if (p.tags) for (const t of p.tags) seen.add(t);
+    }
+    return Array.from(seen);
+  }, [savedPlaces]);
 
   useEffect(() => {
     if (!userId) return;
@@ -497,7 +521,12 @@ export default function MapView({
     setPlaces((prev) => (prev.some((p) => p.id === place.id) ? prev : [...prev, place]));
   };
 
-  const displayedPlaces = view === "all" ? places : savedPlaces;
+  const displayedPlaces =
+    view === "all"
+      ? places
+      : activeTag === null
+        ? savedPlaces
+        : savedPlaces.filter((p) => p.tags?.includes(activeTag));
 
   return (
     <div className="fixed inset-0 md:top-14">
@@ -509,7 +538,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
           <button
             type="button"
-            onClick={() => { setView("all"); setSelected(null); }}
+            onClick={() => { setView("all"); setSelected(null); setActiveTag(null); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
@@ -530,6 +559,35 @@ export default function MapView({
             I miei salvati
           </button>
         </div>
+        {view === "saved" && availableTags.length > 0 && (
+          <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setActiveTag(null)}
+              className={
+                activeTag === null
+                  ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
+                  : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+              }
+            >
+              Tutti
+            </button>
+            {availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setActiveTag(tag)}
+                className={
+                  activeTag === tag
+                    ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
+                    : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                }
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Messaggio se non loggato e vista "salvati" */}
@@ -616,6 +674,15 @@ export default function MapView({
             {selected.note && (
               <p className="mt-1.5 text-xs text-zinc-500 italic">{selected.note}</p>
             )}
+            {view === "saved" && (
+              <button
+                type="button"
+                onClick={() => setPendingEditPlace(selected)}
+                className="mt-2 rounded-md border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+              >
+                Modifica
+              </button>
+            )}
             <SaveButton
               placeId={selected.id}
               userId={userId}
@@ -632,10 +699,31 @@ export default function MapView({
           placeId={pendingSavePlaceId}
           userId={userId}
           onSaved={() => {
-            handleToggle(pendingSavePlaceId, true);
+            handleToggle(pendingSavePlaceId!, true);
             setPendingSavePlaceId(null);
           }}
           onCancel={() => setPendingSavePlaceId(null)}
+        />
+      )}
+
+      {pendingEditPlace && userId && (
+        <SaveModal
+          placeId={pendingEditPlace.id}
+          userId={userId}
+          mode="edit"
+          initialTags={pendingEditPlace.tags ?? []}
+          initialNote={pendingEditPlace.note ?? ""}
+          onSaved={(tags, note) => {
+            const updated = { ...pendingEditPlace, tags, note };
+            setSavedPlaces((prev) =>
+              prev.map((p) => (p.id === pendingEditPlace.id ? updated : p))
+            );
+            setSelected((prev) =>
+              prev?.id === pendingEditPlace.id ? updated : prev
+            );
+            setPendingEditPlace(null);
+          }}
+          onCancel={() => setPendingEditPlace(null)}
         />
       )}
     </div>
