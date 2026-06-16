@@ -338,7 +338,7 @@ export default function MapView({
   const displayedPlaces = view === "all" ? places : savedPlaces;
 
   return (
-    <div className="fixed inset-0">
+    <div className="fixed inset-0 md:top-14">
       {/* Toggle vista */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
         <button
