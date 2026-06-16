@@ -6,12 +6,118 @@ import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { createClient } from "@/lib/supabase/client";
 
+const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
+
+function SaveModal({
+  placeId,
+  userId,
+  onSaved,
+  onCancel,
+}: {
+  placeId: string;
+  userId: string;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState(false);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleSave = () => {
+    setError(false);
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.from("saved_places").insert({
+        user_id: userId,
+        place_id: placeId,
+        tags: selectedTags.length > 0 ? selectedTags : null,
+        note: note.trim() || null,
+      });
+
+      if (error && error.code !== "23505") {
+        setError(true);
+        return;
+      }
+      onSaved();
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-80 max-w-[90vw] rounded-xl bg-white p-5 shadow-xl">
+        <h2 className="mb-3 text-base font-semibold text-zinc-900">Salva locale</h2>
+
+        <p className="mb-2 text-xs text-zinc-500">Tag</p>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {PRESET_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className={
+                selectedTags.includes(tag)
+                  ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
+                  : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+              }
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        <p className="mb-1 text-xs text-zinc-500">Nota personale</p>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Aggiungi una nota..."
+          rows={3}
+          className="w-full resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+        />
+
+        {error && (
+          <p className="mt-1 text-sm text-red-600">
+            Errore durante il salvataggio. Riprova.
+          </p>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isPending}
+            className="flex-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? "..." : "Salva"}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 rounded-md bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-60"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Place = {
   id: string;
   name: string;
   category: string | null;
   lat: number;
   lng: number;
+  tags?: string[] | null;
+  note?: string | null;
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -42,11 +148,13 @@ function SaveButton({
   userId,
   isSaved,
   onToggle,
+  onSaveRequest,
 }: {
   placeId: string;
   userId: string | null;
   isSaved: boolean;
   onToggle: (placeId: string, saved: boolean) => void;
+  onSaveRequest: (placeId: string) => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -58,34 +166,25 @@ function SaveButton({
       return;
     }
 
+    if (!isSaved) {
+      onSaveRequest(placeId);
+      return;
+    }
+
     setError(false);
     startTransition(async () => {
       const supabase = createClient();
+      const { error } = await supabase
+        .from("saved_places")
+        .delete()
+        .eq("user_id", userId)
+        .eq("place_id", placeId);
 
-      if (isSaved) {
-        const { error } = await supabase
-          .from("saved_places")
-          .delete()
-          .eq("user_id", userId)
-          .eq("place_id", placeId);
-
-        if (error) {
-          setError(true);
-          return;
-        }
-        onToggle(placeId, false);
-      } else {
-        const { error } = await supabase
-          .from("saved_places")
-          .insert({ user_id: userId, place_id: placeId });
-
-        // 23505 = unique_violation: il locale era già salvato
-        if (error && error.code !== "23505") {
-          setError(true);
-          return;
-        }
-        onToggle(placeId, true);
+      if (error) {
+        setError(true);
+        return;
       }
+      onToggle(placeId, false);
     });
   };
 
@@ -331,6 +430,7 @@ export default function MapView({
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -356,7 +456,7 @@ export default function MapView({
     const supabase = createClient();
     supabase
       .from("saved_places")
-      .select("places(id, name, category, lat, lng)")
+      .select("tags, note, places(id, name, category, lat, lng)")
       .eq("user_id", userId)
       .then(({ data, error }) => {
         setLoadingSaved(false);
@@ -365,8 +465,12 @@ export default function MapView({
           return;
         }
         const fetched = (data ?? [])
-          .map((row) => row.places as unknown as Place | null)
-          .filter((p): p is Place => p !== null && p.lat != null && p.lng != null);
+          .map((row) => {
+            const place = row.places as unknown as Place | null;
+            if (!place || place.lat == null || place.lng == null) return null;
+            return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
+          })
+          .filter((p): p is Place => p !== null);
         setSavedPlaces(fetched);
       });
   }, [view, userId]);
@@ -491,15 +595,43 @@ export default function MapView({
           >
             <p className="font-semibold text-zinc-900">{selected.name}</p>
             <p className="text-sm text-zinc-500">{selected.category}</p>
+            {selected.tags && selected.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {selected.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {selected.note && (
+              <p className="mt-1.5 text-xs text-zinc-500 italic">{selected.note}</p>
+            )}
             <SaveButton
               placeId={selected.id}
               userId={userId}
               isSaved={savedIds.has(selected.id)}
               onToggle={handleToggle}
+              onSaveRequest={(placeId) => setPendingSavePlaceId(placeId)}
             />
           </Popup>
         )}
       </Map>
+
+      {pendingSavePlaceId && userId && (
+        <SaveModal
+          placeId={pendingSavePlaceId}
+          userId={userId}
+          onSaved={() => {
+            handleToggle(pendingSavePlaceId, true);
+            setPendingSavePlaceId(null);
+          }}
+          onCancel={() => setPendingSavePlaceId(null)}
+        />
+      )}
     </div>
   );
 }
