@@ -116,8 +116,8 @@ type Place = {
   category: string | null;
   lat: number;
   lng: number;
-  tags?: string[] | null;
-  note?: string | null;
+  tags: string[] | null;
+  note: string | null;
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -314,6 +314,8 @@ function SearchPanel({
         category: data.place.category,
         lat: data.place.lat,
         lng: data.place.lng,
+        tags: null,
+        note: null,
       });
 
       if (data.created === false) {
