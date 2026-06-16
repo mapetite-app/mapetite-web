@@ -131,9 +131,20 @@ function SearchPanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const clearResults = () => {
+    setResults([]);
+    setError(null);
+    setInfo(null);
+    setQuery("");
+    setAddedIds(new Set());
+    setHasSearched(false);
+  };
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
@@ -141,6 +152,8 @@ function SearchPanel({
 
     setIsSearching(true);
     setError(null);
+    setInfo(null);
+    setHasSearched(false);
 
     try {
       const res = await fetch("/api/places/search", {
@@ -157,6 +170,7 @@ function SearchPanel({
       }
 
       setResults(data.results ?? []);
+      setHasSearched(true);
     } catch {
       setError("Errore nella ricerca.");
     } finally {
@@ -174,6 +188,7 @@ function SearchPanel({
 
     setAddingId(result.id);
     setError(null);
+    setInfo(null);
 
     try {
       const res = await fetch("/api/places/add", {
@@ -201,7 +216,15 @@ function SearchPanel({
         lat: data.place.lat,
         lng: data.place.lng,
       });
-      setAddedIds((prev) => new Set(prev).add(result.id));
+
+      if (data.created === false) {
+        setResults([]);
+        setHasSearched(false);
+        setInfo("Questo locale è già nella mappa.");
+        return;
+      }
+
+      clearResults();
     } catch {
       setError("Errore nell'aggiunta del locale.");
     } finally {
@@ -215,7 +238,15 @@ function SearchPanel({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!e.target.value) {
+              setResults([]);
+              setError(null);
+              setInfo(null);
+              setHasSearched(false);
+            }
+          }}
           placeholder="Cerca un locale..."
           className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
         />
@@ -226,9 +257,34 @@ function SearchPanel({
         >
           {isSearching ? "..." : "Cerca"}
         </button>
+        {(results.length > 0 || !!error || !!info || hasSearched) && (
+          <button
+            type="button"
+            onClick={clearResults}
+            aria-label="Chiudi risultati"
+            className="shrink-0 rounded-md px-2 text-lg font-bold text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            ✕
+          </button>
+        )}
       </form>
 
+      {isSearching && (
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
+          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+          Sto cercando…
+        </p>
+      )}
+
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+      {info && <p className="mt-2 text-sm text-amber-600">{info}</p>}
+
+      {hasSearched && !isSearching && results.length === 0 && !error && (
+        <p className="mt-2 text-sm text-zinc-500">
+          Nessun locale trovato, prova con un altro nome.
+        </p>
+      )}
 
       {results.length > 0 && (
         <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
