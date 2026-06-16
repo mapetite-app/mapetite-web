@@ -334,7 +334,7 @@ function SearchPanel({
   };
 
   return (
-    <div className="absolute left-4 top-4 z-10 w-80 max-w-[90vw] rounded-md bg-white p-3 shadow-lg">
+    <div className="rounded-md bg-white p-3 shadow-lg">
       <form onSubmit={handleSearch} className="flex gap-2">
         <input
           type="text"
@@ -501,30 +501,35 @@ export default function MapView({
 
   return (
     <div className="fixed inset-0 md:top-14">
-      {/* Toggle vista */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
-        <button
-          type="button"
-          onClick={() => { setView("all"); setSelected(null); }}
-          className={
-            view === "all"
-              ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
-              : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
-          }
-        >
-          Tutti i locali
-        </button>
-        <button
-          type="button"
-          onClick={() => { setView("saved"); setSelected(null); }}
-          className={
-            view === "saved"
-              ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
-              : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
-          }
-        >
-          I miei salvati
-        </button>
+      {/* Pannello controlli superiori: ricerca + switch impilati */}
+      <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
+        <div className="pointer-events-auto">
+          <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
+        </div>
+        <div className="pointer-events-auto self-start flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
+          <button
+            type="button"
+            onClick={() => { setView("all"); setSelected(null); }}
+            className={
+              view === "all"
+                ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
+                : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+            }
+          >
+            Tutti i locali
+          </button>
+          <button
+            type="button"
+            onClick={() => { setView("saved"); setSelected(null); }}
+            className={
+              view === "saved"
+                ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
+                : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+            }
+          >
+            I miei salvati
+          </button>
+        </div>
       </div>
 
       {/* Messaggio se non loggato e vista "salvati" */}
@@ -555,7 +560,6 @@ export default function MapView({
         </div>
       )}
 
-      <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         initialViewState={{
