@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { createClient } from "@/lib/supabase/client";
@@ -121,6 +122,120 @@ function SaveModal({
         </div>
       </div>
     </div>
+  );
+}
+
+type ReviewItem = {
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+function StarPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          aria-label={`${star} stelle`}
+          className="text-xl leading-none focus:outline-none"
+        >
+          <span className={(hovered || value) >= star ? "text-amber-400" : "text-zinc-300"}>
+            ★
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewForm({
+  placeId,
+  userId,
+  existing,
+  onSaved,
+}: {
+  placeId: string;
+  userId: string;
+  existing: ReviewItem | null;
+  onSaved: (items: ReviewItem[]) => void;
+}) {
+  const [rating, setRating] = useState(existing?.rating ?? 0);
+  const [comment, setComment] = useState(existing?.comment ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating === 0) {
+      setStatus("error");
+      setErrorMsg("Seleziona almeno una stella.");
+      return;
+    }
+    setStatus("saving");
+    setErrorMsg("");
+
+    const supabase = createClient();
+    const { error } = await supabase.from("reviews").upsert(
+      { place_id: placeId, user_id: userId, rating, comment: comment.trim() || null },
+      { onConflict: "user_id,place_id" }
+    );
+
+    if (error) {
+      setStatus("error");
+      setErrorMsg("Salvataggio non riuscito. Riprova.");
+      return;
+    }
+
+    const { data } = await supabase
+      .from("reviews")
+      .select("user_id, rating, comment, created_at")
+      .eq("place_id", placeId)
+      .order("created_at", { ascending: false });
+
+    setStatus("done");
+    onSaved((data ?? []) as ReviewItem[]);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 space-y-2 border-t border-zinc-100 pt-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        {existing ? "Modifica la tua recensione" : "Lascia una recensione"}
+      </p>
+      <StarPicker value={rating} onChange={(v) => { setRating(v); setStatus("idle"); }} />
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Commento (opzionale)"
+        rows={2}
+        className="w-full resize-none rounded-md border border-zinc-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400"
+      />
+      {status === "error" && (
+        <p className="text-xs text-red-500">{errorMsg}</p>
+      )}
+      {status === "done" && (
+        <p className="text-xs text-emerald-600">Recensione pubblicata ✓</p>
+      )}
+      <button
+        type="submit"
+        disabled={status === "saving"}
+        className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {status === "saving" ? "..." : existing ? "Aggiorna" : "Pubblica recensione"}
+      </button>
+    </form>
   );
 }
 
@@ -452,6 +567,11 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [selectedReviews, setSelectedReviews] = useState<{
+    avg: number;
+    count: number;
+    items: ReviewItem[];
+  } | null>(null);
 
   const availableTags = useMemo(() => {
     const seen = new Set<string>();
@@ -477,6 +597,33 @@ export default function MapView({
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
       });
   }, [userId]);
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedReviews(null);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from("reviews")
+      .select("user_id, rating, comment, created_at")
+      .eq("place_id", selected.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!data || data.length === 0) {
+          setSelectedReviews(null);
+          return;
+        }
+        const avg =
+          data.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
+          data.length;
+        setSelectedReviews({
+          avg,
+          count: data.length,
+          items: data as ReviewItem[],
+        });
+      });
+  }, [selected?.id]);
 
   useEffect(() => {
     if (view !== "saved" || !userId) return;
@@ -630,6 +777,7 @@ export default function MapView({
         }}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
+        onClick={() => setSelected(null)}
       >
         {displayedPlaces.map((place) => (
           <Marker
@@ -659,9 +807,82 @@ export default function MapView({
             anchor="top"
             onClose={() => setSelected(null)}
             closeOnClick={false}
+            maxWidth="210px"
           >
-            <p className="font-semibold text-zinc-900">{selected.name}</p>
-            <p className="text-sm text-zinc-500">{selected.category}</p>
+            <p className="text-sm font-semibold text-zinc-900">{selected.name}</p>
+            <p className="text-xs text-zinc-500">{selected.category}</p>
+            <div className="mt-2 border-t border-zinc-100 pt-2">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Recensioni
+              </p>
+              {selectedReviews ? (
+                <>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-base font-semibold text-zinc-900">
+                      {selectedReviews.avg.toLocaleString("it-IT", {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}
+                    </span>
+                    <span className="text-amber-400 text-sm">
+                      {"★".repeat(Math.round(selectedReviews.avg))}
+                      <span className="text-zinc-300">
+                        {"★".repeat(5 - Math.round(selectedReviews.avg))}
+                      </span>
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      su {selectedReviews.count}{" "}
+                      {selectedReviews.count === 1 ? "recensione" : "recensioni"}
+                    </span>
+                  </div>
+                  <ul className="mt-1.5 max-h-32 space-y-2 overflow-y-auto">
+                    {selectedReviews.items.map((r, i) => (
+                      <li key={i} className="text-xs">
+                        <span className="text-amber-400">{"★".repeat(r.rating)}</span>
+                        <span className="text-zinc-300">{"★".repeat(5 - r.rating)}</span>
+                        {r.comment && (
+                          <p className="mt-0.5 text-zinc-600">{r.comment}</p>
+                        )}
+                        <p className="text-zinc-400">
+                          {new Date(r.created_at).toLocaleDateString("it-IT", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-xs text-zinc-400">Ancora nessuna recensione.</p>
+              )}
+              {userId ? (
+                <ReviewForm
+                  placeId={selected.id}
+                  userId={userId}
+                  existing={
+                    selectedReviews?.items.find((r) => r.user_id === userId) ?? null
+                  }
+                  onSaved={(items) => {
+                    if (items.length === 0) {
+                      setSelectedReviews(null);
+                      return;
+                    }
+                    const avg =
+                      items.reduce((sum, r) => sum + r.rating, 0) / items.length;
+                    setSelectedReviews({ avg, count: items.length, items });
+                  }}
+                />
+              ) : (
+                <p className="mt-2 text-xs text-zinc-400">
+                  <a href="/login" className="underline hover:text-zinc-700">
+                    Accedi
+                  </a>{" "}
+                  per lasciare una recensione.
+                </p>
+              )}
+            </div>
             {selected.tags && selected.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {selected.tags.map((tag) => (
