@@ -549,6 +549,123 @@ function SearchPanel({
   );
 }
 
+type AIFiltri = {
+  categoria: string | null;
+  parole_chiave: string[];
+  vicino_a_me: boolean;
+};
+
+function buildAISummary(filtri: AIFiltri): string {
+  const parts: string[] = [];
+  if (filtri.categoria) parts.push(filtri.categoria);
+  parts.push(...filtri.parole_chiave);
+  if (filtri.vicino_a_me) parts.push("vicino a te");
+  return "Ho cercato: " + (parts.length > 0 ? parts.join(" · ") : "qualsiasi locale");
+}
+
+function AISearchPanel({
+  onResults,
+  onClear,
+  activeFiltri,
+  activeCount,
+}: {
+  onResults: (places: Place[], filtri: AIFiltri) => void;
+  onClear: () => void;
+  activeFiltri: AIFiltri | null;
+  activeCount: number | null;
+}) {
+  const [query, setQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setIsSearching(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Qualcosa è andato storto. Riprova.");
+        return;
+      }
+      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null };
+      const places: Place[] = (data.risultati ?? [])
+        .filter((p: RawPlace) => p.lat != null && p.lng != null)
+        .map((p: RawPlace) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          lat: p.lat as number,
+          lng: p.lng as number,
+          tags: null,
+          note: null,
+        }));
+      onResults(places, data.filtri_usati);
+    } catch {
+      setError("Errore di rete. Controlla la connessione e riprova.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md bg-white p-3 shadow-lg">
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Cerca con parole tue: una trattoria autentica vicino casa…"
+          className="flex-1 min-w-0 rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+        />
+        <button
+          type="submit"
+          disabled={isSearching}
+          className="shrink-0 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isSearching ? "..." : "Cerca"}
+        </button>
+        {activeFiltri !== null && (
+          <button
+            type="button"
+            onClick={() => { setQuery(""); setError(null); onClear(); }}
+            aria-label="Azzera ricerca AI"
+            className="shrink-0 rounded-md px-2 text-lg font-bold text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            ✕
+          </button>
+        )}
+      </form>
+
+      {isSearching && (
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
+          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+          Sto cercando…
+        </p>
+      )}
+
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+      {activeFiltri !== null && !isSearching && (
+        <p className="mt-2 text-sm text-zinc-600">
+          {buildAISummary(activeFiltri)}
+          {activeCount !== null && (
+            <span className="ml-1 text-zinc-400">
+              · {activeCount} {activeCount === 1 ? "locale trovato" : "locali trovati"}
+            </span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 type ViewMode = "all" | "saved";
 
 export default function MapView({
@@ -567,6 +684,7 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri } | null>(null);
   const [selectedReviews, setSelectedReviews] = useState<{
     avg: number;
     count: number;
@@ -672,23 +790,33 @@ export default function MapView({
   };
 
   const displayedPlaces =
-    view === "all"
-      ? places
-      : activeTag === null
-        ? savedPlaces
-        : savedPlaces.filter((p) => p.tags?.includes(activeTag));
+    aiSearch !== null
+      ? aiSearch.risultati
+      : view === "all"
+        ? places
+        : activeTag === null
+          ? savedPlaces
+          : savedPlaces.filter((p) => p.tags?.includes(activeTag));
 
   return (
     <div className="fixed inset-0 md:top-14">
-      {/* Pannello controlli superiori: ricerca + switch impilati */}
+      {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
       <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
+        <div className="pointer-events-auto">
+          <AISearchPanel
+            onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); }}
+            onClear={() => { setAiSearch(null); setSelected(null); }}
+            activeFiltri={aiSearch?.filtri ?? null}
+            activeCount={aiSearch?.risultati.length ?? null}
+          />
+        </div>
         <div className="pointer-events-auto">
           <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
         </div>
         <div className="pointer-events-auto self-start flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
           <button
             type="button"
-            onClick={() => { setView("all"); setSelected(null); setActiveTag(null); }}
+            onClick={() => { setView("all"); setSelected(null); setActiveTag(null); setAiSearch(null); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
@@ -699,7 +827,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setSelected(null); }}
+            onClick={() => { setView("saved"); setSelected(null); setAiSearch(null); }}
             className={
               view === "saved"
                 ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
@@ -713,7 +841,7 @@ export default function MapView({
           <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
             <button
               type="button"
-              onClick={() => setActiveTag(null)}
+              onClick={() => { setActiveTag(null); setAiSearch(null); }}
               className={
                 activeTag === null
                   ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
@@ -726,7 +854,7 @@ export default function MapView({
               <button
                 key={tag}
                 type="button"
-                onClick={() => setActiveTag(tag)}
+                onClick={() => { setActiveTag(tag); setAiSearch(null); }}
                 className={
                   activeTag === tag
                     ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
