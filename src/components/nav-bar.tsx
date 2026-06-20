@@ -95,93 +95,96 @@ export default function NavBar({ userId }: { userId: string | null }) {
   return (
     <>
       {/* ── Mobile: barra fissa in basso ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-zinc-200 flex items-center justify-around md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center bg-surface border-t border-border shadow-float pb-[env(safe-area-inset-bottom)] md:hidden">
         <Link
           href="/mappa"
-          className={`flex flex-col items-center gap-0.5 text-xs font-medium transition-colors ${
-            mapActive ? "text-zinc-900" : "text-zinc-400"
+          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
+            mapActive ? "text-brand" : "text-text-muted"
           }`}
         >
-          <MapIcon filled={mapActive} />
-          Mappa
+          <MapIcon filled={false} />
+          <span className="text-[11px] font-display">Mappa</span>
         </Link>
 
         <Link
           href="/importa"
-          className={`flex flex-col items-center gap-0.5 text-xs font-medium transition-colors ${
-            importActive ? "text-zinc-900" : "text-zinc-400"
+          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
+            importActive ? "text-brand" : "text-text-muted"
           }`}
         >
-          <ImportIcon filled={importActive} />
-          Importa
+          <ImportIcon filled={false} />
+          <span className="text-[11px] font-display">Importa</span>
         </Link>
 
         <Link
           href="/profilo"
-          className={`flex flex-col items-center gap-0.5 text-xs font-medium transition-colors ${
-            profileActive ? "text-zinc-900" : "text-zinc-400"
+          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
+            profileActive ? "text-brand" : "text-text-muted"
           }`}
         >
-          <ProfileIcon filled={profileActive} />
-          Profilo
+          <ProfileIcon filled={false} />
+          <span className="text-[11px] font-display">Profilo</span>
         </Link>
 
         {userId ? (
-          <form action={logout}>
+          <form action={logout} className="flex-1 flex">
             <button
               type="submit"
-              className="flex flex-col items-center gap-0.5 text-xs font-medium text-zinc-400"
+              className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
             >
               <AuthIcon />
-              Esci
+              <span className="text-[11px] font-display">Esci</span>
             </button>
           </form>
         ) : (
           <Link
             href="/login"
-            className="flex flex-col items-center gap-0.5 text-xs font-medium text-zinc-400"
+            className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
           >
             <AuthIcon />
-            Entra
+            <span className="text-[11px] font-display">Entra</span>
           </Link>
         )}
       </nav>
 
       {/* ── Desktop: barra fissa in alto ── */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-zinc-200 hidden md:flex items-center justify-between px-6">
-        <Link href="/" className="text-lg font-bold text-zinc-900 shrink-0">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-surface border-b border-border shadow-card hidden md:flex items-center justify-between px-6">
+        <Link href="/" className="text-lg font-display font-semibold text-brand shrink-0">
           Mapetite
         </Link>
 
-        <nav className="flex items-center gap-8 text-sm font-medium">
+        <nav className="flex items-center gap-1">
           <Link
             href="/mappa"
-            className={`transition-colors hover:text-zinc-900 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
               mapActive
-                ? "text-zinc-900 underline underline-offset-4 decoration-2"
-                : "text-zinc-400"
+                ? "text-white bg-brand"
+                : "text-text-muted hover:text-text hover:bg-brand-light"
             }`}
           >
+            <MapIcon filled={false} />
             Mappa
           </Link>
           <Link
             href="/importa"
-            className={`transition-colors hover:text-zinc-900 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
               importActive
-                ? "text-zinc-900 underline underline-offset-4 decoration-2"
-                : "text-zinc-400"
+                ? "text-white bg-brand"
+                : "text-text-muted hover:text-text hover:bg-brand-light"
             }`}
           >
+            <ImportIcon filled={false} />
             Importa
           </Link>
           <Link
             href="/profilo"
-            className={`transition-colors hover:text-zinc-900 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
               profileActive
-                ? "text-zinc-900 underline underline-offset-4 decoration-2"
-                : "text-zinc-400"
+                ? "text-white bg-brand"
+                : "text-text-muted hover:text-text hover:bg-brand-light"
             }`}
           >
+            <ProfileIcon filled={false} />
             Profilo
           </Link>
         </nav>
@@ -190,7 +193,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
           <form action={logout}>
             <button
               type="submit"
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="rounded-btn bg-brand text-white px-4 py-2 text-sm font-display font-semibold hover:opacity-90 transition-opacity duration-150"
             >
               Esci
             </button>
@@ -198,7 +201,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
         ) : (
           <Link
             href="/login"
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+            className="rounded-btn bg-brand text-white px-4 py-2 text-sm font-display font-semibold hover:opacity-90 transition-opacity duration-150"
           >
             Entra
           </Link>
