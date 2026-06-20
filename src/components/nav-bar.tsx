@@ -65,7 +65,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
   const pathname = usePathname();
 
   const mapActive = pathname === "/mappa" || pathname.startsWith("/mappa/");
-  const profileActive = pathname === "/me";
+  const profileActive = pathname === "/profilo" || pathname.startsWith("/profilo/");
 
   return (
     <>
@@ -82,7 +82,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
         </Link>
 
         <Link
-          href="/me"
+          href="/profilo"
           className={`flex flex-col items-center gap-0.5 text-xs font-medium transition-colors ${
             profileActive ? "text-zinc-900" : "text-zinc-400"
           }`}
@@ -130,7 +130,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
             Mappa
           </Link>
           <Link
-            href="/me"
+            href="/profilo"
             className={`transition-colors hover:text-zinc-900 ${
               profileActive
                 ? "text-zinc-900 underline underline-offset-4 decoration-2"
