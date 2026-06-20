@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import PlaceCard from "@/components/place-card";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -39,15 +40,15 @@ export default async function MieiLocaliPage() {
       {!savedPlaces || savedPlaces.length === 0 ? (
         <p className="text-zinc-500">Non hai ancora salvato nessun locale.</p>
       ) : (
-        <ul className="space-y-6">
+        <ul className="space-y-3">
           {savedPlaces.map(({ places: place }) =>
             place ? (
-              <li key={place.id} className="border-b border-zinc-200 pb-4">
-                <p className="text-xl font-semibold text-zinc-900">
-                  {place.name}
-                </p>
-                <p className="text-sm text-zinc-500">{place.category}</p>
-                <p className="text-sm text-zinc-500">{place.address}</p>
+              <li key={place.id}>
+                <PlaceCard
+                  name={place.name}
+                  category={place.category}
+                  address={place.address}
+                />
               </li>
             ) : null
           )}

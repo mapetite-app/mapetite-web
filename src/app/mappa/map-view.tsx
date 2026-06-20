@@ -6,6 +6,7 @@ import Link from "next/link";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { createClient } from "@/lib/supabase/client";
+import { getCategoryEmoji } from "@/lib/emoji";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 
@@ -248,30 +249,6 @@ type Place = {
   tags: string[] | null;
   note: string | null;
 };
-
-const EMOJI_RULES: [string[], string][] = [
-  [["pizza", "pizzeria"], "🍕"],
-  [["sushi", "giappones", "japanese"], "🍣"],
-  [["pesce", "fish", "seafood", "frutti di mare"], "🐟"],
-  [["gelat", "ice cream", "ice_cream"], "🍦"],
-  [["forno", "panific", "panetteria", "bakery", "pasticc", "pastry"], "🥐"],
-  [["caff", "cafe", "coffee"], "☕️"],
-  [["enotec", "wine"], "🍷"],
-  [["bar", "pub", "birrer", "brewery"], "🍺"],
-  [["burger", "hamburger", "panino", "paninote"], "🍔"],
-  [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian"], "🍜"],
-  [["steak", "grill", "brace", "carne", "macelleria"], "🥩"],
-  [["ristorante", "restaurant", "trattoria", "osteria"], "🍝"],
-];
-
-function getCategoryEmoji(category: string | null): string {
-  if (!category) return "🍴";
-  const c = category.toLowerCase();
-  for (const [keywords, emoji] of EMOJI_RULES) {
-    if (keywords.some((kw) => c.includes(kw))) return emoji;
-  }
-  return "🍴";
-}
 
 function SaveButton({
   placeId,
