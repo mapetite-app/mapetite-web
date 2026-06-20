@@ -42,6 +42,30 @@ function ProfileIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function ImportIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 1.5}
+      className="w-6 h-6"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z"
+      />
+    </svg>
+  );
+}
+
 function AuthIcon() {
   return (
     <svg
@@ -65,6 +89,7 @@ export default function NavBar({ userId }: { userId: string | null }) {
   const pathname = usePathname();
 
   const mapActive = pathname === "/mappa" || pathname.startsWith("/mappa/");
+  const importActive = pathname === "/importa" || pathname.startsWith("/importa/");
   const profileActive = pathname === "/profilo" || pathname.startsWith("/profilo/");
 
   return (
@@ -79,6 +104,16 @@ export default function NavBar({ userId }: { userId: string | null }) {
         >
           <MapIcon filled={mapActive} />
           Mappa
+        </Link>
+
+        <Link
+          href="/importa"
+          className={`flex flex-col items-center gap-0.5 text-xs font-medium transition-colors ${
+            importActive ? "text-zinc-900" : "text-zinc-400"
+          }`}
+        >
+          <ImportIcon filled={importActive} />
+          Importa
         </Link>
 
         <Link
@@ -128,6 +163,16 @@ export default function NavBar({ userId }: { userId: string | null }) {
             }`}
           >
             Mappa
+          </Link>
+          <Link
+            href="/importa"
+            className={`transition-colors hover:text-zinc-900 ${
+              importActive
+                ? "text-zinc-900 underline underline-offset-4 decoration-2"
+                : "text-zinc-400"
+            }`}
+          >
+            Importa
           </Link>
           <Link
             href="/profilo"
