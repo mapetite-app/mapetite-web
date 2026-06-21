@@ -65,12 +65,12 @@ function SaveModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-80 max-w-[90vw] rounded-xl bg-white p-5 shadow-xl">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900">
+      <div className="w-80 max-w-[90vw] rounded-card bg-surface p-5 shadow-float">
+        <h2 className="mb-3 text-base font-display font-semibold text-text">
           {mode === "edit" ? "Modifica locale" : "Salva locale"}
         </h2>
 
-        <p className="mb-2 text-xs text-zinc-500">Tag</p>
+        <p className="mb-2 text-xs font-sans text-text-muted">Tag</p>
         <div className="mb-4 flex flex-wrap gap-2">
           {PRESET_TAGS.map((tag) => (
             <button
@@ -79,8 +79,8 @@ function SaveModal({
               onClick={() => toggleTag(tag)}
               className={
                 selectedTags.includes(tag)
-                  ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
-                  : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                  ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
+                  : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
               {tag}
@@ -88,13 +88,13 @@ function SaveModal({
           ))}
         </div>
 
-        <p className="mb-1 text-xs text-zinc-500">Nota personale</p>
+        <p className="mb-1 text-xs font-sans text-text-muted">Nota personale</p>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Aggiungi una nota..."
           rows={3}
-          className="w-full resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+          className="w-full resize-none rounded-btn border border-border px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-brand"
         />
 
         {error && (
@@ -108,7 +108,7 @@ function SaveModal({
             type="button"
             onClick={handleSave}
             disabled={isPending}
-            className="flex-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-btn bg-brand px-3 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? "..." : "Salva"}
           </button>
@@ -116,7 +116,7 @@ function SaveModal({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="flex-1 rounded-md bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-60"
+            className="flex-1 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-display font-semibold text-text-muted hover:text-text disabled:opacity-60"
           >
             Annulla
           </button>
@@ -153,7 +153,7 @@ function StarPicker({
           aria-label={`${star} stelle`}
           className="text-xl leading-none focus:outline-none"
         >
-          <span className={(hovered || value) >= star ? "text-amber-400" : "text-zinc-300"}>
+          <span className={(hovered || value) >= star ? "text-amber-400" : "text-border"}>
             ★
           </span>
         </button>
@@ -211,8 +211,8 @@ function ReviewForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 space-y-2 border-t border-zinc-100 pt-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+    <form onSubmit={handleSubmit} className="mt-3 space-y-2 border-t border-border pt-3">
+      <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
         {existing ? "Modifica la tua recensione" : "Lascia una recensione"}
       </p>
       <StarPicker value={rating} onChange={(v) => { setRating(v); setStatus("idle"); }} />
@@ -221,18 +221,18 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Commento (opzionale)"
         rows={2}
-        className="w-full resize-none rounded-md border border-zinc-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-400"
+        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {status === "error" && (
         <p className="text-xs text-red-500">{errorMsg}</p>
       )}
       {status === "done" && (
-        <p className="text-xs text-emerald-600">Recensione pubblicata ✓</p>
+        <p className="text-xs text-success">Recensione pubblicata ✓</p>
       )}
       <button
         type="submit"
         disabled={status === "saving"}
-        className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-btn bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {status === "saving" ? "..." : existing ? "Aggiorna" : "Pubblica recensione"}
       </button>
@@ -303,8 +303,8 @@ function SaveButton({
         disabled={isPending}
         className={
           isSaved
-            ? "rounded-md bg-emerald-600 px-3 py-1 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed"
-            : "rounded-md bg-zinc-900 px-3 py-1 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "rounded-btn bg-success px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            : "rounded-btn bg-brand px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
         {isPending ? "..." : isSaved ? "Salvato" : "Salva"}
@@ -592,19 +592,19 @@ function AISearchPanel({
   };
 
   return (
-    <div className="rounded-md bg-white p-3 shadow-lg">
+    <div className="rounded-card bg-surface p-3 shadow-float">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Cerca con parole tue: una trattoria autentica vicino casa…"
-          className="flex-1 min-w-0 rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+          className="flex-1 min-w-0 rounded-btn border border-border px-3 py-1.5 text-sm font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
         />
         <button
           type="submit"
           disabled={isSearching}
-          className="shrink-0 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="shrink-0 rounded-btn bg-brand px-3 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSearching ? "..." : "Cerca"}
         </button>
@@ -613,7 +613,7 @@ function AISearchPanel({
             type="button"
             onClick={() => { setQuery(""); setError(null); onClear(); }}
             aria-label="Azzera ricerca AI"
-            className="shrink-0 rounded-md px-2 text-lg font-bold text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            className="shrink-0 rounded-btn px-2 text-lg font-bold text-text-muted hover:text-text"
           >
             ✕
           </button>
@@ -621,8 +621,8 @@ function AISearchPanel({
       </form>
 
       {isSearching && (
-        <p className="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
-          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-text-muted">
+          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-border border-t-brand" />
           Sto cercando…
         </p>
       )}
@@ -630,10 +630,10 @@ function AISearchPanel({
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {activeFiltri !== null && !isSearching && (
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-sm font-sans text-text-muted">
           {buildAISummary(activeFiltri)}
           {activeCount !== null && (
-            <span className="ml-1 text-zinc-400">
+            <span className="ml-1 text-text-muted">
               · {activeCount} {activeCount === 1 ? "locale trovato" : "locali trovati"}
             </span>
           )}
@@ -790,14 +790,14 @@ export default function MapView({
         <div className="pointer-events-auto">
           <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
         </div>
-        <div className="pointer-events-auto self-start flex rounded-lg overflow-hidden shadow-lg border border-zinc-200 bg-white">
+        <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
             onClick={() => { setView("all"); setSelected(null); setActiveTag(null); setAiSearch(null); }}
             className={
               view === "all"
-                ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
-                : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             Tutti i locali
@@ -807,22 +807,22 @@ export default function MapView({
             onClick={() => { setView("saved"); setSelected(null); setAiSearch(null); }}
             className={
               view === "saved"
-                ? "px-4 py-2 text-sm font-semibold bg-zinc-900 text-white"
-                : "px-4 py-2 text-sm font-semibold bg-white text-zinc-700 hover:bg-zinc-50"
+                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             I miei salvati
           </button>
         </div>
         {view === "saved" && availableTags.length > 0 && (
-          <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+          <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-card border border-border bg-surface p-2 shadow-float">
             <button
               type="button"
               onClick={() => { setActiveTag(null); setAiSearch(null); }}
               className={
                 activeTag === null
-                  ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
-                  : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                  ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
+                  : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
               Tutti
@@ -834,8 +834,8 @@ export default function MapView({
                 onClick={() => { setActiveTag(tag); setAiSearch(null); }}
                 className={
                   activeTag === tag
-                    ? "rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
-                    : "rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                    ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
+                    : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
                 }
               >
                 {tag}
@@ -848,15 +848,15 @@ export default function MapView({
       {/* Messaggio se non loggato e vista "salvati" */}
       {view === "saved" && !userId && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center max-w-xs pointer-events-auto">
+          <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
             <p className="text-2xl mb-2">🔒</p>
-            <p className="text-zinc-800 font-semibold">Accesso richiesto</p>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="font-display font-semibold text-text">Accesso richiesto</p>
+            <p className="mt-1 text-sm font-sans text-text-muted">
               Accedi per vedere la tua mappa personale
             </p>
             <a
               href="/login"
-              className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700"
+              className="mt-4 inline-block rounded-btn bg-brand px-4 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95"
             >
               Accedi
             </a>
@@ -867,7 +867,7 @@ export default function MapView({
       {/* Spinner caricamento salvati */}
       {view === "saved" && userId && loadingSaved && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="bg-white rounded-lg shadow px-4 py-2 text-sm text-zinc-600">
+          <div className="bg-surface rounded-card shadow-card px-4 py-2 text-sm font-sans text-text-muted">
             Caricamento...
           </div>
         </div>
@@ -914,16 +914,16 @@ export default function MapView({
             closeOnClick={false}
             maxWidth="210px"
           >
-            <p className="text-sm font-semibold text-zinc-900">{selected.name}</p>
-            <p className="text-xs text-zinc-500">{selected.category}</p>
-            <div className="mt-2 border-t border-zinc-100 pt-2">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <p className="text-sm font-display font-semibold text-text">{selected.name}</p>
+            <p className="text-xs font-sans text-text-muted">{selected.category}</p>
+            <div className="mt-2 border-t border-border pt-2">
+              <p className="mb-1 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
                 Recensioni
               </p>
               {selectedReviews ? (
                 <>
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-base font-semibold text-zinc-900">
+                    <span className="text-base font-display font-semibold text-text">
                       {selectedReviews.avg.toLocaleString("it-IT", {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 1,
@@ -931,11 +931,11 @@ export default function MapView({
                     </span>
                     <span className="text-amber-400 text-sm">
                       {"★".repeat(Math.round(selectedReviews.avg))}
-                      <span className="text-zinc-300">
+                      <span className="text-border">
                         {"★".repeat(5 - Math.round(selectedReviews.avg))}
                       </span>
                     </span>
-                    <span className="text-xs text-zinc-400">
+                    <span className="text-xs font-sans text-text-muted">
                       su {selectedReviews.count}{" "}
                       {selectedReviews.count === 1 ? "recensione" : "recensioni"}
                     </span>
@@ -944,11 +944,11 @@ export default function MapView({
                     {selectedReviews.items.map((r, i) => (
                       <li key={i} className="text-xs">
                         <span className="text-amber-400">{"★".repeat(r.rating)}</span>
-                        <span className="text-zinc-300">{"★".repeat(5 - r.rating)}</span>
+                        <span className="text-border">{"★".repeat(5 - r.rating)}</span>
                         {r.comment && (
-                          <p className="mt-0.5 text-zinc-600">{r.comment}</p>
+                          <p className="mt-0.5 font-sans text-text-muted">{r.comment}</p>
                         )}
-                        <p className="text-zinc-400">
+                        <p className="font-sans text-text-muted">
                           {new Date(r.created_at).toLocaleDateString("it-IT", {
                             day: "numeric",
                             month: "short",
@@ -960,7 +960,7 @@ export default function MapView({
                   </ul>
                 </>
               ) : (
-                <p className="text-xs text-zinc-400">Ancora nessuna recensione.</p>
+                <p className="text-xs font-sans text-text-muted">Ancora nessuna recensione.</p>
               )}
               {userId ? (
                 <ReviewForm
@@ -980,8 +980,8 @@ export default function MapView({
                   }}
                 />
               ) : (
-                <p className="mt-2 text-xs text-zinc-400">
-                  <a href="/login" className="underline hover:text-zinc-700">
+                <p className="mt-2 text-xs font-sans text-text-muted">
+                  <a href="/login" className="underline hover:text-text">
                     Accedi
                   </a>{" "}
                   per lasciare una recensione.
@@ -993,7 +993,7 @@ export default function MapView({
                 {selected.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"
+                    className="rounded-pill bg-accent-light px-2 py-0.5 text-xs font-display font-medium text-accent"
                   >
                     {tag}
                   </span>
@@ -1001,13 +1001,13 @@ export default function MapView({
               </div>
             )}
             {selected.note && (
-              <p className="mt-1.5 text-xs text-zinc-500 italic">{selected.note}</p>
+              <p className="mt-1.5 text-xs font-sans text-text-muted italic">{selected.note}</p>
             )}
             {view === "saved" && (
               <button
                 type="button"
                 onClick={() => setPendingEditPlace(selected)}
-                className="mt-2 rounded-md border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                className="mt-2 rounded-btn border border-border px-3 py-1 text-xs font-display font-semibold text-text-muted hover:text-text"
               >
                 Modifica
               </button>
