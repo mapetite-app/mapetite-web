@@ -443,7 +443,7 @@ function SearchPanel({
   };
 
   return (
-    <div className="rounded-md bg-white p-3 shadow-lg">
+    <div className="rounded-card bg-surface p-3 shadow-float">
       <form onSubmit={handleSearch} className="flex gap-2">
         <input
           type="text"
@@ -458,12 +458,12 @@ function SearchPanel({
             }
           }}
           placeholder="Cerca un locale..."
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+          className="flex-1 rounded-btn border border-border px-3 py-1.5 text-sm font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
         />
         <button
           type="submit"
           disabled={isSearching}
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="rounded-btn bg-brand px-3 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSearching ? "..." : "Cerca"}
         </button>
@@ -472,7 +472,7 @@ function SearchPanel({
             type="button"
             onClick={clearResults}
             aria-label="Chiudi risultati"
-            className="shrink-0 rounded-md px-2 text-lg font-bold text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            className="shrink-0 rounded-btn px-2 text-lg font-bold text-text-muted hover:text-text"
           >
             ✕
           </button>
@@ -480,8 +480,8 @@ function SearchPanel({
       </form>
 
       {isSearching && (
-        <p className="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
-          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-text-muted">
+          <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-border border-t-brand" />
           Sto cercando…
         </p>
       )}
@@ -491,7 +491,7 @@ function SearchPanel({
       {info && <p className="mt-2 text-sm text-amber-600">{info}</p>}
 
       {hasSearched && !isSearching && results.length === 0 && !error && (
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-text-muted">
           Nessun locale trovato, prova con un altro nome.
         </p>
       )}
@@ -499,17 +499,17 @@ function SearchPanel({
       {results.length > 0 && (
         <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
           {results.map((result) => (
-            <li key={result.id} className="rounded-md border border-zinc-200 p-2">
-              <p className="text-sm font-semibold text-zinc-900">{result.name}</p>
-              <p className="text-xs text-zinc-500">{result.address}</p>
+            <li key={result.id} className="rounded-card border border-border shadow-card p-3">
+              <p className="font-display font-semibold text-text">{result.name}</p>
+              <p className="text-xs font-sans text-text-muted">{result.address}</p>
               <button
                 type="button"
                 onClick={() => handleAdd(result)}
                 disabled={addingId === result.id || addedIds.has(result.id)}
                 className={
                   addedIds.has(result.id)
-                    ? "mt-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
-                    : "mt-1 rounded-md bg-zinc-900 px-2 py-1 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    ? "mt-1 rounded-btn bg-success px-2 py-1 text-xs font-display font-semibold text-white disabled:opacity-60"
+                    : "mt-1 rounded-btn bg-brand px-2 py-1 text-xs font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                 }
               >
                 {addedIds.has(result.id)
