@@ -8,7 +8,7 @@ type PlaceCardProps = {
 };
 
 export default function PlaceCard({ name, category, address, tags }: PlaceCardProps) {
-  const emoji = getCategoryEmoji(category);
+  const emoji = getCategoryEmoji(category, name);
 
   return (
     <div className="flex gap-4 bg-white rounded-card shadow-card border border-border p-4">

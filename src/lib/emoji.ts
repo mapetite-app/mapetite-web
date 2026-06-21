@@ -15,11 +15,23 @@ const EMOJI_RULES: [string[], string][] = [
   [["bar", "pub", "birrer", "brewery"], "🍺"],
 ];
 
-export function getCategoryEmoji(category: string | null): string {
-  if (!category) return "🍴";
-  const c = category.toLowerCase();
-  for (const [keywords, emoji] of EMOJI_RULES) {
-    if (keywords.some((kw) => c.includes(kw))) return emoji;
+function matchRule(text: string): { index: number; emoji: string } | null {
+  const t = text.toLowerCase();
+  for (let i = 0; i < EMOJI_RULES.length; i++) {
+    const [keywords, emoji] = EMOJI_RULES[i];
+    if (keywords.some((kw) => t.includes(kw))) return { index: i, emoji };
   }
-  return "🍴";
+  return null;
+}
+
+export function getCategoryEmoji(category: string | null, name?: string | null): string {
+  const catMatch = category ? matchRule(category) : null;
+  const nameMatch = name ? matchRule(name) : null;
+
+  if (catMatch && nameMatch) {
+    // Il match con indice più basso è la regola più specifica — vince.
+    // In caso di parità, vince la category.
+    return catMatch.index <= nameMatch.index ? catMatch.emoji : nameMatch.emoji;
+  }
+  return catMatch?.emoji ?? nameMatch?.emoji ?? "🍴";
 }

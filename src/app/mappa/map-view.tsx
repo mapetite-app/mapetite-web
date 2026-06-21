@@ -904,7 +904,7 @@ export default function MapView({
               aria-label={place.category ?? "locale"}
               className="text-3xl leading-none cursor-pointer drop-shadow"
             >
-              {getCategoryEmoji(place.category)}
+              {getCategoryEmoji(place.category, place.name)}
             </span>
           </Marker>
         ))}
