@@ -29,7 +29,12 @@ export async function signup(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mapetite-web.vercel.app";
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${siteUrl}/login` },
+  });
 
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
