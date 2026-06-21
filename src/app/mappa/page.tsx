@@ -5,7 +5,7 @@ export default async function MappaPage() {
   const supabase = await createClient();
   const { data: places, error } = await supabase
     .from("places")
-    .select("id, name, category, lat, lng")
+    .select("id, name, category, lat, lng, address")
     .not("lat", "is", null)
     .not("lng", "is", null);
 

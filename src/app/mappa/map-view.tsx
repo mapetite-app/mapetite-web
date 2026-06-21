@@ -244,6 +244,7 @@ type Place = {
   id: string;
   name: string;
   category: string | null;
+  address: string | null;
   lat: number;
   lng: number;
   tags: string[] | null;
@@ -421,6 +422,7 @@ function SearchPanel({
         id: data.place.id,
         name: data.place.name,
         category: data.place.category,
+        address: data.place.address ?? null,
         lat: data.place.lat,
         lng: data.place.lng,
         tags: null,
@@ -721,7 +723,7 @@ export default function MapView({
   }, [selected?.id]);
 
   useEffect(() => {
-    if (view !== "saved" || !userId) return;
+    if (!userId) return;
 
     setLoadingSaved(true);
     const supabase = createClient();
@@ -744,7 +746,7 @@ export default function MapView({
           .filter((p): p is Place => p !== null);
         setSavedPlaces(fetched);
       });
-  }, [view, userId]);
+  }, [userId]);
 
   const handleToggle = (placeId: string, saved: boolean) => {
     setSavedIds((prev) => {
@@ -756,9 +758,9 @@ export default function MapView({
       }
       return next;
     });
-    if (!saved && view === "saved") {
+    if (!saved) {
       setSavedPlaces((prev) => prev.filter((p) => p.id !== placeId));
-      setSelected(null);
+      if (view === "saved") setSelected(null);
     }
   };
 
@@ -892,7 +894,9 @@ export default function MapView({
             anchor="bottom"
             onClick={(e) => {
               e.originalEvent.stopPropagation();
-              setSelected(place);
+              const base = places.find(p => p.id === place.id) ?? place;
+              const savedVersion = savedPlaces.find(p => p.id === place.id);
+              setSelected(savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base);
             }}
           >
             <span
@@ -916,6 +920,9 @@ export default function MapView({
           >
             <p className="text-sm font-display font-semibold text-text">{selected.name}</p>
             <p className="text-xs font-sans text-text-muted">{selected.category}</p>
+            {selected.address && (
+              <p className="text-xs font-sans text-text-muted">{selected.address}</p>
+            )}
             <div className="mt-2 border-t border-border pt-2">
               <p className="mb-1 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
                 Recensioni
@@ -1027,8 +1034,12 @@ export default function MapView({
         <SaveModal
           placeId={pendingSavePlaceId}
           userId={userId}
-          onSaved={() => {
+          onSaved={(tags, note) => {
             handleToggle(pendingSavePlaceId!, true);
+            const base = places.find(p => p.id === pendingSavePlaceId);
+            if (base && pendingSavePlaceId) {
+              setSavedPlaces(prev => [...prev.filter(p => p.id !== pendingSavePlaceId), { ...base, tags, note }]);
+            }
             setPendingSavePlaceId(null);
           }}
           onCancel={() => setPendingSavePlaceId(null)}
