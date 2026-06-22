@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { completeOnboarding } from "./actions";
 
 // ─── Dati ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,8 @@ export default function OnboardingPage() {
   const [occasions, setOccasions] = useState<string[]>([]);
   const [atmospheres, setAtmospheres] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const totalSteps = 4;
   const progress = ((step + 1) / totalSteps) * 100;
@@ -156,8 +159,16 @@ export default function OnboardingPage() {
   const handleContinue = () => {
     if (step < totalSteps - 1) {
       setStep((s) => s + 1);
-    } else {
-      console.log({ cuisines, occasions, atmospheres, priceRange });
+    }
+  };
+
+  const handleComplete = async () => {
+    setSubmitting(true);
+    setError(null);
+    const result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange });
+    if (result?.error) {
+      setError(result.error);
+      setSubmitting(false);
     }
   };
 
@@ -260,14 +271,22 @@ export default function OnboardingPage() {
         <div className="mx-auto max-w-lg">
           <button
             type="button"
-            onClick={handleContinue}
+            onClick={step < totalSteps - 1 ? handleContinue : handleComplete}
+            disabled={submitting}
             className={[
-              "w-full rounded-btn px-6 py-3.5 font-display font-semibold text-white transition-opacity active:scale-95",
+              "w-full rounded-btn px-6 py-3.5 font-display font-semibold text-white transition-opacity active:scale-95 disabled:cursor-not-allowed disabled:opacity-60",
               step < totalSteps - 1 ? "bg-accent hover:opacity-90" : "bg-brand hover:opacity-90",
             ].join(" ")}
           >
-            {step < totalSteps - 1 ? "Continua →" : "Esplora Mapetite ✓"}
+            {step < totalSteps - 1
+              ? "Continua →"
+              : submitting
+              ? "Un attimo…"
+              : "Esplora Mapetite ✓"}
           </button>
+          {error && (
+            <p className="mt-3 text-center text-sm text-red-600">{error}</p>
+          )}
         </div>
       </div>
     </div>
