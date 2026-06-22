@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Map, { Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 
@@ -660,6 +661,8 @@ export default function MapView({
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
+  const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -777,6 +780,32 @@ export default function MapView({
           ? savedPlaces
           : savedPlaces.filter((p) => p.tags?.includes(activeTag));
 
+  const clusterIndex = useMemo(() => {
+    const points = displayedPlaces.map((place) => ({
+      type: "Feature" as const,
+      properties: { cluster: false, placeData: place },
+      geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
+    }));
+    const index = new Supercluster({ radius: 60, maxZoom: 16 });
+    index.load(points);
+    return index;
+  }, [displayedPlaces]);
+
+  const roundedZoom = Math.round(viewState.zoom);
+  const clusters = useMemo(() => {
+    const map = (mapRef.current as { getMap?: () => { getBounds: () => { getWest: () => number; getSouth: () => number; getEast: () => number; getNorth: () => number } } } | null)?.getMap?.();
+    if (!map) {
+      return displayedPlaces.map((place) => ({
+        type: "Feature" as const,
+        properties: { cluster: false, placeData: place },
+        geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
+      }));
+    }
+    const b = map.getBounds();
+    const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    return clusterIndex.getClusters(bbox, roundedZoom);
+  }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude]);
+
   return (
     <div className="fixed inset-0 md:top-14">
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
@@ -877,37 +906,67 @@ export default function MapView({
 
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        initialViewState={{
-          longitude: 12.4964,
-          latitude: 41.9028,
-          zoom: 11,
-        }}
+        {...viewState}
+        onMove={(evt) => setViewState(evt.viewState)}
+        ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onClick={() => setSelected(null)}
       >
-        {displayedPlaces.map((place) => (
-          <Marker
-            key={place.id}
-            longitude={place.lng}
-            latitude={place.lat}
-            anchor="bottom"
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              const base = places.find(p => p.id === place.id) ?? place;
-              const savedVersion = savedPlaces.find(p => p.id === place.id);
-              setSelected(savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base);
-            }}
-          >
-            <span
-              role="img"
-              aria-label={place.category ?? "locale"}
-              className="text-3xl leading-none cursor-pointer drop-shadow"
+        {clusters.map((c) => {
+          const [lng, lat] = c.geometry.coordinates;
+
+          if (c.properties.cluster) {
+            const clusterId = (c as { id: number }).id;
+            const clusterProps = c.properties as { cluster: true; point_count: number };
+            return (
+              <Marker
+                key={`cluster-${clusterId}`}
+                longitude={lng}
+                latitude={lat}
+                anchor="center"
+                onClick={() => {
+                  const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+                  if (map) map.flyTo({ center: [lng, lat], zoom: viewState.zoom + 2 });
+                }}
+              >
+                <div
+                  className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-accent"
+                  style={{
+                    width: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
+                    height: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
+                  }}
+                >
+                  {clusterProps.point_count}
+                </div>
+              </Marker>
+            );
+          }
+
+          const place = c.properties.placeData as Place;
+          return (
+            <Marker
+              key={place.id}
+              longitude={place.lng}
+              latitude={place.lat}
+              anchor="bottom"
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                const base = places.find(p => p.id === place.id) ?? place;
+                const savedVersion = savedPlaces.find(p => p.id === place.id);
+                setSelected(savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base);
+              }}
             >
-              {getCategoryEmoji(place.category, place.name)}
-            </span>
-          </Marker>
-        ))}
+              <span
+                role="img"
+                aria-label={place.category ?? "locale"}
+                className="text-3xl leading-none cursor-pointer drop-shadow"
+              >
+                {getCategoryEmoji(place.category, place.name)}
+              </span>
+            </Marker>
+          );
+        })}
 
         {selected && (
           <Popup
