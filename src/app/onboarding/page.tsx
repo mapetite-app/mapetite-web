@@ -41,9 +41,10 @@ const ATMOSPHERES: { value: string; label: string; emoji: string }[] = [
 ];
 
 const PRICE_RANGES: { value: string; description: string }[] = [
-  { value: "€",   description: "Meno di 15€ a persona" },
-  { value: "€€",  description: "15–35€ a persona" },
-  { value: "€€€", description: "Oltre 35€ a persona" },
+  { value: "€",    description: "Economico" },
+  { value: "€€",   description: "Nella media" },
+  { value: "€€€",  description: "Sopra la media" },
+  { value: "€€€€", description: "Alta cucina" },
 ];
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
