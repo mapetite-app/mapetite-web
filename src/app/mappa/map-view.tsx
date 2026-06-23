@@ -1168,6 +1168,63 @@ export default function MapView({
           onCancel={() => setPendingEditPlace(null)}
         />
       )}
+
+      <BottomSheet
+        places={displayedPlaces}
+        onSelect={(place) => {
+          setSelected(place);
+          const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+          if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 14) });
+        }}
+      />
+    </div>
+  );
+}
+
+function BottomSheet({
+  places,
+  onSelect,
+}: {
+  places: Place[];
+  onSelect: (place: Place) => void;
+}) {
+  if (places.length === 0) return null;
+
+  return (
+    <div className="pointer-events-auto absolute bottom-0 left-0 right-0 z-10 max-h-[45vh] overflow-y-auto rounded-t-card bg-surface shadow-float">
+      <div className="sticky top-0 flex items-center justify-center bg-surface py-2">
+        <div className="h-1 w-10 rounded-pill bg-border" />
+      </div>
+      <div className="px-3 pb-4">
+        <p className="px-1 pb-2 text-xs font-sans text-text-muted">
+          {places.length} {places.length === 1 ? "risultato" : "risultati"}
+        </p>
+        <ul className="flex flex-col gap-1">
+          {places.map((place) => (
+            <li key={place.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(place)}
+                className="flex w-full items-start gap-3 rounded-btn px-2 py-2.5 text-left hover:bg-brand/5"
+              >
+                <span className="text-xl leading-none">
+                  {getCategoryEmoji(place.category, place.name)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-display font-semibold text-text">
+                    {place.name}
+                  </span>
+                  {place.address && (
+                    <span className="block truncate text-xs font-sans text-text-muted">
+                      {place.address}
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
