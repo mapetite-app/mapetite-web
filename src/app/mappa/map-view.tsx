@@ -904,6 +904,37 @@ export default function MapView({
         </div>
       )}
 
+      {/* Empty state — nessun luogo da mostrare */}
+      {displayedPlaces.length === 0 &&
+        !(view === "saved" && !userId) &&
+        !(view === "saved" && userId && loadingSaved) && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
+              <p className="text-2xl mb-2">
+                {aiSearch !== null ? "🔍" : view === "saved" && activeTag !== null ? "🏷️" : "📍"}
+              </p>
+              <p className="font-display font-semibold text-text">
+                {aiSearch !== null
+                  ? "Nessun risultato"
+                  : view === "saved" && activeTag !== null
+                    ? "Nessun posto con questo tag"
+                    : view === "saved"
+                      ? "Nessun posto salvato"
+                      : "Nessun posto da mostrare"}
+              </p>
+              <p className="mt-1 text-sm font-sans text-text-muted">
+                {aiSearch !== null
+                  ? "Prova a modificare la ricerca"
+                  : view === "saved" && activeTag !== null
+                    ? "Cambia filtro o salva nuovi posti"
+                    : view === "saved"
+                      ? "Inizia a salvare i posti che vuoi ricordare"
+                      : "Sposta la mappa o cambia vista"}
+              </p>
+            </div>
+          </div>
+        )}
+
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
