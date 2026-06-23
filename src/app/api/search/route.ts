@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -19,6 +20,8 @@ const sanitize = (s: string): string =>
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const query = body?.query;
+  const source: "world" | "saved" =
+    body?.source === "world" ? "world" : "saved";
 
   if (typeof query !== "string" || query.trim() === "") {
     return NextResponse.json(
@@ -106,49 +109,58 @@ ESEMPI (input → output atteso):
     // proceed with empty filters rather than returning an error
   }
 
-  const supabase = createAdminClient();
+  let risultati: PlaceResult[];
 
-  const categoria = filtri.categoria ? sanitize(filtri.categoria) : null;
-  const keywords = filtri.parole_chiave
-    .map(sanitize)
-    .filter((kw) => kw.length > 0);
-
-  const fetchPlaces = async (withKeywords: boolean) => {
-    let q = supabase
-      .from("places")
-      .select("id, name, category, address, lat, lng");
-
-    if (categoria) {
-      q = q.ilike("category", `%${categoria}%`);
-    }
-
-    if (withKeywords && keywords.length > 0) {
-      // places has no note/descrizione — search keywords in name and category only
-      const orFilter = keywords
-        .flatMap((kw) => [`name.ilike.%${kw}%`, `category.ilike.%${kw}%`])
-        .join(",");
-      q = q.or(orFilter);
-    }
-
-    const { data, error } = await q.order("name");
-
-    if (error) {
-      console.error("[search/route] Supabase error:", error);
-      return [];
-    }
-    return data ?? [];
-  };
-
-  let risultati;
-
-  if (keywords.length > 0) {
-    risultati = await fetchPlaces(true);
-    // fallback: if no results with keywords, try category-only
-    if (risultati.length === 0) {
-      risultati = await fetchPlaces(false);
+  if (source === "world") {
+    try {
+      risultati = await searchGooglePlaces(query.trim());
+    } catch (err) {
+      console.error("[search/route] Google Places error:", err);
+      risultati = [];
     }
   } else {
-    risultati = await fetchPlaces(false);
+    const supabase = createAdminClient();
+
+    const categoria = filtri.categoria ? sanitize(filtri.categoria) : null;
+    const keywords = filtri.parole_chiave
+      .map(sanitize)
+      .filter((kw) => kw.length > 0);
+
+    const fetchPlaces = async (withKeywords: boolean) => {
+      let q = supabase
+        .from("places")
+        .select("id, name, category, address, lat, lng");
+
+      if (categoria) {
+        q = q.ilike("category", `%${categoria}%`);
+      }
+
+      if (withKeywords && keywords.length > 0) {
+        // places has no note/descrizione — search keywords in name and category only
+        const orFilter = keywords
+          .flatMap((kw) => [`name.ilike.%${kw}%`, `category.ilike.%${kw}%`])
+          .join(",");
+        q = q.or(orFilter);
+      }
+
+      const { data, error } = await q.order("name");
+
+      if (error) {
+        console.error("[search/route] Supabase error:", error);
+        return [];
+      }
+      return data ?? [];
+    };
+
+    if (keywords.length > 0) {
+      risultati = await fetchPlaces(true);
+      // fallback: if no results with keywords, try category-only
+      if (risultati.length === 0) {
+        risultati = await fetchPlaces(false);
+      }
+    } else {
+      risultati = await fetchPlaces(false);
+    }
   }
 
   return NextResponse.json({ risultati, filtri_usati: filtri });
