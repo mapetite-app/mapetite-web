@@ -21,10 +21,35 @@ export type PlaceResult = {
   category: string | null;
 };
 
-export async function searchGooglePlaces(query: string): Promise<PlaceResult[]> {
+export type SearchOptions = {
+  lat?: number;
+  lng?: number;
+  radius?: number;
+  limit?: number;
+};
+
+const DEFAULT_RADIUS = 1500;
+const DEFAULT_LIMIT = 20;
+
+export async function searchGooglePlaces(
+  query: string,
+  options: SearchOptions = {},
+): Promise<PlaceResult[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_PLACES_API_KEY non configurata sul server.");
+  }
+
+  const { lat, lng, radius = DEFAULT_RADIUS, limit = DEFAULT_LIMIT } = options;
+
+  const requestBody: Record<string, unknown> = { textQuery: query };
+  if (typeof lat === "number" && typeof lng === "number") {
+    requestBody.locationBias = {
+      circle: {
+        center: { latitude: lat, longitude: lng },
+        radius,
+      },
+    };
   }
 
   const googleResponse = await fetch("https://places.googleapis.com/v1/places:searchText", {
@@ -34,7 +59,7 @@ export async function searchGooglePlaces(query: string): Promise<PlaceResult[]> 
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask": FIELD_MASK,
     },
-    body: JSON.stringify({ textQuery: query }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!googleResponse.ok) {
@@ -44,12 +69,14 @@ export async function searchGooglePlaces(query: string): Promise<PlaceResult[]> 
 
   const data: GoogleSearchTextResponse = await googleResponse.json();
 
-  return (data.places ?? []).map((place) => ({
-    id: place.id,
-    name: place.displayName?.text ?? "",
-    address: place.formattedAddress ?? "",
-    lat: place.location?.latitude ?? null,
-    lng: place.location?.longitude ?? null,
-    category: place.primaryType ?? null,
-  }));
+  return (data.places ?? [])
+    .slice(0, limit)
+    .map((place) => ({
+      id: place.id,
+      name: place.displayName?.text ?? "",
+      address: place.formattedAddress ?? "",
+      lat: place.location?.latitude ?? null,
+      lng: place.location?.longitude ?? null,
+      category: place.primaryType ?? null,
+    }));
 }

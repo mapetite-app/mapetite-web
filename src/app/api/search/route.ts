@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   const query = body?.query;
   const source: "world" | "saved" =
     body?.source === "world" ? "world" : "saved";
+  const lat = typeof body?.lat === "number" ? body.lat : undefined;
+  const lng = typeof body?.lng === "number" ? body.lng : undefined;
 
   if (typeof query !== "string" || query.trim() === "") {
     return NextResponse.json(
@@ -113,7 +115,7 @@ ESEMPI (input → output atteso):
 
   if (source === "world") {
     try {
-      risultati = await searchGooglePlaces(query.trim());
+      risultati = await searchGooglePlaces(query.trim(), { lat, lng });
     } catch (err) {
       console.error("[search/route] Google Places error:", err);
       risultati = [];
