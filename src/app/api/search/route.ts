@@ -151,7 +151,18 @@ ESEMPI (input → output atteso):
         console.error("[search/route] Supabase error:", error);
         return [];
       }
-      return data ?? [];
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        address: row.address ?? "",
+        lat: row.lat,
+        lng: row.lng,
+        category: row.category,
+        rating: null,
+        userRatingCount: null,
+        priceLevel: null,
+        openNow: null,
+      }));
     };
 
     if (keywords.length > 0) {
