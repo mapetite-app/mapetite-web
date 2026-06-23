@@ -5,9 +5,10 @@ type PlaceCardProps = {
   category: string | null;
   address: string | null;
   tags?: string[];
+  note?: string | null;
 };
 
-export default function PlaceCard({ name, category, address, tags }: PlaceCardProps) {
+export default function PlaceCard({ name, category, address, tags, note }: PlaceCardProps) {
   const emoji = getCategoryEmoji(category, name);
 
   return (
@@ -45,6 +46,10 @@ export default function PlaceCard({ name, category, address, tags }: PlaceCardPr
               </span>
             ))}
           </div>
+        )}
+
+        {note && (
+          <p className="mt-1.5 text-xs text-text-muted italic">{note}</p>
         )}
       </div>
     </div>

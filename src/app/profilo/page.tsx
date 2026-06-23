@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import PlaceCard from "@/components/place-card";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -80,29 +81,17 @@ export default async function ProfiloPage() {
             Non hai ancora salvato nessun locale.
           </p>
         ) : (
-          <ul className="space-y-5">
+          <ul className="space-y-3">
             {saved.map(({ places: place, tags, note }, i) =>
               place ? (
-                <li key={place.id ?? i} className="border-b border-zinc-100 pb-5 last:border-0">
-                  <p className="font-semibold text-zinc-900">{place.name}</p>
-                  {place.category && (
-                    <p className="text-sm text-zinc-500">{place.category}</p>
-                  )}
-                  {tags && tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-600"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {note && (
-                    <p className="mt-1.5 text-sm text-zinc-500 italic">{note}</p>
-                  )}
+                <li key={place.id ?? i}>
+                  <PlaceCard
+                    name={place.name}
+                    category={place.category}
+                    address={place.address}
+                    tags={tags ?? undefined}
+                    note={note}
+                  />
                 </li>
               ) : null
             )}
