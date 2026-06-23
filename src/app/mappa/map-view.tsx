@@ -548,11 +548,13 @@ function AISearchPanel({
   onClear,
   activeFiltri,
   activeCount,
+  view,
 }: {
   onResults: (places: Place[], filtri: AIFiltri) => void;
   onClear: () => void;
   activeFiltri: AIFiltri | null;
   activeCount: number | null;
+  view: "all" | "saved";
 }) {
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -567,7 +569,7 @@ function AISearchPanel({
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ query: query.trim(), source: view === "all" ? "world" : "saved" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -816,6 +818,7 @@ export default function MapView({
             onClear={() => { setAiSearch(null); setSelected(null); }}
             activeFiltri={aiSearch?.filtri ?? null}
             activeCount={aiSearch?.risultati.length ?? null}
+            view={view}
           />
         </div>
         <div className="pointer-events-auto">
