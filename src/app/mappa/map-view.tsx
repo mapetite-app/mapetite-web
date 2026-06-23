@@ -775,7 +775,7 @@ export default function MapView({
     aiSearch !== null
       ? aiSearch.risultati
       : view === "all"
-        ? places
+        ? []
         : activeTag === null
           ? savedPlaces
           : savedPlaces.filter((p) => p.tags?.includes(activeTag));
@@ -907,7 +907,8 @@ export default function MapView({
       {/* Empty state — nessun luogo da mostrare */}
       {displayedPlaces.length === 0 &&
         !(view === "saved" && !userId) &&
-        !(view === "saved" && userId && loadingSaved) && (
+        !(view === "saved" && userId && loadingSaved) &&
+        !(view === "all" && aiSearch === null) && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
               <p className="text-2xl mb-2">
