@@ -7,6 +7,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Public pricing for claude-haiku-4-5 (https://platform.claude.com/docs/en/pricing)
+const HAIKU_INPUT_PER_MTOK = 1.00;
+const HAIKU_OUTPUT_PER_MTOK = 5.00;
+
 type SearchFilters = {
   categoria: string | null;
   parole_chiave: string[];
@@ -81,6 +85,14 @@ ESEMPI (input → output atteso):
 → {"categoria":"sushi","parole_chiave":["all you can eat"],"vicino_a_me":true}`,
       messages: [{ role: "user", content: query }],
     });
+
+    const { input_tokens, output_tokens } = message.usage;
+    const cost =
+      (input_tokens / 1_000_000) * HAIKU_INPUT_PER_MTOK +
+      (output_tokens / 1_000_000) * HAIKU_OUTPUT_PER_MTOK;
+    console.log(
+      `[haiku-cost] source=${source} in=${input_tokens}tok out=${output_tokens}tok cost=$${cost.toFixed(6)} query="${query.trim().slice(0, 60)}"`
+    );
 
     const rawText =
       message.content[0].type === "text" ? message.content[0].text.trim() : "";
