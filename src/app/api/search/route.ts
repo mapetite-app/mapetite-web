@@ -49,11 +49,21 @@ export async function POST(request: Request) {
     vicino_a_me: false,
   };
 
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
-      system: `Sei un assistente che traduce frasi di ricerca di locali in filtri strutturati.
+  let risultati: PlaceResult[];
+
+  if (source === "world") {
+    try {
+      risultati = await searchGooglePlaces(query.trim(), { lat, lng });
+    } catch (err) {
+      console.error("[search/route] Google Places error:", err);
+      risultati = [];
+    }
+  } else {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 512,
+        system: `Sei un assistente che traduce frasi di ricerca di locali in filtri strutturati.
 Rispondi SOLO con un oggetto JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
 La struttura deve essere esattamente:
 {"categoria":string|null,"parole_chiave":string[],"vicino_a_me":boolean}
@@ -83,56 +93,46 @@ ESEMPI (input → output atteso):
 
 "sushi all you can eat in zona"
 → {"categoria":"sushi","parole_chiave":["all you can eat"],"vicino_a_me":true}`,
-      messages: [{ role: "user", content: query }],
-    });
+        messages: [{ role: "user", content: query }],
+      });
 
-    const { input_tokens, output_tokens } = message.usage;
-    const cost =
-      (input_tokens / 1_000_000) * HAIKU_INPUT_PER_MTOK +
-      (output_tokens / 1_000_000) * HAIKU_OUTPUT_PER_MTOK;
-    console.log(
-      `[haiku-cost] source=${source} in=${input_tokens}tok out=${output_tokens}tok cost=$${cost.toFixed(6)} query="${query.trim().slice(0, 60)}"`
-    );
+      const { input_tokens, output_tokens } = message.usage;
+      const cost =
+        (input_tokens / 1_000_000) * HAIKU_INPUT_PER_MTOK +
+        (output_tokens / 1_000_000) * HAIKU_OUTPUT_PER_MTOK;
+      console.log(
+        `[haiku-cost] source=${source} in=${input_tokens}tok out=${output_tokens}tok cost=$${cost.toFixed(6)} query="${query.trim().slice(0, 60)}"`
+      );
 
-    const rawText =
-      message.content[0].type === "text" ? message.content[0].text.trim() : "";
+      const rawText =
+        message.content[0].type === "text" ? message.content[0].text.trim() : "";
 
-    // Strip markdown code fences (```json ... ``` or ``` ... ```)
-    let text = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    // Extract just the JSON object in case there's stray text before/after
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start !== -1 && end !== -1 && end > start) {
-      text = text.slice(start, end + 1);
-    }
+      // Strip markdown code fences (```json ... ``` or ``` ... ```)
+      let text = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      // Extract just the JSON object in case there's stray text before/after
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start !== -1 && end !== -1 && end > start) {
+        text = text.slice(start, end + 1);
+      }
 
-    try {
-      const parsed = JSON.parse(text);
-      filtri = {
-        categoria: typeof parsed.categoria === "string" ? parsed.categoria : null,
-        parole_chiave: Array.isArray(parsed.parole_chiave)
-          ? parsed.parole_chiave.filter((k: unknown) => typeof k === "string")
-          : [],
-        vicino_a_me:
-          typeof parsed.vicino_a_me === "boolean" ? parsed.vicino_a_me : false,
-      };
+      try {
+        const parsed = JSON.parse(text);
+        filtri = {
+          categoria: typeof parsed.categoria === "string" ? parsed.categoria : null,
+          parole_chiave: Array.isArray(parsed.parole_chiave)
+            ? parsed.parole_chiave.filter((k: unknown) => typeof k === "string")
+            : [],
+          vicino_a_me:
+            typeof parsed.vicino_a_me === "boolean" ? parsed.vicino_a_me : false,
+        };
+      } catch {
+        // keep default empty filters on JSON parse error
+      }
     } catch {
-      // keep default empty filters on JSON parse error
+      // proceed with empty filters rather than returning an error
     }
-  } catch {
-    // proceed with empty filters rather than returning an error
-  }
 
-  let risultati: PlaceResult[];
-
-  if (source === "world") {
-    try {
-      risultati = await searchGooglePlaces(query.trim(), { lat, lng });
-    } catch (err) {
-      console.error("[search/route] Google Places error:", err);
-      risultati = [];
-    }
-  } else {
     const supabase = createAdminClient();
 
     const categoria = filtri.categoria ? sanitize(filtri.categoria) : null;
