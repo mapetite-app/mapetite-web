@@ -353,7 +353,6 @@ function AISearchPanel({
   activeCount,
   view,
   viewState,
-  filters,
 }: {
   onResults: (places: Place[], filtri: AIFiltri) => void;
   onClear: () => void;
@@ -361,7 +360,6 @@ function AISearchPanel({
   activeCount: number | null;
   view: "all" | "saved";
   viewState: { latitude: number; longitude: number };
-  filters: Filters;
 }) {
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -381,13 +379,6 @@ function AISearchPanel({
           source: view === "all" ? "world" : "saved",
           lat: viewState.latitude,
           lng: viewState.longitude,
-          ...(filters.minRating != null && { minRating: filters.minRating }),
-          ...(filters.minReviews != null && { minReviews: filters.minReviews }),
-          ...(filters.minPriceLevel != null && { minPriceLevel: filters.minPriceLevel }),
-          ...(filters.maxPriceLevel != null && { maxPriceLevel: filters.maxPriceLevel }),
-          ...(filters.openNowOnly && { openNowOnly: true }),
-          ...(filters.radiusKm != null && { radius: filters.radiusKm * 1000 }),
-          ...(filters.categories.length > 0 && { categories: filters.categories }),
         }),
       });
       const data = await res.json();
@@ -487,7 +478,7 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedReviews, setSelectedReviews] = useState<{
@@ -595,6 +586,65 @@ export default function MapView({
     }
   };
 
+  const CATEGORY_QUERY: Record<string, string> = {
+    restaurant: "ristoranti", cafe: "caffè bar", pizza: "pizzeria",
+    sushi: "sushi", pub: "pub birreria", gelato: "gelateria",
+    bakery: "panetteria", fastfood: "fast food", vegetarian: "ristorante vegetariano",
+    seafood: "ristorante di pesce", steakhouse: "steakhouse", wine_bar: "wine bar",
+  };
+
+  const runFilteredSearch = async (f: Filters) => {
+    if (view === "saved") {
+      const allowed = f.categories;
+      const filtered = allowed.length > 0
+        ? savedPlaces.filter((p) => {
+            const cat = (p.category ?? "").toLowerCase();
+            return allowed.some((c) => cat.includes(c));
+          })
+        : savedPlaces;
+      setAiSearch({ risultati: filtered, filtri: null });
+      setSelected(null);
+      return;
+    }
+
+    let query: string;
+    if (f.categories.length > 0) {
+      query = f.categories.map((c) => CATEGORY_QUERY[c] ?? c).join(" ");
+    } else {
+      query = "ristoranti bar locali";
+    }
+
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          source: "world",
+          lat: viewState.latitude,
+          lng: viewState.longitude,
+          ...(f.minRating != null && { minRating: f.minRating }),
+          ...(f.minReviews != null && { minReviews: f.minReviews }),
+          ...(f.minPriceLevel != null && { minPriceLevel: f.minPriceLevel }),
+          ...(f.maxPriceLevel != null && { maxPriceLevel: f.maxPriceLevel }),
+          ...(f.openNowOnly && { openNowOnly: true }),
+          ...(f.radiusKm != null && { radius: f.radiusKm * 1000 }),
+          ...(f.categories.length > 0 && { categories: f.categories }),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null };
+      const places: Place[] = (data.risultati ?? [])
+        .filter((p: RawPlace) => p.lat != null && p.lng != null)
+        .map((p: RawPlace) => ({ id: p.id, name: p.name, category: p.category, address: null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null }));
+      setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
+      setSelected(null);
+    } catch {
+      // silenzioso per ora
+    }
+  };
+
 const displayedPlaces =
     aiSearch !== null
       ? aiSearch.risultati
@@ -636,13 +686,12 @@ const displayedPlaces =
       <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
         <div className="pointer-events-auto">
           <AISearchPanel
-            onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); }}
+            onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); setFilters(EMPTY_FILTERS); }}
             onClear={() => { setAiSearch(null); setSelected(null); }}
             activeFiltri={aiSearch?.filtri ?? null}
             activeCount={aiSearch?.risultati.length ?? null}
             view={view}
             viewState={viewState}
-            filters={filters}
           />
         </div>
         <div className="pointer-events-auto self-start">
@@ -1036,7 +1085,7 @@ const displayedPlaces =
         isOpen={filtersOpen}
         filters={filters}
         onClose={() => setFiltersOpen(false)}
-        onApply={(f) => { setFilters(f); setFiltersOpen(false); }}
+        onApply={(f) => { setFilters(f); setFiltersOpen(false); void runFilteredSearch(f); }}
       />
     </div>
   );
