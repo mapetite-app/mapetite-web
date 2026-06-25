@@ -39,6 +39,7 @@ export type SearchOptions = {
   minPriceLevel?: number;
   maxPriceLevel?: number;
   openNowOnly?: boolean;
+  categories?: string[];
 };
 
 const DEFAULT_RADIUS = 1500;
@@ -51,6 +52,21 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   PRICE_LEVEL_MODERATE: 2,
   PRICE_LEVEL_EXPENSIVE: 3,
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
+
+const CATEGORY_TYPE_MAP: Record<string, string[]> = {
+  restaurant: ["restaurant", "italian_restaurant", "fine_dining_restaurant"],
+  cafe: ["cafe", "coffee_shop", "breakfast_restaurant"],
+  pizza: ["pizza_restaurant"],
+  sushi: ["sushi_restaurant", "japanese_restaurant"],
+  pub: ["bar", "pub", "wine_bar"],
+  gelato: ["ice_cream_shop", "dessert_shop"],
+  bakery: ["bakery"],
+  fastfood: ["fast_food_restaurant", "hamburger_restaurant"],
+  vegetarian: ["vegetarian_restaurant", "vegan_restaurant"],
+  seafood: ["seafood_restaurant"],
+  steakhouse: ["steak_house", "barbecue_restaurant"],
+  wine_bar: ["wine_bar"],
 };
 
 // Bayesian-style quality score: bilancia rating e numero di recensioni
@@ -82,6 +98,7 @@ export async function searchGooglePlaces(
     minPriceLevel,
     maxPriceLevel,
     openNowOnly,
+    categories,
   } = options;
 
   const requestBody: Record<string, unknown> = { textQuery: query };
@@ -131,6 +148,10 @@ export async function searchGooglePlaces(
     if (minPriceLevel != null && (p.priceLevel ?? -1) < minPriceLevel) return false;
     if (maxPriceLevel != null && (p.priceLevel ?? 99) > maxPriceLevel) return false;
     if (openNowOnly === true && p.openNow !== true) return false;
+    if (categories != null && categories.length > 0) {
+      const allowedTypes = categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
+      if (p.category == null || !allowedTypes.includes(p.category)) return false;
+    }
     return true;
   });
 
@@ -139,7 +160,8 @@ export async function searchGooglePlaces(
     minReviews != null ||
     minPriceLevel != null ||
     maxPriceLevel != null ||
-    openNowOnly === true;
+    openNowOnly === true ||
+    (categories != null && categories.length > 0);
 
   if (hasFilters) {
     filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));

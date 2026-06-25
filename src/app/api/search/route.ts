@@ -53,7 +53,17 @@ export async function POST(request: Request) {
 
   if (source === "world") {
     try {
-      risultati = await searchGooglePlaces(query.trim(), { lat, lng });
+      risultati = await searchGooglePlaces(query.trim(), {
+        lat,
+        lng,
+        minRating: typeof body?.minRating === "number" ? body.minRating : undefined,
+        minReviews: typeof body?.minReviews === "number" ? body.minReviews : undefined,
+        minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,
+        maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
+        openNowOnly: body?.openNowOnly === true ? true : undefined,
+        radius: typeof body?.radius === "number" ? body.radius : undefined,
+        categories: Array.isArray(body?.categories) ? body.categories : undefined,
+      });
     } catch (err) {
       console.error("[search/route] Google Places error:", err);
       risultati = [];
