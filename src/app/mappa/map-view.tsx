@@ -725,6 +725,11 @@ export default function MapView({
       setSelectedReviews(null);
       return;
     }
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selected.id);
+    if (!isUuid) {
+      setSelectedReviews(null);
+      return;
+    }
     const supabase = createClient();
     supabase
       .from("reviews")
