@@ -8,6 +8,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
+import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
+import { SlidersHorizontal } from "lucide-react";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 
@@ -550,6 +552,7 @@ function AISearchPanel({
   activeCount,
   view,
   viewState,
+  filters,
 }: {
   onResults: (places: Place[], filtri: AIFiltri) => void;
   onClear: () => void;
@@ -557,6 +560,7 @@ function AISearchPanel({
   activeCount: number | null;
   view: "all" | "saved";
   viewState: { latitude: number; longitude: number };
+  filters: Filters;
 }) {
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -576,6 +580,13 @@ function AISearchPanel({
           source: view === "all" ? "world" : "saved",
           lat: viewState.latitude,
           lng: viewState.longitude,
+          ...(filters.minRating != null && { minRating: filters.minRating }),
+          ...(filters.minReviews != null && { minReviews: filters.minReviews }),
+          ...(filters.minPriceLevel != null && { minPriceLevel: filters.minPriceLevel }),
+          ...(filters.maxPriceLevel != null && { maxPriceLevel: filters.maxPriceLevel }),
+          ...(filters.openNowOnly && { openNowOnly: true }),
+          ...(filters.radiusKm != null && { radius: filters.radiusKm * 1000 }),
+          ...(filters.categories.length > 0 && { categories: filters.categories }),
         }),
       });
       const data = await res.json();
@@ -676,6 +687,8 @@ export default function MapView({
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri } | null>(null);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedReviews, setSelectedReviews] = useState<{
     avg: number;
     count: number;
@@ -795,12 +808,12 @@ export default function MapView({
       properties: { cluster: false, placeData: place },
       geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
     }));
-    const index = new Supercluster({ radius: 60, maxZoom: 16 });
+    const index = new Supercluster({ radius: 50, maxZoom: 20 });
     index.load(points);
     return index;
   }, [displayedPlaces]);
 
-  const roundedZoom = Math.round(viewState.zoom);
+  const roundedZoom = Math.ceil(viewState.zoom);
   const clusters = useMemo(() => {
     const map = (mapRef.current as { getMap?: () => { getBounds: () => { getWest: () => number; getSouth: () => number; getEast: () => number; getNorth: () => number } } } | null)?.getMap?.();
     if (!map) {
@@ -827,7 +840,23 @@ export default function MapView({
             activeCount={aiSearch?.risultati.length ?? null}
             view={view}
             viewState={viewState}
+            filters={filters}
           />
+        </div>
+        <div className="pointer-events-auto self-start">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="relative flex items-center gap-2 rounded-pill bg-surface shadow-float px-4 py-2 font-display text-sm font-semibold text-text hover:shadow-card transition-shadow"
+          >
+            <SlidersHorizontal size={16} className="text-text-muted" />
+            Filtri
+            {countActive(filters) > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent font-display text-xs font-bold text-white">
+                {countActive(filters)}
+              </span>
+            )}
+          </button>
         </div>
         <div className="pointer-events-auto">
           <SearchPanel userId={userId} onPlaceAdded={handlePlaceAdded} />
@@ -969,8 +998,34 @@ export default function MapView({
                 latitude={lat}
                 anchor="center"
                 onClick={() => {
-                  const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-                  if (map) map.flyTo({ center: [lng, lat], zoom: viewState.zoom + 2 });
+                  const leaves = clusterIndex.getLeaves(clusterId, Infinity);
+                  const coords = leaves.map((l) => {
+                    const p = (l.properties as { placeData: { lat: number; lng: number } }).placeData;
+                    return [p.lng, p.lat] as [number, number];
+                  });
+                  if (coords.length === 0) return;
+                  let minLng = coords[0][0], maxLng = coords[0][0];
+                  let minLat = coords[0][1], maxLat = coords[0][1];
+                  for (const [lng2, lat2] of coords) {
+                    if (lng2 < minLng) minLng = lng2;
+                    if (lng2 > maxLng) maxLng = lng2;
+                    if (lat2 < minLat) minLat = lat2;
+                    if (lat2 > maxLat) maxLat = lat2;
+                  }
+                  const map = (mapRef.current as {
+                    getMap?: () => {
+                      fitBounds: (
+                        bounds: [[number, number], [number, number]],
+                        opts?: { padding?: number | { top: number; bottom: number; left: number; right: number }; maxZoom?: number; duration?: number },
+                      ) => void;
+                    };
+                  } | null)?.getMap?.();
+                  if (map) {
+                    map.fitBounds(
+                      [[minLng, minLat], [maxLng, maxLat]],
+                      { padding: { top: 120, bottom: 120, left: 420, right: 120 }, maxZoom: 17, duration: 600 },
+                    );
+                  }
                 }}
               >
                 <div
@@ -1174,8 +1229,15 @@ export default function MapView({
         onSelect={(place) => {
           setSelected(place);
           const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-          if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 14) });
+          if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
         }}
+      />
+
+      <FiltersSheet
+        isOpen={filtersOpen}
+        filters={filters}
+        onClose={() => setFiltersOpen(false)}
+        onApply={(f) => { setFilters(f); setFiltersOpen(false); }}
       />
     </div>
   );
