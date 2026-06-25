@@ -17,6 +17,8 @@ type GoogleResult = {
   lat: number | null;
   lng: number | null;
   category: string | null;
+  rating: number | null;
+  priceLevel: number | null;
 };
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -148,6 +150,8 @@ export default function ImportaPage() {
           lat: result.lat,
           lng: result.lng,
           category: result.category,
+          rating: result.rating,
+          priceLevel: result.priceLevel,
         }),
       });
       if (!addRes.ok) {

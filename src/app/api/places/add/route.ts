@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const { googlePlaceId, name, address, lat, lng, category } = body ?? {};
+  const { googlePlaceId, name, address, lat, lng, category, rating, priceLevel } = body ?? {};
 
   if (
     typeof googlePlaceId !== "string" ||
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
   const { data: existing, error: selectError } = await admin
     .from("places")
-    .select("id, name, category, address, lat, lng, google_place_id")
+    .select("id, name, category, address, lat, lng, google_place_id, rating, price_level")
     .eq("google_place_id", googlePlaceId)
     .maybeSingle();
 
@@ -51,8 +51,17 @@ export async function POST(request: Request) {
 
   const { data: inserted, error: insertError } = await admin
     .from("places")
-    .insert({ google_place_id: googlePlaceId, name, address, lat, lng, category: category ?? null })
-    .select("id, name, category, address, lat, lng, google_place_id")
+    .insert({
+      google_place_id: googlePlaceId,
+      name,
+      address,
+      lat,
+      lng,
+      category: category ?? null,
+      rating: typeof rating === "number" ? rating : null,
+      price_level: typeof priceLevel === "number" ? priceLevel : null,
+    })
+    .select("id, name, category, address, lat, lng, google_place_id, rating, price_level")
     .single();
 
   if (insertError) {

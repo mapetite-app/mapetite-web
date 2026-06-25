@@ -15,7 +15,7 @@ export default async function MappaPage() {
 
   const { data: userData } = await supabase.auth.getUser();
 
-  const normalized = (places ?? []).map((p) => ({ ...p, tags: null, note: null }));
+  const normalized = (places ?? []).map((p) => ({ ...p, tags: null, note: null, rating: null, priceLevel: null }));
 
   return <MapView places={normalized} userId={userData?.user?.id ?? null} />;
 }

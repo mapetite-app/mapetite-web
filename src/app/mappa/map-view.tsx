@@ -14,7 +14,7 @@ import { SlidersHorizontal } from "lucide-react";
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 
 function SaveModal({
-  placeId,
+  place,
   userId,
   mode = "save",
   initialTags = [],
@@ -22,7 +22,7 @@ function SaveModal({
   onSaved,
   onCancel,
 }: {
-  placeId: string;
+  place: Place;
   userId: string;
   mode?: "save" | "edit";
   initialTags?: string[];
@@ -53,12 +53,32 @@ function SaveModal({
           .from("saved_places")
           .update({ tags, note: noteValue })
           .eq("user_id", userId)
-          .eq("place_id", placeId);
+          .eq("place_id", place.id);
         if (error) { setError(true); return; }
       } else {
+        // 1. crea/trova il locale in places via endpoint (ottiene UUID + salva rating/prezzo)
+        const addRes = await fetch("/api/places/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            googlePlaceId: place.id,
+            name: place.name,
+            address: place.address ?? "",
+            lat: place.lat,
+            lng: place.lng,
+            category: place.category,
+            rating: place.rating,
+            priceLevel: place.priceLevel,
+          }),
+        });
+        if (!addRes.ok) { setError(true); return; }
+        const addData = await addRes.json();
+        const placeUuid: string = addData.place.id;
+
+        // 2. collega in saved_places con l'UUID
         const { error } = await supabase
           .from("saved_places")
-          .insert({ user_id: userId, place_id: placeId, tags, note: noteValue });
+          .insert({ user_id: userId, place_id: placeUuid, tags, note: noteValue });
         if (error && error.code !== "23505") { setError(true); return; }
       }
 
@@ -252,6 +272,8 @@ type Place = {
   lng: number;
   tags: string[] | null;
   note: string | null;
+  rating: number | null;
+  priceLevel: number | null;
 };
 
 function SaveButton({
@@ -386,17 +408,20 @@ function AISearchPanel({
         setError(data.error ?? "Qualcosa è andato storto. Riprova.");
         return;
       }
-      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null };
+      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null; rating: number | null; priceLevel: number | null; address: string | null };
       const places: Place[] = (data.risultati ?? [])
         .filter((p: RawPlace) => p.lat != null && p.lng != null)
         .map((p: RawPlace) => ({
           id: p.id,
           name: p.name,
           category: p.category,
+          address: p.address ?? null,
           lat: p.lat as number,
           lng: p.lng as number,
           tags: null,
           note: null,
+          rating: p.rating ?? null,
+          priceLevel: p.priceLevel ?? null,
         }));
       onResults(places, data.filtri_usati);
     } catch {
@@ -634,10 +659,10 @@ export default function MapView({
       });
       const data = await res.json();
       if (!res.ok) return;
-      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null };
+      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null; rating: number | null; priceLevel: number | null; address: string | null };
       const places: Place[] = (data.risultati ?? [])
         .filter((p: RawPlace) => p.lat != null && p.lng != null)
-        .map((p: RawPlace) => ({ id: p.id, name: p.name, category: p.category, address: null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null }));
+        .map((p: RawPlace) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setSelected(null);
     } catch {
@@ -1035,25 +1060,27 @@ const displayedPlaces =
         )}
       </Map>
 
-      {pendingSavePlaceId && userId && (
-        <SaveModal
-          placeId={pendingSavePlaceId}
-          userId={userId}
-          onSaved={(tags, note) => {
-            handleToggle(pendingSavePlaceId!, true);
-            const base = places.find(p => p.id === pendingSavePlaceId);
-            if (base && pendingSavePlaceId) {
-              setSavedPlaces(prev => [...prev.filter(p => p.id !== pendingSavePlaceId), { ...base, tags, note }]);
-            }
-            setPendingSavePlaceId(null);
-          }}
-          onCancel={() => setPendingSavePlaceId(null)}
-        />
-      )}
+      {(() => {
+        const pendingPlace = pendingSavePlaceId
+          ? (places.find(p => p.id === pendingSavePlaceId) ?? aiSearch?.risultati.find(p => p.id === pendingSavePlaceId) ?? null)
+          : null;
+        return pendingPlace && userId ? (
+          <SaveModal
+            place={pendingPlace}
+            userId={userId}
+            onSaved={(tags, note) => {
+              handleToggle(pendingPlace.id, true);
+              setSavedPlaces(prev => [...prev.filter(p => p.id !== pendingPlace.id), { ...pendingPlace, tags, note }]);
+              setPendingSavePlaceId(null);
+            }}
+            onCancel={() => setPendingSavePlaceId(null)}
+          />
+        ) : null;
+      })()}
 
       {pendingEditPlace && userId && (
         <SaveModal
-          placeId={pendingEditPlace.id}
+          place={pendingEditPlace}
           userId={userId}
           mode="edit"
           initialTags={pendingEditPlace.tags ?? []}
