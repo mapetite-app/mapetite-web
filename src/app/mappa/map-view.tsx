@@ -715,8 +715,10 @@ const displayedPlaces =
           <button
             type="button"
             onClick={() => {
-              if (aiOpen) { setAiOpen(false); }
-              else { setAiOpen(true); setFilters(EMPTY_FILTERS); if (aiSearch?.filtri === null) setAiSearch(null); }
+              setSelected(null);
+              setFilters(EMPTY_FILTERS);
+              if (aiOpen) { setAiOpen(false); setAiSearch(null); }
+              else { setAiOpen(true); setAiSearch(null); }
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
@@ -728,8 +730,9 @@ const displayedPlaces =
           <button
             type="button"
             onClick={() => {
+              setSelected(null);
               setAiOpen(false);
-              if (aiSearch?.filtri != null) setAiSearch(null);
+              setAiSearch(null);
               setFiltersOpen(true);
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
@@ -1127,6 +1130,7 @@ const displayedPlaces =
           const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
           if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
         }}
+        onClose={() => { setAiSearch(null); setSelected(null); }}
       />
 
       <FiltersSheet
@@ -1142,9 +1146,11 @@ const displayedPlaces =
 function BottomSheet({
   places,
   onSelect,
+  onClose,
 }: {
   places: Place[];
   onSelect: (place: Place) => void;
+  onClose: () => void;
 }) {
   const [snap, setSnap] = useState<"compact" | "medium" | "tall">("medium");
   const snapClass = snap === "compact" ? "max-h-[25vh]" : snap === "tall" ? "max-h-[75vh]" : "max-h-[45vh]";
@@ -1162,9 +1168,19 @@ function BottomSheet({
         <div className="h-1 w-10 rounded-pill bg-border" />
       </button>
       <div className="px-3 pb-4">
-        <p className="px-1 pb-2 text-xs font-sans text-text-muted">
-          {places.length} {places.length === 1 ? "risultato" : "risultati"}
-        </p>
+        <div className="flex items-center justify-between px-1 pb-2">
+          <p className="text-xs font-sans text-text-muted">
+            {places.length} {places.length === 1 ? "risultato" : "risultati"}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Chiudi lista"
+            className="text-text-muted hover:text-text text-lg leading-none px-1"
+          >
+            ✕
+          </button>
+        </div>
         <ul className="flex flex-col gap-1">
           {places.map((place) => (
             <li key={place.id}>
