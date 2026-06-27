@@ -9,7 +9,7 @@ import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 
@@ -506,6 +506,7 @@ export default function MapView({
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [selectedReviews, setSelectedReviews] = useState<{
     avg: number;
     count: number;
@@ -709,24 +710,31 @@ const displayedPlaces =
     <div className="fixed inset-0 md:top-14">
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
       <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
-        <div className="pointer-events-auto">
-          <AISearchPanel
-            onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); setFilters(EMPTY_FILTERS); }}
-            onClear={() => { setAiSearch(null); setSelected(null); }}
-            activeFiltri={aiSearch?.filtri ?? null}
-            activeCount={aiSearch?.risultati.length ?? null}
-            view={view}
-            viewState={viewState}
-          />
-        </div>
-        <div className="pointer-events-auto self-start">
+        {/* Riga icone: Concierge AI + Filtri */}
+        <div className="pointer-events-auto flex gap-2">
           <button
             type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="relative flex items-center gap-2 rounded-pill bg-surface shadow-float px-4 py-2 font-display text-sm font-semibold text-text hover:shadow-card transition-shadow"
+            onClick={() => {
+              if (aiOpen) { setAiOpen(false); }
+              else { setAiOpen(true); setFilters(EMPTY_FILTERS); if (aiSearch?.filtri === null) setAiSearch(null); }
+            }}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
-            <SlidersHorizontal size={16} className="text-text-muted" />
-            Filtri
+            <Sparkles size={20} className="text-brand" />
+            {aiSearch?.filtri != null && (
+              <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-surface" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAiOpen(false);
+              if (aiSearch?.filtri != null) setAiSearch(null);
+              setFiltersOpen(true);
+            }}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
+          >
+            <SlidersHorizontal size={20} className="text-text-muted" />
             {countActive(filters) > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent font-display text-xs font-bold text-white">
                 {countActive(filters)}
@@ -734,7 +742,20 @@ const displayedPlaces =
             )}
           </button>
         </div>
-<div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
+        {/* Pannello AI espandibile */}
+        {aiOpen && (
+          <div className="pointer-events-auto w-80 max-w-[90vw] relative">
+            <AISearchPanel
+              onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); setFilters(EMPTY_FILTERS); }}
+              onClear={() => { setAiSearch(null); setSelected(null); }}
+              activeFiltri={aiSearch?.filtri ?? null}
+              activeCount={aiSearch?.risultati.length ?? null}
+              view={view}
+              viewState={viewState}
+            />
+          </div>
+        )}
+        <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
             onClick={() => { setView("all"); setSelected(null); setActiveTag(null); setAiSearch(null); }}
@@ -1125,13 +1146,21 @@ function BottomSheet({
   places: Place[];
   onSelect: (place: Place) => void;
 }) {
+  const [snap, setSnap] = useState<"compact" | "medium" | "tall">("medium");
+  const snapClass = snap === "compact" ? "max-h-[25vh]" : snap === "tall" ? "max-h-[75vh]" : "max-h-[45vh]";
+  const cycleSnap = () => setSnap((s) => s === "compact" ? "medium" : s === "medium" ? "tall" : "compact");
+
   if (places.length === 0) return null;
 
   return (
-    <div className="pointer-events-auto absolute bottom-0 left-0 right-0 z-10 max-h-[45vh] overflow-y-auto rounded-t-card bg-surface shadow-float">
-      <div className="sticky top-0 flex items-center justify-center bg-surface py-2">
+    <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 mx-auto max-w-2xl z-10 ${snapClass} overflow-y-auto rounded-t-card bg-surface shadow-float`}>
+      <button
+        type="button"
+        onClick={cycleSnap}
+        className="sticky top-0 flex w-full cursor-pointer items-center justify-center bg-surface py-2"
+      >
         <div className="h-1 w-10 rounded-pill bg-border" />
-      </div>
+      </button>
       <div className="px-3 pb-4">
         <p className="px-1 pb-2 text-xs font-sans text-text-muted">
           {places.length} {places.length === 1 ? "risultato" : "risultati"}
