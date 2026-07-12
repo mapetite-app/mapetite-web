@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
@@ -51,7 +51,8 @@ export async function POST(request: Request) {
     vicino_a_me: false,
   };
 
-  let risultati: PlaceResult[];
+  // Il ramo saved aggiunge tags/note personali (assenti nel ramo world): campi opzionali.
+  let risultati: (PlaceResult & { tags?: string[] | null; note?: string | null })[];
   // Sintesi editoriale Haiku: solo sul ramo world, opzionale e degradabile.
   let sintesi: Record<string, PlaceSynthesis> = {};
 
@@ -156,43 +157,82 @@ ESEMPI (input → output atteso):
       // proceed with empty filters rather than returning an error
     }
 
-    const supabase = createAdminClient();
+    // Client server AUTENTICATO: la ricerca "tra i miei salvati" deve rispettare la RLS
+    // e leggere saved_places dell'utente, non il catalogo globale places.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Autenticazione richiesta." },
+        { status: 401 }
+      );
+    }
 
     const categoria = filtri.categoria ? sanitize(filtri.categoria) : null;
     const keywords = filtri.parole_chiave
       .map(sanitize)
       .filter((kw) => kw.length > 0);
 
+    type SavedRow = {
+      tags: string[] | null;
+      note: string | null;
+      place: {
+        id: string;
+        name: string;
+        category: string | null;
+        address: string | null;
+        lat: number | null;
+        lng: number | null;
+      };
+    };
+
     const fetchPlaces = async (withKeywords: boolean) => {
-      let q = supabase
-        .from("places")
-        .select("id, name, category, address, lat, lng");
-
-      if (categoria) {
-        q = q.ilike("category", `%${categoria}%`);
-      }
-
-      if (withKeywords && keywords.length > 0) {
-        // places has no note/descrizione — search keywords in name and category only
-        const orFilter = keywords
-          .flatMap((kw) => [`name.ilike.%${kw}%`, `category.ilike.%${kw}%`])
-          .join(",");
-        q = q.or(orFilter);
-      }
-
-      const { data, error } = await q.order("name");
+      // Pattern identico a map-view.tsx: saved_places join places, filtrato per utente.
+      const { data, error } = await supabase
+        .from("saved_places")
+        .select("tags, note, places(id, name, category, address, lat, lng)")
+        .eq("user_id", user.id);
 
       if (error) {
         console.error("[search/route] Supabase error:", error);
         return [];
       }
-      return (data ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        address: row.address ?? "",
-        lat: row.lat,
-        lng: row.lng,
-        category: row.category,
+
+      let rows: SavedRow[] = (data ?? [])
+        .map((row) => {
+          const place = row.places as unknown as SavedRow["place"] | null;
+          if (!place || place.lat == null || place.lng == null) return null;
+          return { tags: row.tags as string[] | null, note: row.note as string | null, place };
+        })
+        .filter((r): r is SavedRow => r !== null);
+
+      // Filtri applicati in memoria (poche decine di righe per utente):
+      // si evita l'embedded filtering PostgREST sui campi joinati.
+      if (categoria) {
+        const c = categoria.toLowerCase();
+        rows = rows.filter((r) => (r.place.category ?? "").toLowerCase().includes(c));
+      }
+      if (withKeywords && keywords.length > 0) {
+        rows = rows.filter((r) =>
+          keywords.some((kw) => {
+            const k = kw.toLowerCase();
+            return (
+              (r.place.name ?? "").toLowerCase().includes(k) ||
+              (r.place.category ?? "").toLowerCase().includes(k)
+            );
+          })
+        );
+      }
+
+      rows.sort((a, b) => (a.place.name ?? "").localeCompare(b.place.name ?? ""));
+
+      return rows.map((r) => ({
+        id: r.place.id,
+        name: r.place.name,
+        address: r.place.address ?? "",
+        lat: r.place.lat,
+        lng: r.place.lng,
+        category: r.place.category,
         rating: null,
         userRatingCount: null,
         priceLevel: null,
@@ -203,6 +243,9 @@ ESEMPI (input → output atteso):
         reviewTexts: null,
         phone: null,
         photoRef: null,
+        // tag e nota personali dell'utente, presi da saved_places
+        tags: r.tags,
+        note: r.note,
       }));
     };
 
@@ -227,7 +270,7 @@ ESEMPI (input → output atteso):
       ...rest,
       selectedReviews: selectQualityReviews(reviewTexts),
       synthesis: s?.synthesis ?? null,
-      tags: s?.tags ?? null,
+      tags: s?.tags ?? rest.tags ?? null,
       verdict: s?.verdict ?? null,
       matchReason: s?.matchReason ?? null,
     };
