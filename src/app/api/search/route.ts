@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
+import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
   };
 
   let risultati: PlaceResult[];
+  // Sintesi editoriale Haiku: solo sul ramo world, opzionale e degradabile.
+  let sintesi: Record<string, PlaceSynthesis> = {};
 
   if (source === "world") {
     try {
@@ -67,6 +70,15 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[search/route] Google Places error:", err);
       risultati = [];
+    }
+
+    if (risultati.length > 0) {
+      try {
+        sintesi = await getSynthesis(risultati, query.trim());
+      } catch (err) {
+        console.error("[search/route] Haiku synthesis error:", err);
+        sintesi = {};
+      }
     }
   } else {
     try {
@@ -184,6 +196,10 @@ ESEMPI (input → output atteso):
         userRatingCount: null,
         priceLevel: null,
         openNow: null,
+        types: null,
+        websiteUri: null,
+        editorialSummary: null,
+        reviewTexts: null,
       }));
     };
 
@@ -198,5 +214,5 @@ ESEMPI (input → output atteso):
     }
   }
 
-  return NextResponse.json({ risultati, filtri_usati: filtri });
+  return NextResponse.json({ risultati, filtri_usati: filtri, sintesi });
 }

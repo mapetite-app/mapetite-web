@@ -1,4 +1,4 @@
-const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow";
+const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri";
 
 type GooglePlace = {
   id: string;
@@ -10,6 +10,10 @@ type GooglePlace = {
   userRatingCount?: number;
   priceLevel?: string;
   currentOpeningHours?: { openNow?: boolean };
+  types?: string[];
+  websiteUri?: string;
+  editorialSummary?: { text?: string };
+  reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
 };
 
 type GoogleSearchTextResponse = {
@@ -27,6 +31,10 @@ export type PlaceResult = {
   userRatingCount: number | null;
   priceLevel: number | null;
   openNow: boolean | null;
+  types: string[] | null;
+  websiteUri: string | null;
+  editorialSummary: string | null;
+  reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
 };
 
 export type SearchOptions = {
@@ -140,6 +148,16 @@ export async function searchGooglePlaces(
     priceLevel:
       place.priceLevel != null ? PRICE_LEVEL_MAP[place.priceLevel] ?? null : null,
     openNow: place.currentOpeningHours?.openNow ?? null,
+    types: place.types ?? null,
+    websiteUri: place.websiteUri ?? null,
+    editorialSummary: place.editorialSummary?.text ?? null,
+    reviewTexts: (() => {
+      const texts = (place.reviews ?? [])
+        .map((r) => r.text?.text)
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+        .slice(0, 5);
+      return texts.length > 0 ? texts : null;
+    })(),
   }));
 
   const filtered = mapped.filter((p) => {
