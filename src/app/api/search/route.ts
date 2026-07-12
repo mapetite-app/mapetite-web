@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
+import { selectQualityReviews } from "@/lib/review-selection";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -200,6 +201,8 @@ ESEMPI (input → output atteso):
         websiteUri: null,
         editorialSummary: null,
         reviewTexts: null,
+        phone: null,
+        photoRef: null,
       }));
     };
 
@@ -214,5 +217,21 @@ ESEMPI (input → output atteso):
     }
   }
 
-  return NextResponse.json({ risultati, filtri_usati: filtri, sintesi });
+  // Un locale = un solo oggetto completo: fonde la sintesi nei risultati,
+  // sostituisce reviewTexts (server-only) con le recensioni selezionate per la scheda.
+  // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
+  const risultatiFinali = risultati.map((p) => {
+    const s = sintesi[p.id];
+    const { reviewTexts, ...rest } = p;
+    return {
+      ...rest,
+      selectedReviews: selectQualityReviews(reviewTexts),
+      synthesis: s?.synthesis ?? null,
+      tags: s?.tags ?? null,
+      verdict: s?.verdict ?? null,
+      matchReason: s?.matchReason ?? null,
+    };
+  });
+
+  return NextResponse.json({ risultati: risultatiFinali, filtri_usati: filtri });
 }

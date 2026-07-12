@@ -1,4 +1,4 @@
-const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri";
+const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos";
 
 type GooglePlace = {
   id: string;
@@ -14,6 +14,8 @@ type GooglePlace = {
   websiteUri?: string;
   editorialSummary?: { text?: string };
   reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
+  nationalPhoneNumber?: string;
+  photos?: { name: string }[];
 };
 
 type GoogleSearchTextResponse = {
@@ -35,6 +37,8 @@ export type PlaceResult = {
   websiteUri: string | null;
   editorialSummary: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
+  phone: string | null;
+  photoRef: string | null;   // il campo "name" della PRIMA foto, o null
 };
 
 export type SearchOptions = {
@@ -158,6 +162,8 @@ export async function searchGooglePlaces(
         .slice(0, 5);
       return texts.length > 0 ? texts : null;
     })(),
+    phone: place.nationalPhoneNumber ?? null,
+    photoRef: place.photos?.[0]?.name ?? null,
   }));
 
   const filtered = mapped.filter((p) => {
