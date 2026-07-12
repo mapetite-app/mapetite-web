@@ -23,6 +23,17 @@
   /* Ombre */
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 4px 20px rgba(0, 0, 0, 0.12);
+
+  /* Layout — altezza della nav bar mobile: 56px (min-h-14) + safe area.
+     Unica fonte di verità: i consumer la usano come offset dal fondo. */
+  --nav-height-mobile: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Su desktop la nav è in alto: nessun ingombro dal fondo, offset azzerato. */
+@media (min-width: 768px) {
+  :root {
+    --nav-height-mobile: 0px;
+  }
 }
 
 @theme inline {

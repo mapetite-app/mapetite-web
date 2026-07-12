@@ -94,7 +94,10 @@ export default function NavBar({ userId }: { userId: string | null }) {
 
   return (
     <>
-      {/* ── Mobile: barra fissa in basso ── */}
+      {/* ── Mobile: barra fissa in basso ──
+          Altezza effettiva = min-h-14 (56px, sui Link) + pb env(safe-area-inset-bottom).
+          VALORE GEMELLO: --nav-height-mobile in globals.css deve restare sincronizzato
+          con questi due (3.5rem + safe area). Se cambi min-h-14 qui, aggiorna anche la var. */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center bg-surface border-t border-border shadow-float pb-[env(safe-area-inset-bottom)] md:hidden">
         <Link
           href="/mappa"

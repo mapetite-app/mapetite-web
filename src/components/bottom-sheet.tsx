@@ -20,8 +20,8 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-0 left-0 right-0 mx-auto max-w-2xl z-10 flex flex-col overflow-hidden rounded-t-card bg-surface shadow-float"
-      style={{ maxHeight: snapMaxHeight }}
+      className="pointer-events-auto absolute left-0 right-0 mx-auto max-w-2xl z-10 flex flex-col overflow-hidden rounded-t-card bg-surface shadow-float"
+      style={{ maxHeight: snapMaxHeight, bottom: "var(--nav-height-mobile)" }}
     >
       <button
         type="button"

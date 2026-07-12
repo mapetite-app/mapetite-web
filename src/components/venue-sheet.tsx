@@ -233,7 +233,11 @@ export default function VenueSheet({
       )}
 
       {/* 7. ACTION PILLS */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 px-5 pb-5">
+      {/* padding-bottom = pb-5 (1.25rem) + offset nav mobile, così le pill risalgono sopra la nav */}
+      <div
+        className="mt-5 flex flex-wrap items-center gap-2 px-5"
+        style={{ paddingBottom: "calc(1.25rem + var(--nav-height-mobile))" }}
+      >
         {saveSlot}
 
         <a
