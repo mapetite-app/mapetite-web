@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
+import BottomSheet from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -268,7 +269,7 @@ function ReviewForm({
   );
 }
 
-type Place = {
+export type Place = {
   id: string;
   name: string;
   category: string | null;
@@ -1216,74 +1217,6 @@ const displayedPlaces =
         onClose={() => setFiltersOpen(false)}
         onApply={(f) => { setFilters(f); setFiltersOpen(false); void runFilteredSearch(f); }}
       />
-    </div>
-  );
-}
-
-function BottomSheet({
-  places,
-  onSelect,
-  onClose,
-}: {
-  places: Place[];
-  onSelect: (place: Place) => void;
-  onClose: () => void;
-}) {
-  const [snap, setSnap] = useState<"compact" | "medium" | "tall">("medium");
-  const snapClass = snap === "compact" ? "max-h-[25vh]" : snap === "tall" ? "max-h-[75vh]" : "max-h-[45vh]";
-  const cycleSnap = () => setSnap((s) => s === "compact" ? "medium" : s === "medium" ? "tall" : "compact");
-
-  if (places.length === 0) return null;
-
-  return (
-    <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 mx-auto max-w-2xl z-10 ${snapClass} overflow-y-auto rounded-t-card bg-surface shadow-float`}>
-      <button
-        type="button"
-        onClick={cycleSnap}
-        className="sticky top-0 flex w-full cursor-pointer items-center justify-center bg-surface py-2"
-      >
-        <div className="h-1 w-10 rounded-pill bg-border" />
-      </button>
-      <div className="px-3 pb-4">
-        <div className="flex items-center justify-between px-1 pb-2">
-          <p className="text-xs font-sans text-text-muted">
-            {places.length} {places.length === 1 ? "risultato" : "risultati"}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Chiudi lista"
-            className="text-text-muted hover:text-text text-lg leading-none px-1"
-          >
-            ✕
-          </button>
-        </div>
-        <ul className="flex flex-col gap-1">
-          {places.map((place) => (
-            <li key={place.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(place)}
-                className="flex w-full items-start gap-3 rounded-btn px-2 py-2.5 text-left hover:bg-brand/5"
-              >
-                <span className="text-xl leading-none">
-                  {getCategoryEmoji(place.category, place.name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-display font-semibold text-text">
-                    {place.name}
-                  </span>
-                  {place.address && (
-                    <span className="block truncate text-xs font-sans text-text-muted">
-                      {place.address}
-                    </span>
-                  )}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
