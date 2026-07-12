@@ -749,6 +749,7 @@ const displayedPlaces =
         {aiOpen && (
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
+              key={view}
               onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); setFilters(EMPTY_FILTERS); }}
               onClear={() => { setAiSearch(null); setSelected(null); }}
               activeFiltri={aiSearch?.filtri ?? null}
