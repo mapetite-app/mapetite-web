@@ -104,15 +104,18 @@ export default function FiltersSheet({
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — z-[55]: sopra la nav (z-50), sotto il pannello (z-[60]) */}
       <div
-        className="fixed inset-0 z-40 bg-black/40"
+        className="fixed inset-0 z-[55] bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-lg flex-col rounded-t-[24px] bg-surface shadow-float max-h-[85vh]">
+      {/* Sheet — z-[60] per stare sopra la nav; si ferma sopra la nav via offset */}
+      <div
+        className="fixed inset-x-0 z-[60] mx-auto flex max-w-lg flex-col rounded-t-[24px] bg-surface shadow-float"
+        style={{ bottom: "var(--nav-height-mobile)", maxHeight: "var(--sheet-max-h)" }}
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="h-1 w-10 rounded-full bg-border" />

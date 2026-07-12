@@ -12,7 +12,7 @@ export interface BottomSheetProps {
 
 export default function BottomSheet({ places, onSelect, onClose }: BottomSheetProps) {
   const [snap, setSnap] = useState<"compact" | "medium" | "tall">("medium");
-  const snapMaxHeight = snap === "compact" ? "25vh" : snap === "tall" ? "75vh" : "45vh";
+  const snapMaxHeight = snap === "compact" ? "25dvh" : snap === "tall" ? "75dvh" : "45dvh";
   const cycleSnap = () => setSnap((s) => s === "compact" ? "medium" : s === "medium" ? "tall" : "compact");
   const contentRef = useRef<HTMLDivElement>(null);
 

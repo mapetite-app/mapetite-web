@@ -1049,7 +1049,7 @@ const displayedPlaces =
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
             <VenueSheet
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,

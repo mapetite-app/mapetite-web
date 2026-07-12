@@ -27,6 +27,18 @@
   /* Layout — altezza della nav bar mobile: 56px (min-h-14) + safe area.
      Unica fonte di verità: i consumer la usano come offset dal fondo. */
   --nav-height-mobile: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+
+  /* Altezza massima dei bottom-sheet. Base in vh come fallback per browser
+     senza dvh; l'@supports sotto la promuove a dvh (esclude la barra URL iOS). */
+  --sheet-max-h: 85vh;
+}
+
+/* dvh dove supportato: fallback reale via feature query (due righe di custom
+   property "nude" non funzionerebbero — i custom prop non validano l'unità). */
+@supports (height: 100dvh) {
+  :root {
+    --sheet-max-h: 85dvh;
+  }
 }
 
 /* Su desktop la nav è in alto: nessun ingombro dal fondo, offset azzerato. */
