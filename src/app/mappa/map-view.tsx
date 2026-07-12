@@ -121,7 +121,7 @@ function SaveModal({
         />
 
         {error && (
-          <p className="mt-1 text-sm text-red-600">
+          <p className="mt-1 text-sm text-error">
             Errore durante il salvataggio. Riprova.
           </p>
         )}
@@ -176,7 +176,7 @@ function StarPicker({
           aria-label={`${star} stelle`}
           className="text-xl leading-none focus:outline-none"
         >
-          <span className={(hovered || value) >= star ? "text-amber-400" : "text-border"}>
+          <span className={(hovered || value) >= star ? "text-star" : "text-border"}>
             ★
           </span>
         </button>
@@ -247,7 +247,7 @@ function ReviewForm({
         className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {status === "error" && (
-        <p className="text-xs text-red-500">{errorMsg}</p>
+        <p className="text-xs text-error">{errorMsg}</p>
       )}
       {status === "done" && (
         <p className="text-xs text-success">Recensione pubblicata ✓</p>
@@ -336,7 +336,7 @@ function SaveButton({
         {isPending ? "..." : isSaved ? "Salvato" : "Salva"}
       </button>
       {error && (
-        <p className="mt-1 text-sm text-red-600">
+        <p className="mt-1 text-sm text-error">
           Errore durante il salvataggio. Riprova.
         </p>
       )}
@@ -467,7 +467,7 @@ function AISearchPanel({
         </p>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-error">{error}</p>}
 
       {activeFiltri !== null && !isSearching && (
         <p className="mt-2 text-sm font-sans text-text-muted">
@@ -991,7 +991,7 @@ const displayedPlaces =
                         maximumFractionDigits: 1,
                       })}
                     </span>
-                    <span className="text-amber-400 text-sm">
+                    <span className="text-star text-sm">
                       {"★".repeat(Math.round(selectedReviews.avg))}
                       <span className="text-border">
                         {"★".repeat(5 - Math.round(selectedReviews.avg))}
@@ -1005,7 +1005,7 @@ const displayedPlaces =
                   <ul className="mt-1.5 max-h-32 space-y-2 overflow-y-auto">
                     {selectedReviews.items.map((r, i) => (
                       <li key={i} className="text-xs">
-                        <span className="text-amber-400">{"★".repeat(r.rating)}</span>
+                        <span className="text-star">{"★".repeat(r.rating)}</span>
                         <span className="text-border">{"★".repeat(5 - r.rating)}</span>
                         {r.comment && (
                           <p className="mt-0.5 font-sans text-text-muted">{r.comment}</p>

@@ -188,7 +188,7 @@ export default function FiltersSheet({
                   >
                     <Star
                       size={28}
-                      className={filled ? "text-amber-400 fill-amber-400" : "text-text-muted"}
+                      className={filled ? "text-star fill-star" : "text-text-muted"}
                     />
                   </button>
                 );

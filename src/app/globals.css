@@ -13,6 +13,7 @@
   --color-border: #e7e5e4;
   --color-success: #22a06b;
   --color-star: #f5a623;
+  --color-error: #C7442E;   /* rosso desaturato, coerente con il coral #FF6B4A */
 
   /* Raggi */
   --radius-card: 1rem;
@@ -41,6 +42,7 @@
   --color-border: var(--color-border);
   --color-success: var(--color-success);
   --color-star: var(--color-star);
+  --color-error: var(--color-error);
 
   /* Raggi */
   --radius-card: var(--radius-card);
