@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  X,
-  Quote,
-  Bookmark,
-  BookmarkCheck,
-  Navigation,
-  Globe,
-  Phone,
-} from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -28,20 +20,28 @@ export type Venue = {
   synthesis: string | null;
   tags: string[] | null;
   verdict: string | null;
+  personalTags: string[] | null;
+  personalNote: string | null;
 };
 
 type VenueSheetProps = {
   venue: Venue;
   isSaved: boolean;
-  onSave: () => void;
+  canEdit: boolean; // true solo in vista "saved"
+  onEdit: () => void;
   onClose: () => void;
+  saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
+  communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
 };
 
 export default function VenueSheet({
   venue,
   isSaved,
-  onSave,
+  canEdit,
+  onEdit,
   onClose,
+  saveSlot,
+  communitySlot,
 }: VenueSheetProps) {
   const {
     name,
@@ -59,10 +59,15 @@ export default function VenueSheet({
     synthesis,
     tags,
     verdict,
+    personalTags,
+    personalNote,
   } = venue;
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
   const hasTags = tags != null && tags.length > 0;
+  const hasPersonalTags = personalTags != null && personalTags.length > 0;
+  const showPersonalBlock =
+    isSaved && (hasPersonalTags || personalNote != null || canEdit);
   const priceLabel =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
 
@@ -148,7 +153,7 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 3. TAGS */}
+      {/* 3. TAG AI */}
       {hasTags && (
         <div className="mt-4 flex flex-wrap gap-1.5 px-5">
           {tags!.map((tag) => (
@@ -162,7 +167,50 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 4. RECENSIONI */}
+      {/* 4. LE TUE NOTE */}
+      {showPersonalBlock && (
+        <div className="mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4">
+          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            Le tue note
+          </p>
+          {hasPersonalTags && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {personalTags!.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {personalNote != null && (
+            <p className="mt-2 font-sans italic text-text">{personalNote}</p>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="mt-3 rounded-btn border border-border px-3 py-1 text-xs font-display font-semibold text-text-muted hover:text-text"
+            >
+              Modifica
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 5. COMMUNITY — recensioni Mapetite + ReviewForm */}
+      {communitySlot && (
+        <div className="mt-5 border-t border-border px-5 pt-4">
+          <h3 className="font-display text-base font-semibold text-brand">
+            Recensioni Mapetite
+          </h3>
+          <div className="mt-2">{communitySlot}</div>
+        </div>
+      )}
+
+      {/* 6. COSA DICONO — recensioni Google */}
       {hasReviews && (
         <div className="mt-5 px-5">
           <h3 className="font-display text-base font-semibold text-brand">
@@ -184,20 +232,9 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 5. ACTION PILLS */}
-      <div className="mt-5 flex flex-wrap gap-2 px-5 pb-5">
-        <button
-          type="button"
-          onClick={onSave}
-          className={
-            isSaved
-              ? "inline-flex items-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95"
-              : "inline-flex items-center gap-1.5 rounded-pill bg-accent px-4 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95"
-          }
-        >
-          {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-          {isSaved ? "Salvato" : "Salva"}
-        </button>
+      {/* 7. ACTION PILLS */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 px-5 pb-5">
+        {saveSlot}
 
         <a
           href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}

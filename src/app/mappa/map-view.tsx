@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Map, { Marker, Popup } from "react-map-gl/mapbox";
+import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
@@ -28,7 +28,7 @@ function SaveModal({
   mode?: "save" | "edit";
   initialTags?: string[];
   initialNote?: string;
-  onSaved: (tags: string[] | null, note: string | null) => void;
+  onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
 }) {
   const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
@@ -49,11 +49,14 @@ function SaveModal({
       const tags = selectedTags.length > 0 ? selectedTags : null;
       const noteValue = note.trim() || null;
 
+      let savedUuid: string | undefined;
+
       if (mode === "edit") {
         const { error } = await supabase
           .from("saved_places")
           .update({ tags, note: noteValue })
           .eq("user_id", userId)
+          // place.id qui e' gia' l'UUID (vista saved)
           .eq("place_id", place.id);
         if (error) { setError(true); return; }
       } else {
@@ -75,6 +78,7 @@ function SaveModal({
         if (!addRes.ok) { setError(true); return; }
         const addData = await addRes.json();
         const placeUuid: string = addData.place.id;
+        savedUuid = placeUuid;
 
         // 2. collega in saved_places con l'UUID
         const { error } = await supabase
@@ -83,7 +87,7 @@ function SaveModal({
         if (error && error.code !== "23505") { setError(true); return; }
       }
 
-      onSaved(tags, noteValue);
+      onSaved(tags, noteValue, savedUuid);
     });
   };
 
@@ -279,16 +283,18 @@ type Place = {
 
 function SaveButton({
   placeId,
+  googlePlaceId,
   userId,
   isSaved,
   onToggle,
   onSaveRequest,
 }: {
-  placeId: string;
+  placeId: string;        // UUID canonico Supabase: usato per delete e onToggle
+  googlePlaceId: string;  // ID Google: usato per il salvataggio (/api/places/add)
   userId: string | null;
   isSaved: boolean;
   onToggle: (placeId: string, saved: boolean) => void;
-  onSaveRequest: (placeId: string) => void;
+  onSaveRequest: (googlePlaceId: string) => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -301,9 +307,14 @@ function SaveButton({
     }
 
     if (!isSaved) {
-      onSaveRequest(placeId);
+      onSaveRequest(googlePlaceId);
       return;
     }
+
+    const conferma = window.confirm(
+      "Vuoi rimuovere questo locale dai salvati? Perderai i tag e le note che hai aggiunto."
+    );
+    if (!conferma) return;
 
     setError(false);
     startTransition(async () => {
@@ -536,7 +547,9 @@ export default function MapView({
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
-  const [venueOpen, setVenueOpen] = useState(false);
+  // googlePlaceId -> uuid Supabase. Il client conosce i locali per id Google;
+  // Supabase li conosce per UUID. Questa mappa e' il ponte.
+  const [placeUuids, setPlaceUuids] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -553,6 +566,19 @@ export default function MapView({
     }
     return Array.from(seen);
   }, [savedPlaces]);
+
+  // Risolve l'identita' canonica Supabase di un locale, qualunque id abbia il client.
+  const resolveUuid = (id: string): string | null => {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) return id;
+    return placeUuids[id] ?? null;
+  };
+
+  // Un locale e' salvato se il suo UUID canonico e' in savedIds.
+  const isPlaceSaved = (id: string): boolean => {
+    const uuid = resolveUuid(id);
+    return uuid != null && savedIds.has(uuid);
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -576,8 +602,8 @@ export default function MapView({
       setSelectedReviews(null);
       return;
     }
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selected.id);
-    if (!isUuid) {
+    const uuid = resolveUuid(selected.id);
+    if (!uuid) {
       setSelectedReviews(null);
       return;
     }
@@ -585,7 +611,7 @@ export default function MapView({
     supabase
       .from("reviews")
       .select("user_id, rating, comment, created_at")
-      .eq("place_id", selected.id)
+      .eq("place_id", uuid)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         if (!data || data.length === 0) {
@@ -601,7 +627,7 @@ export default function MapView({
           items: data as ReviewItem[],
         });
       });
-  }, [selected?.id]);
+  }, [selected?.id, placeUuids]);
 
   useEffect(() => {
     if (!userId) return;
@@ -610,7 +636,7 @@ export default function MapView({
     const supabase = createClient();
     supabase
       .from("saved_places")
-      .select("tags, note, places(id, name, category, lat, lng)")
+      .select("tags, note, places(id, name, category, lat, lng, google_place_id)")
       .eq("user_id", userId)
       .then(({ data, error }) => {
         setLoadingSaved(false);
@@ -618,29 +644,32 @@ export default function MapView({
           console.error("Errore nel caricamento dei locali salvati:", error);
           return;
         }
+        const uuidMap: Record<string, string> = {};
         const fetched = (data ?? [])
           .map((row) => {
-            const place = row.places as unknown as Place | null;
-            if (!place || place.lat == null || place.lng == null) return null;
+            // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
+            const raw = row.places as unknown as (Place & { google_place_id?: string | null }) | null;
+            if (!raw || raw.lat == null || raw.lng == null) return null;
+            const { google_place_id, ...place } = raw;
+            if (google_place_id) uuidMap[google_place_id] = place.id;
             return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
           })
           .filter((p): p is Place => p !== null);
         setSavedPlaces(fetched);
+        setPlaceUuids((prev) => ({ ...prev, ...uuidMap }));
       });
   }, [userId]);
 
   const handleToggle = (placeId: string, saved: boolean) => {
+    const uuid = resolveUuid(placeId);
+    if (!uuid) return; // senza UUID non c'e' nulla da tracciare
     setSavedIds((prev) => {
       const next = new Set(prev);
-      if (saved) {
-        next.add(placeId);
-      } else {
-        next.delete(placeId);
-      }
+      if (saved) next.add(uuid); else next.delete(uuid);
       return next;
     });
     if (!saved) {
-      setSavedPlaces((prev) => prev.filter((p) => p.id !== placeId));
+      setSavedPlaces((prev) => prev.filter((p) => p.id !== uuid));
       if (view === "saved") setSelected(null);
     }
   };
@@ -1015,153 +1044,112 @@ const displayedPlaces =
           );
         })}
 
-        {selected && (
-          <Popup
-            longitude={selected.lng}
-            latitude={selected.lat}
-            anchor="top"
-            onClose={() => setSelected(null)}
-            closeOnClick={false}
-            maxWidth="210px"
-          >
-            <p className="text-sm font-display font-semibold text-text">{selected.name}</p>
-            <p className="text-xs font-sans text-text-muted">{selected.category}</p>
-            {selected.address && (
-              <p className="text-xs font-sans text-text-muted">{selected.address}</p>
-            )}
-            <div className="mt-2 border-t border-border pt-2">
-              <p className="mb-1 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
-                Recensioni
-              </p>
-              {selectedReviews ? (
-                <>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-base font-display font-semibold text-text">
-                      {selectedReviews.avg.toLocaleString("it-IT", {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
-                    </span>
-                    <span className="text-star text-sm">
-                      {"★".repeat(Math.round(selectedReviews.avg))}
-                      <span className="text-border">
-                        {"★".repeat(5 - Math.round(selectedReviews.avg))}
-                      </span>
-                    </span>
-                    <span className="text-xs font-sans text-text-muted">
-                      su {selectedReviews.count}{" "}
-                      {selectedReviews.count === 1 ? "recensione" : "recensioni"}
-                    </span>
-                  </div>
-                  <ul className="mt-1.5 max-h-32 space-y-2 overflow-y-auto">
-                    {selectedReviews.items.map((r, i) => (
-                      <li key={i} className="text-xs">
-                        <span className="text-star">{"★".repeat(r.rating)}</span>
-                        <span className="text-border">{"★".repeat(5 - r.rating)}</span>
-                        {r.comment && (
-                          <p className="mt-0.5 font-sans text-text-muted">{r.comment}</p>
-                        )}
-                        <p className="font-sans text-text-muted">
-                          {new Date(r.created_at).toLocaleDateString("it-IT", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="text-xs font-sans text-text-muted">Ancora nessuna recensione.</p>
-              )}
-              {userId ? (
-                <ReviewForm
-                  placeId={selected.id}
-                  userId={userId}
-                  existing={
-                    selectedReviews?.items.find((r) => r.user_id === userId) ?? null
-                  }
-                  onSaved={(items) => {
-                    if (items.length === 0) {
-                      setSelectedReviews(null);
-                      return;
-                    }
-                    const avg =
-                      items.reduce((sum, r) => sum + r.rating, 0) / items.length;
-                    setSelectedReviews({ avg, count: items.length, items });
-                  }}
-                />
-              ) : (
-                <p className="mt-2 text-xs font-sans text-text-muted">
-                  <a href="/login" className="underline hover:text-text">
-                    Accedi
-                  </a>{" "}
-                  per lasciare una recensione.
-                </p>
-              )}
-            </div>
-            {selected.tags && selected.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {selected.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-pill bg-accent-light px-2 py-0.5 text-xs font-display font-medium text-accent"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            {selected.note && (
-              <p className="mt-1.5 text-xs font-sans text-text-muted italic">{selected.note}</p>
-            )}
-            {view === "saved" && (
-              <button
-                type="button"
-                onClick={() => setPendingEditPlace(selected)}
-                className="mt-2 rounded-btn border border-border px-3 py-1 text-xs font-display font-semibold text-text-muted hover:text-text"
-              >
-                Modifica
-              </button>
-            )}
-            {venueDetails[selected.id]?.verdict != null && (
-              <button
-                type="button"
-                onClick={() => setVenueOpen(true)}
-                className="mt-2 flex items-center gap-1.5 rounded-btn bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white"
-              >
-                <Sparkles size={14} />
-                Scopri di più
-              </button>
-            )}
-            <SaveButton
-              placeId={selected.id}
-              userId={userId}
-              isSaved={savedIds.has(selected.id)}
-              onToggle={handleToggle}
-              onSaveRequest={(placeId) => setPendingSavePlaceId(placeId)}
-            />
-          </Popup>
-        )}
       </Map>
 
-      {venueOpen && selected && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setVenueOpen(false)}>
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSelected(null)}>
           <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
             <VenueSheet
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
                 category: selected.category, rating: selected.rating,
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
+                personalTags: selected.tags,
+                personalNote: selected.note,
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
                   selectedReviews: null, synthesis: null, tags: null, verdict: null,
                 }),
               }}
-              isSaved={savedIds.has(selected.id)}
-              onSave={() => setPendingSavePlaceId(selected.id)}
-              onClose={() => setVenueOpen(false)}
+              isSaved={isPlaceSaved(selected.id)}
+              canEdit={view === "saved"}
+              onEdit={() => setPendingEditPlace(selected)}
+              onClose={() => setSelected(null)}
+              saveSlot={
+                <SaveButton
+                  placeId={resolveUuid(selected.id) ?? selected.id}
+                  googlePlaceId={selected.id}
+                  userId={userId}
+                  isSaved={isPlaceSaved(selected.id)}
+                  onToggle={handleToggle}
+                  onSaveRequest={(googlePlaceId) => setPendingSavePlaceId(googlePlaceId)}
+                />
+              }
+              communitySlot={
+                <>
+                  {selectedReviews ? (
+                    <>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base font-display font-semibold text-text">
+                          {selectedReviews.avg.toLocaleString("it-IT", {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                        </span>
+                        <span className="text-star text-sm">
+                          {"★".repeat(Math.round(selectedReviews.avg))}
+                          <span className="text-border">
+                            {"★".repeat(5 - Math.round(selectedReviews.avg))}
+                          </span>
+                        </span>
+                        <span className="text-xs font-sans text-text-muted">
+                          su {selectedReviews.count}{" "}
+                          {selectedReviews.count === 1 ? "recensione" : "recensioni"}
+                        </span>
+                      </div>
+                      <ul className="mt-1.5 max-h-32 space-y-2 overflow-y-auto">
+                        {selectedReviews.items.map((r, i) => (
+                          <li key={i} className="text-xs">
+                            <span className="text-star">{"★".repeat(r.rating)}</span>
+                            <span className="text-border">{"★".repeat(5 - r.rating)}</span>
+                            {r.comment && (
+                              <p className="mt-0.5 font-sans text-text-muted">{r.comment}</p>
+                            )}
+                            <p className="font-sans text-text-muted">
+                              {new Date(r.created_at).toLocaleDateString("it-IT", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-xs font-sans text-text-muted">Ancora nessuna recensione.</p>
+                  )}
+                  {!userId ? (
+                    <p className="mt-2 text-xs font-sans text-text-muted">
+                      <a href="/login" className="underline hover:text-text">
+                        Accedi
+                      </a>{" "}
+                      per lasciare una recensione.
+                    </p>
+                  ) : resolveUuid(selected.id) === null ? (
+                    <p className="mt-2 text-xs font-sans text-text-muted">
+                      Salva questo locale per poter lasciare una recensione.
+                    </p>
+                  ) : (
+                    <ReviewForm
+                      placeId={resolveUuid(selected.id)!}
+                      userId={userId}
+                      existing={
+                        selectedReviews?.items.find((r) => r.user_id === userId) ?? null
+                      }
+                      onSaved={(items) => {
+                        if (items.length === 0) {
+                          setSelectedReviews(null);
+                          return;
+                        }
+                        const avg =
+                          items.reduce((sum, r) => sum + r.rating, 0) / items.length;
+                        setSelectedReviews({ avg, count: items.length, items });
+                      }}
+                    />
+                  )}
+                </>
+              }
             />
           </div>
         </div>
@@ -1175,9 +1163,15 @@ const displayedPlaces =
           <SaveModal
             place={pendingPlace}
             userId={userId}
-            onSaved={(tags, note) => {
-              handleToggle(pendingPlace.id, true);
-              setSavedPlaces(prev => [...prev.filter(p => p.id !== pendingPlace.id), { ...pendingPlace, tags, note }]);
+            onSaved={(tags, note, uuid) => {
+              if (uuid) {
+                setPlaceUuids((prev) => ({ ...prev, [pendingPlace.id]: uuid }));
+                setSavedIds((prev) => new Set(prev).add(uuid));
+              }
+              setSavedPlaces(prev => [
+                ...prev.filter(p => p.id !== uuid),
+                { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note },
+              ]);
               setPendingSavePlaceId(null);
             }}
             onCancel={() => setPendingSavePlaceId(null)}

@@ -56,7 +56,13 @@ export type SearchOptions = {
 
 const DEFAULT_RADIUS = 1500;
 const DEFAULT_LIMIT = 20;
-const FETCH_MULTIPLIER = 3;
+const FETCH_MULTIPLIER = 4;
+
+// Pavimento di qualita': sotto queste soglie un locale non entra mai nei risultati,
+// indipendentemente dai filtri utente. Soglia bassa di proposito: lascia passare
+// il locale "poco recensito ma buono", che l'arricchimento multi-fonte sapra' poi promuovere.
+const FLOOR_RATING = 3.5;
+const FLOOR_REVIEWS = 20;
 
 const PRICE_LEVEL_MAP: Record<string, number> = {
   PRICE_LEVEL_FREE: 0,
@@ -167,6 +173,10 @@ export async function searchGooglePlaces(
   }));
 
   const filtered = mapped.filter((p) => {
+    // Pavimento di qualita': sempre attivo, prima dei filtri utente.
+    if ((p.rating ?? 0) < FLOOR_RATING) return false;
+    if ((p.userRatingCount ?? 0) < FLOOR_REVIEWS) return false;
+    // Filtri utente: possono solo alzare l'asticella.
     if (minRating != null && (p.rating ?? 0) < minRating) return false;
     if (minReviews != null && (p.userRatingCount ?? 0) < minReviews) return false;
     if (minPriceLevel != null && (p.priceLevel ?? -1) < minPriceLevel) return false;
@@ -179,17 +189,8 @@ export async function searchGooglePlaces(
     return true;
   });
 
-  const hasFilters =
-    minRating != null ||
-    minReviews != null ||
-    minPriceLevel != null ||
-    maxPriceLevel != null ||
-    openNowOnly === true ||
-    (categories != null && categories.length > 0);
-
-  if (hasFilters) {
-    filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));
-  }
+  // Sort per qualita' sempre applicato: nel mondo Mapetite l'ordine e' la qualita', non la rilevanza Google.
+  filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));
 
   return filtered.slice(0, limit);
 }
