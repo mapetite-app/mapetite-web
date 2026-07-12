@@ -9,6 +9,7 @@ import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
+import VenueSheet from "@/components/venue-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -368,6 +369,19 @@ function buildAISummary(filtri: AIFiltri): string {
   return "Ho cercato: " + (parts.length > 0 ? parts.join(" · ") : "qualsiasi locale");
 }
 
+// Dettaglio editoriale di un locale, tenuto a lato del marker leggero `Place`
+// (Place resta minimale perché Supercluster ne renderizza a centinaia).
+type VenueDetails = {
+  userRatingCount: number | null;
+  openNow: boolean | null;
+  websiteUri: string | null;
+  phone: string | null;
+  selectedReviews: { text: string }[] | null;
+  synthesis: string | null;
+  tags: string[] | null;
+  verdict: string | null;
+};
+
 function AISearchPanel({
   onResults,
   onClear,
@@ -376,7 +390,7 @@ function AISearchPanel({
   view,
   viewState,
 }: {
-  onResults: (places: Place[], filtri: AIFiltri) => void;
+  onResults: (places: Place[], filtri: AIFiltri, details: Record<string, VenueDetails>) => void;
   onClear: () => void;
   activeFiltri: AIFiltri | null;
   activeCount: number | null;
@@ -408,22 +422,39 @@ function AISearchPanel({
         setError(data.error ?? "Qualcosa è andato storto. Riprova.");
         return;
       }
-      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null; rating: number | null; priceLevel: number | null; address: string | null };
-      const places: Place[] = (data.risultati ?? [])
-        .filter((p: RawPlace) => p.lat != null && p.lng != null)
-        .map((p: RawPlace) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category,
-          address: p.address ?? null,
-          lat: p.lat as number,
-          lng: p.lng as number,
-          tags: null,
-          note: null,
-          rating: p.rating ?? null,
-          priceLevel: p.priceLevel ?? null,
-        }));
-      onResults(places, data.filtri_usati);
+      type RawPlace = {
+        id: string; name: string; category: string | null; lat: number | null; lng: number | null;
+        rating: number | null; priceLevel: number | null; address: string | null;
+        userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
+        selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
+      };
+      const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
+      const places: Place[] = raw.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        address: p.address ?? null,
+        lat: p.lat as number,
+        lng: p.lng as number,
+        tags: null,
+        note: null,
+        rating: p.rating ?? null,
+        priceLevel: p.priceLevel ?? null,
+      }));
+      const details: Record<string, VenueDetails> = {};
+      for (const p of raw) {
+        details[p.id] = {
+          userRatingCount: p.userRatingCount ?? null,
+          openNow: p.openNow ?? null,
+          websiteUri: p.websiteUri ?? null,
+          phone: p.phone ?? null,
+          selectedReviews: p.selectedReviews ?? null,
+          synthesis: p.synthesis ?? null,
+          tags: p.tags ?? null,
+          verdict: p.verdict ?? null,
+        };
+      }
+      onResults(places, data.filtri_usati, details);
     } catch {
       setError("Errore di rete. Controlla la connessione e riprova.");
     } finally {
@@ -504,6 +535,8 @@ export default function MapView({
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
+  const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
+  const [venueOpen, setVenueOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -660,11 +693,29 @@ export default function MapView({
       });
       const data = await res.json();
       if (!res.ok) return;
-      type RawPlace = { id: string; name: string; category: string | null; lat: number | null; lng: number | null; rating: number | null; priceLevel: number | null; address: string | null };
-      const places: Place[] = (data.risultati ?? [])
-        .filter((p: RawPlace) => p.lat != null && p.lng != null)
-        .map((p: RawPlace) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
+      type RawPlace = {
+        id: string; name: string; category: string | null; lat: number | null; lng: number | null;
+        rating: number | null; priceLevel: number | null; address: string | null;
+        userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
+        selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
+      };
+      const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
+      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
+      const details: Record<string, VenueDetails> = {};
+      for (const p of raw) {
+        details[p.id] = {
+          userRatingCount: p.userRatingCount ?? null,
+          openNow: p.openNow ?? null,
+          websiteUri: p.websiteUri ?? null,
+          phone: p.phone ?? null,
+          selectedReviews: p.selectedReviews ?? null,
+          synthesis: p.synthesis ?? null,
+          tags: p.tags ?? null,
+          verdict: p.verdict ?? null,
+        };
+      }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
+      setVenueDetails(details);
       setSelected(null);
     } catch {
       // silenzioso per ora
@@ -750,7 +801,7 @@ const displayedPlaces =
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
               key={view}
-              onResults={(places, filtri) => { setAiSearch({ risultati: places, filtri }); setSelected(null); setFilters(EMPTY_FILTERS); }}
+              onResults={(places, filtri, details) => { setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setSelected(null); setFilters(EMPTY_FILTERS); }}
               onClear={() => { setAiSearch(null); setSelected(null); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
@@ -1074,6 +1125,16 @@ const displayedPlaces =
                 Modifica
               </button>
             )}
+            {venueDetails[selected.id]?.verdict != null && (
+              <button
+                type="button"
+                onClick={() => setVenueOpen(true)}
+                className="mt-2 flex items-center gap-1.5 rounded-btn bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white"
+              >
+                <Sparkles size={14} />
+                Scopri di più
+              </button>
+            )}
             <SaveButton
               placeId={selected.id}
               userId={userId}
@@ -1084,6 +1145,27 @@ const displayedPlaces =
           </Popup>
         )}
       </Map>
+
+      {venueOpen && selected && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setVenueOpen(false)}>
+          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
+            <VenueSheet
+              venue={{
+                id: selected.id, name: selected.name, address: selected.address,
+                category: selected.category, rating: selected.rating,
+                priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
+                ...(venueDetails[selected.id] ?? {
+                  userRatingCount: null, openNow: null, websiteUri: null, phone: null,
+                  selectedReviews: null, synthesis: null, tags: null, verdict: null,
+                }),
+              }}
+              isSaved={savedIds.has(selected.id)}
+              onSave={() => setPendingSavePlaceId(selected.id)}
+              onClose={() => setVenueOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {(() => {
         const pendingPlace = pendingSavePlaceId
