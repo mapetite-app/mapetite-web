@@ -38,8 +38,8 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
           <button
             type="button"
             onClick={onClose}
-            aria-label="Chiudi lista"
-            className="text-text-muted hover:text-text text-lg leading-none px-1"
+            aria-label="Chiudi"
+            className="-my-2 -mr-1 flex h-11 w-11 select-none touch-manipulation items-center justify-center text-lg leading-none text-text-muted hover:text-text"
           >
             ✕
           </button>
