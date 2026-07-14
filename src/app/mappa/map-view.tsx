@@ -551,6 +551,9 @@ export default function MapView({
   // Locali del cluster su cui si è tappato: se valorizzato, la lista mostra
   // solo questi invece di displayedPlaces.
   const [clusterPlaces, setClusterPlaces] = useState<Place[] | null>(null);
+  // Feedback della ricerca filtrata sul ramo "world" (fetch a /api/search).
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
   // googlePlaceId -> uuid Supabase. Il client conosce i locali per id Google;
   // Supabase li conosce per UUID. Questa mappa e' il ponte.
   const [placeUuids, setPlaceUuids] = useState<Record<string, string>>({});
@@ -743,6 +746,8 @@ export default function MapView({
       query = "ristoranti bar locali";
     }
 
+    setFilterError(null);
+    setFilterLoading(true);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
@@ -762,7 +767,7 @@ export default function MapView({
         }),
       });
       const data = await res.json();
-      if (!res.ok) return;
+      if (!res.ok) { setFilterError("Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
         id: string; name: string; category: string | null; lat: number | null; lng: number | null;
         rating: number | null; priceLevel: number | null; address: string | null;
@@ -788,7 +793,9 @@ export default function MapView({
       setVenueDetails(details);
       dispatch({ type: "OPEN_LIST" });
     } catch {
-      // silenzioso per ora
+      setFilterError("Ricerca non riuscita. Riprova.");
+    } finally {
+      setFilterLoading(false);
     }
   };
 
@@ -1202,6 +1209,27 @@ export default function MapView({
           }}
           onCancel={() => setPendingEditPlace(null)}
         />
+      )}
+
+      {filterLoading && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-pill bg-surface px-4 py-2 shadow-float">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-accent" />
+            <span className="text-sm font-sans text-text">Sto cercando…</span>
+          </div>
+        </div>
+      )}
+
+      {filterError && (
+        <div className="absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
+          <button
+            type="button"
+            onClick={() => setFilterError(null)}
+            className="rounded-pill bg-surface px-4 py-2 text-sm font-sans text-text shadow-float"
+          >
+            {filterError} ✕
+          </button>
+        </div>
       )}
 
       {overlay.kind === "list" && (
