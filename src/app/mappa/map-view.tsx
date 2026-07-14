@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
@@ -12,6 +12,7 @@ import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/compon
 import VenueSheet from "@/components/venue-sheet";
 import BottomSheet from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
+import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 
@@ -536,7 +537,6 @@ export default function MapView({
   userId: string | null;
 }) {
   const [places, setPlaces] = useState<Place[]>(initialPlaces);
-  const [selected, setSelected] = useState<Place | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
@@ -552,13 +552,50 @@ export default function MapView({
   // Supabase li conosce per UUID. Questa mappa e' il ponte.
   const [placeUuids, setPlaceUuids] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
   const [selectedReviews, setSelectedReviews] = useState<{
     avg: number;
     count: number;
     items: ReviewItem[];
   } | null>(null);
+
+  // Lista attiva: risultati AI, oppure i salvati (eventualmente per tag).
+  // È un dato, non una visibilità — ma è anche la risposta a "c'è qualcosa
+  // da mostrare in lista?", quindi va calcolata PRIMA del dispatch.
+  const displayedPlaces =
+    aiSearch !== null
+      ? aiSearch.risultati
+      : view === "all"
+        ? []
+        : activeTag === null
+          ? savedPlaces
+          : savedPlaces.filter((p) => p.tags?.includes(activeTag));
+
+  // --- Overlay: autorità unica sulla visibilità dei pannelli ---
+  // Un solo pannello visibile alla volta. Il dispatch è avvolto in una
+  // funzione che inietta il contesto (c'è una lista da mostrare?) di cui il
+  // reducer ha bisogno per decidere dove tornare su CLOSE.
+  const [overlay, dispatchRaw] = useReducer(
+    (state: Overlay, wrapped: { action: OverlayAction; ctx: { hasResults: boolean } }): Overlay =>
+      overlayReducer(state, wrapped.action, wrapped.ctx),
+    { kind: "none" } as Overlay,
+  );
+  const dispatch = (action: OverlayAction) =>
+    dispatchRaw({ action, ctx: { hasResults: displayedPlaces.length > 0 } });
+
+  // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
+  // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
+  const selected = useMemo<Place | null>(() => {
+    if (overlay.kind !== "venue") return null;
+    const id = overlay.placeId;
+    const base =
+      places.find((p) => p.id === id) ??
+      displayedPlaces.find((p) => p.id === id) ??
+      savedPlaces.find((p) => p.id === id) ??
+      null;
+    if (!base) return null;
+    const savedVersion = savedPlaces.find((p) => p.id === id);
+    return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
+  }, [overlay, places, displayedPlaces, savedPlaces]);
 
   const availableTags = useMemo(() => {
     const seen = new Set<string>();
@@ -671,7 +708,7 @@ export default function MapView({
     });
     if (!saved) {
       setSavedPlaces((prev) => prev.filter((p) => p.id !== uuid));
-      if (view === "saved") setSelected(null);
+      if (view === "saved") dispatch({ type: "CLOSE" });
     }
   };
 
@@ -692,7 +729,7 @@ export default function MapView({
           })
         : savedPlaces;
       setAiSearch({ risultati: filtered, filtri: null });
-      setSelected(null);
+      dispatch({ type: "OPEN_LIST" });
       return;
     }
 
@@ -746,20 +783,11 @@ export default function MapView({
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setVenueDetails(details);
-      setSelected(null);
+      dispatch({ type: "OPEN_LIST" });
     } catch {
       // silenzioso per ora
     }
   };
-
-const displayedPlaces =
-    aiSearch !== null
-      ? aiSearch.risultati
-      : view === "all"
-        ? []
-        : activeTag === null
-          ? savedPlaces
-          : savedPlaces.filter((p) => p.tags?.includes(activeTag));
 
   const clusterIndex = useMemo(() => {
     const points = displayedPlaces.map((place) => ({
@@ -796,10 +824,9 @@ const displayedPlaces =
           <button
             type="button"
             onClick={() => {
-              setSelected(null);
               setFilters(EMPTY_FILTERS);
-              if (aiOpen) { setAiOpen(false); setAiSearch(null); }
-              else { setAiOpen(true); setAiSearch(null); }
+              setAiSearch(null);
+              dispatch({ type: overlay.kind === "ai" ? "RESET" : "OPEN_AI" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
@@ -811,10 +838,8 @@ const displayedPlaces =
           <button
             type="button"
             onClick={() => {
-              setSelected(null);
-              setAiOpen(false);
               setAiSearch(null);
-              setFiltersOpen(true);
+              dispatch({ type: "OPEN_FILTERS" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
@@ -827,12 +852,12 @@ const displayedPlaces =
           </button>
         </div>
         {/* Pannello AI espandibile */}
-        {aiOpen && (
+        {overlay.kind === "ai" && (
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
               key={view}
-              onResults={(places, filtri, details) => { setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setSelected(null); setFilters(EMPTY_FILTERS); }}
-              onClear={() => { setAiSearch(null); setSelected(null); }}
+              onResults={(places, filtri, details) => { setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
+              onClear={() => { setAiSearch(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               view={view}
@@ -843,7 +868,7 @@ const displayedPlaces =
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setSelected(null); setActiveTag(null); setAiSearch(null); }}
+            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -854,7 +879,7 @@ const displayedPlaces =
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setSelected(null); setAiSearch(null); }}
+            onClick={() => { setView("saved"); setAiSearch(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -962,7 +987,7 @@ const displayedPlaces =
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
-        onClick={() => setSelected(null)}
+        onClick={() => dispatch({ type: "CLOSE" })}
       >
         {clusters.map((c) => {
           const [lng, lat] = c.geometry.coordinates;
@@ -1029,9 +1054,7 @@ const displayedPlaces =
               anchor="bottom"
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
-                const base = places.find(p => p.id === place.id) ?? place;
-                const savedVersion = savedPlaces.find(p => p.id === place.id);
-                setSelected(savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base);
+                dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
             >
               <span
@@ -1048,7 +1071,7 @@ const displayedPlaces =
       </Map>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
           <div className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
             <VenueSheet
               venue={{
@@ -1065,7 +1088,7 @@ const displayedPlaces =
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onEdit={() => setPendingEditPlace(selected)}
-              onClose={() => setSelected(null)}
+              onClose={() => dispatch({ type: "CLOSE" })}
               saveSlot={
                 <SaveButton
                   placeId={resolveUuid(selected.id) ?? selected.id}
@@ -1192,30 +1215,29 @@ const displayedPlaces =
             setSavedPlaces((prev) =>
               prev.map((p) => (p.id === pendingEditPlace.id ? updated : p))
             );
-            setSelected((prev) =>
-              prev?.id === pendingEditPlace.id ? updated : prev
-            );
             setPendingEditPlace(null);
           }}
           onCancel={() => setPendingEditPlace(null)}
         />
       )}
 
-      <BottomSheet
-        places={displayedPlaces}
-        onSelect={(place) => {
-          setSelected(place);
-          const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-          if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
-        }}
-        onClose={() => { setAiSearch(null); setSelected(null); }}
-      />
+      {overlay.kind === "list" && (
+        <BottomSheet
+          places={displayedPlaces}
+          onSelect={(place) => {
+            dispatch({ type: "OPEN_VENUE", placeId: place.id });
+            const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+            if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
+          }}
+          onClose={() => { setAiSearch(null); dispatch({ type: "RESET" }); }}
+        />
+      )}
 
       <FiltersSheet
-        isOpen={filtersOpen}
+        isOpen={overlay.kind === "filters"}
         filters={filters}
-        onClose={() => setFiltersOpen(false)}
-        onApply={(f) => { setFilters(f); setFiltersOpen(false); void runFilteredSearch(f); }}
+        onClose={() => dispatch({ type: "CLOSE" })}
+        onApply={(f) => { setFilters(f); void runFilteredSearch(f); }}
       />
     </div>
   );
