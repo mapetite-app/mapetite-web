@@ -866,8 +866,8 @@ export default function MapView({
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
               key={view}
-              onResults={(places, filtri, details) => { setClusterPlaces(null); setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
-              onClear={() => { setClusterPlaces(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+              onResults={(places, filtri, details) => { setClusterPlaces(null); setFilterError(null); setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
+              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               view={view}
@@ -878,7 +878,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setClusterPlaces(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -889,7 +889,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setAiSearch(null); setClusterPlaces(null); dispatch({ type: "OPEN_LIST" }); }}
+            onClick={() => { setView("saved"); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -903,7 +903,7 @@ export default function MapView({
           <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-card border border-border bg-surface p-2 shadow-float">
             <button
               type="button"
-              onClick={() => { setActiveTag(null); setAiSearch(null); setClusterPlaces(null); }}
+              onClick={() => { setActiveTag(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
               className={
                 activeTag === null
                   ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
@@ -916,7 +916,7 @@ export default function MapView({
               <button
                 key={tag}
                 type="button"
-                onClick={() => { setActiveTag(tag); setAiSearch(null); setClusterPlaces(null); }}
+                onClick={() => { setActiveTag(tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
                 className={
                   activeTag === tag
                     ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
@@ -997,7 +997,7 @@ export default function MapView({
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
-        onClick={() => { setClusterPlaces(null); dispatch({ type: "CLOSE" }); }}
+        onClick={() => { setClusterPlaces(null); setFilterError(null); dispatch({ type: "CLOSE" }); }}
       >
         {clusters.map((c) => {
           const [lng, lat] = c.geometry.coordinates;
@@ -1240,7 +1240,7 @@ export default function MapView({
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
-          onClose={() => { setClusterPlaces(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
         />
       )}
 
@@ -1248,7 +1248,7 @@ export default function MapView({
         isOpen={overlay.kind === "filters"}
         filters={filters}
         onClose={() => dispatch({ type: "CLOSE" })}
-        onApply={(f) => { setClusterPlaces(null); setFilters(f); void runFilteredSearch(f); }}
+        onApply={(f) => { setClusterPlaces(null); setFilterError(null); setFilters(f); void runFilteredSearch(f); }}
       />
     </div>
   );
