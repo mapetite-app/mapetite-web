@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Inter } from "next/font/google";
 import NavBar from "@/components/nav-bar";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +21,19 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Mapetite",
   description: "Trova e salva i tuoi locali preferiti",
+  applicationName: "Mapetite",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Mapetite",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a3c40",
 };
 
 export default async function RootLayout({
