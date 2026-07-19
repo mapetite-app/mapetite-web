@@ -4,6 +4,7 @@
 // place_id = Google Places id (text), coerente con place_synthesis. Nessuna FK.
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { YouTubeVideo } from "@/lib/youtube";
 
 export type EnrichmentSource =
   | "google"
@@ -84,6 +85,42 @@ export function mapEditorialToEnrichment(placeId: string, input: EditorialInput)
     comment: input.comment ?? null,
     source_url: input.source_url ?? null,
     metadata: input.metadata ?? {},
+  };
+}
+
+// --- MAPPER: YouTube → riga enrichment -----------------------------------
+// Fonte automatica. I video arrivano già ordinati per rilevanza: il primo è il
+// "top" e diventa la riga. YouTube non dà rating, quindi il valore è il title
+// del video top; gli altri video (2 e 3) restano in metadata.otherVideos.
+// Ritorna null se non c'è alcun video: nessuna riga da scrivere.
+export function mapYouTubeToEnrichment(
+  placeId: string,
+  videos: YouTubeVideo[]
+): EnrichmentRow | null {
+  if (!videos.length) return null;
+
+  const [top, ...rest] = videos;
+
+  return {
+    place_id: placeId,
+    source: "youtube",
+    source_kind: "automatic",
+    rating_value: null,
+    rating_scale: null,
+    ranking: null,
+    comment: top.title,
+    source_url: `https://www.youtube.com/watch?v=${top.videoId}`,
+    metadata: {
+      channelTitle: top.channelTitle,
+      publishedAt: top.publishedAt,
+      thumbnailUrl: top.thumbnailUrl,
+      otherVideos: rest.slice(0, 2).map((v) => ({
+        videoId: v.videoId,
+        title: v.title,
+        channelTitle: v.channelTitle,
+        thumbnailUrl: v.thumbnailUrl,
+      })),
+    },
   };
 }
 
