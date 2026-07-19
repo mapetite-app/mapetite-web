@@ -10,7 +10,8 @@ export type EnrichmentSource =
   | "youtube"
   | "tripadvisor"
   | "michelin"
-  | "gambero_rosso";
+  | "gambero_rosso"
+  | "puntarella_rossa";
 
 export type SourceKind = "automatic" | "editorial";
 
@@ -59,6 +60,33 @@ export function mapGoogleToEnrichment(
   };
 }
 
+// --- MAPPER: editoriale → riga enrichment --------------------------------
+// Guide cartacee/online (Michelin, Gambero Rosso, Puntarella Rossa): verdetto
+// testuale, inserito a mano sui locali di punta. source_kind = "editorial".
+export interface EditorialInput {
+  source: Extract<EnrichmentSource, "michelin" | "gambero_rosso" | "puntarella_rossa">;
+  rating_value?: string | null;   // es. "1 stella", "Due Gamberi", "Trovato"
+  rating_scale?: string | null;   // es. "3 stelle Michelin"
+  ranking?: string | null;
+  comment?: string | null;        // il verdetto editoriale, testo libero
+  source_url?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export function mapEditorialToEnrichment(placeId: string, input: EditorialInput): EnrichmentRow {
+  return {
+    place_id: placeId,
+    source: input.source,
+    source_kind: "editorial",
+    rating_value: input.rating_value ?? null,
+    rating_scale: input.rating_scale ?? null,
+    ranking: input.ranking ?? null,
+    comment: input.comment ?? null,
+    source_url: input.source_url ?? null,
+    metadata: input.metadata ?? {},
+  };
+}
+
 // --- SCRITTURA: canale unico su enrichment ------------------------------
 // Upsert idempotente sulla unique(place_id, source). Degrada in sicurezza:
 // logga e ritorna false invece di lanciare — l'arricchimento è additivo.
@@ -88,8 +116,9 @@ const SOURCE_ORDER: Record<string, number> = {
   google: 0,
   tripadvisor: 1,
   michelin: 2,
-  gambero_rosso: 3,
-  youtube: 4,
+  puntarella_rossa: 3,
+  gambero_rosso: 4,
+  youtube: 5,
 };
 
 export async function getEnrichment(placeId: string): Promise<EnrichmentRow[]> {
