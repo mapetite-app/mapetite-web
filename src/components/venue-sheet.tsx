@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone, Sparkles } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Sparkles, Check } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -20,8 +20,8 @@ export type Venue = {
   synthesis: string | null;
   tags: string[] | null;
   verdict: string | null;
-  goFor: string | null;
-  dontExpect: string | null;
+  goFor: string[] | null;
+  dontExpect: string[] | null;
   matchReason: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
@@ -70,20 +70,22 @@ export default function VenueSheet({
   } = venue;
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
-  // Verdetto bipolare: mostrati solo se non vuoti. dont_expect è spesso "" per
-  // il vincolo feroce lato prompt → resta nascosto. Se entrambi vuoti (cache
-  // vecchia) il blocco degrada al verdict singolo, come prima.
+  // Verdetto bipolare come CHIP: filtra gli elementi non vuoti dell'array.
+  // dont_expect è spesso [] per il vincolo feroce lato prompt → resta nascosto.
   const matchReasonText =
     matchReason != null && matchReason.trim() !== "" ? matchReason.trim() : null;
   const verdictText =
     verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
-  const goForText = goFor != null && goFor.trim() !== "" ? goFor.trim() : null;
-  const dontExpectText =
-    dontExpect != null && dontExpect.trim() !== "" ? dontExpect.trim() : null;
+  const goForChips = Array.isArray(goFor)
+    ? goFor.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
+    : [];
+  const dontExpectChips = Array.isArray(dontExpect)
+    ? dontExpect.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
+    : [];
   // Il blocco appare se ALMENO UNO tra verdict e i due poli è presente: il
-  // prompt bipolare può produrre goFor/dontExpect anche con verdict vuoto.
+  // prompt bipolare può produrre chip anche con verdict vuoto.
   const hasVerdictBlock =
-    verdictText != null || goForText != null || dontExpectText != null;
+    verdictText != null || goForChips.length > 0 || dontExpectChips.length > 0;
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
@@ -173,43 +175,63 @@ export default function VenueSheet({
 
       {/* 2. BLOCCO VERDICT */}
       {hasVerdictBlock && (
-        <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
-          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-            Il verdetto Mapetite
-          </p>
-          {verdictText && (
-            <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
-              {verdictText}
-            </p>
-          )}
-          {synthesis != null && (
-            <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
-              {synthesis}
-            </p>
+        <>
+          {/* Card verdetto (teal): verdict + synthesis. */}
+          {(verdictText != null || synthesis != null) && (
+            <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+                Il verdetto Mapetite
+              </p>
+              {verdictText && (
+                <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
+                  {verdictText}
+                </p>
+              )}
+              {synthesis != null && (
+                <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
+                  {synthesis}
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Verdetto bipolare: orientamento, mai stroncatura. */}
-          {goForText && (
-            <div className="mt-4 border-t border-white/15 pt-3">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                Ci dovresti andare se…
+          {/* Chip bipolari FUORI dalla card, su bg-surface: orientamento, mai stroncatura. */}
+          {goForChips.length > 0 && (
+            <div className="mx-5 mt-4">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-brand">
+                Ci dovresti andare se
               </p>
-              <p className="mt-1 font-sans text-sm leading-relaxed text-white">
-                {goForText}
-              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {goForChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand"
+                  >
+                    <Check size={12} className="shrink-0" />
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-          {dontExpectText && (
-            <div className="mt-3">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">
-                Non aspettarti…
+          {dontExpectChips.length > 0 && (
+            <div className="mx-5 mt-3">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
+                Meno adatto se
               </p>
-              <p className="mt-1 font-sans text-sm leading-relaxed text-white/80">
-                {dontExpectText}
-              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {dontExpectChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-pill bg-text-muted/10 px-2.5 py-1 text-xs font-display font-medium text-text-muted"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* 3. TAG AI */}

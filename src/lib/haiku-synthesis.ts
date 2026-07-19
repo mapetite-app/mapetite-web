@@ -27,8 +27,8 @@ export type PlaceSynthesis = {
   synthesis: string;      // 1-2 frasi, italiano
   tags: string[];         // max 3, lowercase, occasioni (es. "romantico", "gruppi", "informale")
   verdict: string;        // max 12 parole, il "verdetto Mapetite"
-  goFor: string;          // "Ci dovresti andare per…" — il motivo per cui vale la pena
-  dontExpect: string;     // "Non aspettarti…" — il limite da mettere in conto
+  goFor: string[];        // chip "Ci dovresti andare se…" — max 3 motivi concreti
+  dontExpect: string[];   // chip "Meno adatto se…" — max 2 limiti reali, [] se nessuno
   matchReason: string;    // perché QUESTO locale risponde a QUELLA query. NON cacheabile.
 };
 
@@ -37,8 +37,8 @@ type CachedSynthesis = {
   synthesis: string;
   tags: string[];
   verdict: string;
-  goFor: string;
-  dontExpect: string;
+  goFor: string[];
+  dontExpect: string[];
 };
 
 const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo.
@@ -48,14 +48,14 @@ Ricevi una lista di locali con dati e recensioni reali da Google. Ogni locale pu
 Per ogni locale produci una sintesi editoriale in ITALIANO, basata ESCLUSIVAMENTE sui dati forniti. Non inventare nulla.
 Rispondi SOLO con un array JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
 Struttura esatta:
-[{"id":string,"synthesis":string,"tags":string[],"verdict":string,"go_for":string,"dont_expect":string}]
+[{"id":string,"synthesis":string,"tags":string[],"verdict":string,"go_for":string[],"dont_expect":string[]}]
 - id: DEVE essere identico all'id ricevuto in input
 - synthesis: 1-2 frasi che dicono cosa rende questo locale quello che è. Concreta, non generica. Vietate frasi come 'locale apprezzato' o 'ottime recensioni'.
 - tags: massimo 3, scelti ESCLUSIVAMENTE da questa lista chiusa. Non inventarne altri:
 romantico, informale, gruppi, business, veloce, aperitivo, famiglia, intimo, vivace, tradizionale, raffinato, economico
 - verdict: massimo 12 parole, tono diretto. VINCOLO CRITICO: il verdetto deve essere verificabile parola per parola contro le recensioni fornite. Non affermare MAI il contrario di ciò che dicono le recensioni. Se non sei certo del senso di un'informazione, ometti quel dettaglio invece di rischiare di invertirlo. Meglio un verdetto più povero che un verdetto sbagliato.
-- go_for: una frase breve. Il motivo CONCRETO e RICORRENTE per cui vale la pena andarci, ricavato dai punti di forza citati più volte nelle recensioni. Niente generico ('buon cibo', 'bella atmosfera'): dì cosa specifico.
-- dont_expect: DEFAULT stringa vuota "". Lo popoli SOLO se nelle recensioni esiste un segnale negativo REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: "". Meglio dont_expect vuoto che un difetto inventato. Una frase breve, tono onesto non stroncatorio.`;
+- go_for: array di CHIP brevissime (1-4 parole ciascuna), MASSIMO 3. Ogni chip è un motivo CONCRETO e RICORRENTE per andarci, ricavato dai punti di forza citati più volte nelle recensioni. Esempio: ["carbonara","forno a legna","servizio veloce"]. Niente chip generiche ('buon cibo', 'bella atmosfera'): dì cosa specifico. Se non ci sono motivi forti e ricorrenti, array più corto o vuoto [].
+- dont_expect: DEFAULT array vuoto []. Array di CHIP brevissime (1-4 parole), MASSIMO 2. Lo popoli SOLO se nelle recensioni esiste un limite REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: []. Meglio [] che un difetto inventato. Tono onesto, non stroncatorio.`;
 
 const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
@@ -94,6 +94,26 @@ function parseJsonArray(raw: string): unknown[] {
     console.error("[haiku-synthesis] JSON parse error:", err);
     return [];
   }
+}
+
+// Normalizza le chip go_for/dont_expect dall'output LLM: tiene solo stringhe non
+// vuote, trimma, deduplica case-insensitive (senza forzare il lowercase in
+// output — le chip non sono vocabolario chiuso), tronca al cap. Non-array → [].
+function normalizeChips(value: unknown, cap: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (trimmed === "") continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= cap) break;
+  }
+  return out;
 }
 
 // Gusti dell'utente per personalizzare matchReason: preferenze DICHIARATE
@@ -194,8 +214,8 @@ export async function getSynthesis(
           synthesis: (row.synthesis as string) ?? "",
           tags: (row.tags as string[] | null) ?? [],
           verdict: (row.verdict as string) ?? "",
-          goFor: (row.go_for as string | null) ?? "",
-          dontExpect: (row.dont_expect as string | null) ?? "",
+          goFor: (row.go_for as string[] | null) ?? [],
+          dontExpect: (row.dont_expect as string[] | null) ?? [],
         });
       }
     }
@@ -271,8 +291,8 @@ export async function getSynthesis(
           tags: validTags,
           verdict: typeof o.verdict === "string" ? o.verdict : "",
           // Il prompt non li produce ancora (arriva in un commit successivo): default "".
-          goFor: typeof o.go_for === "string" ? o.go_for : "",
-          dontExpect: typeof o.dont_expect === "string" ? o.dont_expect : "",
+          goFor: normalizeChips(o.go_for, 3),
+          dontExpect: normalizeChips(o.dont_expect, 2),
         });
       }
       if (generated.size < missing.length) {
