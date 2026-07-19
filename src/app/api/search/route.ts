@@ -76,7 +76,11 @@ export async function POST(request: Request) {
 
     if (risultati.length > 0) {
       try {
-        sintesi = await getSynthesis(risultati, query.trim());
+        // Utente opzionale: la ricerca world è pubblica. Se autenticato, i suoi
+        // gusti personalizzano matchReason; altrimenti degrada su richiesta+locale.
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        sintesi = await getSynthesis(risultati, query.trim(), user?.id ?? null);
       } catch (err) {
         console.error("[search/route] Haiku synthesis error:", err);
         sintesi = {};

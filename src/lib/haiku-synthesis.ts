@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import type { PlaceResult } from "@/lib/google-places";
 
 const anthropic = new Anthropic({
@@ -40,27 +41,36 @@ type CachedSynthesis = {
   dontExpect: string;
 };
 
-const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags e verdict deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo.
+const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo.
 
 Sei il curatore editoriale di Mapetite, piattaforma di scoperta food & beverage.
-Ricevi una lista di locali con dati e recensioni reali da Google.
+Ricevi una lista di locali con dati e recensioni reali da Google. Ogni locale può includere un campo "enrichment": segnali da altre fonti (Google aggregato, guide editoriali come Michelin, Gambero Rosso, Puntarella Rossa). Usa enrichment come CONFERMA o contesto, MAI come sostituto delle recensioni, e non citarne la fonte se non aggiunge valore reale.
 Per ogni locale produci una sintesi editoriale in ITALIANO, basata ESCLUSIVAMENTE sui dati forniti. Non inventare nulla.
 Rispondi SOLO con un array JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
 Struttura esatta:
-[{"id":string,"synthesis":string,"tags":string[],"verdict":string}]
+[{"id":string,"synthesis":string,"tags":string[],"verdict":string,"go_for":string,"dont_expect":string}]
 - id: DEVE essere identico all'id ricevuto in input
 - synthesis: 1-2 frasi che dicono cosa rende questo locale quello che è. Concreta, non generica. Vietate frasi come 'locale apprezzato' o 'ottime recensioni'.
 - tags: massimo 3, scelti ESCLUSIVAMENTE da questa lista chiusa. Non inventarne altri:
 romantico, informale, gruppi, business, veloce, aperitivo, famiglia, intimo, vivace, tradizionale, raffinato, economico
-- verdict: massimo 12 parole, tono diretto. VINCOLO CRITICO: il verdetto deve essere verificabile parola per parola contro le recensioni fornite. Non affermare MAI il contrario di ciò che dicono le recensioni. Se non sei certo del senso di un'informazione, ometti quel dettaglio invece di rischiare di invertirlo. Meglio un verdetto più povero che un verdetto sbagliato.`;
+- verdict: massimo 12 parole, tono diretto. VINCOLO CRITICO: il verdetto deve essere verificabile parola per parola contro le recensioni fornite. Non affermare MAI il contrario di ciò che dicono le recensioni. Se non sei certo del senso di un'informazione, ometti quel dettaglio invece di rischiare di invertirlo. Meglio un verdetto più povero che un verdetto sbagliato.
+- go_for: una frase breve. Il motivo CONCRETO e RICORRENTE per cui vale la pena andarci, ricavato dai punti di forza citati più volte nelle recensioni. Niente generico ('buon cibo', 'bella atmosfera'): dì cosa specifico.
+- dont_expect: DEFAULT stringa vuota "". Lo popoli SOLO se nelle recensioni esiste un segnale negativo REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: "". Meglio dont_expect vuoto che un difetto inventato. Una frase breve, tono onesto non stroncatorio.`;
 
 const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
 L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in ITALIANO perché risponde (o non risponde bene) alla sua richiesta specifica.
+
+Ti possono essere forniti i GUSTI dell'utente in due forme:
+- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze.
+- storico_stelle_per_tipologia: la media di stelle che l'utente ha dato per tipologia di locale (comportamento reale, più affidabile delle dichiarazioni).
+Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta. Dai peso allo storico comportamentale quando c'è.
+Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
+
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
 Struttura esatta: [{"id":string,"matchReason":string}]
 - id identico a quello ricevuto
-- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente. Se il locale non centra bene la richiesta, dillo.`;
+- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo.`;
 
 function costOf(inputTokens: number, outputTokens: number): number {
   return (
@@ -86,9 +96,78 @@ function parseJsonArray(raw: string): unknown[] {
   }
 }
 
+// Gusti dell'utente per personalizzare matchReason: preferenze DICHIARATE
+// (profiles) + storico COMPORTAMENTALE (media stelle per tipologia da reviews).
+// Degrada in sicurezza: qualsiasi errore → taste vuoto (nessuna personalizzazione).
+type UserTaste = {
+  declared: {
+    cuisines: string[];
+    occasions: string[];
+    atmospheres: string[];
+    priceRange: string | null;
+  } | null;
+  byCategory: { category: string; avgStars: number; count: number }[];
+};
+
+async function getUserTaste(userId: string): Promise<UserTaste> {
+  const empty: UserTaste = { declared: null, byCategory: [] };
+  try {
+    const supabase = createAdminClient();
+    const [{ data: profile }, { data: reviews }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("cuisines, occasions, atmospheres, price_range")
+        .eq("id", userId)
+        .maybeSingle(),
+      // reviews.place_id = UUID interno places → join per leggere la category.
+      supabase
+        .from("reviews")
+        .select("rating, places(category)")
+        .eq("user_id", userId),
+    ]);
+
+    const declared = profile
+      ? {
+          cuisines: (profile.cuisines as string[] | null) ?? [],
+          occasions: (profile.occasions as string[] | null) ?? [],
+          atmospheres: (profile.atmospheres as string[] | null) ?? [],
+          priceRange: (profile.price_range as string | null) ?? null,
+        }
+      : null;
+
+    // Aggregato stelle per tipologia (gusto comportamentale).
+    const agg = new Map<string, { sum: number; count: number }>();
+    for (const r of (reviews ?? []) as Array<Record<string, unknown>>) {
+      const placeField = r.places;
+      const cat = Array.isArray(placeField)
+        ? (placeField[0] as { category?: string } | undefined)?.category
+        : (placeField as { category?: string } | null)?.category;
+      const rating = typeof r.rating === "number" ? r.rating : null;
+      if (!cat || rating == null) continue;
+      const cur = agg.get(cat) ?? { sum: 0, count: 0 };
+      cur.sum += rating;
+      cur.count += 1;
+      agg.set(cat, cur);
+    }
+    const byCategory = Array.from(agg.entries())
+      .map(([category, { sum, count }]) => ({
+        category,
+        avgStars: Math.round((sum / count) * 10) / 10,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { declared, byCategory };
+  } catch (err) {
+    console.error("[haiku-synthesis] getUserTaste exception:", err);
+    return empty;
+  }
+}
+
 export async function getSynthesis(
   places: PlaceResult[],
   query: string,
+  userId: string | null = null,
 ): Promise<Record<string, PlaceSynthesis>> {
   // 1. Limita ai primi SYNTHESIS_LIMIT locali.
   const targets = places.slice(0, SYNTHESIS_LIMIT);
@@ -131,6 +210,11 @@ export async function getSynthesis(
   const generated = new Map<string, CachedSynthesis>();
   if (missing.length > 0) {
     try {
+      // Enrichment nel contesto: una sola query batch per i soli missing.
+      // Stesso place_id (Google Place ID) di place_synthesis. Additivo: se vuoto
+      // o in errore, la sintesi procede solo sulle recensioni.
+      const enrichmentByPlace = await getEnrichmentForPlaces(missing.map((p) => p.id));
+
       const userPayload = missing.map((p) => ({
         id: p.id,
         name: p.name,
@@ -142,11 +226,19 @@ export async function getSynthesis(
         reviewTexts: (p.reviewTexts ?? [])
           .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
           .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
+        enrichment: (enrichmentByPlace.get(p.id) ?? []).map((e) => ({
+          source: e.source,
+          kind: e.source_kind,
+          rating: e.rating_value,
+          scale: e.rating_scale,
+          ranking: e.ranking,
+          comment: e.comment,
+        })),
       }));
 
       const message = await anthropic.messages.create({
         model: HAIKU_MODEL,
-        max_tokens: 1024,
+        max_tokens: 1536,
         system: SYNTHESIS_SYSTEM,
         messages: [{ role: "user", content: JSON.stringify(userPayload) }],
       });
@@ -232,6 +324,24 @@ export async function getSynthesis(
         synthesis: base.get(p.id)?.synthesis ?? "",
       }));
 
+      // Gusti dell'utente: iniettati solo se disponibili. Profilo vuoto e zero
+      // reviews → taste vuoto → il prompt degrada su richiesta + dati del locale.
+      const taste = userId ? await getUserTaste(userId) : null;
+      const hasTaste =
+        taste != null &&
+        ((taste.declared != null &&
+          (taste.declared.cuisines.length > 0 ||
+            taste.declared.occasions.length > 0 ||
+            taste.declared.atmospheres.length > 0 ||
+            taste.declared.priceRange != null)) ||
+          taste.byCategory.length > 0);
+      const tasteBlock = hasTaste
+        ? `\n\nGusti dell'utente:\n${JSON.stringify({
+            dichiarati: taste!.declared,
+            storico_stelle_per_tipologia: taste!.byCategory,
+          })}`
+        : "";
+
       const message = await anthropic.messages.create({
         model: HAIKU_MODEL,
         max_tokens: 1024,
@@ -239,7 +349,7 @@ export async function getSynthesis(
         messages: [
           {
             role: "user",
-            content: `Richiesta dell'utente: ${query}\n\nLocali:\n${JSON.stringify(userPayload)}`,
+            content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
           },
         ],
       });

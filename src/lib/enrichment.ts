@@ -178,3 +178,39 @@ export async function getEnrichment(placeId: string): Promise<EnrichmentRow[]> {
     return [];
   }
 }
+
+// --- LETTURA BATCH: enrichment di più locali in una query --------------
+// Per il pipeline di sintesi (una sola .in() invece di N getEnrichment).
+// Ritorna una mappa placeId -> righe ordinate per SOURCE_ORDER. Degrada in
+// sicurezza a mappa vuota: l'enrichment nel contesto Haiku è additivo.
+export async function getEnrichmentForPlaces(
+  placeIds: string[]
+): Promise<Map<string, EnrichmentRow[]>> {
+  const byPlace = new Map<string, EnrichmentRow[]>();
+  if (placeIds.length === 0) return byPlace;
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("enrichment")
+      .select("place_id,source,source_kind,rating_value,rating_scale,ranking,comment,source_url,metadata")
+      .in("place_id", placeIds);
+    if (error) {
+      console.error("[enrichment] batch select fallito:", error.message);
+      return byPlace;
+    }
+    for (const row of (data ?? []) as EnrichmentRow[]) {
+      const list = byPlace.get(row.place_id) ?? [];
+      list.push(row);
+      byPlace.set(row.place_id, list);
+    }
+    for (const list of byPlace.values()) {
+      list.sort(
+        (a, b) => (SOURCE_ORDER[a.source] ?? 99) - (SOURCE_ORDER[b.source] ?? 99)
+      );
+    }
+    return byPlace;
+  } catch (err) {
+    console.error("[enrichment] batch select exception:", err);
+    return byPlace;
+  }
+}
