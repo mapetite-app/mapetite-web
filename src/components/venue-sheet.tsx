@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone, Sparkles, Check } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -82,10 +82,15 @@ export default function VenueSheet({
   const dontExpectChips = Array.isArray(dontExpect)
     ? dontExpect.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
     : [];
-  // Il blocco appare se ALMENO UNO tra verdict e i due poli è presente: il
-  // prompt bipolare può produrre chip anche con verdict vuoto.
+  // La card appare se c'è ALMENO UNO tra verdict, synthesis, matchReason e i due
+  // poli: tutto vive ora in un'unica card teal (matchReason incluso, niente più
+  // banner esterno).
   const hasVerdictBlock =
-    verdictText != null || goForChips.length > 0 || dontExpectChips.length > 0;
+    verdictText != null ||
+    synthesis != null ||
+    matchReasonText != null ||
+    goForChips.length > 0 ||
+    dontExpectChips.length > 0;
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
@@ -158,27 +163,11 @@ export default function VenueSheet({
         )}
       </div>
 
-      {/* 2a. BANNER "PER LA TUA RICERCA" (matchReason, solo nei risultati) */}
-      {matchReasonText && (
-        <div className="mx-5 mt-4 flex items-start gap-2 rounded-card bg-accent/10 px-4 py-3">
-          <Sparkles size={16} className="mt-0.5 shrink-0 text-accent" />
-          <div>
-            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-              Per la tua ricerca
-            </p>
-            <p className="mt-0.5 font-sans text-sm leading-relaxed text-text">
-              {matchReasonText}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 2. BLOCCO VERDICT */}
+      {/* 2. CARD VERDETTO (teal): verdetto + matchReason + chip, tutto dentro. */}
       {hasVerdictBlock && (
-        <>
-          {/* Card verdetto (teal): verdict + synthesis. */}
+        <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
           {(verdictText != null || synthesis != null) && (
-            <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
+            <>
               <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
                 Il verdetto Mapetite
               </p>
@@ -192,20 +181,45 @@ export default function VenueSheet({
                   {synthesis}
                 </p>
               )}
+            </>
+          )}
+
+          {/* matchReason al centro: solo nei risultati (null nei salvati → niente
+              riga né separatore orfano). Separatore solo se c'è contenuto sopra. */}
+          {matchReasonText && (
+            <div
+              className={
+                verdictText != null || synthesis != null
+                  ? "mt-4 border-t border-white/15 pt-3"
+                  : ""
+              }
+            >
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+                ✦ Per la tua ricerca
+              </p>
+              <p className="mt-1 font-sans text-sm leading-relaxed text-white/90">
+                {matchReasonText}
+              </p>
             </div>
           )}
 
-          {/* Chip bipolari FUORI dalla card, su bg-surface: orientamento, mai stroncatura. */}
+          {/* Chip bipolari in fondo, colori su-teal: orientamento, mai stroncatura. */}
           {goForChips.length > 0 && (
-            <div className="mx-5 mt-4">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-brand">
+            <div
+              className={
+                verdictText != null || synthesis != null || matchReasonText != null
+                  ? "mt-4 border-t border-white/15 pt-3"
+                  : ""
+              }
+            >
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/80">
                 Ci dovresti andare se
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {goForChips.map((chip) => (
                   <span
                     key={chip}
-                    className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand"
+                    className="inline-flex items-center gap-1 rounded-pill bg-white/15 px-2.5 py-1 text-xs font-display font-medium text-white"
                   >
                     <Check size={12} className="shrink-0" />
                     {chip}
@@ -215,23 +229,24 @@ export default function VenueSheet({
             </div>
           )}
           {dontExpectChips.length > 0 && (
-            <div className="mx-5 mt-3">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
+            <div className="mt-3">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">
                 Meno adatto se
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {dontExpectChips.map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-pill bg-text-muted/10 px-2.5 py-1 text-xs font-display font-medium text-text-muted"
+                    className="inline-flex items-center gap-1 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-display font-medium text-white/60"
                   >
+                    <X size={12} className="shrink-0" />
                     {chip}
                   </span>
                 ))}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* 3. TAG AI */}
