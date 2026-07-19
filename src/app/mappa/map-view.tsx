@@ -393,6 +393,8 @@ type VenueDetails = {
   synthesis: string | null;
   tags: string[] | null;
   verdict: string | null;
+  goFor: string | null;
+  dontExpect: string | null;
 };
 
 function AISearchPanel({
@@ -440,6 +442,7 @@ function AISearchPanel({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
+        goFor: string | null; dontExpect: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({
@@ -465,6 +468,8 @@ function AISearchPanel({
           synthesis: p.synthesis ?? null,
           tags: p.tags ?? null,
           verdict: p.verdict ?? null,
+          goFor: p.goFor ?? null,
+          dontExpect: p.dontExpect ?? null,
         };
       }
       onResults(places, data.filtri_usati, details);
@@ -773,6 +778,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
+        goFor: string | null; dontExpect: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -787,6 +793,8 @@ export default function MapView({
           synthesis: p.synthesis ?? null,
           tags: p.tags ?? null,
           verdict: p.verdict ?? null,
+          goFor: p.goFor ?? null,
+          dontExpect: p.dontExpect ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
@@ -1073,6 +1081,7 @@ export default function MapView({
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
                   selectedReviews: null, synthesis: null, tags: null, verdict: null,
+                  goFor: null, dontExpect: null,
                 }),
               }}
               isSaved={isPlaceSaved(selected.id)}

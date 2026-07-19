@@ -20,6 +20,8 @@ export type Venue = {
   synthesis: string | null;
   tags: string[] | null;
   verdict: string | null;
+  goFor: string | null;
+  dontExpect: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
 };
@@ -59,11 +61,25 @@ export default function VenueSheet({
     synthesis,
     tags,
     verdict,
+    goFor,
+    dontExpect,
     personalTags,
     personalNote,
   } = venue;
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
+  // Verdetto bipolare: mostrati solo se non vuoti. dont_expect è spesso "" per
+  // il vincolo feroce lato prompt → resta nascosto. Se entrambi vuoti (cache
+  // vecchia) il blocco degrada al verdict singolo, come prima.
+  const verdictText =
+    verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
+  const goForText = goFor != null && goFor.trim() !== "" ? goFor.trim() : null;
+  const dontExpectText =
+    dontExpect != null && dontExpect.trim() !== "" ? dontExpect.trim() : null;
+  // Il blocco appare se ALMENO UNO tra verdict e i due poli è presente: il
+  // prompt bipolare può produrre goFor/dontExpect anche con verdict vuoto.
+  const hasVerdictBlock =
+    verdictText != null || goForText != null || dontExpectText != null;
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
@@ -137,18 +153,42 @@ export default function VenueSheet({
       </div>
 
       {/* 2. BLOCCO VERDICT */}
-      {verdict != null && (
+      {hasVerdictBlock && (
         <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
           <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
             Il verdetto Mapetite
           </p>
-          <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
-            {verdict}
-          </p>
+          {verdictText && (
+            <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
+              {verdictText}
+            </p>
+          )}
           {synthesis != null && (
             <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
               {synthesis}
             </p>
+          )}
+
+          {/* Verdetto bipolare: orientamento, mai stroncatura. */}
+          {goForText && (
+            <div className="mt-4 border-t border-white/15 pt-3">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+                Ci dovresti andare se…
+              </p>
+              <p className="mt-1 font-sans text-sm leading-relaxed text-white">
+                {goForText}
+              </p>
+            </div>
+          )}
+          {dontExpectText && (
+            <div className="mt-3">
+              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">
+                Non aspettarti…
+              </p>
+              <p className="mt-1 font-sans text-sm leading-relaxed text-white/80">
+                {dontExpectText}
+              </p>
+            </div>
           )}
         </div>
       )}

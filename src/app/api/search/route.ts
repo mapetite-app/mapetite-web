@@ -276,6 +276,8 @@ ESEMPI (input → output atteso):
       synthesis: s?.synthesis ?? null,
       tags: s?.tags ?? rest.tags ?? null,
       verdict: s?.verdict ?? null,
+      goFor: s?.goFor ?? null,
+      dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason ?? null,
     };
   });
