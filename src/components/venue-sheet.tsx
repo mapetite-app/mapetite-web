@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Sparkles } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -22,6 +22,7 @@ export type Venue = {
   verdict: string | null;
   goFor: string | null;
   dontExpect: string | null;
+  matchReason: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
 };
@@ -63,6 +64,7 @@ export default function VenueSheet({
     verdict,
     goFor,
     dontExpect,
+    matchReason,
     personalTags,
     personalNote,
   } = venue;
@@ -71,6 +73,8 @@ export default function VenueSheet({
   // Verdetto bipolare: mostrati solo se non vuoti. dont_expect è spesso "" per
   // il vincolo feroce lato prompt → resta nascosto. Se entrambi vuoti (cache
   // vecchia) il blocco degrada al verdict singolo, come prima.
+  const matchReasonText =
+    matchReason != null && matchReason.trim() !== "" ? matchReason.trim() : null;
   const verdictText =
     verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
   const goForText = goFor != null && goFor.trim() !== "" ? goFor.trim() : null;
@@ -151,6 +155,21 @@ export default function VenueSheet({
           <p className="mt-1 text-xs font-sans text-text-muted">{address}</p>
         )}
       </div>
+
+      {/* 2a. BANNER "PER LA TUA RICERCA" (matchReason, solo nei risultati) */}
+      {matchReasonText && (
+        <div className="mx-5 mt-4 flex items-start gap-2 rounded-card bg-accent/10 px-4 py-3">
+          <Sparkles size={16} className="mt-0.5 shrink-0 text-accent" />
+          <div>
+            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+              Per la tua ricerca
+            </p>
+            <p className="mt-0.5 font-sans text-sm leading-relaxed text-text">
+              {matchReasonText}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2. BLOCCO VERDICT */}
       {hasVerdictBlock && (
