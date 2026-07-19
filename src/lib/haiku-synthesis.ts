@@ -26,6 +26,8 @@ export type PlaceSynthesis = {
   synthesis: string;      // 1-2 frasi, italiano
   tags: string[];         // max 3, lowercase, occasioni (es. "romantico", "gruppi", "informale")
   verdict: string;        // max 12 parole, il "verdetto Mapetite"
+  goFor: string;          // "Ci dovresti andare per…" — il motivo per cui vale la pena
+  dontExpect: string;     // "Non aspettarti…" — il limite da mettere in conto
   matchReason: string;    // perché QUESTO locale risponde a QUELLA query. NON cacheabile.
 };
 
@@ -34,6 +36,8 @@ type CachedSynthesis = {
   synthesis: string;
   tags: string[];
   verdict: string;
+  goFor: string;
+  dontExpect: string;
 };
 
 const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags e verdict deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo.
@@ -101,7 +105,7 @@ export async function getSynthesis(
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("place_synthesis")
-      .select("place_id, synthesis, tags, verdict")
+      .select("place_id, synthesis, tags, verdict, go_for, dont_expect")
       .in("place_id", ids);
     if (error) {
       console.error("[haiku-synthesis] cache read error:", error);
@@ -111,6 +115,8 @@ export async function getSynthesis(
           synthesis: (row.synthesis as string) ?? "",
           tags: (row.tags as string[] | null) ?? [],
           verdict: (row.verdict as string) ?? "",
+          goFor: (row.go_for as string | null) ?? "",
+          dontExpect: (row.dont_expect as string | null) ?? "",
         });
       }
     }
@@ -172,6 +178,9 @@ export async function getSynthesis(
           synthesis: typeof o.synthesis === "string" ? o.synthesis : "",
           tags: validTags,
           verdict: typeof o.verdict === "string" ? o.verdict : "",
+          // Il prompt non li produce ancora (arriva in un commit successivo): default "".
+          goFor: typeof o.go_for === "string" ? o.go_for : "",
+          dontExpect: typeof o.dont_expect === "string" ? o.dont_expect : "",
         });
       }
       if (generated.size < missing.length) {
@@ -193,6 +202,8 @@ export async function getSynthesis(
           synthesis: s.synthesis,
           tags: s.tags,
           verdict: s.verdict,
+          go_for: s.goFor,
+          dont_expect: s.dontExpect,
         }));
         const { error } = await supabase
           .from("place_synthesis")
@@ -271,6 +282,8 @@ export async function getSynthesis(
       synthesis: s.synthesis,
       tags: s.tags,
       verdict: s.verdict,
+      goFor: s.goFor,
+      dontExpect: s.dontExpect,
       matchReason: matchReasons.get(id) ?? "",
     };
   }
