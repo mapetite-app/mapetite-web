@@ -683,30 +683,73 @@ export default function MapView({
 
     setLoadingSaved(true);
     const supabase = createClient();
-    supabase
-      .from("saved_places")
-      .select("tags, note, places(id, name, category, lat, lng, google_place_id)")
-      .eq("user_id", userId)
-      .then(({ data, error }) => {
-        setLoadingSaved(false);
-        if (error) {
-          console.error("Errore nel caricamento dei locali salvati:", error);
-          return;
-        }
-        const uuidMap: Record<string, string> = {};
-        const fetched = (data ?? [])
-          .map((row) => {
-            // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
-            const raw = row.places as unknown as (Place & { google_place_id?: string | null }) | null;
-            if (!raw || raw.lat == null || raw.lng == null) return null;
-            const { google_place_id, ...place } = raw;
-            if (google_place_id) uuidMap[google_place_id] = place.id;
-            return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
-          })
-          .filter((p): p is Place => p !== null);
-        setSavedPlaces(fetched);
-        setPlaceUuids((prev) => ({ ...prev, ...uuidMap }));
-      });
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("saved_places")
+        .select("tags, note, places(id, name, category, lat, lng, google_place_id)")
+        .eq("user_id", userId);
+
+      setLoadingSaved(false);
+      if (error) {
+        console.error("Errore nel caricamento dei locali salvati:", error);
+        return;
+      }
+
+      const uuidMap: Record<string, string> = {}; // Google Place ID -> UUID interno
+      const fetched = (data ?? [])
+        .map((row) => {
+          // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
+          const raw = row.places as unknown as (Place & { google_place_id?: string | null }) | null;
+          if (!raw || raw.lat == null || raw.lng == null) return null;
+          const { google_place_id, ...place } = raw;
+          if (google_place_id) uuidMap[google_place_id] = place.id;
+          return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
+        })
+        .filter((p): p is Place => p !== null);
+
+      setSavedPlaces(fetched);
+      setPlaceUuids((prev) => ({ ...prev, ...uuidMap }));
+
+      // Verdetto editoriale anche sui salvati: legge la cache place_synthesis
+      // (RLS read-all pubblica) per i Google Place ID e popola venueDetails
+      // keyed per UUID — lo stesso id con cui selected.id identifica un salvato.
+      // SOLO blocco editoriale: i campi Google-live restano null e il gate del
+      // verdetto li nasconde. Degrada in sicurezza: su errore, niente verdetto.
+      const googleIds = Object.keys(uuidMap);
+      if (googleIds.length === 0) return;
+
+      const { data: synthRows, error: synthError } = await supabase
+        .from("place_synthesis")
+        .select("place_id, synthesis, tags, verdict, go_for, dont_expect")
+        .in("place_id", googleIds);
+
+      if (synthError) {
+        console.error("[map-view] lettura place_synthesis (salvati) fallita:", synthError);
+        return;
+      }
+
+      const savedDetails: Record<string, VenueDetails> = {};
+      for (const row of synthRows ?? []) {
+        const uuid = uuidMap[row.place_id as string];
+        if (!uuid) continue;
+        savedDetails[uuid] = {
+          userRatingCount: null,
+          openNow: null,
+          websiteUri: null,
+          phone: null,
+          selectedReviews: null,
+          synthesis: (row.synthesis as string | null) ?? null,
+          tags: (row.tags as string[] | null) ?? null,
+          verdict: (row.verdict as string | null) ?? null,
+          goFor: (row.go_for as string | null) ?? null,
+          dontExpect: (row.dont_expect as string | null) ?? null,
+        };
+      }
+      if (Object.keys(savedDetails).length > 0) {
+        setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
+      }
+    })();
   }, [userId]);
 
   const handleToggle = (placeId: string, saved: boolean) => {
