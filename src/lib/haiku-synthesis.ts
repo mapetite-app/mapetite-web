@@ -83,6 +83,45 @@ function costOf(inputTokens: number, outputTokens: number): number {
   );
 }
 
+// Recupero best-effort da JSON troncato: estrae gli oggetti {...} top-level
+// COMPLETI presenti nel testo, ignorando l'ultimo oggetto tagliato a metà.
+// Traccia stringhe/escape per non contare graffe dentro i valori string.
+function recoverJsonObjects(text: string): unknown[] {
+  const out: unknown[] = [];
+  let depth = 0;
+  let objStart = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      if (depth === 0) objStart = i;
+      depth++;
+    } else if (ch === "}") {
+      if (depth > 0) {
+        depth--;
+        if (depth === 0 && objStart !== -1) {
+          try {
+            out.push(JSON.parse(text.slice(objStart, i + 1)));
+          } catch {
+            // oggetto comunque malformato: lo salto
+          }
+          objStart = -1;
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // Strippa backtick / ```json e isola l'array JSON. Ritorna [] se il parse fallisce.
 function parseJsonArray(raw: string): unknown[] {
   let text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -95,6 +134,17 @@ function parseJsonArray(raw: string): unknown[] {
     const parsed = JSON.parse(text);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
+    // Risposta probabilmente troncata (es. stop=max_tokens): il parse dell'intero
+    // array fallisce. Recupero gli oggetti completi prima del taglio: meglio N-1
+    // risultati che zero. Il caso di parse riuscito qui sopra resta invariato.
+    const recovered = recoverJsonObjects(text);
+    if (recovered.length > 0) {
+      console.warn(
+        `[haiku-synthesis] JSON troncato: recuperati ${recovered.length} oggetti su parse fallito`,
+        err,
+      );
+      return recovered;
+    }
     console.error("[haiku-synthesis] JSON parse error:", err);
     return [];
   }
@@ -242,7 +292,11 @@ export async function getSynthesis(
 
       const message = await anthropic.messages.create({
         model: HAIKU_MODEL,
-        max_tokens: 1024,
+        // Il payload matchReason porta ora le recensioni grezze (id+name+category+
+        // reviewTexts × ~12 locali): l'input è salito a ~3700 token e l'output pieno
+        // (12 frasi + overhead JSON) sfora 1024, causando troncamento a metà stringa
+        // e parse error. 3000 dà margine per tutti i 12 senza taglio.
+        max_tokens: 3000,
         system: MATCH_REASON_SYSTEM,
         messages: [
           {
@@ -255,8 +309,13 @@ export async function getSynthesis(
       const { input_tokens, output_tokens } = message.usage;
       cost = costOf(input_tokens, output_tokens);
       console.log(
-        `[haiku-synthesis] call=matchReason places=${targets.length} in=${input_tokens} out=${output_tokens} cost=$${cost.toFixed(6)}`,
+        `[haiku-synthesis] call=matchReason places=${targets.length} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${cost.toFixed(6)}`,
       );
+      if (message.stop_reason === "max_tokens") {
+        console.error(
+          `[haiku-synthesis] TRONCAMENTO call=matchReason stop=max_tokens places=${targets.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
+        );
+      }
 
       const rawText =
         message.content[0]?.type === "text" ? message.content[0].text : "";
@@ -341,7 +400,10 @@ export async function getSynthesis(
 
       const message = await anthropic.messages.create({
         model: HAIKU_MODEL,
-        max_tokens: 1536,
+        // 12 locali a cache fredda × 5 campi (synthesis, tags, verdict, go_for,
+        // dont_expect) ≈ ~180-200 tok/oggetto → ~2200-2400 tok di fabbisogno pieno.
+        // 1536 troncava (~65% del necessario); 4000 dà ~1.7× di margine.
+        max_tokens: 4000,
         system: SYNTHESIS_SYSTEM,
         messages: [{ role: "user", content: JSON.stringify(userPayload) }],
       });
@@ -350,8 +412,13 @@ export async function getSynthesis(
       const cost = costOf(input_tokens, output_tokens);
       totalCost += cost;
       console.log(
-        `[haiku-synthesis] call=synthesis places=${missing.length} cached=${cached.size} in=${input_tokens} out=${output_tokens} cost=$${cost.toFixed(6)}`,
+        `[haiku-synthesis] call=synthesis places=${missing.length} cached=${cached.size} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${cost.toFixed(6)}`,
       );
+      if (message.stop_reason === "max_tokens") {
+        console.error(
+          `[haiku-synthesis] TRONCAMENTO call=synthesis stop=max_tokens places=${missing.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
+        );
+      }
 
       const rawText =
         message.content[0]?.type === "text" ? message.content[0].text : "";
