@@ -52,6 +52,9 @@ export type SearchOptions = {
   maxPriceLevel?: number;
   openNowOnly?: boolean;
   categories?: string[];
+  // "quality" (default): ordina per qualityScore. "relevance": preserva l'ordine
+  // di rilevanza di Google (nessun sort). Floor e filtri utente invariati in entrambi.
+  sortMode?: "relevance" | "quality";
 };
 
 const DEFAULT_RADIUS = 1500;
@@ -117,6 +120,7 @@ export async function searchGooglePlaces(
     maxPriceLevel,
     openNowOnly,
     categories,
+    sortMode = "quality",
   } = options;
 
   const requestBody: Record<string, unknown> = { textQuery: query };
@@ -197,12 +201,17 @@ export async function searchGooglePlaces(
   // Catturati PRIMA del sort: .slice non muta, quindi non altera l'ordine reale.
   const preSortNames = filtered.slice(0, 3).map((p) => p.name);
 
-  // Sort per qualita' sempre applicato: nel mondo Mapetite l'ordine e' la qualita', non la rilevanza Google.
-  filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));
+  // Sort per qualita' SOLO in sortMode "quality" (default): nel mondo Mapetite
+  // l'ordine e' la qualita', non la rilevanza Google. In "relevance" si preserva
+  // l'ordine restituito da Google (utile per query dove la rilevanza semantica
+  // conta piu' del rating aggregato, es. "trattoria autentica non turistica").
+  if (sortMode === "quality") {
+    filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));
+  }
 
   const postSortNames = filtered.slice(0, 3).map((p) => p.name);
   console.log(
-    `[search-funnel] sent=${JSON.stringify(query)} radius=${radius} limit=${limit} ` +
+    `[search-funnel] sent=${JSON.stringify(query)} sortMode=${sortMode} radius=${radius} limit=${limit} ` +
       `google=${mapped.length} floor=${floorSurvivors} userFilters=${filtered.length} ` +
       `final=${Math.min(filtered.length, limit)} ` +
       `preSort=[${preSortNames.join(",")}] postSort=[${postSortNames.join(",")}]`,

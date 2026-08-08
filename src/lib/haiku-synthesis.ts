@@ -13,8 +13,12 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const HAIKU_INPUT_PER_MTOK = 1.0;
 const HAIKU_OUTPUT_PER_MTOK = 5.0;
 
-// Solo i primi N locali vengono sintetizzati; gli altri restano senza sintesi.
-export const SYNTHESIS_LIMIT = 8;
+// Solo i primi N locali ricevono sintesi/verdetto/matchReason; gli altri restano
+// senza. Il valore è un trade-off costo/latenza: ogni locale in più è token Haiku
+// (due chiamate: synthesis + matchReason) e tempo di risposta aggiunto. La cache
+// place_synthesis ne assorbe gran parte — i locali già visti non ripagano la
+// chiamata synthesis — quindi il costo marginale reale grava sui soli locali nuovi.
+export const SYNTHESIS_LIMIT = 12;
 
 // Vocabolario chiuso dei tag: ogni tag fuori da questa lista viene scartato lato server.
 export const ALLOWED_TAGS = ["romantico","informale","gruppi","business","veloce","aperitivo","famiglia","intimo","vivace","tradizionale","raffinato","economico"] as const;
