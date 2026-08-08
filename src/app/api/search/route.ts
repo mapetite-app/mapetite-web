@@ -282,5 +282,20 @@ ESEMPI (input → output atteso):
     };
   });
 
+  // [search-funnel] diagnostica branch + Haiku. haiku = sintesi invocata (solo ramo
+  // world con risultati); verdicts/matchReasons = quanti campi non vuoti ha prodotto.
+  const synthVals = Object.values(sintesi);
+  const haikuInvoked = source === "world" && risultati.length > 0;
+  const verdictsCount = synthVals.filter(
+    (s) => typeof s.verdict === "string" && s.verdict.trim() !== "",
+  ).length;
+  const matchReasonsCount = synthVals.filter(
+    (s) => typeof s.matchReason === "string" && s.matchReason.trim() !== "",
+  ).length;
+  console.log(
+    `[search-funnel] sent=${JSON.stringify(query.trim())} branch=${source} ` +
+      `haiku=${haikuInvoked} verdicts=${verdictsCount} matchReasons=${matchReasonsCount}`,
+  );
+
   return NextResponse.json({ risultati: risultatiFinali, filtri_usati: filtri });
 }

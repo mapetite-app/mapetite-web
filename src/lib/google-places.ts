@@ -189,8 +189,24 @@ export async function searchGooglePlaces(
     return true;
   });
 
+  // [search-funnel] conteggi diagnostici — SOLO lettura, nessun effetto sulla pipeline.
+  // floorSurvivors ricalcola il solo pavimento (il .filter reale fonde floor + filtri utente).
+  const floorSurvivors = mapped.filter(
+    (p) => (p.rating ?? 0) >= FLOOR_RATING && (p.userRatingCount ?? 0) >= FLOOR_REVIEWS,
+  ).length;
+  // Catturati PRIMA del sort: .slice non muta, quindi non altera l'ordine reale.
+  const preSortNames = filtered.slice(0, 3).map((p) => p.name);
+
   // Sort per qualita' sempre applicato: nel mondo Mapetite l'ordine e' la qualita', non la rilevanza Google.
   filtered.sort((a, b) => qualityScore(b.rating, b.userRatingCount) - qualityScore(a.rating, a.userRatingCount));
+
+  const postSortNames = filtered.slice(0, 3).map((p) => p.name);
+  console.log(
+    `[search-funnel] sent=${JSON.stringify(query)} radius=${radius} limit=${limit} ` +
+      `google=${mapped.length} floor=${floorSurvivors} userFilters=${filtered.length} ` +
+      `final=${Math.min(filtered.length, limit)} ` +
+      `preSort=[${preSortNames.join(",")}] postSort=[${postSortNames.join(",")}]`,
+  );
 
   return filtered.slice(0, limit);
 }
