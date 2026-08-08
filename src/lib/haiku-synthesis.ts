@@ -202,6 +202,85 @@ export async function getSynthesis(
 
   let totalCost = 0;
 
+  // Le due chiamate Haiku sono INDIPENDENTI. matchReason non dipende più dalla
+  // sintesi: opera su `targets` con nome + categoria + recensioni grezze +
+  // richiesta + gusti. La lancio SUBITO così la sua fetch gira in parallelo con
+  // la chiamata synthesis qui sotto (le due richieste si sovrappongono).
+  const matchReasonWork = async (): Promise<{
+    matchReasons: Map<string, string>;
+    cost: number;
+  }> => {
+    const matchReasons = new Map<string, string>();
+    let cost = 0;
+    try {
+      const userPayload = targets.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        reviewTexts: (p.reviewTexts ?? [])
+          .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
+          .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
+      }));
+
+      // Gusti dell'utente: iniettati solo se disponibili. Profilo vuoto e zero
+      // reviews → taste vuoto → il prompt degrada su richiesta + dati del locale.
+      const taste = userId ? await getUserTaste(userId) : null;
+      const hasTaste =
+        taste != null &&
+        ((taste.declared != null &&
+          (taste.declared.cuisines.length > 0 ||
+            taste.declared.occasions.length > 0 ||
+            taste.declared.atmospheres.length > 0 ||
+            taste.declared.priceRange != null)) ||
+          taste.byCategory.length > 0);
+      const tasteBlock = hasTaste
+        ? `\n\nGusti dell'utente:\n${JSON.stringify({
+            dichiarati: taste!.declared,
+            storico_stelle_per_tipologia: taste!.byCategory,
+          })}`
+        : "";
+
+      const message = await anthropic.messages.create({
+        model: HAIKU_MODEL,
+        max_tokens: 1024,
+        system: MATCH_REASON_SYSTEM,
+        messages: [
+          {
+            role: "user",
+            content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
+          },
+        ],
+      });
+
+      const { input_tokens, output_tokens } = message.usage;
+      cost = costOf(input_tokens, output_tokens);
+      console.log(
+        `[haiku-synthesis] call=matchReason places=${targets.length} in=${input_tokens} out=${output_tokens} cost=$${cost.toFixed(6)}`,
+      );
+
+      const rawText =
+        message.content[0]?.type === "text" ? message.content[0].text : "";
+      const arr = parseJsonArray(rawText);
+      for (const item of arr) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
+        if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
+      }
+      if (matchReasons.size < targets.length) {
+        const missingIds = targets.map((p) => p.id).filter((id) => !matchReasons.has(id));
+        console.warn(
+          `[haiku-synthesis] MISSING call=matchReason expected=${targets.length} received=${matchReasons.size} missingIds=${JSON.stringify(missingIds)}`,
+        );
+      }
+    } catch (err) {
+      console.error("[haiku-synthesis] matchReason call exception:", err);
+    }
+    return { matchReasons, cost };
+  };
+  // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
+  const matchReasonPromise = matchReasonWork();
+
   // 2. Legge la cache.
   const cached = new Map<string, CachedSynthesis>();
   try {
@@ -336,74 +415,10 @@ export async function getSynthesis(
   for (const [id, s] of cached) base.set(id, s);
   for (const [id, s] of generated) base.set(id, s);
 
-  // 6. SECONDA chiamata Haiku: matchReason per TUTTI quelli con sintesi disponibile.
-  const matchReasons = new Map<string, string>();
-  const withSynthesis = targets.filter((p) => base.has(p.id));
-  if (withSynthesis.length > 0) {
-    try {
-      const userPayload = withSynthesis.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        synthesis: base.get(p.id)?.synthesis ?? "",
-      }));
-
-      // Gusti dell'utente: iniettati solo se disponibili. Profilo vuoto e zero
-      // reviews → taste vuoto → il prompt degrada su richiesta + dati del locale.
-      const taste = userId ? await getUserTaste(userId) : null;
-      const hasTaste =
-        taste != null &&
-        ((taste.declared != null &&
-          (taste.declared.cuisines.length > 0 ||
-            taste.declared.occasions.length > 0 ||
-            taste.declared.atmospheres.length > 0 ||
-            taste.declared.priceRange != null)) ||
-          taste.byCategory.length > 0);
-      const tasteBlock = hasTaste
-        ? `\n\nGusti dell'utente:\n${JSON.stringify({
-            dichiarati: taste!.declared,
-            storico_stelle_per_tipologia: taste!.byCategory,
-          })}`
-        : "";
-
-      const message = await anthropic.messages.create({
-        model: HAIKU_MODEL,
-        max_tokens: 1024,
-        system: MATCH_REASON_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
-          },
-        ],
-      });
-
-      const { input_tokens, output_tokens } = message.usage;
-      const cost = costOf(input_tokens, output_tokens);
-      totalCost += cost;
-      console.log(
-        `[haiku-synthesis] call=matchReason places=${withSynthesis.length} cached=${cached.size} in=${input_tokens} out=${output_tokens} cost=$${cost.toFixed(6)}`,
-      );
-
-      const rawText =
-        message.content[0]?.type === "text" ? message.content[0].text : "";
-      const arr = parseJsonArray(rawText);
-      for (const item of arr) {
-        if (!item || typeof item !== "object") continue;
-        const o = item as Record<string, unknown>;
-        if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
-        if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
-      }
-      if (matchReasons.size < withSynthesis.length) {
-        const missingIds = withSynthesis.map((p) => p.id).filter((id) => !matchReasons.has(id));
-        console.warn(
-          `[haiku-synthesis] MISSING call=matchReason expected=${withSynthesis.length} received=${matchReasons.size} missingIds=${JSON.stringify(missingIds)}`,
-        );
-      }
-    } catch (err) {
-      console.error("[haiku-synthesis] matchReason call exception:", err);
-    }
-  }
+  // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
+  //    Girava mentre sopra completavano cache read + synthesis + upsert.
+  const { matchReasons, cost: matchReasonCost } = await matchReasonPromise;
+  totalCost += matchReasonCost;
 
   console.log(
     `[haiku-synthesis] total places=${targets.length} cached=${cached.size} generated=${generated.size} cost=$${totalCost.toFixed(6)}`,
