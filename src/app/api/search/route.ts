@@ -28,6 +28,11 @@ export async function POST(request: Request) {
   const query = body?.query;
   const source: "world" | "saved" =
     body?.source === "world" ? "world" : "saved";
+  // Intento dichiarato dal chiamante: "natural" = query in linguaggio naturale →
+  // preserva la rilevanza Google; "structured" (o assente) = modalità a filtri →
+  // sort per qualità. Nessuna euristica: lo decide chi fa la ricerca, non il server.
+  const searchIntent: "natural" | "structured" =
+    body?.searchIntent === "natural" ? "natural" : "structured";
   const lat = typeof body?.lat === "number" ? body.lat : undefined;
   const lng = typeof body?.lng === "number" ? body.lng : undefined;
 
@@ -68,6 +73,7 @@ export async function POST(request: Request) {
         openNowOnly: body?.openNowOnly === true ? true : undefined,
         radius: typeof body?.radius === "number" ? body.radius : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
+        sortMode: searchIntent === "natural" ? "relevance" : "quality",
       });
     } catch (err) {
       console.error("[search/route] Google Places error:", err);

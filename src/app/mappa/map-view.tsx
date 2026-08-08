@@ -429,6 +429,7 @@ function AISearchPanel({
         body: JSON.stringify({
           query: query.trim(),
           source: view === "all" ? "world" : "saved",
+          searchIntent: "natural",
           lat: viewState.latitude,
           lng: viewState.longitude,
         }),
@@ -807,6 +808,7 @@ export default function MapView({
         body: JSON.stringify({
           query,
           source: "world",
+          searchIntent: "structured",
           lat: viewState.latitude,
           lng: viewState.longitude,
           ...(f.minRating != null && { minRating: f.minRating }),
