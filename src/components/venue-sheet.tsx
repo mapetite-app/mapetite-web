@@ -99,7 +99,7 @@ export default function VenueSheet({
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
 
   return (
-    <div className="relative flex max-h-full flex-col overflow-y-auto rounded-card bg-surface shadow-float">
+    <div className="relative flex flex-col rounded-card bg-surface shadow-float">
       {/* 1. HEADER */}
       <button
         type="button"
@@ -328,11 +328,9 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 7. ACTION PILLS */}
-      {/* padding-bottom = pb-5 (1.25rem) + offset nav mobile, così le pill risalgono sopra la nav */}
+      {/* 7. BARRA AZIONI FLOTTANTE: sempre visibile in fondo alla scheda mentre si scorre. */}
       <div
-        className="mt-5 flex flex-wrap items-center gap-2 px-5"
-        style={{ paddingBottom: "calc(1.25rem + var(--nav-height-mobile))" }}
+        className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur"
       >
         {saveSlot}
 
@@ -340,34 +338,36 @@ export default function VenueSheet({
           href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-4 py-2 text-sm font-display font-semibold text-brand hover:shadow-card"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white active:scale-95"
         >
           <Navigation size={16} />
           Indicazioni
         </a>
+
+        {phone != null && (
+          <a
+            href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+            aria-label={`Chiama ${name}`}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
+          >
+            <Phone size={18} />
+          </a>
+        )}
 
         {websiteUri != null && (
           <a
             href={websiteUri}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-4 py-2 text-sm font-display font-semibold text-brand hover:shadow-card"
+            aria-label={`Sito di ${name}`}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
           >
-            <Globe size={16} />
-            Sito
-          </a>
-        )}
-
-        {phone != null && (
-          <a
-            href={`tel:${phone}`}
-            className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-4 py-2 text-sm font-display font-semibold text-brand hover:shadow-card"
-          >
-            <Phone size={16} />
-            Chiama
+            <Globe size={18} />
           </a>
         )}
       </div>
+      {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
+      <div aria-hidden style={{ height: "var(--nav-height-mobile)" }} />
     </div>
   );
 }

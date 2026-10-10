@@ -336,15 +336,15 @@ function SaveButton({
   };
 
   return (
-    <div className="mt-2">
+    <div>
       <button
         type="button"
         onClick={handleClick}
         disabled={isPending}
         className={
           isSaved
-            ? "rounded-btn bg-success px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            : "rounded-btn bg-brand px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "min-h-11 rounded-pill bg-success px-5 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            : "min-h-11 rounded-pill bg-accent px-5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
         {isPending ? "..." : isSaved ? "Salvato" : "Salva"}
