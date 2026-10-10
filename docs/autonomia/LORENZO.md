@@ -13,6 +13,8 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 ## Obiettivo e ritmo
 
 - Obiettivo fissato da Lorenzo (10/10): **entro il 25 ottobre 2026** un'app nettamente più avanzata, con grafica molto vicina ai riferimenti (Places soprattutto, poi Albo — vedi `RIFERIMENTI-DESIGN.md`), funzioni complete e uso semplice per chi la apre la prima volta. Poi test con un gruppo ristretto di persone. Ogni notte deve far avanzare il piano in `BACKLOG.md` il più possibile.
+- **Ritmo richiesto da Lorenzo: massima velocità.** Ogni sessione deve valere più "giorni" del vecchio sprint (un giorno = una voce). Non fermarti dopo una voce: continua finché restano voci PRONTA o finché i limiti di utilizzo lo consentono. Per voci indipendenti usa sub-agent in parallelo (ognuno sul proprio branch di lavoro, poi uniti nel branch della notte), mantenendo commit separati per voce. Se una voce si blocca, annotalo e passa alla successiva invece di insistere.
+- A fine PR indica quante voci sono state chiuse e il tempo impiegato, così si misura il ritmo.
 - Lorenzo lascia lavorare in autonomia: se una PR non è ancora unita, la notte dopo si riparte dal suo branch e si continua.
 - Quando tocchi la grafica, metti in PR gli screenshot dell'app affiancati al riferimento di design pertinente.
 - In `BACKLOG.md` tieni aggiornata una riga "Avanzamento verso il 25/10" con cosa è fatto e cosa manca.
