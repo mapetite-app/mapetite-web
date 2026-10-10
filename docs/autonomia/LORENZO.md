@@ -12,7 +12,10 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 
 ## Obiettivo e ritmo
 
-- Obiettivo: versione da far usare a un gruppo ristretto di persone entro circa 2 settimane (fine ottobre 2026). Ogni notte deve far avanzare il piano in `BACKLOG.md` il più possibile.
+- Obiettivo fissato da Lorenzo (10/10): **entro il 25 ottobre 2026** un'app nettamente più avanzata, con grafica molto vicina ai riferimenti (Places soprattutto, poi Albo — vedi `RIFERIMENTI-DESIGN.md`), funzioni complete e uso semplice per chi la apre la prima volta. Poi test con un gruppo ristretto di persone. Ogni notte deve far avanzare il piano in `BACKLOG.md` il più possibile.
+- Lorenzo lascia lavorare in autonomia: se una PR non è ancora unita, la notte dopo si riparte dal suo branch e si continua.
+- Quando tocchi la grafica, metti in PR gli screenshot dell'app affiancati al riferimento di design pertinente.
+- In `BACKLOG.md` tieni aggiornata una riga "Avanzamento verso il 25/10" con cosa è fatto e cosa manca.
 - Lorenzo ha 20–30 minuti la mattina per provare e approvare. Interviene solo nei momenti critici (merge, decisioni elencate sotto "Cosa NON fare mai").
 
 ## Il ciclo di ogni notte
