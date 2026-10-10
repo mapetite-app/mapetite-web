@@ -1,5 +1,7 @@
 # Backlog Mapetite — piano 2 settimane verso il test con utenti
 
+Ordine di priorità deciso da Lorenzo (10/10): 1) funzioni che oggi impediscono di far usare l'app ai tester; 2) grafica vicina ai riferimenti; 3) tutto ciò che si può prendere dai concorrenti e migliorare. Social e profili dei locali vengono dopo (Fase 5).
+
 Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone possa usare davvero: ricerca precisa, interfaccia chiara, niente errori evidenti.
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
@@ -62,3 +64,10 @@ Regole:
 
 ### Proposte
 (vuoto: le aggiunge Claude)
+
+
+## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
+Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
+- Profili utente pubblici, seguire persone, feed attività, curatori.
+- Profilo del locale arricchito (contenuti social collegati, chi l'ha salvato).
+Richiedono nuove tabelle e regole di privacy: Claude prepara una proposta con le schermate e le migrazioni necessarie, Lorenzo approva prima di costruire.
