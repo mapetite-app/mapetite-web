@@ -405,7 +405,11 @@ function AISearchPanel({
   activeCount,
   view,
   viewState,
+  query,
+  setQuery,
 }: {
+  query: string;
+  setQuery: (q: string) => void;
   onResults: (places: Place[], filtri: AIFiltri, details: Record<string, VenueDetails>) => void;
   onClear: () => void;
   activeFiltri: AIFiltri | null;
@@ -413,7 +417,6 @@ function AISearchPanel({
   view: "all" | "saved";
   viewState: { latitude: number; longitude: number };
 }) {
-  const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -555,6 +558,8 @@ export default function MapView({
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
+  // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
+  const [aiQuery, setAiQuery] = useState("");
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
   // Locali del cluster su cui si è tappato: se valorizzato, la lista mostra
   // solo questi invece di displayedPlaces.
@@ -892,9 +897,8 @@ export default function MapView({
           <button
             type="button"
             onClick={() => {
-              setFilters(EMPTY_FILTERS);
-              setAiSearch(null);
-              dispatch({ type: overlay.kind === "ai" ? "RESET" : "OPEN_AI" });
+              // La ricerca AI resta: si azzera solo con ✕ o passando ai filtri.
+              dispatch({ type: overlay.kind === "ai" ? "CLOSE" : "OPEN_AI" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
@@ -907,6 +911,7 @@ export default function MapView({
             type="button"
             onClick={() => {
               setAiSearch(null);
+              setAiQuery("");
               dispatch({ type: "OPEN_FILTERS" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
@@ -924,8 +929,10 @@ export default function MapView({
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
               key={view}
+              query={aiQuery}
+              setQuery={setAiQuery}
               onResults={(places, filtri, details) => { setClusterPlaces(null); setFilterError(null); setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
-              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               view={view}
@@ -936,7 +943,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -947,7 +954,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+            onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -1299,7 +1306,7 @@ export default function MapView({
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
-          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
 
