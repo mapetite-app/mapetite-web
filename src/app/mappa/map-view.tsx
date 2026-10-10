@@ -374,6 +374,9 @@ type AIFiltri = {
   vicino_a_me: boolean;
 };
 
+// Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
+type PendingSynthesis = { places: unknown[]; token: string };
+
 function buildAISummary(filtri: AIFiltri): string {
   const parts: string[] = [];
   if (filtri.categoria) parts.push(filtri.categoria);
@@ -410,7 +413,13 @@ function AISearchPanel({
 }: {
   query: string;
   setQuery: (q: string) => void;
-  onResults: (places: Place[], filtri: AIFiltri, details: Record<string, VenueDetails>) => void;
+  onResults: (
+    places: Place[],
+    filtri: AIFiltri,
+    details: Record<string, VenueDetails>,
+    pending: PendingSynthesis | null,
+    query: string,
+  ) => void;
   onClear: () => void;
   activeFiltri: AIFiltri | null;
   activeCount: number | null;
@@ -433,6 +442,7 @@ function AISearchPanel({
           query: query.trim(),
           source: view === "all" ? "world" : "saved",
           searchIntent: "natural",
+          phase: "fast",
           lat: viewState.latitude,
           lng: viewState.longitude,
         }),
@@ -478,7 +488,7 @@ function AISearchPanel({
           matchReason: p.matchReason ?? null,
         };
       }
-      onResults(places, data.filtri_usati, details);
+      onResults(places, data.filtri_usati, details, data.sintesi_pendente ?? null, query.trim());
     } catch {
       setError("Errore di rete. Controlla la connessione e riprova.");
     } finally {
@@ -557,7 +567,10 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number } | null>(null);
+  // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
+  const [loadingVerdicts, setLoadingVerdicts] = useState(false);
+  const searchSeq = useRef(0);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
@@ -888,6 +901,41 @@ export default function MapView({
     return clusterIndex.getClusters(bbox, roundedZoom);
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude]);
 
+  // Secondo tempo della ricerca AI: verdetti e motivi arrivano dopo la lista.
+  // Se nel frattempo l'utente ha cambiato o azzerato la ricerca (id diverso) si scarta.
+  const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
+    if (!pending) return;
+    setLoadingVerdicts(true);
+    try {
+      const res = await fetch("/api/search/synthesis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchedQuery, places: pending.places, token: pending.token }),
+      });
+      if (!res.ok || searchSeq.current !== id) return;
+      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[] } = await res.json();
+      const esclusi = new Set(data.esclusi ?? []);
+      setVenueDetails((prev) => {
+        const next = { ...prev };
+        for (const [pid, d] of Object.entries(data.dettagli ?? {})) {
+          next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+        }
+        return next;
+      });
+      if (esclusi.size > 0) {
+        setAiSearch((prev) =>
+          prev && prev.id === id
+            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id)) }
+            : prev,
+        );
+      }
+    } catch {
+      // Degrada: la lista Google resta, senza verdetti.
+    } finally {
+      if (searchSeq.current === id) setLoadingVerdicts(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 md:top-14">
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
@@ -931,7 +979,14 @@ export default function MapView({
               key={view}
               query={aiQuery}
               setQuery={setAiQuery}
-              onResults={(places, filtri, details) => { setClusterPlaces(null); setFilterError(null); setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
+              onResults={(places, filtri, details, pending, searchedQuery) => {
+                const id = ++searchSeq.current;
+                setClusterPlaces(null); setFilterError(null);
+                setAiSearch({ risultati: places, filtri, id });
+                setVenueDetails(details); setFilters(EMPTY_FILTERS);
+                dispatch({ type: "OPEN_LIST" });
+                void loadVerdicts(id, searchedQuery, pending);
+              }}
               onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
@@ -1301,6 +1356,8 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
+          verdicts={aiSearch !== null ? Object.fromEntries((clusterPlaces ?? displayedPlaces).map((p) => [p.id, venueDetails[p.id]?.verdict ?? null])) : undefined}
+          loadingVerdicts={aiSearch !== null && loadingVerdicts}
           onSelect={(place) => {
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();

@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
+import { extractSearchIntent } from "@/lib/search-intent";
+import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -33,6 +35,9 @@ export async function POST(request: Request) {
   // sort per qualità. Nessuna euristica: lo decide chi fa la ricerca, non il server.
   const searchIntent: "natural" | "structured" =
     body?.searchIntent === "natural" ? "natural" : "structured";
+  // "fast": solo dati Google (prima risposta); verdetti con /api/search/synthesis.
+  // Assente = comportamento completo di sempre.
+  const fastPhase = body?.phase === "fast";
   const lat = typeof body?.lat === "number" ? body.lat : undefined;
   const lng = typeof body?.lng === "number" ? body.lng : undefined;
 
@@ -60,10 +65,29 @@ export async function POST(request: Request) {
   let risultati: (PlaceResult & { tags?: string[] | null; note?: string | null })[];
   // Sintesi editoriale Haiku: solo sul ramo world, opzionale e degradabile.
   let sintesi: Record<string, PlaceSynthesis> = {};
+  let synthInput: SynthesisInput[] | null = null;
+  let synthToken: string | null = null;
+  let esclusi: string[] = [];
 
   if (source === "world") {
+    // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
+    // Se Haiku non risponde si usa la frase originale come prima.
+    const intent = searchIntent === "natural" ? await extractSearchIntent(query.trim()) : null;
+    if (intent) {
+      filtri = {
+        categoria: intent.tipo,
+        parole_chiave: intent.requisiti,
+        vicino_a_me: intent.vicino_a_me,
+      };
+      console.log(`[search-intent] ${JSON.stringify({ q: query.trim().slice(0, 80), ...intent })}`);
+    }
+    // Zona nominata → è già nel testo della query: nessun bias sulla posizione della mappa.
+    // "Vicino a me" → solo risultati nell'area intorno al centro mappa. Altrimenti bias.
+    const locationMode = intent?.zona ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
     try {
-      risultati = await searchGooglePlaces(query.trim(), {
+      risultati = await searchGooglePlaces(intent?.queryGoogle ?? query.trim(), {
+        includedType: intent?.includedType ?? undefined,
+        locationMode,
         lat,
         lng,
         minRating: typeof body?.minRating === "number" ? body.minRating : undefined,
@@ -71,7 +95,7 @@ export async function POST(request: Request) {
         minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,
         maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
         openNowOnly: body?.openNowOnly === true ? true : undefined,
-        radius: typeof body?.radius === "number" ? body.radius : undefined,
+        radius: typeof body?.radius === "number" ? body.radius : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
         sortMode: searchIntent === "natural" ? "relevance" : "quality",
       });
@@ -80,13 +104,26 @@ export async function POST(request: Request) {
       risultati = [];
     }
 
-    if (risultati.length > 0) {
+    if (risultati.length > 0 && fastPhase) {
+      // Primo tempo: niente Haiku. Il client chiede i verdetti con i dati firmati.
+      try {
+        synthInput = buildSynthesisInput(risultati);
+        synthToken = signSynthesisInput(query.trim(), synthInput);
+      } catch (err) {
+        console.error("[search/route] firma sintesi non disponibile:", err);
+        synthInput = null;
+      }
+    } else if (risultati.length > 0) {
       try {
         // Utente opzionale: la ricerca world è pubblica. Se autenticato, i suoi
         // gusti personalizzano matchReason; altrimenti degrada su richiesta+locale.
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         sintesi = await getSynthesis(risultati, query.trim(), user?.id ?? null);
+        // Esclusione dei locali che chiaramente non rispettano la richiesta
+        // (approvata da Lorenzo il 10/10). Se Haiku li scarta tutti, non si esclude nulla.
+        esclusi = risultati.filter((p) => sintesi[p.id]?.fit === false).map((p) => p.id);
+        if (esclusi.length === risultati.length) esclusi = [];
       } catch (err) {
         console.error("[search/route] Haiku synthesis error:", err);
         sintesi = {};
@@ -273,7 +310,7 @@ ESEMPI (input → output atteso):
   // Un locale = un solo oggetto completo: fonde la sintesi nei risultati,
   // sostituisce reviewTexts (server-only) con le recensioni selezionate per la scheda.
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
-  const risultatiFinali = risultati.map((p) => {
+  const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
     const { reviewTexts, ...rest } = p;
     return {
@@ -303,5 +340,10 @@ ESEMPI (input → output atteso):
       `haiku=${haikuInvoked} verdicts=${verdictsCount} matchReasons=${matchReasonsCount}`,
   );
 
-  return NextResponse.json({ risultati: risultatiFinali, filtri_usati: filtri });
+  return NextResponse.json({
+    risultati: risultatiFinali,
+    filtri_usati: filtri,
+    // Solo nel primo tempo: dati firmati per chiedere i verdetti.
+    ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken } } : {}),
+  });
 }

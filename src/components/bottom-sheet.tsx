@@ -8,6 +8,10 @@ export interface BottomSheetProps {
   places: Place[];
   onSelect: (place: Place) => void;
   onClose: () => void;
+  // Verdetto in una riga per locale (id Google → testo). Mentre arrivano
+  // (`loadingVerdicts`) le card mostrano una barra di caricamento.
+  verdicts?: Record<string, string | null>;
+  loadingVerdicts?: boolean;
 }
 
 // Snap points in dvh numerici (percentuali dell'altezza viewport).
@@ -29,7 +33,7 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-export default function BottomSheet({ places, onSelect, onClose }: BottomSheetProps) {
+export default function BottomSheet({ places, onSelect, onClose, verdicts, loadingVerdicts = false }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -178,6 +182,7 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
         <div className="flex items-center justify-between px-1 pb-2">
           <p className="text-xs font-sans text-text-muted">
             {places.length} {places.length === 1 ? "risultato" : "risultati"}
+            {loadingVerdicts && " · preparo i verdetti…"}
           </p>
           <button
             type="button"
@@ -208,6 +213,16 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
                       {place.address}
                     </span>
                   )}
+                  {verdicts?.[place.id] ? (
+                    <span className="mt-0.5 block text-xs font-sans text-text">
+                      {verdicts[place.id]}
+                    </span>
+                  ) : loadingVerdicts && verdicts ? (
+                    <span
+                      aria-label="Sto preparando il verdetto"
+                      className="mt-1.5 block h-3 w-3/4 animate-pulse rounded-pill bg-border"
+                    />
+                  ) : null}
                 </span>
               </button>
             </li>
