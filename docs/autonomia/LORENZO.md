@@ -44,7 +44,8 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 
 - Next.js 16: leggi la guida pertinente in `node_modules/next/dist/docs/` prima di scrivere codice (vedi AGENTS.md).
 - Chiavi server-side mai con prefisso `NEXT_PUBLIC_`. Mai valori hardcoded dipendenti dall'ambiente ("regola anti-Simone").
-- Google è l'unica fonte dei fatti. Haiku produce solo campi derivati: non riordina i risultati, non inventa locali, e se fallisce l'app degrada senza rompersi.
+- Google è l'unica fonte dei fatti. Haiku produce campi derivati e non inventa mai locali; se fallisce, l'app degrada mostrando i risultati Google senza rompersi.
+- Approvato da Lorenzo (10/10/2026): Haiku può escludere o spostare in fondo i locali che chiaramente non rispettano i requisiti espliciti della richiesta (tipo di locale, caratteristica fisica, occasione, atmosfera), basandosi solo su recensioni e attributi Google. Ogni esclusione va registrata nei log con il motivo. Nel dubbio il locale resta.
 - Pavimento qualità (`FLOOR_RATING=3.5`, `FLOOR_REVIEWS=20`) volutamente basso: non alzarlo.
 - `dont_expect` è orientamento, mai giudizio negativo; array vuoto se non c'è un segnale ricorrente nelle recensioni. Il vincolo anti-invenzione va preservato in ogni modifica del prompt.
 - Google Place ID (`ChIJ...`) e UUID Supabase sono distinti: operazioni Supabase con UUID, Google con Place ID.
