@@ -10,18 +10,26 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 - Obiettivo di breve: un'app che possa far provare a tester e investitori senza imbarazzo. Oggi non è così: la ricerca è troppo approssimativa e la grafica non convince.
 - Preferisce poche cose fatte molto bene a tante cose a metà.
 
-## Il ciclo di ogni sessione autonoma
+## Obiettivo e ritmo
 
-1. `git fetch origin main` e `git log --oneline -15`: il log è la fonte di verità, non la memoria.
-2. Leggi `docs/autonomia/BACKLOG.md` e i commenti di Lorenzo sulle PR aperte (`gh pr list`, `gh pr view N --comments`).
-3. Priorità: (a) correggere una PR aperta su cui Lorenzo ha lasciato feedback; (b) altrimenti la prima voce "PRONTA" del backlog.
-4. Lavora su UNA voce sola. Branch: `claude/<numero-voce>-<slug>` creato da `main` aggiornato.
+- Obiettivo: versione da far usare a un gruppo ristretto di persone entro circa 2 settimane (fine ottobre 2026). Ogni notte deve far avanzare il piano in `BACKLOG.md` il più possibile.
+- Lorenzo ha 20–30 minuti la mattina per provare e approvare. Interviene solo nei momenti critici (merge, decisioni elencate sotto "Cosa NON fare mai").
+
+## Il ciclo di ogni notte
+
+1. `git fetch origin` e `git log --oneline -15 origin/main`: il log è la fonte di verità, non la memoria.
+2. Leggi `docs/autonomia/BACKLOG.md` e i commenti di Lorenzo sulle PR aperte (solo API REST: `gh api repos/mapetite-app/mapetite-web/pulls`, `.../issues/N/comments`, `.../pulls/N/comments`; GraphQL non è disponibile).
+3. Priorità: (a) applicare il feedback di Lorenzo sulle PR aperte; (b) poi le voci "PRONTA" del backlog, in ordine.
+4. **Una PR per notte, più voci dentro.** Branch `claude/notte-AAAA-MM-GG` da `main` aggiornato (se la PR della notte precedente non è ancora stata unita, parti dal suo branch e dichiaralo nella PR). Fai quante più voci possibile, ognuna in commit separati e reversibili singolarmente. Fermati quando una voce richiede una decisione di Lorenzo: passa alla successiva.
 5. Diagnostica prima del codice: grep/lettura dei file coinvolti; mai agire su supposizioni sullo stato dei file.
 6. Una modifica logica alla volta. Commit atomici con messaggi in italiano.
-7. Verifica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (oggi: 11 errori, 8 warning preesistenti). `npm run build` in questo ambiente fallisce per il download di Google Fonts: è un limite dell'ambiente, la build vera è quella della preview Vercel.
-8. Apri una PR verso `main` con descrizione in italiano: cosa cambia per l'utente, come provarlo sul telefono (passi concreti), cosa NON è stato verificato, eventuali dubbi. Niente gergo superfluo.
-9. Aggiorna `docs/autonomia/BACKLOG.md` (stato della voce, link alla PR) nello stesso branch.
-10. Se la voce è troppo grande per una sessione, consegna un primo pezzo funzionante e scrivi nella PR cosa resta.
+7. Verifica statica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (oggi: 11 errori, 8 warning preesistenti).
+8. **Test reali (se l'ambiente ha chiavi e rete abilitate):** avvia `npm run dev`, prova le API con `curl` e l'interfaccia con Playwright (Chromium già installato) a viewport mobile 390×844. Allega alla PR gli screenshot prima/dopo e l'esito delle ricerche di prova di `docs/autonomia/TEST-RICERCHE.md`.
+   - Budget Google per i test: massimo 10 ricerche reali a notte (la quota totale è 50/giorno ed è condivisa con Lorenzo). Salva le risposte Google delle ricerche di prova in `scripts/fixtures/` (cartella esclusa da git) e riusale per i test ripetuti.
+   - Se chiavi o rete mancano, dichiaralo in PR: "non testato dal vivo".
+   - `npm run build` può fallire per il download di Google Fonts se la rete non lo consente: non è un errore del codice.
+9. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
+10. Aggiorna `docs/autonomia/BACKLOG.md` (stato delle voci, link alla PR) nello stesso branch.
 
 ## Cosa NON fare mai senza approvazione esplicita di Lorenzo
 

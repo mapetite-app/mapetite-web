@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 .env.local.bak
 tmp-takeout/
+
+# fixture locali dei test autonomi
+/scripts/fixtures/
