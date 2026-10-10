@@ -20,6 +20,12 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 - In `BACKLOG.md` tieni aggiornata una riga "Avanzamento verso il 25/10" con cosa è fatto e cosa manca.
 - Lorenzo ha 20–30 minuti la mattina per provare e approvare. Interviene solo nei momenti critici (merge, decisioni elencate sotto "Cosa NON fare mai").
 
+## Orari (limiti di utilizzo condivisi con il lavoro di Lorenzo)
+- Lorenzo usa Claude per lavoro dal lunedì al venerdì dalle 9 alle 21 circa. Il limite di utilizzo è unico (finestre da 5 ore + limite settimanale) e va lasciato a lui in quelle ore.
+- Sessioni di sviluppo: 22:00 e 03:05. La seconda riparte dal branch della prima.
+- Nei giorni feriali chiudi il lavoro entro le 08:00: commit, push, PR aggiornata e messaggio finale. Non iniziare voci nuove dopo le 07:30.
+- Se una sessione si interrompe per il limite di utilizzo, la successiva riprende da dove era: lascia sempre il branch in uno stato che compila e una nota in PR su cosa era in corso.
+
 ## Il ciclo di ogni notte
 
 1. `git fetch origin` e `git log --oneline -15 origin/main`: il log è la fonte di verità, non la memoria.
