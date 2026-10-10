@@ -48,3 +48,16 @@ Pulsante "Dai un feedback" nell'app. Dove far arrivare i messaggi (email, tabell
 - Log delle ricerche `search_logs` (migrazione + privacy).
 - Prompt caching Haiku quando i volumi crescono.
 - Funzioni social: escluse finché non ci sono utenti reali.
+
+## Fase 4 — Crescita del prodotto (dopo la Fase 3, o prima se una notte avanza tempo)
+
+Lorenzo (10/10): vuole che Mapetite cresca oltre il piano, con funzioni nuove ispirate ai competitor (Google Maps, Mapstr, TripAdvisor e simili), proposte da Claude in autonomia.
+
+Regole:
+- Ogni notte, finito il lavoro sulle voci PRONTA, Claude aggiunge qui fino a 3 proposte (stato PROPOSTA): cosa fa per l'utente, quale competitor lo fa già e come Mapetite lo farebbe meglio, costo stimato.
+- Claude può portare una sua proposta a PRONTA e realizzarla senza chiedere solo se: non richiede migrazioni Supabase, non aumenta le chiamate Google o i costi AI, non cambia la direzione grafica già scelta da Lorenzo. Altrimenti resta PROPOSTA finché Lorenzo non commenta "ok".
+- Le Fasi 1–3 hanno sempre la precedenza: una funzione nuova non deve mai rallentare l'obiettivo dei tester di fine ottobre.
+- Ogni funzione nuova è attivabile/disattivabile (flag) finché Lorenzo non la approva nella PR.
+
+### Proposte di Claude
+(vuoto: si riempie dalle prossime notti)
