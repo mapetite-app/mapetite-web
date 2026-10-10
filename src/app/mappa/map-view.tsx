@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
@@ -571,6 +571,12 @@ export default function MapView({
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
+  // Variante grafica della lista risultati (voce 5): ?lista=a (default) | ?lista=b.
+  const listVariant = useSyncExternalStore(
+    () => () => {},
+    () => (new URLSearchParams(window.location.search).get("lista") === "b" ? "b" : "a"),
+    () => "a" as const,
+  );
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
@@ -1356,8 +1362,9 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
-          verdicts={aiSearch !== null ? Object.fromEntries((clusterPlaces ?? displayedPlaces).map((p) => [p.id, venueDetails[p.id]?.verdict ?? null])) : undefined}
+          details={aiSearch !== null ? venueDetails : undefined}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
+          variant={listVariant}
           onSelect={(place) => {
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
