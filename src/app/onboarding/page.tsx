@@ -157,7 +157,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-32 pt-6">
+      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-48 pt-6">
         <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">
           {config.kicker}
         </p>
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Footer button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-bg px-6 pb-8 pt-4 shadow-float">
+      <div className="fixed left-0 right-0 z-40 bg-bg px-6 pb-4 pt-4 shadow-float" style={{ bottom: "var(--nav-height-mobile)" }}>
         <div className="mx-auto max-w-lg">
           <button
             type="button"
