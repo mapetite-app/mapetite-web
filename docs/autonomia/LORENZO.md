@@ -54,6 +54,7 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi√
 - Emoji: riordinare le keyword in `src/lib/emoji.ts` cambia silenziosamente l'emoji dei locali esistenti: verifica prima.
 - Tailwind v4: token in `globals.css` (`@theme inline`), non esiste `tailwind.config.ts`. Colori: `bg-brand` teal `#1a3c40`, `accent` corallo `#ff6b4a`; font `font-display` Poppins, `font-sans` Inter.
 - Testi dell'interfaccia in italiano.
+- Prima di qualsiasi lavoro grafico leggi `docs/autonomia/RIFERIMENTI-DESIGN.md` e guarda gli screenshot in `docs/autonomia/riferimenti/`.
 
 ## Costi (tetto Lorenzo: 20 ‚Ç¨/mese su Google)
 

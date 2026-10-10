@@ -24,12 +24,15 @@ Possibile complemento senza costi aggiuntivi: chiedere a Google attributi come `
 
 ### 5. Nuova lista risultati — PRONTA (2 varianti)
 Lorenzo: la lista attuale "non mi piace per niente"; la vuole più integrata e bella. Pannello trascinabile con 3 altezze (mappa / metà / pieno), card più leggibili con foto, verdetto in una riga e motivo per cui è adatto alla ricerca. Consegnare 2 varianti attivabili da un parametro nell'URL (`?lista=a` / `?lista=b`) per far scegliere Lorenzo.
+Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
 ### 6. Scheda locale rifinita — PRONTA
 Gerarchia chiara: foto, nome, verdetto, perché è adatto, azioni (salva, indicazioni, chiama, sito). Verifica che ogni pulsante funzioni su iPhone.
+Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
 ### 7. Primo accesso guidato — PRONTA
 Un tester nuovo deve capire in 10 secondi cosa fare: schermata iniziale con 3–4 ricerche di esempio cliccabili, permesso posizione spiegato, stati vuoti ed errori con messaggi umani.
+Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
 ### 8. Vista "salvati" ricercabile e raggruppata per città — DA DECIDERE (migrazione)
 Richiede campo `city` su `saved_places` (migrazione Supabase) e `addressComponents` nel FIELD_MASK.
