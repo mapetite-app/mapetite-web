@@ -22,13 +22,13 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 3. Priorità: (a) applicare il feedback di Lorenzo sulle PR aperte; (b) poi le voci "PRONTA" del backlog, in ordine.
 4. **Una PR per notte, più voci dentro.** Branch `claude/notte-AAAA-MM-GG` da `main` aggiornato (se la PR della notte precedente non è ancora stata unita, parti dal suo branch e dichiaralo nella PR). Fai quante più voci possibile, ognuna in commit separati e reversibili singolarmente. Fermati quando una voce richiede una decisione di Lorenzo: passa alla successiva.
 5. Diagnostica prima del codice: grep/lettura dei file coinvolti; mai agire su supposizioni sullo stato dei file.
-6. Una modifica logica alla volta. Commit atomici con messaggi in italiano.
+6. Una modifica logica alla volta. Commit atomici con messaggi in italiano. **Autore dei commit obbligatorio:** `git -c user.name="lorenzo-mapetite" -c user.email="founder.mapetite@gmail.com" commit ...` — Vercel (piano Hobby) non crea l'anteprima per commit di altri autori. Mantieni la riga `Co-Authored-By` di Claude nel messaggio.
 7. Verifica statica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (oggi: 11 errori, 8 warning preesistenti).
 8. **Test reali (se l'ambiente ha chiavi e rete abilitate):** avvia `npm run dev`, prova le API con `curl` e l'interfaccia con Playwright (Chromium già installato) a viewport mobile 390×844. Allega alla PR gli screenshot prima/dopo e l'esito delle ricerche di prova di `docs/autonomia/TEST-RICERCHE.md`.
    - Budget Google per i test: massimo 10 ricerche reali a notte (la quota totale è 50/giorno ed è condivisa con Lorenzo). Salva le risposte Google delle ricerche di prova in `scripts/fixtures/` (cartella esclusa da git) e riusale per i test ripetuti.
    - Se chiavi o rete mancano, dichiaralo in PR: "non testato dal vivo".
    - `npm run build` può fallire per il download di Google Fonts se la rete non lo consente: non è un errore del codice.
-9. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
+9. L'anteprima Vercel del branch compare come stato del commit (`gh api repos/mapetite-app/mapetite-web/deployments`, poi `.../deployments/ID/statuses` → `environment_url`, formato `https://mapetite-…-lorenzomapetite.vercel.app`): mettila in cima alla PR. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
 10. Aggiorna `docs/autonomia/BACKLOG.md` (stato delle voci, link alla PR) nello stesso branch.
 
 ## Cosa NON fare mai senza approvazione esplicita di Lorenzo
