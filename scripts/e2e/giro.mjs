@@ -297,6 +297,15 @@ ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stess
 await shot("20-pin-foto");
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
+// 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"
+await page.route("**/api/search/synthesis", (r) => r.fulfill({ status: 500, json: { error: "x" } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await page.waitForTimeout(800);
+ok(!(await page.getByText(/preparo i verdetti/).isVisible()) && (await page.locator("ul.snap-x li").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
+await page.unroute("**/api/search/synthesis");
+
 // 7-sexies. Un solo interruttore per tutte le varianti
 await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "serif" && d.scheda === "b" && d.home === "b" && d.pin === "b"; }), "?stile=places accende tutte le varianti");
