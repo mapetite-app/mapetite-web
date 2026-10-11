@@ -48,10 +48,23 @@
   }
 }
 
+:root {
+  --font-title-active: var(--font-poppins);
+}
+:root[data-titoli="serif"] {
+  --font-title-active: var(--font-fraunces);
+}
+:root[data-titoli="serif"] .font-title {
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
 @theme inline {
   /* Font */
   --font-display: var(--font-poppins);
   --font-sans: var(--font-inter);
+  /* Nomi dei locali e titoli editoriali: Poppins, oppure serif con ?titoli=serif (variante da scegliere). */
+  --font-title: var(--font-title-active);
 
   /* Colori */
   --color-brand: var(--color-brand);

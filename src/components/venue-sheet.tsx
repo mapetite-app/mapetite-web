@@ -166,7 +166,7 @@ export default function VenueSheet({
             {getCategoryEmoji(category, name)}
           </span>
         )}
-        <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-display text-2xl font-semibold leading-tight text-brand`}>
+        <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand`}>
           {name}
         </h2>
 

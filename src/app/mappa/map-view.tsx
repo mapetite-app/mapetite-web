@@ -1287,7 +1287,7 @@ export default function MapView({
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
-              <p className="font-display text-base font-semibold text-brand">Cosa cerchi?</p>
+              <p className="font-title text-lg font-semibold text-brand">Cosa cerchi?</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}

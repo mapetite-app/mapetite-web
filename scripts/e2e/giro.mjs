@@ -227,6 +227,18 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) === 0, "?beta=off: spegne anche le gemme");
 
+// 5g. Variante titoli serif (?titoli=serif, da far scegliere): resta sul telefono, ?titoli=poppins torna indietro
+const titleFont = () => page.locator("ul.snap-x li").first().locator(".font-title").first().evaluate((el) => getComputedStyle(el).fontFamily);
+await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+ok(/fraunces/i.test(await titleFont()), "?titoli=serif: nomi dei locali in serif");
+await shot("05c-titoli-serif");
+await page.goto(`${BASE}/mappa?titoli=poppins`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok(/poppins/i.test(await titleFont()), "?titoli=poppins: si torna al font attuale");
+
 // 5f. Ricerca scritta direttamente nella card iniziale
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
