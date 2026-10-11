@@ -154,7 +154,7 @@ export default function VenueSheet({
         >
           {getCategoryEmoji(category, name)}
         </span>
-        <h2 className="mt-2 pr-8 font-display text-2xl font-semibold text-brand">
+        <h2 className="mt-2 pr-8 font-title text-2xl font-semibold in-data-[titoli=serif]:text-[2.1rem] in-data-[titoli=serif]:leading-tight text-brand">
           {name}
         </h2>
 

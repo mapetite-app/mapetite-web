@@ -223,6 +223,17 @@ ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul p
 await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
 await ctx3.close();
 
+// 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
+const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(/Poppins/i.test(await titleFont()), "titoli: Poppins di default");
+await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+await page.goto(`${BASE}/mappa?titoli=sans`, { waitUntil: "networkidle" });
+ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
+
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
 const fb = page.getByRole("link", { name: "Feedback" });

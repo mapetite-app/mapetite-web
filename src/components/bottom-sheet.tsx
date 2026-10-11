@@ -271,7 +271,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0">
             {title && (
-              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-base font-semibold leading-snug text-brand first-letter:uppercase">
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
               </p>
             )}
@@ -314,7 +314,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
                       )}
                     </span>
-                    <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
+                    <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
                     <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
                       {metaLine(place, d, origin)}
                     </span>
@@ -387,7 +387,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <div className="flex items-start justify-between px-1 pb-2">
           <div className="min-w-0">
             {title && (
-              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-lg font-semibold leading-snug text-brand first-letter:uppercase">
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-lg font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
               </p>
             )}
@@ -429,7 +429,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-display font-semibold leading-snug text-text">
+                  <span className="block truncate text-[15px] font-title font-semibold leading-snug text-text">
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
