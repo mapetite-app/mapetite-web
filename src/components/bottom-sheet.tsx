@@ -15,6 +15,8 @@ export interface BottomSheetProps {
   loadingVerdicts?: boolean;
   // Variante grafica della lista (voce 5, scelta con ?lista=a|b nell'URL).
   variant?: "a" | "b";
+  // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
+  origin?: { lat: number; lng: number } | null;
 }
 
 export type ListDetails = {
@@ -38,8 +40,19 @@ function formatCount(n: number | null): string | null {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
 }
 
-// Riga di metadati: categoria · ★ voto (n) · prezzo.
-function metaLine(place: Place, d: ListDetails | undefined): string {
+function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
+  const R = 6371000;
+  const rad = (x: number) => (x * Math.PI) / 180;
+  const a =
+    Math.sin(rad(to.lat - from.lat) / 2) ** 2 +
+    Math.cos(rad(from.lat)) * Math.cos(rad(to.lat)) * Math.sin(rad(to.lng - from.lng) / 2) ** 2;
+  const m = 2 * R * Math.asin(Math.sqrt(a));
+  if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;
+  return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
+}
+
+// Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
+function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null): string {
   const parts: string[] = [];
   const cat = prettyCategory(place.category);
   if (cat) parts.push(cat);
@@ -49,6 +62,7 @@ function metaLine(place: Place, d: ListDetails | undefined): string {
   }
   const price = priceLabel(place.priceLevel);
   if (price) parts.push(price);
+  if (origin) parts.push(distanceLabel(origin, place));
   return parts.join(" · ");
 }
 
@@ -83,7 +97,7 @@ type DragState = {
 
 type QuickFilter = "open" | "cheap" | "top";
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a" }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
   const places = useMemo(
@@ -254,7 +268,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   </span>
                   <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
                   <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
-                    {metaLine(place, d)}
+                    {metaLine(place, d, origin)}
                   </span>
                   {d?.verdict ? (
                     <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
@@ -355,7 +369,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
-                    <span className="truncate">{metaLine(place, details?.[place.id])}</span>
+                    <span className="truncate">{metaLine(place, details?.[place.id], origin)}</span>
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
