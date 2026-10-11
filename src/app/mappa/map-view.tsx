@@ -17,6 +17,7 @@ import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
+import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
@@ -1962,6 +1963,11 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
           focusedId={focusId}
+          understood={aiSearch?.filtri ? [
+            ...(aiSearch.filtri.categoria ? [categoryLabel(aiSearch.filtri.categoria) ?? aiSearch.filtri.categoria] : []),
+            ...aiSearch.filtri.parole_chiave,
+            ...(aiSearch.filtri.vicino_a_me ? ["vicino a te"] : []),
+          ].slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
           isSaved={isPlaceSaved}

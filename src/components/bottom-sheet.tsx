@@ -35,6 +35,8 @@ export interface BottomSheetProps {
   onFocus?: (place: Place) => void;
   // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
   onOrder?: (ids: string[]) => void;
+  // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
+  understood?: string[];
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -129,7 +131,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, heading = null, shareAt = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -345,6 +347,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             {title && (
               <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
+              </p>
+            )}
+            {title && understood.length > 0 && (
+              <p data-testid="ho-capito" className="mt-0.5 truncate text-xs font-sans text-accent">
+                Ho capito: {understood.join(" · ")}
               </p>
             )}
             {!title && heading && (
