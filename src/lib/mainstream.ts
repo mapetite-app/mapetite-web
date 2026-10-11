@@ -7,8 +7,9 @@ const OFF_THE_BEATEN_PATH =
   /\b(?:non|poco)\s+(?:troppo\s+)?(?:turistic|famos|mainstream|commercial|conosciut)|\bautentic|\bgenuin|\bnascost|\bsconosciut|\bsegret|\bda\s+romani|\bdove\s+vanno\s+(?:i|gli)\s+(?:romani|milanesi|napoletani|fiorentini|locali|abitanti)|\bfuori\s+dai\s+(?:soliti\s+)?giri|\bgemm[ae]\b|\blontano\s+dai\s+turisti|\bsenza\s+turisti/i;
 
 // Massiccio = almeno MIN_COUNT recensioni E più di RATIO volte la mediana dei risultati.
+// 2,5 (era 3): a Trastevere Da Enzo (10.239 recensioni, mediana ~3.900) restava primo.
 const MIN_COUNT = 8000;
-const RATIO = 3;
+const RATIO = 2.5;
 
 export function wantsOffTheBeatenPath(query: string): boolean {
   return OFF_THE_BEATEN_PATH.test(query);
