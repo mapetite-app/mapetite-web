@@ -1395,6 +1395,31 @@ export default function MapView({
     }
   };
 
+  // Esc (da computer) chiude la finestra più in alto: Salva, scheda, filtri, articolo, pannello.
+  const closeTopmost = useRef<() => void>(() => {});
+  useEffect(() => {
+    closeTopmost.current = () => {
+      if (pendingSavePlaceId) { setPendingSavePlaceId(null); return; }
+      if (pendingEditPlace) { setPendingEditPlace(null); return; }
+      if (overlay.kind === "venue" || overlay.kind === "filters" || overlay.kind === "ai") { dispatch({ type: "CLOSE" }); return; }
+      if (articleOpen) {
+        // L'articolo ha una voce nella cronologia: si chiude tornando indietro.
+        if (window.history.state?.articolo) window.history.back();
+        else setArticleOpen(false);
+      }
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Nei campi di testo Esc lascia fare al campo (es. annullare il tag nuovo).
+      if ((e.target as HTMLElement | null)?.closest("input, textarea")) return;
+      closeTopmost.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
