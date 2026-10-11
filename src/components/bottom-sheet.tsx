@@ -31,6 +31,8 @@ export interface BottomSheetProps {
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
   focusedId?: string | null;
   onFocus?: (place: Place) => void;
+  // Riapre il pannello di ricerca con la frase attuale, per correggerla.
+  onRefine?: () => void;
 }
 
 export type ListDetails = {
@@ -55,13 +57,17 @@ function formatCount(n: number | null): string | null {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
 }
 
-function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
+function distanceM(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
   const R = 6371000;
   const rad = (x: number) => (x * Math.PI) / 180;
   const a =
     Math.sin(rad(to.lat - from.lat) / 2) ** 2 +
     Math.cos(rad(from.lat)) * Math.cos(rad(to.lat)) * Math.sin(rad(to.lng - from.lng) / 2) ** 2;
-  const m = 2 * R * Math.asin(Math.sqrt(a));
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
+  const m = distanceM(from, to);
   if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;
   return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 }
@@ -127,15 +133,18 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
-  const places = useMemo(
-    () => (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces),
-    [allPlaces, quick, quickFiltersOn, details],
-  );
+  // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
+  const [nearestFirst, setNearestFirst] = useState(false);
+  const places = useMemo(() => {
+    const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
+    if (!nearestFirst || !origin) return list;
+    return [...list].sort((a, b) => distanceM(origin, a) - distanceM(origin, b));
+  }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
   const toggleQuick = (f: QuickFilter) => {
     if (onToggleQuick) return onToggleQuick(f);
     setQuickLocal((prev) => {
@@ -295,7 +304,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (allPlaces.length === 0) return null;
 
   const quickChips = (
-    <div className="flex flex-wrap gap-2" data-testid="filtri-lista">
+    <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0" data-testid="filtri-lista">
       {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
@@ -307,6 +316,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
+      {origin && (
+        <button
+          type="button"
+          aria-pressed={nearestFirst}
+          onClick={() => setNearestFirst((v) => !v)}
+          className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium shadow-card ${nearestFirst ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+        >
+          Più vicini
+        </button>
+      )}
     </div>
   );
 
@@ -331,7 +350,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
+          {title && onRefine && (
+            <button type="button" onClick={onRefine} className="-my-1 ml-2 min-h-9 shrink-0 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95">
+              Affina
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-1 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
         </div>

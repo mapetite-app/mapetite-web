@@ -1641,6 +1641,7 @@ export default function MapView({
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           focusedId={focusId}
+          onRefine={() => dispatch({ type: "OPEN_AI" })}
           onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
