@@ -491,7 +491,7 @@ export default function VenueSheet({
               type="button"
               onClick={share}
               aria-label={`Condividi ${name}`}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
+              className="inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
             >
               <Share2 size={18} />
             </button>
@@ -502,7 +502,7 @@ export default function VenueSheet({
             <a
               href={`tel:${phone.replace(/[^\d+]/g, "")}`}
               aria-label={`Chiama ${name}`}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
+              className="inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
             >
               <Phone size={18} />
             </a>
@@ -514,7 +514,7 @@ export default function VenueSheet({
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Sito di ${name}`}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
+              className="inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
             >
               <Globe size={18} />
             </a>

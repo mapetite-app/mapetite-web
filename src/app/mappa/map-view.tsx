@@ -362,8 +362,8 @@ function SaveButton({
         disabled={isPending}
         className={
           isSaved
-            ? "min-h-11 rounded-pill bg-success px-5 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            : "min-h-11 rounded-pill bg-accent px-5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "min-h-11 rounded-pill bg-success px-4 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            : "min-h-11 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
         {isPending ? "..." : isSaved ? "Salvato" : "Salva"}

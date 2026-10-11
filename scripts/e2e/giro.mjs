@@ -362,6 +362,56 @@ else {
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   await sctx.close();
+
+  // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const writes = [];
+  let addMode = "error";
+  await vctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await vctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await vctx.route("**/api/places/add", (r) => addMode === "error"
+    ? r.fulfill({ status: 500, json: { error: "x" } })
+    : r.fulfill({ json: { place: { id: "11111111-2222-3333-4444-555555555555" } } }));
+  await vctx.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m === "GET") return r.fulfill({ json: [] });
+    writes.push({ m, url: r.request().url(), body: r.request().postDataJSON?.() ?? null });
+    return r.fulfill({ status: m === "POST" ? 201 : 204, body: "" });
+  });
+  await vctx.route("**/rest/v1/reviews**", (r) => r.fulfill({ json: [] }));
+  await vctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  const v = await vctx.newPage();
+  v.on("pageerror", (e) => errors.push(e.message));
+  v.on("dialog", (d) => d.accept());
+  await v.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await v.getByText("Terrazza Uno").first().click();
+  await v.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+  await v.locator("button:text-is('Salva')").first().click();
+  const modal = v.locator("div.w-80");
+  await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
+  ok(true, "salva: si apre la finestra con tag e nota");
+  await modal.getByRole("button", { name: "Romantico" }).click();
+  await modal.locator("textarea").fill("Tavolo vicino alla ringhiera");
+  await modal.getByRole("button", { name: "Salva", exact: true }).click();
+  await modal.getByText("Errore durante il salvataggio. Riprova.").waitFor({ timeout: 3000 });
+  ok(true, "salva: se il server non risponde, messaggio d'errore e la finestra resta aperta");
+  addMode = "ok";
+  await modal.getByRole("button", { name: "Salva", exact: true }).click();
+  await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
+  const ins = writes.find((w) => w.m === "POST");
+  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
+    "salva: scrive in saved_places l'UUID Supabase con tag e nota");
+  ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
+  ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
+  { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
+  await v.screenshot({ path: `${OUT}/17-salvato.png` });
+  await v.locator("button:text-is('Salvato')").click();
+  await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
+  const del = writes.find((w) => w.m === "DELETE");
+  ok(!!del && del.url.includes("place_id=eq.11111111-2222-3333-4444-555555555555"), "rimuovi: dopo la conferma cancella il salvato giusto e il pulsante torna 'Salva'");
+  await vctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
