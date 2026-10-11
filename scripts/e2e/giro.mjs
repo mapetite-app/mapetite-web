@@ -153,11 +153,13 @@ await page.locator("ul.snap-x").evaluate((ul) => ul.scrollTo({ left: ul.children
 await page.waitForTimeout(700);
 ok((await focusedName()).includes("Rooftop Tre"), "carosello: scorrendo, si evidenzia il pin della card al centro");
 await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
-await page.waitForTimeout(900);
-const centered = await page.locator("ul.snap-x").evaluate((ul) => {
+// lo scorrimento è animato: si aspetta che finisca (fino a 3 s)
+const centerOf = () => page.locator("ul.snap-x").evaluate((ul) => {
   const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
   return [...ul.children].map((li) => ({ id: li.dataset.id, d: Math.abs(li.getBoundingClientRect().left + li.clientWidth / 2 - mid) })).sort((a, b) => a.d - b.d)[0].id;
 });
+let centered = await centerOf();
+for (let i = 0; i < 15 && centered !== "P1"; i++) { await page.waitForTimeout(200); centered = await centerOf(); }
 ok(centered === "P1", "pin toccato: il carosello porta al centro la sua card");
 ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "pin toccato una volta: la scheda non si apre ancora");
 await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
@@ -350,6 +352,8 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
   ok(resp?.status() === 200, `/${r} risponde 200`);
 }
+const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
+ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
 await page.getByLabel("Scegli uno screenshot").setInputFiles({ name: "post.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
 ok(await page.getByText("Cambia screenshot").isVisible() && await page.getByText("post.png").isVisible(), "importa: area grande per scegliere lo screenshot, in italiano");
