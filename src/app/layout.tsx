@@ -27,9 +27,11 @@ const newsreader = Newsreader({
   display: "swap",
 });
 
-// ?titoli=serif accende la variante e la ricorda su questo telefono; ?titoli=sans torna a Poppins.
-// Gira prima del primo disegno, così non si vede il cambio di font.
-const TITOLI_SCRIPT = `try{var t=new URLSearchParams(location.search).get("titoli");if(t==="serif"||t==="sans")localStorage.setItem("mapetite.titoli",t);if(localStorage.getItem("mapetite.titoli")==="serif")document.documentElement.dataset.titoli="serif"}catch(e){}`;
+// Varianti grafiche in prova, ricordate su questo telefono:
+//   ?titoli=serif | ?titoli=sans   font dei titoli (serif editoriale come Places / Poppins)
+//   ?scheda=b     | ?scheda=a      scheda del locale (stile Places / attuale)
+// Gira prima del primo disegno, così non si vede il cambio.
+const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"]};for(var k in v){var t=q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Mapetite",
@@ -65,7 +67,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full">
-        <script dangerouslySetInnerHTML={{ __html: TITOLI_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT }} />
         <NavBar userId={userId} />
         {/*
           Pagine normali (non fixed): pb-16 evita che il contenuto finisca

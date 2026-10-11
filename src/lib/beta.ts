@@ -48,3 +48,13 @@ export function saveRecentSearch(q: string): void {
     // localStorage non disponibile (navigazione privata): si ignora
   }
 }
+
+// Variante della scheda locale scelta con ?scheda=b (stile Places) / ?scheda=a (attuale).
+// La imposta lo script in layout.tsx su <html data-scheda>, prima del primo disegno.
+export function useSchedaVariant(): "a" | "b" {
+  return useSyncExternalStore(
+    () => () => {},
+    () => (document.documentElement.dataset.scheda === "b" ? "b" : "a"),
+    () => "a",
+  );
+}

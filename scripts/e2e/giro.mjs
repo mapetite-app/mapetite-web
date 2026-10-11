@@ -248,6 +248,29 @@ if (shared) {
   await page.unroute("**/api/search");
 }
 
+// 7-ter. Variante B della scheda (?scheda=b, stile Places; ricordata sul telefono, ?scheda=a torna all'attuale)
+await page.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().click();
+await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
+await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
+ok((await page.getByText("Il verdetto Mapetite").count()) === 0, "scheda B: layout Places al posto della card teal");
+ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
+ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
+for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
+  const box = await page.locator(sel).first().boundingBox();
+  ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
+}
+ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
+await shot("15-scheda-b");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
+await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+ok(true, "?scheda=a: torna la scheda attuale");
+
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
