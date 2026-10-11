@@ -248,6 +248,18 @@ await page.getByLabel("Scrivi cosa cerchi").press("Enter");
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitivo sul tetto"), "card iniziale: si scrive e si cerca senza aprire altri pannelli");
 
+// 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await shot("00-home");
+await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
+ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await page.getByRole("link", { name: /Rooftop romantico/ }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
+ok(true, "home: un esempio apre la mappa con i risultati");
+
 // 5d. Foto non disponibili (quota finita): resta l'emoji, nessun errore
 photoMode = "off";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
