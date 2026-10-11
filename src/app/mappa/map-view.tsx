@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
@@ -336,15 +336,15 @@ function SaveButton({
   };
 
   return (
-    <div className="mt-2">
+    <div>
       <button
         type="button"
         onClick={handleClick}
         disabled={isPending}
         className={
           isSaved
-            ? "rounded-btn bg-success px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            : "rounded-btn bg-brand px-3 py-1 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "min-h-11 rounded-pill bg-success px-5 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            : "min-h-11 rounded-pill bg-accent px-5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
         {isPending ? "..." : isSaved ? "Salvato" : "Salva"}
@@ -374,6 +374,9 @@ type AIFiltri = {
   vicino_a_me: boolean;
 };
 
+// Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
+type PendingSynthesis = { places: unknown[]; token: string };
+
 function buildAISummary(filtri: AIFiltri): string {
   const parts: string[] = [];
   if (filtri.categoria) parts.push(filtri.categoria);
@@ -399,88 +402,28 @@ type VenueDetails = {
 };
 
 function AISearchPanel({
-  onResults,
+  onSubmit,
+  isSearching,
+  error,
   onClear,
   activeFiltri,
   activeCount,
-  view,
-  viewState,
+  query,
+  setQuery,
 }: {
-  onResults: (places: Place[], filtri: AIFiltri, details: Record<string, VenueDetails>) => void;
+  onSubmit: (q: string) => void;
+  isSearching: boolean;
+  error: string | null;
   onClear: () => void;
   activeFiltri: AIFiltri | null;
   activeCount: number | null;
-  view: "all" | "saved";
-  viewState: { latitude: number; longitude: number };
+  query: string;
+  setQuery: (q: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    setIsSearching(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: query.trim(),
-          source: view === "all" ? "world" : "saved",
-          searchIntent: "natural",
-          lat: viewState.latitude,
-          lng: viewState.longitude,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Qualcosa è andato storto. Riprova.");
-        return;
-      }
-      type RawPlace = {
-        id: string; name: string; category: string | null; lat: number | null; lng: number | null;
-        rating: number | null; priceLevel: number | null; address: string | null;
-        userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
-        selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
-      };
-      const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
-      const places: Place[] = raw.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        address: p.address ?? null,
-        lat: p.lat as number,
-        lng: p.lng as number,
-        tags: null,
-        note: null,
-        rating: p.rating ?? null,
-        priceLevel: p.priceLevel ?? null,
-      }));
-      const details: Record<string, VenueDetails> = {};
-      for (const p of raw) {
-        details[p.id] = {
-          userRatingCount: p.userRatingCount ?? null,
-          openNow: p.openNow ?? null,
-          websiteUri: p.websiteUri ?? null,
-          phone: p.phone ?? null,
-          selectedReviews: p.selectedReviews ?? null,
-          synthesis: p.synthesis ?? null,
-          tags: p.tags ?? null,
-          verdict: p.verdict ?? null,
-          goFor: p.goFor ?? null,
-          dontExpect: p.dontExpect ?? null,
-          matchReason: p.matchReason ?? null,
-        };
-      }
-      onResults(places, data.filtri_usati, details);
-    } catch {
-      setError("Errore di rete. Controlla la connessione e riprova.");
-    } finally {
-      setIsSearching(false);
-    }
+    onSubmit(query.trim());
   };
 
   return (
@@ -503,7 +446,7 @@ function AISearchPanel({
         {activeFiltri !== null && (
           <button
             type="button"
-            onClick={() => { setQuery(""); setError(null); onClear(); }}
+            onClick={() => { setQuery(""); onClear(); }}
             aria-label="Azzera ricerca AI"
             className="shrink-0 rounded-btn px-2 text-lg font-bold text-text-muted hover:text-text"
           >
@@ -554,7 +497,23 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number } | null>(null);
+  // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
+  const [loadingVerdicts, setLoadingVerdicts] = useState(false);
+  const searchSeq = useRef(0);
+  // Variante grafica della lista risultati (voce 5): ?lista=a (default) | ?lista=b.
+  const listVariant = useSyncExternalStore(
+    () => () => {},
+    () => (new URLSearchParams(window.location.search).get("lista") === "b" ? "b" : "a"),
+    () => "a" as const,
+  );
+  // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiSearching, setAiSearching] = useState(false);
+  // Schermata di benvenuto: sparisce alla prima interazione.
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
+  const [aiError, setAiError] = useState<string | null>(null);
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
   // Locali del cluster su cui si è tappato: se valorizzato, la lista mostra
   // solo questi invece di displayedPlaces.
@@ -883,6 +842,128 @@ export default function MapView({
     return clusterIndex.getClusters(bbox, roundedZoom);
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude]);
 
+  // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
+  const runAISearch = async (q: string) => {
+    setAiSearching(true);
+      setAiError(null);
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: q,
+            source: view === "all" ? "world" : "saved",
+            searchIntent: "natural",
+            phase: "fast",
+            lat: viewState.latitude,
+            lng: viewState.longitude,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
+          return;
+        }
+        type RawPlace = {
+          id: string; name: string; category: string | null; lat: number | null; lng: number | null;
+          rating: number | null; priceLevel: number | null; address: string | null;
+          userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
+          selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
+        };
+        const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
+        const places: Place[] = raw.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          address: p.address ?? null,
+          lat: p.lat as number,
+          lng: p.lng as number,
+          tags: null,
+          note: null,
+          rating: p.rating ?? null,
+          priceLevel: p.priceLevel ?? null,
+        }));
+        const details: Record<string, VenueDetails> = {};
+        for (const p of raw) {
+          details[p.id] = {
+            userRatingCount: p.userRatingCount ?? null,
+            openNow: p.openNow ?? null,
+            websiteUri: p.websiteUri ?? null,
+            phone: p.phone ?? null,
+            selectedReviews: p.selectedReviews ?? null,
+            synthesis: p.synthesis ?? null,
+            tags: p.tags ?? null,
+            verdict: p.verdict ?? null,
+            goFor: p.goFor ?? null,
+            dontExpect: p.dontExpect ?? null,
+            matchReason: p.matchReason ?? null,
+          };
+        }
+        const id = ++searchSeq.current;
+        setClusterPlaces(null); setFilterError(null);
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id });
+        setVenueDetails(details); setFilters(EMPTY_FILTERS);
+        dispatch({ type: "OPEN_LIST" });
+        void loadVerdicts(id, q, data.sintesi_pendente ?? null);
+      } catch {
+        setAiError("Errore di rete. Controlla la connessione e riprova.");
+      } finally {
+        setAiSearching(false);
+      }
+
+  };
+
+  // Posizione: chiesta solo quando l'utente tocca il pulsante (mai al caricamento).
+  const goToMyPosition = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) { setGeoState("unavailable"); return; }
+    setGeoState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setViewState((v) => ({ ...v, latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 14 }));
+        setGeoState("idle");
+        setWelcomeDismissed(true);
+      },
+      (err) => setGeoState(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable"),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  };
+
+  // Secondo tempo della ricerca AI: verdetti e motivi arrivano dopo la lista.
+  // Se nel frattempo l'utente ha cambiato o azzerato la ricerca (id diverso) si scarta.
+  const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
+    if (!pending) return;
+    setLoadingVerdicts(true);
+    try {
+      const res = await fetch("/api/search/synthesis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchedQuery, places: pending.places, token: pending.token }),
+      });
+      if (!res.ok || searchSeq.current !== id) return;
+      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[] } = await res.json();
+      const esclusi = new Set(data.esclusi ?? []);
+      setVenueDetails((prev) => {
+        const next = { ...prev };
+        for (const [pid, d] of Object.entries(data.dettagli ?? {})) {
+          next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+        }
+        return next;
+      });
+      if (esclusi.size > 0) {
+        setAiSearch((prev) =>
+          prev && prev.id === id
+            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id)) }
+            : prev,
+        );
+      }
+    } catch {
+      // Degrada: la lista Google resta, senza verdetti.
+    } finally {
+      if (searchSeq.current === id) setLoadingVerdicts(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 md:top-14">
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
@@ -892,9 +973,8 @@ export default function MapView({
           <button
             type="button"
             onClick={() => {
-              setFilters(EMPTY_FILTERS);
-              setAiSearch(null);
-              dispatch({ type: overlay.kind === "ai" ? "RESET" : "OPEN_AI" });
+              // La ricerca AI resta: si azzera solo con ✕ o passando ai filtri.
+              dispatch({ type: overlay.kind === "ai" ? "CLOSE" : "OPEN_AI" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
@@ -907,6 +987,7 @@ export default function MapView({
             type="button"
             onClick={() => {
               setAiSearch(null);
+              setAiQuery("");
               dispatch({ type: "OPEN_FILTERS" });
             }}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
@@ -924,19 +1005,21 @@ export default function MapView({
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
             <AISearchPanel
               key={view}
-              onResults={(places, filtri, details) => { setClusterPlaces(null); setFilterError(null); setAiSearch({ risultati: places, filtri }); setVenueDetails(details); setFilters(EMPTY_FILTERS); dispatch({ type: "OPEN_LIST" }); }}
-              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+              query={aiQuery}
+              setQuery={setAiQuery}
+              onSubmit={(q) => { void runAISearch(q); }}
+              isSearching={aiSearching}
+              error={aiError}
+              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
-              view={view}
-              viewState={viewState}
             />
           </div>
         )}
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -947,7 +1030,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setAiSearch(null); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+            onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -1028,7 +1111,7 @@ export default function MapView({
               </p>
               <p className="font-display font-semibold text-text">
                 {aiSearch !== null
-                  ? "Nessun risultato"
+                  ? "Non ho trovato nulla"
                   : view === "saved" && activeTag !== null
                     ? "Nessun posto con questo tag"
                     : view === "saved"
@@ -1037,7 +1120,7 @@ export default function MapView({
               </p>
               <p className="mt-1 text-sm font-sans text-text-muted">
                 {aiSearch !== null
-                  ? "Prova a modificare la ricerca"
+                  ? "Prova con meno requisiti o scrivi un'altra zona (es. “a Trastevere”)."
                   : view === "saved" && activeTag !== null
                     ? "Cambia filtro o salva nuovi posti"
                     : view === "saved"
@@ -1047,6 +1130,82 @@ export default function MapView({
             </div>
           </div>
         )}
+
+      {/* Primo accesso: cosa fare in 10 secondi (esempi cliccabili + posizione spiegata). */}
+      {view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
+        <div
+          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
+          style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}
+        >
+          <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface p-4 shadow-float">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-display text-lg font-semibold text-brand">Cosa cerchi?</p>
+                <p className="mt-0.5 text-sm font-sans text-text-muted">
+                  Scrivilo con parole tue: ti propongo i posti giusti, non solo i più famosi.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWelcomeDismissed(true)}
+                aria-label="Chiudi"
+                className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center text-lg text-text-muted"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                "Rooftop romantico per due a Roma",
+                "Trattoria autentica non turistica a Trastevere",
+                "Colazione buona qui vicino",
+                "Cocktail bar elegante per un appuntamento",
+              ].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(example); void runAISearch(example); }}
+                  className="min-h-11 rounded-pill border border-border bg-white px-3.5 py-2 text-left text-sm font-sans text-text active:scale-95 disabled:opacity-60"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+            {aiSearching && (
+              <p className="mt-3 flex items-center gap-2 text-sm text-text-muted">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-brand" />
+                Sto cercando…
+              </p>
+            )}
+            {aiError && <p className="mt-3 text-sm text-error">{aiError}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "OPEN_AI" })}
+                className="min-h-11 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+              >
+                Scrivi la tua ricerca
+              </button>
+              <button
+                type="button"
+                onClick={goToMyPosition}
+                disabled={geoState === "loading"}
+                className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
+              >
+                {geoState === "loading" ? "Cerco dove sei…" : "📍 Usa la mia posizione"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs font-sans text-text-muted">
+              {geoState === "denied"
+                ? "Non ho il permesso di vedere dove sei. Puoi attivarlo dalle impostazioni del browser, oppure scrivere la zona nella ricerca (es. “a Trastevere”)."
+                : geoState === "unavailable"
+                  ? "Non riesco a trovare la tua posizione. Scrivi la zona nella ricerca (es. “a Trastevere”)."
+                  : "La posizione serve solo a mostrarti i locali vicini: non viene salvata."}
+            </p>
+          </div>
+        </div>
+      )}
 
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -1294,12 +1453,15 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
+          details={aiSearch !== null ? venueDetails : undefined}
+          loadingVerdicts={aiSearch !== null && loadingVerdicts}
+          variant={listVariant}
           onSelect={(place) => {
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
-          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); dispatch({ type: "RESET" }); }}
+          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
 

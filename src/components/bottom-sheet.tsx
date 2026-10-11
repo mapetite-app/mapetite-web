@@ -8,6 +8,57 @@ export interface BottomSheetProps {
   places: Place[];
   onSelect: (place: Place) => void;
   onClose: () => void;
+  // Dettaglio editoriale per locale (id → dati). Presente solo nelle ricerche AI:
+  // mentre i verdetti arrivano (`loadingVerdicts`) le card mostrano un caricamento.
+  details?: Record<string, ListDetails | undefined>;
+  loadingVerdicts?: boolean;
+  // Variante grafica della lista (voce 5, scelta con ?lista=a|b nell'URL).
+  variant?: "a" | "b";
+}
+
+export type ListDetails = {
+  userRatingCount: number | null;
+  openNow: boolean | null;
+  verdict: string | null;
+  matchReason: string | null;
+  goFor: string[] | null;
+};
+
+function prettyCategory(c: string | null): string | null {
+  return c ? c.replace(/_/g, " ") : null;
+}
+
+function priceLabel(level: number | null): string | null {
+  return level != null && level > 0 ? "€".repeat(Math.min(level, 4)) : null;
+}
+
+function formatCount(n: number | null): string | null {
+  if (n == null) return null;
+  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
+}
+
+// Riga di metadati: categoria · ★ voto (n) · prezzo.
+function metaLine(place: Place, d: ListDetails | undefined): string {
+  const parts: string[] = [];
+  const cat = prettyCategory(place.category);
+  if (cat) parts.push(cat);
+  if (place.rating != null) {
+    const n = formatCount(d?.userRatingCount ?? null);
+    parts.push(`★ ${place.rating.toFixed(1).replace(".", ",")}${n ? ` (${n})` : ""}`);
+  }
+  const price = priceLabel(place.priceLevel);
+  if (price) parts.push(price);
+  return parts.join(" · ");
+}
+
+function SkeletonLines({ dark = false }: { dark?: boolean }) {
+  const bar = dark ? "bg-white/20" : "bg-border";
+  return (
+    <span aria-label="Sto preparando il verdetto" className="mt-2 block space-y-1.5">
+      <span className={`block h-3 w-4/5 animate-pulse rounded-pill ${bar}`} />
+      <span className={`block h-3 w-3/5 animate-pulse rounded-pill ${bar}`} />
+    </span>
+  );
 }
 
 // Snap points in dvh numerici (percentuali dell'altezza viewport).
@@ -29,7 +80,7 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-export default function BottomSheet({ places, onSelect, onClose }: BottomSheetProps) {
+export default function BottomSheet({ places, onSelect, onClose, details, loadingVerdicts = false, variant = "a" }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -145,6 +196,63 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
 
   if (places.length === 0) return null;
 
+  // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
+  if (variant === "b") {
+    return (
+      <div
+        className="pointer-events-none absolute left-0 right-0 z-10"
+        style={{ bottom: "var(--nav-height-mobile)" }}
+      >
+        <div className="pointer-events-auto mx-3 mb-2 flex items-center justify-between rounded-pill bg-surface px-4 py-1.5 shadow-float w-fit">
+          <p className="text-xs font-sans text-text-muted">
+            {places.length} {places.length === 1 ? "risultato" : "risultati"}
+            {loadingVerdicts && " · preparo i verdetti…"}
+          </p>
+          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 items-center justify-center text-base text-text-muted">
+            ✕
+          </button>
+        </div>
+        <ul className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
+          {places.map((place) => {
+            const d = details?.[place.id];
+            return (
+              <li key={place.id} className="w-[78vw] max-w-sm shrink-0 snap-center">
+                <button
+                  type="button"
+                  onClick={() => onSelect(place)}
+                  className="flex h-full min-h-[190px] w-full flex-col rounded-card bg-brand p-4 text-left text-white shadow-float active:scale-[0.99]"
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
+                    {d?.openNow === true && (
+                      <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
+                    )}
+                  </span>
+                  <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
+                  <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
+                    {metaLine(place, d)}
+                  </span>
+                  {d?.verdict ? (
+                    <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
+                  ) : loadingVerdicts && details ? (
+                    <SkeletonLines dark />
+                  ) : null}
+                  {(d?.goFor ?? []).length > 0 && (
+                    <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
+                      {d!.goFor!.slice(0, 2).map((c) => (
+                        <span key={c} className="rounded-pill bg-white/15 px-2 py-0.5 text-[11px] font-display">{c}</span>
+                      ))}
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={sheetRef}
@@ -178,6 +286,7 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
         <div className="flex items-center justify-between px-1 pb-2">
           <p className="text-xs font-sans text-text-muted">
             {places.length} {places.length === 1 ? "risultato" : "risultati"}
+            {loadingVerdicts && " · preparo i verdetti…"}
           </p>
           <button
             type="button"
@@ -194,18 +303,42 @@ export default function BottomSheet({ places, onSelect, onClose }: BottomSheetPr
               <button
                 type="button"
                 onClick={() => onSelect(place)}
-                className="flex w-full items-start gap-3 rounded-btn px-2 py-2.5 text-left hover:bg-brand/5"
+                className="flex w-full items-start gap-3 rounded-card border border-border bg-white px-3 py-3 text-left shadow-card active:scale-[0.99]"
               >
-                <span className="text-xl leading-none">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl leading-none">
                   {getCategoryEmoji(place.category, place.name)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-display font-semibold text-text">
+                  <span className="block truncate text-[15px] font-display font-semibold leading-snug text-text">
                     {place.name}
                   </span>
-                  {place.address && (
-                    <span className="block truncate text-xs font-sans text-text-muted">
-                      {place.address}
+                  <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
+                    <span className="truncate">{metaLine(place, details?.[place.id])}</span>
+                    {details?.[place.id]?.openNow === true && (
+                      <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
+                        Aperto ora
+                      </span>
+                    )}
+                  </span>
+                  {details?.[place.id]?.verdict ? (
+                    <span className="mt-1.5 block text-sm font-sans font-medium leading-snug text-brand">
+                      {details[place.id]!.verdict}
+                    </span>
+                  ) : loadingVerdicts && details ? (
+                    <SkeletonLines />
+                  ) : null}
+                  {details?.[place.id]?.matchReason && (
+                    <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">
+                      {details[place.id]!.matchReason}
+                    </span>
+                  )}
+                  {(details?.[place.id]?.goFor ?? []).length > 0 && (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {details![place.id]!.goFor!.slice(0, 3).map((c) => (
+                        <span key={c} className="rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-medium text-accent">
+                          {c}
+                        </span>
+                      ))}
                     </span>
                   )}
                 </span>

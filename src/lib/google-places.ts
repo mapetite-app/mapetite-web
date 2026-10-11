@@ -55,6 +55,12 @@ export type SearchOptions = {
   // "quality" (default): ordina per qualityScore. "relevance": preserva l'ordine
   // di rilevanza di Google (nessun sort). Floor e filtri utente invariati in entrambi.
   sortMode?: "relevance" | "quality";
+  // Tipo Google (Table A) per restringere la Text Search; vuoto = nessun vincolo.
+  includedType?: string;
+  // "bias" (default): preferenza di zona intorno a lat/lng. "restrict": solo
+  // risultati dentro il rettangolo intorno a lat/lng. "none": nessun vincolo
+  // (la zona è già nel testo della query, es. "Trastevere").
+  locationMode?: "bias" | "restrict" | "none";
 };
 
 const DEFAULT_RADIUS = 1500;
@@ -121,16 +127,31 @@ export async function searchGooglePlaces(
     openNowOnly,
     categories,
     sortMode = "quality",
+    includedType,
+    locationMode = "bias",
   } = options;
 
   const requestBody: Record<string, unknown> = { textQuery: query };
-  if (typeof lat === "number" && typeof lng === "number") {
-    requestBody.locationBias = {
-      circle: {
-        center: { latitude: lat, longitude: lng },
-        radius,
-      },
-    };
+  if (includedType) requestBody.includedType = includedType;
+  if (typeof lat === "number" && typeof lng === "number" && locationMode !== "none") {
+    if (locationMode === "restrict") {
+      // locationRestriction accetta solo un rettangolo: lo ricavo dal raggio.
+      const dLat = radius / 111_320;
+      const dLng = radius / (111_320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+      requestBody.locationRestriction = {
+        rectangle: {
+          low: { latitude: lat - dLat, longitude: lng - dLng },
+          high: { latitude: lat + dLat, longitude: lng + dLng },
+        },
+      };
+    } else {
+      requestBody.locationBias = {
+        circle: {
+          center: { latitude: lat, longitude: lng },
+          radius,
+        },
+      };
+    }
   }
 
   const googleResponse = await fetch("https://places.googleapis.com/v1/places:searchText", {

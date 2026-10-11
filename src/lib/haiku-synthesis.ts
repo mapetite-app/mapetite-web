@@ -34,6 +34,11 @@ export type PlaceSynthesis = {
   goFor: string[];        // chip "Ci dovresti andare se…" — max 3 motivi concreti
   dontExpect: string[];   // chip "Meno adatto se…" — max 2 limiti reali, [] se nessuno
   matchReason: string;    // perché QUESTO locale risponde a QUELLA query. NON cacheabile.
+  // Adeguatezza ai requisiti espliciti della richiesta (tipo, caratteristica
+  // fisica, occasione, atmosfera). false SOLO se chiaramente non li rispetta;
+  // nel dubbio true. Il chiamante sposta/esclude i false e ne logga il motivo.
+  fit: boolean;
+  fitReason: string;
 };
 
 // Riga cache: matchReason NON è persistito (dipende dalla query).
@@ -72,9 +77,11 @@ Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è a
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
-Struttura esatta: [{"id":string,"matchReason":string}]
+Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string}]
 - id identico a quello ricevuto
-- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo.`;
+- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo.
+- fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
+- fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.`;
 
 function costOf(inputTokens: number, outputTokens: number): number {
   return (
@@ -258,15 +265,19 @@ export async function getSynthesis(
   // la chiamata synthesis qui sotto (le due richieste si sovrappongono).
   const matchReasonWork = async (): Promise<{
     matchReasons: Map<string, string>;
+    fits: Map<string, { fit: boolean; fitReason: string }>;
     cost: number;
   }> => {
     const matchReasons = new Map<string, string>();
+    const fits = new Map<string, { fit: boolean; fitReason: string }>();
     let cost = 0;
     try {
       const userPayload = targets.map((p) => ({
         id: p.id,
         name: p.name,
         category: p.category,
+        types: (p.types ?? []).slice(0, 6),
+        editorialSummary: p.editorialSummary,
         reviewTexts: (p.reviewTexts ?? [])
           .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
           .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
@@ -325,6 +336,12 @@ export async function getSynthesis(
         const o = item as Record<string, unknown>;
         if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
         if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
+        if (typeof o.fit === "boolean") {
+          fits.set(o.id, {
+            fit: o.fit,
+            fitReason: typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "",
+          });
+        }
       }
       if (matchReasons.size < targets.length) {
         const missingIds = targets.map((p) => p.id).filter((id) => !matchReasons.has(id));
@@ -335,7 +352,7 @@ export async function getSynthesis(
     } catch (err) {
       console.error("[haiku-synthesis] matchReason call exception:", err);
     }
-    return { matchReasons, cost };
+    return { matchReasons, fits, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = matchReasonWork();
@@ -484,7 +501,7 @@ export async function getSynthesis(
 
   // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
   //    Girava mentre sopra completavano cache read + synthesis + upsert.
-  const { matchReasons, cost: matchReasonCost } = await matchReasonPromise;
+  const { matchReasons, fits, cost: matchReasonCost } = await matchReasonPromise;
   totalCost += matchReasonCost;
 
   console.log(
@@ -501,7 +518,16 @@ export async function getSynthesis(
       goFor: s.goFor,
       dontExpect: s.dontExpect,
       matchReason: matchReasons.get(id) ?? "",
+      // Nel dubbio il locale resta: fit mancante = true.
+      fit: fits.get(id)?.fit ?? true,
+      fitReason: fits.get(id)?.fitReason ?? "",
     };
+    if (fits.get(id)?.fit === false) {
+      const name = targets.find((p) => p.id === id)?.name ?? id;
+      console.log(
+        `[search-exclude] query=${JSON.stringify(query.slice(0, 80))} place=${JSON.stringify(name)} id=${id} motivo=${JSON.stringify(fits.get(id)?.fitReason ?? "")}`,
+      );
+    }
   }
   return result;
 }

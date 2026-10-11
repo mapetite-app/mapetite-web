@@ -40,8 +40,19 @@ export default async function ProfiloPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center px-6">
-        <p className="text-zinc-500">Accedi per vedere il tuo profilo.</p>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="font-display text-xl font-semibold text-brand">Il tuo profilo ti aspetta</p>
+        <p className="max-w-xs text-sm text-text-muted">
+          Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
+        </p>
+        <div className="flex gap-2">
+          <a href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+            Accedi
+          </a>
+          <a href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
+            Crea un account
+          </a>
+        </div>
       </div>
     );
   }
