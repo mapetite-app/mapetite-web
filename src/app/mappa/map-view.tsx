@@ -1699,6 +1699,13 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           focusedId={focusId}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
+          isSaved={isPlaceSaved}
+          onSave={aiSearch !== null && view === "all" ? (place) => {
+            if (!userId) { window.location.href = "/login"; return; }
+            // Già salvato: la scheda permette di modificarlo o rimuoverlo.
+            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
+            setPendingSavePlaceId(place.id);
+          } : undefined}
           onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);

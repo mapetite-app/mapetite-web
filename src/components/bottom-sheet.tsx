@@ -33,6 +33,9 @@ export interface BottomSheetProps {
   onFocus?: (place: Place) => void;
   // Riapre il pannello di ricerca con la frase attuale, per correggerla.
   onRefine?: () => void;
+  // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
+  isSaved?: (id: string) => boolean;
+  onSave?: (place: Place) => void;
 }
 
 export type ListDetails = {
@@ -133,7 +136,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine, isSaved, onSave }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
@@ -367,7 +370,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {places.map((place) => {
             const d = details?.[place.id];
             return (
-              <li key={place.id} data-id={place.id} className="w-[78vw] max-w-sm shrink-0 snap-center">
+              <li key={place.id} data-id={place.id} className="relative w-[78vw] max-w-sm shrink-0 snap-center">
+                {onSave && (
+                  <button
+                    type="button"
+                    onClick={() => onSave(place)}
+                    aria-label={isSaved?.(place.id) ? `${place.name} è tra i salvati` : `Salva ${place.name}`}
+                    aria-pressed={isSaved?.(place.id) ?? false}
+                    className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-btn bg-white/20 text-white backdrop-blur active:scale-95"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill={isSaved?.(place.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path strokeLinejoin="round" d="M6 3.75h12a.75.75 0 0 1 .75.75v16.19l-6.75-4.5-6.75 4.5V4.5A.75.75 0 0 1 6 3.75Z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onSelect(place)}
@@ -383,7 +399,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="relative flex flex-1 flex-col">
                     <span className="flex items-start justify-between gap-2">
                       <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
-                      <span className="flex flex-wrap justify-end gap-1">
+                      <span className={`flex flex-wrap justify-end gap-1 ${onSave ? "pr-11" : ""}`}>
                         {gemsOn && isGem(place.rating, d?.userRatingCount) && (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}

@@ -130,6 +130,7 @@ ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosell
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
   if (!name) return false;
@@ -327,6 +328,8 @@ else {
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
   await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const p = await sctx.newPage();
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -350,6 +353,13 @@ else {
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await p.getByRole("button", { name: "Salva Rooftop Tre" }).click();
+  await p.getByText("Salva locale").waitFor({ timeout: 3000 });
+  ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
+  await p.screenshot({ path: `${OUT}/14-salva-da-card.png` });
   await sctx.close();
 }
 
