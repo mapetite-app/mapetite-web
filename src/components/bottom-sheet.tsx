@@ -57,7 +57,18 @@ export type ListDetails = {
   matchReason: string | null;
   goFor: string[] | null;
   photoRef?: string | null;
+  // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
+  editorialSummary?: string | null;
+  selectedReviews?: { text: string }[] | null;
 };
+
+// Riga di ripiego quando manca il verdetto: solo fatti di Google, mai testo inventato.
+function googleLine(d: ListDetails | undefined): string | null {
+  if (!d) return null;
+  if (d.editorialSummary) return d.editorialSummary;
+  const review = d.selectedReviews?.[0]?.text;
+  return review ? `“${review}”` : null;
+}
 
 function prettyCategory(c: string | null): string | null {
   return categoryLabel(c);
@@ -462,6 +473,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
+                    ) : googleLine(d) ? (
+                      <span data-testid="riga-google" className="mt-2 line-clamp-3 block text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
                     {d?.matchReason && (
                       <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
@@ -591,6 +604,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                   ) : loadingVerdicts && details ? (
                     <SkeletonLines />
+                  ) : googleLine(details?.[place.id]) ? (
+                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 block text-sm font-sans leading-snug text-text-muted">
+                      {googleLine(details?.[place.id])}
+                    </span>
                   ) : null}
                   {details?.[place.id]?.matchReason && (
                     <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">
