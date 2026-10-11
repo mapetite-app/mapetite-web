@@ -377,7 +377,7 @@ const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("but
 if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
-    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "u1", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1" } },
+    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "u1", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1", rating: 4.6, price_level: 2 } },
     { tags: ["amici"], note: null, places: { id: "u2", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
     { tags: null, note: "Brunch domenica", places: { id: "u3", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
   ];
@@ -408,6 +408,7 @@ else {
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
+  ok(await p.locator("ul.snap-x li").first().getByText(/★ 4,6 · €€/).isVisible(), "card salvato: voto e prezzo salvati");
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");

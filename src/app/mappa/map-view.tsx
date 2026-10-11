@@ -773,7 +773,7 @@ export default function MapView({
     (async () => {
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id)")
+        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
         .eq("user_id", userId);
 
       setLoadingSaved(false);
@@ -786,11 +786,12 @@ export default function MapView({
       const fetched = (data ?? [])
         .map((row) => {
           // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
-          const raw = row.places as unknown as (Place & { google_place_id?: string | null }) | null;
+          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null }) | null;
           if (!raw || raw.lat == null || raw.lng == null) return null;
-          const { google_place_id, ...place } = raw;
+          const { google_place_id, price_level, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
-          return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
+          // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null };
         })
         .filter((p): p is Place => p !== null);
 
