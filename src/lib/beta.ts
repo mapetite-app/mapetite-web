@@ -11,16 +11,24 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
 // Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
 // quel telefono finché non si apre ?beta=off).
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
-export type OptInFlag = "gemme";
+//   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
+//   barra         campo "Cosa cerchi?" sempre visibile in cima alla mappa (Places), al posto dell'icona ✨
+//   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
+export type OptInFlag = "gemme" | "articolo" | "barra" | "salva";
 const OPTIN_KEY = "mapetite.beta";
 
+// ?stile=places accende anche l'articolo e il nuovo "Salva"; ?stile=attuale li spegne.
+const PLACES_OPTIN = ["articolo", "salva"];
 function readOptIn(): string {
   const url = readFlags();
   if (url.split(",").includes("off")) return EMPTY;
+  const stile = new URLSearchParams(window.location.search).get("stile");
   try {
-    const saved = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
-    const merged = Array.from(new Set([...saved.split(","), ...url.split(",")].map((f) => f.trim()).filter(Boolean))).join(",");
-    if (merged !== saved) window.localStorage.setItem(OPTIN_KEY, merged);
+    const stored = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
+    const saved = stile === "attuale" ? stored.split(",").filter((f) => !PLACES_OPTIN.includes(f)).join(",") : stored;
+    const extra = stile === "places" ? PLACES_OPTIN : [];
+    const merged = Array.from(new Set([...saved.split(","), ...url.split(","), ...extra].map((f) => f.trim()).filter(Boolean))).join(",");
+    if (merged !== stored) window.localStorage.setItem(OPTIN_KEY, merged);
     return merged;
   } catch {
     return url;

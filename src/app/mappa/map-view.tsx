@@ -10,12 +10,13 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
+import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import DragToClose from "@/components/drag-to-close";
-import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta, useVariant } from "@/lib/beta";
+import { ArrowUp, LocateFixed, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
@@ -35,6 +36,7 @@ function SaveModal({
   initialNote = "",
   onSaved,
   onCancel,
+  photoRef = null,
 }: {
   place: Place;
   userId: string;
@@ -43,8 +45,14 @@ function SaveModal({
   initialNote?: string;
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
+  photoRef?: string | null;
 }) {
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
+  // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
+  const sheetOn = useOptIn("salva");
+  // Nel foglio nuovo salvare vuol dire "voglio andarci" finché non si sceglie altro (come Places).
+  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+    sheetOn && mode === "save" && initialTags.length === 0 ? [VISIT_WANT] : initialTags,
+  );
   const [note, setNote] = useState(initialNote);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
@@ -104,6 +112,91 @@ function SaveModal({
     });
   };
 
+  if (sheetOn) {
+    const visit = selectedTags.includes(VISIT_DONE) ? VISIT_DONE : selectedTags.includes(VISIT_WANT) ? VISIT_WANT : null;
+    const setVisit = (v: VisitStatus) =>
+      setSelectedTags((prev) => {
+        const rest = prev.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+        return visit === v ? rest : [v, ...rest];
+      });
+    return (
+      // Sopra la barra in basso: la mappa è un contesto a parte e la barra resterebbe sopra il foglio.
+      <div data-testid="salva-foglio" className="fixed inset-x-0 top-0 z-50 flex items-end justify-center bg-black/40" style={{ bottom: "var(--nav-height-mobile)" }} onClick={() => { if (!isPending) onCancel(); }}>
+        <div
+          role="dialog"
+          aria-label={mode === "edit" ? `Modifica ${place.name}` : `Salva ${place.name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-full w-full max-w-lg overflow-y-auto rounded-t-card bg-surface px-5 pb-3 pt-2 shadow-float"
+        >
+          <div className="mx-auto mb-3 h-1 w-10 rounded-pill bg-border" />
+          <div className="flex items-center gap-3 border-b border-border pb-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl">
+              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name)} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-sans text-text-muted">{mode === "edit" ? "Tra i tuoi salvati" : "Salva"}</span>
+              <span className="block truncate font-title text-lg font-semibold text-brand">{place.name}</span>
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-1 rounded-pill bg-brand/5 p-1" role="group" aria-label="Stato">
+            {([[VISIT_WANT, "📌 Voglio andarci"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={visit === v}
+                onClick={() => setVisit(v)}
+                className={`min-h-11 rounded-pill text-sm font-display font-semibold transition-colors ${visit === v ? "bg-white text-brand shadow-card" : "text-text-muted"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <label className="mt-3 block">
+            <span className="sr-only">Nota personale</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="✎ Scrivi una nota (solo per te)"
+              rows={2}
+              className="w-full resize-none rounded-card border border-border bg-white px-4 py-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+          </label>
+
+          <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_TAGS.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                aria-pressed={selectedTags.includes(tag)}
+                onClick={() => toggleTag(tag)}
+                className={`min-h-9 rounded-pill border px-3.5 text-sm font-display font-medium ${selectedTags.includes(tag) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {error && <p className="mt-3 text-sm text-error">Non sono riuscito a salvare. Controlla la connessione e riprova.</p>}
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isPending}
+            className="mt-5 min-h-12 w-full rounded-pill bg-brand text-base font-display font-semibold text-white active:scale-[0.99] disabled:opacity-60"
+          >
+            {isPending ? "Salvo…" : "Fatto"}
+          </button>
+          <button type="button" onClick={onCancel} disabled={isPending} className="mt-1 min-h-11 w-full text-sm font-display font-semibold text-text-muted disabled:opacity-60">
+            Annulla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-80 max-w-[90vw] rounded-card bg-surface p-5 shadow-float">
@@ -135,7 +228,7 @@ function SaveModal({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Aggiungi una nota..."
           rows={3}
-          className="w-full resize-none rounded-btn border border-border px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-brand"
+          className="w-full resize-none rounded-btn border border-border px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand"
         />
 
         {error && (
@@ -655,6 +748,12 @@ export default function MapView({
   const [aiSearching, setAiSearching] = useState(false);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
+  // Risposta "come un articolo" (?beta=articolo, spenta di default).
+  const articleOn = useOptIn("articolo");
+  // Campo "Cosa cerchi?" sempre visibile in cima alla mappa (?beta=barra, spento di default).
+  const barOn = useOptIn("barra");
+  const barInputRef = useRef<HTMLInputElement>(null);
+  const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
     () => () => {},
     () => (recentOn ? JSON.stringify(loadRecentSearches()) : "[]"),
@@ -1282,9 +1381,50 @@ export default function MapView({
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
-      <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
-        {/* Riga icone: Concierge AI + Filtri */}
+      <div className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+        {/* Riga icone: Concierge AI + Filtri (con ?beta=barra: campo "Cosa cerchi?" sempre visibile, come Places) */}
         <div className="pointer-events-auto flex gap-2">
+          {barOn ? (
+            <form
+              data-testid="barra-ricerca"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-1 shadow-float"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = aiQuery.trim();
+                if (q.length < 3 || aiSearching) return;
+                (document.activeElement as HTMLElement | null)?.blur();
+                setWelcomeDismissed(true);
+                if (overlay.kind === "ai") dispatch({ type: "CLOSE" });
+                void runAISearch(q);
+              }}
+            >
+              {aiSearching ? (
+                <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-brand" />
+              ) : (
+                <Search size={18} className="shrink-0 text-brand" aria-hidden />
+              )}
+              <input
+                ref={barInputRef}
+                type="search"
+                enterKeyHint="search"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                placeholder="Cosa cerchi?"
+                aria-label="Cosa cerchi?"
+                className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+              />
+              {(aiQuery !== "" || aiSearch !== null) && (
+                <button
+                  type="button"
+                  aria-label="Cancella la ricerca"
+                  onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-text-muted"
+                >
+                  ✕
+                </button>
+              )}
+            </form>
+          ) : (
           <button
             type="button"
             onClick={() => {
@@ -1299,14 +1439,16 @@ export default function MapView({
               <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-surface" />
             )}
           </button>
+          )}
           <button
             type="button"
+            aria-label="Filtri"
             onClick={() => {
               setAiSearch(null);
               setAiQuery("");
               dispatch({ type: "OPEN_FILTERS" });
             }}
-            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
+            className="relative flex shrink-0 h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
             <SlidersHorizontal size={20} className="text-text-muted" />
             {countActive(filters) > 0 && (
@@ -1591,7 +1733,7 @@ export default function MapView({
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
-              <p className="font-title text-lg font-semibold text-brand">Cosa cerchi?</p>
+              <p className="font-title text-lg font-semibold text-brand">{barOn ? "Prova con…" : "Cosa cerchi?"}</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
@@ -1658,8 +1800,9 @@ export default function MapView({
             )}
             {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
             <div className="mt-2 flex gap-2">
-              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito. */}
-              <form
+              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito.
+                  Con la barra in alto il campo c'è già: qui resta solo "Dove sono". */}
+              {!barOn && <form
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-brand pl-3.5 pr-1"
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1682,7 +1825,7 @@ export default function MapView({
                     →
                   </button>
                 )}
-              </form>
+              </form>}
               <button
                 type="button"
                 onClick={goToMyPosition}
@@ -1968,6 +2111,8 @@ export default function MapView({
         return pendingPlace && userId ? (
           <SaveModal
             place={pendingPlace}
+            // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
+            photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
             onSaved={(tags, note, uuid) => {
               if (uuid) {
@@ -2060,7 +2205,8 @@ export default function MapView({
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
-          onRefine={() => dispatch({ type: "OPEN_AI" })}
+          onRefine={() => { if (barOn) barInputRef.current?.focus(); else dispatch({ type: "OPEN_AI" }); }}
+          onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {
             if (!userId) { window.location.href = "/login"; return; }
@@ -2082,6 +2228,31 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
+        />
+      )}
+
+      {articleOpen && articleOn && aiSearch !== null && view === "all" && (
+        <AnswerArticle
+          title={aiSearch.query ?? aiQuery}
+          understood={aiSearch.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
+          places={(() => {
+            // Stesso ordine e stessi filtri rapidi del carosello.
+            const byId = new globalThis.Map(displayedPlaces.map((p) => [p.id, p]));
+            const ordered = carouselOrder.map((id) => byId.get(id)).filter((p): p is Place => p != null);
+            return ordered.length > 0 || quickFilters.size > 0 ? ordered : displayedPlaces;
+          })()}
+          details={venueDetails}
+          loadingVerdicts={loadingVerdicts}
+          origin={userPos ?? searchOrigin}
+          isSaved={isPlaceSaved}
+          onSave={(place) => {
+            if (!userId) { window.location.href = "/login"; return; }
+            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
+            setPendingSavePlaceId(place.id);
+          }}
+          onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
+          onAsk={(q) => { setArticleOpen(false); setAiQuery(q); void runAISearch(q); }}
+          onClose={() => setArticleOpen(false)}
         />
       )}
 

@@ -46,6 +46,8 @@ export interface BottomSheetProps {
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
   onSave?: (place: Place) => void;
+  // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
+  onOpenArticle?: () => void;
 }
 
 export type ListDetails = {
@@ -71,7 +73,7 @@ function formatCount(n: number | null): string | null {
 }
 
 // Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
-function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null): string {
+export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null): string {
   const parts: string[] = [];
   const cat = prettyCategory(place.category);
   if (cat) parts.push(cat);
@@ -131,7 +133,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -311,7 +313,17 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
 
   const quickChips = (
     <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0" data-testid="filtri-lista">
-      {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+      {onOpenArticle && (
+        <button
+          type="button"
+          data-testid="apri-articolo"
+          onClick={onOpenArticle}
+          className="min-h-9 rounded-pill border border-brand bg-surface px-3 text-xs font-display font-semibold text-brand shadow-card"
+        >
+          ☰ Leggi la risposta
+        </button>
+      )}
+      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
           type="button"
@@ -322,7 +334,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
-      {origin && (
+      {quickFiltersOn && origin && (
         <button
           type="button"
           aria-pressed={nearestFirst}
@@ -396,7 +408,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             ✕
           </button>
         </div>
-        {quickFiltersOn && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
+        {(quickFiltersOn || onOpenArticle) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
         )}
