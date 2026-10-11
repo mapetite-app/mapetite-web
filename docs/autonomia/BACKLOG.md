@@ -7,48 +7,49 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-Notte 10/10: voci 1–7 e 9 (parziale) in PR `claude/notte-2026-10-10`. Mancano: scelta tra lista A e B (Lorenzo), foto nelle card e nella scheda (richiedono Place Photos, a pagamento: DA DECIDERE), prova dal vivo di intento ed esclusioni con Haiku (nell'ambiente di sviluppo manca `ANTHROPIC_API_KEY`), giro completo con account reale (registrazione, salvataggio), voci 8 e 10 (DA DECIDERE).
+Aggiornato 11/10 pomeriggio. **Fatto:** voci 1–8 e 10, voce 9 in parte; foto, mappa viva, filtri rapidi, condividi, ricerche recenti, cerca in quest'area; lista B scelta da Lorenzo e predefinita.
+**Manca:** correggere ciò che Lorenzo ha visto non funzionare nelle ricerche reali (in attesa dei suoi esempi); prova dal vivo di intento ed esclusioni con Haiku (nell'ambiente di sviluppo manca `ANTHROPIC_API_KEY`); giro completo con un account vero (registrazione, salvataggio); grafica più vicina ai riferimenti Places su scheda e primo accesso.
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
 
-### 1. Ricerca AI che resta quando chiudi e riapri il pannello — IN PR (notte 10/10)
+### 1. Ricerca AI che resta quando chiudi e riapri il pannello — FATTA (PR #11)
 `aiSearch` deve sopravvivere a chiusura/riapertura del pannello; si azzera solo se l'utente cancella la ricerca o passa ai filtri. `src/lib/panel-state.ts` + `map-view.tsx`.
 
-### 2. Ricerca veloce: risultati subito, verdetti dopo — IN PR (notte 10/10)
+### 2. Ricerca veloce: risultati subito, verdetti dopo — FATTA (PR #11)
 Oggi a cache fredda 13–22 s perché la risposta aspetta la sintesi Haiku. Mostrare i locali di Google appena arrivano (1–2 s), poi caricare verdetti/matchReason con una seconda chiamata e uno stato di caricamento curato sulle card. Nessun aumento di costi.
 
-### 3. Ricerca precisa: capire la richiesta — IN PR (notte 10/10, Haiku non testato dal vivo)
+### 3. Ricerca precisa: capire la richiesta — FATTA (PR #11), DA RIFINIRE con gli esempi reali di Lorenzo (11/10)
 Problema (Lorenzo): "rooftop romantico per la fidanzata" restituisce osterie semplici o pub. Casi di prova in `TEST-RICERCHE.md`.
 Prima di Google, Haiku estrae dalla frase: zona/città, tipo di locale, requisiti fisici (rooftop, vista, all'aperto), occasione (coppia, amici, lavoro), atmosfera; poi costruisce una query Google mirata con `includedType` coerente e, se c'è una zona, `locationRestriction` invece di `locationBias`. Stesso numero di chiamate Google (1 per ricerca).
 
-### 4. Ricerca precisa: scartare ciò che non c'entra — IN PR (notte 10/10, Haiku non testato dal vivo)
+### 4. Ricerca precisa: scartare ciò che non c'entra — FATTA (PR #11), DA RIFINIRE con gli esempi reali di Lorenzo (11/10)
 Anche con la query giusta Google restituisce locali fuori tema. Proposta: Haiku valuta per ogni locale, usando recensioni e attributi Google, se soddisfa i requisiti della richiesta; i locali che chiaramente non li soddisfano vengono esclusi o spostati in fondo, con la motivazione registrata nei log. Regola aggiornata in LORENZO.md. Nel dubbio il locale resta; nessuna chiamata Google in più.
 Possibile complemento senza costi aggiuntivi: chiedere a Google attributi come `outdoorSeating`, `servesCocktails`, `liveMusic`, `goodForGroups`, `reservable`. Sono nella stessa fascia di prezzo dei campi già richiesti (recensioni, editorialSummary), quindi non dovrebbero aumentare il costo per chiamata. Da verificare sul listino: se non è certo che il costo resti uguale, non attivarli e segnalalo in PR.
 
 ## Fase 2 — L'interfaccia è chiara (notti 5–9)
 
-### 5. Nuova lista risultati — IN PR (varianti A e B dietro ?lista=; senza foto)
+### 5. Nuova lista risultati — FATTA: Lorenzo ha scelto B (11/10), ora predefinita; `?lista=a` per la vecchia
 Lorenzo: la lista attuale "non mi piace per niente"; la vuole più integrata e bella. Pannello trascinabile con 3 altezze (mappa / metà / pieno), card più leggibili con foto, verdetto in una riga e motivo per cui è adatto alla ricerca. Consegnare 2 varianti attivabili da un parametro nell'URL (`?lista=a` / `?lista=b`) per far scegliere Lorenzo.
 Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
-### 6. Scheda locale rifinita — IN PR (notte 10/10)
+### 6. Scheda locale rifinita — FATTA (PR #11)
 Gerarchia chiara: foto, nome, verdetto, perché è adatto, azioni (salva, indicazioni, chiama, sito). Verifica che ogni pulsante funzioni su iPhone.
 Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
-### 7. Primo accesso guidato — IN PR (notte 10/10)
+### 7. Primo accesso guidato — FATTA (PR #11)
 Un tester nuovo deve capire in 10 secondi cosa fare: schermata iniziale con 3–4 ricerche di esempio cliccabili, permesso posizione spiegato, stati vuoti ed errori con messaggi umani.
 Riferimenti visivi: `RIFERIMENTI-DESIGN.md` (Places per lista, mappa e scheda; Albo per primo accesso e salvataggio).
 
-### 8. Vista "salvati" ricercabile e raggruppata per città — DA DECIDERE (migrazione)
-Richiede campo `city` su `saved_places` (migrazione Supabase) e `addressComponents` nel FIELD_MASK.
+### 8. Vista "salvati" ricercabile e raggruppata per città — FATTA 11/10 (approvata da Lorenzo)
+Casella di ricerca e chip per città. La città si ricava dall\'indirizzo già salvato: nessuna migrazione e nessun campo Google in più (era la proposta iniziale, non serve più).
 
 ## Fase 3 — Pronta per i tester (notti 10–12)
 
-### 9. Giro completo di controllo — IN PR (parziale: schermate pubbliche; flussi con account non provati)
+### 9. Giro completo di controllo — IN CORSO (parziale; salvati provati con dati simulati: schermate pubbliche; flussi con account non provati)
 Percorsi completi con Playwright a viewport mobile: registrazione, ricerca, apertura scheda, salvataggio, profilo. Correzione dei bug trovati, screenshot di ogni schermata in PR.
 
-### 10. Raccolta feedback dei tester — DA DECIDERE
-Pulsante "Dai un feedback" nell'app. Dove far arrivare i messaggi (email, tabella Supabase) lo decide Lorenzo.
+### 10. Raccolta feedback dei tester — FATTA 11/10
+Voce "Feedback" nella barra in basso: apre un\'email precompilata verso founder.mapetite@gmail.com con pagina e telefono. Scelta di Lorenzo: la cosa più semplice, leggibile dal telefono. Niente database.
 
 ## Dopo il test con utenti
 - Import salvati da Google Maps per tutti (quota Google insufficiente per import grandi: da ripensare).
@@ -71,7 +72,6 @@ Regole:
 - **Filtri rapidi sulla lista — FATTA e ACCESA per tutti dall'11/10 (`?beta=off` per spegnere)**: chip "Aperto ora", "Fino a €€", "Voto 4,5+" sopra la lista. Nessun costo (filtra i dati già arrivati), nessuna migrazione.
 - **Condividi un locale — FATTA e ACCESA per tutti dall'11/10**: pulsante nella scheda; apre il foglio di condivisione del telefono (o copia il link) con nome, verdetto e link Google Maps. Nessun costo, nessuna migrazione.
 - **Ricerche recenti — FATTA e ACCESA per tutti dall'11/10**: nella card iniziale, le ultime 5 ricerche fatte su quel telefono (salvate solo nel browser). Nessun costo, nessuna migrazione.
-- **Foto dei locali (DA DECIDERE, costo)**: Place Photos è fatturata a parte (quota attuale 200/giorno). Il campo `photos` è già nel FIELD_MASK, quindi serve solo l'endpoint di download. Senza foto le card restano più povere dei riferimenti Places. Stima: 1 chiamata foto per card visibile; con 6–8 card/ricerca, ~8 chiamate extra per ricerca.
 
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
