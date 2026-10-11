@@ -130,6 +130,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const quick = quickProp ?? quickLocal;
   // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
   const [nearestFirst, setNearestFirst] = useState(false);
+  const [shared, setShared] = useState(false);
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
@@ -335,11 +336,33 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             )}
             <p className="text-xs font-sans text-text-muted">
               {title
-                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
                 : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>
+          {title && (
+            <button
+              type="button"
+              aria-label="Condividi questa ricerca"
+              onClick={async () => {
+                const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}`;
+                try {
+                  if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
+                  else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
+                } catch {
+                  // foglio di condivisione chiuso: niente da segnalare
+                }
+              }}
+              className="-my-1 ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
+            >
+              {shared ? "✓" : (
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                </svg>
+              )}
+            </button>
+          )}
           {title && onRefine && (
             <button type="button" onClick={onRefine} className="-my-1 ml-2 min-h-9 shrink-0 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95">
               Affina
@@ -474,7 +497,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             )}
             <p className="text-xs font-sans text-text-muted">
               {title
-                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
                 : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>

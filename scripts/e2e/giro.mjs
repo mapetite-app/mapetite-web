@@ -169,6 +169,10 @@ const firstCard = () => page.locator("ul.snap-x li").first().getAttribute("data-
 ok((await firstCard()) === "P1", "ordine iniziale: prima Terrazza Uno (la più adatta)");
 await page.getByRole("button", { name: "Più vicini" }).click();
 ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
+await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+await page.getByRole("button", { name: "Condividi questa ricerca" }).click();
+const sharedUrl = await page.evaluate(() => window.__shared?.url ?? "");
+ok(decodeURIComponent(sharedUrl).endsWith("/mappa?q=Rooftop romantico per due a Roma"), "condividi ricerca: link che riapre la stessa ricerca");
 await page.getByRole("button", { name: "Affina" }).click();
 const refine = page.locator("input[type=text]");
 await refine.waitFor({ timeout: 3000 });
