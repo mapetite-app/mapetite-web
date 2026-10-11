@@ -76,13 +76,14 @@ await shot("01-benvenuto");
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(await page.getByText("preparo i verdetti").isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
+ok(await page.getByText(/preparo i verdetti/).isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
 ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
 await shot("02-lista-caricamento");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(true, "lista: il verdetto compare dopo");
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
+ok((await page.getByTestId("titolo-risposta").textContent())?.includes("Rooftop romantico"), "lista: titolo con la richiesta dell'utente");
 await shot("03-lista-verdetti");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
@@ -132,7 +133,16 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 await page.getByRole("button", { name: "Aperto ora" }).first().click();
-ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
+await page.getByRole("button", { name: "Aperto ora" }).first().click();
+// sposto la mappa a mano: compare "Cerca in quest'area"
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
+ok(true, "mappa spostata: compare 'Cerca in quest'area'");
+await page.getByRole("button", { name: "Cerca in quest'area" }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });

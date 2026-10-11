@@ -21,6 +21,11 @@ export interface BottomSheetProps {
   variant?: "a" | "b";
   // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
   origin?: { lat: number; lng: number } | null;
+  // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
+  quick?: ReadonlySet<QuickFilter>;
+  onToggleQuick?: (f: QuickFilter) => void;
+  // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
+  title?: string | null;
 }
 
 export type ListDetails = {
@@ -100,30 +105,40 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-type QuickFilter = "open" | "cheap" | "top";
+export type QuickFilter = "open" | "cheap" | "top";
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null }: BottomSheetProps) {
+// Filtri rapidi condivisi da lista e mappa (i pin seguono la lista).
+export function applyQuickFilters(
+  list: Place[],
+  quick: ReadonlySet<QuickFilter>,
+  details: Record<string, ListDetails | undefined> | undefined,
+): Place[] {
+  if (quick.size === 0) return list;
+  return list.filter(
+    (p) =>
+      (!quick.has("open") || details?.[p.id]?.openNow === true) &&
+      (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
+      (!quick.has("top") || (p.rating ?? 0) >= 4.5),
+  );
+}
+
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
-  const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
+  const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
+  const quick = quickProp ?? quickLocal;
   const places = useMemo(
-    () =>
-      !quickFiltersOn || quick.size === 0
-        ? allPlaces
-        : allPlaces.filter(
-            (p) =>
-              (!quick.has("open") || details?.[p.id]?.openNow === true) &&
-              (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
-              (!quick.has("top") || (p.rating ?? 0) >= 4.5),
-          ),
+    () => (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces),
     [allPlaces, quick, quickFiltersOn, details],
   );
-  const toggleQuick = (f: QuickFilter) =>
-    setQuick((prev) => {
+  const toggleQuick = (f: QuickFilter) => {
+    if (onToggleQuick) return onToggleQuick(f);
+    setQuickLocal((prev) => {
       const next = new Set(prev);
       if (next.has(f)) next.delete(f);
       else next.add(f);
       return next;
     });
+  };
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -332,11 +347,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="flex-1 overflow-y-auto px-3 pb-4"
         style={{ touchAction: "pan-y" }}
       >
-        <div className="flex items-center justify-between px-1 pb-2">
-          <p className="text-xs font-sans text-text-muted">
-            {places.length} {places.length === 1 ? "risultato" : "risultati"}
-            {loadingVerdicts && " · preparo i verdetti…"}
-          </p>
+        <div className="flex items-start justify-between px-1 pb-2">
+          <div className="min-w-0">
+            {title && (
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-lg font-semibold leading-snug text-brand first-letter:uppercase">
+                {title}
+              </p>
+            )}
+            <p className="text-xs font-sans text-text-muted">
+              {title
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+              {loadingVerdicts && " · preparo i verdetti…"}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -412,6 +436,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {c}
                         </span>
                       ))}
+                    </span>
+                  )}
+                  {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
+                  {place.tags && place.tags.length > 0 && (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {place.tags.map((t) => (
+                        <span key={t} className="rounded-pill border border-accent/40 px-2 py-0.5 text-[11px] font-display font-medium text-accent">
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {place.note && (
+                    <span className="mt-1.5 line-clamp-2 block text-xs font-sans italic text-text">
+                      “{place.note}”
                     </span>
                   )}
                 </span>
