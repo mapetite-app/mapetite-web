@@ -1,7 +1,8 @@
 // Giro di controllo automatico a viewport mobile 390x844.
 // Le API di ricerca sono SIMULATE (nessuna chiamata Google/Haiku, nessun costo):
 // verifica l'interfaccia, non la qualità delle ricerche.
-//   npm run dev   (in un altro terminale)
+//   E2E_FAKE_USER=00000000-0000-0000-0000-000000000001 npm run dev   (in un altro terminale)
+//   (senza E2E_FAKE_USER il blocco "salvati" viene saltato)
 //   PW_MODULE=$(npm root -g)/playwright node scripts/e2e/giro.mjs [cartella-screenshot]
 import { createRequire } from "module";
 import { mkdirSync } from "fs";
@@ -229,6 +230,47 @@ ok(covered === "ok", `onboarding: pulsante Continua raggiungibile (${covered})`)
 await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
+
+// 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
+// Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
+const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("button", { name: "I miei salvati" }).click())
+  .then(() => page.getByText("Accesso richiesto").isVisible({ timeout: 1500 })).then((v) => !v);
+if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
+else {
+  const rows = [
+    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "u1", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1" } },
+    { tags: ["amici"], note: null, places: { id: "u2", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
+    { tags: null, note: "Brunch domenica", places: { id: "u3", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
+  ];
+  const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
+  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const p = await sctx.newPage();
+  p.on("pageerror", (e) => errors.push(e.message));
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+  ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
+  ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  await p.screenshot({ path: `${OUT}/11-salvati.png` });
+  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
+  await p.waitForTimeout(1500);
+  const pin = await p.getByTestId("pin").first().boundingBox();
+  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
+  await p.screenshot({ path: `${OUT}/13-salvati-milano.png` });
+  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByLabel("Cerca tra i salvati").fill("terrazza");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
+  ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
+  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
+  await p.getByLabel("Cerca tra i salvati").fill("sushi");
+  ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
+  await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  await sctx.close();
+}
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
 await browser.close();

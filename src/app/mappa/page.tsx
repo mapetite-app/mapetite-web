@@ -17,5 +17,9 @@ export default async function MappaPage() {
 
   const normalized = (places ?? []).map((p) => ({ ...p, tags: null, note: null, rating: null, priceLevel: null }));
 
-  return <MapView places={normalized} userId={userData?.user?.id ?? null} />;
+  // Solo in sviluppo locale: utente finto per il test automatico dei salvati
+  // (scripts/e2e/giro.mjs). In produzione NODE_ENV è sempre "production".
+  const e2eUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
+
+  return <MapView places={normalized} userId={e2eUser ?? userData?.user?.id ?? null} />;
 }

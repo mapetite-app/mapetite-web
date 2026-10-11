@@ -13,6 +13,7 @@ import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
+import { cityFromAddress } from "@/lib/city";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -271,6 +272,23 @@ function ReviewForm({
   );
 }
 
+const OTHER_CITY = "Altre zone";
+const CHIP_ON = "rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
+const CHIP_OFF = "rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
+const CHIP_CITY = "rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
+
+// Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag).
+function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
+  const q = query.trim().toLocaleLowerCase("it");
+  return list.filter((p) => {
+    if (tag !== null && !p.tags?.includes(tag)) return false;
+    if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
+    if (!q) return true;
+    return [p.name, p.category, p.address, p.note, ...(p.tags ?? [])]
+      .some((v) => v != null && v.toLocaleLowerCase("it").includes(q));
+  });
+}
+
 export type Place = {
   id: string;
   name: string;
@@ -499,6 +517,9 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
+  const [savedQuery, setSavedQuery] = useState("");
+  const [activeCity, setActiveCity] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
@@ -554,9 +575,7 @@ export default function MapView({
       ? aiSearch.risultati
       : view === "all"
         ? []
-        : activeTag === null
-          ? savedPlaces
-          : savedPlaces.filter((p) => p.tags?.includes(activeTag));
+        : filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
 
   // --- Overlay: autorità unica sulla visibilità dei pannelli ---
   // Un solo pannello visibile alla volta. Il dispatch è avvolto in una
@@ -587,6 +606,20 @@ export default function MapView({
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+
+  const savedFiltered = activeTag !== null || activeCity !== null || savedQuery.trim() !== "";
+
+  // Città dei salvati, la più frequente per prima; null = indirizzo senza città.
+  const availableCities = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of savedPlaces) {
+      const c = cityFromAddress(p.address) ?? OTHER_CITY;
+      counts[c] = (counts[c] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => (a[0] === OTHER_CITY ? 1 : b[0] === OTHER_CITY ? -1 : b[1] - a[1]))
+      .map(([city, count]) => ({ city, count }));
+  }, [savedPlaces]);
 
   const availableTags = useMemo(() => {
     const seen = new Set<string>();
@@ -667,7 +700,7 @@ export default function MapView({
     (async () => {
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, places(id, name, category, lat, lng, google_place_id)")
+        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id)")
         .eq("user_id", userId);
 
       setLoadingSaved(false);
@@ -867,7 +900,7 @@ export default function MapView({
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces]);
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
-  const fitToPlaces = (list: Place[]) => {
+  const fitToPlaces = (list: Place[], top = 150) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map) return;
@@ -877,7 +910,7 @@ export default function MapView({
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: { top: 150, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+        { padding: { top, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -1068,7 +1101,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -1089,33 +1122,52 @@ export default function MapView({
             I miei salvati
           </button>
         </div>
-        {view === "saved" && availableTags.length > 0 && (
-          <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-card border border-border bg-surface p-2 shadow-float">
-            <button
-              type="button"
-              onClick={() => { setActiveTag(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
-              className={
-                activeTag === null
-                  ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
-                  : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
-              }
-            >
-              Tutti
-            </button>
-            {availableTags.map((tag) => (
+        {view === "saved" && userId && savedPlaces.length > 0 && (
+          <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-2 rounded-card border border-border bg-surface p-2 shadow-float">
+            <input
+              type="search"
+              value={savedQuery}
+              onChange={(e) => { setSavedQuery(e.target.value); setClusterPlaces(null); }}
+              placeholder={`Cerca tra i tuoi ${savedPlaces.length} salvati`}
+              aria-label="Cerca tra i salvati"
+              className="min-h-10 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
+            />
+            <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
               <button
-                key={tag}
                 type="button"
-                onClick={() => { setActiveTag(tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
-                className={
-                  activeTag === tag
-                    ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
-                    : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
-                }
+                onClick={() => { setActiveTag(null); setActiveCity(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                className={`shrink-0 ${activeTag === null && activeCity === null ? CHIP_ON : CHIP_OFF}`}
               >
-                {tag}
+                Tutti
               </button>
-            ))}
+              {availableCities.length > 1 && availableCities.map(({ city, count }) => (
+                <button
+                  key={`c-${city}`}
+                  type="button"
+                  aria-pressed={activeCity === city}
+                  onClick={() => {
+                    const next = activeCity === city ? null : city;
+                    setActiveCity(next); setAiSearch(null); setClusterPlaces(null); setFilterError(null);
+                    // sotto il riquadro dei filtri salvati (~220px)
+                    fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 230);
+                  }}
+                  className={`shrink-0 ${activeCity === city ? CHIP_ON : CHIP_CITY}`}
+                >
+                  📍 {city} · {count}
+                </button>
+              ))}
+              {availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={activeTag === tag}
+                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                  className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1156,13 +1208,13 @@ export default function MapView({
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
               <p className="text-2xl mb-2">
-                {aiSearch !== null ? "🔍" : view === "saved" && activeTag !== null ? "🏷️" : "📍"}
+                {aiSearch !== null ? "🔍" : view === "saved" && savedFiltered ? "🏷️" : "📍"}
               </p>
               <p className="font-display font-semibold text-text">
                 {aiSearch !== null
                   ? "Non ho trovato nulla"
-                  : view === "saved" && activeTag !== null
-                    ? "Nessun posto con questo tag"
+                  : view === "saved" && savedFiltered
+                    ? "Nessun salvato con questi filtri"
                     : view === "saved"
                       ? "Nessun posto salvato"
                       : "Nessun posto da mostrare"}
@@ -1170,8 +1222,8 @@ export default function MapView({
               <p className="mt-1 text-sm font-sans text-text-muted">
                 {aiSearch !== null
                   ? "Prova con meno requisiti o scrivi un'altra zona (es. “a Trastevere”)."
-                  : view === "saved" && activeTag !== null
-                    ? "Cambia filtro o salva nuovi posti"
+                  : view === "saved" && savedFiltered
+                    ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
                       ? "Inizia a salvare i posti che vuoi ricordare"
                       : "Sposta la mappa o cambia vista"}
