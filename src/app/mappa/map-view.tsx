@@ -424,6 +424,9 @@ type VenueDetails = {
   photoRef?: string | null;
 };
 
+const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
+const PANEL_EXAMPLES = ["Aperitivo con vista", "Pizza napoletana vera", "Cena tranquilla per due", "Brunch nel weekend"];
+
 function AISearchPanel({
   onSubmit,
   isSearching,
@@ -456,13 +459,15 @@ function AISearchPanel({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cerca con parole tue: una trattoria autentica vicino casa…"
-          className="flex-1 min-w-0 rounded-btn border border-border px-3 py-1.5 text-sm font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
+          placeholder="Cosa cerchi?"
+          enterKeyHint="search"
+          autoFocus={query === ""}
+          className="min-h-11 flex-1 min-w-0 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
         />
         <button
           type="submit"
           disabled={isSearching}
-          className="shrink-0 rounded-btn bg-brand px-3 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="min-h-11 shrink-0 rounded-btn bg-brand px-4 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSearching ? "..." : "Cerca"}
         </button>
@@ -486,6 +491,26 @@ function AISearchPanel({
       )}
 
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
+
+      {/* Aggiunte rapide: con una ricerca attiva affinano la frase, altrimenti sono esempi. */}
+      {!isSearching && (
+        <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]" data-testid="aggiunte-rapide">
+          {(activeFiltri !== null ? REFINEMENTS : PANEL_EXAMPLES).map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => {
+                const next = activeFiltri !== null ? `${query.trim()} ${chip.replace(/^\+ /, "")}` : chip;
+                setQuery(next);
+                onSubmit(next);
+              }}
+              className="min-h-9 shrink-0 rounded-pill border border-border bg-white px-3 text-xs font-display font-medium text-text active:scale-95"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
 
       {activeFiltri !== null && !isSearching && (
         <p className="mt-2 text-sm font-sans text-text-muted">
