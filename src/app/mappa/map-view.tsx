@@ -1211,8 +1211,9 @@ export default function MapView({
     map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
   };
 
-  // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
-  const fitToPlaces = (list: Place[], top = 150) => {
+  // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
+  // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
+  const fitToPlaces = (list: Place[], top = 190) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map) return;
