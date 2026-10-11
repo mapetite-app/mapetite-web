@@ -288,8 +288,10 @@ photoMode = "off";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-await page.waitForTimeout(800);
-ok((await page.locator("ul img").count()) === 0 && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
+// le immagini falliscono una alla volta: si aspetta fino a 3 s che restino solo le emoji
+let noPhotos = false;
+for (let i = 0; i < 15 && !noPhotos; i++) { await page.waitForTimeout(200); noPhotos = (await page.locator("ul img").count()) === 0; }
+ok(noPhotos && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
 photoMode = "ok";
 
 // 6. Errore di rete/API
@@ -511,9 +513,9 @@ const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("but
 if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
-    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "u1", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1", rating: 4.6, price_level: 2 } },
-    { tags: ["amici"], note: null, places: { id: "u2", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
-    { tags: null, note: "Brunch domenica", places: { id: "u3", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
+    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "00000000-0000-4000-8000-000000000001", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1", rating: 4.6, price_level: 2 } },
+    { tags: ["amici"], note: null, places: { id: "00000000-0000-4000-8000-000000000002", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
+    { tags: null, note: "Brunch domenica", places: { id: "00000000-0000-4000-8000-000000000003", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
   ];
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
@@ -549,6 +551,22 @@ else {
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
+  let patched = null;
+  await p.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "PATCH") { patched = r.request().postDataJSON(); return r.fulfill({ status: 204, body: "" }); }
+    return r.fallback();
+  });
+  await p.getByLabel("Cerca tra i salvati").fill("");
+  await p.locator("ul.snap-x li").first().locator("button").last().click();
+  await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
+  await p.getByRole("button", { name: "✓ Ci sono stato" }).click();
+  await p.waitForTimeout(500);
+  ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
+  await p.screenshot({ path: `${OUT}/13b-stato-salvato.png` });
+  await p.keyboard.press("Escape");
+  await p.unroute("**/rest/v1/saved_places**");
+
   // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();

@@ -21,6 +21,9 @@ import { momentSuggestion } from "@/lib/moment";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
+const VISIT_WANT = "Da provare";
+const VISIT_DONE = "Già visitato";
+type VisitStatus = typeof VISIT_WANT | typeof VISIT_DONE;
 
 function SaveModal({
   place,
@@ -872,6 +875,24 @@ export default function MapView({
       setSavedPlaces((prev) => prev.filter((p) => p.id !== uuid));
       if (view === "saved") dispatch({ type: "CLOSE" });
     }
+  };
+
+  // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
+  // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
+  const setVisitStatus = async (placeId: string, status: VisitStatus) => {
+    const uuid = resolveUuid(placeId);
+    if (!userId || !uuid) return;
+    const current = savedPlaces.find((p) => p.id === uuid);
+    const base = (current?.tags ?? []).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+    const had = current?.tags?.includes(status) ?? false;
+    const tags = had ? base : [...base, status];
+    const { error } = await createClient()
+      .from("saved_places")
+      .update({ tags })
+      .eq("user_id", userId)
+      .eq("place_id", uuid);
+    if (error) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
+    setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
   };
 
   const CATEGORY_QUERY: Record<string, string> = {
@@ -1773,6 +1794,7 @@ export default function MapView({
               }}
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
+              onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
               userPos={userPos}

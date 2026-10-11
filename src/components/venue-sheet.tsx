@@ -49,6 +49,7 @@ type VenueSheetProps = {
   communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
+  onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
 };
 
 export default function VenueSheet({
@@ -61,6 +62,7 @@ export default function VenueSheet({
   communitySlot,
   origin = null,
   userPos = null,
+  onVisitStatus,
 }: VenueSheetProps) {
   const {
     name,
@@ -129,7 +131,7 @@ export default function VenueSheet({
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
-    isSaved && (hasPersonalTags || personalNote != null || canEdit);
+    isSaved && (hasPersonalTags || personalNote != null || canEdit || onVisitStatus != null);
   const priceLabel =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
   // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
@@ -458,9 +460,27 @@ export default function VenueSheet({
           <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
             Le tue note
           </p>
+          {onVisitStatus && (
+            <div className="mt-2 flex gap-2" data-testid="stato-salvato">
+              {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
+                const on = personalTags?.includes(tag) ?? false;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onVisitStatus(tag)}
+                    className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {hasPersonalTags && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {personalTags!.map((tag) => (
+              {personalTags!.filter((t) => !onVisitStatus || (t !== "Da provare" && t !== "Già visitato")).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
