@@ -51,7 +51,7 @@ export function tasteQuery(p: { cuisines: string[]; occasions: string[]; atmosph
   // Frasi naturali: "pizzeria", "con vista panoramica" invece di "cucina pizza", "atmosfera vista panoramica".
   const CUISINE_TEXT: Record<string, string> = {
     pizza: "pizzeria", street_food: "street food", vegetariana: "cucina vegetariana",
-    romana_laziale: "cucina romana", pesce: "di pesce",
+    romana_laziale: "cucina romana", pesce: "cucina di pesce",
   };
   const ATMOSPHERE_TEXT: Record<string, string> = {
     aperto: "all'aperto", panoramica: "con vista panoramica", storica: "in un locale storico",

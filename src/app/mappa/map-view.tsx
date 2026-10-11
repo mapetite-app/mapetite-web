@@ -424,11 +424,18 @@ type AIFiltri = {
 // Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
 type PendingSynthesis = { places: unknown[]; token: string };
 
-function buildAISummary(filtri: AIFiltri): string {
+// Cosa ha capito la ricerca: tipo, requisiti, "vicino a te" o la zona nominata.
+function filtriParts(filtri: AIFiltri): string[] {
   const parts: string[] = [];
-  if (filtri.categoria) parts.push(filtri.categoria);
+  if (filtri.categoria) parts.push(categoryLabel(filtri.categoria) as string);
   parts.push(...filtri.parole_chiave);
   if (filtri.vicino_a_me) parts.push("vicino a te");
+  else if (filtri.zona) parts.push(`a ${filtri.zona}`);
+  return parts;
+}
+
+function buildAISummary(filtri: AIFiltri): string {
+  const parts = filtriParts(filtri);
   return "Ho cercato: " + (parts.length > 0 ? parts.join(" · ") : "qualsiasi locale");
 }
 
@@ -881,20 +888,30 @@ export default function MapView({
 
   // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
+  const visitBusy = useRef(false);
   const setVisitStatus = async (placeId: string, status: VisitStatus) => {
     const uuid = resolveUuid(placeId);
-    if (!userId || !uuid) return;
-    const current = savedPlaces.find((p) => p.id === uuid);
-    const base = (current?.tags ?? []).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
-    const had = current?.tags?.includes(status) ?? false;
-    const tags = had ? base : [...base, status];
-    const { error } = await createClient()
-      .from("saved_places")
-      .update({ tags })
-      .eq("user_id", userId)
-      .eq("place_id", uuid);
-    if (error) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
-    setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
+    if (!userId || !uuid || visitBusy.current) return;
+    visitBusy.current = true;
+    try {
+      const supabase = createClient();
+      // Tag attuali: dalla lista dei salvati, o dal database se lì non c'è (mai scrivere alla cieca).
+      let currentTags = savedPlaces.find((p) => p.id === uuid)?.tags ?? null;
+      if (currentTags === null) {
+        const { data, error } = await supabase
+          .from("saved_places").select("tags").eq("user_id", userId).eq("place_id", uuid).maybeSingle();
+        if (error || !data) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
+        currentTags = (data.tags as string[] | null) ?? [];
+      }
+      const base = currentTags.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+      const tags = currentTags.includes(status) ? base : [...base, status];
+      const previous = savedPlaces;
+      setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
+      const { error } = await supabase.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", uuid);
+      if (error) { setSavedPlaces(previous); setFilterError("Non sono riuscito a salvare: riprova."); }
+    } finally {
+      visitBusy.current = false;
+    }
   };
 
   const CATEGORY_QUERY: Record<string, string> = {
@@ -1201,9 +1218,13 @@ export default function MapView({
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q")?.trim().slice(0, 200);
-    if (!q) return;
-    const [lat, lng] = (params.get("at") ?? "").split(",").map(Number);
-    const center = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && params.get("at")
+    // meno di 3 caratteri: link troncato o sbagliato, niente ricerca a pagamento
+    if (!q || q.length < 3) return;
+    const atParts = (params.get("at") ?? "").split(",");
+    const [lat, lng] = atParts.map(Number);
+    // entrambe le coordinate scritte davvero (Number("") varrebbe 0: Golfo di Guinea)
+    const center = atParts.length === 2 && atParts.every((x) => x.trim() !== "") &&
+      Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
       ? { lat, lng }
       : undefined;
     params.delete("q");
@@ -1973,11 +1994,7 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
           focusedId={focusId}
-          understood={aiSearch?.filtri ? [
-            ...(aiSearch.filtri.categoria ? [categoryLabel(aiSearch.filtri.categoria) ?? aiSearch.filtri.categoria] : []),
-            ...aiSearch.filtri.parole_chiave,
-            ...(aiSearch.filtri.vicino_a_me ? ["vicino a te"] : aiSearch.filtri.zona ? [`a ${aiSearch.filtri.zona}`] : []),
-          ].slice(0, 4) : []}
+          understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
           isSaved={isPlaceSaved}

@@ -6,7 +6,7 @@ import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
-import { distanceLabel, distanceM } from "@/lib/distance";
+import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
@@ -144,7 +144,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
-    return [...list].sort((a, b) => distanceM(origin, a) - distanceM(origin, b));
+    return [...list].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
   const orderKey = places.map((p) => p.id).join(",");
   useEffect(() => {
