@@ -12,6 +12,7 @@ import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/compon
 import VenueSheet from "@/components/venue-sheet";
 import BottomSheet from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
+import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -511,6 +512,12 @@ export default function MapView({
   const [aiQuery, setAiQuery] = useState("");
   const [aiSearching, setAiSearching] = useState(false);
   // Schermata di benvenuto: sparisce alla prima interazione.
+  const recentOn = useBeta("recenti");
+  const recentSearches = useSyncExternalStore(
+    () => () => {},
+    () => (recentOn ? JSON.stringify(loadRecentSearches()) : "[]"),
+    () => "[]",
+  );
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
   const [aiError, setAiError] = useState<string | null>(null);
@@ -905,7 +912,8 @@ export default function MapView({
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id });
         setVenueDetails(details); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
-        void loadVerdicts(id, q, data.sintesi_pendente ?? null);
+        if (view === "all") saveRecentSearch(q);
+      void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
       } finally {
@@ -1172,6 +1180,24 @@ export default function MapView({
                 </button>
               ))}
             </div>
+            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+              <div className="mt-3" data-testid="recenti">
+                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cercate di recente</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {(JSON.parse(recentSearches) as string[]).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      disabled={aiSearching}
+                      onClick={() => { setAiQuery(r); void runAISearch(r); }}
+                      className="min-h-9 rounded-pill bg-accent-light px-3 text-left text-xs font-sans text-accent active:scale-95 disabled:opacity-60"
+                    >
+                      ↻ {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {aiSearching && (
               <p className="mt-3 flex items-center gap-2 text-sm text-text-muted">
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-brand" />

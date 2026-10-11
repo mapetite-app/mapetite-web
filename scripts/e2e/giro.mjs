@@ -22,7 +22,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
-  mk("P3", "Rooftop Tre", 41.902, 12.494),
+  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false }),
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
@@ -98,12 +98,30 @@ for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salv
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 await shot("04-scheda");
 
+// 4b. Funzioni beta spente di default
+ok((await page.getByLabel(/Condividi/).count()) === 0, "beta: 'Condividi' assente senza ?beta=condividi");
+
 // 5. Variante B
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: /Rooftop romantico/ }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.locator("ul.snap-x").count() === 1, "variante B: carosello presente");
 await shot("05-lista-b");
+
+// 5b. Beta: filtri lista, condividi, recenti
+await page.goto(`${BASE}/mappa?beta=filtri-lista,condividi,recenti`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+await page.getByRole("button", { name: "Aperto ora" }).first().click();
+ok((await page.getByText("Rooftop Tre").count()) === 0 && (await page.getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
+await shot("09-beta-filtri");
+await page.getByText("Terrazza Uno").first().click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condividi: pulsante presente nella scheda");
+await page.goto(`${BASE}/mappa?beta=recenti`, { waitUntil: "networkidle" });
+ok((await page.getByTestId("recenti").getByText(/Rooftop romantico/).count()) === 1, "beta recenti: la ricerca fatta compare tra le recenti");
+await shot("10-beta-recenti");
 
 // 6. Errore di rete/API
 searchMode = "error";

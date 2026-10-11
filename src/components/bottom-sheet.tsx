@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
+import { useBeta } from "@/lib/beta";
 
 export interface BottomSheetProps {
   places: Place[];
@@ -80,7 +81,30 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-export default function BottomSheet({ places, onSelect, onClose, details, loadingVerdicts = false, variant = "a" }: BottomSheetProps) {
+type QuickFilter = "open" | "cheap" | "top";
+
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a" }: BottomSheetProps) {
+  const quickFiltersOn = useBeta("filtri-lista");
+  const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
+  const places = useMemo(
+    () =>
+      !quickFiltersOn || quick.size === 0
+        ? allPlaces
+        : allPlaces.filter(
+            (p) =>
+              (!quick.has("open") || details?.[p.id]?.openNow === true) &&
+              (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
+              (!quick.has("top") || (p.rating ?? 0) >= 4.5),
+          ),
+    [allPlaces, quick, quickFiltersOn, details],
+  );
+  const toggleQuick = (f: QuickFilter) =>
+    setQuick((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
+      return next;
+    });
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -194,7 +218,7 @@ export default function BottomSheet({ places, onSelect, onClose, details, loadin
     endDrag(e);
   };
 
-  if (places.length === 0) return null;
+  if (allPlaces.length === 0) return null;
 
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
@@ -297,6 +321,24 @@ export default function BottomSheet({ places, onSelect, onClose, details, loadin
             ✕
           </button>
         </div>
+        {quickFiltersOn && (
+          <div className="flex flex-wrap gap-2 px-1 pb-2" data-testid="filtri-lista">
+            {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={quick.has(k)}
+                onClick={() => toggleQuick(k)}
+                className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium ${quick.has(k) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {places.length === 0 && allPlaces.length > 0 && (
+          <p className="px-2 py-6 text-center text-sm text-text-muted">Nessun locale con questi filtri: togline qualcuno.</p>
+        )}
         <ul className="flex flex-col gap-1">
           {places.map((place) => (
             <li key={place.id}>
