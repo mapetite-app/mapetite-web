@@ -1092,22 +1092,6 @@ export default function MapView({
   };
 
   // Posizione: chiesta solo quando l'utente tocca il pulsante (mai al caricamento).
-  // /mappa?q=... (dalla home o da un link condiviso): la ricerca parte da sola, una volta.
-  const autoQueryDone = useRef(false);
-  useEffect(() => {
-    if (autoQueryDone.current) return;
-    autoQueryDone.current = true;
-    const q = new URLSearchParams(window.location.search).get("q")?.trim();
-    if (!q || q.length < 3) return;
-    setAiQuery(q);
-    void runAISearch(q.slice(0, 200));
-    // Tolto dall'indirizzo: ricaricare la pagina non deve rifare (e ripagare) la ricerca.
-    const url = new URL(window.location.href);
-    url.searchParams.delete("q");
-    window.history.replaceState(null, "", url.pathname + url.search);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const goToMyPosition = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) { setGeoState("unavailable"); return; }
     setGeoState("loading");
@@ -1162,6 +1146,25 @@ export default function MapView({
       if (searchSeq.current === id) setLoadingVerdicts(false);
     }
   };
+
+  // /mappa?q=... (dalla home o da un link condiviso): la ricerca parte da sola, una volta.
+  const autoQueryDone = useRef(false);
+  useEffect(() => {
+    if (autoQueryDone.current) return;
+    autoQueryDone.current = true;
+    const q = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (!q || q.length < 3) return;
+    // rimandato di un istante: niente setState sincrono dentro l'effetto
+    setTimeout(() => {
+      setAiQuery(q);
+      void runAISearch(q.slice(0, 200));
+    }, 0);
+    // Tolto dall'indirizzo: ricaricare la pagina non deve rifare (e ripagare) la ricerca.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="fixed inset-0 md:top-14">
