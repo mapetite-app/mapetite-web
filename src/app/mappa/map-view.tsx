@@ -1399,6 +1399,14 @@ export default function MapView({
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
+    // Dalla home "Oppure cerca con i filtri" (/mappa?filtri=1): apre subito il pannello dei filtri.
+    if (params.get("filtri") === "1") {
+      params.delete("filtri");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); dispatch({ type: "OPEN_FILTERS" }); }, 0);
+      return;
+    }
     const q = params.get("q")?.trim().slice(0, 200);
     // meno di 3 caratteri: link troncato o sbagliato, niente ricerca a pagamento
     if (!q || q.length < 3) return;

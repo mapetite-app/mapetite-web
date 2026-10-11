@@ -360,6 +360,11 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
+ok(await page.getByText("Chiedi all'AI, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
+await page.getByTestId("home-filtri").click();
+await page.getByText(/Applica filtri/).first().waitFor({ timeout: 5000 }).then(() => ok(true, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"), () => ok(false, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"));
+ok(!page.url().includes("filtri=1"), "home → filtri: il parametro sparisce dall'indirizzo (ricaricare non riapre i filtri)");
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
 searchDelay = 1500;
 await page.getByLabel("Cosa cerchi?").press("Enter");
