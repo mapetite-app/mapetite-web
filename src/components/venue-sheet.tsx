@@ -50,6 +50,7 @@ type VenueSheetProps = {
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
+  googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
 };
 
 export default function VenueSheet({
@@ -63,6 +64,7 @@ export default function VenueSheet({
   origin = null,
   userPos = null,
   onVisitStatus,
+  googlePlaceId = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -87,11 +89,13 @@ export default function VenueSheet({
     personalNote,
   } = venue;
 
+  // Scheda completa su Google Maps (orari, foto, tutte le recensioni): con il Place ID se c'è.
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}${googlePlaceId ? `&query_place_id=${encodeURIComponent(googlePlaceId)}` : ""}`;
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const share = async () => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${encodeURIComponent(venue.id)}`;
+    const url = mapsUrl;
     const text = verdict ? `${name} — ${verdict}` : name;
     try {
       if (typeof navigator.share === "function") {
@@ -265,6 +269,9 @@ export default function VenueSheet({
         {address && (
           <p className="mt-1 text-xs font-sans text-text-muted">{address}</p>
         )}
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs font-display font-semibold text-accent">
+          Orari, foto e recensioni su Google Maps →
+        </a>
       </div>
 
       {/* 2. CARD VERDETTO (teal): verdetto + matchReason + chip, tutto dentro. */}
@@ -399,6 +406,9 @@ export default function VenueSheet({
             </h2>
             {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
             {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+              Orari e foto su Google Maps →
+            </a>
             {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
             {gem && (
               <span data-testid="gemma" className="mt-3 mr-2 inline-flex rounded-pill bg-accent-light px-3 py-1 text-sm font-display font-semibold text-accent">💎 Poco conosciuto</span>

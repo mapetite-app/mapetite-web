@@ -1818,6 +1818,7 @@ export default function MapView({
           <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               origin={userPos ?? searchOrigin}
+              googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
                 category: selected.category, rating: selected.rating,
