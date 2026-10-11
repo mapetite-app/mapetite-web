@@ -22,6 +22,7 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 
 ## Orari (limiti di utilizzo condivisi con il lavoro di Lorenzo)
 - Lorenzo usa Claude per lavoro dal lunedì al venerdì dalle 9 alle 21 circa. Il limite di utilizzo è unico (finestre da 5 ore + limite settimanale) e va lasciato a lui in quelle ore.
+- **Sabato e domenica (e festivi): lavora tutto il giorno, senza limite d'orario** (Lorenzo non usa Claude per lavoro). Continua finché restano voci o proposte da costruire; non fermarti dopo la prima PR. Ogni ~2 ore apri/aggiorna la PR con ciò che è pronto, così Lorenzo vede avanzamenti durante il giorno.
 - Sessioni di sviluppo: 22:00 e 03:05. La seconda riparte dal branch della prima.
 - Nei giorni feriali chiudi il lavoro entro le 08:00: commit, push, PR aggiornata e messaggio finale. Non iniziare voci nuove dopo le 07:30.
 - Se una sessione si interrompe per il limite di utilizzo, la successiva riprende da dove era: lascia sempre il branch in uno stato che compila e una nota in PR su cosa era in corso.
@@ -35,11 +36,12 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 5. Diagnostica prima del codice: grep/lettura dei file coinvolti; mai agire su supposizioni sullo stato dei file.
 6. Una modifica logica alla volta. Commit atomici con messaggi in italiano. **Autore dei commit obbligatorio:** `git -c user.name="lorenzo-mapetite" -c user.email="founder.mapetite@gmail.com" commit ...` — Vercel (piano Hobby) non crea l'anteprima per commit di altri autori. Mantieni la riga `Co-Authored-By` di Claude nel messaggio.
 7. Verifica statica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (oggi: 11 errori, 8 warning preesistenti).
-8. **Test reali (se l'ambiente ha chiavi e rete abilitate):** avvia `npm run dev`, prova le API con `curl` e l'interfaccia con Playwright (Chromium già installato) a viewport mobile 390×844. Allega alla PR gli screenshot prima/dopo e l'esito delle ricerche di prova di `docs/autonomia/TEST-RICERCHE.md`.
+8. **Test automatico obbligatorio (zero costi):** prima di ogni push esegui `PW_MODULE=$(npm root -g)/playwright node scripts/e2e/giro.mjs cartella-screenshot` con `npm run dev` attivo. Simula Google/Haiku, quindi non consuma quote. Ogni nuova funzione dell'interfaccia deve aggiungere i suoi controlli a quello script. Scrivi l'esito in PR. Lorenzo non deve rifare i test: deve solo ricontrollare.
+8b. **Test reali (se l'ambiente ha chiavi e rete abilitate):** avvia `npm run dev`, prova le API con `curl` e l'interfaccia con Playwright (Chromium già installato) a viewport mobile 390×844. Allega alla PR gli screenshot prima/dopo e l'esito delle ricerche di prova di `docs/autonomia/TEST-RICERCHE.md`.
    - Budget Google per i test: massimo 10 ricerche reali a notte (la quota totale è 50/giorno ed è condivisa con Lorenzo). Salva le risposte Google delle ricerche di prova in `scripts/fixtures/` (cartella esclusa da git) e riusale per i test ripetuti.
    - Se chiavi o rete mancano, dichiaralo in PR: "non testato dal vivo".
    - `npm run build` può fallire per il download di Google Fonts se la rete non lo consente: non è un errore del codice.
-9. L'anteprima Vercel del branch compare come stato del commit (`gh api repos/mapetite-app/mapetite-web/deployments`, poi `.../deployments/ID/statuses` → `environment_url`, formato `https://mapetite-…-lorenzomapetite.vercel.app`): mettila in cima alla PR. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
+9. **PR scritta per chi non ha seguito niente:** in cima "Cosa c'è di nuovo" in 5 righe di italiano semplice (nessun gergo), poi come trovarlo. Le anteprime Vercel chiedono il login Vercel: dopo il merge indica sempre come vederlo nel sito di produzione. L'anteprima Vercel del branch compare come stato del commit (`gh api repos/mapetite-app/mapetite-web/deployments`, poi `.../deployments/ID/statuses` → `environment_url`, formato `https://mapetite-…-lorenzomapetite.vercel.app`): mettila in cima alla PR. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
 10. Aggiorna `docs/autonomia/BACKLOG.md` (stato delle voci, link alla PR) nello stesso branch.
 
 ## Cosa NON fare mai senza approvazione esplicita di Lorenzo
