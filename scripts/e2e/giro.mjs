@@ -320,6 +320,22 @@ ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella ca
 await shot("22-barra");
 await page.getByTestId("benvenuto-filtri").click();
 await page.getByText(/Applica filtri/).first().waitFor({ timeout: 3000 }).then(() => ok(true, "card iniziale: 'Oppure usa i filtri' apre i filtri"), () => ok(false, "card iniziale: 'Oppure usa i filtri' apre i filtri"));
+await shot("24-filtri");
+ok((await page.getByText("Reset").count()) === 0 && await page.getByRole("button", { name: "Azzera" }).isVisible(), "filtri: tutto in italiano ('Azzera')");
+{ const b = await page.getByRole("button", { name: "Pizzerie" }).boundingBox(); ok(!!b && b.height >= 40, `filtri: scelte comode col dito (${Math.round(b?.height ?? 0)}px)`); }
+let filterBody = null;
+await page.route("**/api/search", async (r) => { filterBody = r.request().postDataJSON(); return r.fallback(); });
+await page.getByRole("button", { name: "Pizzerie" }).click();
+await page.getByRole("button", { name: "3 km" }).click();
+await page.getByRole("button", { name: "★ 4,5+" }).click();
+await page.getByRole("button", { name: "Applica filtri (3)" }).click();
+await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
+ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 3000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 3 km e voto 4,5+");
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 3 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
+await page.waitForTimeout(1200);
+{ const pins = await page.getByTestId("pin").count(); ok(pins >= 2, `filtri: la mappa si sposta sui risultati (${pins} pin separati, non un gruppo unico)`); }
+await shot("24b-filtri-risultati");
+await page.unroute("**/api/search");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");
 await page.getByLabel("Cosa cerchi?").press("Enter");
