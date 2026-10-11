@@ -661,30 +661,6 @@ export default function MapView({
     }
   };
 
-  // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
-  // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
-  const sharedSearchDone = useRef(false);
-  useEffect(() => {
-    if (sharedSearchDone.current) return;
-    sharedSearchDone.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get("q")?.trim().slice(0, 200);
-    if (!q) return;
-    const [lat, lng] = (params.get("at") ?? "").split(",").map(Number);
-    const center = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && params.get("at")
-      ? { lat, lng }
-      : undefined;
-    params.delete("q");
-    params.delete("at");
-    const rest = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
-    if (center) setViewState((v) => ({ ...v, latitude: center.lat, longitude: center.lng, zoom: 13 }));
-    setWelcomeDismissed(true);
-    setAiQuery(q);
-    void runAISearch(q, center);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
-  }, []);
-
   useEffect(() => {
     if (!userId) return;
 
@@ -1090,6 +1066,33 @@ export default function MapView({
       if (searchSeq.current === id) setLoadingVerdicts(false);
     }
   };
+
+  // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
+  // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
+  const sharedSearchDone = useRef(false);
+  useEffect(() => {
+    if (sharedSearchDone.current) return;
+    sharedSearchDone.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q")?.trim().slice(0, 200);
+    if (!q) return;
+    const [lat, lng] = (params.get("at") ?? "").split(",").map(Number);
+    const center = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && params.get("at")
+      ? { lat, lng }
+      : undefined;
+    params.delete("q");
+    params.delete("at");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+    // Fuori dal ciclo dell'effetto: gli aggiornamenti di stato partono dopo il primo disegno.
+    setTimeout(() => {
+      if (center) setViewState((v) => ({ ...v, latitude: center.lat, longitude: center.lng, zoom: 13 }));
+      setWelcomeDismissed(true);
+      setAiQuery(q);
+      void runAISearch(q, center);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
+  }, []);
 
   return (
     <div className="fixed inset-0 md:top-14">

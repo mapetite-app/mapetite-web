@@ -250,7 +250,7 @@ if (shared) {
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-ok(/Poppins/i.test(await titleFont()), "titoli: Poppins di default");
+{ const f = await titleFont(); ok(/Poppins/i.test(f), `titoli: Poppins di default (${f.slice(0, 40)})`); }
 await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
 ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
