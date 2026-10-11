@@ -20,6 +20,15 @@ export function useBeta(flag: BetaFlag): boolean {
   return !list.includes("off") && !list.includes(`-${flag}`);
 }
 
+// Proposte nuove (Fase 4): SPENTE di default, si accendono solo elencandole, es. ?beta=condividi-ricerca
+//   condividi-ricerca  pulsante "Condividi" sul titolo della risposta: link che rifà la stessa ricerca
+export type OptInFlag = "condividi-ricerca";
+
+export function useBetaOptIn(flag: OptInFlag): boolean {
+  const raw = useSyncExternalStore(() => () => {}, readFlags, () => EMPTY);
+  return raw.split(",").map((f) => f.trim()).includes(flag);
+}
+
 const RECENT_KEY = "mapetite.recenti";
 
 export function loadRecentSearches(): string[] {

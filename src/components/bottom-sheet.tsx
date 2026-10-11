@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Share2 } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta } from "@/lib/beta";
@@ -23,6 +24,8 @@ export interface BottomSheetProps {
   variant?: "a" | "b";
   // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
   origin?: { lat: number; lng: number } | null;
+  onShare?: (() => void) | null; // condividi la ricerca (solo con titolo della risposta)
+  shareNote?: string | null;
   // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
   quick?: ReadonlySet<QuickFilter>;
   onToggleQuick?: (f: QuickFilter) => void;
@@ -113,7 +116,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, onShare = null, shareNote = null }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -280,8 +283,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
                 : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
+              {shareNote && <span role="status"> · {shareNote}</span>}
             </p>
           </div>
+          {title && onShare && (
+            <button type="button" onClick={onShare} aria-label="Condividi questa ricerca" className="-my-2 ml-2 flex h-11 w-9 shrink-0 items-center justify-center text-brand">
+              <Share2 size={18} />
+            </button>
+          )}
           <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
@@ -396,8 +405,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
                 : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
+              {shareNote && <span role="status"> · {shareNote}</span>}
             </p>
           </div>
+          {title && onShare && (
+            <button type="button" onClick={onShare} aria-label="Condividi questa ricerca" className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center text-brand">
+              <Share2 size={18} />
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

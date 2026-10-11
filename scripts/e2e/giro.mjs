@@ -223,6 +223,30 @@ ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul p
 await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
 await ctx3.close();
 
+// 7-bis. Condividi la ricerca (proposta, spenta di default: ?beta=condividi-ricerca)
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
+ok((await page.getByLabel("Condividi questa ricerca").count()) === 0, "condividi ricerca: spento di default");
+await page.goto(`${BASE}/mappa?beta=condividi-ricerca`, { waitUntil: "networkidle" });
+await page.evaluate(() => { navigator.share = async (d) => { window.__shared = d; }; });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByLabel("Condividi questa ricerca").click();
+const shared = await page.evaluate(() => window.__shared ?? null);
+ok(!!shared && /\/mappa\?q=Rooftop/.test(shared.url) && /&at=-?\d+\.\d+,-?\d+\.\d+/.test(shared.url), `condividi ricerca: link con richiesta e punto (${shared?.url ?? "nessuno"})`);
+if (shared) {
+  let body = null;
+  await page.route("**/api/search", async (route) => { body = route.request().postDataJSON(); return route.fulfill({ json: SEARCH_FAST }); });
+  await page.goto(shared.url, { waitUntil: "networkidle" });
+  await page.getByTestId("titolo-risposta").waitFor({ timeout: 6000 });
+  ok(/Rooftop romantico/i.test(await page.getByTestId("titolo-risposta").innerText()), "link ricerca: apre la stessa ricerca con il titolo");
+  const at = new URL(shared.url).searchParams.get("at").split(",").map(Number);
+  ok(body && Math.abs(body.lat - at[0]) < 1e-6 && Math.abs(body.lng - at[1]) < 1e-6, "link ricerca: cerca nel punto di chi ha condiviso");
+  ok(!new URL(page.url()).searchParams.has("q"), "link ricerca: dopo l'apertura 'q' sparisce dall'indirizzo (ricaricare non ripete)");
+  await shot("14-link-ricerca");
+  await page.unroute("**/api/search");
+}
+
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

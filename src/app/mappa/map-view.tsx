@@ -12,7 +12,7 @@ import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/compon
 import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
+import { loadRecentSearches, saveRecentSearch, useBeta, useBetaOptIn } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
@@ -642,6 +642,49 @@ export default function MapView({
     return uuid != null && savedIds.has(uuid);
   };
 
+  const shareSearchOn = useBetaOptIn("condividi-ricerca");
+  const [shareSearchNote, setShareSearchNote] = useState<string | null>(null);
+  const shareSearch = async (q: string) => {
+    const origin = searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude };
+    const url = `${window.location.origin}/mappa?q=${encodeURIComponent(q)}&at=${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}`;
+    const text = `Guarda cosa mi propone Mapetite per «${q}»`;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: "Mapetite", text, url });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        setShareSearchNote("link copiato");
+        setTimeout(() => setShareSearchNote(null), 2500);
+      }
+    } catch {
+      // foglio di condivisione chiuso dall'utente: niente da mostrare
+    }
+  };
+
+  // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
+  // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
+  const sharedSearchDone = useRef(false);
+  useEffect(() => {
+    if (sharedSearchDone.current) return;
+    sharedSearchDone.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q")?.trim().slice(0, 200);
+    if (!q) return;
+    const [lat, lng] = (params.get("at") ?? "").split(",").map(Number);
+    const center = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && params.get("at")
+      ? { lat, lng }
+      : undefined;
+    params.delete("q");
+    params.delete("at");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+    if (center) setViewState((v) => ({ ...v, latitude: center.lat, longitude: center.lng, zoom: 13 }));
+    setWelcomeDismissed(true);
+    setAiQuery(q);
+    void runAISearch(q, center);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -918,7 +961,9 @@ export default function MapView({
   };
 
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
-  const runAISearch = async (q: string) => {
+  // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
+  const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
+    const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
     setAiSearching(true);
       setAiError(null);
       try {
@@ -930,8 +975,8 @@ export default function MapView({
             source: view === "all" ? "world" : "saved",
             searchIntent: "natural",
             phase: "fast",
-            lat: viewState.latitude,
-            lng: viewState.longitude,
+            lat: at.lat,
+            lng: at.lng,
           }),
         });
         const data = await res.json();
@@ -984,7 +1029,7 @@ export default function MapView({
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
       if (view === "all") saveRecentSearch(q);
-      setSearchOrigin({ lat: viewState.latitude, lng: viewState.longitude });
+      setSearchOrigin(at);
       fitToPlaces(places);
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
@@ -1594,6 +1639,8 @@ export default function MapView({
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
+          onShare={shareSearchOn && aiSearch?.query ? () => void shareSearch(aiSearch.query!) : null}
+          shareNote={shareSearchNote}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);
