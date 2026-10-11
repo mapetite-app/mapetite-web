@@ -203,6 +203,15 @@ await p2.waitForTimeout(1500);
 ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
 await ctx2.close();
 
+// 7b. Feedback dei tester: email precompilata con pagina e telefono
+await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
+const fb = page.getByRole("link", { name: "Feedback" });
+ok(await fb.isVisible(), "feedback: voce 'Feedback' nella barra in basso");
+await fb.evaluate((a) => a.addEventListener("click", (e) => e.preventDefault()));
+await fb.click();
+const fbHref = decodeURIComponent((await fb.getAttribute("href")) ?? "");
+ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /mappa?lista=b"), "feedback: email precompilata con la pagina in cui si trova il tester");
+
 // 8. Pagine pubbliche: si aprono e il pulsante principale non è coperto
 for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
