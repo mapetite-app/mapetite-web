@@ -51,6 +51,9 @@ await ctx.route("**/api/places/photo**", async (route) => {
   if (photoMode === "off") return route.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } });
   return route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' });
 });
+// Con E2E_FAKE_USER la mappa legge i salvati: nel giro principale risultano vuoti (niente rete verso Supabase).
+await ctx.route("**/rest/v1/saved_places**", (route) => route.fulfill({ json: [] }));
+await ctx.route("**/rest/v1/place_synthesis**", (route) => route.fulfill({ json: [] }));
 let synthDelay = 900;
 await ctx.route("**/api/search", async (route) => {
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
