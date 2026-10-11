@@ -33,6 +33,8 @@ export interface BottomSheetProps {
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
   focusedId?: string | null;
   onFocus?: (place: Place) => void;
+  // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
+  onOrder?: (ids: string[]) => void;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
   heading?: string | null;
   // Riapre il pannello di ricerca con la frase attuale, per correggerla.
@@ -125,7 +127,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine, isSaved, onSave, heading = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, heading = null }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -140,6 +142,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     if (!nearestFirst || !origin) return list;
     return [...list].sort((a, b) => distanceM(origin, a) - distanceM(origin, b));
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
+  const orderKey = places.map((p) => p.id).join(",");
+  useEffect(() => {
+    onOrder?.(orderKey ? orderKey.split(",") : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderKey]);
   const toggleQuick = (f: QuickFilter) => {
     if (onToggleQuick) return onToggleQuick(f);
     setQuickLocal((prev) => {

@@ -6,7 +6,8 @@ const EXAMPLES = [
   { emoji: "🌇", title: "Rooftop romantico", sub: "per due a Roma", q: "Rooftop romantico per due a Roma" },
   { emoji: "🍝", title: "Trattoria vera", sub: "non turistica a Trastevere", q: "Trattoria autentica non turistica a Trastevere" },
   { emoji: "🍸", title: "Cocktail bar", sub: "elegante per un appuntamento", q: "Cocktail bar elegante per un appuntamento" },
-  { emoji: "🥐", title: "Colazione buona", sub: "qui vicino", q: "Colazione buona qui vicino" },
+  // Niente "qui vicino": dalla home la posizione non è ancora nota.
+  { emoji: "🥐", title: "Colazione buona", sub: "a Prati, con cornetti veri", q: "Colazione buona a Prati con cornetti veri" },
 ];
 
 export default function Home() {

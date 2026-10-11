@@ -175,6 +175,8 @@ const firstCard = () => page.locator("ul.snap-x li").first().getAttribute("data-
 ok((await firstCard()) === "P1", "ordine iniziale: prima Terrazza Uno (la più adatta)");
 await page.getByRole("button", { name: "Più vicini" }).click();
 ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
+await page.waitForTimeout(300);
+ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Rooftop Tre"), "'Più vicini': il pin evidenziato segue la prima card");
 await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
 await page.getByRole("button", { name: "Condividi questa ricerca" }).click();
 const sharedUrl = await page.evaluate(() => window.__shared?.url ?? "");
@@ -412,6 +414,8 @@ else {
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
+  await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

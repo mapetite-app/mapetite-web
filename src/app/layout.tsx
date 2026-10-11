@@ -24,6 +24,8 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
   display: "swap",
+  // Usato solo con ?titoli=serif: niente precaricamento per tutti.
+  preload: false,
 });
 
 export const metadata: Metadata = {

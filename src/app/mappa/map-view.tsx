@@ -294,11 +294,17 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
 
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
 // nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
-type MapStyleApi = { getStyle: () => { layers?: { id: string }[] } | undefined; setLayoutProperty: (id: string, k: string, v: string) => void };
+type MapStyleApi = {
+  getStyle: () => { layers?: { id: string }[] } | undefined;
+  getLayoutProperty: (id: string, k: string) => unknown;
+  setLayoutProperty: (id: string, k: string, v: string) => void;
+};
 function hidePoiLabels(map: MapStyleApi) {
   try {
     for (const layer of map.getStyle()?.layers ?? []) {
-      if (/poi-label|transit-label/.test(layer.id)) map.setLayoutProperty(layer.id, "visibility", "none");
+      if (/poi-label|transit-label/.test(layer.id) && map.getLayoutProperty(layer.id, "visibility") !== "none") {
+        map.setLayoutProperty(layer.id, "visibility", "none");
+      }
     }
   } catch {
     // stile non pronto: resta com'è
@@ -655,12 +661,13 @@ export default function MapView({
 
   // Carosello B aperto: il pin della card al centro (di default la prima) è evidenziato.
   const carouselOpen = overlay.kind === "list" && listVariant === "b";
-  const carouselList = clusterPlaces ?? displayedPlaces;
+  // Ordine delle card come le vede l'utente (dopo filtri rapidi e "Più vicini"), riportato dal carosello.
+  const [carouselOrder, setCarouselOrder] = useState<string[]>([]);
   const focusId = !carouselOpen
     ? null
-    : focusedId && carouselList.some((p) => p.id === focusedId)
+    : focusedId && carouselOrder.includes(focusedId)
       ? focusedId
-      : carouselList[0]?.id ?? null;
+      : carouselOrder[0] ?? null;
 
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
@@ -935,6 +942,9 @@ export default function MapView({
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setVenueDetails(details);
+      // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
+      setQuickFilters(new Set());
+      setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });
     } catch {
       setFilterError("Ricerca non riuscita. Riprova.");
@@ -1253,8 +1263,8 @@ export default function MapView({
             <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
               <button
                 type="button"
-                onClick={() => { setActiveTag(null); setActiveCity(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
-                className={`shrink-0 ${activeTag === null && activeCity === null ? CHIP_ON : CHIP_OFF}`}
+                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                className={`shrink-0 ${!savedFiltered ? CHIP_ON : CHIP_OFF}`}
               >
                 Tutti
               </button>
@@ -1491,7 +1501,7 @@ export default function MapView({
           <button
             type="button"
             disabled={aiSearching}
-            onClick={() => { void runAISearch(aiQuery.trim()); }}
+            onClick={() => { const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q); }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
             {aiSearching ? "Cerco…" : "Cerca in quest'area"}
@@ -1560,7 +1570,7 @@ export default function MapView({
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
                 // il secondo apre la scheda.
-                if (carouselOpen && focusId !== place.id) {
+                if (carouselOpen && focusId !== place.id && carouselOrder.includes(place.id)) {
                   setFocusedId(place.id);
                   return;
                 }
@@ -1577,7 +1587,7 @@ export default function MapView({
                   }`}
                 >
                   {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
-                  {focusId === place.id && aiSearch !== null && carouselList.indexOf(place) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                  {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
                       alt=""
@@ -1794,6 +1804,7 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
           focusedId={focusId}
+          onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {

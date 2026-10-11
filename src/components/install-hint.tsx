@@ -8,7 +8,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 // o se l'utente l'ha chiuso (solo su questo telefono).
 const KEY = "mapetite.installHint";
 
-type InstallEvent = Event & { prompt: () => Promise<void> };
+type InstallEvent = Event & { prompt: () => Promise<void>; userChoice?: Promise<{ outcome: "accepted" | "dismissed" }> };
 
 function readPlatform(): "ios" | "other" | "hidden" {
   try {
@@ -57,7 +57,16 @@ export default function InstallHint() {
         ) : (
           <button
             type="button"
-            onClick={async () => { await androidPrompt?.prompt(); close(); }}
+            onClick={async () => {
+              const ev = androidPrompt;
+              if (!ev) return;
+              await ev.prompt();
+              const choice = await ev.userChoice?.catch(() => null);
+              // Solo se installata si nasconde per sempre; se la finestra viene chiusa
+              // l'invito torna alla prossima occasione (il browser rimanda l'evento).
+              if (choice?.outcome === "accepted") close();
+              else setAndroidPrompt(null);
+            }}
             className="min-h-9 flex-1 text-left font-medium text-brand"
           >
             📲 Installa Mapetite sul telefono
