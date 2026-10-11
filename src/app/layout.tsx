@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Inter, Fraunces } from "next/font/google";
+import { Poppins, Inter, Newsreader } from "next/font/google";
 import NavBar from "@/components/nav-bar";
-import TitleVariant from "@/components/title-variant";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -19,14 +18,25 @@ const inter = Inter({
   display: "swap",
 });
 
-// Serif editoriale per la variante ?titoli=serif (decisione grafica aperta, stile Places).
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Variante in prova dei titoli (decisione grafica aperta): serif editoriale come Places.
+// Si scarica solo se la pagina la usa davvero (?titoli=serif).
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
+  weight: ["500", "600"],
   display: "swap",
   // Usato solo con ?titoli=serif: niente precaricamento per tutti.
   preload: false,
 });
+
+// Varianti grafiche in prova, ricordate su questo telefono:
+//   ?titoli=serif | ?titoli=sans   font dei titoli (serif editoriale come Places / Poppins)
+//   ?scheda=b     | ?scheda=a      scheda del locale (stile Places / attuale)
+//   ?home=b       | ?home=a        primo accesso con campo di ricerca diretto (stile Places / attuale)
+//   ?pin=b        | ?pin=a         pin con la foto del locale (stile Places / emoji)
+//   ?stile=places | ?stile=attuale tutte insieme
+// Gira prima del primo disegno, così non si vede il cambio.
+const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Mapetite",
@@ -64,10 +74,11 @@ export default async function RootLayout({
   return (
     <html
       lang="it"
-      className={`${poppins.variable} ${inter.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${poppins.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full">
-        <TitleVariant />
+        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT }} />
         <NavBar userId={userId} />
         {/*
           Pagine normali (non fixed): pb-16 evita che il contenuto finisca

@@ -1,14 +1,17 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone, Check, Share2 } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
-import { useBeta, useOptIn } from "@/lib/beta";
+import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
-import { distanceLabel } from "@/lib/distance";
+import { distanceLabel, walkMinutes } from "@/lib/distance";
+
+const TILE =
+  "flex min-h-[52px] min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-display font-semibold text-white active:scale-95";
 
 export type Venue = {
   id: string;
@@ -45,6 +48,8 @@ type VenueSheetProps = {
   saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
   communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
+  userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
+  onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
 };
 
 export default function VenueSheet({
@@ -56,6 +61,8 @@ export default function VenueSheet({
   saveSlot,
   communitySlot,
   origin = null,
+  userPos = null,
+  onVisitStatus,
 }: VenueSheetProps) {
   const {
     name,
@@ -124,12 +131,32 @@ export default function VenueSheet({
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
-    isSaved && (hasPersonalTags || personalNote != null || canEdit);
+    isSaved && (hasPersonalTags || personalNote != null || canEdit || onVisitStatus != null);
   const priceLabel =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
+  // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
+  const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
+  // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
+  const variant = useVariant("scheda");
+  const emoji = getCategoryEmoji(category, name);
+  // Righe di contesto della variante B: "Roma · 600 m" e "Cocktail bar · €€ · ★ 4,5 (812)".
+  const placeLine = [cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null]
+    .filter(Boolean)
+    .join(" · ");
+  const kindLine = [
+    categoryLabel(category),
+    priceLabel,
+    rating != null
+      ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${userRatingCount != null ? ` (${userRatingCount})` : ""}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
+      {variant === "a" && (
+        <>
       {/* 1. HEADER */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
         {shareNote && <span role="status" className="rounded-pill bg-surface px-2.5 py-1 text-xs font-sans text-text shadow-card">{shareNote}</span>}
@@ -179,7 +206,7 @@ export default function VenueSheet({
             {getCategoryEmoji(category, name)}
           </span>
         )}
-        <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand`}>
+        <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[2.1rem]`}>
           {name}
         </h2>
 
@@ -326,6 +353,93 @@ export default function VenueSheet({
         </div>
       )}
 
+        </>
+      )}
+      {variant === "b" && (
+        <>
+          {/* B (stile Places): foto grande con chiudi e condividi sopra, poi nome grande e righe di contesto. */}
+          <div className="relative">
+            {venue.photoRef ? (
+              <PlacePhoto
+                photoRef={venue.photoRef}
+                alt={name}
+                width={700}
+                priority
+                className="h-72 w-full rounded-t-card object-cover"
+                fallback={<div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>}
+              />
+            ) : (
+              <div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>
+            )}
+            {venue.photoRef && venue.photoAuthor && (
+              <span className="absolute bottom-2 right-3 rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white">Foto: {venue.photoAuthor}</span>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Chiudi"
+              className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
+            >
+              <X size={20} />
+            </button>
+            {shareOn && (
+              <button
+                type="button"
+                onClick={share}
+                aria-label={`Condividi ${name}`}
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
+              >
+                <Share2 size={18} />
+              </button>
+            )}
+          </div>
+          <div className="px-5 pt-5">
+            <h2 className="font-title text-3xl font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.4rem]">
+              {name}
+            </h2>
+            {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
+            {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
+            {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+            {gem && (
+              <span data-testid="gemma" className="mt-3 mr-2 inline-flex rounded-pill bg-accent-light px-3 py-1 text-sm font-display font-semibold text-accent">💎 Poco conosciuto</span>
+            )}
+            {openNow != null && (
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
+                <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
+                {openNow ? "Aperto ora" : "Chiuso ora"}
+              </span>
+            )}
+            {goForChips.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Ci dovresti andare se">
+                {goForChips.map((chip) => (
+                  <span key={chip} className="rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(verdictText != null || synthesis != null) && (
+              <div className="mt-5 border-t border-border pt-4">
+                {verdictText && (
+                  <p className="font-title text-xl font-semibold leading-snug text-brand in-data-[titoli=serif]:text-2xl">{verdictText}</p>
+                )}
+                {synthesis != null && (
+                  <p className="mt-2 text-[15px] font-sans leading-relaxed text-text">{synthesis}</p>
+                )}
+              </div>
+            )}
+            {matchReasonText && (
+              <div className="mt-4 rounded-card bg-accent-light px-4 py-3">
+                <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">✦ Per la tua ricerca</p>
+                <p className="mt-1 text-sm font-sans leading-relaxed text-text">{matchReasonText}</p>
+              </div>
+            )}
+            {dontExpectChips.length > 0 && (
+              <p className="mt-3 text-sm font-sans text-text-muted">Meno adatto se: {dontExpectChips.join(" · ")}</p>
+            )}
+          </div>
+        </>
+      )}
       {/* 3. TAG AI */}
       {hasTags && (
         <div className="mt-4 flex flex-wrap gap-1.5 px-5">
@@ -346,9 +460,27 @@ export default function VenueSheet({
           <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
             Le tue note
           </p>
+          {onVisitStatus && (
+            <div className="mt-2 flex gap-2" data-testid="stato-salvato">
+              {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
+                const on = personalTags?.includes(tag) ?? false;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onVisitStatus(tag)}
+                    className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {hasPersonalTags && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {personalTags!.map((tag) => (
+              {personalTags!.filter((t) => !onVisitStatus || (t !== "Da provare" && t !== "Già visitato")).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
@@ -407,6 +539,7 @@ export default function VenueSheet({
       )}
 
       {/* 7. BARRA AZIONI FLOTTANTE: sempre visibile in fondo alla scheda mentre si scorre. */}
+      {variant === "a" && (
       <div
         className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur"
       >
@@ -416,10 +549,11 @@ export default function VenueSheet({
           href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
           className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white active:scale-95"
         >
-          <Navigation size={16} />
-          Indicazioni
+          {walk != null ? <Footprints size={16} className="shrink-0" /> : <Navigation size={16} className="shrink-0" />}
+          <span className="truncate">{walk != null ? `${walk} min a piedi` : "Indicazioni"}</span>
         </a>
 
         {phone != null && (
@@ -444,6 +578,37 @@ export default function VenueSheet({
           </a>
         )}
       </div>
+      )}
+      {variant === "b" && (
+        /* B: barra scura a riquadri, staccata dal fondo (come Places). */
+        <div className="sticky bottom-[calc(var(--nav-height-mobile)+0.75rem)] z-10 mt-6 flex justify-center px-3">
+          <div className="flex max-w-full items-center gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
+            {saveSlot}
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
+              className={TILE}
+            >
+              {walk != null ? <Footprints size={18} /> : <Navigation size={18} />}
+              {walk != null ? `${walk} min` : "Percorso"}
+            </a>
+            {phone != null && (
+              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} aria-label={`Chiama ${name}`} className={TILE}>
+                <Phone size={18} />
+                Chiama
+              </a>
+            )}
+            {websiteUri != null && (
+              <a href={websiteUri} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={TILE}>
+                <Globe size={18} />
+                Sito
+              </a>
+            )}
+          </div>
+        </div>
+      )}
       {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
       <div aria-hidden style={{ height: "var(--nav-height-mobile)" }} />
     </div>

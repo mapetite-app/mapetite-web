@@ -68,3 +68,13 @@ export function saveRecentSearch(q: string): void {
     // localStorage non disponibile (navigazione privata): si ignora
   }
 }
+
+// Varianti grafiche in prova (?scheda=b, ?home=b, ?pin=b; "a" = attuale, predefinita).
+// Le imposta lo script in layout.tsx su <html data-…>, prima del primo disegno.
+export function useVariant(key: "scheda" | "home" | "pin"): "a" | "b" {
+  return useSyncExternalStore(
+    () => () => {},
+    () => (document.documentElement.dataset[key] === "b" ? "b" : "a"),
+    () => "a",
+  );
+}
