@@ -2,7 +2,8 @@
 
 import { X, Quote, Navigation, Globe, Phone, Check, Share2 } from "lucide-react";
 import { useState } from "react";
-import { useBeta } from "@/lib/beta";
+import { useBeta, useOptIn } from "@/lib/beta";
+import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 
@@ -74,6 +75,7 @@ export default function VenueSheet({
   } = venue;
 
   const shareOn = useBeta("condividi");
+  const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const share = async () => {
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${encodeURIComponent(venue.id)}`;
@@ -123,14 +125,27 @@ export default function VenueSheet({
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
       {/* 1. HEADER */}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Chiudi"
-        className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-text-muted shadow-card hover:text-text"
-      >
-        <X size={18} />
-      </button>
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+        {shareNote && <span role="status" className="rounded-pill bg-surface px-2.5 py-1 text-xs font-sans text-text shadow-card">{shareNote}</span>}
+        {shareOn && (
+          <button
+            type="button"
+            onClick={share}
+            aria-label={`Condividi ${name}`}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-brand shadow-card active:scale-95"
+          >
+            <Share2 size={18} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Chiudi"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-text-muted shadow-card hover:text-text"
+        >
+          <X size={18} />
+        </button>
+      </div>
 
       {venue.photoRef && (
         <PlacePhoto
@@ -142,14 +157,16 @@ export default function VenueSheet({
         />
       )}
       <div className="px-5 pt-5">
-        <span
-          role="img"
-          aria-label={category ?? "locale"}
-          className="text-4xl leading-none"
-        >
-          {getCategoryEmoji(category, name)}
-        </span>
-        <h2 className="mt-2 pr-8 font-display text-2xl font-semibold text-brand">
+        {!venue.photoRef && (
+          <span
+            role="img"
+            aria-label={category ?? "locale"}
+            className="text-4xl leading-none"
+          >
+            {getCategoryEmoji(category, name)}
+          </span>
+        )}
+        <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-display text-2xl font-semibold leading-tight text-brand`}>
           {name}
         </h2>
 
@@ -186,6 +203,11 @@ export default function VenueSheet({
                 {openNow ? "Aperto" : "Chiuso"}
               </span>
             </>
+          )}
+          {gem && (
+            <span data-testid="gemma" className="rounded-pill bg-accent-light px-2 py-0.5 text-xs font-display font-semibold text-accent">
+              💎 Poco conosciuto
+            </span>
           )}
         </div>
 
@@ -369,23 +391,11 @@ export default function VenueSheet({
           href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white active:scale-95"
+          className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white active:scale-95"
         >
           <Navigation size={16} />
           Indicazioni
         </a>
-
-        {shareOn && (
-          <button
-            type="button"
-            onClick={share}
-            aria-label={`Condividi ${name}`}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
-          >
-            <Share2 size={18} />
-          </button>
-        )}
-        {shareNote && <span role="status" className="text-xs font-sans text-text-muted">{shareNote}</span>}
 
         {phone != null && (
           <a
