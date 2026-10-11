@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Inter } from "next/font/google";
+import { Poppins, Inter, Fraunces } from "next/font/google";
 import NavBar from "@/components/nav-bar";
+import TitleVariant from "@/components/title-variant";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -18,9 +19,24 @@ const inter = Inter({
   display: "swap",
 });
 
+// Serif editoriale per la variante ?titoli=serif (decisione grafica aperta, stile Places).
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
+  // Usato solo con ?titoli=serif: niente precaricamento per tutti.
+  preload: false,
+});
+
 export const metadata: Metadata = {
   title: "Mapetite",
-  description: "Trova e salva i tuoi locali preferiti",
+  description: "I locali giusti per te, non quelli di tutti. Scrivi cosa cerchi come lo diresti a un amico.",
+  openGraph: {
+    title: "Mapetite",
+    description: "I locali giusti per te, non quelli di tutti.",
+    locale: "it_IT",
+    type: "website",
+  },
   applicationName: "Mapetite",
   appleWebApp: {
     capable: true,
@@ -48,9 +64,10 @@ export default async function RootLayout({
   return (
     <html
       lang="it"
-      className={`${poppins.variable} ${inter.variable} h-full antialiased`}
+      className={`${poppins.variable} ${inter.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <TitleVariant />
         <NavBar userId={userId} />
         {/*
           Pagine normali (non fixed): pb-16 evita che il contenuto finisca

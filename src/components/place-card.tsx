@@ -1,4 +1,5 @@
 import { getCategoryEmoji } from "@/lib/emoji";
+import { categoryLabel } from "@/lib/category-label";
 
 type PlaceCardProps = {
   name: string;
@@ -25,7 +26,7 @@ export default function PlaceCard({ name, category, address, tags, note }: Place
         </p>
 
         {category && (
-          <p className="text-sm text-text-muted mt-0.5 truncate">{category}</p>
+          <p className="text-sm text-text-muted mt-0.5 truncate">{categoryLabel(category)}</p>
         )}
 
         {address && (

@@ -15,7 +15,7 @@ type GooglePlace = {
   editorialSummary?: { text?: string };
   reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
   nationalPhoneNumber?: string;
-  photos?: { name: string }[];
+  photos?: { name: string; authorAttributions?: { displayName?: string }[] }[];
 };
 
 type GoogleSearchTextResponse = {
@@ -39,6 +39,7 @@ export type PlaceResult = {
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
   phone: string | null;
   photoRef: string | null;   // il campo "name" della PRIMA foto, o null
+  photoAuthor?: string | null; // autore della prima foto: Google chiede di mostrarlo
 };
 
 export type SearchOptions = {
@@ -195,6 +196,7 @@ export async function searchGooglePlaces(
     })(),
     phone: place.nationalPhoneNumber ?? null,
     photoRef: place.photos?.[0]?.name ?? null,
+    photoAuthor: place.photos?.[0]?.authorAttributions?.[0]?.displayName ?? null,
   }));
 
   const filtered = mapped.filter((p) => {

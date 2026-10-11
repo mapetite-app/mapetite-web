@@ -10,10 +10,14 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
-import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
-import { SlidersHorizontal, Sparkles } from "lucide-react";
+import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
+import PlacePhoto from "@/components/place-photo";
+import InstallHint from "@/components/install-hint";
+import DragToClose from "@/components/drag-to-close";
+import { LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
+import { momentSuggestion } from "@/lib/moment";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -289,6 +293,25 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
   });
 }
 
+// Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
+// nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
+type MapStyleApi = {
+  getStyle: () => { layers?: { id: string }[] } | undefined;
+  getLayoutProperty: (id: string, k: string) => unknown;
+  setLayoutProperty: (id: string, k: string, v: string) => void;
+};
+function hidePoiLabels(map: MapStyleApi) {
+  try {
+    for (const layer of map.getStyle()?.layers ?? []) {
+      if (/poi-label|transit-label/.test(layer.id) && map.getLayoutProperty(layer.id, "visibility") !== "none") {
+        map.setLayoutProperty(layer.id, "visibility", "none");
+      }
+    }
+  } catch {
+    // stile non pronto: resta com'è
+  }
+}
+
 export type Place = {
   id: string;
   name: string;
@@ -419,7 +442,11 @@ type VenueDetails = {
   dontExpect: string[] | null;
   matchReason: string | null;
   photoRef?: string | null;
+  photoAuthor?: string | null;
 };
+
+const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
+const PANEL_EXAMPLES = ["Aperitivo con vista", "Pizza napoletana vera", "Cena tranquilla per due", "Brunch nel weekend"];
 
 function AISearchPanel({
   onSubmit,
@@ -430,6 +457,7 @@ function AISearchPanel({
   activeCount,
   query,
   setQuery,
+  recent = [],
 }: {
   onSubmit: (q: string) => void;
   isSearching: boolean;
@@ -439,6 +467,7 @@ function AISearchPanel({
   activeCount: number | null;
   query: string;
   setQuery: (q: string) => void;
+  recent?: string[];
 }) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -453,13 +482,15 @@ function AISearchPanel({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cerca con parole tue: una trattoria autentica vicino casa…"
-          className="flex-1 min-w-0 rounded-btn border border-border px-3 py-1.5 text-sm font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
+          placeholder="Cosa cerchi?"
+          enterKeyHint="search"
+          autoFocus={query === ""}
+          className="min-h-11 flex-1 min-w-0 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
         />
         <button
           type="submit"
           disabled={isSearching}
-          className="shrink-0 rounded-btn bg-brand px-3 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="min-h-11 shrink-0 rounded-btn bg-brand px-4 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSearching ? "..." : "Cerca"}
         </button>
@@ -483,6 +514,26 @@ function AISearchPanel({
       )}
 
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
+
+      {/* Aggiunte rapide: con una ricerca attiva affinano la frase, altrimenti sono esempi. */}
+      {!isSearching && (
+        <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]" data-testid="aggiunte-rapide">
+          {(activeFiltri !== null ? REFINEMENTS : [...recent.map((r) => `↻ ${r}`), ...PANEL_EXAMPLES].slice(0, 6)).map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => {
+                const next = activeFiltri !== null ? `${query.trim()} ${chip.replace(/^\+ /, "")}` : chip.replace(/^↻ /, "");
+                setQuery(next);
+                onSubmit(next);
+              }}
+              className="min-h-9 shrink-0 rounded-pill border border-border bg-white px-3 text-xs font-display font-medium text-text active:scale-95"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
 
       {activeFiltri !== null && !isSearching && (
         <p className="mt-2 text-sm font-sans text-text-muted">
@@ -520,6 +571,8 @@ export default function MapView({
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
   const [activeCity, setActiveCity] = useState<string | null>(null);
+  // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
@@ -528,12 +581,32 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
+  // Variante della mappa da far scegliere: ?mappa=chiara (grigia stile Places), resta sul telefono.
+  const mapVariant = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const v = new URLSearchParams(window.location.search).get("mappa");
+      try {
+        if (v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
+        return window.localStorage.getItem("mapetite.mappa") ?? "standard";
+      } catch {
+        return v ?? "standard";
+      }
+    },
+    () => "standard",
+  );
   // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
   // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
   const listVariant = useSyncExternalStore(
     () => () => {},
     () => (new URLSearchParams(window.location.search).get("lista") === "a" ? "a" : "b"),
     () => "b" as const,
+  );
+  // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
+  const momentExample = useSyncExternalStore(
+    () => () => {},
+    () => momentSuggestion(new Date()),
+    () => null,
   );
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
@@ -588,6 +661,16 @@ export default function MapView({
   );
   const dispatch = (action: OverlayAction) =>
     dispatchRaw({ action, ctx: { hasResults: displayedPlaces.length > 0 } });
+
+  // Carosello B aperto: il pin della card al centro (di default la prima) è evidenziato.
+  const carouselOpen = overlay.kind === "list" && listVariant === "b";
+  // Ordine delle card come le vede l'utente (dopo filtri rapidi e "Più vicini"), riportato dal carosello.
+  const [carouselOrder, setCarouselOrder] = useState<string[]>([]);
+  const focusId = !carouselOpen
+    ? null
+    : focusedId && carouselOrder.includes(focusedId)
+      ? focusedId
+      : carouselOrder[0] ?? null;
 
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
@@ -700,7 +783,7 @@ export default function MapView({
     (async () => {
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id)")
+        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
         .eq("user_id", userId);
 
       setLoadingSaved(false);
@@ -713,11 +796,12 @@ export default function MapView({
       const fetched = (data ?? [])
         .map((row) => {
           // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
-          const raw = row.places as unknown as (Place & { google_place_id?: string | null }) | null;
+          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null }) | null;
           if (!raw || raw.lat == null || raw.lng == null) return null;
-          const { google_place_id, ...place } = raw;
+          const { google_place_id, price_level, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
-          return { ...place, tags: row.tags as string[] | null, note: row.note as string | null };
+          // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null };
         })
         .filter((p): p is Place => p !== null);
 
@@ -837,7 +921,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -856,10 +940,14 @@ export default function MapView({
           dontExpect: p.dontExpect ?? null,
           matchReason: p.matchReason ?? null,
           photoRef: p.photoRef ?? null,
+          photoAuthor: p.photoAuthor ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setVenueDetails(details);
+      // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
+      setQuickFilters(new Set());
+      setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });
     } catch {
       setFilterError("Ricerca non riuscita. Riprova.");
@@ -898,6 +986,16 @@ export default function MapView({
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     return clusterIndex.getClusters(bbox, roundedZoom);
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces]);
+
+  // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
+  const panIntoView = (place: Place) => {
+    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
+    if (!map || typeof window === "undefined") return;
+    const { innerWidth: w, innerHeight: h } = window;
+    const pt = map.project([place.lng, place.lat]);
+    if (pt.x > 30 && pt.x < w - 30 && pt.y > 140 && pt.y < h * 0.5) return;
+    map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
+  };
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
   const fitToPlaces = (list: Place[], top = 150) => {
@@ -944,7 +1042,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({
@@ -974,6 +1072,7 @@ export default function MapView({
             dontExpect: p.dontExpect ?? null,
             matchReason: p.matchReason ?? null,
             photoRef: p.photoRef ?? null,
+            photoAuthor: p.photoAuthor ?? null,
           };
         }
         const id = ++searchSeq.current;
@@ -1006,7 +1105,12 @@ export default function MapView({
         setGeoState("idle");
         setWelcomeDismissed(true);
       },
-      (err) => setGeoState(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable"),
+      (err) => {
+        const denied = err.code === err.PERMISSION_DENIED;
+        setGeoState(denied ? "denied" : "unavailable");
+        // A card iniziale chiusa il messaggio non si vedrebbe: avviso in sovrimpressione.
+        if (welcomeDismissed) setFilterError(denied ? "Posizione non permessa: attivala nelle impostazioni del browser" : "Posizione non disponibile ora");
+      },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
     );
   };
@@ -1046,8 +1150,37 @@ export default function MapView({
     }
   };
 
+  // /mappa?q=... (dalla home o da un link condiviso): la ricerca parte da sola, una volta.
+  const autoQueryDone = useRef(false);
+  useEffect(() => {
+    if (autoQueryDone.current) return;
+    autoQueryDone.current = true;
+    const q = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (!q || q.length < 3) return;
+    // rimandato di un istante: niente setState sincrono dentro l'effetto
+    setTimeout(() => {
+      setAiQuery(q);
+      void runAISearch(q.slice(0, 200));
+    }, 0);
+    // Tolto dall'indirizzo: ricaricare la pagina non deve rifare (e ripagare) la ricerca.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="fixed inset-0 md:top-14">
+      {/* Torna alla mia posizione: sempre raggiungibile, anche dopo aver chiuso la card iniziale. */}
+      <button
+        type="button"
+        onClick={goToMyPosition}
+        disabled={geoState === "loading"}
+        aria-label="La mia posizione"
+        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60"
+      >
+        <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
+      </button>
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
       <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
         {/* Riga icone: Concierge AI + Filtri */}
@@ -1058,6 +1191,7 @@ export default function MapView({
               // La ricerca AI resta: si azzera solo con ✕ o passando ai filtri.
               dispatch({ type: overlay.kind === "ai" ? "CLOSE" : "OPEN_AI" });
             }}
+            aria-label="Ricerca con l'AI"
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
             <Sparkles size={20} className="text-brand" />
@@ -1095,6 +1229,7 @@ export default function MapView({
               onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
+              recent={recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : []}
             />
           </div>
         )}
@@ -1135,8 +1270,8 @@ export default function MapView({
             <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
               <button
                 type="button"
-                onClick={() => { setActiveTag(null); setActiveCity(null); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
-                className={`shrink-0 ${activeTag === null && activeCity === null ? CHIP_ON : CHIP_OFF}`}
+                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                className={`shrink-0 ${!savedFiltered ? CHIP_ON : CHIP_OFF}`}
               >
                 Tutti
               </button>
@@ -1228,6 +1363,24 @@ export default function MapView({
                       ? "Inizia a salvare i posti che vuoi ricordare"
                       : "Sposta la mappa o cambia vista"}
               </p>
+              {aiSearch !== null && (
+                <div className="mt-4 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "OPEN_AI" })}
+                    className="min-h-11 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+                  >
+                    Correggi la ricerca
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAiSearch(null); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                    className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
+                  >
+                    Vedi esempi
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1241,7 +1394,7 @@ export default function MapView({
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
-              <p className="font-display text-base font-semibold text-brand">Cosa cerchi?</p>
+              <p className="font-title text-lg font-semibold text-brand">Cosa cerchi?</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
@@ -1264,6 +1417,18 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {momentExample && (
+                <button
+                  key="momento"
+                  type="button"
+                  data-testid="suggerimento-momento"
+                  disabled={aiSearching}
+                  onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setAiQuery(q); void runAISearch(q); }}
+                  className="min-h-11 shrink-0 rounded-pill border border-brand/40 bg-white px-3.5 text-sm font-sans font-semibold text-brand active:scale-95 disabled:opacity-60"
+                >
+                  {momentExample}
+                </button>
+              )}
               {[
                 "Rooftop romantico per due a Roma",
                 "Trattoria autentica non turistica a Trastevere",
@@ -1289,13 +1454,31 @@ export default function MapView({
             )}
             {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
             <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "OPEN_AI" })}
-                className="min-h-11 flex-1 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito. */}
+              <form
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-brand pl-3.5 pr-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = aiQuery.trim();
+                  if (q.length >= 3 && !aiSearching) void runAISearch(q);
+                }}
               >
-                Scrivi la tua ricerca
-              </button>
+                <Sparkles size={16} className="shrink-0 text-accent" aria-hidden />
+                <input
+                  type="search"
+                  enterKeyHint="search"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  placeholder="Scrivi cosa cerchi…"
+                  aria-label="Scrivi cosa cerchi"
+                  className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-white placeholder:text-white/70 focus:outline-none"
+                />
+                {aiQuery.trim().length >= 3 && (
+                  <button type="submit" disabled={aiSearching} aria-label="Cerca" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white active:scale-95 disabled:opacity-60">
+                    →
+                  </button>
+                )}
+              </form>
               <button
                 type="button"
                 onClick={goToMyPosition}
@@ -1306,6 +1489,8 @@ export default function MapView({
                 {geoState === "loading" ? "Cerco…" : "📍 Dove sono"}
               </button>
             </div>
+            {/* Solo a chi torna (ha già cercato): al primo accesso conta la ricerca. */}
+            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && <InstallHint />}
             {(geoState === "denied" || geoState === "unavailable") && (
               <p className="mt-2 text-xs font-sans text-text-muted">
                 {geoState === "denied"
@@ -1323,7 +1508,7 @@ export default function MapView({
           <button
             type="button"
             disabled={aiSearching}
-            onClick={() => { void runAISearch(aiQuery.trim()); }}
+            onClick={() => { const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q); }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
             {aiSearching ? "Cerco…" : "Cerca in quest'area"}
@@ -1338,7 +1523,11 @@ export default function MapView({
         onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        onStyleData={() => {
+          const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
+          if (map) hidePoiLabels(map);
+        }}
         onClick={() => { setClusterPlaces(null); setFilterError(null); dispatch({ type: "CLOSE" }); }}
       >
         {clusters.map((c) => {
@@ -1386,18 +1575,36 @@ export default function MapView({
               anchor="bottom"
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
+                // Con il carosello aperto il primo tocco porta la card al centro,
+                // il secondo apre la scheda.
+                if (carouselOpen && focusId !== place.id && carouselOrder.includes(place.id)) {
+                  setFocusedId(place.id);
+                  return;
+                }
                 dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
+              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 2 : 1 }}
             >
-              <div className="flex cursor-pointer flex-col items-center" data-testid="pin">
+              <div className="flex cursor-pointer flex-col items-center" data-testid="pin" data-focused={focusId === place.id ? "true" : undefined}>
                 <span
                   role="img"
                   aria-label={place.category ?? "locale"}
-                  className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
-                    selected?.id === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
+                  className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                    selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                   }`}
                 >
-                  {getCategoryEmoji(place.category, place.name)}
+                  {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
+                  {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                    <PlacePhoto
+                      photoRef={venueDetails[place.id]?.photoRef}
+                      alt=""
+                      width={500}
+                      className="h-full w-full rounded-full object-cover"
+                      fallback={getCategoryEmoji(place.category, place.name)}
+                    />
+                  ) : (
+                    getCategoryEmoji(place.category, place.name)
+                  )}
                 </span>
                 {(aiSearch !== null || viewState.zoom >= 14 || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
@@ -1409,12 +1616,21 @@ export default function MapView({
           );
         })}
 
+        {userPos && (
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
+            <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
+              <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
+            </span>
+          </Marker>
+        )}
       </Map>
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
-          <div className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
+          <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
+              origin={userPos ?? searchOrigin}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
                 category: selected.category, rating: selected.rating,
@@ -1517,7 +1733,7 @@ export default function MapView({
                 </>
               }
             />
-          </div>
+          </DragToClose>
         </div>
       )}
 
@@ -1593,6 +1809,18 @@ export default function MapView({
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
+          heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
+          focusedId={focusId}
+          onOrder={setCarouselOrder}
+          onRefine={() => dispatch({ type: "OPEN_AI" })}
+          isSaved={isPlaceSaved}
+          onSave={aiSearch !== null && view === "all" ? (place) => {
+            if (!userId) { window.location.href = "/login"; return; }
+            // Già salvato: la scheda permette di modificarlo o rimuoverlo.
+            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
+            setPendingSavePlaceId(place.id);
+          } : undefined}
+          onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);

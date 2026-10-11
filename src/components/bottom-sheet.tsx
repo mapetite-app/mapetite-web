@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
-import { useBeta } from "@/lib/beta";
+import { useBeta, useOptIn } from "@/lib/beta";
+import { isGem } from "@/lib/gem";
+import { categoryLabel } from "@/lib/category-label";
+import { distanceLabel, distanceM } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
-const PHOTO_CARDS = 6;
+export const PHOTO_CARDS = 6;
 const NO_MATCH = "Nessun locale con questi filtri: togline qualcuno.";
 
 export interface BottomSheetProps {
@@ -27,6 +30,18 @@ export interface BottomSheetProps {
   onToggleQuick?: (f: QuickFilter) => void;
   // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
   title?: string | null;
+  // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
+  focusedId?: string | null;
+  onFocus?: (place: Place) => void;
+  // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
+  onOrder?: (ids: string[]) => void;
+  // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
+  heading?: string | null;
+  // Riapre il pannello di ricerca con la frase attuale, per correggerla.
+  onRefine?: () => void;
+  // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
+  isSaved?: (id: string) => boolean;
+  onSave?: (place: Place) => void;
 }
 
 export type ListDetails = {
@@ -39,7 +54,7 @@ export type ListDetails = {
 };
 
 function prettyCategory(c: string | null): string | null {
-  return c ? c.replace(/_/g, " ") : null;
+  return categoryLabel(c);
 }
 
 function priceLabel(level: number | null): string | null {
@@ -49,17 +64,6 @@ function priceLabel(level: number | null): string | null {
 function formatCount(n: number | null): string | null {
   if (n == null) return null;
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
-}
-
-function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
-  const R = 6371000;
-  const rad = (x: number) => (x * Math.PI) / 180;
-  const a =
-    Math.sin(rad(to.lat - from.lat) / 2) ** 2 +
-    Math.cos(rad(from.lat)) * Math.cos(rad(to.lat)) * Math.sin(rad(to.lng - from.lng) / 2) ** 2;
-  const m = 2 * R * Math.asin(Math.sqrt(a));
-  if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;
-  return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
 // Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
@@ -123,14 +127,26 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
-  const quickFiltersOn = useBeta("filtri-lista");
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, heading = null }: BottomSheetProps) {
+  // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
+  // ("Aperto ora" nasconderebbe tutto).
+  const quickFiltersOn = useBeta("filtri-lista") && details != null;
+  const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
-  const places = useMemo(
-    () => (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces),
-    [allPlaces, quick, quickFiltersOn, details],
-  );
+  // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
+  const [nearestFirst, setNearestFirst] = useState(false);
+  const [shared, setShared] = useState(false);
+  const places = useMemo(() => {
+    const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
+    if (!nearestFirst || !origin) return list;
+    return [...list].sort((a, b) => distanceM(origin, a) - distanceM(origin, b));
+  }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
+  const orderKey = places.map((p) => p.id).join(",");
+  useEffect(() => {
+    onOrder?.(orderKey ? orderKey.split(",") : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderKey]);
   const toggleQuick = (f: QuickFilter) => {
     if (onToggleQuick) return onToggleQuick(f);
     setQuickLocal((prev) => {
@@ -140,6 +156,40 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       return next;
     });
   };
+  // Carosello B collegato alla mappa: scorrendo, la card al centro diventa
+  // quella "a fuoco"; se il fuoco arriva da fuori (tocco su un pin) il carosello
+  // scorre fino alla card.
+  const carouselRef = useRef<HTMLUListElement>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const centeredId = () => {
+    const ul = carouselRef.current;
+    if (!ul) return null;
+    const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
+    let best: { id: string; d: number } | null = null;
+    for (const li of Array.from(ul.children) as HTMLElement[]) {
+      const r = li.getBoundingClientRect();
+      const d = Math.abs(r.left + r.width / 2 - mid);
+      if (!best || d < best.d) best = { id: li.dataset.id ?? "", d };
+    }
+    return best?.id ?? null;
+  };
+  const onCarouselScroll = () => {
+    if (!onFocus) return;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const id = centeredId();
+      const place = places.find((p) => p.id === id);
+      if (place && id !== focusedId) onFocus(place);
+    }, 140);
+  };
+  useEffect(() => {
+    const ul = carouselRef.current;
+    if (!ul || !focusedId || centeredId() === focusedId) return;
+    const li = Array.from(ul.children).find((el) => (el as HTMLElement).dataset.id === focusedId) as HTMLElement | undefined;
+    if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
+  }, [focusedId]);
+  useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
+
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -256,7 +306,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (allPlaces.length === 0) return null;
 
   const quickChips = (
-    <div className="flex flex-wrap gap-2" data-testid="filtri-lista">
+    <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0" data-testid="filtri-lista">
       {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
@@ -268,6 +318,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
+      {origin && (
+        <button
+          type="button"
+          aria-pressed={nearestFirst}
+          onClick={() => setNearestFirst((v) => !v)}
+          className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium shadow-card ${nearestFirst ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+        >
+          Più vicini
+        </button>
+      )}
     </div>
   );
 
@@ -278,21 +338,51 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0">
             {title && (
-              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-base font-semibold leading-snug text-brand first-letter:uppercase">
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
               </p>
             )}
+            {!title && heading && (
+              <p data-testid="intestazione-lista" className="truncate font-title text-base font-semibold leading-snug text-brand">{heading}</p>
+            )}
             <p className="text-xs font-sans text-text-muted">
               {title
-                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
-                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
+                : heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
+          {title && (
+            <button
+              type="button"
+              aria-label="Condividi questa ricerca"
+              onClick={async () => {
+                const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}`;
+                try {
+                  if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
+                  else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
+                } catch {
+                  // foglio di condivisione chiuso: niente da segnalare
+                }
+              }}
+              className="-my-1 ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
+            >
+              {shared ? "✓" : (
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                </svg>
+              )}
+            </button>
+          )}
+          {title && onRefine && (
+            <button type="button" onClick={onRefine} className="-my-1 ml-2 min-h-9 shrink-0 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95">
+              Affina
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-1 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
         </div>
@@ -300,11 +390,24 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
         )}
-        <ul className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
           {places.map((place) => {
             const d = details?.[place.id];
             return (
-              <li key={place.id} className="w-[78vw] max-w-sm shrink-0 snap-center">
+              <li key={place.id} data-id={place.id} className="relative w-[78vw] max-w-sm shrink-0 snap-center">
+                {onSave && (
+                  <button
+                    type="button"
+                    onClick={() => onSave(place)}
+                    aria-label={isSaved?.(place.id) ? `${place.name} è tra i salvati` : `Salva ${place.name}`}
+                    aria-pressed={isSaved?.(place.id) ?? false}
+                    className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-btn bg-white/20 text-white backdrop-blur active:scale-95"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill={isSaved?.(place.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path strokeLinejoin="round" d="M6 3.75h12a.75.75 0 0 1 .75.75v16.19l-6.75-4.5-6.75 4.5V4.5A.75.75 0 0 1 6 3.75Z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onSelect(place)}
@@ -320,11 +423,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="relative flex flex-1 flex-col">
                     <span className="flex items-start justify-between gap-2">
                       <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
-                      {d?.openNow === true && (
-                        <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
-                      )}
+                      <span className={`flex flex-wrap justify-end gap-1 ${onSave ? "pr-11" : ""}`}>
+                        {gemsOn && isGem(place.rating, d?.userRatingCount) && (
+                          <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                        )}
+                        {d?.openNow === true && (
+                          <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
+                        )}
+                      </span>
                     </span>
-                    <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
+                    <span className="mt-3 line-clamp-2 text-lg font-title font-semibold leading-snug">{place.name}</span>
                     <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
                       {metaLine(place, d, origin)}
                     </span>
@@ -397,14 +505,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <div className="flex items-start justify-between px-1 pb-2">
           <div className="min-w-0">
             {title && (
-              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-lg font-semibold leading-snug text-brand first-letter:uppercase">
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-lg font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
               </p>
             )}
             <p className="text-xs font-sans text-text-muted">
               {title
-                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
-                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
+                : heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>
@@ -439,7 +547,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-display font-semibold leading-snug text-text">
+                  <span className="block truncate text-[15px] font-title font-semibold leading-snug text-text">
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
@@ -447,6 +555,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
+                      </span>
+                    )}
+                    {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount) && (
+                      <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-1.5 py-0.5 text-[10px] font-display font-semibold text-accent">
+                        💎 Poco conosciuto
                       </span>
                     )}
                   </span>
