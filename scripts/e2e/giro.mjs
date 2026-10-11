@@ -335,6 +335,29 @@ await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
 ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
 await shot("19-importa");
 
+// 7d. Suggerimento "Aggiungi alla schermata Home" (proposta, ?beta=installa) su iPhone
+const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2,
+  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+await ictx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+await ictx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+await ictx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+const ip = await ictx.newPage();
+const searchExample = async (url) => {
+  await ip.goto(url, { waitUntil: "networkidle" });
+  await ip.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await ip.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+  await ip.waitForTimeout(2000);
+};
+await searchExample(`${BASE}/mappa`);
+ok((await ip.getByTestId("installa").count()) === 0, "installa: spento di default");
+await searchExample(`${BASE}/mappa?beta=installa`);
+ok(await ip.getByText("Aggiungi alla schermata Home", { exact: false }).isVisible(), "installa: su iPhone spiega come aggiungerla alla Home dopo la prima ricerca");
+await ip.screenshot({ path: `${OUT}/21-installa.png` });
+await ip.getByLabel("Chiudi suggerimento").click();
+await searchExample(`${BASE}/mappa?beta=installa`);
+ok((await ip.getByTestId("installa").count()) === 0, "installa: chiuso una volta, non ricompare");
+await ictx.close();
+
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
 const fb = page.getByRole("link", { name: "Feedback" });

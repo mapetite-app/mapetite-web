@@ -11,6 +11,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
 import PlacePhoto from "@/components/place-photo";
+import InstallHint from "@/components/install-hint";
 import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useBetaOptIn, useVariant } from "@/lib/beta";
@@ -653,6 +654,7 @@ export default function MapView({
   };
 
   const shareSearchOn = useBetaOptIn("condividi-ricerca");
+  const installOn = useBetaOptIn("installa");
   const [shareSearchNote, setShareSearchNote] = useState<string | null>(null);
   const shareSearch = async (q: string) => {
     const origin = searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude };
@@ -1466,6 +1468,8 @@ export default function MapView({
           </div>
         </div>
       )}
+
+      {installOn && <InstallHint ready={aiSearch !== null} />}
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
       {aiSearch !== null && movedSinceSearch && aiQuery.trim() !== "" && (overlay.kind === "list" || overlay.kind === "none") && (

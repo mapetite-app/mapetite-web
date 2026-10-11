@@ -22,7 +22,8 @@ export function useBeta(flag: BetaFlag): boolean {
 
 // Proposte nuove (Fase 4): SPENTE di default, si accendono solo elencandole, es. ?beta=condividi-ricerca
 //   condividi-ricerca  pulsante "Condividi" sul titolo della risposta: link che rifà la stessa ricerca
-export type OptInFlag = "condividi-ricerca";
+//   installa           dopo la prima ricerca, suggerimento "Aggiungi alla schermata Home"
+export type OptInFlag = "condividi-ricerca" | "installa";
 
 export function useBetaOptIn(flag: OptInFlag): boolean {
   const raw = useSyncExternalStore(() => () => {}, readFlags, () => EMPTY);
