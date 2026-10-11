@@ -13,6 +13,7 @@ import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
+import DragToClose from "@/components/drag-to-close";
 import { LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
@@ -1627,7 +1628,7 @@ export default function MapView({
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
-          <div className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
+          <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               origin={userPos ?? searchOrigin}
               venue={{
@@ -1732,7 +1733,7 @@ export default function MapView({
                 </>
               }
             />
-          </div>
+          </DragToClose>
         </div>
       )}
 

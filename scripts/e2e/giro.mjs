@@ -126,6 +126,19 @@ ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
 await shot("04-scheda");
 
+// 4a. Scheda: trascinando verso il basso si chiude
+await page.getByTestId("scheda-trascinabile").evaluate((el) => {
+  const t = (y) => new Touch({ identifier: 1, target: el, clientX: 200, clientY: y });
+  el.dispatchEvent(new TouchEvent("touchstart", { touches: [t(300)], bubbles: true }));
+  el.dispatchEvent(new TouchEvent("touchmove", { touches: [t(380)], bubbles: true }));
+  el.dispatchEvent(new TouchEvent("touchmove", { touches: [t(480)], bubbles: true }));
+  el.dispatchEvent(new TouchEvent("touchend", { touches: [], bubbles: true }));
+});
+await page.waitForTimeout(400);
+ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "scheda: trascinata verso il basso si chiude");
+await page.getByText("Terrazza Uno").first().click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+
 // 4b. Funzioni beta spente di default
 ok((await page.getByLabel(/Condividi/).count()) === 1, "condividi: pulsante presente nella scheda (acceso di default)");
 
