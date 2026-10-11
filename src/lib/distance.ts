@@ -11,9 +11,6 @@ export function distanceMeters(from: Point, to: Point): number {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-// Nome breve usato dalla lista ("Più vicini").
-export const distanceM = distanceMeters;
-
 export function distanceLabel(from: Point, to: Point): string {
   const m = distanceMeters(from, to);
   if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;

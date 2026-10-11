@@ -19,6 +19,7 @@ import { loadRecentSearches, saveRecentSearch, useBeta, useVariant } from "@/lib
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
+import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -418,16 +419,24 @@ type AIFiltri = {
   categoria: string | null;
   parole_chiave: string[];
   vicino_a_me: boolean;
+  zona?: string | null;
 };
 
 // Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
 type PendingSynthesis = { places: unknown[]; token: string };
 
-function buildAISummary(filtri: AIFiltri): string {
+// Cosa ha capito la ricerca: tipo, requisiti, "vicino a te" o la zona nominata.
+function filtriParts(filtri: AIFiltri): string[] {
   const parts: string[] = [];
-  if (filtri.categoria) parts.push(filtri.categoria);
+  if (filtri.categoria) parts.push(categoryLabel(filtri.categoria) as string);
   parts.push(...filtri.parole_chiave);
   if (filtri.vicino_a_me) parts.push("vicino a te");
+  else if (filtri.zona) parts.push(`a ${filtri.zona}`);
+  return parts;
+}
+
+function buildAISummary(filtri: AIFiltri): string {
+  const parts = filtriParts(filtri);
   return "Ho cercato: " + (parts.length > 0 ? parts.join(" · ") : "qualsiasi locale");
 }
 
@@ -583,6 +592,27 @@ export default function MapView({
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
   const [activeCity, setActiveCity] = useState<string | null>(null);
+  // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
+  const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    createClient()
+      .from("profiles")
+      .select("cuisines, occasions, atmospheres, price_range")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        setTasteSuggestion(tasteQuery({
+          cuisines: (data.cuisines as string[] | null) ?? [],
+          occasions: (data.occasions as string[] | null) ?? [],
+          atmospheres: (data.atmospheres as string[] | null) ?? [],
+          priceRange: (data.price_range as string | null) ?? null,
+        }));
+      });
+    return () => { alive = false; };
+  }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
@@ -631,7 +661,13 @@ export default function MapView({
     () => "[]",
   );
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
-  const homeVariant = useVariant("home");
+  // Variante del primo accesso: sul server non è nota (sta nel telefono), quindi la card
+  // compare solo dopo l'avvio sul telefono, senza mostrare per un attimo quella sbagliata.
+  const homeVariant = useSyncExternalStore(
+    () => () => {},
+    () => (document.documentElement.dataset.home === "b" ? "b" : "a"),
+    () => null,
+  );
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
@@ -880,20 +916,30 @@ export default function MapView({
 
   // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
+  const visitBusy = useRef(false);
   const setVisitStatus = async (placeId: string, status: VisitStatus) => {
     const uuid = resolveUuid(placeId);
-    if (!userId || !uuid) return;
-    const current = savedPlaces.find((p) => p.id === uuid);
-    const base = (current?.tags ?? []).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
-    const had = current?.tags?.includes(status) ?? false;
-    const tags = had ? base : [...base, status];
-    const { error } = await createClient()
-      .from("saved_places")
-      .update({ tags })
-      .eq("user_id", userId)
-      .eq("place_id", uuid);
-    if (error) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
-    setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
+    if (!userId || !uuid || visitBusy.current) return;
+    visitBusy.current = true;
+    try {
+      const supabase = createClient();
+      // Tag attuali: dalla lista dei salvati, o dal database se lì non c'è (mai scrivere alla cieca).
+      let currentTags = savedPlaces.find((p) => p.id === uuid)?.tags ?? null;
+      if (currentTags === null) {
+        const { data, error } = await supabase
+          .from("saved_places").select("tags").eq("user_id", userId).eq("place_id", uuid).maybeSingle();
+        if (error || !data) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
+        currentTags = (data.tags as string[] | null) ?? [];
+      }
+      const base = currentTags.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+      const tags = currentTags.includes(status) ? base : [...base, status];
+      const previous = savedPlaces;
+      setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
+      const { error } = await supabase.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", uuid);
+      if (error) { setSavedPlaces(previous); setFilterError("Non sono riuscito a salvare: riprova."); }
+    } finally {
+      visitBusy.current = false;
+    }
   };
 
   const CATEGORY_QUERY: Record<string, string> = {
@@ -1200,9 +1246,13 @@ export default function MapView({
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q")?.trim().slice(0, 200);
-    if (!q) return;
-    const [lat, lng] = (params.get("at") ?? "").split(",").map(Number);
-    const center = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && params.get("at")
+    // meno di 3 caratteri: link troncato o sbagliato, niente ricerca a pagamento
+    if (!q || q.length < 3) return;
+    const atParts = (params.get("at") ?? "").split(",");
+    const [lat, lng] = atParts.map(Number);
+    // entrambe le coordinate scritte davvero (Number("") varrebbe 0: Golfo di Guinea)
+    const center = atParts.length === 2 && atParts.every((x) => x.trim() !== "") &&
+      Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
       ? { lat, lng }
       : undefined;
     params.delete("q");
@@ -1293,7 +1343,7 @@ export default function MapView({
                 : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
-            Tutti i locali
+            Esplora
           </button>
           <button
             type="button"
@@ -1410,9 +1460,18 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
-                      ? "Inizia a salvare i posti che vuoi ricordare"
+                      ? "Tocca il segnalibro su un locale per ritrovarlo qui, con note e tag."
                       : "Sposta la mappa o cambia vista"}
               </p>
+              {aiSearch === null && view === "saved" && !savedFiltered && (
+                <button
+                  type="button"
+                  onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                  className="mt-4 min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
+                >
+                  Cerca un locale
+                </button>
+              )}
               {aiSearch !== null && (
                 <div className="mt-4 flex justify-center gap-2">
                   <button
@@ -1555,6 +1614,18 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {tasteSuggestion && (
+                <button
+                  key="per-te"
+                  type="button"
+                  data-testid="suggerimento-per-te"
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
+                  className="min-h-11 shrink-0 rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white active:scale-95 disabled:opacity-60"
+                >
+                  ✨ Per te: {tasteSuggestion}
+                </button>
+              )}
               {momentExample && (
                 <button
                   key="momento"
@@ -1781,6 +1852,7 @@ export default function MapView({
           <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               origin={userPos ?? searchOrigin}
+              googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
                 category: selected.category, rating: selected.rating,
@@ -1931,6 +2003,29 @@ export default function MapView({
         />
       )}
 
+      {/* Ricerca in corso senza card iniziale (link ?q=, home): card fantasma come Places, la mappa non resta muta. */}
+      {aiSearching && aiSearch === null && welcomeDismissed && overlay.kind === "none" && (
+        <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: "var(--nav-height-mobile)" }}>
+          <div className="mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface px-4 py-2 shadow-float">
+            <p className="truncate font-title text-base font-semibold text-brand first-letter:uppercase">{aiQuery}</p>
+            <p className="flex items-center gap-2 text-xs font-sans text-text-muted">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-accent" />
+              Cerco i posti giusti…
+            </p>
+          </div>
+          <div className="flex gap-3 overflow-hidden px-3 pb-3">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-[190px] w-[78vw] max-w-sm shrink-0 animate-pulse rounded-card bg-brand/80 p-4 shadow-float">
+                <div className="h-7 w-7 rounded-full bg-white/20" />
+                <div className="mt-4 h-5 w-2/3 rounded bg-white/25" />
+                <div className="mt-2 h-3 w-1/3 rounded bg-white/15" />
+                <div className="mt-4 h-3 w-5/6 rounded bg-white/15" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {filterLoading && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
           <div className="pointer-events-auto flex items-center gap-2 rounded-pill bg-surface px-4 py-2 shadow-float">
@@ -1963,11 +2058,7 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
           focusedId={focusId}
-          understood={aiSearch?.filtri ? [
-            ...(aiSearch.filtri.categoria ? [categoryLabel(aiSearch.filtri.categoria) ?? aiSearch.filtri.categoria] : []),
-            ...aiSearch.filtri.parole_chiave,
-            ...(aiSearch.filtri.vicino_a_me ? ["vicino a te"] : []),
-          ].slice(0, 4) : []}
+          understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
           isSaved={isPlaceSaved}

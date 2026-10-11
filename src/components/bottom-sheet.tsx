@@ -6,7 +6,7 @@ import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
-import { distanceLabel, distanceM } from "@/lib/distance";
+import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
@@ -144,7 +144,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
-    return [...list].sort((a, b) => distanceM(origin, a) - distanceM(origin, b));
+    return [...list].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
   const orderKey = places.map((p) => p.id).join(",");
   useEffect(() => {
@@ -342,8 +342,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
-          <div className="min-w-0">
+        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+          <div className="min-w-0 flex-1">
             {title && (
               <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}

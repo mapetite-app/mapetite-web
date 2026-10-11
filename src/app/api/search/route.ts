@@ -19,6 +19,7 @@ type SearchFilters = {
   categoria: string | null;
   parole_chiave: string[];
   vicino_a_me: boolean;
+  zona?: string | null; // zona nominata nella frase (solo per mostrarla: "Ho capito: … · a Trastevere")
 };
 
 // Strip chars that could break PostgREST or() filter string syntax
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
         categoria: intent.tipo,
         parole_chiave: intent.requisiti,
         vicino_a_me: intent.vicino_a_me,
+        zona: intent.zona,
       };
       console.log(`[search-intent] ${JSON.stringify({ q: query.trim().slice(0, 80), ...intent })}`);
     }

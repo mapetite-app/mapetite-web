@@ -27,7 +27,7 @@ const PLACES = [
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
-  filtri_usati: { categoria: "bar", parole_chiave: ["rooftop"], vicino_a_me: false },
+  filtri_usati: { categoria: "bar", parole_chiave: ["rooftop"], vicino_a_me: false, zona: "Roma" },
   sintesi_pendente: { places: [], token: "x" },
 };
 const SYNTH = {
@@ -54,8 +54,11 @@ await ctx.route("**/api/places/photo**", async (route) => {
 // Con E2E_FAKE_USER la mappa legge i salvati: nel giro principale risultano vuoti (niente rete verso Supabase).
 await ctx.route("**/rest/v1/saved_places**", (route) => route.fulfill({ json: [] }));
 await ctx.route("**/rest/v1/place_synthesis**", (route) => route.fulfill({ json: [] }));
+await ctx.route("**/rest/v1/profiles**", (route) => route.fulfill({ json: [] }));
 let synthDelay = 900;
+let searchDelay = 0;
 await ctx.route("**/api/search", async (route) => {
+  if (searchDelay) await new Promise((r) => setTimeout(r, searchDelay));
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
   if (searchMode === "empty") return route.fulfill({ json: { ...SEARCH_FAST, risultati: [], sintesi_pendente: null } });
   return route.fulfill({ json: SEARCH_FAST });
@@ -121,6 +124,7 @@ for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["S
 }
 ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
 ok(await page.getByText("Foto: Maria R.").isVisible(), "scheda: autore della foto indicato (condizioni Google)");
+ok(((await page.getByRole("link", { name: /su Google Maps/ }).first().getAttribute("href")) ?? "").includes("query_place_id=P1"), "scheda: link a orari e foto su Google Maps con il Place ID");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
@@ -151,7 +155,7 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
-ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
+ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
 { const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
@@ -276,7 +280,12 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
 await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
+searchDelay = 1500;
 await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("ricerca-in-corso").waitFor({ timeout: 4000 });
+ok((await page.getByTestId("ricerca-in-corso").textContent())?.includes("pizza napoletana"), "home → mappa: mentre cerca si vedono la richiesta e le card fantasma");
+await shot("00b-ricerca-in-corso");
+searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -507,6 +516,15 @@ await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
 
+// 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
+if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {
+  console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
+} else {
+  await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
+  await page.getByRole("button", { name: "Cerca un locale" }).click();
+  ok(await page.getByText("Cosa cerchi?").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
+}
+
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
 // Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
 const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("button", { name: "I miei salvati" }).click())
@@ -521,12 +539,14 @@ else {
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
   await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await sctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" }] }));
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const p = await sctx.newPage();
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  ok((await p.getByTestId("suggerimento-per-te").textContent()) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
