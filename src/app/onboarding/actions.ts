@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { tasteQuery } from "@/lib/preferences";
 
 interface OnboardingData {
   cuisines: string[];
@@ -40,5 +41,8 @@ export async function completeOnboarding({
     return { error: error.message };
   }
 
-  redirect("/mappa");
+  // Momento magia: la mappa si apre già con una ricerca sui gusti appena scelti
+  // (1 ricerca Google, una volta per utente, come se la scrivesse lui).
+  const q = tasteQuery({ cuisines, occasions, atmospheres, priceRange });
+  redirect(q ? `/mappa?q=${encodeURIComponent(q)}` : "/mappa");
 }
