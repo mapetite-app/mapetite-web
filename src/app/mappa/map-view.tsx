@@ -1321,7 +1321,7 @@ export default function MapView({
                 : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
-            Tutti i locali
+            Esplora
           </button>
           <button
             type="button"
