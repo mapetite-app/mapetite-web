@@ -11,17 +11,21 @@ export default function DragToClose({ onClose, className, children }: { onClose:
   // il valore corrente serve subito al rilascio, anche prima del nuovo render
   const dyRef = useRef(0);
   const setDy = (v: number) => { dyRef.current = v; setDyState(v); };
+  // durante il trascinamento niente animazione: la scheda segue il dito
+  const [dragging, setDragging] = useState(false);
 
   return (
     <div
       ref={ref}
       data-testid="scheda-trascinabile"
       className={className}
-      style={{ transform: dy > 0 ? `translateY(${dy}px)` : undefined, transition: start.current?.active ? "none" : "transform 200ms ease-out" }}
+      style={{ transform: dy > 0 ? `translateY(${dy}px)` : undefined, transition: dragging ? "none" : "transform 200ms ease-out" }}
       onClick={(e) => e.stopPropagation()}
       onTouchStart={(e) => {
         // solo se la scheda è già scorsa in cima: altrimenti è uno scroll normale
-        start.current = { y: e.touches[0].clientY, active: (ref.current?.scrollTop ?? 0) <= 0 };
+        const active = (ref.current?.scrollTop ?? 0) <= 0;
+        start.current = { y: e.touches[0].clientY, active };
+        setDragging(active);
       }}
       onTouchMove={(e) => {
         const s = start.current;
@@ -33,6 +37,7 @@ export default function DragToClose({ onClose, className, children }: { onClose:
       onTouchEnd={() => {
         const close = dyRef.current > 110;
         start.current = null;
+        setDragging(false);
         setDy(0);
         if (close) onClose();
       }}

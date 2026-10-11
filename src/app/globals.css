@@ -31,6 +31,20 @@
   /* Altezza massima dei bottom-sheet. Base in vh come fallback per browser
      senza dvh; l'@supports sotto la promuove a dvh (esclude la barra URL iOS). */
   --sheet-max-h: 85vh;
+
+  /* Font dei titoli (nomi dei locali, titolo della risposta): Poppins di default,
+     serif editoriale con ?titoli=serif (variante in prova, vedi layout.tsx). */
+  --title-font: var(--font-poppins);
+}
+
+:root[data-titoli="serif"] {
+  --title-font: var(--font-newsreader), "Iowan Old Style", Georgia, serif;
+}
+
+/* Il serif rende meglio un po' più grande e meno pesante, con spaziatura stretta. */
+:root[data-titoli="serif"] .font-title {
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 /* dvh dove supportato: fallback reale via feature query (due righe di custom
@@ -48,23 +62,12 @@
   }
 }
 
-:root {
-  --font-title-active: var(--font-poppins);
-}
-:root[data-titoli="serif"] {
-  --font-title-active: var(--font-fraunces);
-}
-:root[data-titoli="serif"] .font-title {
-  letter-spacing: -0.01em;
-  font-weight: 500;
-}
 
 @theme inline {
   /* Font */
   --font-display: var(--font-poppins);
   --font-sans: var(--font-inter);
-  /* Nomi dei locali e titoli editoriali: Poppins, oppure serif con ?titoli=serif (variante da scegliere). */
-  --font-title: var(--font-title-active);
+  --font-title: var(--title-font);
 
   /* Colori */
   --color-brand: var(--color-brand);

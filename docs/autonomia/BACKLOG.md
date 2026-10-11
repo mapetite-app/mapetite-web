@@ -7,8 +7,8 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-Aggiornato 11/10 pomeriggio. **Fatto:** voci 1–8 e 10, voce 9 in parte; foto, mappa viva, filtri rapidi, condividi, ricerche recenti, cerca in quest'area; lista B scelta da Lorenzo e predefinita.
-**Manca:** correggere ciò che Lorenzo ha visto non funzionare nelle ricerche reali (in attesa dei suoi esempi); prova dal vivo di intento ed esclusioni con Haiku (nell'ambiente di sviluppo manca `ANTHROPIC_API_KEY`); giro completo con un account vero (registrazione, salvataggio); grafica più vicina ai riferimenti Places su scheda e primo accesso.
+Aggiornato 11/10 sera (PR #15). **Fatto:** voci 1–8 e 10, voce 9 quasi completa (salvataggio, errore e rimozione provati con dati simulati; accesso/registrazione/importa rifatti nello stile dell'app); foto, mappa viva, filtri rapidi, condividi, ricerche recenti, cerca in quest'area; lista B scelta da Lorenzo e predefinita; categorie in italiano; minuti a piedi. **In prova, da scegliere:** scheda stile Places (`?scheda=b`), primo accesso stile Places (`?home=b`), titoli serif (`?titoli=serif`), condividi una ricerca (`?beta=condividi-ricerca`).
+**Manca:** le scelte di Lorenzo sulle varianti; correggere ciò che Lorenzo ha visto non funzionare nelle ricerche reali (in attesa dei suoi esempi); prova dal vivo di intento ed esclusioni con Haiku (nell'ambiente di sviluppo manca `ANTHROPIC_API_KEY`); un giro con un account vero (registrazione reale e salvataggio: non fatto per non scrivere nel database di produzione).
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
 
@@ -45,7 +45,8 @@ Casella di ricerca e chip per città. La città si ricava dall\'indirizzo già s
 
 ## Fase 3 — Pronta per i tester (notti 10–12)
 
-### 9. Giro completo di controllo — IN CORSO (parziale; salvati provati con dati simulati: schermate pubbliche; flussi con account non provati)
+### 9. Giro completo di controllo — QUASI FATTA (PR #15): manca solo il giro con un account vero
+Provati con dati simulati (nessuna scrittura vera): ricerca, scheda, salvataggio con tag e nota, errore del server, rimozione, salvati per città, schermate pubbliche. Bug trovati e corretti in PR #15: barra della scheda fuori schermo a 390px, "Percorso" tagliato dopo il salvataggio, errori di accesso in inglese, campi che facevano zoomare l'iPhone, selettore file in inglese.
 Percorsi completi con Playwright a viewport mobile: registrazione, ricerca, apertura scheda, salvataggio, profilo. Correzione dei bug trovati, screenshot di ogni schermata in PR.
 
 ### 10. Raccolta feedback dei tester — FATTA 11/10
@@ -67,10 +68,14 @@ Regole:
 - Le fasi 1–3 restano la priorità: una funzione nuova non deve mai rallentare o rompere la ricerca e la lista risultati.
 
 ### Proposte
-- **Fatte 11/10 pomeriggio (PR #14), accese per tutti, nessun costo né migrazione:** carosello e mappa collegati con foto nel pin a fuoco; suggerimento in base all'ora; "Più vicini"; "Affina"; segnalibro Salva sulle card; condividi una ricerca (`/mappa?q=`); nuova home come Places; ricerca scritta nella card iniziale; punto blu "tu sei qui" e pulsante posizione; invito ad aggiungere alla Home (iPhone/Android); tipi di locale in italiano; riga "Roma · 600 m" nella scheda; Accedi, Registrati, Profilo e Importa nei colori Mapetite; pulsanti quando non trova nulla.
+- **Fatte 11/10 pomeriggio (PR #16), accese per tutti, nessun costo né migrazione:** carosello e mappa collegati con foto nel pin a fuoco; suggerimento in base all'ora; "Più vicini"; "Affina"; segnalibro Salva sulle card; condividi una ricerca (`/mappa?q=…&at=lat,lng`, accesa per tutti: unita alla versione della PR #15); nuova home come Places; ricerca scritta nella card iniziale; punto blu "tu sei qui" e pulsante posizione; invito ad aggiungere alla Home (iPhone/Android); tipi di locale in italiano; riga "Roma · 600 m" nella scheda; Accedi, Registrati, Profilo e Importa nei colori Mapetite; pulsanti quando non trova nulla.
 - **Gemme — IN PROVA (`?beta=gemme`, spenta di default)**: badge "💎 Poco conosciuto" su voto ≥ 4,5 e 20–400 recensioni. Da decidere se accenderla per tutti.
-- **Titoli serif — DA SCEGLIERE (`?titoli=serif`)**: nomi dei locali e titoli in Fraunces (stile Places) contro Poppins attuale.
 - Pagine non collegate da nessuna parte e ancora nello stile vecchio: `/miei-locali`, `/locali/[id]`, `site-header`. Proposta: eliminarle (serve ok di Lorenzo).
+- **Mappa chiara — DA SCEGLIERE (`?mappa=chiara`)**: mappa grigia stile Places contro quella attuale (già senza etichette di hotel e negozi).
+- **Varianti grafiche stile Places — IN PROVA (PR #15, portate nella #16), da scegliere**: `?scheda=b` (foto grande, nome grande, "Roma · 350 m", "Cocktail bar · €€ · ★ 4,5", barra scura a riquadri), `?home=b` (campo "Cosa cerchi?" subito scrivibile, esempi a schede), `?titoli=serif` (nomi e titoli in serif editoriale). Si combinano; ognuna resta sul telefono finché non si apre `=a` / `=sans`. Nessun costo, nessuna migrazione.
+- **PROPOSTA — Stati del salvato "Voglio andarci / Ci sono stato"** (Places `places-07`, Beli "Want to try"): oggi ci sono i tag "Da provare" / "Già visitato"; farne due stati veri con filtro dedicato richiede una colonna in `saved_places` → migrazione, DA DECIDERE. Costo: zero chiamate.
+- **PROPOSTA — Salva da link** (Corner: incolli un link Instagram/TikTok o Google Maps e diventa un pin): un link Google Maps con Place ID si risolve con 1 Place Details per salvataggio; un link social richiede di leggere la didascalia (Haiku, come l'import da screenshot). Nessuna migrazione; costo 1 chiamata Google per link. DA DECIDERE per il costo.
+- **PROPOSTA — Mappa dei salvati condivisibile** (Mapstr: la mappa si apre da browser senza app): serve una lettura pubblica di `saved_places` di un utente → modifica RLS/migrazione, DA DECIDERE, e una scelta di privacy.
 - **Foto dei locali — FATTA 11/10 (autorizzata da Lorenzo)**: foto sulle prime 6 card (liste A e B) e in cima alla scheda, tramite `/api/places/photo` con cache 7 giorni e tetto 100 foto/giorno per istanza; se la quota finisce resta l'emoji. Costo stimato: ~0 € con pochi tester (1.000 foto/mese gratuite, 7 $ ogni 1.000 dopo); caso peggiore senza cache ~60 €/mese. Consigliato: quota Google "Place Photos" a 100/giorno e avviso di budget a 10 €. Non verificato dal vivo il download dell'immagine (dall'ambiente di sviluppo l'host immagini non è raggiungibile): la prima chiamata a Google funziona.
 - **Mappa viva — FATTA 11/10**: dopo una ricerca la mappa si sposta da sola per mostrare tutti i risultati; i pin hanno emoji in un cerchio bianco e il nome; il pin del locale aperto è più grande con anello corallo; le card mostrano la distanza. Limite noto: i filtri rapidi nascondono le card ma non i pin.
 - **Filtri rapidi sulla lista — FATTA e ACCESA per tutti dall'11/10 (`?beta=off` per spegnere)**: chip "Aperto ora", "Fino a €€", "Voto 4,5+" sopra la lista. Nessun costo (filtra i dati già arrivati), nessuna migrazione.

@@ -23,7 +23,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R." }),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
-  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180 }),
+  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180, category: "cocktail_bar" }),
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
@@ -114,7 +114,7 @@ ok(true, "pannello AI: chiudendo si torna alla lista");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
 const vh = 844;
-for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
+for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
   const box = await page.locator(sel).first().boundingBox();
   ok(!!box && box.y + box.height <= vh && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390, `scheda: pulsante ${label} nel viewport (anche in larghezza)`);
   if (box) ok(box.height >= 40, `scheda: pulsante ${label} alto almeno 40px (${Math.round(box.height)})`);
@@ -151,6 +151,7 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
+{ const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
   if (!name) return false;
@@ -193,7 +194,7 @@ ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).incl
 await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
 await page.getByRole("button", { name: "Condividi questa ricerca" }).click();
 const sharedUrl = await page.evaluate(() => window.__shared?.url ?? "");
-ok(decodeURIComponent(sharedUrl).endsWith("/mappa?q=Rooftop romantico per due a Roma"), "condividi ricerca: link che riapre la stessa ricerca");
+ok(/\/mappa\?q=Rooftop romantico per due a Roma&at=-?\d+\.\d+,-?\d+\.\d+$/.test(decodeURIComponent(sharedUrl)), "condividi ricerca: link che riapre la stessa ricerca nello stesso punto");
 await page.getByRole("button", { name: "Affina" }).click();
 const refine = page.locator("input[type=text]");
 await refine.waitFor({ timeout: 3000 });
@@ -262,18 +263,6 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) === 0, "?beta=off: spegne anche le gemme");
 
-// 5g. Variante titoli serif (?titoli=serif, da far scegliere): resta sul telefono, ?titoli=poppins torna indietro
-const titleFont = () => page.locator("ul.snap-x li").first().locator(".font-title").first().evaluate((el) => getComputedStyle(el).fontFamily);
-await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
-await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
-ok(/fraunces/i.test(await titleFont()), "?titoli=serif: nomi dei locali in serif");
-await shot("05c-titoli-serif");
-await page.goto(`${BASE}/mappa?titoli=poppins`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
-await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(/poppins/i.test(await titleFont()), "?titoli=poppins: si torna al font attuale");
-
 // 5f. Ricerca scritta direttamente nella card iniziale
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
@@ -340,6 +329,105 @@ await p2.getByRole("button", { name: "La mia posizione" }).click();
 ok(true, "pulsante 'La mia posizione' sempre disponibile in alto a destra");
 await p2.screenshot({ path: `${OUT}/07b-posizione.png` });
 await ctx2.close();
+// posizione concessa vicino ai risultati: il pulsante percorso mostra i minuti a piedi (come Places)
+const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8995, longitude: 12.4895 } });
+await ctx3.route("**/api/places/photo**", (route) => route.fulfill({ status: 429, json: {} }));
+await ctx3.route("**/api/search", (route) => route.fulfill({ json: SEARCH_FAST }));
+await ctx3.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+const p3 = await ctx3.newPage();
+await p3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await p3.getByRole("button", { name: "Usa la mia posizione" }).click();
+await p3.waitForTimeout(1200);
+await p3.locator("button:has(svg.lucide-sparkles)").first().click();
+await p3.locator("input[type=text]").fill("rooftop");
+await p3.getByRole("button", { name: "Cerca", exact: true }).click();
+await p3.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await p3.getByText("Terrazza Uno").first().click();
+await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
+ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
+await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
+await ctx3.close();
+
+// 7-bis. Condividi la ricerca: il link porta richiesta e punto della mappa
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.evaluate(() => { navigator.share = async (d) => { window.__shared = d; }; });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByLabel("Condividi questa ricerca").click();
+const shared = await page.evaluate(() => window.__shared ?? null);
+ok(!!shared && /\/mappa\?q=Rooftop/.test(shared.url) && /&at=-?\d+\.\d+,-?\d+\.\d+/.test(shared.url), `condividi ricerca: link con richiesta e punto (${shared?.url ?? "nessuno"})`);
+if (shared) {
+  let body = null;
+  await page.route("**/api/search", async (route) => { body = route.request().postDataJSON(); return route.fulfill({ json: SEARCH_FAST }); });
+  await page.goto(shared.url, { waitUntil: "networkidle" });
+  await page.getByTestId("titolo-risposta").waitFor({ timeout: 6000 });
+  ok(/Rooftop romantico/i.test(await page.getByTestId("titolo-risposta").innerText()), "link ricerca: apre la stessa ricerca con il titolo");
+  const at = new URL(shared.url).searchParams.get("at").split(",").map(Number);
+  ok(body && Math.abs(body.lat - at[0]) < 1e-6 && Math.abs(body.lng - at[1]) < 1e-6, "link ricerca: cerca nel punto di chi ha condiviso");
+  ok(!new URL(page.url()).searchParams.has("q"), "link ricerca: dopo l'apertura 'q' sparisce dall'indirizzo (ricaricare non ripete)");
+  await shot("14-link-ricerca");
+  await page.unroute("**/api/search");
+}
+
+// 7-ter. Variante B della scheda (?scheda=b, stile Places; ricordata sul telefono, ?scheda=a torna all'attuale)
+await page.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().click();
+await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
+await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
+ok((await page.getByText("Il verdetto Mapetite").count()) === 0, "scheda B: layout Places al posto della card teal");
+ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
+ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
+for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
+  const box = await page.locator(sel).first().boundingBox();
+  ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
+}
+ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
+await shot("15-scheda-b");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
+await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+ok(true, "?scheda=a: torna la scheda attuale");
+
+// 7-quater. Primo accesso variante B (?home=b): si scrive subito, senza aprire un altro pannello
+await page.goto(`${BASE}/mappa?home=b`, { waitUntil: "networkidle" });
+ok(await page.getByLabel("Cosa cerchi?").isVisible(), "home B: campo di ricerca visibile subito");
+ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "home B: esempi a schede cliccabili");
+ok((await page.getByRole("button", { name: "Usa la mia posizione" }).count()) === 1, "home B: pulsante 'Vicino a me'");
+{ const hb = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999; ok(hb < 844 * 0.35, `home B: la mappa resta visibile (altezza ${Math.round(hb)}px)`); }
+await shot("16-home-b");
+await page.getByLabel("Cosa cerchi?").fill("rooftop con vista");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
+ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText()), "home B: Invio avvia la ricerca scritta");
+await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
+ok(await page.getByLabel("Scrivi cosa cerchi").isVisible(), "?home=a: torna il primo accesso attuale");
+
+// 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
+const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+{ const f = await titleFont(); ok(/Poppins/i.test(f), `titoli: Poppins di default (${f.slice(0, 40)})`); }
+await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+await page.goto(`${BASE}/mappa?titoli=sans`, { waitUntil: "networkidle" });
+ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
+
+// 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
+await page.goto(`${BASE}/login?error=Email%20o%20password%20non%20corrette.`, { waitUntil: "networkidle" });
+ok(await page.getByRole("alert").getByText("Email o password non corrette.").isVisible(), "login: messaggio d'errore in evidenza");
+ok(await page.locator("#email").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "login: campi da almeno 16px (niente zoom su iPhone)");
+ok(await page.getByRole("link", { name: "Intanto prova a cercare senza account" }).isVisible(), "login: si può provare l'app senza account");
+await shot("18-login");
+await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
+ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
+await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
+await shot("19-importa");
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
@@ -441,6 +529,56 @@ else {
   ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
   await p.screenshot({ path: `${OUT}/14-salva-da-card.png` });
   await sctx.close();
+
+  // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const writes = [];
+  let addMode = "error";
+  await vctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await vctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await vctx.route("**/api/places/add", (r) => addMode === "error"
+    ? r.fulfill({ status: 500, json: { error: "x" } })
+    : r.fulfill({ json: { place: { id: "11111111-2222-3333-4444-555555555555" } } }));
+  await vctx.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m === "GET") return r.fulfill({ json: [] });
+    writes.push({ m, url: r.request().url(), body: r.request().postDataJSON?.() ?? null });
+    return r.fulfill({ status: m === "POST" ? 201 : 204, body: "" });
+  });
+  await vctx.route("**/rest/v1/reviews**", (r) => r.fulfill({ json: [] }));
+  await vctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  const v = await vctx.newPage();
+  v.on("pageerror", (e) => errors.push(e.message));
+  v.on("dialog", (d) => d.accept());
+  await v.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await v.getByText("Terrazza Uno").first().click();
+  await v.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+  await v.locator("button:text-is('Salva')").first().click();
+  const modal = v.locator("div.w-80");
+  await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
+  ok(true, "salva: si apre la finestra con tag e nota");
+  await modal.getByRole("button", { name: "Romantico" }).click();
+  await modal.locator("textarea").fill("Tavolo vicino alla ringhiera");
+  await modal.getByRole("button", { name: "Salva", exact: true }).click();
+  await modal.getByText("Errore durante il salvataggio. Riprova.").waitFor({ timeout: 3000 });
+  ok(true, "salva: se il server non risponde, messaggio d'errore e la finestra resta aperta");
+  addMode = "ok";
+  await modal.getByRole("button", { name: "Salva", exact: true }).click();
+  await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
+  const ins = writes.find((w) => w.m === "POST");
+  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
+    "salva: scrive in saved_places l'UUID Supabase con tag e nota");
+  ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
+  ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
+  { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
+  await v.screenshot({ path: `${OUT}/17-salvato.png` });
+  await v.locator("button:text-is('Salvato')").click();
+  await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
+  const del = writes.find((w) => w.m === "DELETE");
+  ok(!!del && del.url.includes("place_id=eq.11111111-2222-3333-4444-555555555555"), "rimuovi: dopo la conferma cancella il salvato giusto e il pulsante torna 'Salva'");
+  await vctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
