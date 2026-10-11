@@ -13,7 +13,7 @@ import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
-import { SlidersHorizontal, Sparkles } from "lucide-react";
+import { LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { momentSuggestion } from "@/lib/moment";
@@ -1036,7 +1036,12 @@ export default function MapView({
         setGeoState("idle");
         setWelcomeDismissed(true);
       },
-      (err) => setGeoState(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable"),
+      (err) => {
+        const denied = err.code === err.PERMISSION_DENIED;
+        setGeoState(denied ? "denied" : "unavailable");
+        // A card iniziale chiusa il messaggio non si vedrebbe: avviso in sovrimpressione.
+        if (welcomeDismissed) setFilterError(denied ? "Posizione non permessa: attivala nelle impostazioni del browser" : "Posizione non disponibile ora");
+      },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
     );
   };
@@ -1078,6 +1083,16 @@ export default function MapView({
 
   return (
     <div className="fixed inset-0 md:top-14">
+      {/* Torna alla mia posizione: sempre raggiungibile, anche dopo aver chiuso la card iniziale. */}
+      <button
+        type="button"
+        onClick={goToMyPosition}
+        disabled={geoState === "loading"}
+        aria-label="La mia posizione"
+        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60"
+      >
+        <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
+      </button>
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
       <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
         {/* Riga icone: Concierge AI + Filtri */}
@@ -1088,6 +1103,7 @@ export default function MapView({
               // La ricerca AI resta: si azzera solo con ✕ o passando ai filtri.
               dispatch({ type: overlay.kind === "ai" ? "CLOSE" : "OPEN_AI" });
             }}
+            aria-label="Ricerca con l'AI"
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
             <Sparkles size={20} className="text-brand" />
@@ -1489,6 +1505,14 @@ export default function MapView({
           );
         })}
 
+        {userPos && (
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
+            <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
+              <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
+            </span>
+          </Marker>
+        )}
       </Map>
 
       {selected && (

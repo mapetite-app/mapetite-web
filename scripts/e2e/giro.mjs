@@ -97,12 +97,12 @@ ok(pinBoxes.length >= 2, `mappa: ${pinBoxes.length} pin con nome sulla mappa dop
 ok(pinBoxes.every((b) => b.y > 0 && b.y + b.height < 844 * 0.55 && b.x >= 0 && b.x + b.width <= 390), "mappa: la mappa si sposta sui risultati (pin sopra la lista, dentro lo schermo)");
 
 // 3. Persistenza pannello AI
-await page.locator("button").first().click(); // ✨
+await page.getByRole("button", { name: "Ricerca con l'AI" }).click(); // ✨
 const input = page.locator("input[type=text]");
 await input.waitFor({ timeout: 3000 });
 ok((await input.inputValue()).startsWith("Rooftop romantico"), "pannello AI: il testo cercato è conservato");
 ok(await page.getByText(/locali trovati/).isVisible(), "pannello AI: i risultati restano attivi");
-await page.locator("button").first().click(); // chiude
+await page.getByRole("button", { name: "Ricerca con l'AI" }).click(); // chiude
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 3000 });
 ok(true, "pannello AI: chiudendo si torna alla lista");
 
@@ -264,6 +264,10 @@ await p2.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await p2.getByRole("button", { name: "Usa la mia posizione" }).click();
 await p2.waitForTimeout(1500);
 ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
+ok(await p2.getByTestId("tu-sei-qui").isVisible(), "posizione concessa: punto blu 'tu sei qui' sulla mappa");
+await p2.getByRole("button", { name: "La mia posizione" }).click();
+ok(true, "pulsante 'La mia posizione' sempre disponibile in alto a destra");
+await p2.screenshot({ path: `${OUT}/07b-posizione.png` });
 await ctx2.close();
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
