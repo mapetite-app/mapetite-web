@@ -132,7 +132,16 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 await page.getByRole("button", { name: "Aperto ora" }).first().click();
-ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
+await page.getByRole("button", { name: "Aperto ora" }).first().click();
+// sposto la mappa a mano: compare "Cerca in quest'area"
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
+ok(true, "mappa spostata: compare 'Cerca in quest'area'");
+await page.getByRole("button", { name: "Cerca in quest'area" }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });

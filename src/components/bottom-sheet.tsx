@@ -21,6 +21,9 @@ export interface BottomSheetProps {
   variant?: "a" | "b";
   // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
   origin?: { lat: number; lng: number } | null;
+  // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
+  quick?: ReadonlySet<QuickFilter>;
+  onToggleQuick?: (f: QuickFilter) => void;
 }
 
 export type ListDetails = {
@@ -100,30 +103,40 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-type QuickFilter = "open" | "cheap" | "top";
+export type QuickFilter = "open" | "cheap" | "top";
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null }: BottomSheetProps) {
+// Filtri rapidi condivisi da lista e mappa (i pin seguono la lista).
+export function applyQuickFilters(
+  list: Place[],
+  quick: ReadonlySet<QuickFilter>,
+  details: Record<string, ListDetails | undefined> | undefined,
+): Place[] {
+  if (quick.size === 0) return list;
+  return list.filter(
+    (p) =>
+      (!quick.has("open") || details?.[p.id]?.openNow === true) &&
+      (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
+      (!quick.has("top") || (p.rating ?? 0) >= 4.5),
+  );
+}
+
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
-  const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
+  const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
+  const quick = quickProp ?? quickLocal;
   const places = useMemo(
-    () =>
-      !quickFiltersOn || quick.size === 0
-        ? allPlaces
-        : allPlaces.filter(
-            (p) =>
-              (!quick.has("open") || details?.[p.id]?.openNow === true) &&
-              (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
-              (!quick.has("top") || (p.rating ?? 0) >= 4.5),
-          ),
+    () => (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces),
     [allPlaces, quick, quickFiltersOn, details],
   );
-  const toggleQuick = (f: QuickFilter) =>
-    setQuick((prev) => {
+  const toggleQuick = (f: QuickFilter) => {
+    if (onToggleQuick) return onToggleQuick(f);
+    setQuickLocal((prev) => {
       const next = new Set(prev);
       if (next.has(f)) next.delete(f);
       else next.add(f);
       return next;
     });
+  };
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);

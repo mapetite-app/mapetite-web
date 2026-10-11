@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
-import BottomSheet from "@/components/bottom-sheet";
+import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
@@ -503,6 +503,10 @@ export default function MapView({
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
+  // Filtri rapidi della lista: valgono anche per i pin sulla mappa.
+  const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
+  // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
+  const [movedSinceSearch, setMovedSinceSearch] = useState(false);
   // Variante grafica della lista risultati (voce 5): ?lista=a (default) | ?lista=b.
   const listVariant = useSyncExternalStore(
     () => () => {},
@@ -830,8 +834,13 @@ export default function MapView({
     }
   };
 
+  // Pin visibili: con una ricerca AI seguono i filtri rapidi della lista.
+  const quickOn = useBeta("filtri-lista");
+  const mapPlaces =
+    aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
+
   const clusterIndex = useMemo(() => {
-    const points = displayedPlaces.map((place) => ({
+    const points = mapPlaces.map((place) => ({
       type: "Feature" as const,
       properties: { cluster: false, placeData: place },
       geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
@@ -839,13 +848,13 @@ export default function MapView({
     const index = new Supercluster({ radius: 50, maxZoom: 20 });
     index.load(points);
     return index;
-  }, [displayedPlaces]);
+  }, [mapPlaces]);
 
   const roundedZoom = Math.ceil(viewState.zoom);
   const clusters = useMemo(() => {
     const map = (mapRef.current as { getMap?: () => { getBounds: () => { getWest: () => number; getSouth: () => number; getEast: () => number; getNorth: () => number } } } | null)?.getMap?.();
     if (!map) {
-      return displayedPlaces.map((place) => ({
+      return mapPlaces.map((place) => ({
         type: "Feature" as const,
         properties: { cluster: false, placeData: place },
         geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
@@ -854,7 +863,7 @@ export default function MapView({
     const b = map.getBounds();
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     return clusterIndex.getClusters(bbox, roundedZoom);
-  }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude]);
+  }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces]);
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
   const fitToPlaces = (list: Place[]) => {
@@ -938,7 +947,9 @@ export default function MapView({
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id });
         setVenueDetails(details); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
-        if (view === "all") saveRecentSearch(q);
+        setQuickFilters(new Set());
+      setMovedSinceSearch(false);
+      if (view === "all") saveRecentSearch(q);
       setSearchOrigin({ lat: viewState.latitude, lng: viewState.longitude });
       fitToPlaces(places);
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
@@ -1253,10 +1264,25 @@ export default function MapView({
         </div>
       )}
 
+      {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
+      {aiSearch !== null && movedSinceSearch && aiQuery.trim() !== "" && (overlay.kind === "list" || overlay.kind === "none") && (
+        <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
+          <button
+            type="button"
+            disabled={aiSearching}
+            onClick={() => { void runAISearch(aiQuery.trim()); }}
+            className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
+          >
+            {aiSearching ? "Cerco…" : "Cerca in quest'area"}
+          </button>
+        </div>
+      )}
+
       <Map
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
+        onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
@@ -1512,6 +1538,13 @@ export default function MapView({
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           origin={userPos ?? searchOrigin}
+          quick={quickFilters}
+          onToggleQuick={(f) => setQuickFilters((prev) => {
+            const next = new Set(prev);
+            if (next.has(f)) next.delete(f);
+            else next.add(f);
+            return next;
+          })}
           onSelect={(place) => {
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
