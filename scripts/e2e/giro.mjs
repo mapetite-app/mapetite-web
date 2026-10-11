@@ -25,6 +25,11 @@ const PLACES = [
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
   mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180, category: "cocktail_bar" }),
 ];
+// Molti locali vicinissimi + uno lontano (la mappa si allarga): i primi 5 non devono finire in un cerchio.
+const FOLLA = [
+  ...Array.from({ length: 10 }, (_, i) => mk(`F${i + 1}`, `Folla ${i + 1}`, 41.89 + (i % 5) * 0.0003, 12.47 + Math.floor(i / 5) * 0.0003)),
+  mk("F11", "Folla Lontano", 41.95, 12.55),
+];
 const SEARCH_FAST = {
   risultati: PLACES,
   filtri_usati: { categoria: "bar", parole_chiave: ["rooftop"], vicino_a_me: false, zona: "Roma" },
@@ -61,6 +66,7 @@ await ctx.route("**/api/search", async (route) => {
   if (searchDelay) await new Promise((r) => setTimeout(r, searchDelay));
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
   if (searchMode === "empty") return route.fulfill({ json: { ...SEARCH_FAST, risultati: [], sintesi_pendente: null } });
+  if (searchMode === "folla") return route.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, sintesi_pendente: null } });
   return route.fulfill({ json: SEARCH_FAST });
 });
 await ctx.route("**/api/search/synthesis", async (route) => {
@@ -367,6 +373,22 @@ let noPhotos = false;
 for (let i = 0; i < 15 && !noPhotos; i++) { await page.waitForTimeout(200); noPhotos = (await page.locator("ul img").count()) === 0; }
 ok(noPhotos && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
 photoMode = "ok";
+
+// 5c. Mappa affollata: i primi 5 risultati sempre come pin con nome, gli altri raggruppati o senza nome
+searchMode = "folla";
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Folla 1").first().waitFor({ timeout: 5000 });
+await page.waitForTimeout(1500);
+{
+  const labels = (await page.getByTestId("pin").allInnerTexts()).map((t) => t.replace(/[^\p{L}\p{N} ]/gu, "").trim());
+  const top = ["Folla 1", "Folla 2", "Folla 3", "Folla 4", "Folla 5"];
+  ok(top.every((n) => labels.some((l) => l.trim() === n)), `mappa affollata: i primi 5 risultati hanno il loro pin con nome (${labels.filter(Boolean).length} nomi)`);
+  ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
+  ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Folla 1"), "mappa affollata: il pin della prima card è visibile ed evidenziato");
+  await shot("05c-mappa-affollata");
+}
+searchMode = "ok";
 
 // 6. Errore di rete/API
 searchMode = "error";

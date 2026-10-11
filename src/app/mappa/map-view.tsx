@@ -23,6 +23,9 @@ import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
+// Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
+const TOP_PINS = 5;
+
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 const VISIT_WANT = "Da provare";
 const VISIT_DONE = "Già visitato";
@@ -1150,8 +1153,21 @@ export default function MapView({
       : [],
   );
 
+  // Dopo una ricerca i primi risultati (e il pin della card al centro) non finiscono mai
+  // dentro un cerchio "2"/"3": prima i più adatti restavano nascosti mentre quelli spostati
+  // in fondo (es. i locali di massa nelle ricerche "non turistiche") avevano il nome in vista.
+  const topIds = aiSearch !== null && clusterPlaces === null
+    ? [...(carouselOrder.length > 0 ? carouselOrder : mapPlaces.map((p) => p.id)).slice(0, TOP_PINS), ...(focusId ? [focusId] : [])]
+    : [];
+  const topKey = topIds.join(",");
+  const topPlaces = useMemo(() => {
+    const ids = new Set(topKey ? topKey.split(",") : []);
+    return mapPlaces.filter((p) => ids.has(p.id));
+  }, [mapPlaces, topKey]);
+
   const clusterIndex = useMemo(() => {
-    const points = mapPlaces.map((place) => ({
+    const top = new Set(topPlaces.map((p) => p.id));
+    const points = mapPlaces.filter((p) => !top.has(p.id)).map((place) => ({
       type: "Feature" as const,
       properties: { cluster: false, placeData: place },
       geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
@@ -1159,7 +1175,7 @@ export default function MapView({
     const index = new Supercluster({ radius: 50, maxZoom: 20 });
     index.load(points);
     return index;
-  }, [mapPlaces]);
+  }, [mapPlaces, topPlaces]);
 
   const roundedZoom = Math.ceil(viewState.zoom);
   const clusters = useMemo(() => {
@@ -1173,8 +1189,15 @@ export default function MapView({
     }
     const b = map.getBounds();
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-    return clusterIndex.getClusters(bbox, roundedZoom);
-  }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces]);
+    return [
+      ...clusterIndex.getClusters(bbox, roundedZoom),
+      ...topPlaces.map((place) => ({
+        type: "Feature" as const,
+        properties: { cluster: false, placeData: place },
+        geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
+      })),
+    ];
+  }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces, topPlaces]);
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
@@ -1971,7 +1994,7 @@ export default function MapView({
                 }
                 dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
-              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 2 : 1 }}
+              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 3 : topPlaces.includes(place) ? 2 : 1 }}
             >
               <div className="flex cursor-pointer flex-col items-center" data-testid="pin" data-focused={focusId === place.id ? "true" : undefined}>
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
@@ -2010,7 +2033,8 @@ export default function MapView({
                     )}
                   </span>
                 )}
-                {(aiSearch !== null || viewState.zoom >= 14 || selected?.id === place.id) && (
+                {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
+                {((aiSearch !== null && clusterPlaces === null ? topPlaces.includes(place) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
                     {place.name}
                   </span>
