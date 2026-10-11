@@ -120,10 +120,13 @@ export default function AnswerArticle({
                       )}
                       <span className="block bg-white px-4 py-3">
                         <span className="block truncate font-mono text-[11px] uppercase tracking-wider text-text-muted">{metaLine(place, d, origin)}</span>
-                        {(d?.openNow === true || (d?.goFor ?? []).length > 0) && (
+                        {(d?.openNow != null || (d?.goFor ?? []).length > 0) && (
                           <span className="mt-2 flex flex-wrap gap-1.5">
                             {d?.openNow === true && (
                               <span className="rounded-pill bg-success/10 px-2 py-0.5 text-[11px] font-display font-medium text-success">Aperto ora</span>
+                            )}
+                            {d?.openNow === false && (
+                              <span className="rounded-pill bg-border/60 px-2 py-0.5 text-[11px] font-display font-medium text-text-muted">Chiuso ora</span>
                             )}
                             {(d?.goFor ?? []).slice(0, 2).map((c) => (
                               <span key={c} className="rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-medium text-accent">{c}</span>

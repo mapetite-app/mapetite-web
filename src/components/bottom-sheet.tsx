@@ -454,6 +454,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         {d?.openNow === true && (
                           <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
                         )}
+                        {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
+                        {d?.openNow === false && (
+                          <span data-testid="chiuso-ora" className="rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium text-white/80">Chiuso ora</span>
+                        )}
                       </span>
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
@@ -579,6 +583,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
+                      </span>
+                    )}
+                    {details?.[place.id]?.openNow === false && (
+                      <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-border/60 px-1.5 py-0.5 text-[10px] font-display font-medium text-text-muted">
+                        Chiuso ora
                       </span>
                     )}
                     {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount) && (

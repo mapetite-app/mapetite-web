@@ -95,6 +95,7 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok(true, "lista: il verdetto compare dopo");
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
+ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("chiuso-ora").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("chiuso-ora").count()) === 0, "card: 'Chiuso ora' sul locale chiuso (e solo lì)");
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("Rooftop romantico"), "lista: titolo con la richiesta dell'utente");
 await shot("03-lista-verdetti");
 ok(await page.getByTestId("ho-capito").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1), "lista: 'Ho capito' si legge per intero (non tagliato)");
