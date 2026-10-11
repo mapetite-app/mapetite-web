@@ -12,12 +12,13 @@ export default async function SignupPage({
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-zinc-900 mb-6 text-center">
+        <h1 className="font-title text-3xl font-semibold text-brand text-center">
           Crea un account
         </h1>
+        <p className="mb-6 mt-2 text-center text-sm text-text-muted">Salva i locali che ti piacciono e ritrovali sulla tua mappa.</p>
 
         {params.error && (
-          <p className="mb-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
+          <p className="mb-4 rounded-btn bg-red-50 px-4 py-2 text-sm text-red-700">
             {params.error}
           </p>
         )}
@@ -26,7 +27,7 @@ export default async function SignupPage({
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-text"
             >
               Email
             </label>
@@ -36,14 +37,14 @@ export default async function SignupPage({
               type="email"
               autoComplete="email"
               required
-              className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              className="mt-1 min-h-12 w-full rounded-btn border border-border bg-white px-4 text-base focus:border-brand focus:outline-none"
             />
           </div>
 
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-text"
             >
               Password
             </label>
@@ -54,20 +55,20 @@ export default async function SignupPage({
               autoComplete="new-password"
               minLength={6}
               required
-              className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              className="mt-1 min-h-12 w-full rounded-btn border border-border bg-white px-4 text-base focus:border-brand focus:outline-none"
             />
           </div>
 
-          <SubmitButton className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed">
+          <SubmitButton className="min-h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed">
             Registrati
           </SubmitButton>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-500">
+        <p className="mt-6 text-center text-sm text-text-muted">
           Hai già un account?{" "}
           <Link
             href="/login"
-            className="font-semibold text-zinc-900 hover:underline"
+            className="font-semibold text-brand hover:underline"
           >
             Accedi
           </Link>
