@@ -176,6 +176,7 @@ let centered = await centerOf();
 for (let i = 0; i < 15 && centered !== "P1"; i++) { await page.waitForTimeout(200); centered = await centerOf(); }
 ok(centered === "P1", "pin toccato: il carosello porta al centro la sua card");
 ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "pin toccato una volta: la scheda non si apre ancora");
+await page.locator("[data-testid=pin][data-focused=true]", { hasText: "Terrazza Uno" }).waitFor({ timeout: 3000 });
 await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
 ok(true, "pin toccato due volte: si apre la scheda");
@@ -405,6 +406,33 @@ await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
 ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText()), "home B: Invio avvia la ricerca scritta");
 await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
 ok(await page.getByLabel("Scrivi cosa cerchi").isVisible(), "?home=a: torna il primo accesso attuale");
+
+// 7-quinquies. Pin con foto (?pin=b): stesse foto delle card, nessuna foto in più
+await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+await page.waitForTimeout(500);
+const pinSrcs = await page.locator("[data-testid=pin] img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
+const cardSrcs = await page.locator("ul.snap-x img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
+ok(pinSrcs.length >= 1, `pin con foto: ${pinSrcs.length} pin mostrano la foto`);
+ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stesse foto delle card (nessun costo in più)");
+await shot("20-pin-foto");
+await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
+
+// 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"
+await page.route("**/api/search/synthesis", (r) => r.fulfill({ status: 500, json: { error: "x" } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await page.waitForTimeout(800);
+ok(!(await page.getByText(/preparo i verdetti/).isVisible()) && (await page.locator("ul.snap-x li").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
+await page.unroute("**/api/search/synthesis");
+
+// 7-sexies. Un solo interruttore per tutte le varianti
+await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "serif" && d.scheda === "b" && d.home === "b" && d.pin === "b"; }), "?stile=places accende tutte le varianti");
+await page.goto(`${BASE}/mappa?stile=attuale`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return !d.titoli && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte");
 
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });

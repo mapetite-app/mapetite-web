@@ -361,7 +361,7 @@ export default function VenueSheet({
               <PlacePhoto
                 photoRef={venue.photoRef}
                 alt={name}
-                width={800}
+                width={700}
                 priority
                 className="h-72 w-full rounded-t-card object-cover"
                 fallback={<div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>}
