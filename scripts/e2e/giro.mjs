@@ -507,6 +507,15 @@ await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
 
+// 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
+if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {
+  console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
+} else {
+  await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
+  await page.getByRole("button", { name: "Cerca un locale" }).click();
+  ok(await page.getByText("Cosa cerchi?").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
+}
+
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
 // Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
 const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("button", { name: "I miei salvati" }).click())

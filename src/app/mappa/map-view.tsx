@@ -1411,9 +1411,18 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
-                      ? "Inizia a salvare i posti che vuoi ricordare"
+                      ? "Tocca il segnalibro su un locale per ritrovarlo qui, con note e tag."
                       : "Sposta la mappa o cambia vista"}
               </p>
+              {aiSearch === null && view === "saved" && !savedFiltered && (
+                <button
+                  type="button"
+                  onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                  className="mt-4 min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
+                >
+                  Cerca un locale
+                </button>
+              )}
               {aiSearch !== null && (
                 <div className="mt-4 flex justify-center gap-2">
                   <button
