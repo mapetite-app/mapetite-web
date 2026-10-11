@@ -6,6 +6,9 @@ import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { categoryLabel } from "@/lib/category-label";
+import { cityFromAddress } from "@/lib/city";
+import { distanceLabel } from "@/lib/distance";
 
 export type Venue = {
   id: string;
@@ -40,6 +43,7 @@ type VenueSheetProps = {
   onClose: () => void;
   saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
   communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
+  origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
 };
 
 export default function VenueSheet({
@@ -50,6 +54,7 @@ export default function VenueSheet({
   onClose,
   saveSlot,
   communitySlot,
+  origin = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -170,8 +175,19 @@ export default function VenueSheet({
           {name}
         </h2>
 
-        {/* Riga meta compatta */}
+        {/* Come Places: "Città · distanza", poi tipo · voto · prezzo · aperto. */}
+        {(cityFromAddress(address) || origin) && (
+          <p data-testid="citta-distanza" className="mt-1 text-sm font-sans text-text-muted">
+            {[cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null].filter(Boolean).join(" · ")}
+          </p>
+        )}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-sans text-text-muted">
+          {categoryLabel(category) && (
+            <>
+              <span className="text-text">{categoryLabel(category)}</span>
+              {rating != null && <span aria-hidden>·</span>}
+            </>
+          )}
           {rating != null && (
             <span className="inline-flex items-center gap-0.5">
               <span className="text-star">★</span>

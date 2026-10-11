@@ -1519,6 +1519,7 @@ export default function MapView({
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
           <div className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-card bg-surface shadow-float" onClick={(e) => e.stopPropagation()}>
             <VenueSheet
+              origin={userPos ?? searchOrigin}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
                 category: selected.category, rating: selected.rating,

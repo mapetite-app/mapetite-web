@@ -5,6 +5,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
+import { categoryLabel } from "@/lib/category-label";
+import { distanceLabel, distanceM } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
@@ -48,7 +50,7 @@ export type ListDetails = {
 };
 
 function prettyCategory(c: string | null): string | null {
-  return c ? c.replace(/_/g, " ") : null;
+  return categoryLabel(c);
 }
 
 function priceLabel(level: number | null): string | null {
@@ -58,21 +60,6 @@ function priceLabel(level: number | null): string | null {
 function formatCount(n: number | null): string | null {
   if (n == null) return null;
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
-}
-
-function distanceM(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
-  const R = 6371000;
-  const rad = (x: number) => (x * Math.PI) / 180;
-  const a =
-    Math.sin(rad(to.lat - from.lat) / 2) ** 2 +
-    Math.cos(rad(from.lat)) * Math.cos(rad(to.lat)) * Math.sin(rad(to.lng - from.lng) / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
-  const m = distanceM(from, to);
-  if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;
-  return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
 // Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.

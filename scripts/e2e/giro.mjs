@@ -117,6 +117,8 @@ for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salv
 }
 ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
+ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
+ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
 await shot("04-scheda");
 
 // 4b. Funzioni beta spente di default
