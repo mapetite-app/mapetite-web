@@ -14,6 +14,7 @@ import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/b
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
+import { momentSuggestion } from "@/lib/moment";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -536,6 +537,12 @@ export default function MapView({
     () => () => {},
     () => (new URLSearchParams(window.location.search).get("lista") === "a" ? "a" : "b"),
     () => "b" as const,
+  );
+  // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
+  const momentExample = useSyncExternalStore(
+    () => () => {},
+    () => momentSuggestion(new Date()),
+    () => null,
   );
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
@@ -1285,6 +1292,18 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {momentExample && (
+                <button
+                  key="momento"
+                  type="button"
+                  data-testid="suggerimento-momento"
+                  disabled={aiSearching}
+                  onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setAiQuery(q); void runAISearch(q); }}
+                  className="min-h-11 shrink-0 rounded-pill border border-brand/40 bg-white px-3.5 text-sm font-sans font-semibold text-brand active:scale-95 disabled:opacity-60"
+                >
+                  {momentExample}
+                </button>
+              )}
               {[
                 "Rooftop romantico per due a Roma",
                 "Trattoria autentica non turistica a Trastevere",

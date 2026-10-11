@@ -72,6 +72,7 @@ ok(await page.getByText("Cosa cerchi?").isVisible(), "primo accesso: card 'Cosa 
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 const bh = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999;
 ok(bh < 844 * 0.3, `primo accesso: la card lascia vedere la mappa (altezza ${Math.round(bh)}px < 30% schermo)`);
+ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
 await shot("01-benvenuto");
 
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
