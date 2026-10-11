@@ -395,6 +395,7 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
 ok(await page.getByText("Chiedi all'AI, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
+ok((await page.getByTestId("home-recenti").getByRole("link").count()) >= 1, "home: le ultime ricerche fatte su questo telefono, a un tocco");
 await page.getByTestId("home-filtri").click();
 await page.getByText(/Applica filtri/).first().waitFor({ timeout: 5000 }).then(() => ok(true, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"), () => ok(false, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"));
 ok(!page.url().includes("filtri=1"), "home → filtri: il parametro sparisce dall'indirizzo (ricaricare non riapre i filtri)");
@@ -409,7 +410,7 @@ searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-await page.getByRole("link", { name: /Rooftop romantico/ }).click();
+await page.getByRole("link", { name: /Rooftop romantico/ }).last().click(); // l'esempio (la prima è la ricerca recente)
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(true, "home: un esempio apre la mappa con i risultati");
 

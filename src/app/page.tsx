@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
+import HomeRecent from "@/components/home-recent";
 
 // Home come quella di Places: marchio al centro, esempi e campo "Cosa cerchi?" in basso.
 // Il modulo porta a /mappa?q=..., dove la ricerca parte da sola (funziona anche senza JS).
@@ -24,6 +25,7 @@ export default function Home() {
 
       <div className="mx-auto w-full max-w-md pb-4">
         {/* Due modi di cercare, chiari subito (Lorenzo 11/10): chiedere all'AI o usare i filtri. */}
+        <HomeRecent />
         <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI, per esempio:</p>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
           {EXAMPLES.map((e) => (
