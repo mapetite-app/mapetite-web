@@ -2381,7 +2381,8 @@ export default function MapView({
             const lines = list.slice(0, 30).map((p) => {
               const gid = Object.keys(placeUuids).find((g) => placeUuids[g] === p.id);
               const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}${gid ? `&query_place_id=${encodeURIComponent(gid)}` : ""}`;
-              return `• ${p.name}${p.note ? ` — ${p.note}` : ""}\n  ${url}`;
+              // La nota è privata ("solo per te"): non finisce nel messaggio.
+              return `• ${p.name}\n  ${url}`;
             });
             const text = `I miei posti su Mapetite${activeCity ? ` · ${activeCity}` : ""}:\n\n${lines.join("\n")}`;
             try {
