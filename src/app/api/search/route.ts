@@ -5,6 +5,7 @@ import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
+import { demoteMainstream } from "@/lib/mainstream";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -104,6 +105,14 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[search/route] Google Places error:", err);
       risultati = [];
+    }
+    // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
+    if (searchIntent === "natural") {
+      const { places, demoted } = demoteMainstream(query.trim(), risultati);
+      if (demoted.length > 0) {
+        risultati = places;
+        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
+      }
     }
 
     if (risultati.length > 0 && fastPhase) {
