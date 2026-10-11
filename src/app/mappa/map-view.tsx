@@ -400,6 +400,7 @@ type VenueDetails = {
   goFor: string[] | null;
   dontExpect: string[] | null;
   matchReason: string | null;
+  photoRef?: string | null;
 };
 
 function AISearchPanel({
@@ -795,7 +796,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -813,6 +814,7 @@ export default function MapView({
           goFor: p.goFor ?? null,
           dontExpect: p.dontExpect ?? null,
           matchReason: p.matchReason ?? null,
+          photoRef: p.photoRef ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
@@ -896,7 +898,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({
@@ -925,6 +927,7 @@ export default function MapView({
             goFor: p.goFor ?? null,
             dontExpect: p.dontExpect ?? null,
             matchReason: p.matchReason ?? null,
+            photoRef: p.photoRef ?? null,
           };
         }
         const id = ++searchSeq.current;

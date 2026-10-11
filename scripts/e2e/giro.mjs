@@ -15,7 +15,7 @@ mkdirSync(OUT, { recursive: true });
 const mk = (id, name, lat, lng, extra = {}) => ({
   id, name, address: "Via di Prova 1, Roma", lat, lng, category: "bar",
   rating: 4.5, userRatingCount: 812, priceLevel: 2, openNow: true, types: ["bar"],
-  websiteUri: "https://example.com", editorialSummary: null, phone: "+39 06 1234 5678", photoRef: null,
+  websiteUri: "https://example.com", editorialSummary: null, phone: "+39 06 1234 5678", photoRef: `places/${id}/photos/AbC_${id}`,
   selectedReviews: [{ text: "Bella vista sulla città." }], synthesis: null, tags: null,
   verdict: null, goFor: null, dontExpect: null, matchReason: null, ...extra,
 });
@@ -43,6 +43,13 @@ const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: [] });
 let searchMode = "ok";
+let photoMode = "ok";
+let photoCalls = 0;
+await ctx.route("**/api/places/photo**", async (route) => {
+  photoCalls++;
+  if (photoMode === "off") return route.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } });
+  return route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' });
+});
 let synthDelay = 900;
 await ctx.route("**/api/search", async (route) => {
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
@@ -78,6 +85,8 @@ ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale esclu
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
 await shot("03-lista-verdetti");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
+ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
+ok(await page.locator("ul img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "foto: la prima card ha la foto caricata");
 await page.waitForTimeout(1200);
 const pinBoxes = [];
 for (const pin of await page.getByTestId("pin").all()) { const b = await pin.boundingBox(); if (b) pinBoxes.push(b); }
@@ -103,6 +112,7 @@ for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salv
   ok(!!box && box.y + box.height <= vh && box.y >= 0, `scheda: pulsante ${label} nel viewport`);
   if (box) ok(box.height >= 40, `scheda: pulsante ${label} alto almeno 40px (${Math.round(box.height)})`);
 }
+ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 await shot("04-scheda");
 
@@ -136,6 +146,15 @@ await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "?beta=off: i filtri rapidi spariscono");
+
+// 5d. Foto non disponibili (quota finita): resta l'emoji, nessun errore
+photoMode = "off";
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await page.waitForTimeout(800);
+ok((await page.locator("ul img").count()) === 0 && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
+photoMode = "ok";
 
 // 6. Errore di rete/API
 searchMode = "error";

@@ -4,6 +4,10 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } fro
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta } from "@/lib/beta";
+import PlacePhoto from "@/components/place-photo";
+
+// Solo le prime card mostrano la foto: contiene il costo di Place Photos.
+const PHOTO_CARDS = 6;
 
 export interface BottomSheetProps {
   places: Place[];
@@ -25,6 +29,7 @@ export type ListDetails = {
   verdict: string | null;
   matchReason: string | null;
   goFor: string[] | null;
+  photoRef?: string | null;
 };
 
 function prettyCategory(c: string | null): string | null {
@@ -258,8 +263,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 <button
                   type="button"
                   onClick={() => onSelect(place)}
-                  className="flex h-full min-h-[190px] w-full flex-col rounded-card bg-brand p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  className="relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-card bg-brand p-4 text-left text-white shadow-float active:scale-[0.99]"
                 >
+                  {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
+                    <>
+                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-brand/20" />
+                    </>
+                  )}
                   <span className="flex items-start justify-between gap-2">
                     <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
                     {d?.openNow === true && (
@@ -361,8 +372,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 onClick={() => onSelect(place)}
                 className="flex w-full items-start gap-3 rounded-card border border-border bg-white px-3 py-3 text-left shadow-card active:scale-[0.99]"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl leading-none">
-                  {getCategoryEmoji(place.category, place.name)}
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl leading-none">
+                  <PlacePhoto
+                    photoRef={places.indexOf(place) < PHOTO_CARDS ? details?.[place.id]?.photoRef : null}
+                    alt={place.name}
+                    width={200}
+                    className="h-full w-full object-cover"
+                    fallback={getCategoryEmoji(place.category, place.name)}
+                  />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-display font-semibold leading-snug text-text">
