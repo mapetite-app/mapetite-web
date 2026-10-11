@@ -365,21 +365,12 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 5. COMMUNITY — recensioni Mapetite + ReviewForm */}
-      {communitySlot && (
-        <div className="mt-5 border-t border-border px-5 pt-4">
-          <h3 className="font-display text-base font-semibold text-brand">
-            Recensioni Mapetite
-          </h3>
-          <div className="mt-2">{communitySlot}</div>
-        </div>
-      )}
-
-      {/* 6. COSA DICONO — recensioni Google */}
+      {/* 5. COSA DICONO — recensioni Google (prima: è quasi sempre piena) */}
       {hasReviews && (
-        <div className="mt-5 px-5">
-          <h3 className="font-display text-base font-semibold text-brand">
+        <div className="mt-5 border-t border-border px-5 pt-4">
+          <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
             Cosa dicono
+            <span className="text-xs font-sans font-normal text-text-muted">Recensioni da Google</span>
           </h3>
           <div className="mt-2 flex flex-col gap-2">
             {selectedReviews!.map((review, i) => (
@@ -394,6 +385,16 @@ export default function VenueSheet({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 6. COMMUNITY — recensioni Mapetite + ReviewForm */}
+      {communitySlot && (
+        <div className="mt-5 border-t border-border px-5 pt-4">
+          <h3 className="font-display text-base font-semibold text-brand">
+            Recensioni Mapetite
+          </h3>
+          <div className="mt-2">{communitySlot}</div>
         </div>
       )}
 
