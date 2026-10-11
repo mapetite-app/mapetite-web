@@ -189,37 +189,32 @@ export default function ImportaPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-2">Importa da screenshot</h1>
-      <p className="text-sm text-zinc-500 mb-8">
+    <div className="mx-auto max-w-2xl px-5 py-8">
+      <h1 className="mb-2 font-title text-2xl font-semibold text-brand">Importa da screenshot</h1>
+      <p className="text-sm text-text-muted mb-8">
         Carica uno screenshot di un post social e aggiungi il locale alla tua mappa in pochi passi.
       </p>
 
       {/* ── Step 1: carica immagine ── */}
       {step === 1 && (
         <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-2">
-              Screenshot
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-zinc-500
-                file:mr-3 file:rounded-md file:border-0
-                file:bg-zinc-900 file:px-3 file:py-2
-                file:text-sm file:font-semibold file:text-white
-                hover:file:bg-zinc-700 file:cursor-pointer"
-            />
-          </div>
+          <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-card border-2 border-dashed border-border bg-surface px-4 py-6 text-center active:scale-[0.99]">
+            <span aria-hidden className="text-3xl">📷</span>
+            <span className="text-base font-display font-semibold text-brand">
+              {file ? "Cambia screenshot" : "Scegli uno screenshot"}
+            </span>
+            <span className="text-xs font-sans text-text-muted">
+              {file ? file.name : "Un post Instagram o TikTok, o una storia"}
+            </span>
+            <input type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
+          </label>
 
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={previewUrl}
               alt="Anteprima screenshot"
-              className="max-h-72 w-full rounded-lg border border-zinc-200 object-contain"
+              className="max-h-72 w-full rounded-card border border-border object-contain"
             />
           )}
 
@@ -227,10 +222,10 @@ export default function ImportaPage() {
             type="button"
             onClick={handleRead}
             disabled={!file || isReading}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white
-              hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+            className="h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white
+              hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
           >
-            {isReading ? "Lettura in corso..." : "Leggi locale"}
+            {isReading ? "Leggo lo screenshot…" : "Trova il locale"}
           </button>
         </div>
       )}
@@ -239,8 +234,8 @@ export default function ImportaPage() {
       {step === 2 && extracted && (
         <div className="space-y-6">
           {/* Estratto dall'AI */}
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 space-y-2">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3">
+          <div className="rounded-btn border border-border bg-surface p-4 space-y-2">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
               Letto dall&apos;AI
             </p>
             <Row label="Nome" value={extracted.nome} fallback="non rilevato" />
@@ -250,7 +245,7 @@ export default function ImportaPage() {
 
           {/* Risultati Google */}
           <div>
-            <p className="text-sm font-semibold text-zinc-700 mb-3">
+            <p className="text-sm font-semibold text-text mb-3">
               Seleziona il locale corretto
             </p>
 
@@ -262,23 +257,23 @@ export default function ImportaPage() {
                       type="button"
                       onClick={() => handleSelectPlace(r)}
                       disabled={isSaving || !userId}
-                      className="w-full rounded-md border border-zinc-200 px-4 py-3 text-left
-                        hover:border-zinc-400 hover:bg-zinc-50
+                      className="w-full rounded-btn border border-border px-4 py-3 text-left
+                        hover:border-brand hover:bg-surface
                         disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
                     >
-                      <p className="text-sm font-semibold text-zinc-900">{r.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{r.address}</p>
+                      <p className="text-sm font-semibold text-text">{r.name}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{r.address}</p>
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-zinc-400 mb-4">Nessun risultato trovato.</p>
+              <p className="text-sm text-text-muted mb-4">Nessun risultato trovato.</p>
             )}
 
             {/* Ricerca manuale */}
             <div className="space-y-2">
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-text-muted">
                 {searchResults.length > 0
                   ? "Non trovi il locale? Cerca manualmente:"
                   : "Prova a cercarlo manualmente:"}
@@ -290,15 +285,15 @@ export default function ImportaPage() {
                   onChange={(e) => setManualQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
                   placeholder="Es. Dal Toscano Roma"
-                  className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm
-                    focus:border-zinc-500 focus:outline-none"
+                  className="min-w-0 flex-1 rounded-btn border border-border px-3 py-2 text-base
+                    focus:ring-2 focus:ring-brand focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleManualSearch}
                   disabled={isSearching || !manualQuery.trim()}
-                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium
-                    text-zinc-700 hover:bg-zinc-100 disabled:opacity-60 transition-colors"
+                  className="rounded-btn border border-border px-3 py-2 text-sm font-medium
+                    text-text hover:bg-surface disabled:opacity-60 transition-colors"
                 >
                   {isSearching ? "..." : "Cerca"}
                 </button>
@@ -306,8 +301,8 @@ export default function ImportaPage() {
             </div>
 
             {!userId && (
-              <p className="mt-4 text-sm text-zinc-500">
-                <Link href="/login" className="underline text-zinc-900">
+              <p className="mt-4 text-sm text-text-muted">
+                <Link href="/login" className="underline text-text">
                   Accedi
                 </Link>{" "}
                 per salvare un locale.
@@ -318,7 +313,7 @@ export default function ImportaPage() {
           <button
             type="button"
             onClick={handleReset}
-            className="text-sm text-zinc-400 hover:text-zinc-600 underline"
+            className="text-sm text-text-muted hover:text-text-muted underline"
           >
             ← Ricomincia con un altro screenshot
           </button>
@@ -327,25 +322,25 @@ export default function ImportaPage() {
 
       {/* ── Step 3: conferma ── */}
       {step === 3 && savedName && (
-        <div className="rounded-md border border-green-200 bg-green-50 p-8 text-center space-y-3">
+        <div className="rounded-btn border border-green-200 bg-green-50 p-8 text-center space-y-3">
           <p className="text-3xl">✅</p>
-          <p className="text-base font-semibold text-zinc-900">Salvato!</p>
-          <p className="text-sm text-zinc-600">
+          <p className="text-base font-semibold text-text">Salvato!</p>
+          <p className="text-sm text-text-muted">
             <span className="font-medium">{savedName}</span> è stato aggiunto alla tua mappa.
           </p>
           <div className="flex justify-center gap-3 pt-3">
             <Link
               href="/mappa"
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white
-                hover:bg-zinc-700 transition-colors"
+              className="rounded-btn bg-brand px-4 py-2 text-sm font-semibold text-white
+                hover:opacity-90 transition-colors"
             >
               Vai alla mappa
             </Link>
             <button
               type="button"
               onClick={handleReset}
-              className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium
-                text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="rounded-btn border border-border px-4 py-2 text-sm font-medium
+                text-text hover:bg-surface transition-colors"
             >
               Importa un altro
             </button>
@@ -354,7 +349,7 @@ export default function ImportaPage() {
       )}
 
       {error && (
-        <p className="mt-6 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="mt-6 rounded-btn bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </p>
       )}
@@ -373,11 +368,11 @@ function Row({
 }) {
   return (
     <div className="flex gap-3">
-      <span className="text-sm font-medium text-zinc-600 w-24 shrink-0">{label}</span>
+      <span className="text-sm font-medium text-text-muted w-24 shrink-0">{label}</span>
       {value ? (
-        <span className="text-sm text-zinc-900">{value}</span>
+        <span className="text-sm text-text">{value}</span>
       ) : (
-        <span className="text-sm text-zinc-400 italic">{fallback}</span>
+        <span className="text-sm text-text-muted italic">{fallback}</span>
       )}
     </div>
   );

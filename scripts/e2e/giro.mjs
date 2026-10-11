@@ -296,6 +296,18 @@ ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza p
 await page.goto(`${BASE}/mappa?titoli=sans`, { waitUntil: "networkidle" });
 ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
 
+// 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
+await page.goto(`${BASE}/login?error=Email%20o%20password%20non%20corrette.`, { waitUntil: "networkidle" });
+ok(await page.getByRole("alert").getByText("Email o password non corrette.").isVisible(), "login: messaggio d'errore in evidenza");
+ok(await page.locator("#email").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "login: campi da almeno 16px (niente zoom su iPhone)");
+ok(await page.getByRole("link", { name: "Intanto prova a cercare senza account" }).isVisible(), "login: si può provare l'app senza account");
+await shot("18-login");
+await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
+ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
+await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
+await shot("19-importa");
+
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
 const fb = page.getByRole("link", { name: "Feedback" });
