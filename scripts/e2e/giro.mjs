@@ -723,6 +723,17 @@ else {
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
 
+  // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
+  ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: spento di default");
+  await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("scegli-tu").click();
+  await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
+  ok(await p.getByText("Osteria Due").last().isVisible() && (await p.getByTestId("stato-salvato").getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "scegli tu: apre il salvato 'Voglio andarci'");
+  await p.screenshot({ path: `${OUT}/26-scegli-tu.png`, caret: "initial" });
+  await p.keyboard.press("Escape");
+  await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+
   // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();

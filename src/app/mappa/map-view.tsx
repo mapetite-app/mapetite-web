@@ -804,6 +804,8 @@ export default function MapView({
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
   const shareOn = useBeta("condividi");
+  // "🎲 Scegli tu" tra i salvati (?beta=sorprendimi, spento di default).
+  const pickOn = useOptIn("sorprendimi");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
@@ -1615,6 +1617,26 @@ export default function MapView({
               className="min-h-10 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
             />
             <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
+              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
+              {pickOn && filterSaved(savedPlaces, activeTag, activeCity, savedQuery).length >= 2 && (
+                <button
+                  type="button"
+                  data-testid="scegli-tu"
+                  onClick={() => {
+                    const shown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
+                    const want = shown.filter((p) => p.tags?.includes(VISIT_WANT));
+                    const pool = (want.length > 0 ? want : shown).filter((p) => p.id !== selected?.id);
+                    const place = pool[Math.floor(Math.random() * pool.length)] ?? shown[0];
+                    setFocusedId(place.id);
+                    dispatch({ type: "OPEN_VENUE", placeId: place.id });
+                    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+                    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+                  }}
+                  className={`shrink-0 ${CHIP_OFF}`}
+                >
+                  🎲 Scegli tu
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}

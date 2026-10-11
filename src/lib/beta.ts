@@ -13,9 +13,9 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 // quel telefono finché non si apre ?beta=off).
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
-//   barra         campo "Cosa cerchi?" sempre visibile in cima alla mappa (Places), al posto dell'icona ✨
 //   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
-export type OptInFlag = "gemme" | "articolo" | "barra" | "salva";
+//   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche l'articolo e il nuovo "Salva"; ?stile=attuale li spegne.
