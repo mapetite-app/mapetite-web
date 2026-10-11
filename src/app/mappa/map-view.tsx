@@ -37,6 +37,7 @@ function SaveModal({
   onSaved,
   onCancel,
   photoRef = null,
+  knownTags = [],
 }: {
   place: Place;
   userId: string;
@@ -46,6 +47,8 @@ function SaveModal({
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
   photoRef?: string | null;
+  // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
+  knownTags?: string[];
 }) {
   // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
   const sheetOn = useOptIn("salva");
@@ -62,6 +65,37 @@ function SaveModal({
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
+
+  // Tag scritti dall'utente (come le raccolte di Places): stessa colonna tags, nessuna migrazione.
+  const tagOptions = Array.from(new Set([...PRESET_TAGS, ...knownTags, ...selectedTags]));
+  const [newTag, setNewTag] = useState<string | null>(null);
+  const addNewTag = () => {
+    const raw = (newTag ?? "").trim().replace(/\s+/g, " ").slice(0, 24);
+    setNewTag(null);
+    if (raw === "") return;
+    const existing = tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase());
+    const tag = existing ?? raw.charAt(0).toUpperCase() + raw.slice(1);
+    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+  };
+  const newTagControl = (chipClass: string) =>
+    newTag === null ? (
+      <button type="button" data-testid="nuovo-tag" onClick={() => setNewTag("")} className={chipClass}>
+        + Nuovo tag
+      </button>
+    ) : (
+      <input
+        autoFocus
+        value={newTag}
+        onChange={(e) => setNewTag(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNewTag(); } if (e.key === "Escape") setNewTag(null); }}
+        onBlur={addNewTag}
+        maxLength={24}
+        enterKeyHint="done"
+        placeholder="es. Brunch, Da Milano…"
+        aria-label="Nuovo tag"
+        className="min-h-9 w-40 rounded-pill border border-brand bg-white px-3 text-base font-sans text-text focus:outline-none"
+      />
+    );
 
   const handleSave = () => {
     setError(false);
@@ -166,7 +200,7 @@ function SaveModal({
 
           <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
           <div className="flex flex-wrap gap-2">
-            {PRESET_TAGS.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
+            {tagOptions.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
               <button
                 key={tag}
                 type="button"
@@ -177,6 +211,7 @@ function SaveModal({
                 {tag}
               </button>
             ))}
+            {newTagControl("min-h-9 rounded-pill border border-dashed border-brand/50 px-3.5 text-sm font-display font-medium text-brand")}
           </div>
 
           {error && <p className="mt-3 text-sm text-error">Non sono riuscito a salvare. Controlla la connessione e riprova.</p>}
@@ -206,10 +241,11 @@ function SaveModal({
 
         <p className="mb-2 text-xs font-sans text-text-muted">Tag</p>
         <div className="mb-4 flex flex-wrap gap-2">
-          {PRESET_TAGS.map((tag) => (
+          {tagOptions.map((tag) => (
             <button
               key={tag}
               type="button"
+              aria-pressed={selectedTags.includes(tag)}
               onClick={() => toggleTag(tag)}
               className={
                 selectedTags.includes(tag)
@@ -220,6 +256,7 @@ function SaveModal({
               {tag}
             </button>
           ))}
+          {newTagControl("rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
         </div>
 
         <p className="mb-1 text-xs font-sans text-text-muted">Nota personale</p>
@@ -2151,6 +2188,7 @@ export default function MapView({
         return pendingPlace && userId ? (
           <SaveModal
             place={pendingPlace}
+            knownTags={availableTags}
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
@@ -2173,6 +2211,7 @@ export default function MapView({
       {pendingEditPlace && userId && (
         <SaveModal
           place={pendingEditPlace}
+          knownTags={availableTags}
           userId={userId}
           mode="edit"
           initialTags={pendingEditPlace.tags ?? []}

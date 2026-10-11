@@ -690,6 +690,8 @@ else {
   await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
   ok(true, "salva: si apre la finestra con tag e nota");
   await modal.getByRole("button", { name: "Romantico" }).click();
+  await modal.getByTestId("nuovo-tag").click();
+  await modal.getByLabel("Nuovo tag").fill("da rifare");
   await modal.locator("textarea").fill("Tavolo vicino alla ringhiera");
   await modal.getByRole("button", { name: "Salva", exact: true }).click();
   await modal.getByText("Errore durante il salvataggio. Riprova.").waitFor({ timeout: 3000 });
@@ -698,8 +700,8 @@ else {
   await modal.getByRole("button", { name: "Salva", exact: true }).click();
   await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
   const ins = writes.find((w) => w.m === "POST");
-  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
-    "salva: scrive in saved_places l'UUID Supabase con tag e nota");
+  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
+    "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
@@ -724,11 +726,15 @@ else {
   await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false", "salva B: gli stati si escludono a vicenda");
   await sheet.getByRole("button", { name: "Con amici" }).click();
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("  brunch  ");
+  await sheet.getByLabel("Nuovo tag").press("Enter");
+  ok((await sheet.getByRole("button", { name: "Brunch" }).getAttribute("aria-pressed")) === "true", "salva B: '+ Nuovo tag' aggiunge un tag scritto da te (già scelto)");
   await sheet.locator("textarea").fill("Prenotare");
   await sheet.getByRole("button", { name: "Fatto" }).click();
   await sheet.waitFor({ state: "detached", timeout: 4000 });
   const ins2 = writes.find((w) => w.m === "POST");
-  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + nota (stessi campi di prima)");
+  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici","Brunch"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + tag nuovo + nota (stessi campi di prima)");
   await v.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
   await vctx.close();
 }
