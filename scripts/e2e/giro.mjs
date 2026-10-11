@@ -226,6 +226,13 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) === 0, "?beta=off: spegne anche le gemme");
 
+// 5f. Ricerca scritta direttamente nella card iniziale
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
+await page.getByLabel("Scrivi cosa cerchi").press("Enter");
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitivo sul tetto"), "card iniziale: si scrive e si cerca senza aprire altri pannelli");
+
 // 5d. Foto non disponibili (quota finita): resta l'emoji, nessun errore
 photoMode = "off";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

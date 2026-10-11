@@ -1330,13 +1330,31 @@ export default function MapView({
             )}
             {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
             <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "OPEN_AI" })}
-                className="min-h-11 flex-1 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito. */}
+              <form
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-brand pl-3.5 pr-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = aiQuery.trim();
+                  if (q.length >= 3 && !aiSearching) void runAISearch(q);
+                }}
               >
-                Scrivi la tua ricerca
-              </button>
+                <Sparkles size={16} className="shrink-0 text-accent" aria-hidden />
+                <input
+                  type="search"
+                  enterKeyHint="search"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  placeholder="Scrivi cosa cerchi…"
+                  aria-label="Scrivi cosa cerchi"
+                  className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-white placeholder:text-white/70 focus:outline-none"
+                />
+                {aiQuery.trim().length >= 3 && (
+                  <button type="submit" disabled={aiSearching} aria-label="Cerca" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white active:scale-95 disabled:opacity-60">
+                    →
+                  </button>
+                )}
+              </form>
               <button
                 type="button"
                 onClick={goToMyPosition}
