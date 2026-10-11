@@ -19,6 +19,7 @@ import { loadRecentSearches, saveRecentSearch, useBeta, useVariant } from "@/lib
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
+import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
@@ -591,6 +592,27 @@ export default function MapView({
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
   const [activeCity, setActiveCity] = useState<string | null>(null);
+  // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
+  const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    createClient()
+      .from("profiles")
+      .select("cuisines, occasions, atmospheres, price_range")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        setTasteSuggestion(tasteQuery({
+          cuisines: (data.cuisines as string[] | null) ?? [],
+          occasions: (data.occasions as string[] | null) ?? [],
+          atmospheres: (data.atmospheres as string[] | null) ?? [],
+          priceRange: (data.price_range as string | null) ?? null,
+        }));
+      });
+    return () => { alive = false; };
+  }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
@@ -1592,6 +1614,18 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {tasteSuggestion && (
+                <button
+                  key="per-te"
+                  type="button"
+                  data-testid="suggerimento-per-te"
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
+                  className="min-h-11 shrink-0 rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white active:scale-95 disabled:opacity-60"
+                >
+                  ✨ Per te: {tasteSuggestion}
+                </button>
+              )}
               {momentExample && (
                 <button
                   key="momento"

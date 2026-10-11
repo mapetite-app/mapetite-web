@@ -54,6 +54,7 @@ await ctx.route("**/api/places/photo**", async (route) => {
 // Con E2E_FAKE_USER la mappa legge i salvati: nel giro principale risultano vuoti (niente rete verso Supabase).
 await ctx.route("**/rest/v1/saved_places**", (route) => route.fulfill({ json: [] }));
 await ctx.route("**/rest/v1/place_synthesis**", (route) => route.fulfill({ json: [] }));
+await ctx.route("**/rest/v1/profiles**", (route) => route.fulfill({ json: [] }));
 let synthDelay = 900;
 let searchDelay = 0;
 await ctx.route("**/api/search", async (route) => {
@@ -538,12 +539,14 @@ else {
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
   await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await sctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" }] }));
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const p = await sctx.newPage();
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  ok((await p.getByTestId("suggerimento-per-te").textContent()) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
