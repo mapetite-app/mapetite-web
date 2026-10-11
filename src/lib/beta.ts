@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-// Funzioni in prova, spente di default: si accendono con ?beta=nome1,nome2 nell'URL.
+// Funzioni introdotte in prova: dal 11/10 sono ACCESE per tutti. Per spegnerle (confronto) ?beta=off.
 //   filtri-lista  chip "Aperto ora / Fino a €€ / 4,5+" sopra la lista risultati
 //   condividi     pulsante "Condividi" nella scheda locale
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
@@ -16,7 +16,8 @@ function readFlags(): string {
 
 export function useBeta(flag: BetaFlag): boolean {
   const raw = useSyncExternalStore(() => () => {}, readFlags, () => EMPTY);
-  return raw.split(",").map((f) => f.trim()).includes(flag);
+  const list = raw.split(",").map((f) => f.trim());
+  return !list.includes("off") && !list.includes(`-${flag}`);
 }
 
 const RECENT_KEY = "mapetite.recenti";

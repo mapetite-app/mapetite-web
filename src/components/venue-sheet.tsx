@@ -3,6 +3,7 @@
 import { X, Quote, Navigation, Globe, Phone, Check, Share2 } from "lucide-react";
 import { useState } from "react";
 import { useBeta } from "@/lib/beta";
+import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -27,6 +28,7 @@ export type Venue = {
   matchReason: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
+  photoRef?: string | null;
 };
 
 type VenueSheetProps = {
@@ -130,6 +132,15 @@ export default function VenueSheet({
         <X size={18} />
       </button>
 
+      {venue.photoRef && (
+        <PlacePhoto
+          photoRef={venue.photoRef}
+          alt={name}
+          width={700}
+          priority
+          className="h-44 w-full rounded-t-card object-cover"
+        />
+      )}
       <div className="px-5 pt-5">
         <span
           role="img"

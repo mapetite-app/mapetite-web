@@ -15,7 +15,7 @@ mkdirSync(OUT, { recursive: true });
 const mk = (id, name, lat, lng, extra = {}) => ({
   id, name, address: "Via di Prova 1, Roma", lat, lng, category: "bar",
   rating: 4.5, userRatingCount: 812, priceLevel: 2, openNow: true, types: ["bar"],
-  websiteUri: "https://example.com", editorialSummary: null, phone: "+39 06 1234 5678", photoRef: null,
+  websiteUri: "https://example.com", editorialSummary: null, phone: "+39 06 1234 5678", photoRef: `places/${id}/photos/AbC_${id}`,
   selectedReviews: [{ text: "Bella vista sulla città." }], synthesis: null, tags: null,
   verdict: null, goFor: null, dontExpect: null, matchReason: null, ...extra,
 });
@@ -43,6 +43,13 @@ const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: [] });
 let searchMode = "ok";
+let photoMode = "ok";
+let photoCalls = 0;
+await ctx.route("**/api/places/photo**", async (route) => {
+  photoCalls++;
+  if (photoMode === "off") return route.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } });
+  return route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' });
+});
 let synthDelay = 900;
 await ctx.route("**/api/search", async (route) => {
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
@@ -61,22 +68,30 @@ const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
 // 1. Primo accesso
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.getByText("Cosa cerchi?").isVisible(), "primo accesso: card 'Cosa cerchi?' visibile");
-ok((await page.getByRole("button", { name: /Rooftop romantico/ }).count()) === 1, "primo accesso: esempi cliccabili presenti");
+ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 const bh = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999;
 ok(bh < 844 * 0.3, `primo accesso: la card lascia vedere la mappa (altezza ${Math.round(bh)}px < 30% schermo)`);
 await shot("01-benvenuto");
 
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
-await page.getByRole("button", { name: /Rooftop romantico/ }).click();
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.getByText("preparo i verdetti").isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
-ok(await page.getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
+ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
 await shot("02-lista-caricamento");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(true, "lista: il verdetto compare dopo");
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
 await shot("03-lista-verdetti");
+ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
+ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
+ok(await page.locator("ul img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "foto: la prima card ha la foto caricata");
+await page.waitForTimeout(1200);
+const pinBoxes = [];
+for (const pin of await page.getByTestId("pin").all()) { const b = await pin.boundingBox(); if (b) pinBoxes.push(b); }
+ok(pinBoxes.length >= 2, `mappa: ${pinBoxes.length} pin con nome sulla mappa dopo la ricerca`);
+ok(pinBoxes.every((b) => b.y > 0 && b.y + b.height < 844 * 0.55 && b.x >= 0 && b.x + b.width <= 390), "mappa: la mappa si sposta sui risultati (pin sopra la lista, dentro lo schermo)");
 
 // 3. Persistenza pannello AI
 await page.locator("button").first().click(); // ✨
@@ -97,38 +112,54 @@ for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salv
   ok(!!box && box.y + box.height <= vh && box.y >= 0, `scheda: pulsante ${label} nel viewport`);
   if (box) ok(box.height >= 40, `scheda: pulsante ${label} alto almeno 40px (${Math.round(box.height)})`);
 }
+ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 await shot("04-scheda");
 
 // 4b. Funzioni beta spente di default
-ok((await page.getByLabel(/Condividi/).count()) === 0, "beta: 'Condividi' assente senza ?beta=condividi");
+ok((await page.getByLabel(/Condividi/).count()) === 1, "condividi: pulsante presente nella scheda (acceso di default)");
 
 // 5. Variante B
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: /Rooftop romantico/ }).click();
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.locator("ul.snap-x").count() === 1, "variante B: carosello presente");
 await shot("05-lista-b");
 
 // 5b. Beta: filtri lista, condividi, recenti
-await page.goto(`${BASE}/mappa?beta=filtri-lista,condividi,recenti`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 await page.getByRole("button", { name: "Aperto ora" }).first().click();
-ok((await page.getByText("Rooftop Tre").count()) === 0 && (await page.getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
 ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condividi: pulsante presente nella scheda");
-await page.goto(`${BASE}/mappa?beta=recenti`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
 await shot("10-beta-recenti");
+
+// 5c. Spegnimento con ?beta=off
+await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "?beta=off: i filtri rapidi spariscono");
+
+// 5d. Foto non disponibili (quota finita): resta l'emoji, nessun errore
+photoMode = "off";
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await page.waitForTimeout(800);
+ok((await page.locator("ul img").count()) === 0 && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
+photoMode = "ok";
 
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: /Colazione buona/ }).click();
+await page.getByRole("button", { name: "Colazione buona qui vicino", exact: true }).click();
 await page.getByText(/Qualcosa è andato storto/).first().waitFor({ timeout: 4000 });
 ok(true, "errore API: messaggio umano mostrato nella card");
 await shot("06-errore");

@@ -400,6 +400,7 @@ type VenueDetails = {
   goFor: string[] | null;
   dontExpect: string[] | null;
   matchReason: string | null;
+  photoRef?: string | null;
 };
 
 function AISearchPanel({
@@ -519,6 +520,8 @@ export default function MapView({
     () => "[]",
   );
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
   const [aiError, setAiError] = useState<string | null>(null);
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
@@ -793,7 +796,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -811,6 +814,7 @@ export default function MapView({
           goFor: p.goFor ?? null,
           dontExpect: p.dontExpect ?? null,
           matchReason: p.matchReason ?? null,
+          photoRef: p.photoRef ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
@@ -849,6 +853,24 @@ export default function MapView({
     return clusterIndex.getClusters(bbox, roundedZoom);
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude]);
 
+  // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
+  const fitToPlaces = (list: Place[]) => {
+    if (list.length === 0) return;
+    const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
+    if (!map) return;
+    const lngs = list.map((p) => p.lng);
+    const lats = list.map((p) => p.lat);
+    const h = typeof window !== "undefined" ? window.innerHeight : 800;
+    try {
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: { top: 150, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+      );
+    } catch {
+      // mappa non pronta: si lascia la vista com'è
+    }
+  };
+
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
   const runAISearch = async (q: string) => {
     setAiSearching(true);
@@ -876,7 +898,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({
@@ -905,6 +927,7 @@ export default function MapView({
             goFor: p.goFor ?? null,
             dontExpect: p.dontExpect ?? null,
             matchReason: p.matchReason ?? null,
+            photoRef: p.photoRef ?? null,
           };
         }
         const id = ++searchSeq.current;
@@ -913,6 +936,8 @@ export default function MapView({
         setVenueDetails(details); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         if (view === "all") saveRecentSearch(q);
+      setSearchOrigin({ lat: viewState.latitude, lng: viewState.longitude });
+      fitToPlaces(places);
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
@@ -928,6 +953,7 @@ export default function MapView({
     setGeoState("loading");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setViewState((v) => ({ ...v, latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 14 }));
         setGeoState("idle");
         setWelcomeDismissed(true);
@@ -1281,13 +1307,22 @@ export default function MapView({
                 dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
             >
-              <span
-                role="img"
-                aria-label={place.category ?? "locale"}
-                className="text-3xl leading-none cursor-pointer drop-shadow"
-              >
-                {getCategoryEmoji(place.category, place.name)}
-              </span>
+              <div className="flex cursor-pointer flex-col items-center" data-testid="pin">
+                <span
+                  role="img"
+                  aria-label={place.category ?? "locale"}
+                  className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                    selected?.id === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
+                  }`}
+                >
+                  {getCategoryEmoji(place.category, place.name)}
+                </span>
+                {(aiSearch !== null || viewState.zoom >= 14 || selected?.id === place.id) && (
+                  <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
+                    {place.name}
+                  </span>
+                )}
+              </div>
             </Marker>
           );
         })}
@@ -1473,6 +1508,7 @@ export default function MapView({
           details={aiSearch !== null ? venueDetails : undefined}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
+          origin={userPos ?? searchOrigin}
           onSelect={(place) => {
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
