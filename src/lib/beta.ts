@@ -6,7 +6,8 @@ import { useSyncExternalStore } from "react";
 //   filtri-lista  chip "Aperto ora / Fino a €€ / 4,5+" sopra la lista risultati
 //   condividi     pulsante "Condividi" nella scheda locale
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
-export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
+//   barra         campo "Chiedi all'AI" + pulsante "Filtri" sempre in cima alla mappa (dal 11/10, scelta di Lorenzo)
+export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 
 // Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
 // quel telefono finché non si apre ?beta=off).

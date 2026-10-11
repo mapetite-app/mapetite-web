@@ -75,7 +75,10 @@ const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
 
 // 1. Primo accesso
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-ok(await page.getByText("Cosa cerchi?").isVisible(), "primo accesso: card 'Cosa cerchi?' visibile");
+ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible(), "primo accesso: card con esempi 'Chiedi all'AI' visibile");
+ok(await page.getByTestId("benvenuto-filtri").isVisible(), "primo accesso: si vede anche la ricerca per filtri ('Oppure usa i filtri')");
+ok(await page.getByRole("button", { name: "Filtri", exact: true }).getByText("Filtri").isVisible(), "barra in alto: pulsante 'Filtri' con la scritta");
+ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "barra in alto: si capisce che è la ricerca con l'AI");
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 const bh = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999;
 ok(bh < 844 * 0.3, `primo accesso: la card lascia vedere la mappa (altezza ${Math.round(bh)}px < 30% schermo)`);
@@ -103,15 +106,8 @@ for (const pin of await page.getByTestId("pin").all()) { const b = await pin.bou
 ok(pinBoxes.length >= 2, `mappa: ${pinBoxes.length} pin con nome sulla mappa dopo la ricerca`);
 ok(pinBoxes.every((b) => b.y > 0 && b.y + b.height < 844 * 0.55 && b.x >= 0 && b.x + b.width <= 390), "mappa: la mappa si sposta sui risultati (pin sopra la lista, dentro lo schermo)");
 
-// 3. Persistenza pannello AI
-await page.getByRole("button", { name: "Ricerca con l'AI" }).click(); // ✨
-const input = page.locator("input[type=text]");
-await input.waitFor({ timeout: 3000 });
-ok((await input.inputValue()).startsWith("Rooftop romantico"), "pannello AI: il testo cercato è conservato");
-ok(await page.getByText(/locali trovati/).isVisible(), "pannello AI: i risultati restano attivi");
-await page.getByRole("button", { name: "Ricerca con l'AI" }).click(); // chiude
-await page.getByText("Terrazza Uno").first().waitFor({ timeout: 3000 });
-ok(true, "pannello AI: chiudendo si torna alla lista");
+// 3. La ricerca resta scritta nella barra in alto
+ok((await page.getByLabel("Cosa cerchi?").inputValue()).startsWith("Rooftop romantico"), "barra: il testo cercato resta nella barra con i risultati");
 
 // 4. Scheda locale: barra azioni nel viewport
 await page.getByText("Terrazza Uno").first().click();
@@ -202,9 +198,9 @@ await page.getByRole("button", { name: "Condividi questa ricerca" }).click();
 const sharedUrl = await page.evaluate(() => window.__shared?.url ?? "");
 ok(/\/mappa\?q=Rooftop romantico per due a Roma&at=-?\d+\.\d+,-?\d+\.\d+$/.test(decodeURIComponent(sharedUrl)), "condividi ricerca: link che riapre la stessa ricerca nello stesso punto");
 await page.getByRole("button", { name: "Affina" }).click();
-const refine = page.locator("input[type=text]");
-await refine.waitFor({ timeout: 3000 });
-ok((await refine.inputValue()).startsWith("Rooftop romantico"), "'Affina': riapre la ricerca con la frase da correggere");
+const refine = page.getByLabel("Cosa cerchi?");
+ok((await refine.inputValue()).startsWith("Rooftop romantico") && await refine.evaluate((el) => el === document.activeElement), "'Affina': cursore nella barra con la frase da correggere");
+ok((await page.locator("input[type=text]").count()) === 0, "'Affina': nessun secondo campo sotto la barra");
 await page.getByRole("button", { name: "+ economico" }).click();
 await page.getByTestId("titolo-risposta").filter({ hasText: "economico" }).waitFor({ timeout: 5000 });
 ok(true, "'Affina' + '+ economico': rifà la ricerca con la frase allungata");
@@ -237,6 +233,7 @@ ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condiv
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
 await shot("10-beta-recenti");
+await page.goto(`${BASE}/mappa?beta=-barra`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Ricerca con l'AI" }).click();
 ok((await page.getByTestId("aggiunte-rapide").getByText(/^↻ /).count()) >= 1, "pannello ✨: mostra anche le ricerche recenti");
 await page.getByRole("button", { name: "Ricerca con l'AI" }).click();
@@ -311,15 +308,18 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("apri-articolo").count()) === 0, "?stile=attuale: spegne l'articolo");
 
-// 5e3. Beta "barra" (spenta di default): campo "Cosa cerchi?" sempre in cima alla mappa (Places)
+// 5e3. Barra "Chiedi all'AI" + "Filtri" in cima alla mappa: accesa per tutti (scelta di Lorenzo 11/10)
+await page.goto(`${BASE}/mappa?beta=-barra`, { waitUntil: "networkidle" });
+ok((await page.getByTestId("barra-ricerca").count()) === 0 && (await page.getByRole("button", { name: "Ricerca con l'AI" }).count()) === 1, "?beta=-barra: torna l'icona ✨ di prima");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-ok((await page.getByTestId("barra-ricerca").count()) === 0, "barra: spenta di default");
-await page.goto(`${BASE}/mappa?beta=barra`, { waitUntil: "networkidle" });
 const bar = await page.getByTestId("barra-ricerca").boundingBox();
 const loc = await page.getByRole("button", { name: "La mia posizione", exact: true }).boundingBox();
 ok(!!bar && !!loc && bar.y < 80 && bar.x + bar.width <= loc.x, "barra: in cima, non copre il pulsante posizione");
 ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella card iniziale niente secondo campo");
 await shot("22-barra");
+await page.getByTestId("benvenuto-filtri").click();
+await page.getByText(/Applica filtri/).first().waitFor({ timeout: 3000 }).then(() => ok(true, "card iniziale: 'Oppure usa i filtri' apre i filtri"), () => ok(false, "card iniziale: 'Oppure usa i filtri' apre i filtri"));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");
 await page.getByLabel("Cosa cerchi?").press("Enter");
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
@@ -333,8 +333,8 @@ await page.waitForTimeout(300);
 ok((await page.getByTestId("titolo-risposta").count()) === 0 && (await page.getByLabel("Cosa cerchi?").inputValue()) === "", "barra: ✕ cancella la ricerca e i risultati");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
-// 5f. Ricerca scritta direttamente nella card iniziale
-await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+// 5f. Ricerca scritta direttamente nella card iniziale (senza la barra in alto)
+await page.goto(`${BASE}/mappa?beta=-barra`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
 await page.getByLabel("Scrivi cosa cerchi").press("Enter");
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
@@ -385,7 +385,7 @@ await page.getByText("Non ho trovato nulla").waitFor({ timeout: 4000 });
 ok(await page.getByRole("button", { name: "Correggi la ricerca" }).isVisible(), "nessun risultato: pulsante 'Correggi la ricerca'");
 await shot("06b-nessun-risultato");
 await page.getByRole("button", { name: "Vedi esempi" }).click();
-ok(await page.getByText("Cosa cerchi?").isVisible(), "nessun risultato: 'Vedi esempi' riporta alla card iniziale");
+ok(await page.getByTestId("benvenuto").isVisible(), "nessun risultato: 'Vedi esempi' riporta alla card iniziale");
 searchMode = "ok";
 
 // 7. Posizione: negata
@@ -400,7 +400,7 @@ const p2 = await ctx2.newPage();
 await p2.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await p2.getByRole("button", { name: "Usa la mia posizione" }).click();
 await p2.waitForTimeout(1500);
-ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
+ok((await p2.getByTestId("benvenuto").count()) === 0, "posizione concessa: la card si chiude");
 ok(await p2.getByTestId("tu-sei-qui").isVisible(), "posizione concessa: punto blu 'tu sei qui' sulla mappa");
 await p2.getByRole("button", { name: "La mia posizione" }).click();
 ok(true, "pulsante 'La mia posizione' sempre disponibile in alto a destra");
@@ -415,9 +415,8 @@ const p3 = await ctx3.newPage();
 await p3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await p3.getByRole("button", { name: "Usa la mia posizione" }).click();
 await p3.waitForTimeout(1200);
-await p3.locator("button:has(svg.lucide-sparkles)").first().click();
-await p3.locator("input[type=text]").fill("rooftop");
-await p3.getByRole("button", { name: "Cerca", exact: true }).click();
+await p3.getByLabel("Cosa cerchi?").fill("rooftop");
+await p3.getByLabel("Cosa cerchi?").press("Enter");
 await p3.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 await p3.getByText("Terrazza Uno").first().click();
 await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
@@ -481,7 +480,7 @@ await page.getByLabel("Cosa cerchi?").press("Enter");
 await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
 ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText()), "home B: Invio avvia la ricerca scritta");
 await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
-ok(await page.getByLabel("Scrivi cosa cerchi").isVisible(), "?home=a: torna il primo accesso attuale");
+ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible(), "?home=a: torna il primo accesso attuale");
 
 // 7-quinquies. Pin con foto (?pin=b): stesse foto delle card, nessuna foto in più
 await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
@@ -586,7 +585,7 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
 } else {
   await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
   await page.getByRole("button", { name: "Cerca un locale" }).click();
-  ok(await page.getByText("Cosa cerchi?").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
+  ok(await page.getByTestId("benvenuto").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
 }
 
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
