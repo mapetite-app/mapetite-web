@@ -576,9 +576,12 @@ export default function MapView({
       savedPlaces.find((p) => p.id === id) ??
       null;
     if (!base) return null;
-    const savedVersion = savedPlaces.find((p) => p.id === id);
+    // I salvati sono indicizzati per UUID Supabase, i risultati di ricerca per
+    // Place ID Google: cerco con entrambi, così note e tag compaiono sempre.
+    const uuid = placeUuids[id];
+    const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
-  }, [overlay, places, displayedPlaces, savedPlaces]);
+  }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
 
   const availableTags = useMemo(() => {
     const seen = new Set<string>();

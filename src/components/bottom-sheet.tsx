@@ -414,6 +414,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       ))}
                     </span>
                   )}
+                  {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
+                  {place.tags && place.tags.length > 0 && (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {place.tags.map((t) => (
+                        <span key={t} className="rounded-pill border border-accent/40 px-2 py-0.5 text-[11px] font-display font-medium text-accent">
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {place.note && (
+                    <span className="mt-1.5 line-clamp-2 block text-xs font-sans italic text-text">
+                      “{place.note}”
+                    </span>
+                  )}
                 </span>
               </button>
             </li>
