@@ -33,6 +33,8 @@ export interface BottomSheetProps {
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
   focusedId?: string | null;
   onFocus?: (place: Place) => void;
+  // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
+  heading?: string | null;
   // Riapre il pannello di ricerca con la frase attuale, per correggerla.
   onRefine?: () => void;
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
@@ -123,8 +125,10 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine, isSaved, onSave }: BottomSheetProps) {
-  const quickFiltersOn = useBeta("filtri-lista");
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onRefine, isSaved, onSave, heading = null }: BottomSheetProps) {
+  // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
+  // ("Aperto ora" nasconderebbe tutto).
+  const quickFiltersOn = useBeta("filtri-lista") && details != null;
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -327,17 +331,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0">
             {title && (
               <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
               </p>
             )}
+            {!title && heading && (
+              <p data-testid="intestazione-lista" className="truncate font-title text-base font-semibold leading-snug text-brand">{heading}</p>
+            )}
             <p className="text-xs font-sans text-text-muted">
               {title
                 ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
-                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+                : heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>
@@ -498,7 +505,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             <p className="text-xs font-sans text-text-muted">
               {title
                 ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
-                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+                : heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
               {loadingVerdicts && " · preparo i verdetti…"}
             </p>
           </div>

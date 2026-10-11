@@ -398,6 +398,8 @@ else {
   await p.screenshot({ path: `${OUT}/11-salvati.png` });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
+  ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
+  ok((await p.getByTestId("filtri-lista").count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
   await p.waitForTimeout(1500);
   const pin = await p.getByTestId("pin").first().boundingBox();
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");

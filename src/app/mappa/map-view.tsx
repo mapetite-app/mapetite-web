@@ -1791,6 +1791,7 @@ export default function MapView({
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
+          heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
           focusedId={focusId}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
           isSaved={isPlaceSaved}
