@@ -639,7 +639,13 @@ export default function MapView({
     () => "[]",
   );
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
-  const homeVariant = useVariant("home");
+  // Variante del primo accesso: sul server non è nota (sta nel telefono), quindi la card
+  // compare solo dopo l'avvio sul telefono, senza mostrare per un attimo quella sbagliata.
+  const homeVariant = useSyncExternalStore(
+    () => () => {},
+    () => (document.documentElement.dataset.home === "b" ? "b" : "a"),
+    () => null,
+  );
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
