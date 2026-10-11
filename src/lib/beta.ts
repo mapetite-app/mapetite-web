@@ -11,7 +11,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
 // Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
 // quel telefono finché non si apre ?beta=off).
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
-export type OptInFlag = "gemme";
+//   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
+export type OptInFlag = "gemme" | "articolo";
 const OPTIN_KEY = "mapetite.beta";
 
 function readOptIn(): string {

@@ -10,12 +10,13 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
+import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta, useVariant } from "@/lib/beta";
+import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
@@ -655,6 +656,9 @@ export default function MapView({
   const [aiSearching, setAiSearching] = useState(false);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
+  // Risposta "come un articolo" (?beta=articolo, spenta di default).
+  const articleOn = useOptIn("articolo");
+  const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
     () => () => {},
     () => (recentOn ? JSON.stringify(loadRecentSearches()) : "[]"),
@@ -2061,6 +2065,7 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
+          onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {
             if (!userId) { window.location.href = "/login"; return; }
@@ -2082,6 +2087,31 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
+        />
+      )}
+
+      {articleOpen && articleOn && aiSearch !== null && view === "all" && (
+        <AnswerArticle
+          title={aiSearch.query ?? aiQuery}
+          understood={aiSearch.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
+          places={(() => {
+            // Stesso ordine e stessi filtri rapidi del carosello.
+            const byId = new globalThis.Map(displayedPlaces.map((p) => [p.id, p]));
+            const ordered = carouselOrder.map((id) => byId.get(id)).filter((p): p is Place => p != null);
+            return ordered.length > 0 || quickFilters.size > 0 ? ordered : displayedPlaces;
+          })()}
+          details={venueDetails}
+          loadingVerdicts={loadingVerdicts}
+          origin={userPos ?? searchOrigin}
+          isSaved={isPlaceSaved}
+          onSave={(place) => {
+            if (!userId) { window.location.href = "/login"; return; }
+            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
+            setPendingSavePlaceId(place.id);
+          }}
+          onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
+          onAsk={(q) => { setArticleOpen(false); setAiQuery(q); void runAISearch(q); }}
+          onClose={() => setArticleOpen(false)}
         />
       )}
 
