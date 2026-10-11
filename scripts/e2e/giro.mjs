@@ -70,7 +70,7 @@ await ctx.route("**/api/search/synthesis", async (route) => {
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
 const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
 
 // 1. Primo accesso
@@ -682,6 +682,10 @@ else {
   ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci' come nella scheda");
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
+  await p.getByTestId("condividi-lista").click();
+  { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
+    ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno — Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con note e link Google Maps"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png` });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");

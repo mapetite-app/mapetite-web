@@ -803,6 +803,7 @@ export default function MapView({
   const [aiSearching, setAiSearching] = useState(false);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
+  const shareOn = useBeta("condividi");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
@@ -2375,6 +2376,22 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
+          onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {
+            // Come la mappa condivisibile di Mapstr, ma senza dati pubblici: un messaggio con i link.
+            const lines = list.slice(0, 30).map((p) => {
+              const gid = Object.keys(placeUuids).find((g) => placeUuids[g] === p.id);
+              const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}${gid ? `&query_place_id=${encodeURIComponent(gid)}` : ""}`;
+              return `• ${p.name}${p.note ? ` — ${p.note}` : ""}\n  ${url}`;
+            });
+            const text = `I miei posti su Mapetite${activeCity ? ` · ${activeCity}` : ""}:\n\n${lines.join("\n")}`;
+            try {
+              if (typeof navigator.share === "function") { await navigator.share({ title: "I miei posti su Mapetite", text }); return "shared"; }
+              await navigator.clipboard.writeText(text);
+              return "copied";
+            } catch {
+              return null; // foglio di condivisione chiuso
+            }
+          } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {

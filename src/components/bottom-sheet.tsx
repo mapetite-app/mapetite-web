@@ -47,6 +47,8 @@ export interface BottomSheetProps {
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
   onSave?: (place: Place) => void;
+  // Condivide la lista mostrata (salvati): testo con nomi e link Google Maps.
+  onShareList?: (places: Place[]) => Promise<"shared" | "copied" | null>;
   // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
   onOpenArticle?: () => void;
 }
@@ -134,7 +136,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, onShareList, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -392,6 +394,27 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
                 </svg>
+              )}
+            </button>
+          )}
+          {!title && heading && onShareList && places.length > 0 && (
+            <button
+              type="button"
+              data-testid="condividi-lista"
+              aria-label="Condividi questa lista"
+              onClick={async () => {
+                const r = await onShareList(places);
+                if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
+              }}
+              className="-my-1 ml-2 flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+            >
+              {shared ? "✓ Copiata" : (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                  </svg>
+                  Condividi
+                </>
               )}
             </button>
           )}
