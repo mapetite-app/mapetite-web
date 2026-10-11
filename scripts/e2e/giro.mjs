@@ -27,7 +27,7 @@ const PLACES = [
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
-  filtri_usati: { categoria: "bar", parole_chiave: ["rooftop"], vicino_a_me: false },
+  filtri_usati: { categoria: "bar", parole_chiave: ["rooftop"], vicino_a_me: false, zona: "Roma" },
   sintesi_pendente: { places: [], token: "x" },
 };
 const SYNTH = {
@@ -151,7 +151,7 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
-ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
+ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
 { const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");

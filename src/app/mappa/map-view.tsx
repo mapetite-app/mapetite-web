@@ -418,6 +418,7 @@ type AIFiltri = {
   categoria: string | null;
   parole_chiave: string[];
   vicino_a_me: boolean;
+  zona?: string | null;
 };
 
 // Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
@@ -1966,7 +1967,7 @@ export default function MapView({
           understood={aiSearch?.filtri ? [
             ...(aiSearch.filtri.categoria ? [categoryLabel(aiSearch.filtri.categoria) ?? aiSearch.filtri.categoria] : []),
             ...aiSearch.filtri.parole_chiave,
-            ...(aiSearch.filtri.vicino_a_me ? ["vicino a te"] : []),
+            ...(aiSearch.filtri.vicino_a_me ? ["vicino a te"] : aiSearch.filtri.zona ? [`a ${aiSearch.filtri.zona}`] : []),
           ].slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => dispatch({ type: "OPEN_AI" })}
