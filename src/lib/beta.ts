@@ -16,13 +16,17 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
 export type OptInFlag = "gemme" | "articolo" | "barra";
 const OPTIN_KEY = "mapetite.beta";
 
+// ?stile=places accende anche la risposta come articolo; ?stile=attuale la spegne.
 function readOptIn(): string {
   const url = readFlags();
   if (url.split(",").includes("off")) return EMPTY;
+  const stile = new URLSearchParams(window.location.search).get("stile");
   try {
-    const saved = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
-    const merged = Array.from(new Set([...saved.split(","), ...url.split(",")].map((f) => f.trim()).filter(Boolean))).join(",");
-    if (merged !== saved) window.localStorage.setItem(OPTIN_KEY, merged);
+    const stored = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
+    const saved = stile === "attuale" ? stored.split(",").filter((f) => f !== "articolo").join(",") : stored;
+    const extra = stile === "places" ? ["articolo"] : [];
+    const merged = Array.from(new Set([...saved.split(","), ...url.split(","), ...extra].map((f) => f.trim()).filter(Boolean))).join(",");
+    if (merged !== stored) window.localStorage.setItem(OPTIN_KEY, merged);
     return merged;
   } catch {
     return url;

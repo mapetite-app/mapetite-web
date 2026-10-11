@@ -302,6 +302,14 @@ await page.getByLabel("Fai un'altra domanda").press("Enter");
 await page.waitForTimeout(800);
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("cocktail bar elegante"), "articolo: 'Fai un'altra domanda' avvia una nuova ricerca");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).first().click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("apri-articolo").count()) === 1, "?stile=places: accende anche l'articolo");
+await page.goto(`${BASE}/mappa?stile=attuale`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).first().click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("apri-articolo").count()) === 0, "?stile=attuale: spegne l'articolo");
 
 // 5e3. Beta "barra" (spenta di default): campo "Cosa cerchi?" sempre in cima alla mappa (Places)
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
