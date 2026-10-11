@@ -456,6 +456,7 @@ function AISearchPanel({
   activeCount,
   query,
   setQuery,
+  recent = [],
 }: {
   onSubmit: (q: string) => void;
   isSearching: boolean;
@@ -465,6 +466,7 @@ function AISearchPanel({
   activeCount: number | null;
   query: string;
   setQuery: (q: string) => void;
+  recent?: string[];
 }) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -515,12 +517,12 @@ function AISearchPanel({
       {/* Aggiunte rapide: con una ricerca attiva affinano la frase, altrimenti sono esempi. */}
       {!isSearching && (
         <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]" data-testid="aggiunte-rapide">
-          {(activeFiltri !== null ? REFINEMENTS : PANEL_EXAMPLES).map((chip) => (
+          {(activeFiltri !== null ? REFINEMENTS : [...recent.map((r) => `↻ ${r}`), ...PANEL_EXAMPLES].slice(0, 6)).map((chip) => (
             <button
               key={chip}
               type="button"
               onClick={() => {
-                const next = activeFiltri !== null ? `${query.trim()} ${chip.replace(/^\+ /, "")}` : chip;
+                const next = activeFiltri !== null ? `${query.trim()} ${chip.replace(/^\+ /, "")}` : chip.replace(/^↻ /, "");
                 setQuery(next);
                 onSubmit(next);
               }}
@@ -1226,6 +1228,7 @@ export default function MapView({
               onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
+              recent={recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : []}
             />
           </div>
         )}

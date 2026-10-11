@@ -217,6 +217,9 @@ ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condiv
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
 await shot("10-beta-recenti");
+await page.getByRole("button", { name: "Ricerca con l'AI" }).click();
+ok((await page.getByTestId("aggiunte-rapide").getByText(/^↻ /).count()) >= 1, "pannello ✨: mostra anche le ricerche recenti");
+await page.getByRole("button", { name: "Ricerca con l'AI" }).click();
 
 // 5c. Spegnimento con ?beta=off
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
