@@ -507,11 +507,12 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
-  // Variante grafica della lista risultati (voce 5): ?lista=a (default) | ?lista=b.
+  // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
+  // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
   const listVariant = useSyncExternalStore(
     () => () => {},
-    () => (new URLSearchParams(window.location.search).get("lista") === "b" ? "b" : "a"),
-    () => "a" as const,
+    () => (new URLSearchParams(window.location.search).get("lista") === "a" ? "a" : "b"),
+    () => "b" as const,
   );
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");

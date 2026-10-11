@@ -120,12 +120,25 @@ await shot("04-scheda");
 // 4b. Funzioni beta spente di default
 ok((await page.getByLabel(/Condividi/).count()) === 1, "condividi: pulsante presente nella scheda (acceso di default)");
 
-// 5. Variante B
-await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
+// 5. Lista: B (carosello) è la predefinita dall'11/10, A resta con ?lista=a
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(await page.locator("ul.snap-x").count() === 1, "variante B: carosello presente");
+ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosello presente");
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
+ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
+  const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
+  if (!name) return false;
+  const r = name.getBoundingClientRect();
+  return name.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+}), "lista B: il nome del locale è leggibile sopra la foto");
 await shot("05-lista-b");
+await page.goto(`${BASE}/mappa?lista=a`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok(await page.locator("ul.snap-x").count() === 0, "?lista=a: torna la lista verticale");
 
 // 5b. Beta: filtri lista, condividi, recenti
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
