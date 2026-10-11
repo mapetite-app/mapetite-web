@@ -62,6 +62,8 @@ const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.getByText("Cosa cerchi?").isVisible(), "primo accesso: card 'Cosa cerchi?' visibile");
 ok((await page.getByRole("button", { name: /Rooftop romantico/ }).count()) === 1, "primo accesso: esempi cliccabili presenti");
+const bh = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999;
+ok(bh < 844 * 0.3, `primo accesso: la card lascia vedere la mappa (altezza ${Math.round(bh)}px < 30% schermo)`);
 await shot("01-benvenuto");
 
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
@@ -120,7 +122,7 @@ await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
 ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condividi: pulsante presente nella scheda");
 await page.goto(`${BASE}/mappa?beta=recenti`, { waitUntil: "networkidle" });
-ok((await page.getByTestId("recenti").getByText(/Rooftop romantico/).count()) === 1, "beta recenti: la ricerca fatta compare tra le recenti");
+ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
 await shot("10-beta-recenti");
 
 // 6. Errore di rete/API
@@ -134,7 +136,7 @@ searchMode = "ok";
 
 // 7. Posizione: negata
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: /Usa la mia posizione/ }).click();
+await page.getByRole("button", { name: "Usa la mia posizione" }).click();
 await page.getByText(/Non ho il permesso/).waitFor({ timeout: 4000 });
 ok(true, "posizione negata: messaggio con alternativa");
 await shot("07-posizione-negata");
@@ -142,7 +144,7 @@ await shot("07-posizione-negata");
 const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 45.4642, longitude: 9.19 } });
 const p2 = await ctx2.newPage();
 await p2.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await p2.getByRole("button", { name: /Usa la mia posizione/ }).click();
+await p2.getByRole("button", { name: "Usa la mia posizione" }).click();
 await p2.waitForTimeout(1500);
 ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
 await ctx2.close();

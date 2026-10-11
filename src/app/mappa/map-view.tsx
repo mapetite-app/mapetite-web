@@ -1139,30 +1139,38 @@ export default function MapView({
           </div>
         )}
 
-      {/* Primo accesso: cosa fare in 10 secondi (esempi cliccabili + posizione spiegata). */}
+      {/* Primo accesso: barra compatta in basso (la mappa resta visibile). */}
       {view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
         <div
+          data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
-          style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}
+          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
         >
-          <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface p-4 shadow-float">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-display text-lg font-semibold text-brand">Cosa cerchi?</p>
-                <p className="mt-0.5 text-sm font-sans text-text-muted">
-                  Scrivilo con parole tue: ti propongo i posti giusti, non solo i più famosi.
-                </p>
-              </div>
+          <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
+            <div className="flex items-center justify-between">
+              <p className="font-display text-base font-semibold text-brand">Cosa cerchi?</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
                 aria-label="Chiudi"
-                className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center text-lg text-text-muted"
+                className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center text-lg text-text-muted"
               >
                 ✕
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="-mx-3 -mt-1 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
+              {recentOn && (JSON.parse(recentSearches) as string[]).map((r) => (
+                <button
+                  key={`r-${r}`}
+                  type="button"
+                  data-testid="recenti"
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(r); void runAISearch(r); }}
+                  className="min-h-11 shrink-0 rounded-pill bg-accent-light px-3.5 text-sm font-sans text-accent active:scale-95 disabled:opacity-60"
+                >
+                  ↻ {r}
+                </button>
+              ))}
               {[
                 "Rooftop romantico per due a Roma",
                 "Trattoria autentica non turistica a Trastevere",
@@ -1174,42 +1182,24 @@ export default function MapView({
                   type="button"
                   disabled={aiSearching}
                   onClick={() => { setAiQuery(example); void runAISearch(example); }}
-                  className="min-h-11 rounded-pill border border-border bg-white px-3.5 py-2 text-left text-sm font-sans text-text active:scale-95 disabled:opacity-60"
+                  className="min-h-11 shrink-0 rounded-pill border border-border bg-white px-3.5 text-sm font-sans text-text active:scale-95 disabled:opacity-60"
                 >
                   {example}
                 </button>
               ))}
             </div>
-            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-              <div className="mt-3" data-testid="recenti">
-                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cercate di recente</p>
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  {(JSON.parse(recentSearches) as string[]).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      disabled={aiSearching}
-                      onClick={() => { setAiQuery(r); void runAISearch(r); }}
-                      className="min-h-9 rounded-pill bg-accent-light px-3 text-left text-xs font-sans text-accent active:scale-95 disabled:opacity-60"
-                    >
-                      ↻ {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             {aiSearching && (
-              <p className="mt-3 flex items-center gap-2 text-sm text-text-muted">
+              <p className="mt-2 flex items-center gap-2 text-sm text-text-muted">
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-brand" />
                 Sto cercando…
               </p>
             )}
-            {aiError && <p className="mt-3 text-sm text-error">{aiError}</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
+            <div className="mt-2 flex gap-2">
               <button
                 type="button"
                 onClick={() => dispatch({ type: "OPEN_AI" })}
-                className="min-h-11 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+                className="min-h-11 flex-1 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
               >
                 Scrivi la tua ricerca
               </button>
@@ -1217,18 +1207,19 @@ export default function MapView({
                 type="button"
                 onClick={goToMyPosition}
                 disabled={geoState === "loading"}
-                className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
+                aria-label="Usa la mia posizione"
+                className="min-h-11 shrink-0 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
               >
-                {geoState === "loading" ? "Cerco dove sei…" : "📍 Usa la mia posizione"}
+                {geoState === "loading" ? "Cerco…" : "📍 Dove sono"}
               </button>
             </div>
-            <p className="mt-2 text-xs font-sans text-text-muted">
-              {geoState === "denied"
-                ? "Non ho il permesso di vedere dove sei. Puoi attivarlo dalle impostazioni del browser, oppure scrivere la zona nella ricerca (es. “a Trastevere”)."
-                : geoState === "unavailable"
-                  ? "Non riesco a trovare la tua posizione. Scrivi la zona nella ricerca (es. “a Trastevere”)."
-                  : "La posizione serve solo a mostrarti i locali vicini: non viene salvata."}
-            </p>
+            {(geoState === "denied" || geoState === "unavailable") && (
+              <p className="mt-2 text-xs font-sans text-text-muted">
+                {geoState === "denied"
+                  ? "Non ho il permesso di vedere dove sei: attivalo dalle impostazioni del browser, oppure scrivi la zona (es. “a Trastevere”)."
+                  : "Non riesco a trovare la tua posizione: scrivi la zona (es. “a Trastevere”)."}
+              </p>
+            )}
           </div>
         </div>
       )}
