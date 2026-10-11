@@ -4,6 +4,28 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+// Messaggi di Supabase Auth in italiano semplice (arrivano in inglese).
+function authErrorIt(error: { code?: string; message: string }): string {
+  switch (error.code) {
+    case "invalid_credentials":
+      return "Email o password non corrette.";
+    case "email_not_confirmed":
+      return "Conferma prima la tua email: trovi il link nella posta in arrivo.";
+    case "user_already_exists":
+    case "email_exists":
+      return "Esiste già un account con questa email: prova ad accedere.";
+    case "weak_password":
+      return "Password troppo debole: usa almeno 6 caratteri.";
+    case "email_address_invalid":
+      return "Questa email non sembra valida.";
+    case "over_email_send_rate_limit":
+    case "over_request_rate_limit":
+      return "Troppi tentativi ravvicinati: riprova tra qualche minuto.";
+    default:
+      return "Non è andata a buon fine. Riprova tra poco.";
+  }
+}
+
 export async function login(formData: FormData) {
   const supabase = await createClient();
 
@@ -16,7 +38,8 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    console.error("[auth] login:", error.code, error.message);
+    redirect(`/login?error=${encodeURIComponent(authErrorIt(error))}`);
   }
 
   revalidatePath("/", "layout");
@@ -37,7 +60,8 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+    console.error("[auth] signup:", error.code, error.message);
+    redirect(`/signup?error=${encodeURIComponent(authErrorIt(error))}`);
   }
 
   if (data.session) {
