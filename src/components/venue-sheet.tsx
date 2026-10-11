@@ -1,6 +1,8 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone, Check } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2 } from "lucide-react";
+import { useState } from "react";
+import { useBeta } from "@/lib/beta";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 export type Venue = {
@@ -68,6 +70,24 @@ export default function VenueSheet({
     personalTags,
     personalNote,
   } = venue;
+
+  const shareOn = useBeta("condividi");
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const share = async () => {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${encodeURIComponent(venue.id)}`;
+    const text = verdict ? `${name} — ${verdict}` : name;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: name, text, url });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        setShareNote("Link copiato");
+        setTimeout(() => setShareNote(null), 2500);
+      }
+    } catch {
+      // l'utente ha chiuso il foglio di condivisione: nessun errore da mostrare
+    }
+  };
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
   // Verdetto bipolare come CHIP: filtra gli elementi non vuoti dell'array.
@@ -343,6 +363,18 @@ export default function VenueSheet({
           <Navigation size={16} />
           Indicazioni
         </a>
+
+        {shareOn && (
+          <button
+            type="button"
+            onClick={share}
+            aria-label={`Condividi ${name}`}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
+          >
+            <Share2 size={18} />
+          </button>
+        )}
+        {shareNote && <span role="status" className="text-xs font-sans text-text-muted">{shareNote}</span>}
 
         {phone != null && (
           <a

@@ -66,6 +66,9 @@ Regole:
 - Le fasi 1–3 restano la priorità: una funzione nuova non deve mai rallentare o rompere la ricerca e la lista risultati.
 
 ### Proposte
+- **Filtri rapidi sulla lista — IN PR, dietro `?beta=filtri-lista`**: chip "Aperto ora", "Fino a €€", "Voto 4,5+" sopra la lista. Nessun costo (filtra i dati già arrivati), nessuna migrazione.
+- **Condividi un locale — IN PR, dietro `?beta=condividi`**: pulsante nella scheda; apre il foglio di condivisione del telefono (o copia il link) con nome, verdetto e link Google Maps. Nessun costo, nessuna migrazione.
+- **Ricerche recenti — IN PR, dietro `?beta=recenti`**: nella card iniziale, le ultime 5 ricerche fatte su quel telefono (salvate solo nel browser). Nessun costo, nessuna migrazione.
 - **Foto dei locali (DA DECIDERE, costo)**: Place Photos è fatturata a parte (quota attuale 200/giorno). Il campo `photos` è già nel FIELD_MASK, quindi serve solo l'endpoint di download. Senza foto le card restano più povere dei riferimenti Places. Stima: 1 chiamata foto per card visibile; con 6–8 card/ricerca, ~8 chiamate extra per ricerca.
 
 
