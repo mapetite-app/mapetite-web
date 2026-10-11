@@ -126,6 +126,13 @@ ok(((await page.getByRole("link", { name: /su Google Maps/ }).first().getAttribu
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
+ok((await page.getByTestId("scheda-nav").textContent())?.includes("1 di 2"), "scheda: '‹ 1 di 2 ›' per passare agli altri risultati");
+await page.getByRole("button", { name: "Locale successivo" }).click();
+await page.waitForTimeout(400);
+ok((await page.getByTestId("scheda-nav").textContent())?.includes("2 di 2") && await page.getByRole("heading", { name: "Rooftop Tre" }).or(page.getByText("Rooftop Tre").last()).first().isVisible(), "scheda: '›' apre il locale successivo senza tornare alla lista");
+await shot("04c-scheda-successivo");
+await page.getByRole("button", { name: "Locale precedente" }).click();
+await page.waitForTimeout(300);
 await shot("04-scheda");
 
 // 4a. Scheda: trascinando verso il basso si chiude

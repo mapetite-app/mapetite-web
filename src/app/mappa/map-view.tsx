@@ -2133,9 +2133,32 @@ export default function MapView({
       </Map>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
+          {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
+          {(() => {
+            const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+            const i = ids.indexOf(selected.id);
+            if (i < 0 || ids.length < 2) return null;
+            const go = (j: number) => {
+              const id = ids[(j + ids.length) % ids.length];
+              const place = displayedPlaces.find((p) => p.id === id);
+              if (!place) return;
+              setFocusedId(id);
+              dispatch({ type: "OPEN_VENUE", placeId: id });
+              const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+              if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+            };
+            return (
+              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float">
+                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
+                <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
+                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
+              </div>
+            );
+          })()}
           <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
+              key={selected.id}
               origin={userPos ?? searchOrigin}
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
