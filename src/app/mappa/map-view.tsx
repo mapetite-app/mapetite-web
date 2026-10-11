@@ -520,6 +520,8 @@ export default function MapView({
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
   const [activeCity, setActiveCity] = useState<string | null>(null);
+  // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
@@ -588,6 +590,15 @@ export default function MapView({
   );
   const dispatch = (action: OverlayAction) =>
     dispatchRaw({ action, ctx: { hasResults: displayedPlaces.length > 0 } });
+
+  // Carosello B aperto: il pin della card al centro (di default la prima) è evidenziato.
+  const carouselOpen = overlay.kind === "list" && listVariant === "b";
+  const carouselList = clusterPlaces ?? displayedPlaces;
+  const focusId = !carouselOpen
+    ? null
+    : focusedId && carouselList.some((p) => p.id === focusedId)
+      ? focusedId
+      : carouselList[0]?.id ?? null;
 
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
@@ -898,6 +909,16 @@ export default function MapView({
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     return clusterIndex.getClusters(bbox, roundedZoom);
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces]);
+
+  // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
+  const panIntoView = (place: Place) => {
+    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
+    if (!map || typeof window === "undefined") return;
+    const { innerWidth: w, innerHeight: h } = window;
+    const pt = map.project([place.lng, place.lat]);
+    if (pt.x > 30 && pt.x < w - 30 && pt.y > 140 && pt.y < h * 0.5) return;
+    map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
+  };
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista.
   const fitToPlaces = (list: Place[], top = 150) => {
@@ -1386,15 +1407,22 @@ export default function MapView({
               anchor="bottom"
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
+                // Con il carosello aperto il primo tocco porta la card al centro,
+                // il secondo apre la scheda.
+                if (carouselOpen && focusId !== place.id) {
+                  setFocusedId(place.id);
+                  return;
+                }
                 dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
+              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 2 : 1 }}
             >
-              <div className="flex cursor-pointer flex-col items-center" data-testid="pin">
+              <div className="flex cursor-pointer flex-col items-center" data-testid="pin" data-focused={focusId === place.id ? "true" : undefined}>
                 <span
                   role="img"
                   aria-label={place.category ?? "locale"}
                   className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
-                    selected?.id === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
+                    selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                   }`}
                 >
                   {getCategoryEmoji(place.category, place.name)}
@@ -1593,6 +1621,8 @@ export default function MapView({
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
+          focusedId={focusId}
+          onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);

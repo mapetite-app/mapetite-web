@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta } from "@/lib/beta";
@@ -27,6 +27,9 @@ export interface BottomSheetProps {
   onToggleQuick?: (f: QuickFilter) => void;
   // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
   title?: string | null;
+  // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
+  focusedId?: string | null;
+  onFocus?: (place: Place) => void;
 }
 
 export type ListDetails = {
@@ -123,7 +126,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -140,6 +143,40 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       return next;
     });
   };
+  // Carosello B collegato alla mappa: scorrendo, la card al centro diventa
+  // quella "a fuoco"; se il fuoco arriva da fuori (tocco su un pin) il carosello
+  // scorre fino alla card.
+  const carouselRef = useRef<HTMLUListElement>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const centeredId = () => {
+    const ul = carouselRef.current;
+    if (!ul) return null;
+    const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
+    let best: { id: string; d: number } | null = null;
+    for (const li of Array.from(ul.children) as HTMLElement[]) {
+      const r = li.getBoundingClientRect();
+      const d = Math.abs(r.left + r.width / 2 - mid);
+      if (!best || d < best.d) best = { id: li.dataset.id ?? "", d };
+    }
+    return best?.id ?? null;
+  };
+  const onCarouselScroll = () => {
+    if (!onFocus) return;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const id = centeredId();
+      const place = places.find((p) => p.id === id);
+      if (place && id !== focusedId) onFocus(place);
+    }, 140);
+  };
+  useEffect(() => {
+    const ul = carouselRef.current;
+    if (!ul || !focusedId || centeredId() === focusedId) return;
+    const li = Array.from(ul.children).find((el) => (el as HTMLElement).dataset.id === focusedId) as HTMLElement | undefined;
+    if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
+  }, [focusedId]);
+  useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
+
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -300,11 +337,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
         )}
-        <ul className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
           {places.map((place) => {
             const d = details?.[place.id];
             return (
-              <li key={place.id} className="w-[78vw] max-w-sm shrink-0 snap-center">
+              <li key={place.id} data-id={place.id} className="w-[78vw] max-w-sm shrink-0 snap-center">
                 <button
                   type="button"
                   onClick={() => onSelect(place)}

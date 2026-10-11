@@ -136,6 +136,24 @@ ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   return name.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
 }), "lista B: il nome del locale è leggibile sopra la foto");
 await shot("05-lista-b");
+// Carosello ↔ mappa: la card al centro evidenzia il suo pin e viceversa
+const focusedName = () => page.locator("[data-testid=pin][data-focused=true]").innerText().catch(() => "");
+ok((await focusedName()).includes("Terrazza Uno"), "carosello: il pin della prima card è evidenziato");
+await page.locator("ul.snap-x").evaluate((ul) => ul.scrollTo({ left: ul.children[1].offsetLeft, behavior: "instant" }));
+await page.waitForTimeout(700);
+ok((await focusedName()).includes("Rooftop Tre"), "carosello: scorrendo, si evidenzia il pin della card al centro");
+await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
+await page.waitForTimeout(900);
+const centered = await page.locator("ul.snap-x").evaluate((ul) => {
+  const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
+  return [...ul.children].map((li) => ({ id: li.dataset.id, d: Math.abs(li.getBoundingClientRect().left + li.clientWidth / 2 - mid) })).sort((a, b) => a.d - b.d)[0].id;
+});
+ok(centered === "P1", "pin toccato: il carosello porta al centro la sua card");
+ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "pin toccato una volta: la scheda non si apre ancora");
+await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+ok(true, "pin toccato due volte: si apre la scheda");
+await shot("05b-carosello-pin");
 await page.goto(`${BASE}/mappa?lista=a`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
