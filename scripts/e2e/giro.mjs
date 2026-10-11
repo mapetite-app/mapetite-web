@@ -335,6 +335,12 @@ ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Piz
 await page.waitForTimeout(1200);
 { const pins = await page.getByTestId("pin").count(); ok(pins >= 2, `filtri: la mappa si sposta sui risultati (${pins} pin separati, non un gruppo unico)`); }
 await shot("24b-filtri-risultati");
+filterBody = null;
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.getByRole("button", { name: "Cerca in quest'area" }).click({ timeout: 3000 }).then(async () => {
+  await page.waitForTimeout(800);
+  ok(filterBody?.searchIntent === "structured" && filterBody?.minRating === 4.5, "filtri: 'Cerca in quest'area' rifà la ricerca con gli stessi filtri");
+}, () => ok(false, "filtri: 'Cerca in quest'area' compare anche dopo i filtri"));
 await page.unroute("**/api/search");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");

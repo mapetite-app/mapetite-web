@@ -1964,15 +1964,19 @@ export default function MapView({
 
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
-      {aiSearch !== null && movedSinceSearch && aiQuery.trim() !== "" && (overlay.kind === "list" || overlay.kind === "none") && (
+      {/* Vale anche per i risultati dei filtri: rifà la stessa ricerca a filtri nella zona visibile. */}
+      {aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
         <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
           <button
             type="button"
-            disabled={aiSearching}
-            onClick={() => { const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q); }}
+            disabled={aiSearching || filterLoading}
+            onClick={() => {
+              if (aiSearch?.query == null && countActive(filters) > 0) { void runFilteredSearch(filters); return; }
+              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q);
+            }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
-            {aiSearching ? "Cerco…" : "Cerca in quest'area"}
+            {aiSearching || filterLoading ? "Cerco…" : "Cerca in quest'area"}
           </button>
         </div>
       )}
