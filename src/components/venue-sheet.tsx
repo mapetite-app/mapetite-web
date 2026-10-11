@@ -2,7 +2,7 @@
 
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
-import { useBeta, useSchedaVariant } from "@/lib/beta";
+import { useBeta, useVariant } from "@/lib/beta";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
@@ -129,7 +129,7 @@ export default function VenueSheet({
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
   // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
   const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
-  const variant = useSchedaVariant();
+  const variant = useVariant("scheda");
   const emoji = getCategoryEmoji(category, name);
   // Righe di contesto della variante B: "Roma · 600 m" e "Cocktail bar · €€ · ★ 4,5 (812)".
   const placeLine = [cityFromAddress(address), userPos ? distanceLabel(userPos, { lat, lng }) : null]

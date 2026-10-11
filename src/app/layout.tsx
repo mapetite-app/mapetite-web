@@ -30,8 +30,9 @@ const newsreader = Newsreader({
 // Varianti grafiche in prova, ricordate su questo telefono:
 //   ?titoli=serif | ?titoli=sans   font dei titoli (serif editoriale come Places / Poppins)
 //   ?scheda=b     | ?scheda=a      scheda del locale (stile Places / attuale)
+//   ?home=b       | ?home=a        primo accesso con campo di ricerca diretto (stile Places / attuale)
 // Gira prima del primo disegno, così non si vede il cambio.
-const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"]};for(var k in v){var t=q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
+const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"]};for(var k in v){var t=q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Mapetite",

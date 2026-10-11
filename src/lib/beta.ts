@@ -49,12 +49,12 @@ export function saveRecentSearch(q: string): void {
   }
 }
 
-// Variante della scheda locale scelta con ?scheda=b (stile Places) / ?scheda=a (attuale).
-// La imposta lo script in layout.tsx su <html data-scheda>, prima del primo disegno.
-export function useSchedaVariant(): "a" | "b" {
+// Varianti grafiche in prova (?scheda=b, ?home=b; "a" = attuale, predefinita).
+// Le imposta lo script in layout.tsx su <html data-…>, prima del primo disegno.
+export function useVariant(key: "scheda" | "home"): "a" | "b" {
   return useSyncExternalStore(
     () => () => {},
-    () => (document.documentElement.dataset.scheda === "b" ? "b" : "a"),
+    () => (document.documentElement.dataset[key] === "b" ? "b" : "a"),
     () => "a",
   );
 }

@@ -271,6 +271,20 @@ await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
 ok(true, "?scheda=a: torna la scheda attuale");
 
+// 7-quater. Primo accesso variante B (?home=b): si scrive subito, senza aprire un altro pannello
+await page.goto(`${BASE}/mappa?home=b`, { waitUntil: "networkidle" });
+ok(await page.getByLabel("Cosa cerchi?").isVisible(), "home B: campo di ricerca visibile subito");
+ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "home B: esempi a schede cliccabili");
+ok((await page.getByRole("button", { name: "Usa la mia posizione" }).count()) === 1, "home B: pulsante 'Vicino a me'");
+{ const hb = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999; ok(hb < 844 * 0.35, `home B: la mappa resta visibile (altezza ${Math.round(hb)}px)`); }
+await shot("16-home-b");
+await page.getByLabel("Cosa cerchi?").fill("rooftop con vista");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
+ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText()), "home B: Invio avvia la ricerca scritta");
+await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
+ok(await page.getByRole("button", { name: "Scrivi la tua ricerca" }).isVisible(), "?home=a: torna il primo accesso attuale");
+
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

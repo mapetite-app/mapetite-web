@@ -11,8 +11,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
-import { SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta, useBetaOptIn } from "@/lib/beta";
+import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
+import { loadRecentSearches, saveRecentSearch, useBeta, useBetaOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 
@@ -500,6 +500,14 @@ function AISearchPanel({
 
 type ViewMode = "all" | "saved";
 
+// Ricerche di esempio del primo accesso (titolo + seconda riga per le schede della variante B).
+const WELCOME_EXAMPLES = [
+  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma" },
+  { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere" },
+  { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino" },
+  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento" },
+];
+
 export default function MapView({
   places: initialPlaces,
   userId,
@@ -546,6 +554,7 @@ export default function MapView({
     () => "[]",
   );
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const homeVariant = useVariant("home");
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
@@ -1280,8 +1289,96 @@ export default function MapView({
           </div>
         )}
 
+      {/* Primo accesso, variante B (stile Places): suggerimenti a schede e campo di ricerca subito scrivibile. */}
+      {homeVariant === "b" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
+        <div
+          data-testid="benvenuto"
+          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
+          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
+        >
+          <div className="pointer-events-auto w-full max-w-md">
+            <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
+              {recentOn && (JSON.parse(recentSearches) as string[]).map((r) => (
+                <button
+                  key={`r-${r}`}
+                  type="button"
+                  data-testid="recenti"
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(r); void runAISearch(r); }}
+                  className="min-h-14 max-w-56 shrink-0 rounded-card border border-border bg-white/95 px-3.5 py-2 text-left text-sm font-sans text-accent shadow-card backdrop-blur active:scale-95 disabled:opacity-60"
+                >
+                  <span className="line-clamp-2">↻ {r}</span>
+                </button>
+              ))}
+              {WELCOME_EXAMPLES.map((ex) => (
+                <button
+                  key={ex.query}
+                  type="button"
+                  aria-label={ex.query}
+                  disabled={aiSearching}
+                  onClick={() => { setAiQuery(ex.query); void runAISearch(ex.query); }}
+                  className="min-h-14 shrink-0 rounded-card border border-border bg-white/95 px-3.5 py-2 text-left shadow-card backdrop-blur active:scale-95 disabled:opacity-60"
+                >
+                  <span className="block text-sm font-sans font-medium text-text">{ex.title}</span>
+                  <span className="block text-sm font-sans text-text-muted">{ex.sub}</span>
+                </button>
+              ))}
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); if (aiQuery.trim()) void runAISearch(aiQuery.trim()); }}
+              className="rounded-card border border-border bg-white p-3 shadow-float"
+            >
+              <label htmlFor="cerca-home" className="sr-only">Cosa cerchi?</label>
+              <textarea
+                id="cerca-home"
+                rows={2}
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (aiQuery.trim()) void runAISearch(aiQuery.trim()); }
+                }}
+                placeholder="Cosa cerchi?"
+                className="font-title block w-full resize-none bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none"
+              />
+              <div className="mt-1 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={goToMyPosition}
+                  disabled={geoState === "loading"}
+                  aria-label="Usa la mia posizione"
+                  className="-ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-pill px-2 text-sm font-sans text-text-muted active:scale-95 disabled:opacity-60"
+                >
+                  <LocateFixed size={18} className="text-brand" />
+                  {geoState === "loading" ? "Cerco…" : "Vicino a me"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={aiSearching || aiQuery.trim() === ""}
+                  aria-label="Cerca"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-40"
+                >
+                  {aiSearching ? (
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  ) : (
+                    <ArrowUp size={20} />
+                  )}
+                </button>
+              </div>
+              {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
+              {(geoState === "denied" || geoState === "unavailable") && (
+                <p className="mt-2 text-xs font-sans text-text-muted">
+                  {geoState === "denied"
+                    ? "Non ho il permesso di vedere dove sei: attivalo dalle impostazioni del browser, oppure scrivi la zona (es. “a Trastevere”)."
+                    : "Non riesco a trovare la tua posizione: scrivi la zona (es. “a Trastevere”)."}
+                </p>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Primo accesso: barra compatta in basso (la mappa resta visibile). */}
-      {view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
+      {homeVariant === "a" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
@@ -1312,12 +1409,7 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
-              {[
-                "Rooftop romantico per due a Roma",
-                "Trattoria autentica non turistica a Trastevere",
-                "Colazione buona qui vicino",
-                "Cocktail bar elegante per un appuntamento",
-              ].map((example) => (
+              {WELCOME_EXAMPLES.map(({ query: example }) => (
                 <button
                   key={example}
                   type="button"
