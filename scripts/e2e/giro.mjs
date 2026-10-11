@@ -326,6 +326,9 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
   ok(resp?.status() === 200, `/${r} risponde 200`);
 }
+await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+await page.getByLabel("Scegli uno screenshot").setInputFiles({ name: "post.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
+ok(await page.getByText("Cambia screenshot").isVisible() && await page.getByText("post.png").isVisible(), "importa: area grande per scegliere lo screenshot, in italiano");
 await page.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
 const covered = await page.evaluate(() => {
   const b = [...document.querySelectorAll("button")].find((x) => /Continua/.test(x.textContent ?? ""));
