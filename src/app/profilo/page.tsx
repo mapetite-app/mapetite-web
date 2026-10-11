@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import PlaceCard from "@/components/place-card";
+import { cityFromAddress } from "@/lib/city";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -27,8 +29,8 @@ function Stars({ rating }: { rating: number }) {
   const filled = Math.round(Math.max(0, Math.min(5, rating)));
   return (
     <span aria-label={`${filled} stelle su 5`}>
-      <span className="text-amber-400">{"★".repeat(filled)}</span>
-      <span className="text-zinc-300">{"★".repeat(5 - filled)}</span>
+      <span className="text-star">{"★".repeat(filled)}</span>
+      <span className="text-border">{"★".repeat(5 - filled)}</span>
     </span>
   );
 }
@@ -73,63 +75,89 @@ export default async function ProfiloPage() {
   const saved = (savedRaw ?? []) as unknown as SavedPlaceRow[];
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
+  // Salvati raggruppati per città (ricavata dall'indirizzo, come nella mappa).
+  const byCity = new Map<string, SavedPlaceRow[]>();
+  for (const row of saved) {
+    if (!row.places) continue;
+    const city = cityFromAddress(row.places.address) ?? "Altre zone";
+    byCity.set(city, [...(byCity.get(city) ?? []), row]);
+  }
+  const cityGroups = [...byCity.entries()].sort((a, b) =>
+    a[0] === "Altre zone" ? 1 : b[0] === "Altre zone" ? -1 : b[1].length - a[1].length,
+  );
+  const initial = (user.email ?? "?").charAt(0).toUpperCase();
+
   return (
-    <div className="mx-auto max-w-2xl px-6 py-12">
-      <div className="mb-10">
-        <p className="text-lg font-semibold text-zinc-900">{user.email}</p>
-        <p className="mt-1 text-sm text-zinc-500">
-          {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
-          {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
-        </p>
+    <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mb-8 flex items-center gap-4">
+        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
+          {initial}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-display text-base font-semibold text-text">{user.email}</p>
+          <p className="mt-0.5 text-sm text-text-muted">
+            {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
+            {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
+          </p>
+        </div>
       </div>
 
-      <section className="mb-12">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">
-          I miei locali salvati
-        </h2>
+      <section className="mb-10">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="font-title text-xl font-semibold text-brand">I miei locali salvati</h2>
+          {saved.length > 0 && (
+            <Link href="/mappa" className="text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
+          )}
+        </div>
         {saved.length === 0 ? (
-          <p className="text-sm text-zinc-400">
-            Non hai ancora salvato nessun locale.
-          </p>
+          <div className="rounded-card border border-border bg-surface p-5 text-center">
+            <p className="text-sm text-text-muted">Non hai ancora salvato nessun locale.</p>
+            <Link href="/mappa" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+              Cerca un locale
+            </Link>
+          </div>
         ) : (
-          <ul className="space-y-3">
-            {saved.map(({ places: place, tags, note }, i) =>
-              place ? (
-                <li key={place.id ?? i}>
-                  <PlaceCard
-                    name={place.name}
-                    category={place.category}
-                    address={place.address}
-                    tags={tags ?? undefined}
-                    note={note}
-                  />
-                </li>
-              ) : null
-            )}
-          </ul>
+          cityGroups.map(([city, rows]) => (
+            <div key={city} className="mb-5">
+              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
+                📍 {city} · {rows.length}
+              </h3>
+              <ul className="space-y-2">
+                {rows.map(({ places: place, tags, note }, i) =>
+                  place ? (
+                    <li key={place.id ?? i}>
+                      <PlaceCard
+                        name={place.name}
+                        category={place.category}
+                        address={place.address}
+                        tags={tags ?? undefined}
+                        note={note}
+                      />
+                    </li>
+                  ) : null
+                )}
+              </ul>
+            </div>
+          ))
         )}
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">
-          Le mie recensioni
-        </h2>
+        <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le mie recensioni</h2>
         {reviews.length === 0 ? (
-          <p className="text-sm text-zinc-400">
-            Non hai ancora scritto recensioni.
-          </p>
+          <p className="text-sm text-text-muted">Non hai ancora scritto recensioni.</p>
         ) : (
-          <ul className="space-y-5">
+          <ul className="space-y-2">
             {reviews.map((review) => (
-              <li key={review.id} className="border-b border-zinc-100 pb-5 last:border-0">
-                <p className="font-semibold text-zinc-900">
+              <li key={review.id} className="rounded-card border border-border bg-white p-4 shadow-card">
+                <p className="font-display font-semibold text-text">
                   {review.places?.name ?? "Locale sconosciuto"}
                 </p>
                 <div className="mt-1">
                   <Stars rating={review.rating} />
                 </div>
                 {review.comment && (
-                  <p className="mt-1.5 text-sm text-zinc-600">{review.comment}</p>
+                  <p className="mt-1.5 text-sm text-text-muted">{review.comment}</p>
                 )}
               </li>
             ))}
