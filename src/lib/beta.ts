@@ -12,7 +12,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
 // quel telefono finché non si apre ?beta=off).
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
-export type OptInFlag = "gemme" | "articolo";
+//   barra         campo "Cosa cerchi?" sempre visibile in cima alla mappa (Places), al posto dell'icona ✨
+export type OptInFlag = "gemme" | "articolo" | "barra";
 const OPTIN_KEY = "mapetite.beta";
 
 function readOptIn(): string {

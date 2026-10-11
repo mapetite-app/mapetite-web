@@ -15,7 +15,7 @@ import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import DragToClose from "@/components/drag-to-close";
-import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowUp, LocateFixed, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
@@ -658,6 +658,9 @@ export default function MapView({
   const recentOn = useBeta("recenti");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
+  // Campo "Cosa cerchi?" sempre visibile in cima alla mappa (?beta=barra, spento di default).
+  const barOn = useOptIn("barra");
+  const barInputRef = useRef<HTMLInputElement>(null);
   const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
     () => () => {},
@@ -1286,9 +1289,50 @@ export default function MapView({
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
-      <div className="absolute top-4 left-4 z-10 flex w-80 max-w-[90vw] flex-col gap-2 pointer-events-none">
-        {/* Riga icone: Concierge AI + Filtri */}
+      <div className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+        {/* Riga icone: Concierge AI + Filtri (con ?beta=barra: campo "Cosa cerchi?" sempre visibile, come Places) */}
         <div className="pointer-events-auto flex gap-2">
+          {barOn ? (
+            <form
+              data-testid="barra-ricerca"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-1 shadow-float"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = aiQuery.trim();
+                if (q.length < 3 || aiSearching) return;
+                (document.activeElement as HTMLElement | null)?.blur();
+                setWelcomeDismissed(true);
+                if (overlay.kind === "ai") dispatch({ type: "CLOSE" });
+                void runAISearch(q);
+              }}
+            >
+              {aiSearching ? (
+                <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-brand" />
+              ) : (
+                <Search size={18} className="shrink-0 text-brand" aria-hidden />
+              )}
+              <input
+                ref={barInputRef}
+                type="search"
+                enterKeyHint="search"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                placeholder="Cosa cerchi?"
+                aria-label="Cosa cerchi?"
+                className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+              />
+              {(aiQuery !== "" || aiSearch !== null) && (
+                <button
+                  type="button"
+                  aria-label="Cancella la ricerca"
+                  onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-text-muted"
+                >
+                  ✕
+                </button>
+              )}
+            </form>
+          ) : (
           <button
             type="button"
             onClick={() => {
@@ -1303,14 +1347,16 @@ export default function MapView({
               <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-surface" />
             )}
           </button>
+          )}
           <button
             type="button"
+            aria-label="Filtri"
             onClick={() => {
               setAiSearch(null);
               setAiQuery("");
               dispatch({ type: "OPEN_FILTERS" });
             }}
-            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
+            className="relative flex shrink-0 h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
           >
             <SlidersHorizontal size={20} className="text-text-muted" />
             {countActive(filters) > 0 && (
@@ -1595,7 +1641,7 @@ export default function MapView({
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
-              <p className="font-title text-lg font-semibold text-brand">Cosa cerchi?</p>
+              <p className="font-title text-lg font-semibold text-brand">{barOn ? "Prova con…" : "Cosa cerchi?"}</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
@@ -1662,8 +1708,9 @@ export default function MapView({
             )}
             {aiError && <p className="mt-2 text-sm text-error">{aiError}</p>}
             <div className="mt-2 flex gap-2">
-              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito. */}
-              <form
+              {/* Campo di ricerca direttamente nella card (come la home di Places): si scrive subito.
+                  Con la barra in alto il campo c'è già: qui resta solo "Dove sono". */}
+              {!barOn && <form
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-brand pl-3.5 pr-1"
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1686,7 +1733,7 @@ export default function MapView({
                     →
                   </button>
                 )}
-              </form>
+              </form>}
               <button
                 type="button"
                 onClick={goToMyPosition}
@@ -2064,7 +2111,7 @@ export default function MapView({
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
-          onRefine={() => dispatch({ type: "OPEN_AI" })}
+          onRefine={() => { if (barOn) barInputRef.current?.focus(); else dispatch({ type: "OPEN_AI" }); }}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {

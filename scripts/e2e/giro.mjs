@@ -303,6 +303,28 @@ await page.waitForTimeout(800);
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("cocktail bar elegante"), "articolo: 'Fai un'altra domanda' avvia una nuova ricerca");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+// 5e3. Beta "barra" (spenta di default): campo "Cosa cerchi?" sempre in cima alla mappa (Places)
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok((await page.getByTestId("barra-ricerca").count()) === 0, "barra: spenta di default");
+await page.goto(`${BASE}/mappa?beta=barra`, { waitUntil: "networkidle" });
+const bar = await page.getByTestId("barra-ricerca").boundingBox();
+const loc = await page.getByRole("button", { name: "La mia posizione", exact: true }).boundingBox();
+ok(!!bar && !!loc && bar.y < 80 && bar.x + bar.width <= loc.x, "barra: in cima, non copre il pulsante posizione");
+ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella card iniziale niente secondo campo");
+await shot("22-barra");
+await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitivo sul tetto"), "barra: si scrive e si cerca dalla barra");
+ok((await page.getByTestId("benvenuto").count()) === 0, "barra: dopo la ricerca la card iniziale sparisce");
+await page.getByRole("button", { name: "Affina" }).click();
+ok(await page.getByLabel("Cosa cerchi?").evaluate((el) => el === document.activeElement), "barra: 'Affina' porta il cursore nella barra");
+await shot("22b-barra-risultati");
+await page.getByRole("button", { name: "Cancella la ricerca" }).click();
+await page.waitForTimeout(300);
+ok((await page.getByTestId("titolo-risposta").count()) === 0 && (await page.getByLabel("Cosa cerchi?").inputValue()) === "", "barra: ✕ cancella la ricerca e i risultati");
+await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+
 // 5f. Ricerca scritta direttamente nella card iniziale
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
