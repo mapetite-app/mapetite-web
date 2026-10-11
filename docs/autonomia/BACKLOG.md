@@ -7,8 +7,9 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-Aggiornato 11/10 sera. **In produzione (PR #13, #14, #16):** voci 1–8 e 10; lista B collegata alla mappa con foto; home nuova; mappa pulita; feedback; salvati per città; tutte le pagine nello stile Mapetite. **In produzione anche la #17:** varianti Places della #15 integrate, "Ci sono stato", accesso che porta alla mappa. **In PR #18:** correzione di "Ci sono stato" (poteva cancellare tag), momento magia a fine onboarding, "✨ Per te", "Ho capito … · a zona", ricerca in corso con card fantasma, link a Google Maps per gli orari, "Esplora".
-**Manca:** scelte di Lorenzo sulle varianti (`?stile=places`: scheda B, home B, pin con foto, titoli serif; `?mappa=chiara`; `?beta=gemme`); prova dal vivo con Haiku (manca `ANTHROPIC_API_KEY` nell'ambiente cloud); giro completo con un account vero; esempi di ricerche che non andavano.
+Aggiornato 11/10 sera (dopo la #18). **In produzione (PR #13–#18):** voci 1–8 e 10; lista B collegata alla mappa con foto; home nuova; mappa pulita; feedback; salvati per città; "Ci sono stato"; momento magia e "✨ Per te"; ricerca in corso con card fantasma; link Google Maps per gli orari.
+**In PR #19:** risposta come articolo (`?beta=articolo`), barra "Cosa cerchi?" in cima (`?beta=barra`), nuovo "Salva" (`?beta=salva`), `?stile=places` che accende tutto lo stile Places, ricerche "non turistiche" senza i locali di massa in cima.
+**Manca:** scelte di Lorenzo sulle varianti (`?stile=places` = scheda B, home B, pin con foto, titoli serif, articolo, nuovo Salva; `?beta=barra`; `?mappa=chiara`; `?beta=gemme`); prova dal vivo con Haiku (manca `ANTHROPIC_API_KEY` nell'ambiente cloud); giro completo con un account vero; esempi di ricerche che non andavano.
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
 
@@ -68,6 +69,10 @@ Regole:
 - Le fasi 1–3 restano la priorità: una funzione nuova non deve mai rallentare o rompere la ricerca e la lista risultati.
 
 ### Proposte
+- **Risposta come un articolo — IN PROVA (PR #19, `?beta=articolo`, accesa anche da `?stile=places`)**: dal carosello "☰ Leggi la risposta" apre la ricerca a tutto schermo come Places (`places-02`): la richiesta, "Ho scelto N posti per te: …", titolo grande, ogni locale con verdetto + motivo, foto grande e Salva; in fondo "Fai un'altra domanda". Nessun costo (dati già arrivati), nessuna migrazione. Niente mini-mappa: sarebbe un caricamento Mapbox in più.
+- **Barra "Cosa cerchi?" sempre in cima — IN PROVA (PR #19, `?beta=barra`)**: campo di ricerca fisso in alto sulla mappa (`places-03/04`) al posto dell'icona ✨. Non è dentro `?stile=places` perché si sovrappone alla home B (due campi uguali): da scegliere quale tenere.
+- **Nuovo "Salva" — IN PROVA (PR #19, `?beta=salva`, acceso anche da `?stile=places`)**: foglio dal basso come `places-07` con "📌 Voglio andarci / ✓ Ci sono stato", nota, tag, "Fatto". Stessi tag di prima, nessuna migrazione.
+- **Ricerche "non turistiche" — FATTA (PR #19), accesa per tutti**: con "non turistico", "autentico", "poco conosciuto", "dove vanno i romani"… i locali con molte più recensioni degli altri (oltre 8.000 e oltre 3× la mediana) scendono in fondo, mai esclusi; log `[search-mainstream]`. Caso 3 di TEST-RICERCHE: prima Tonnarello (110k) e Nannarella (47k) erano in top 5. Nessun costo.
 - **Momento magia a fine onboarding e "✨ Per te" — FATTE (PR #18)**: prima ricerca e suggerimento costruiti sui gusti dell'onboarding. Costo: 1 ricerca a fine onboarding, una volta per utente.
 - **Stati "Voglio andarci / Ci sono stato" — FATTA (PR #17, corretta nella #18)** con i tag esistenti "Da provare" / "Già visitato", senza migrazione (sostituisce la proposta con colonna nuova).
 - **Fatte 11/10 pomeriggio (PR #16), accese per tutti, nessun costo né migrazione:** carosello e mappa collegati con foto nel pin a fuoco; suggerimento in base all'ora; "Più vicini"; "Affina"; segnalibro Salva sulle card; condividi una ricerca (`/mappa?q=…&at=lat,lng`, accesa per tutti: unita alla versione della PR #15); nuova home come Places; ricerca scritta nella card iniziale; punto blu "tu sei qui" e pulsante posizione; invito ad aggiungere alla Home (iPhone/Android); tipi di locale in italiano; riga "Roma · 600 m" nella scheda; Accedi, Registrati, Profilo e Importa nei colori Mapetite; pulsanti quando non trova nulla.
