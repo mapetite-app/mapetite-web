@@ -275,6 +275,21 @@ await fb.click();
 const fbHref = decodeURIComponent((await fb.getAttribute("href")) ?? "");
 ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /mappa?lista=b"), "feedback: email precompilata con la pagina in cui si trova il tester");
 
+// 7c. iPhone: invito ad aggiungere alla Home (solo a chi ha già cercato)
+const ctxIos = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+const pi = await ctxIos.newPage();
+await pi.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok((await pi.getByTestId("installa").count()) === 0, "iPhone, primo accesso: nessun invito a installare");
+await pi.evaluate(() => localStorage.setItem("mapetite.recenti", JSON.stringify(["rooftop a Roma"])));
+await pi.reload({ waitUntil: "networkidle" });
+await pi.getByText("📲 Aggiungi Mapetite alla Home").click();
+ok(await pi.getByText("Aggiungi alla schermata Home").isVisible(), "iPhone, chi torna: invito con le istruzioni per la Home");
+await pi.screenshot({ path: `${OUT}/07c-installa-iphone.png` });
+await pi.getByRole("button", { name: "Non mostrare più" }).click();
+await pi.reload({ waitUntil: "networkidle" });
+ok((await pi.getByTestId("installa").count()) === 0, "iPhone: chiuso l'invito non ricompare");
+await ctxIos.close();
+
 // 8. Pagine pubbliche: si aprono e il pulsante principale non è coperto
 for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });

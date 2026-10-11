@@ -12,6 +12,7 @@ import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/compon
 import VenueSheet from "@/components/venue-sheet";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
+import InstallHint from "@/components/install-hint";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
@@ -1365,6 +1366,8 @@ export default function MapView({
                 {geoState === "loading" ? "Cerco…" : "📍 Dove sono"}
               </button>
             </div>
+            {/* Solo a chi torna (ha già cercato): al primo accesso conta la ricerca. */}
+            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && <InstallHint />}
             {(geoState === "denied" || geoState === "unavailable") && (
               <p className="mt-2 text-xs font-sans text-text-muted">
                 {geoState === "denied"
