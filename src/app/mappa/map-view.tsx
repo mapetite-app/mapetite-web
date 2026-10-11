@@ -8,7 +8,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
-import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
+import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
@@ -22,6 +22,18 @@ import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
+
+// Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
+function filtersSummary(f: Filters): string {
+  const parts: string[] = [];
+  if (f.categories.length > 0) parts.push(f.categories.map((c) => CATEGORIES.find((x) => x.id === c)?.label ?? c).join(", "));
+  if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
+  if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
+  if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
+  if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
+  if (f.openNowOnly) parts.push("aperti ora");
+  return parts.join(" · ");
+}
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 const VISIT_WANT = "Da provare";
@@ -1162,6 +1174,8 @@ export default function MapView({
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setVenueDetails(details);
+      // Come per la ricerca AI: la mappa si sposta sui risultati.
+      fitToPlaces(places);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
       setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -2280,7 +2294,9 @@ export default function MapView({
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
-          heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
+          heading={view === "saved" && aiSearch === null
+            ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}`
+            : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
