@@ -71,7 +71,8 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
-const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
+// caret "initial": nascondere il cursore aggiunge uno stile ai campi e, durante il caricamento, React lo segnala come differenza.
+const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
 
 // 1. Primo accesso
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -468,7 +469,7 @@ ok((await p2.getByTestId("benvenuto").count()) === 0, "posizione concessa: la ca
 ok(await p2.getByTestId("tu-sei-qui").isVisible(), "posizione concessa: punto blu 'tu sei qui' sulla mappa");
 await p2.getByRole("button", { name: "La mia posizione" }).click();
 ok(true, "pulsante 'La mia posizione' sempre disponibile in alto a destra");
-await p2.screenshot({ path: `${OUT}/07b-posizione.png` });
+await p2.screenshot({ path: `${OUT}/07b-posizione.png`, caret: "initial" });
 await ctx2.close();
 // posizione concessa vicino ai risultati: il pulsante percorso mostra i minuti a piedi (come Places)
 const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8995, longitude: 12.4895 } });
@@ -486,7 +487,7 @@ await p3.getByText("Terrazza Uno").first().click();
 await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
 const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
 ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
-await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
+await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png`, caret: "initial" });
 await ctx3.close();
 
 // 7-bis. Condividi la ricerca: il link porta richiesta e punto della mappa
@@ -614,7 +615,7 @@ await pi.evaluate(() => localStorage.setItem("mapetite.recenti", JSON.stringify(
 await pi.reload({ waitUntil: "networkidle" });
 await pi.getByText("📲 Aggiungi Mapetite alla Home").click();
 ok(await pi.getByText("Aggiungi alla schermata Home").isVisible(), "iPhone, chi torna: invito con le istruzioni per la Home");
-await pi.screenshot({ path: `${OUT}/07c-installa-iphone.png` });
+await pi.screenshot({ path: `${OUT}/07c-installa-iphone.png`, caret: "initial" });
 await pi.getByRole("button", { name: "Non mostrare più" }).click();
 await pi.reload({ waitUntil: "networkidle" });
 ok((await pi.getByTestId("installa").count()) === 0, "iPhone: chiuso l'invito non ricompare");
@@ -686,7 +687,7 @@ else {
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
     ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
-  await p.screenshot({ path: `${OUT}/11-salvati.png` });
+  await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
@@ -694,13 +695,13 @@ else {
   await p.waitForTimeout(1500);
   const pin = await p.getByTestId("pin").first().boundingBox();
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
-  await p.screenshot({ path: `${OUT}/13-salvati-milano.png` });
+  await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
   ok(await p.locator("ul.snap-x li").first().getByText(/★ 4,6 · €€/).isVisible(), "card salvato: voto e prezzo salvati");
-  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
+  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
@@ -718,7 +719,7 @@ else {
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   await p.waitForTimeout(500);
   ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
-  await p.screenshot({ path: `${OUT}/13b-stato-salvato.png` });
+  await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
 
@@ -730,7 +731,7 @@ else {
   ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
   { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
     ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
-  await p.screenshot({ path: `${OUT}/14-salva-da-card.png` });
+  await p.screenshot({ path: `${OUT}/14-salva-da-card.png`, caret: "initial" });
   await sctx.close();
 
   // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
@@ -778,7 +779,7 @@ else {
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
-  await v.screenshot({ path: `${OUT}/17-salvato.png` });
+  await v.screenshot({ path: `${OUT}/17-salvato.png`, caret: "initial" });
   await v.locator("button:text-is('Salvato')").click();
   await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
   const del = writes.find((w) => w.m === "DELETE");
@@ -795,7 +796,7 @@ else {
   const sb = await sheet.getByRole("button", { name: "Fatto" }).boundingBox();
   { const ab = await sheet.getByRole("button", { name: "Annulla" }).boundingBox(); ok(!!sb && !!ab && ab.y + ab.height <= 844 - 56, "salva B: 'Fatto' e 'Annulla' visibili sopra la barra in basso"); }
   ok(await sheet.locator("textarea").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "salva B: la nota non fa zoomare l'iPhone (testo ≥ 16px)");
-  await v.screenshot({ path: `${OUT}/23-salva-foglio.png` });
+  await v.screenshot({ path: `${OUT}/23-salva-foglio.png`, caret: "initial" });
   await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false", "salva B: gli stati si escludono a vicenda");
   await sheet.getByRole("button", { name: "Con amici" }).click();
