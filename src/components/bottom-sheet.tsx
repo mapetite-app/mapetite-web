@@ -8,7 +8,7 @@ import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
-const PHOTO_CARDS = 6;
+export const PHOTO_CARDS = 6;
 const NO_MATCH = "Nessun locale con questi filtri: togline qualcuno.";
 
 export interface BottomSheetProps {

@@ -140,6 +140,7 @@ await shot("05-lista-b");
 // Carosello ↔ mappa: la card al centro evidenzia il suo pin e viceversa
 const focusedName = () => page.locator("[data-testid=pin][data-focused=true]").innerText().catch(() => "");
 ok((await focusedName()).includes("Terrazza Uno"), "carosello: il pin della prima card è evidenziato");
+ok((await page.locator("[data-testid=pin][data-focused=true] img").count()) === 1, "pin a fuoco: mostra la miniatura della foto");
 await page.locator("ul.snap-x").evaluate((ul) => ul.scrollTo({ left: ul.children[1].offsetLeft, behavior: "instant" }));
 await page.waitForTimeout(700);
 ok((await focusedName()).includes("Rooftop Tre"), "carosello: scorrendo, si evidenzia il pin della card al centro");

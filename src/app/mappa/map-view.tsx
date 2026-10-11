@@ -10,7 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
-import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
+import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
+import PlacePhoto from "@/components/place-photo";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
@@ -1440,11 +1441,22 @@ export default function MapView({
                 <span
                   role="img"
                   aria-label={place.category ?? "locale"}
-                  className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                  className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
                     selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                   }`}
                 >
-                  {getCategoryEmoji(place.category, place.name)}
+                  {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
+                  {focusId === place.id && aiSearch !== null && carouselList.indexOf(place) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                    <PlacePhoto
+                      photoRef={venueDetails[place.id]?.photoRef}
+                      alt=""
+                      width={500}
+                      className="h-full w-full rounded-full object-cover"
+                      fallback={getCategoryEmoji(place.category, place.name)}
+                    />
+                  ) : (
+                    getCategoryEmoji(place.category, place.name)
+                  )}
                 </span>
                 {(aiSearch !== null || viewState.zoom >= 14 || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
