@@ -1290,6 +1290,24 @@ export default function MapView({
                       ? "Inizia a salvare i posti che vuoi ricordare"
                       : "Sposta la mappa o cambia vista"}
               </p>
+              {aiSearch !== null && (
+                <div className="mt-4 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "OPEN_AI" })}
+                    className="min-h-11 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+                  >
+                    Correggi la ricerca
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAiSearch(null); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                    className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
+                  >
+                    Vedi esempi
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

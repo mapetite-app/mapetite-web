@@ -54,6 +54,7 @@ await ctx.route("**/api/places/photo**", async (route) => {
 let synthDelay = 900;
 await ctx.route("**/api/search", async (route) => {
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
+  if (searchMode === "empty") return route.fulfill({ json: { ...SEARCH_FAST, risultati: [], sintesi_pendente: null } });
   return route.fulfill({ json: SEARCH_FAST });
 });
 await ctx.route("**/api/search/synthesis", async (route) => {
@@ -276,6 +277,17 @@ await page.getByRole("button", { name: "Colazione buona qui vicino", exact: true
 await page.getByText(/Qualcosa è andato storto/).first().waitFor({ timeout: 4000 });
 ok(true, "errore API: messaggio umano mostrato nella card");
 await shot("06-errore");
+searchMode = "ok";
+
+// 6b. Nessun risultato: pulsanti per riprovare
+searchMode = "empty";
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Non ho trovato nulla").waitFor({ timeout: 4000 });
+ok(await page.getByRole("button", { name: "Correggi la ricerca" }).isVisible(), "nessun risultato: pulsante 'Correggi la ricerca'");
+await shot("06b-nessun-risultato");
+await page.getByRole("button", { name: "Vedi esempi" }).click();
+ok(await page.getByText("Cosa cerchi?").isVisible(), "nessun risultato: 'Vedi esempi' riporta alla card iniziale");
 searchMode = "ok";
 
 // 7. Posizione: negata
