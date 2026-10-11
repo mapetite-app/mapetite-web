@@ -1,10 +1,11 @@
 "use client";
 
-import { X, Quote, Navigation, Globe, Phone, Check, Share2 } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
 import { useBeta } from "@/lib/beta";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { walkMinutes } from "@/lib/distance";
 
 export type Venue = {
   id: string;
@@ -39,6 +40,7 @@ type VenueSheetProps = {
   onClose: () => void;
   saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
   communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
+  userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
 };
 
 export default function VenueSheet({
@@ -49,6 +51,7 @@ export default function VenueSheet({
   onClose,
   saveSlot,
   communitySlot,
+  userPos = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -119,6 +122,8 @@ export default function VenueSheet({
     isSaved && (hasPersonalTags || personalNote != null || canEdit);
   const priceLabel =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
+  // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
+  const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
 
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
@@ -361,7 +366,7 @@ export default function VenueSheet({
 
       {/* 7. BARRA AZIONI FLOTTANTE: sempre visibile in fondo alla scheda mentre si scorre. */}
       <div
-        className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur"
+        className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-3 py-3 backdrop-blur"
       >
         {saveSlot}
 
@@ -369,10 +374,11 @@ export default function VenueSheet({
           href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white active:scale-95"
+          aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
+          className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill bg-brand px-3 py-2 text-sm font-display font-semibold text-white active:scale-95"
         >
-          <Navigation size={16} />
-          Indicazioni
+          {walk != null ? <Footprints size={16} className="shrink-0" /> : <Navigation size={16} className="shrink-0" />}
+          <span className="truncate">{walk != null ? `${walk} min` : "Percorso"}</span>
         </a>
 
         {shareOn && (

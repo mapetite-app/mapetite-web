@@ -109,9 +109,9 @@ ok(true, "pannello AI: chiudendo si torna alla lista");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
 const vh = 844;
-for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
+for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
   const box = await page.locator(sel).first().boundingBox();
-  ok(!!box && box.y + box.height <= vh && box.y >= 0, `scheda: pulsante ${label} nel viewport`);
+  ok(!!box && box.y + box.height <= vh && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390, `scheda: pulsante ${label} nel viewport (anche in larghezza)`);
   if (box) ok(box.height >= 40, `scheda: pulsante ${label} alto almeno 40px (${Math.round(box.height)})`);
 }
 ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
@@ -203,6 +203,25 @@ await p2.getByRole("button", { name: "Usa la mia posizione" }).click();
 await p2.waitForTimeout(1500);
 ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
 await ctx2.close();
+// posizione concessa vicino ai risultati: il pulsante percorso mostra i minuti a piedi (come Places)
+const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8995, longitude: 12.4895 } });
+await ctx3.route("**/api/places/photo**", (route) => route.fulfill({ status: 429, json: {} }));
+await ctx3.route("**/api/search", (route) => route.fulfill({ json: SEARCH_FAST }));
+await ctx3.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+const p3 = await ctx3.newPage();
+await p3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await p3.getByRole("button", { name: "Usa la mia posizione" }).click();
+await p3.waitForTimeout(1200);
+await p3.locator("button:has(svg.lucide-sparkles)").first().click();
+await p3.locator("input[type=text]").fill("rooftop");
+await p3.getByRole("button", { name: "Cerca", exact: true }).click();
+await p3.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+await p3.getByText("Terrazza Uno").first().click();
+await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
+ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
+await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
+await ctx3.close();
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono
 await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });

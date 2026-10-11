@@ -1431,6 +1431,7 @@ export default function MapView({
               canEdit={view === "saved"}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
+              userPos={userPos}
               saveSlot={
                 <SaveButton
                   placeId={resolveUuid(selected.id) ?? selected.id}

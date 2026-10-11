@@ -5,6 +5,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta } from "@/lib/beta";
 import PlacePhoto from "@/components/place-photo";
+import { distanceLabel } from "@/lib/distance";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 const PHOTO_CARDS = 6;
@@ -49,17 +50,6 @@ function priceLabel(level: number | null): string | null {
 function formatCount(n: number | null): string | null {
   if (n == null) return null;
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
-}
-
-function distanceLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
-  const R = 6371000;
-  const rad = (x: number) => (x * Math.PI) / 180;
-  const a =
-    Math.sin(rad(to.lat - from.lat) / 2) ** 2 +
-    Math.cos(rad(from.lat)) * Math.cos(rad(to.lat)) * Math.sin(rad(to.lng - from.lng) / 2) ** 2;
-  const m = 2 * R * Math.asin(Math.sqrt(a));
-  if (m < 950) return `${Math.max(50, Math.round(m / 50) * 50)} m`;
-  return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
 // Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
