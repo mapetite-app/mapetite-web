@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
+import PlacePhoto from "@/components/place-photo";
 import BottomSheet, { applyQuickFilters, type QuickFilter } from "@/components/bottom-sheet";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useBetaOptIn, useVariant } from "@/lib/beta";
@@ -901,6 +902,15 @@ export default function MapView({
   const mapPlaces =
     aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
 
+  // Variante pin con foto (?pin=b, stile Places): solo per i locali che hanno già la foto nella
+  // card (le prime 6 della lista B), con lo stesso indirizzo immagine → nessuna foto in più da pagare.
+  const pinVariant = useVariant("pin");
+  const pinPhotoIds = new Set(
+    pinVariant === "b" && aiSearch !== null && listVariant === "b" && clusterPlaces === null
+      ? mapPlaces.slice(0, 6).map((p) => p.id)
+      : [],
+  );
+
   const clusterIndex = useMemo(() => {
     const points = mapPlaces.map((place) => ({
       type: "Feature" as const,
@@ -1530,15 +1540,31 @@ export default function MapView({
               }}
             >
               <div className="flex cursor-pointer flex-col items-center" data-testid="pin">
-                <span
-                  role="img"
-                  aria-label={place.category ?? "locale"}
-                  className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
-                    selected?.id === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
-                  }`}
-                >
-                  {getCategoryEmoji(place.category, place.name)}
-                </span>
+                {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
+                  <span
+                    className={`block overflow-hidden rounded-xl border-2 bg-white shadow-float transition-transform ${
+                      selected?.id === place.id ? "h-14 w-14 scale-110 border-accent" : "h-11 w-11 border-white"
+                    }`}
+                  >
+                    <PlacePhoto
+                      photoRef={venueDetails[place.id]?.photoRef}
+                      alt={place.name}
+                      width={500}
+                      className="h-full w-full object-cover"
+                      fallback={<span className="flex h-full w-full items-center justify-center text-xl">{getCategoryEmoji(place.category, place.name)}</span>}
+                    />
+                  </span>
+                ) : (
+                  <span
+                    role="img"
+                    aria-label={place.category ?? "locale"}
+                    className={`flex items-center justify-center rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                      selected?.id === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
+                    }`}
+                  >
+                    {getCategoryEmoji(place.category, place.name)}
+                  </span>
+                )}
                 {(aiSearch !== null || viewState.zoom >= 14 || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
                     {place.name}

@@ -285,6 +285,18 @@ ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText
 await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
 ok(await page.getByRole("button", { name: "Scrivi la tua ricerca" }).isVisible(), "?home=a: torna il primo accesso attuale");
 
+// 7-quinquies. Pin con foto (?pin=b): stesse foto delle card, nessuna foto in più
+await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+await page.waitForTimeout(500);
+const pinSrcs = await page.locator("[data-testid=pin] img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
+const cardSrcs = await page.locator("ul.snap-x img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
+ok(pinSrcs.length >= 1, `pin con foto: ${pinSrcs.length} pin mostrano la foto`);
+ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stesse foto delle card (nessun costo in più)");
+await shot("20-pin-foto");
+await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
+
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
