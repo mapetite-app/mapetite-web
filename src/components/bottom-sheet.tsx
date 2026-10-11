@@ -7,6 +7,7 @@ import type { Place } from "@/app/mappa/map-view";
 import { useBeta } from "@/lib/beta";
 import PlacePhoto from "@/components/place-photo";
 import { distanceLabel } from "@/lib/distance";
+import { categoryLabel } from "@/lib/category-label";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 const PHOTO_CARDS = 6;
@@ -43,7 +44,7 @@ export type ListDetails = {
 };
 
 function prettyCategory(c: string | null): string | null {
-  return c ? c.replace(/_/g, " ") : null;
+  return categoryLabel(c);
 }
 
 function priceLabel(level: number | null): string | null {

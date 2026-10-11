@@ -23,7 +23,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
-  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false }),
+  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, category: "cocktail_bar" }),
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
@@ -129,6 +129,7 @@ ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosell
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+{ const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
   if (!name) return false;
