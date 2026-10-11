@@ -354,16 +354,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0 flex-1">
             {title && (
               <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
-              </p>
-            )}
-            {title && understood.length > 0 && (
-              <p data-testid="ho-capito" className="mt-0.5 truncate text-xs font-sans text-accent">
-                Ho capito: {understood.join(" · ")}
               </p>
             )}
             {!title && heading && (
@@ -407,6 +402,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-1 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
+          {/* A tutta larghezza sotto i pulsanti: prima veniva tagliato ("a Ro…"). */}
+          {title && understood.length > 0 && (
+            <p data-testid="ho-capito" className="mt-0.5 basis-full line-clamp-2 text-xs font-sans text-accent">
+              Ho capito: {understood.join(" · ")}
+            </p>
+          )}
         </div>
         {(quickFiltersOn || onOpenArticle) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
         {places.length === 0 && (
