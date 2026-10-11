@@ -36,6 +36,7 @@ function SaveModal({
   initialNote = "",
   onSaved,
   onCancel,
+  photoRef = null,
 }: {
   place: Place;
   userId: string;
@@ -44,8 +45,14 @@ function SaveModal({
   initialNote?: string;
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
+  photoRef?: string | null;
 }) {
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
+  // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
+  const sheetOn = useOptIn("salva");
+  // Nel foglio nuovo salvare vuol dire "voglio andarci" finché non si sceglie altro (come Places).
+  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+    sheetOn && mode === "save" && initialTags.length === 0 ? [VISIT_WANT] : initialTags,
+  );
   const [note, setNote] = useState(initialNote);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
@@ -105,6 +112,91 @@ function SaveModal({
     });
   };
 
+  if (sheetOn) {
+    const visit = selectedTags.includes(VISIT_DONE) ? VISIT_DONE : selectedTags.includes(VISIT_WANT) ? VISIT_WANT : null;
+    const setVisit = (v: VisitStatus) =>
+      setSelectedTags((prev) => {
+        const rest = prev.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+        return visit === v ? rest : [v, ...rest];
+      });
+    return (
+      // Sopra la barra in basso: la mappa è un contesto a parte e la barra resterebbe sopra il foglio.
+      <div data-testid="salva-foglio" className="fixed inset-x-0 top-0 z-50 flex items-end justify-center bg-black/40" style={{ bottom: "var(--nav-height-mobile)" }} onClick={() => { if (!isPending) onCancel(); }}>
+        <div
+          role="dialog"
+          aria-label={mode === "edit" ? `Modifica ${place.name}` : `Salva ${place.name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-full w-full max-w-lg overflow-y-auto rounded-t-card bg-surface px-5 pb-3 pt-2 shadow-float"
+        >
+          <div className="mx-auto mb-3 h-1 w-10 rounded-pill bg-border" />
+          <div className="flex items-center gap-3 border-b border-border pb-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl">
+              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name)} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-sans text-text-muted">{mode === "edit" ? "Tra i tuoi salvati" : "Salva"}</span>
+              <span className="block truncate font-title text-lg font-semibold text-brand">{place.name}</span>
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-1 rounded-pill bg-brand/5 p-1" role="group" aria-label="Stato">
+            {([[VISIT_WANT, "📌 Voglio andarci"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={visit === v}
+                onClick={() => setVisit(v)}
+                className={`min-h-11 rounded-pill text-sm font-display font-semibold transition-colors ${visit === v ? "bg-white text-brand shadow-card" : "text-text-muted"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <label className="mt-3 block">
+            <span className="sr-only">Nota personale</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="✎ Scrivi una nota (solo per te)"
+              rows={2}
+              className="w-full resize-none rounded-card border border-border bg-white px-4 py-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+          </label>
+
+          <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_TAGS.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                aria-pressed={selectedTags.includes(tag)}
+                onClick={() => toggleTag(tag)}
+                className={`min-h-9 rounded-pill border px-3.5 text-sm font-display font-medium ${selectedTags.includes(tag) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {error && <p className="mt-3 text-sm text-error">Non sono riuscito a salvare. Controlla la connessione e riprova.</p>}
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isPending}
+            className="mt-5 min-h-12 w-full rounded-pill bg-brand text-base font-display font-semibold text-white active:scale-[0.99] disabled:opacity-60"
+          >
+            {isPending ? "Salvo…" : "Fatto"}
+          </button>
+          <button type="button" onClick={onCancel} disabled={isPending} className="mt-1 min-h-11 w-full text-sm font-display font-semibold text-text-muted disabled:opacity-60">
+            Annulla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-80 max-w-[90vw] rounded-card bg-surface p-5 shadow-float">
@@ -136,7 +228,7 @@ function SaveModal({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Aggiungi una nota..."
           rows={3}
-          className="w-full resize-none rounded-btn border border-border px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-brand"
+          className="w-full resize-none rounded-btn border border-border px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand"
         />
 
         {error && (
@@ -2019,6 +2111,8 @@ export default function MapView({
         return pendingPlace && userId ? (
           <SaveModal
             place={pendingPlace}
+            // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
+            photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
             onSaved={(tags, note, uuid) => {
               if (uuid) {

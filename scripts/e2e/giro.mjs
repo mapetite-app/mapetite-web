@@ -709,6 +709,28 @@ else {
   await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
   const del = writes.find((w) => w.m === "DELETE");
   ok(!!del && del.url.includes("place_id=eq.11111111-2222-3333-4444-555555555555"), "rimuovi: dopo la conferma cancella il salvato giusto e il pulsante torna 'Salva'");
+
+  // 9c. Nuovo "Salva" stile Places (?beta=salva): foglio dal basso, Voglio andarci / Ci sono stato
+  writes.length = 0;
+  await v.goto(`${BASE}/mappa?beta=salva`, { waitUntil: "networkidle" });
+  await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await v.getByRole("button", { name: "Salva Rooftop Tre" }).click();
+  const sheet = v.getByTestId("salva-foglio");
+  await sheet.waitFor({ timeout: 3000 });
+  ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "salva B: 'Voglio andarci' già scelto");
+  const sb = await sheet.getByRole("button", { name: "Fatto" }).boundingBox();
+  { const ab = await sheet.getByRole("button", { name: "Annulla" }).boundingBox(); ok(!!sb && !!ab && ab.y + ab.height <= 844 - 56, "salva B: 'Fatto' e 'Annulla' visibili sopra la barra in basso"); }
+  ok(await sheet.locator("textarea").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "salva B: la nota non fa zoomare l'iPhone (testo ≥ 16px)");
+  await v.screenshot({ path: `${OUT}/23-salva-foglio.png` });
+  await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
+  ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false", "salva B: gli stati si escludono a vicenda");
+  await sheet.getByRole("button", { name: "Con amici" }).click();
+  await sheet.locator("textarea").fill("Prenotare");
+  await sheet.getByRole("button", { name: "Fatto" }).click();
+  await sheet.waitFor({ state: "detached", timeout: 4000 });
+  const ins2 = writes.find((w) => w.m === "POST");
+  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + nota (stessi campi di prima)");
+  await v.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
   await vctx.close();
 }
 
