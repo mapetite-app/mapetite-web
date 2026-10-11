@@ -1522,6 +1522,17 @@ export default function MapView({
             )}
           </button>
         </div>
+        {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
+        {barOn && aiError && !aiSearching && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed) && (
+          <button
+            type="button"
+            data-testid="errore-barra"
+            onClick={() => setAiError(null)}
+            className="pointer-events-auto self-start rounded-card bg-surface px-3 py-2 text-left text-sm font-sans text-error shadow-float"
+          >
+            {aiError} ✕
+          </button>
+        )}
         {/* Pannello AI espandibile */}
         {overlay.kind === "ai" && (
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">

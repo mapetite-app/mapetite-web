@@ -350,6 +350,23 @@ await page.waitForTimeout(300);
 ok((await page.getByTestId("titolo-risposta").count()) === 0 && (await page.getByLabel("Cosa cerchi?").inputValue()) === "", "barra: ✕ cancella la ricerca e i risultati");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+// 5e4. Senza rete: avviso in alto e messaggio chiaro se si cerca dalla barra
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Chiudi" }).first().click();
+await ctx.setOffline(true);
+await page.waitForTimeout(300);
+ok(await page.getByTestId("offline").isVisible(), "senza rete: avviso 'Sei senza connessione'");
+await page.unroute("**/api/search").catch(() => {});
+await page.route("**/api/search", (r) => r.abort("internetdisconnected"));
+await page.getByLabel("Cosa cerchi?").fill("aperitivo a Monti");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("errore-barra").waitFor({ timeout: 4000 }).then(() => ok(true, "senza rete: la ricerca dalla barra spiega l'errore"), () => ok(false, "senza rete: la ricerca dalla barra spiega l'errore"));
+await shot("25-senza-rete");
+await page.unroute("**/api/search");
+await ctx.setOffline(false);
+await page.waitForTimeout(300);
+ok((await page.getByTestId("offline").count()) === 0, "rete tornata: l'avviso sparisce");
+
 // 5f. Ricerca scritta direttamente nella card iniziale (senza la barra in alto)
 await page.goto(`${BASE}/mappa?beta=-barra`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
