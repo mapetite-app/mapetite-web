@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
-import { useBeta } from "@/lib/beta";
+import { useBeta, useOptIn } from "@/lib/beta";
+import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
@@ -128,6 +129,7 @@ export function applyQuickFilters(
 
 export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
+  const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
   const places = useMemo(
@@ -357,9 +359,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="relative flex flex-1 flex-col">
                     <span className="flex items-start justify-between gap-2">
                       <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
-                      {d?.openNow === true && (
-                        <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
-                      )}
+                      <span className="flex flex-wrap justify-end gap-1">
+                        {gemsOn && isGem(place.rating, d?.userRatingCount) && (
+                          <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                        )}
+                        {d?.openNow === true && (
+                          <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
+                        )}
+                      </span>
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
                     <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
@@ -484,6 +491,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
+                      </span>
+                    )}
+                    {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount) && (
+                      <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-1.5 py-0.5 text-[10px] font-display font-semibold text-accent">
+                        💎 Poco conosciuto
                       </span>
                     )}
                   </span>

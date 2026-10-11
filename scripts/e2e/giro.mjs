@@ -23,7 +23,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
-  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false }),
+  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180 }),
 ];
 const SEARCH_FAST = {
   risultati: PLACES,
@@ -189,6 +189,28 @@ await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "?beta=off: i filtri rapidi spariscono");
+
+// 5e. Beta "gemme" (spenta di default): badge sui locali amati ma poco recensiti
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("gemma").count()) === 0, "gemme: spente di default");
+await page.goto(`${BASE}/mappa?beta=gemme`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("gemma").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("gemma").count()) === 0, "?beta=gemme: badge solo sul locale con 4,7 e 180 recensioni (non su quello con 812)");
+await page.locator("ul.snap-x").evaluate((ul) => ul.scrollTo({ left: ul.scrollWidth, behavior: "instant" }));
+await page.waitForTimeout(500);
+await shot("09b-beta-gemme");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("gemma").count()) >= 1, "gemme: restano accese su questo telefono");
+await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("gemma").count()) === 0, "?beta=off: spegne anche le gemme");
 
 // 5d. Foto non disponibili (quota finita): resta l'emoji, nessun errore
 photoMode = "off";

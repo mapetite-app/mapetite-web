@@ -8,10 +8,39 @@ import { useSyncExternalStore } from "react";
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
 export type BetaFlag = "filtri-lista" | "condividi" | "recenti";
 
+// Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
+// quel telefono finché non si apre ?beta=off).
+//   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
+export type OptInFlag = "gemme";
+const OPTIN_KEY = "mapetite.beta";
+
+function readOptIn(): string {
+  const url = readFlags();
+  if (url.split(",").includes("off")) return EMPTY;
+  try {
+    const saved = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
+    const merged = Array.from(new Set([...saved.split(","), ...url.split(",")].map((f) => f.trim()).filter(Boolean))).join(",");
+    if (merged !== saved) window.localStorage.setItem(OPTIN_KEY, merged);
+    return merged;
+  } catch {
+    return url;
+  }
+}
+
+export function useOptIn(flag: OptInFlag): boolean {
+  const raw = useSyncExternalStore(() => () => {}, readOptIn, () => EMPTY);
+  return raw.split(",").includes(flag);
+}
+
 const EMPTY = "";
 
 function readFlags(): string {
-  return new URLSearchParams(window.location.search).get("beta") ?? EMPTY;
+  const raw = new URLSearchParams(window.location.search).get("beta") ?? EMPTY;
+  // ?beta=off spegne anche le funzioni accese su questo telefono (vedi useOptIn).
+  if (raw.split(",").includes("off")) {
+    try { window.localStorage.removeItem("mapetite.beta"); } catch { /* storage non disponibile */ }
+  }
+  return raw;
 }
 
 export function useBeta(flag: BetaFlag): boolean {
