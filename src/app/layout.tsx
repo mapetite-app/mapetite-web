@@ -28,7 +28,13 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "Mapetite",
-  description: "Trova e salva i tuoi locali preferiti",
+  description: "I locali giusti per te, non quelli di tutti. Scrivi cosa cerchi come lo diresti a un amico.",
+  openGraph: {
+    title: "Mapetite",
+    description: "I locali giusti per te, non quelli di tutti.",
+    locale: "it_IT",
+    type: "website",
+  },
   applicationName: "Mapetite",
   appleWebApp: {
     capable: true,
