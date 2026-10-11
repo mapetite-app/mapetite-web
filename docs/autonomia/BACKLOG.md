@@ -7,7 +7,7 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-Aggiornato 11/10 sera. **In produzione (PR #13, #14, #16):** voci 1–8 e 10; lista B collegata alla mappa con foto; home nuova; mappa pulita; feedback; salvati per città; tutte le pagine nello stile Mapetite. **In PR #17:** varianti Places della #15 integrate, "Ci sono stato", accesso che porta alla mappa.
+Aggiornato 11/10 sera. **In produzione (PR #13, #14, #16):** voci 1–8 e 10; lista B collegata alla mappa con foto; home nuova; mappa pulita; feedback; salvati per città; tutte le pagine nello stile Mapetite. **In produzione anche la #17:** varianti Places della #15 integrate, "Ci sono stato", accesso che porta alla mappa. **In PR #18:** correzione di "Ci sono stato" (poteva cancellare tag), momento magia a fine onboarding, "✨ Per te", "Ho capito … · a zona", ricerca in corso con card fantasma, link a Google Maps per gli orari, "Esplora".
 **Manca:** scelte di Lorenzo sulle varianti (`?stile=places`: scheda B, home B, pin con foto, titoli serif; `?mappa=chiara`; `?beta=gemme`); prova dal vivo con Haiku (manca `ANTHROPIC_API_KEY` nell'ambiente cloud); giro completo con un account vero; esempi di ricerche che non andavano.
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
@@ -68,7 +68,8 @@ Regole:
 - Le fasi 1–3 restano la priorità: una funzione nuova non deve mai rallentare o rompere la ricerca e la lista risultati.
 
 ### Proposte
-- **Stati "Voglio andarci / Ci sono stato" — FATTA (PR #17)** con i tag esistenti "Da provare" / "Già visitato", senza migrazione (sostituisce la proposta con colonna nuova).
+- **Momento magia a fine onboarding e "✨ Per te" — FATTE (PR #18)**: prima ricerca e suggerimento costruiti sui gusti dell'onboarding. Costo: 1 ricerca a fine onboarding, una volta per utente.
+- **Stati "Voglio andarci / Ci sono stato" — FATTA (PR #17, corretta nella #18)** con i tag esistenti "Da provare" / "Già visitato", senza migrazione (sostituisce la proposta con colonna nuova).
 - **Fatte 11/10 pomeriggio (PR #16), accese per tutti, nessun costo né migrazione:** carosello e mappa collegati con foto nel pin a fuoco; suggerimento in base all'ora; "Più vicini"; "Affina"; segnalibro Salva sulle card; condividi una ricerca (`/mappa?q=…&at=lat,lng`, accesa per tutti: unita alla versione della PR #15); nuova home come Places; ricerca scritta nella card iniziale; punto blu "tu sei qui" e pulsante posizione; invito ad aggiungere alla Home (iPhone/Android); tipi di locale in italiano; riga "Roma · 600 m" nella scheda; Accedi, Registrati, Profilo e Importa nei colori Mapetite; pulsanti quando non trova nulla.
 - **Gemme — IN PROVA (`?beta=gemme`, spenta di default)**: badge "💎 Poco conosciuto" su voto ≥ 4,5 e 20–400 recensioni. Da decidere se accenderla per tutti.
 - Pagine non collegate da nessuna parte e ancora nello stile vecchio: `/miei-locali`, `/locali/[id]`, `site-header`. Proposta: eliminarle (serve ok di Lorenzo).
