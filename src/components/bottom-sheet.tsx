@@ -24,6 +24,8 @@ export interface BottomSheetProps {
   // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
   quick?: ReadonlySet<QuickFilter>;
   onToggleQuick?: (f: QuickFilter) => void;
+  // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
+  title?: string | null;
 }
 
 export type ListDetails = {
@@ -120,7 +122,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -345,11 +347,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="flex-1 overflow-y-auto px-3 pb-4"
         style={{ touchAction: "pan-y" }}
       >
-        <div className="flex items-center justify-between px-1 pb-2">
-          <p className="text-xs font-sans text-text-muted">
-            {places.length} {places.length === 1 ? "risultato" : "risultati"}
-            {loadingVerdicts && " · preparo i verdetti…"}
-          </p>
+        <div className="flex items-start justify-between px-1 pb-2">
+          <div className="min-w-0">
+            {title && (
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-lg font-semibold leading-snug text-brand first-letter:uppercase">
+                {title}
+              </p>
+            )}
+            <p className="text-xs font-sans text-text-muted">
+              {title
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+              {loadingVerdicts && " · preparo i verdetti…"}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}

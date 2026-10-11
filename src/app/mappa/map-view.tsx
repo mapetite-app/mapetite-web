@@ -499,7 +499,7 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -944,7 +944,7 @@ export default function MapView({
         }
         const id = ++searchSeq.current;
         setClusterPlaces(null); setFilterError(null);
-        setAiSearch({ risultati: places, filtri: data.filtri_usati, id });
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q });
         setVenueDetails(details); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
@@ -1539,6 +1539,7 @@ export default function MapView({
           variant={listVariant}
           origin={userPos ?? searchOrigin}
           quick={quickFilters}
+          title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);
