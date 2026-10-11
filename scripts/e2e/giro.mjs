@@ -55,7 +55,9 @@ await ctx.route("**/api/places/photo**", async (route) => {
 await ctx.route("**/rest/v1/saved_places**", (route) => route.fulfill({ json: [] }));
 await ctx.route("**/rest/v1/place_synthesis**", (route) => route.fulfill({ json: [] }));
 let synthDelay = 900;
+let searchDelay = 0;
 await ctx.route("**/api/search", async (route) => {
+  if (searchDelay) await new Promise((r) => setTimeout(r, searchDelay));
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
   if (searchMode === "empty") return route.fulfill({ json: { ...SEARCH_FAST, risultati: [], sintesi_pendente: null } });
   return route.fulfill({ json: SEARCH_FAST });
@@ -276,7 +278,12 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
 await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
+searchDelay = 1500;
 await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("ricerca-in-corso").waitFor({ timeout: 4000 });
+ok((await page.getByTestId("ricerca-in-corso").textContent())?.includes("pizza napoletana"), "home → mappa: mentre cerca si vedono la richiesta e le card fantasma");
+await shot("00b-ricerca-in-corso");
+searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });

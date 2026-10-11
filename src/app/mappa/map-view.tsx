@@ -1962,6 +1962,29 @@ export default function MapView({
         />
       )}
 
+      {/* Ricerca in corso senza card iniziale (link ?q=, home): card fantasma come Places, la mappa non resta muta. */}
+      {aiSearching && aiSearch === null && welcomeDismissed && overlay.kind === "none" && (
+        <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: "var(--nav-height-mobile)" }}>
+          <div className="mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface px-4 py-2 shadow-float">
+            <p className="truncate font-title text-base font-semibold text-brand first-letter:uppercase">{aiQuery}</p>
+            <p className="flex items-center gap-2 text-xs font-sans text-text-muted">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-accent" />
+              Cerco i posti giusti…
+            </p>
+          </div>
+          <div className="flex gap-3 overflow-hidden px-3 pb-3">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-[190px] w-[78vw] max-w-sm shrink-0 animate-pulse rounded-card bg-brand/80 p-4 shadow-float">
+                <div className="h-7 w-7 rounded-full bg-white/20" />
+                <div className="mt-4 h-5 w-2/3 rounded bg-white/25" />
+                <div className="mt-2 h-3 w-1/3 rounded bg-white/15" />
+                <div className="mt-4 h-3 w-5/6 rounded bg-white/15" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {filterLoading && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
           <div className="pointer-events-auto flex items-center gap-2 rounded-pill bg-surface px-4 py-2 shadow-float">
