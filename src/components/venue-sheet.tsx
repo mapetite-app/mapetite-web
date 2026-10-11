@@ -33,6 +33,7 @@ export type Venue = {
   personalTags: string[] | null;
   personalNote: string | null;
   photoRef?: string | null;
+  photoAuthor?: string | null;
 };
 
 type VenueSheetProps = {
@@ -153,13 +154,20 @@ export default function VenueSheet({
       </div>
 
       {venue.photoRef && (
-        <PlacePhoto
-          photoRef={venue.photoRef}
-          alt={name}
-          width={700}
-          priority
-          className="h-44 w-full rounded-t-card object-cover"
-        />
+        <div className="relative">
+          <PlacePhoto
+            photoRef={venue.photoRef}
+            alt={name}
+            width={700}
+            priority
+            className="h-44 w-full rounded-t-card object-cover"
+          />
+          {venue.photoAuthor && (
+            <span className="absolute bottom-2 left-3 rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white">
+              Foto: {venue.photoAuthor}
+            </span>
+          )}
+        </div>
       )}
       <div className="px-5 pt-5">
         {!venue.photoRef && (

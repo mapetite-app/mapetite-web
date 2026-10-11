@@ -21,7 +21,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
   verdict: null, goFor: null, dontExpect: null, matchReason: null, ...extra,
 });
 const PLACES = [
-  mk("P1", "Terrazza Uno", 41.9, 12.49),
+  mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R." }),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
   mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180 }),
 ];
@@ -120,6 +120,7 @@ for (const [label, sel] of [["Indicazioni", "a:has-text('Indicazioni')"], ["Salv
   if (box) ok(box.height >= 40, `scheda: pulsante ${label} alto almeno 40px (${Math.round(box.height)})`);
 }
 ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: foto in cima alla scheda");
+ok(await page.getByText("Foto: Maria R.").isVisible(), "scheda: autore della foto indicato (condizioni Google)");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
 ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
