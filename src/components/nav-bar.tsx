@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/supabase/actions";
+import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
 
 function MapIcon({ filled }: { filled: boolean }) {
   return (
@@ -85,6 +86,25 @@ function AuthIcon() {
   );
 }
 
+function FeedbackIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      className="w-6 h-6"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"
+      />
+    </svg>
+  );
+}
+
 export default function NavBar({ userId }: { userId: string | null }) {
   const pathname = usePathname();
 
@@ -128,6 +148,15 @@ export default function NavBar({ userId }: { userId: string | null }) {
           <ProfileIcon filled={false} />
           <span className="text-[11px] font-display">Profilo</span>
         </Link>
+
+        <a
+          href={`mailto:${FEEDBACK_EMAIL}`}
+          onClick={(e) => { e.currentTarget.href = feedbackMailto(); }}
+          className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
+        >
+          <FeedbackIcon />
+          <span className="text-[11px] font-display">Feedback</span>
+        </a>
 
         {userId ? (
           <form action={logout} className="flex-1 flex">
@@ -190,6 +219,14 @@ export default function NavBar({ userId }: { userId: string | null }) {
             <ProfileIcon filled={false} />
             Profilo
           </Link>
+          <a
+            href={`mailto:${FEEDBACK_EMAIL}`}
+            onClick={(e) => { e.currentTarget.href = feedbackMailto(); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display text-text-muted hover:text-text hover:bg-brand-light transition-colors duration-150"
+          >
+            <FeedbackIcon />
+            Dai un feedback
+          </a>
         </nav>
 
         {userId ? (

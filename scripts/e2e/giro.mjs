@@ -1,7 +1,8 @@
 // Giro di controllo automatico a viewport mobile 390x844.
 // Le API di ricerca sono SIMULATE (nessuna chiamata Google/Haiku, nessun costo):
 // verifica l'interfaccia, non la qualità delle ricerche.
-//   npm run dev   (in un altro terminale)
+//   E2E_FAKE_USER=00000000-0000-0000-0000-000000000001 npm run dev   (in un altro terminale)
+//   (senza E2E_FAKE_USER il blocco "salvati" viene saltato)
 //   PW_MODULE=$(npm root -g)/playwright node scripts/e2e/giro.mjs [cartella-screenshot]
 import { createRequire } from "module";
 import { mkdirSync } from "fs";
@@ -76,13 +77,14 @@ await shot("01-benvenuto");
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(await page.getByText("preparo i verdetti").isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
+ok(await page.getByText(/preparo i verdetti/).isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
 ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
 await shot("02-lista-caricamento");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(true, "lista: il verdetto compare dopo");
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
+ok((await page.getByTestId("titolo-risposta").textContent())?.includes("Rooftop romantico"), "lista: titolo con la richiesta dell'utente");
 await shot("03-lista-verdetti");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
@@ -119,12 +121,25 @@ await shot("04-scheda");
 // 4b. Funzioni beta spente di default
 ok((await page.getByLabel(/Condividi/).count()) === 1, "condividi: pulsante presente nella scheda (acceso di default)");
 
-// 5. Variante B
-await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
+// 5. Lista: B (carosello) è la predefinita dall'11/10, A resta con ?lista=a
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(await page.locator("ul.snap-x").count() === 1, "variante B: carosello presente");
+ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosello presente");
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
+ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
+  const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
+  if (!name) return false;
+  const r = name.getBoundingClientRect();
+  return name.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+}), "lista B: il nome del locale è leggibile sopra la foto");
 await shot("05-lista-b");
+await page.goto(`${BASE}/mappa?lista=a`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok(await page.locator("ul.snap-x").count() === 0, "?lista=a: torna la lista verticale");
 
 // 5b. Beta: filtri lista, condividi, recenti
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -132,7 +147,16 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 await page.getByRole("button", { name: "Aperto ora" }).first().click();
-ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "beta filtri-lista: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
+ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
+await page.getByRole("button", { name: "Aperto ora" }).first().click();
+// sposto la mappa a mano: compare "Cerca in quest'area"
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
+ok(true, "mappa spostata: compare 'Cerca in quest'area'");
+await page.getByRole("button", { name: "Cerca in quest'area" }).click();
+await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
@@ -180,6 +204,15 @@ await p2.waitForTimeout(1500);
 ok(!(await p2.getByText("Cosa cerchi?").isVisible()), "posizione concessa: la card si chiude");
 await ctx2.close();
 
+// 7b. Feedback dei tester: email precompilata con pagina e telefono
+await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
+const fb = page.getByRole("link", { name: "Feedback" });
+ok(await fb.isVisible(), "feedback: voce 'Feedback' nella barra in basso");
+await fb.evaluate((a) => a.addEventListener("click", (e) => e.preventDefault()));
+await fb.click();
+const fbHref = decodeURIComponent((await fb.getAttribute("href")) ?? "");
+ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /mappa?lista=b"), "feedback: email precompilata con la pagina in cui si trova il tester");
+
 // 8. Pagine pubbliche: si aprono e il pulsante principale non è coperto
 for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
@@ -197,6 +230,47 @@ ok(covered === "ok", `onboarding: pulsante Continua raggiungibile (${covered})`)
 await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
+
+// 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
+// Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
+const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("button", { name: "I miei salvati" }).click())
+  .then(() => page.getByText("Accesso richiesto").isVisible({ timeout: 1500 })).then((v) => !v);
+if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
+else {
+  const rows = [
+    { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "u1", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1" } },
+    { tags: ["amici"], note: null, places: { id: "u2", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
+    { tags: null, note: "Brunch domenica", places: { id: "u3", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
+  ];
+  const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
+  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const p = await sctx.newPage();
+  p.on("pageerror", (e) => errors.push(e.message));
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+  ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
+  ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  await p.screenshot({ path: `${OUT}/11-salvati.png` });
+  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
+  await p.waitForTimeout(1500);
+  const pin = await p.getByTestId("pin").first().boundingBox();
+  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
+  await p.screenshot({ path: `${OUT}/13-salvati-milano.png` });
+  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByLabel("Cerca tra i salvati").fill("terrazza");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
+  ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
+  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
+  await p.getByLabel("Cerca tra i salvati").fill("sushi");
+  ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
+  await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  await sctx.close();
+}
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
 await browser.close();

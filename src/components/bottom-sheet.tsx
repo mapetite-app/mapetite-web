@@ -8,6 +8,7 @@ import PlacePhoto from "@/components/place-photo";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 const PHOTO_CARDS = 6;
+const NO_MATCH = "Nessun locale con questi filtri: togline qualcuno.";
 
 export interface BottomSheetProps {
   places: Place[];
@@ -21,6 +22,11 @@ export interface BottomSheetProps {
   variant?: "a" | "b";
   // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
   origin?: { lat: number; lng: number } | null;
+  // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
+  quick?: ReadonlySet<QuickFilter>;
+  onToggleQuick?: (f: QuickFilter) => void;
+  // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
+  title?: string | null;
 }
 
 export type ListDetails = {
@@ -100,30 +106,40 @@ type DragState = {
   fromContent: boolean; // il gesto è partito dalla lista scrollabile
 };
 
-type QuickFilter = "open" | "cheap" | "top";
+export type QuickFilter = "open" | "cheap" | "top";
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null }: BottomSheetProps) {
+// Filtri rapidi condivisi da lista e mappa (i pin seguono la lista).
+export function applyQuickFilters(
+  list: Place[],
+  quick: ReadonlySet<QuickFilter>,
+  details: Record<string, ListDetails | undefined> | undefined,
+): Place[] {
+  if (quick.size === 0) return list;
+  return list.filter(
+    (p) =>
+      (!quick.has("open") || details?.[p.id]?.openNow === true) &&
+      (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
+      (!quick.has("top") || (p.rating ?? 0) >= 4.5),
+  );
+}
+
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null }: BottomSheetProps) {
   const quickFiltersOn = useBeta("filtri-lista");
-  const [quick, setQuick] = useState<Set<QuickFilter>>(new Set());
+  const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
+  const quick = quickProp ?? quickLocal;
   const places = useMemo(
-    () =>
-      !quickFiltersOn || quick.size === 0
-        ? allPlaces
-        : allPlaces.filter(
-            (p) =>
-              (!quick.has("open") || details?.[p.id]?.openNow === true) &&
-              (!quick.has("cheap") || (p.priceLevel != null && p.priceLevel <= 2)) &&
-              (!quick.has("top") || (p.rating ?? 0) >= 4.5),
-          ),
+    () => (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces),
     [allPlaces, quick, quickFiltersOn, details],
   );
-  const toggleQuick = (f: QuickFilter) =>
-    setQuick((prev) => {
+  const toggleQuick = (f: QuickFilter) => {
+    if (onToggleQuick) return onToggleQuick(f);
+    setQuickLocal((prev) => {
       const next = new Set(prev);
       if (next.has(f)) next.delete(f);
       else next.add(f);
       return next;
     });
+  };
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -239,6 +255,22 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
 
   if (allPlaces.length === 0) return null;
 
+  const quickChips = (
+    <div className="flex flex-wrap gap-2" data-testid="filtri-lista">
+      {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={quick.has(k)}
+          onClick={() => toggleQuick(k)}
+          className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium shadow-card ${quick.has(k) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
     return (
@@ -246,15 +278,28 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className="pointer-events-auto mx-3 mb-2 flex items-center justify-between rounded-pill bg-surface px-4 py-1.5 shadow-float w-fit">
-          <p className="text-xs font-sans text-text-muted">
-            {places.length} {places.length === 1 ? "risultato" : "risultati"}
-            {loadingVerdicts && " · preparo i verdetti…"}
-          </p>
-          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 items-center justify-center text-base text-text-muted">
+        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float ${title ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+          <div className="min-w-0">
+            {title && (
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-base font-semibold leading-snug text-brand first-letter:uppercase">
+                {title}
+              </p>
+            )}
+            <p className="text-xs font-sans text-text-muted">
+              {title
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+              {loadingVerdicts && " · preparo i verdetti…"}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-2 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
         </div>
+        {quickFiltersOn && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
+        {places.length === 0 && (
+          <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
+        )}
         <ul className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
           {places.map((place) => {
             const d = details?.[place.id];
@@ -271,28 +316,45 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-brand/20" />
                     </>
                   )}
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
-                    {d?.openNow === true && (
-                      <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
+                  {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
+                  <span className="relative flex flex-1 flex-col">
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
+                      {d?.openNow === true && (
+                        <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
+                      )}
+                    </span>
+                    <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
+                    <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
+                      {metaLine(place, d, origin)}
+                    </span>
+                    {d?.verdict ? (
+                      <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
+                    ) : loadingVerdicts && details ? (
+                      <SkeletonLines dark />
+                    ) : null}
+                    {d?.matchReason && (
+                      <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
+                    )}
+                    {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
+                    {place.tags && place.tags.length > 0 && (
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {place.tags.slice(0, 3).map((t) => (
+                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{t}</span>
+                        ))}
+                      </span>
+                    )}
+                    {place.note && (
+                      <span className="mt-1 line-clamp-1 block text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
+                    )}
+                    {(d?.goFor ?? []).length > 0 && (
+                      <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
+                        {d!.goFor!.slice(0, 2).map((c) => (
+                          <span key={c} className="rounded-pill bg-white/15 px-2 py-0.5 text-[11px] font-display">{c}</span>
+                        ))}
+                      </span>
                     )}
                   </span>
-                  <span className="mt-3 line-clamp-2 text-lg font-display font-semibold leading-snug">{place.name}</span>
-                  <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
-                    {metaLine(place, d, origin)}
-                  </span>
-                  {d?.verdict ? (
-                    <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
-                  ) : loadingVerdicts && details ? (
-                    <SkeletonLines dark />
-                  ) : null}
-                  {(d?.goFor ?? []).length > 0 && (
-                    <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
-                      {d!.goFor!.slice(0, 2).map((c) => (
-                        <span key={c} className="rounded-pill bg-white/15 px-2 py-0.5 text-[11px] font-display">{c}</span>
-                      ))}
-                    </span>
-                  )}
                 </button>
               </li>
             );
@@ -332,11 +394,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="flex-1 overflow-y-auto px-3 pb-4"
         style={{ touchAction: "pan-y" }}
       >
-        <div className="flex items-center justify-between px-1 pb-2">
-          <p className="text-xs font-sans text-text-muted">
-            {places.length} {places.length === 1 ? "risultato" : "risultati"}
-            {loadingVerdicts && " · preparo i verdetti…"}
-          </p>
+        <div className="flex items-start justify-between px-1 pb-2">
+          <div className="min-w-0">
+            {title && (
+              <p data-testid="titolo-risposta" className="line-clamp-2 font-display text-lg font-semibold leading-snug text-brand first-letter:uppercase">
+                {title}
+              </p>
+            )}
+            <p className="text-xs font-sans text-text-muted">
+              {title
+                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per questa richiesta`
+                : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+              {loadingVerdicts && " · preparo i verdetti…"}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -346,23 +417,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             ✕
           </button>
         </div>
-        {quickFiltersOn && (
-          <div className="flex flex-wrap gap-2 px-1 pb-2" data-testid="filtri-lista">
-            {([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={quick.has(k)}
-                onClick={() => toggleQuick(k)}
-                className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium ${quick.has(k) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {quickFiltersOn && <div className="px-1 pb-2">{quickChips}</div>}
         {places.length === 0 && allPlaces.length > 0 && (
-          <p className="px-2 py-6 text-center text-sm text-text-muted">Nessun locale con questi filtri: togline qualcuno.</p>
+          <p className="px-2 py-6 text-center text-sm text-text-muted">{NO_MATCH}</p>
         )}
         <ul className="flex flex-col gap-1">
           {places.map((place) => (
@@ -412,6 +469,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {c}
                         </span>
                       ))}
+                    </span>
+                  )}
+                  {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
+                  {place.tags && place.tags.length > 0 && (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {place.tags.map((t) => (
+                        <span key={t} className="rounded-pill border border-accent/40 px-2 py-0.5 text-[11px] font-display font-medium text-accent">
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {place.note && (
+                    <span className="mt-1.5 line-clamp-2 block text-xs font-sans italic text-text">
+                      “{place.note}”
                     </span>
                   )}
                 </span>
