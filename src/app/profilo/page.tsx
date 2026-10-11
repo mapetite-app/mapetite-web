@@ -99,6 +99,9 @@ export default async function ProfiloPage() {
             {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
             {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
           </p>
+          <Link href="/me" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+            I tuoi gusti →
+          </Link>
         </div>
       </div>
 

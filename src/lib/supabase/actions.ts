@@ -32,7 +32,7 @@ export async function login(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: auth, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -42,8 +42,16 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(authErrorIt(error))}`);
   }
 
+  // Dopo l'accesso si torna alla mappa (è lì che si usa l'app); solo chi non ha
+  // ancora indicato i suoi gusti passa dall'onboarding. Le preferenze restano in /me.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarding_completed")
+    .eq("id", auth.user!.id)
+    .single();
+
   revalidatePath("/", "layout");
-  redirect("/me");
+  redirect(profile?.onboarding_completed ? "/mappa" : "/onboarding");
 }
 
 export async function signup(formData: FormData) {
