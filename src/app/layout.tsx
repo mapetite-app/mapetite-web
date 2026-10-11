@@ -32,8 +32,9 @@ const newsreader = Newsreader({
 //   ?scheda=b     | ?scheda=a      scheda del locale (stile Places / attuale)
 //   ?home=b       | ?home=a        primo accesso con campo di ricerca diretto (stile Places / attuale)
 //   ?pin=b        | ?pin=a         pin con la foto del locale (stile Places / emoji)
+//   ?stile=places | ?stile=attuale tutte insieme
 // Gira prima del primo disegno, così non si vede il cambio.
-const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]};for(var k in v){var t=q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
+const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Mapetite",

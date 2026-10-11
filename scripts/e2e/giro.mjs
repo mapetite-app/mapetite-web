@@ -297,6 +297,12 @@ ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stess
 await shot("20-pin-foto");
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
+// 7-sexies. Un solo interruttore per tutte le varianti
+await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "serif" && d.scheda === "b" && d.home === "b" && d.pin === "b"; }), "?stile=places accende tutte le varianti");
+await page.goto(`${BASE}/mappa?stile=attuale`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return !d.titoli && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte");
+
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
