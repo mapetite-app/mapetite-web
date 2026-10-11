@@ -292,6 +292,19 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
   });
 }
 
+// Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
+// nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
+type MapStyleApi = { getStyle: () => { layers?: { id: string }[] } | undefined; setLayoutProperty: (id: string, k: string, v: string) => void };
+function hidePoiLabels(map: MapStyleApi) {
+  try {
+    for (const layer of map.getStyle()?.layers ?? []) {
+      if (/poi-label|transit-label/.test(layer.id)) map.setLayoutProperty(layer.id, "visibility", "none");
+    }
+  } catch {
+    // stile non pronto: resta com'è
+  }
+}
+
 export type Place = {
   id: string;
   name: string;
@@ -559,6 +572,20 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
+  // Variante della mappa da far scegliere: ?mappa=chiara (grigia stile Places), resta sul telefono.
+  const mapVariant = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const v = new URLSearchParams(window.location.search).get("mappa");
+      try {
+        if (v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
+        return window.localStorage.getItem("mapetite.mappa") ?? "standard";
+      } catch {
+        return v ?? "standard";
+      }
+    },
+    () => "standard",
+  );
   // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
   // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
   const listVariant = useSyncExternalStore(
@@ -1478,7 +1505,11 @@ export default function MapView({
         onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        onStyleData={() => {
+          const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
+          if (map) hidePoiLabels(map);
+        }}
         onClick={() => { setClusterPlaces(null); setFilterError(null); dispatch({ type: "CLOSE" }); }}
       >
         {clusters.map((c) => {

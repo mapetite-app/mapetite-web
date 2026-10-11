@@ -202,6 +202,7 @@ await page.getByRole("button", { name: "Aperto ora" }).first().click();
 await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
 await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
 ok(true, "mappa spostata: compare 'Cerca in quest'area'");
+await shot("09c-cerca-in-area");
 await page.getByRole("button", { name: "Cerca in quest'area" }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
