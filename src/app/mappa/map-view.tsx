@@ -15,7 +15,7 @@ import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import DragToClose from "@/components/drag-to-close";
-import { ArrowUp, LocateFixed, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
@@ -564,6 +564,7 @@ function AISearchPanel({
   query,
   setQuery,
   recent = [],
+  withInput = true,
 }: {
   onSubmit: (q: string) => void;
   isSearching: boolean;
@@ -574,6 +575,8 @@ function AISearchPanel({
   query: string;
   setQuery: (q: string) => void;
   recent?: string[];
+  // Con la barra in alto il campo c'è già: il pannello mostra solo aggiunte rapide e riepilogo.
+  withInput?: boolean;
 }) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -583,7 +586,7 @@ function AISearchPanel({
 
   return (
     <div className="rounded-card bg-surface p-3 shadow-float">
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      {withInput && <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={query}
@@ -610,7 +613,7 @@ function AISearchPanel({
             ✕
           </button>
         )}
-      </form>
+      </form>}
 
       {isSearching && (
         <p className="mt-2 flex items-center gap-1.5 text-sm text-text-muted">
@@ -623,7 +626,7 @@ function AISearchPanel({
 
       {/* Aggiunte rapide: con una ricerca attiva affinano la frase, altrimenti sono esempi. */}
       {!isSearching && (
-        <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]" data-testid="aggiunte-rapide">
+        <div className={`-mx-3 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] ${withInput ? "mt-2" : ""}`} data-testid="aggiunte-rapide">
           {(activeFiltri !== null ? REFINEMENTS : [...recent.map((r) => `↻ ${r}`), ...PANEL_EXAMPLES].slice(0, 6)).map((chip) => (
             <button
               key={chip}
@@ -750,8 +753,9 @@ export default function MapView({
   const recentOn = useBeta("recenti");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
-  // Campo "Cosa cerchi?" sempre visibile in cima alla mappa (?beta=barra, spento di default).
-  const barOn = useOptIn("barra");
+  // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
+  // ?beta=-barra riporta l'icona ✨ di prima.
+  const barOn = useBeta("barra");
   const barInputRef = useRef<HTMLInputElement>(null);
   const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
@@ -1401,7 +1405,7 @@ export default function MapView({
               {aiSearching ? (
                 <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-brand" />
               ) : (
-                <Search size={18} className="shrink-0 text-brand" aria-hidden />
+                <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
               )}
               <input
                 ref={barInputRef}
@@ -1409,8 +1413,8 @@ export default function MapView({
                 enterKeyHint="search"
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
-                placeholder="Cosa cerchi?"
-                aria-label="Cosa cerchi?"
+                placeholder="Chiedi all'AI…"
+                aria-label="Chiedi all'AI: cosa cerchi?"
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
               {(aiQuery !== "" || aiSearch !== null) && (
@@ -1448,9 +1452,10 @@ export default function MapView({
               setAiQuery("");
               dispatch({ type: "OPEN_FILTERS" });
             }}
-            className="relative flex shrink-0 h-11 w-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow"
+            className={`relative flex shrink-0 h-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow ${barOn ? "gap-1.5 px-3.5" : "w-11"}`}
           >
-            <SlidersHorizontal size={20} className="text-text-muted" />
+            <SlidersHorizontal size={barOn ? 18 : 20} className={barOn ? "text-brand" : "text-text-muted"} />
+            {barOn && <span className="text-sm font-display font-semibold text-brand">Filtri</span>}
             {countActive(filters) > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent font-display text-xs font-bold text-white">
                 {countActive(filters)}
@@ -1472,6 +1477,7 @@ export default function MapView({
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               recent={recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : []}
+              withInput={!barOn}
             />
           </div>
         )}
@@ -1618,7 +1624,7 @@ export default function MapView({
                 <div className="mt-4 flex justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => dispatch({ type: "OPEN_AI" })}
+                    onClick={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
                     className="min-h-11 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
                   >
                     Correggi la ricerca
@@ -1671,7 +1677,8 @@ export default function MapView({
                 </button>
               ))}
             </div>
-            <form
+            {/* Con la barra in alto il campo c'è già: qui restano solo gli esempi. */}
+            {!barOn && <form
               onSubmit={(e) => { e.preventDefault(); if (aiQuery.trim()) void runAISearch(aiQuery.trim()); }}
               className="rounded-card border border-border bg-white p-3 shadow-float"
             >
@@ -1719,7 +1726,30 @@ export default function MapView({
                     : "Non riesco a trovare la tua posizione: scrivi la zona (es. “a Trastevere”)."}
                 </p>
               )}
-            </form>
+            </form>}
+            {barOn && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={goToMyPosition}
+                  disabled={geoState === "loading"}
+                  aria-label="Usa la mia posizione"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95 disabled:opacity-60"
+                >
+                  <LocateFixed size={16} aria-hidden />
+                  {geoState === "loading" ? "Cerco…" : "Vicino a me"}
+                </button>
+                <button
+                  type="button"
+                  data-testid="benvenuto-filtri"
+                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95"
+                >
+                  <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
+                </button>
+              </div>
+            )}
+            {barOn && aiError && <p className="mt-1 rounded-card bg-surface px-3 py-2 text-sm text-error shadow-card">{aiError}</p>}
           </div>
         </div>
       )}
@@ -1733,7 +1763,7 @@ export default function MapView({
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
-              <p className="font-title text-lg font-semibold text-brand">{barOn ? "Prova con…" : "Cosa cerchi?"}</p>
+              <p className="font-title text-lg font-semibold text-brand">{barOn ? "✨ Chiedi all'AI, per esempio:" : "Cosa cerchi?"}</p>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
@@ -1835,6 +1865,16 @@ export default function MapView({
               >
                 {geoState === "loading" ? "Cerco…" : "📍 Dove sono"}
               </button>
+              {barOn && (
+                <button
+                  type="button"
+                  data-testid="benvenuto-filtri"
+                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
+                >
+                  <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
+                </button>
+              )}
             </div>
             {/* Solo a chi torna (ha già cercato): al primo accesso conta la ricerca. */}
             {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && <InstallHint />}
@@ -2205,7 +2245,7 @@ export default function MapView({
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
-          onRefine={() => { if (barOn) barInputRef.current?.focus(); else dispatch({ type: "OPEN_AI" }); }}
+          onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {
