@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowUp } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import PlacePhoto from "@/components/place-photo";
-import { PHOTO_CARDS, metaLine, type ListDetails } from "@/components/bottom-sheet";
+import { PHOTO_CARDS, googleLine, metaLine, type ListDetails } from "@/components/bottom-sheet";
 
 // Risposta della ricerca "come un articolo" (Places, places-02): la richiesta,
 // cosa ho capito, un titolo grande e ogni locale raccontato in due righe
@@ -103,6 +103,8 @@ export default function AnswerArticle({
                       <span className="block h-3 w-11/12 animate-pulse rounded-pill bg-border" />
                       <span className="block h-3 w-3/5 animate-pulse rounded-pill bg-border" />
                     </span>
+                  ) : googleLine(d) ? (
+                    <p data-testid="riga-google" className="mt-1.5 line-clamp-3 text-[15px] font-sans leading-relaxed text-text-muted">{googleLine(d)}</p>
                   ) : null}
 
                   <div className="relative mt-3 overflow-hidden rounded-card bg-brand shadow-card">

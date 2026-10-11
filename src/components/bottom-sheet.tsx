@@ -63,7 +63,7 @@ export type ListDetails = {
 };
 
 // Riga di ripiego quando manca il verdetto: solo fatti di Google, mai testo inventato.
-function googleLine(d: ListDetails | undefined): string | null {
+export function googleLine(d: ListDetails | undefined): string | null {
   if (!d) return null;
   if (d.editorialSummary) return d.editorialSummary;
   const review = d.selectedReviews?.[0]?.text;
