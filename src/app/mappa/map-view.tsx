@@ -18,6 +18,7 @@ import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
+import { sortTags, tagLabel } from "@/lib/tags";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -73,8 +74,10 @@ function SaveModal({
   const [error, setError] = useState(false);
 
   const toggleTag = (tag: string) => {
+    // "Voglio andarci" e "Ci sono stato" si escludono a vicenda, come nella scheda.
+    const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev.filter((t) => t !== other), tag]
     );
   };
 
@@ -265,7 +268,7 @@ function SaveModal({
                   : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
-              {tag}
+              {tagLabel(tag)}
             </button>
           ))}
           {newTagControl("rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
@@ -1609,7 +1612,7 @@ export default function MapView({
                   📍 {city} · {count}
                 </button>
               ))}
-              {availableTags.map((tag) => (
+              {sortTags(availableTags).map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -1617,7 +1620,7 @@ export default function MapView({
                   onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
                   className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
                 >
-                  {tag}
+                  {tagLabel(tag)}
                 </button>
               ))}
             </div>

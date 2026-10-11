@@ -8,6 +8,7 @@ import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
+import { sortTags, tagLabel } from "@/lib/tags";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -470,8 +471,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                     {place.tags && place.tags.length > 0 && (
                       <span className="mt-2 flex flex-wrap gap-1.5">
-                        {place.tags.slice(0, 3).map((t) => (
-                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{t}</span>
+                        {sortTags(place.tags).slice(0, 3).map((t) => (
+                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{tagLabel(t)}</span>
                         ))}
                       </span>
                     )}
@@ -610,9 +611,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                   {place.tags && place.tags.length > 0 && (
                     <span className="mt-2 flex flex-wrap gap-1.5">
-                      {place.tags.map((t) => (
+                      {sortTags(place.tags).map((t) => (
                         <span key={t} className="rounded-pill border border-accent/40 px-2 py-0.5 text-[11px] font-display font-medium text-accent">
-                          {t}
+                          {tagLabel(t)}
                         </span>
                       ))}
                     </span>

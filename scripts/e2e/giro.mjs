@@ -635,7 +635,7 @@ if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
     { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "00000000-0000-4000-8000-000000000001", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1", rating: 4.6, price_level: 2 } },
-    { tags: ["amici"], note: null, places: { id: "00000000-0000-4000-8000-000000000002", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
+    { tags: ["amici", "Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000002", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
     { tags: null, note: "Brunch domenica", places: { id: "00000000-0000-4000-8000-000000000003", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
   ];
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -652,6 +652,7 @@ else {
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
+  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci' come nella scheda");
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
   await p.screenshot({ path: `${OUT}/11-salvati.png` });
@@ -683,9 +684,9 @@ else {
   await p.getByLabel("Cerca tra i salvati").fill("");
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
-  await p.getByRole("button", { name: "✓ Ci sono stato" }).click();
+  await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   await p.waitForTimeout(500);
-  ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
+  ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png` });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
@@ -696,6 +697,8 @@ else {
   await p.getByRole("button", { name: "Salva Rooftop Tre" }).click();
   await p.getByText("Salva locale").waitFor({ timeout: 3000 });
   ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
+  { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
+    ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
   await p.screenshot({ path: `${OUT}/14-salva-da-card.png` });
   await sctx.close();
 

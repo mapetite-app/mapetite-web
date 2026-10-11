@@ -1,5 +1,6 @@
 "use client";
 
+import { tagLabel } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
@@ -495,7 +496,7 @@ export default function VenueSheet({
                   key={tag}
                   className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
                 >
-                  {tag}
+                  {tagLabel(tag)}
                 </span>
               ))}
             </div>
