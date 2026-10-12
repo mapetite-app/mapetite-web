@@ -51,6 +51,16 @@ export default function ImportaView({ userId }: { userId: string | null }) {
   const [searchResults, setSearchResults] = useState<GoogleResult[]>([]);
   const [manualQuery, setManualQuery] = useState("");
   const [savedName, setSavedName] = useState<string | null>(null);
+  // Ricerca "a mano" chiesta da un altro punto della pagina (es. "Cerca …" sotto un link di Instagram).
+  const [manualReq, setManualReq] = useState<{ q: string; n: number } | null>(null);
+  const [flashShot, setFlashShot] = useState(false);
+
+  const goToScreenshot = () => {
+    document.getElementById("da-screenshot")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFlashShot(true);
+    window.setTimeout(() => setFlashShot(false), 2000);
+  };
+  const searchByHand = (q: string) => setManualReq((r) => ({ q, n: (r?.n ?? 0) + 1 }));
 
   // Revoke blob URL when it changes or on unmount
   useEffect(() => {
@@ -194,13 +204,19 @@ export default function ImportaView({ userId }: { userId: string | null }) {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Importa</h1>
 
-      <ManualAddCard userId={userId} />
+      <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
 
       <div className="mt-6">
-        <GoogleMapsCard userId={userId} />
+        <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} />
       </div>
 
-      <h2 className="mt-10 mb-2 font-display text-lg font-semibold text-brand">Da uno screenshot</h2>
+      <h2
+        id="da-screenshot"
+        data-testid="importa-screenshot"
+        className={`mt-10 mb-2 scroll-mt-4 rounded-btn font-display text-lg font-semibold text-brand transition-colors ${flashShot ? "bg-accent/15" : ""}`}
+      >
+        <span aria-hidden>📸 </span>Da uno screenshot
+      </h2>
       <p className="text-sm text-text-muted mb-2">
         Carica uno screenshot di un post social e aggiungi il locale alla tua mappa in pochi passi.
       </p>
