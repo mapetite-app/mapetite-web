@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { cityFromAddress } from "@/lib/city";
 import { isStateTag, normalizeTagName, replaceTag } from "@/lib/tags";
 
 // Un salvato dell'utente: placeId è l'UUID Supabase di places (non il Place ID Google).
@@ -13,7 +14,8 @@ type Sheet =
   | { kind: "menu"; tag: string }
   | { kind: "rinomina"; tag: string }
   | { kind: "unisci"; tag: string }
-  | { kind: "elimina"; tag: string };
+  | { kind: "elimina"; tag: string }
+  | { kind: "nuova" };
 
 function savedHref(tag: string): string {
   return `/mappa?${new URLSearchParams({ vista: "salvati", tag }).toString()}`;
@@ -22,13 +24,15 @@ function savedHref(tag: string): string {
 const plural = (n: number) => `${n} ${n === 1 ? "locale" : "locali"}`;
 
 // "Le tue raccolte" nel profilo: le raccolte sono i tag dei salvati (esclusi i due di stato).
-// Qui si possono rinominare, unire ed eliminare.
+// Qui si possono rinominare, unire, eliminare e crearne di nuove scegliendo tra i salvati.
 // Ogni modifica è un update per riga su saved_places con la sessione dell'utente (come la scheda).
 export default function ProfiloRaccolte({ userId, initialRows }: { userId: string; initialRows: RaccoltaRow[] }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [name, setName] = useState("");
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -50,6 +54,8 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     setError(null);
     setNotice(null);
     setName(next.kind === "rinomina" ? next.tag : "");
+    setQuery("");
+    setPicked(new Set());
     setSheet(next);
   };
   const close = () => { if (!busy) setSheet(null); };
@@ -110,9 +116,33 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if (failed === 0) setNotice(`Raccolta "${tag}" eliminata. I locali restano tra i salvati.`);
   }
 
+  async function create() {
+    const res = checkName(name);
+    if ("error" in res) { setError(res.error); return; }
+    if (picked.size === 0) { setError("Scegli almeno un locale."); return; }
+    const targets = rows.filter((r) => picked.has(r.placeId) && !r.tags.includes(res.tag));
+    const failed = await apply(targets, (tags) => [...tags, res.tag]);
+    if (failed === 0) setNotice(`Raccolta "${res.tag}" pronta: ${plural(picked.size)}.`);
+  }
+
+  // Salvati per la scelta in "Nuova raccolta": filtro per nome/indirizzo, raggruppati per città.
+  const pickGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const groups = new Map<string, RaccoltaRow[]>();
+    for (const r of rows) {
+      if (q && !`${r.name} ${r.address ?? ""}`.toLowerCase().includes(q)) continue;
+      const city = cityFromAddress(r.address) ?? "Altre zone";
+      groups.set(city, [...(groups.get(city) ?? []), r]);
+    }
+    return [...groups.entries()].sort((a, b) =>
+      a[0] === "Altre zone" ? 1 : b[0] === "Altre zone" ? -1 : b[1].length - a[1].length || a[0].localeCompare(b[0], "it"),
+    );
+  }, [rows, query]);
+
   const progressText = progress && `Aggiorno ${progress.done} di ${plural(progress.total)}…`;
   const sheetTitle =
-    sheet?.kind === "rinomina" ? "Rinomina raccolta"
+    sheet?.kind === "nuova" ? "Nuova raccolta"
+      : sheet?.kind === "rinomina" ? "Rinomina raccolta"
       : sheet?.kind === "unisci" ? `Unisci "${sheet.tag}" con…`
       : sheet?.kind === "elimina" ? "Eliminare la raccolta?"
       : sheet ? sheet.tag : "";
@@ -161,6 +191,19 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
             </button>
           </li>
         ))}
+        {rows.length > 0 && (
+          <li>
+            <button
+              type="button"
+              data-testid="nuova-raccolta"
+              onClick={() => open({ kind: "nuova" })}
+              className="flex min-h-[72px] w-full items-center gap-3 rounded-card border border-dashed border-brand/40 px-3 py-3 text-left text-brand active:scale-[0.98] transition-transform duration-150"
+            >
+              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light font-title text-lg font-semibold text-accent">+</span>
+              <span className="font-display text-sm font-semibold">Nuova raccolta</span>
+            </button>
+          </li>
+        )}
       </ul>
 
       {sheet && (
@@ -235,6 +278,60 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
                 </button>
                 <button type="button" disabled={busy} onClick={() => open({ kind: "menu", tag: sheet.tag })} className={secondary}>Annulla</button>
               </div>
+            )}
+
+            {sheet.kind === "nuova" && (
+              <form onSubmit={(e) => { e.preventDefault(); void create(); }} className="flex min-h-0 flex-col gap-3">
+                <input
+                  aria-label="Nome della raccolta"
+                  placeholder="Nome (es. Weekend a Napoli)"
+                  autoFocus
+                  maxLength={40}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={inputClass}
+                />
+                <input
+                  type="search"
+                  aria-label="Cerca tra i salvati"
+                  placeholder="🔎 Cerca tra i tuoi salvati"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className={`${inputClass} min-h-11 bg-surface text-sm`}
+                />
+                <div className="min-h-0 flex-1 overflow-y-auto" data-testid="nuova-raccolta-lista">
+                  {pickGroups.length === 0 && <p className="py-4 text-center text-sm text-text-muted">Nessun salvato con questo nome.</p>}
+                  {pickGroups.map(([city, list]) => (
+                    <div key={city} className="mb-3">
+                      <p className="mb-1.5 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">📍 {city} · {list.length}</p>
+                      <ul className="space-y-1.5">
+                        {list.map((r) => {
+                          const on = picked.has(r.placeId);
+                          return (
+                            <li key={r.placeId}>
+                              <label className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-card border px-3 py-2 ${on ? "border-brand bg-brand/5" : "border-border"}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() => setPicked((prev) => { const n = new Set(prev); if (n.has(r.placeId)) n.delete(r.placeId); else n.add(r.placeId); return n; })}
+                                  className="h-5 w-5 shrink-0 accent-[var(--color-brand)]"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block truncate font-display text-sm font-semibold text-text">{r.name}</span>
+                                  {r.address && <span className="block truncate text-xs text-text-muted">{r.address}</span>}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <button type="submit" data-testid="crea-raccolta" disabled={busy || !name.trim() || picked.size === 0} className={primary}>
+                  {busy ? progressText : picked.size === 0 ? "Scegli i locali" : `Crea raccolta · ${plural(picked.size)}`}
+                </button>
+              </form>
             )}
 
             {error && <p role="alert" data-testid="raccolte-errore" className="mt-3 text-sm text-error">{error}</p>}
