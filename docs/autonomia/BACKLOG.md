@@ -148,6 +148,12 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **Densità Roma e Milano — FATTO (12/10 sera)**: 5 casi su Milano in TEST-RICERCHE, provati dal vivo; "aperitivo sui Navigli non turistico" era sbagliato (locali da turisti in cima), corretto.
 - **Protezione dei costi AI — IN PR (12/10 sera, approvata da Lorenzo): 30 ricerche AI/ora per persona, 1.500 azioni AI/giorno per server; tetto di spesa vero = credito prepagato Anthropic senza ricarica automatica.** Testo originale della proposta: chi non ha fatto login può far partire Haiku (ricerca, import da screenshot) senza limiti; su Google ci protegge la quota giornaliera, su Haiku nessun tetto. Proposta: limite di richieste per telefono/indirizzo (es. 30 ricerche AI all'ora) e avviso di spesa sulla console Anthropic. Nessun costo.
 
+## Notte 12→13/10 (PR della notte)
+- **Primo accesso in 10 secondi — IN PR**: tre schermate sulla home per chi arriva la prima volta (raccogli / ritrova / posti giusti per te), "Salta", "Crea il tuo account" o "Prova senza account"; "Come funziona" per rivederla. DA APPROVARE la grafica (una sola variante); la card d'esempio è etichettata "esempio".
+- **"Stasera dove andiamo?" — IN PR**: `/stasera`, tre proposte dai propri salvati (occasione = le tue raccolte, dove = vicino / città / ovunque, mai provati o anche visitati), prima i "Voglio andarci" e i più vicini, mai il voto Google (VISIONE: non il più popolare). Dal profilo, da "I miei salvati" e dalla scorciatoia dell'app.
+- **Aggiungi a mano + link Instagram/TikTok — IN PR**: su Importa "✍️ Aggiungi a mano" (nome e città → 5 risultati → Salva, 1 ricerca Google per tocco su Cerca); i link di Instagram/TikTok/Shorts spiegano di fare uno screenshot e propongono "Cerca '…'" se nel testo c'è un nome.
+- **Etichetta "Il verdetto Mapetite" sulle card — IN PR.**
+
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
 - Profili utente pubblici, seguire persone, feed attività, curatori.
