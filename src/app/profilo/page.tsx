@@ -157,6 +157,20 @@ export default async function ProfiloPage() {
         </div>
       </div>
 
+      {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
+      <Link
+        href="/stasera"
+        data-testid="profilo-stasera"
+        className="mb-4 flex min-h-[84px] items-center gap-4 rounded-card bg-brand px-4 py-4 text-white shadow-float active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-2xl">🍽️</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-lg font-semibold leading-tight">Stasera dove andiamo?</span>
+          <span className="mt-0.5 block text-sm text-white/75">Scegli tra i tuoi salvati</span>
+        </span>
+        <span aria-hidden className="text-xl text-white/70">→</span>
+      </Link>
+
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
         {counters.map((c) => (
