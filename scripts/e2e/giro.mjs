@@ -984,6 +984,97 @@ else {
       await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
       await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "barra in basso: 'Salvati' apre la mappa sui propri salvati"), () => ok(false, "barra in basso: 'Salvati' apre la mappa sui propri salvati"));
     }
+    // Gestione delle raccolte dal profilo: rinomina, unisci, elimina, nuova. Le scritture partono
+    // dal browser (Supabase con la sessione dell'utente): si catturano i PATCH su saved_places.
+    {
+      await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+      let patches = [];
+      let patchFail = false;
+      await p.route("**/rest/v1/saved_places**", (r) => {
+        if (r.request().method() !== "PATCH") return r.fallback();
+        const u = new URL(r.request().url()).searchParams;
+        patches.push({ id: u.get("place_id")?.replace(/^eq\./, ""), tags: r.request().postDataJSON()?.tags, user: u.get("user_id") });
+        return patchFail ? r.fulfill({ status: 500, json: { message: "errore" } }) : r.fulfill({ status: 204, body: "" });
+      });
+      const sheet = p.getByTestId("raccolte-sheet");
+      const tile = (name) => p.getByTestId("raccolta").filter({ hasText: name });
+      const menu = async (name) => { await p.locator("li", { has: tile(name) }).getByTestId("raccolta-menu").click(); await sheet.waitFor({ timeout: 3000 }); };
+      const id = (n) => `00000000-0000-4000-8000-0000000001${n}`;
+      const has = (pt, n, tags) => pt.some((x) => x.id === id(n) && JSON.stringify(x.tags) === JSON.stringify(tags));
+      const waitClosed = () => sheet.waitFor({ state: "detached", timeout: 5000 }).then(() => true, () => false);
+      const errText = () => p.getByTestId("raccolte-errore").textContent({ timeout: 4000 }).catch(() => "");
+
+      // Rinomina "Romantico" → "  cena   romantica " (normalizzato come "+ Nuovo tag")
+      await menu("Romantico");
+      ok(await sheet.getByRole("button", { name: /Rinomina/ }).isVisible() && await sheet.getByRole("button", { name: /Unisci con/ }).isVisible() && await sheet.getByRole("button", { name: /Elimina raccolta/ }).isVisible(), "raccolte: il ⋯ apre Rinomina / Unisci con… / Elimina raccolta");
+      await p.screenshot({ path: `${OUT}/29-raccolte-gestione.png`, caret: "initial" });
+      await sheet.getByRole("button", { name: /Rinomina/ }).click();
+      await sheet.getByLabel("Nuovo nome").fill("da provare");
+      await sheet.getByRole("button", { name: "Salva" }).click();
+      ok(/stato del locale/.test((await errText()) ?? "") && patches.length === 0, "raccolte: non si può rinominare con il nome di uno stato (Da provare)");
+      await sheet.getByLabel("Nuovo nome").fill("  cena   romantica ");
+      await sheet.getByRole("button", { name: "Salva" }).click();
+      await waitClosed();
+      ok(patches.length === 2 && has(patches, "01", ["Cena romantica", "Da provare"]) && has(patches, "03", ["Cena romantica", "Speciale", "Da provare"]) && patches.every((x) => x.user === "eq.00000000-0000-0000-0000-000000000001"), `raccolte: rinomina = un PATCH per salvato col nuovo nome, stati intatti (${JSON.stringify(patches)})`);
+      ok(await tile("Cena romantica").isVisible() && (await tile("Romantico").count()) === 0 && (await tile("Cena romantica").textContent()).includes("2 locali"), "raccolte: la raccolta rinominata compare subito col nuovo nome");
+
+      // Unisci "Economico" con "Con amici"
+      patches = [];
+      await menu("Economico");
+      await sheet.getByRole("button", { name: /Unisci con/ }).click();
+      ok(!(await sheet.getByTestId("unisci-in").allTextContents()).some((t) => /Economico|Da provare|Già visitato/.test(t)), "raccolte: 'Unisci con…' propone solo le altre raccolte (niente stati)");
+      await sheet.getByTestId("unisci-in").filter({ hasText: "Con amici" }).click();
+      await waitClosed();
+      ok(patches.length === 1 && has(patches, "04", ["Con amici"]) && (await tile("Economico").count()) === 0 && (await tile("Con amici").textContent()).includes("3 locali"), `raccolte: unisci Economico → Con amici (${JSON.stringify(patches)})`);
+
+      // Elimina "Speciale": prima Annulla (nessuna scrittura), poi un errore di rete, poi conferma
+      patches = [];
+      await menu("Speciale");
+      await sheet.getByRole("button", { name: /Elimina raccolta/ }).click();
+      ok(await sheet.getByText("I locali restano tra i tuoi salvati", { exact: false }).isVisible(), "raccolte: elimina chiede conferma e spiega che i locali restano salvati");
+      await sheet.getByRole("button", { name: "Annulla" }).click();
+      ok(patches.length === 0 && await sheet.getByRole("button", { name: /Rinomina/ }).isVisible(), "raccolte: 'Annulla' non scrive niente");
+      patchFail = true;
+      await sheet.getByRole("button", { name: /Elimina raccolta/ }).click();
+      await sheet.getByTestId("conferma-elimina").click();
+      ok(/Non sono riuscito ad aggiornare 1 locale/.test((await errText()) ?? "") && await tile("Speciale").isVisible(), "raccolte: se il salvataggio fallisce, errore in italiano e raccolta intatta");
+      patchFail = false;
+      patches = [];
+      await sheet.getByTestId("conferma-elimina").click();
+      await waitClosed();
+      ok(patches.length === 1 && has(patches, "03", ["Cena romantica", "Da provare"]) && (await tile("Speciale").count()) === 0 && (await p.getByTestId("profilo-salvato").count()) === 6, `raccolte: elimina toglie solo il tag, il locale resta salvato (${JSON.stringify(patches)})`);
+
+      // Nuova raccolta con 2 locali scelti dalla lista (cercando "milano")
+      patches = [];
+      await p.getByTestId("nuova-raccolta").click();
+      await sheet.getByLabel("Nome della raccolta").fill("weekend a Milano");
+      ok((await sheet.getByText("📍 Roma · 4").count()) === 1 && (await sheet.getByText("📍 Milano · 2").count()) === 1, "nuova raccolta: salvati raggruppati per città");
+      await sheet.getByLabel("Cerca tra i salvati").fill("milano");
+      ok((await sheet.getByRole("checkbox").count()) === 2, "nuova raccolta: la ricerca filtra i salvati");
+      await sheet.getByText("Caffè Milano").click();
+      await sheet.getByText("Birreria Sei").click();
+      ok((await sheet.getByTestId("crea-raccolta").textContent()) === "Crea raccolta · 2 locali", "nuova raccolta: il pulsante conta i locali scelti");
+      await p.screenshot({ path: `${OUT}/30-nuova-raccolta.png`, caret: "initial" });
+      await sheet.getByTestId("crea-raccolta").click();
+      await waitClosed();
+      ok(patches.length === 2 && has(patches, "05", ["Da provare", "Weekend a Milano"]) && has(patches, "06", ["Con amici", "Già visitato", "Weekend a Milano"]), `nuova raccolta: tag aggiunto ai 2 locali scelti (${JSON.stringify(patches)})`);
+      ok(await tile("Weekend a Milano").isVisible() && (await tile("Weekend a Milano").getAttribute("href")) === "/mappa?vista=salvati&tag=Weekend+a+Milano", "nuova raccolta: compare tra le raccolte e apre la mappa filtrata");
+      await p.unroute("**/rest/v1/saved_places**");
+
+      // "Le tue ricerche": le recenti salvate su questo telefono
+      const ric = p.getByTestId("profilo-ricerche");
+      // (le ricerche fatte prima in questo giro restano sul "telefono": si parte da vuoto)
+      await p.evaluate(() => { localStorage.removeItem("mapetite.recenti"); window.dispatchEvent(new Event("mapetite-recenti")); });
+      ok(await ric.getByTestId("ricerche-vuote").isVisible(), "le tue ricerche: senza ricerche un invito spiega cosa compare qui");
+      await p.evaluate(() => { localStorage.setItem("mapetite.recenti", JSON.stringify(["trattoria autentica non turistica", "cocktail bar con terrazza"])); window.dispatchEvent(new Event("mapetite-recenti")); });
+      await ric.getByTestId("ricerca-recente").first().waitFor({ timeout: 3000 }).catch(() => {});
+      const ricHrefs = await ric.getByTestId("ricerca-recente").evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+      ok(ricHrefs.length === 2 && ricHrefs[0] === "/mappa?q=trattoria%20autentica%20non%20turistica" && await ric.getByText("Cerca di nuovo").first().isVisible(), `le tue ricerche: elenco con 'Cerca di nuovo' che rifà la ricerca (${ricHrefs.join(" | ")})`);
+      await p.locator("[data-testid=raccolte]").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+      await p.screenshot({ path: `${OUT}/31-raccolte-e-ricerche.png`, caret: "initial" });
+      await ric.getByRole("button", { name: "Cancella le ricerche recenti" }).click();
+      ok(await ric.getByTestId("ricerche-vuote").isVisible() && (await p.evaluate(() => localStorage.getItem("mapetite.recenti"))) === null, "le tue ricerche: 'Cancella' le toglie da questo telefono");
+    }
     await sctx.clearCookies({ name: "e2e_profilo" });
   }
 
