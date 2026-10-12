@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSynthesis } from "@/lib/haiku-synthesis";
 import type { PlaceResult } from "@/lib/google-places";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
+import { allowAi, clientKey } from "@/lib/ai-limit";
 
 // Secondo tempo della ricerca: verdetti, perché-è-adatto ed esclusioni.
 // Riceve i dati Google già ottenuti dal primo tempo (firmati dal server).
@@ -22,6 +23,11 @@ export async function POST(request: Request) {
   }
   if (!valid) {
     return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
+  }
+
+  // Oltre il tetto AI: niente verdetti, restano i dati Google (le card mostrano descrizione o recensione).
+  if (!allowAi("verdetti", clientKey(request))) {
+    return NextResponse.json({ dettagli: {}, esclusi: [] });
   }
 
   const stubs: PlaceResult[] = places.map((p) => ({
