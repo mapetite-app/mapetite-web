@@ -107,6 +107,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
   const savedActive = onMap && vista === "salvati";
   const mapActive = onMap && !savedActive;
   const profileActive = pathname === "/profilo" || pathname.startsWith("/profilo/");
+  const authActive = pathname === "/login" || pathname === "/signup";
 
   return (
     <>
@@ -139,6 +140,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
 
         <Link
           href="/profilo"
+          aria-current={profileActive ? "page" : undefined}
           className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
             profileActive ? "text-brand" : "text-text-muted"
           }`}
@@ -169,7 +171,10 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
         ) : (
           <Link
             href="/login"
-            className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
+            aria-current={authActive ? "page" : undefined}
+            className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
+              authActive ? "text-brand" : "text-text-muted"
+            }`}
           >
             <AuthIcon />
             <span className="text-[11px] font-display">Entra</span>
