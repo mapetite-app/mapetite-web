@@ -82,6 +82,9 @@ const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" 
 
 // 1. Primo accesso
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda stile Places (B) predefinita per chi arriva la prima volta (scelta di Lorenzo, 12/10)");
+// Il giro principale controlla anche la vecchia scheda (?scheda=a); la B ha i suoi controlli più avanti.
+await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
 ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible(), "primo accesso: card con esempi 'Chiedi all'AI' visibile");
 ok(await page.getByTestId("benvenuto-filtri").isVisible(), "primo accesso: si vede anche la ricerca per filtri ('Oppure usa i filtri')");
 ok(await page.getByRole("button", { name: "Filtri", exact: true }).getByText("Filtri").isVisible(), "barra in alto: pulsante 'Filtri' con la scritta");
@@ -540,7 +543,7 @@ await p3.getByLabel("Cosa cerchi?").fill("rooftop");
 await p3.getByLabel("Cosa cerchi?").press("Enter");
 await p3.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 await p3.getByText("Terrazza Uno").first().click();
-await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+await p3.locator("a[aria-label^='Indicazioni']").first().waitFor({ timeout: 4000 });
 const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
 ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
 await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png`, caret: "initial" });
@@ -868,7 +871,7 @@ else {
   await v.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
   await v.getByText("Terrazza Uno").first().click();
-  await v.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+  await v.getByTestId("stato-rapido").waitFor({ timeout: 4000 });
   // Locale non salvato: "✓ Ci sono stato" in scheda apre Salva con lo stato già scelto
   await v.getByTestId("stato-rapido").getByRole("button", { name: "✓ Ci sono stato" }).click();
   await v.locator("div.w-80").getByText("Salva locale").waitFor({ timeout: 3000 });
@@ -893,7 +896,7 @@ else {
   ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
     "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
-  ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
+  ok(await v.locator("a[aria-label^='Indicazioni']").first().evaluate((a) => [a, ...a.querySelectorAll("span")].every((el) => el.scrollWidth <= el.clientWidth + 1)), "salvato: la scritta 'Percorso' non viene tagliata");
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
   await v.screenshot({ path: `${OUT}/17-salvato.png`, caret: "initial" });
   await v.locator("button:text-is('Salvato')").click();
