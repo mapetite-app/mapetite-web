@@ -942,6 +942,98 @@ else {
   await vctx.close();
 }
 
+// 10. Salva da Google Maps: Condividi (Android) e "Incolla link" (iPhone). API simulata, niente Google.
+{
+  const man = await (await fetch(`${BASE}/manifest.webmanifest`)).json().catch(() => ({}));
+  ok(man.share_target?.action === "/importa/condividi" && man.share_target?.method === "GET" && man.share_target?.params?.text === "text", "manifest: Mapetite compare nel Condividi di Android (share_target)");
+
+  const lctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  const lp = await lctx.newPage();
+  lp.on("pageerror", (e) => errors.push(e.message));
+  const lwrites = [];
+  const apiCalls = [];
+  await lctx.route("**/rest/v1/saved_places**", async (route) => {
+    const req = route.request();
+    if (req.method() !== "GET") lwrites.push({ m: req.method(), url: req.url(), body: req.postDataJSON?.() ?? null });
+    return route.fulfill({ status: req.method() === "POST" ? 201 : 200, json: [] });
+  });
+  await lctx.route("**/api/places/from-link", async (route) => {
+    const body = route.request().postDataJSON() ?? {};
+    apiCalls.push(body);
+    const links = (body.text ?? "").match(/https:\/\/maps\.app\.goo\.gl\/\S+/g) ?? [];
+    if (links.length === 0) return route.fulfill({ status: 400, json: { error: "Non vedo un link di Google Maps. In Google Maps apri il locale, tocca Condividi e poi Copia link." } });
+    return route.fulfill({ json: { risultati: links.map((link, i) => link.includes("ERR")
+      ? { link, error: "Non riesco a leggere il link: apri il locale in Google Maps e condividi di nuovo." }
+      : { link, place: { id: `00000000-0000-0000-0000-00000000010${i}`, name: link.includes("BBB") ? "Trattoria Due" : "Bar Rossi" } }) } });
+  });
+
+  await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const card = lp.getByTestId("importa-google");
+  ok(await card.getByText("Da Google Maps").isVisible(), "importa: card 'Da Google Maps' in cima");
+  ok((await card.locator("ol li").count()) === 3 && await card.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
+  const cardTop = (await card.boundingBox())?.y ?? 9999;
+  const shotTop = (await lp.getByText("Scegli uno screenshot").boundingBox())?.y ?? 0;
+  ok(cardTop < shotTop, "importa: la card Google Maps viene prima dello screenshot");
+
+  if (!fakeUser) {
+    ok(await card.getByRole("link", { name: "Accedi" }).isVisible(), "importa da disconnessi: invito ad accedere per salvare da Google Maps");
+    await lp.goto(`${BASE}/importa/condividi?title=Bar%20Rossi&text=${encodeURIComponent("https://maps.app.goo.gl/AAA111")}`, { waitUntil: "networkidle" });
+    ok(await lp.getByTestId("condividi-accedi").isVisible(), "condividi da disconnessi: invito ad accedere");
+    ok((await lp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa")))?.includes("maps.app.goo.gl/AAA111"), "condividi da disconnessi: il link resta in attesa");
+    console.log("SKIP  salva da Google Maps con accesso: dev server senza E2E_FAKE_USER");
+  } else {
+    ok(await card.getByRole("button", { name: "📋 Incolla link" }).isVisible(), "importa: pulsante grande '📋 Incolla link'");
+    await lp.screenshot({ path: `${OUT}/30-importa-google.png`, caret: "initial" });
+    // Più link negli appunti, uno per riga.
+    await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/BBB222"));
+    await card.getByRole("button", { name: "📋 Incolla link" }).click();
+    await card.getByTestId("link-salvato").nth(1).waitFor({ timeout: 5000 });
+    ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Trattoria Due").isVisible(), "incolla: più link salvati in una volta ('Salvato in Mapetite')");
+    const posts = lwrites.filter((w) => w.m === "POST");
+    ok(posts.length === 2 && posts.every((w) => JSON.stringify(w.body?.tags) === '["Da provare"]'), "incolla: salvati con stato 'Da provare' (📌 Voglio andarci)");
+    ok((await card.getByRole("link", { name: "Apri sulla mappa" }).first().getAttribute("href")) === "/mappa?salvato=00000000-0000-0000-0000-000000000100", "incolla: 'Apri sulla mappa' apre il salvato");
+    await card.getByRole("button", { name: "Aggiungi nota" }).first().click();
+    await card.getByLabel("Nota").fill("Consigliato da Giulia");
+    await card.getByRole("button", { name: "Salva nota" }).click();
+    await card.getByText("Nota salvata.").waitFor({ timeout: 4000 });
+    ok(lwrites.some((w) => w.m === "PATCH" && w.body?.note === "Consigliato da Giulia" && w.url.includes("place_id=eq.00000000-0000-0000-0000-000000000100")), "incolla: 'Aggiungi nota' scrive la nota sul salvato giusto");
+    await lp.screenshot({ path: `${OUT}/31-importa-google-salvati.png`, caret: "initial" });
+
+    // Appunti non leggibili (permesso negato): compare il campo per incollare a mano.
+    const nctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: [] });
+    await nctx.route("**/rest/v1/saved_places**", (route) => route.fulfill({ status: 201, json: [] }));
+    await nctx.route("**/api/places/from-link", (route) => route.fulfill({ json: { risultati: [
+      { link: "https://maps.app.goo.gl/AAA111", place: { id: "00000000-0000-0000-0000-000000000100", name: "Bar Rossi" } },
+      { link: "https://maps.app.goo.gl/ERR999", error: "Non riesco a leggere il link: apri il locale in Google Maps e condividi di nuovo." },
+    ] } }));
+    const np = await nctx.newPage();
+    np.on("pageerror", (e) => errors.push(e.message));
+    await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+    await np.getByRole("button", { name: "📋 Incolla link" }).click();
+    ok(await np.getByLabel("Link di Google Maps").isVisible({ timeout: 3000 }).catch(() => false), "incolla senza permesso: compare il campo per incollare a mano");
+    await np.getByLabel("Link di Google Maps").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
+    await np.getByRole("button", { name: "Salva", exact: true }).click();
+    await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
+    ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
+    await nctx.close();
+
+    // Condividi da Google Maps (Android): la pagina salva subito.
+    const before = apiCalls.length;
+    await lp.goto(`${BASE}/importa/condividi?title=Bar%20Rossi&text=${encodeURIComponent("Bar Rossi\nVia Roma 1\nhttps://maps.app.goo.gl/AAA111")}`, { waitUntil: "networkidle" });
+    await lp.getByTestId("link-salvato").waitFor({ timeout: 5000 });
+    ok(await lp.getByText("Salvato in Mapetite:").isVisible() && await lp.getByText("Bar Rossi", { exact: true }).isVisible(), "condividi: 'Salvato in Mapetite: Bar Rossi'");
+    ok(apiCalls.length === before + 1 && apiCalls.at(-1)?.title === "Bar Rossi", "condividi: una sola chiamata, con il nome condiviso");
+    ok(await lp.getByRole("button", { name: "Aggiungi nota" }).isVisible() && await lp.getByRole("link", { name: "Apri sulla mappa" }).isVisible(), "condividi: pulsanti 'Apri sulla mappa' e 'Aggiungi nota'");
+    await lp.screenshot({ path: `${OUT}/32-condividi-salvato.png`, caret: "initial" });
+    await lp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("guarda che bel posto")}`, { waitUntil: "networkidle" });
+    await lp.getByRole("button", { name: "Riprova" }).waitFor({ timeout: 5000 });
+    ok(await lp.getByText(/Non vedo un link di Google Maps/).isVisible(), "condividi senza link: errore in italiano con 'Riprova'");
+    await lp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
+    ok(await lp.getByText("Non è arrivato nessun link.", { exact: false }).isVisible(), "condividi vuoto: spiega cosa fare");
+  }
+  await lctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
