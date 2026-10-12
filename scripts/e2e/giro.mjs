@@ -51,6 +51,9 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 let searchMode = "ok";
 let photoMode = "ok";
 let photoCalls = 0;
+// Segnali di comportamento (/api/events): si registrano qui per controllarli, senza scrivere nulla.
+const events = [];
+await ctx.route("**/api/events", (route) => { events.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
 await ctx.route("**/api/places/photo**", async (route) => {
   photoCalls++;
   if (photoMode === "off") return route.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } });
@@ -148,6 +151,12 @@ await shot("04c-scheda-successivo");
 await page.getByRole("button", { name: "Locale precedente" }).click();
 await page.waitForTimeout(300);
 await shot("04-scheda");
+{ const ev = events.find((e) => e.type === "apri_scheda");
+  ok(!!ev && ev.googlePlaceId === "P1" && ev.placeId === null && typeof ev.anonId === "string" && !("query" in ev), "segnali: aprire la scheda registra 'apri_scheda' (Place ID, nessun testo)"); }
+{ const r1 = await page.request.post(`${BASE}/api/events`, { data: { type: "apri_scheda", googlePlaceId: "P1" } });
+  const r2 = await page.request.post(`${BASE}/api/events`, { data: { type: "ricerca" } });
+  const r3 = await page.request.post(`${BASE}/api/events`, { data: { type: "qualsiasi" } });
+  ok(r1.status() === 204 && r2.status() === 400 && r3.status() === 400, `segnali: /api/events accetta solo i tipi previsti (${r1.status()}/${r2.status()}/${r3.status()}), anche senza la tabella`); }
 
 // 4a. Scheda: trascinando verso il basso si chiude
 await page.getByTestId("scheda-trascinabile").evaluate((el) => {
