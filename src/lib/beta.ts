@@ -13,13 +13,14 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 // quel telefono finché non si apre ?beta=off).
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
-//   barra         campo "Cosa cerchi?" sempre visibile in cima alla mappa (Places), al posto dell'icona ✨
 //   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
-export type OptInFlag = "gemme" | "articolo" | "barra" | "salva";
+//   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
+//   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce";
 const OPTIN_KEY = "mapetite.beta";
 
-// ?stile=places accende anche l'articolo e il nuovo "Salva"; ?stile=attuale li spegne.
-const PLACES_OPTIN = ["articolo", "salva"];
+// ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.
+const PLACES_OPTIN = ["articolo", "salva", "voce"];
 function readOptIn(): string {
   const url = readFlags();
   if (url.split(",").includes("off")) return EMPTY;
@@ -67,6 +68,23 @@ export function loadRecentSearches(): string[] {
   } catch {
     return [];
   }
+}
+
+// Avvisa chi mostra le recenti (mappa, home) che sono cambiate.
+export const RECENT_EVENT = "mapetite-recenti";
+export function subscribeRecent(cb: () => void): () => void {
+  window.addEventListener(RECENT_EVENT, cb);
+  return () => window.removeEventListener(RECENT_EVENT, cb);
+}
+
+// "Cancella" le ricerche recenti (es. se si presta il telefono).
+export function clearRecentSearches(): void {
+  try {
+    window.localStorage.removeItem(RECENT_KEY);
+  } catch {
+    // localStorage non disponibile: niente da cancellare
+  }
+  window.dispatchEvent(new Event(RECENT_EVENT));
 }
 
 export function saveRecentSearch(q: string): void {

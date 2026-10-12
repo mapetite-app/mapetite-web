@@ -8,16 +8,18 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
-import FiltersSheet, { type Filters, EMPTY_FILTERS, countActive } from "@/components/filters-sheet";
+import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
+import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
+import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
+import { sortTags, tagLabel } from "@/lib/tags";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -25,6 +27,18 @@ import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-st
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
+
+// Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
+function filtersSummary(f: Filters): string {
+  const parts: string[] = [];
+  if (f.categories.length > 0) parts.push(f.categories.map((c) => CATEGORIES.find((x) => x.id === c)?.label ?? c).join(", "));
+  if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
+  if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
+  if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
+  if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
+  if (f.openNowOnly) parts.push("aperti ora");
+  return parts.join(" · ");
+}
 
 const PRESET_TAGS = ["Da provare", "Già visitato", "Romantico", "Economico", "Speciale", "Con amici"];
 const VISIT_WANT = "Da provare";
@@ -40,6 +54,7 @@ function SaveModal({
   onSaved,
   onCancel,
   photoRef = null,
+  knownTags = [],
 }: {
   place: Place;
   userId: string;
@@ -49,6 +64,8 @@ function SaveModal({
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
   photoRef?: string | null;
+  // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
+  knownTags?: string[];
 }) {
   // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
   const sheetOn = useOptIn("salva");
@@ -61,16 +78,69 @@ function SaveModal({
   const [error, setError] = useState(false);
 
   const toggleTag = (tag: string) => {
+    // "Voglio andarci" e "Ci sono stato" si escludono a vicenda, come nella scheda.
+    const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev.filter((t) => t !== other), tag]
     );
   };
+
+  // Tag scritti dall'utente (come le raccolte di Places): stessa colonna tags, nessuna migrazione.
+  const tagOptions = Array.from(new Set([...PRESET_TAGS, ...knownTags, ...selectedTags]));
+  const [newTag, setNewTag] = useState<string | null>(null);
+  // Testo scritto → tag (spazi ripuliti, maiuscola iniziale, stesso tag se esiste già).
+  const normalizeNewTag = (text: string | null): string | null => {
+    const raw = (text ?? "").trim().replace(/\s+/g, " ").slice(0, 24);
+    if (raw === "") return null;
+    return tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase()) ?? raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+  // Aggiunge un tag; se è uno stato ("Da provare" / "Già visitato") toglie l'altro.
+  const withTag = (prev: string[], tag: string): string[] => {
+    if (prev.includes(tag)) return prev;
+    const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
+    return [...prev.filter((t) => t !== other), tag];
+  };
+  const addNewTag = () => {
+    const tag = normalizeNewTag(newTag);
+    setNewTag(null);
+    if (tag) setSelectedTags((prev) => withTag(prev, tag));
+  };
+  const newTagControl = (chipClass: string) =>
+    newTag === null ? (
+      <button type="button" data-testid="nuovo-tag" onClick={() => setNewTag("")} className={chipClass}>
+        + Nuovo tag
+      </button>
+    ) : (
+      <input
+        autoFocus
+        value={newTag}
+        onChange={(e) => setNewTag(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNewTag(); } if (e.key === "Escape") setNewTag(null); }}
+        onBlur={addNewTag}
+        maxLength={24}
+        enterKeyHint="done"
+        placeholder="es. Brunch, Da Milano…"
+        aria-label="Nuovo tag"
+        className="min-h-9 w-40 rounded-pill border border-brand bg-white px-3 text-base font-sans text-text focus:outline-none"
+      />
+    );
+
+  // Mentre salva, Esc non chiude la finestra (l'eventuale errore resterebbe invisibile).
+  useEffect(() => {
+    if (!isPending) return;
+    const block = (e: KeyboardEvent) => { if (e.key === "Escape") e.stopImmediatePropagation(); };
+    window.addEventListener("keydown", block, true);
+    return () => window.removeEventListener("keydown", block, true);
+  }, [isPending]);
 
   const handleSave = () => {
     setError(false);
     startTransition(async () => {
       const supabase = createClient();
-      const tags = selectedTags.length > 0 ? selectedTags : null;
+      // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
+      const pending = normalizeNewTag(newTag);
+      const allTags = pending ? withTag(selectedTags, pending) : selectedTags;
+      const tags = allTags.length > 0 ? allTags : null;
       const noteValue = note.trim() || null;
 
       let savedUuid: string | undefined;
@@ -169,7 +239,7 @@ function SaveModal({
 
           <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
           <div className="flex flex-wrap gap-2">
-            {PRESET_TAGS.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
+            {tagOptions.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE).map((tag) => (
               <button
                 key={tag}
                 type="button"
@@ -180,6 +250,7 @@ function SaveModal({
                 {tag}
               </button>
             ))}
+            {newTagControl("min-h-9 rounded-pill border border-dashed border-brand/50 px-3.5 text-sm font-display font-medium text-brand")}
           </div>
 
           {error && <p className="mt-3 text-sm text-error">Non sono riuscito a salvare. Controlla la connessione e riprova.</p>}
@@ -209,10 +280,11 @@ function SaveModal({
 
         <p className="mb-2 text-xs font-sans text-text-muted">Tag</p>
         <div className="mb-4 flex flex-wrap gap-2">
-          {PRESET_TAGS.map((tag) => (
+          {tagOptions.map((tag) => (
             <button
               key={tag}
               type="button"
+              aria-pressed={selectedTags.includes(tag)}
               onClick={() => toggleTag(tag)}
               className={
                 selectedTags.includes(tag)
@@ -220,9 +292,10 @@ function SaveModal({
                   : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
-              {tag}
+              {tagLabel(tag)}
             </button>
           ))}
+          {newTagControl("rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
         </div>
 
         <p className="mb-1 text-xs font-sans text-text-muted">Nota personale</p>
@@ -687,6 +760,10 @@ export default function MapView({
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
+  // Stato scelto in scheda prima di aprire Salva ("Voglio andarci" / "Ci sono stato"); vuoto dal segnalibro.
+  const [pendingSaveTags, setPendingSaveTags] = useState<string[]>([]);
+  // Salvato da aprire appena arrivano i salvati (link dal profilo: /mappa?salvato=UUID).
+  const openSavedRef = useRef<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
@@ -755,6 +832,11 @@ export default function MapView({
   const [aiSearching, setAiSearching] = useState(false);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
+  const shareOn = useBeta("condividi");
+  // "🎲 Scegli tu" tra i salvati (?beta=sorprendimi, spento di default).
+  const pickOn = useOptIn("sorprendimi");
+  // 🎤 nella barra (?beta=voce, spento di default).
+  const voiceOn = useOptIn("voce");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
@@ -763,7 +845,7 @@ export default function MapView({
   const barInputRef = useRef<HTMLInputElement>(null);
   const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
-    () => () => {},
+    subscribeRecent,
     () => (recentOn ? JSON.stringify(loadRecentSearches()) : "[]"),
     () => "[]",
   );
@@ -898,16 +980,19 @@ export default function MapView({
       });
   }, [userId]);
 
+  // UUID del locale aperto: le recensioni si ricaricano solo se cambia davvero locale
+  // (non a ogni aggiornamento di placeUuids, es. dopo un salvataggio dalla scheda).
+  const selectedUuid = selected ? resolveUuid(selected.id) : null;
   useEffect(() => {
-    if (!selected) {
-      setSelectedReviews(null);
-      return;
-    }
-    const uuid = resolveUuid(selected.id);
+    const uuid = selectedUuid;
     if (!uuid) {
       setSelectedReviews(null);
       return;
     }
+    // Con "‹ ›" si cambia locale in fretta: le recensioni del locale precedente non devono restare
+    // né arrivare in ritardo sul successivo.
+    let cancelled = false;
+    setSelectedReviews(null);
     const supabase = createClient();
     supabase
       .from("reviews")
@@ -915,6 +1000,7 @@ export default function MapView({
       .eq("place_id", uuid)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
+        if (cancelled) return;
         if (!data || data.length === 0) {
           setSelectedReviews(null);
           return;
@@ -928,7 +1014,8 @@ export default function MapView({
           items: data as ReviewItem[],
         });
       });
-  }, [selected?.id, placeUuids]);
+    return () => { cancelled = true; };
+  }, [selectedUuid]);
 
   useEffect(() => {
     if (!userId) return;
@@ -963,6 +1050,17 @@ export default function MapView({
 
       setSavedPlaces(fetched);
       setPlaceUuids((prev) => ({ ...prev, ...uuidMap }));
+      // Arrivo dal profilo (/mappa?salvato=UUID): apre la scheda di quel salvato.
+      const wanted = fetched.find((p) => p.id === openSavedRef.current);
+      openSavedRef.current = null;
+      if (wanted) {
+        setTimeout(() => {
+          setFocusedId(wanted.id);
+          dispatch({ type: "OPEN_VENUE", placeId: wanted.id });
+          const map = (mapRef.current as { getMap?: () => { jumpTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+          if (map) map.jumpTo({ center: [wanted.lng, wanted.lat], zoom: 15 });
+        }, 0);
+      }
 
       // Verdetto editoriale anche sui salvati: legge la cache place_synthesis
       // (RLS read-all pubblica) per i Google Place ID e popola venueDetails
@@ -1005,6 +1103,7 @@ export default function MapView({
         setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dispatch serve solo al link dal profilo, una volta
   }, [userId]);
 
   const handleToggle = (placeId: string, saved: boolean) => {
@@ -1057,6 +1156,7 @@ export default function MapView({
   };
 
   const runFilteredSearch = async (f: Filters) => {
+    setAiError(null);
     if (view === "saved") {
       const allowed = f.categories;
       const filtered = allowed.length > 0
@@ -1066,6 +1166,7 @@ export default function MapView({
           })
         : savedPlaces;
       setAiSearch({ risultati: filtered, filtri: null });
+      setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });
       return;
     }
@@ -1130,6 +1231,8 @@ export default function MapView({
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
       setVenueDetails(details);
+      // Come per la ricerca AI: la mappa si sposta sui risultati.
+      fitToPlaces(places);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
       setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -1368,6 +1471,31 @@ export default function MapView({
     }
   };
 
+  // Esc (da computer) chiude la finestra più in alto: Salva, scheda, filtri, articolo, pannello.
+  const closeTopmost = useRef<() => void>(() => {});
+  useEffect(() => {
+    closeTopmost.current = () => {
+      if (pendingSavePlaceId) { setPendingSavePlaceId(null); setPendingSaveTags([]); return; }
+      if (pendingEditPlace) { setPendingEditPlace(null); return; }
+      if (overlay.kind === "venue" || overlay.kind === "filters" || overlay.kind === "ai") { dispatch({ type: "CLOSE" }); return; }
+      if (articleOpen) {
+        // L'articolo ha una voce nella cronologia: si chiude tornando indietro.
+        if (window.history.state?.articolo) window.history.back();
+        else setArticleOpen(false);
+      }
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Nei campi di testo Esc lascia fare al campo (es. annullare il tag nuovo).
+      if ((e.target as HTMLElement | null)?.closest("input, textarea")) return;
+      closeTopmost.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
@@ -1375,6 +1503,32 @@ export default function MapView({
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
+    // Dal profilo: /mappa?salvato=UUID apre i salvati e poi la scheda (quando arrivano).
+    const savedId = params.get("salvato");
+    if (savedId && /^[0-9a-f-]{36}$/i.test(savedId)) {
+      openSavedRef.current = savedId;
+      params.delete("salvato");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
+      return;
+    }
+    // Scorciatoia dell'app installata: /mappa?vista=salvati apre subito "I miei salvati".
+    if (params.get("vista") === "salvati") {
+      params.delete("vista");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
+      return;
+    }
+    // Dalla home "Oppure cerca con i filtri" (/mappa?filtri=1): apre subito il pannello dei filtri.
+    if (params.get("filtri") === "1") {
+      params.delete("filtri");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); dispatch({ type: "OPEN_FILTERS" }); }, 0);
+      return;
+    }
     const q = params.get("q")?.trim().slice(0, 200);
     // meno di 3 caratteri: link troncato o sbagliato, niente ricerca a pagamento
     if (!q || q.length < 3) return;
@@ -1444,6 +1598,9 @@ export default function MapView({
                 aria-label="Chiedi all'AI: cosa cerchi?"
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
+              {voiceOn && aiQuery === "" && aiSearch === null && (
+                <VoiceButton onText={(t) => { setAiQuery(t); setWelcomeDismissed(true); void runAISearch(t); }} />
+              )}
               {(aiQuery !== "" || aiSearch !== null) && (
                 <button
                   type="button"
@@ -1477,6 +1634,7 @@ export default function MapView({
             onClick={() => {
               setAiSearch(null);
               setAiQuery("");
+              setAiError(null);
               dispatch({ type: "OPEN_FILTERS" });
             }}
             className={`relative flex shrink-0 h-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow ${barOn ? "gap-1.5 px-3.5" : "w-11"}`}
@@ -1490,6 +1648,17 @@ export default function MapView({
             )}
           </button>
         </div>
+        {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
+        {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed) && (
+          <button
+            type="button"
+            data-testid="errore-barra"
+            onClick={() => setAiError(null)}
+            className="pointer-events-auto self-start rounded-card bg-surface px-3 py-2 text-left text-sm font-sans text-error shadow-float"
+          >
+            {aiError} ✕
+          </button>
+        )}
         {/* Pannello AI espandibile */}
         {overlay.kind === "ai" && (
           <div className="pointer-events-auto w-80 max-w-[90vw] relative">
@@ -1543,6 +1712,26 @@ export default function MapView({
               className="min-h-10 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
             />
             <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
+              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
+              {pickOn && filterSaved(savedPlaces, activeTag, activeCity, savedQuery).length >= 2 && (
+                <button
+                  type="button"
+                  data-testid="scegli-tu"
+                  onClick={() => {
+                    const shown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
+                    const want = shown.filter((p) => p.tags?.includes(VISIT_WANT));
+                    const pool = (want.length > 0 ? want : shown).filter((p) => p.id !== selected?.id);
+                    const place = pool[Math.floor(Math.random() * pool.length)] ?? shown[0];
+                    setFocusedId(place.id);
+                    dispatch({ type: "OPEN_VENUE", placeId: place.id });
+                    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+                    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+                  }}
+                  className={`shrink-0 ${CHIP_OFF}`}
+                >
+                  🎲 Scegli tu
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
@@ -1566,7 +1755,7 @@ export default function MapView({
                   📍 {city} · {count}
                 </button>
               ))}
-              {availableTags.map((tag) => (
+              {sortTags(availableTags).map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -1574,7 +1763,7 @@ export default function MapView({
                   onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
                   className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
                 >
-                  {tag}
+                  {tagLabel(tag)} · {savedPlaces.filter((p) => p.tags?.includes(tag)).length}
                 </button>
               ))}
             </div>
@@ -1690,6 +1879,16 @@ export default function MapView({
                   <span className="line-clamp-2">↻ {r}</span>
                 </button>
               ))}
+              {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearRecentSearches}
+                  aria-label="Cancella le ricerche recenti"
+                  className="min-h-14 shrink-0 rounded-card px-2 text-xs font-sans text-text-muted active:scale-95"
+                >
+                  Cancella
+                </button>
+              )}
               {WELCOME_EXAMPLES.map((ex) => (
                 <button
                   key={ex.query}
@@ -1813,6 +2012,17 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+                <button
+                  type="button"
+                  data-testid="cancella-recenti"
+                  onClick={clearRecentSearches}
+                  aria-label="Cancella le ricerche recenti"
+                  className="min-h-11 shrink-0 rounded-pill px-2 text-xs font-sans text-text-muted underline-offset-2 active:scale-95"
+                >
+                  Cancella
+                </button>
+              )}
               {tasteSuggestion && (
                 <button
                   key="per-te"
@@ -1918,15 +2128,19 @@ export default function MapView({
 
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
-      {aiSearch !== null && movedSinceSearch && aiQuery.trim() !== "" && (overlay.kind === "list" || overlay.kind === "none") && (
+      {/* Vale anche per i risultati dei filtri: rifà la stessa ricerca a filtri nella zona visibile. */}
+      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
         <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
           <button
             type="button"
-            disabled={aiSearching}
-            onClick={() => { const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q); }}
+            disabled={aiSearching || filterLoading}
+            onClick={() => {
+              if (aiSearch?.query == null && countActive(filters) > 0) { void runFilteredSearch(filters); return; }
+              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q);
+            }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
-            {aiSearching ? "Cerco…" : "Cerca in quest'area"}
+            {aiSearching || filterLoading ? "Cerco…" : "Cerca in quest'area"}
           </button>
         </div>
       )}
@@ -2000,7 +2214,13 @@ export default function MapView({
               }}
               style={{ zIndex: focusId === place.id || selected?.id === place.id ? 3 : topPlaces.includes(place) ? 2 : 1 }}
             >
-              <div className="flex cursor-pointer flex-col items-center" data-testid="pin" data-focused={focusId === place.id ? "true" : undefined}>
+              {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
+              <div
+                className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                data-testid="pin"
+                data-focused={focusId === place.id ? "true" : undefined}
+                data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+              >
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     className={`block overflow-hidden rounded-xl border-2 bg-white shadow-float transition-transform ${
@@ -2059,9 +2279,32 @@ export default function MapView({
       </Map>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
+          {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
+          {(() => {
+            const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+            const i = ids.indexOf(selected.id);
+            if (i < 0 || ids.length < 2) return null;
+            const go = (j: number) => {
+              const id = ids[(j + ids.length) % ids.length];
+              const place = displayedPlaces.find((p) => p.id === id);
+              if (!place) return;
+              setFocusedId(id);
+              dispatch({ type: "OPEN_VENUE", placeId: id });
+              const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+              if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+            };
+            return (
+              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float">
+                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
+                <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
+                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
+              </div>
+            );
+          })()}
           <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
+              key={selected.id}
               origin={userPos ?? searchOrigin}
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
@@ -2079,6 +2322,13 @@ export default function MapView({
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
+              // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
+              // rapido, eviterebbe un doppione in places.
+              onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
+                if (!userId) { window.location.href = "/login"; return; }
+                setPendingSaveTags([st]);
+                setPendingSavePlaceId(selected.id);
+              }}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
               userPos={userPos}
@@ -2179,6 +2429,8 @@ export default function MapView({
         return pendingPlace && userId ? (
           <SaveModal
             place={pendingPlace}
+            initialTags={pendingSaveTags}
+            knownTags={availableTags}
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
@@ -2192,8 +2444,9 @@ export default function MapView({
                 { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note },
               ]);
               setPendingSavePlaceId(null);
+              setPendingSaveTags([]);
             }}
-            onCancel={() => setPendingSavePlaceId(null)}
+            onCancel={() => { setPendingSavePlaceId(null); setPendingSaveTags([]); }}
           />
         ) : null;
       })()}
@@ -2201,6 +2454,7 @@ export default function MapView({
       {pendingEditPlace && userId && (
         <SaveModal
           place={pendingEditPlace}
+          knownTags={availableTags}
           userId={userId}
           mode="edit"
           initialTags={pendingEditPlace.tags ?? []}
@@ -2266,14 +2520,35 @@ export default function MapView({
           details={aiSearch !== null ? venueDetails : undefined}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
-          origin={userPos ?? searchOrigin}
+          // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
+          origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
-          heading={view === "saved" && aiSearch === null ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}` : null}
+          heading={view === "saved" && aiSearch === null
+            ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}`
+            : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
+          showSearchFeedback={clusterPlaces === null}
+          onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {
+            // Come la mappa condivisibile di Mapstr, ma senza dati pubblici: un messaggio con i link.
+            const lines = list.slice(0, 30).map((p) => {
+              const gid = Object.keys(placeUuids).find((g) => placeUuids[g] === p.id);
+              const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}${gid ? `&query_place_id=${encodeURIComponent(gid)}` : ""}`;
+              // La nota è privata ("solo per te"): non finisce nel messaggio.
+              return `• ${p.name}\n  ${url}`;
+            });
+            const text = `I miei posti su Mapetite${activeCity ? ` · ${activeCity}` : ""}:\n\n${lines.join("\n")}`;
+            try {
+              if (typeof navigator.share === "function") { await navigator.share({ title: "I miei posti su Mapetite", text }); return "shared"; }
+              await navigator.clipboard.writeText(text);
+              return "copied";
+            } catch {
+              return null; // foglio di condivisione chiuso
+            }
+          } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           onSave={aiSearch !== null && view === "all" ? (place) => {
@@ -2320,6 +2595,7 @@ export default function MapView({
           }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
           onAsk={(q) => { setArticleOpen(false); setAiQuery(q); void runAISearch(q); }}
+          shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
           onClose={() => setArticleOpen(false)}
         />
       )}

@@ -76,8 +76,9 @@ await ctx.route("**/api/search/synthesis", async (route) => {
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
-const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png` });
+page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
+// caret "initial": nascondere il cursore aggiunge uno stile ai campi e, durante il caricamento, React lo segnala come differenza.
+const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
 
 // 1. Primo accesso
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -101,8 +102,12 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok(true, "lista: il verdetto compare dopo");
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
+ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("chiuso-ora").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("chiuso-ora").count()) === 0, "card: 'Chiuso ora' sul locale chiuso (e solo lì)");
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("Rooftop romantico"), "lista: titolo con la richiesta dell'utente");
+{ const href = decodeURIComponent((await page.getByTestId("ricerca-feedback").getAttribute("href")) ?? "");
+  ok(href.startsWith("mailto:founder.mapetite@gmail.com") && href.includes('Ho cercato: "Rooftop romantico per due a Roma"') && href.includes("1. Terrazza Uno") && !href.includes("Pub Fuori Tema"), "fine carosello: 'Questi risultati non vanno?' apre un'email con la ricerca e i locali mostrati"); }
 await shot("03-lista-verdetti");
+ok(await page.getByTestId("ho-capito").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1), "lista: 'Ho capito' si legge per intero (non tagliato)");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
 ok(await page.locator("ul img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "foto: la prima card ha la foto caricata");
@@ -110,6 +115,7 @@ await page.waitForTimeout(1200);
 const pinBoxes = [];
 for (const pin of await page.getByTestId("pin").all()) { const b = await pin.boundingBox(); if (b) pinBoxes.push(b); }
 ok(pinBoxes.length >= 2, `mappa: ${pinBoxes.length} pin con nome sulla mappa dopo la ricerca`);
+ok((await page.locator("[data-testid=pin][data-closed=true]").count()) === 1 && (await page.locator("[data-testid=pin][data-closed=true]").innerText()).includes("Rooftop Tre"), "mappa: il pin del locale chiuso è più chiaro (solo quello)");
 ok(pinBoxes.every((b) => b.y > 0 && b.y + b.height < 844 * 0.55 && b.x >= 0 && b.x + b.width <= 390), "mappa: la mappa si sposta sui risultati (pin sopra la lista, dentro lo schermo)");
 
 // 3. La ricerca resta scritta nella barra in alto
@@ -128,8 +134,18 @@ ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: f
 ok(await page.getByText("Foto: Maria R.").isVisible(), "scheda: autore della foto indicato (condizioni Google)");
 ok(((await page.getByRole("link", { name: /su Google Maps/ }).first().getAttribute("href")) ?? "").includes("query_place_id=P1"), "scheda: link a orari e foto su Google Maps con il Place ID");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
+await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); });
+await page.getByTestId("copia-indirizzo").click();
+ok((await page.getByTestId("copia-indirizzo").textContent())?.includes("✓ Copiato") && (await page.evaluate(() => window.__copied)) === "Via di Prova 1, Roma", "scheda: tocco sull'indirizzo lo copia");
 ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
+ok((await page.getByTestId("scheda-nav").textContent())?.includes("1 di 2"), "scheda: '‹ 1 di 2 ›' per passare agli altri risultati");
+await page.getByRole("button", { name: "Locale successivo" }).click();
+await page.waitForTimeout(400);
+ok((await page.getByTestId("scheda-nav").textContent())?.includes("2 di 2") && await page.getByRole("heading", { name: "Rooftop Tre" }).or(page.getByText("Rooftop Tre").last()).first().isVisible(), "scheda: '›' apre il locale successivo senza tornare alla lista");
+await shot("04c-scheda-successivo");
+await page.getByRole("button", { name: "Locale precedente" }).click();
+await page.waitForTimeout(300);
 await shot("04-scheda");
 
 // 4a. Scheda: trascinando verso il basso si chiude
@@ -286,7 +302,11 @@ await page.getByTestId("articolo").getByText("Vista vera sui tetti di Roma.").wa
 ok((await page.getByTestId("articolo-locale").count()) === 2, "articolo: un paragrafo per ogni locale (l'escluso non c'è)");
 ok((await page.getByTestId("articolo-intro").textContent())?.startsWith("Ho scelto 2 posti per te"), "articolo: frase di apertura con cosa ha capito");
 ok(await page.getByTestId("articolo").getByText("Ha una vera terrazza.").isVisible(), "articolo: verdetto e motivo scritti come un consiglio");
+ok(decodeURIComponent((await page.getByTestId("articolo-feedback").getAttribute("href")) ?? "").includes("2. Rooftop Tre"), "articolo: in fondo 'Questi risultati non vanno?' con i locali mostrati");
 ok(await page.getByTestId("articolo").locator("img[alt='Terrazza Uno']").isVisible(), "articolo: foto grande del locale");
+await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+await page.getByTestId("articolo-condividi").click();
+ok(decodeURIComponent((await page.evaluate(() => window.__shared?.url)) ?? "").includes("/mappa?q=Rooftop romantico per due a Roma&at="), "articolo: 'Condividi' manda il link che rifà la ricerca");
 const ask = await page.getByLabel("Fai un'altra domanda").boundingBox();
 ok(!!ask && ask.y + ask.height <= 844 - 56 && ask.y > 600, "articolo: 'Fai un'altra domanda' fisso in basso, sopra la barra");
 await shot("21-articolo");
@@ -296,6 +316,16 @@ ok(true, "articolo: tocco sulla foto apre la scheda");
 await page.getByRole("button", { name: "Chiudi" }).first().click();
 await page.waitForTimeout(300);
 ok(await page.getByTestId("articolo").isVisible(), "articolo: chiusa la scheda si torna all'articolo");
+await page.getByTestId("articolo").getByRole("button", { name: "Apri Terrazza Uno" }).click();
+await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+ok((await page.getByText("Il verdetto Mapetite").count()) === 0 && await page.getByTestId("articolo").isVisible(), "Esc (da computer): chiude la scheda e lascia l'articolo");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+ok((await page.getByTestId("articolo").count()) === 0, "Esc: poi chiude l'articolo");
+await page.getByTestId("apri-articolo").click();
+await page.getByTestId("articolo").waitFor({ timeout: 3000 });
 await page.goBack();
 await page.waitForTimeout(300);
 ok((await page.getByTestId("articolo").count()) === 0 && page.url().includes("/mappa"), "articolo: il tasto indietro torna alla mappa (non esce dalla pagina)");
@@ -304,6 +334,11 @@ await page.getByLabel("Fai un'altra domanda").fill("cocktail bar elegante a Mont
 await page.getByLabel("Fai un'altra domanda").press("Enter");
 await page.waitForTimeout(800);
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("cocktail bar elegante"), "articolo: 'Fai un'altra domanda' avvia una nuova ricerca");
+await page.getByTestId("apri-articolo").click();
+await page.getByLabel("Fai un'altra domanda").fill("più economico");
+await page.getByLabel("Fai un'altra domanda").press("Enter");
+await page.waitForTimeout(800);
+ok((await page.getByTestId("titolo-risposta").textContent()) === "cocktail bar elegante a Monti più economico", "articolo: una domanda breve ('più economico') continua la ricerca precedente");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).first().click();
@@ -325,6 +360,28 @@ ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella ca
 await shot("22-barra");
 await page.getByTestId("benvenuto-filtri").click();
 await page.getByText(/Applica filtri/).first().waitFor({ timeout: 3000 }).then(() => ok(true, "card iniziale: 'Oppure usa i filtri' apre i filtri"), () => ok(false, "card iniziale: 'Oppure usa i filtri' apre i filtri"));
+await shot("24-filtri");
+ok((await page.getByText("Reset").count()) === 0 && await page.getByRole("button", { name: "Azzera" }).isVisible(), "filtri: tutto in italiano ('Azzera')");
+{ const b = await page.getByRole("button", { name: "Pizzerie" }).boundingBox(); ok(!!b && b.height >= 40, `filtri: scelte comode col dito (${Math.round(b?.height ?? 0)}px)`); }
+let filterBody = null;
+await page.route("**/api/search", async (r) => { filterBody = r.request().postDataJSON(); return r.fallback(); });
+await page.getByRole("button", { name: "Pizzerie" }).click();
+await page.getByRole("button", { name: "3 km" }).click();
+await page.getByRole("button", { name: "★ 4,5+" }).click();
+await page.getByRole("button", { name: "Applica filtri (3)" }).click();
+await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
+ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 3000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 3 km e voto 4,5+");
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 3 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
+await page.waitForTimeout(1200);
+{ const pins = await page.getByTestId("pin").count(); ok(pins >= 2, `filtri: la mappa si sposta sui risultati (${pins} pin separati, non un gruppo unico)`); }
+await shot("24b-filtri-risultati");
+filterBody = null;
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.getByRole("button", { name: "Cerca in quest'area" }).click({ timeout: 3000 }).then(async () => {
+  await page.waitForTimeout(800);
+  ok(filterBody?.searchIntent === "structured" && filterBody?.minRating === 4.5, "filtri: 'Cerca in quest'area' rifà la ricerca con gli stessi filtri");
+}, () => ok(false, "filtri: 'Cerca in quest'area' compare anche dopo i filtri"));
+await page.unroute("**/api/search");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");
 await page.getByLabel("Cosa cerchi?").press("Enter");
@@ -339,6 +396,42 @@ await page.waitForTimeout(300);
 ok((await page.getByTestId("titolo-risposta").count()) === 0 && (await page.getByLabel("Cosa cerchi?").inputValue()) === "", "barra: ✕ cancella la ricerca e i risultati");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+// 5e3b. 🎤 nella barra (?beta=voce): riconoscimento vocale simulato
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok((await page.getByTestId("microfono").count()) === 0, "microfono: spento di default");
+await page.addInitScript(() => {
+  // Chromium ha anche SpeechRecognition nativo (senza prefisso): si simulano entrambi.
+  const Fake = class {
+    start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: "pizza a Testaccio" }]] }); this.onend?.(); }, 100); }
+    stop() { this.onend?.(); }
+  };
+  window.SpeechRecognition = Fake;
+  window.webkitSpeechRecognition = Fake;
+});
+await page.goto(`${BASE}/mappa?beta=voce`, { waitUntil: "networkidle" });
+await page.getByTestId("microfono").click();
+await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("titolo-risposta").textContent())?.includes("pizza a Testaccio"), "microfono: la ricerca dettata parte da sola");
+}, () => ok(false, "microfono: la ricerca dettata parte da sola"));
+await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+
+// 5e4. Senza rete: avviso in alto e messaggio chiaro se si cerca dalla barra
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Chiudi" }).first().click();
+await ctx.setOffline(true);
+await page.waitForTimeout(300);
+ok(await page.getByTestId("offline").isVisible(), "senza rete: avviso 'Sei senza connessione'");
+await page.unroute("**/api/search").catch(() => {});
+await page.route("**/api/search", (r) => r.abort("internetdisconnected"));
+await page.getByLabel("Cosa cerchi?").fill("aperitivo a Monti");
+await page.getByLabel("Cosa cerchi?").press("Enter");
+await page.getByTestId("errore-barra").waitFor({ timeout: 4000 }).then(() => ok(true, "senza rete: la ricerca dalla barra spiega l'errore"), () => ok(false, "senza rete: la ricerca dalla barra spiega l'errore"));
+await shot("25-senza-rete");
+await page.unroute("**/api/search");
+await ctx.setOffline(false);
+await page.waitForTimeout(300);
+ok((await page.getByTestId("offline").count()) === 0, "rete tornata: l'avviso sparisce");
+
 // 5f. Ricerca scritta direttamente nella card iniziale (senza la barra in alto)
 await page.goto(`${BASE}/mappa?beta=-barra`, { waitUntil: "networkidle" });
 await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
@@ -349,6 +442,12 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
+ok(await page.getByText("Chiedi all'AI, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
+ok((await page.getByTestId("home-recenti").getByRole("link").count()) >= 1, "home: le ultime ricerche fatte su questo telefono, a un tocco");
+await page.getByTestId("home-filtri").click();
+await page.getByText(/Applica filtri/).first().waitFor({ timeout: 5000 }).then(() => ok(true, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"), () => ok(false, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"));
+ok(!page.url().includes("filtri=1"), "home → filtri: il parametro sparisce dall'indirizzo (ricaricare non riapre i filtri)");
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
 searchDelay = 1500;
 await page.getByLabel("Cosa cerchi?").press("Enter");
@@ -359,7 +458,7 @@ searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-await page.getByRole("link", { name: /Rooftop romantico/ }).click();
+await page.getByRole("link", { name: /Rooftop romantico/ }).last().click(); // l'esempio (la prima è la ricerca recente)
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(true, "home: un esempio apre la mappa con i risultati");
 
@@ -426,7 +525,7 @@ ok((await p2.getByTestId("benvenuto").count()) === 0, "posizione concessa: la ca
 ok(await p2.getByTestId("tu-sei-qui").isVisible(), "posizione concessa: punto blu 'tu sei qui' sulla mappa");
 await p2.getByRole("button", { name: "La mia posizione" }).click();
 ok(true, "pulsante 'La mia posizione' sempre disponibile in alto a destra");
-await p2.screenshot({ path: `${OUT}/07b-posizione.png` });
+await p2.screenshot({ path: `${OUT}/07b-posizione.png`, caret: "initial" });
 await ctx2.close();
 // posizione concessa vicino ai risultati: il pulsante percorso mostra i minuti a piedi (come Places)
 const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8995, longitude: 12.4895 } });
@@ -444,7 +543,7 @@ await p3.getByText("Terrazza Uno").first().click();
 await p3.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
 const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
 ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
-await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png` });
+await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png`, caret: "initial" });
 await ctx3.close();
 
 // 7-bis. Condividi la ricerca: il link porta richiesta e punto della mappa
@@ -522,7 +621,7 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 await page.waitForTimeout(800);
-ok(!(await page.getByText(/preparo i verdetti/).isVisible()) && (await page.locator("ul.snap-x li").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
+ok(!(await page.getByText(/preparo i verdetti/).isVisible()) && (await page.locator("ul.snap-x li[data-id]:not([data-id=\"\"])").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
 ok((await page.locator("ul.snap-x li").first().getByTestId("riga-google").textContent()) === "“Bella vista sulla città.”", "senza verdetto: la card mostra una recensione di Google invece di restare vuota");
 await shot("21-senza-verdetto");
 await page.unroute("**/api/search/synthesis");
@@ -574,7 +673,7 @@ await pi.evaluate(() => localStorage.setItem("mapetite.recenti", JSON.stringify(
 await pi.reload({ waitUntil: "networkidle" });
 await pi.getByText("📲 Aggiungi Mapetite alla Home").click();
 ok(await pi.getByText("Aggiungi alla schermata Home").isVisible(), "iPhone, chi torna: invito con le istruzioni per la Home");
-await pi.screenshot({ path: `${OUT}/07c-installa-iphone.png` });
+await pi.screenshot({ path: `${OUT}/07c-installa-iphone.png`, caret: "initial" });
 await pi.getByRole("button", { name: "Non mostrare più" }).click();
 await pi.reload({ waitUntil: "networkidle" });
 ok((await pi.getByTestId("installa").count()) === 0, "iPhone: chiuso l'invito non ricompare");
@@ -599,9 +698,17 @@ const covered = await page.evaluate(() => {
   return b.contains(top) ? "ok" : "coperto";
 });
 ok(covered === "ok", `onboarding: pulsante Continua raggiungibile (${covered})`);
+await page.getByTestId("onboarding-salta").click();
+await page.waitForURL(/\/mappa/, { timeout: 5000 }).then(() => ok(true, "onboarding: 'Salta' porta subito alla mappa"), () => ok(false, "onboarding: 'Salta' porta subito alla mappa"));
 await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
+
+// 8a. "Cancella" le ricerche recenti
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByTestId("cancella-recenti").click();
+await page.waitForTimeout(200);
+ok((await page.getByTestId("recenti").count()) === 0 && (await page.getByTestId("cancella-recenti").count()) === 0, "ricerche recenti: 'Cancella' le toglie subito");
 
 // 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
 if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {
@@ -620,7 +727,7 @@ if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
     { tags: ["romantico"], note: "Tavolo sulla terrazza", places: { id: "00000000-0000-4000-8000-000000000001", name: "Terrazza Uno", category: "bar", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.9, lng: 12.49, google_place_id: "G1", rating: 4.6, price_level: 2 } },
-    { tags: ["amici"], note: null, places: { id: "00000000-0000-4000-8000-000000000002", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
+    { tags: ["amici", "Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000002", name: "Osteria Due", category: "restaurant", address: "Via dei Vascellari 29, Roma", lat: 41.89, lng: 12.47, google_place_id: "G2" } },
     { tags: null, note: "Brunch domenica", places: { id: "00000000-0000-4000-8000-000000000003", name: "Caffè Milano", category: "cafe", address: "Corso Monforte, 26, 20122 Milano MI, Italy", lat: 45.46, lng: 9.2, google_place_id: "G3" } },
   ];
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -637,27 +744,55 @@ else {
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
+  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci · 1' (con quanti sono), come nella scheda");
+  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByRole("button", { name: "Ristoranti" }).click();
+  await p.getByRole("button", { name: /Applica filtri/ }).click();
+  await p.waitForTimeout(500);
+  ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
+  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByRole("button", { name: "Azzera" }).click();
+  await p.getByRole("button", { name: /Applica filtri/ }).click();
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
-  await p.screenshot({ path: `${OUT}/11-salvati.png` });
+  await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
+  await p.getByTestId("condividi-lista").click();
+  { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
+    ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
+  await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
-  ok((await p.getByTestId("filtri-lista").count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
-  await p.waitForTimeout(1500);
-  const pin = await p.getByTestId("pin").first().boundingBox();
+  ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
+  // L'animazione della mappa può durare un po': si aspetta (al massimo 4 s) che il pin sia in vista.
+  let pin = null;
+  for (let t = 0; t < 8; t++) {
+    await p.waitForTimeout(500);
+    // Con un solo salvato mostrato c'è un solo pin (il nome compare solo da vicino).
+    pin = await p.getByTestId("pin").first().boundingBox({ timeout: 1000 }).catch(() => null);
+    if (pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) break;
+  }
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
-  await p.screenshot({ path: `${OUT}/13-salvati-milano.png` });
+  await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
   ok(await p.locator("ul.snap-x li").first().getByText(/★ 4,6 · €€/).isVisible(), "card salvato: voto e prezzo salvati");
-  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png` });
+  await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
+  ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
+  await sctx.grantPermissions(["geolocation"]);
+  await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
+  await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
+  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
+  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
+  await p.getByRole("button", { name: "Più vicini" }).click();
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
@@ -668,12 +803,35 @@ else {
   await p.getByLabel("Cerca tra i salvati").fill("");
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
-  await p.getByRole("button", { name: "✓ Ci sono stato" }).click();
+  await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   await p.waitForTimeout(500);
-  ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
-  await p.screenshot({ path: `${OUT}/13b-stato-salvato.png` });
+  ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
+  await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
+
+  // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
+  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(!p.url().includes("vista="), "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
+  { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
+
+  // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
+  await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
+  await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {
+    ok(await p.getByText("Terrazza Uno").last().isVisible() && !p.url().includes("salvato="), "profilo → mappa: il salvato toccato si apre nella sua scheda");
+  }, () => ok(false, "profilo → mappa: il salvato toccato si apre nella sua scheda"));
+  await p.keyboard.press("Escape");
+
+  // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
+  ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: spento di default");
+  await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("scegli-tu").click();
+  await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
+  ok(await p.getByText("Osteria Due").last().isVisible() && (await p.getByTestId("stato-salvato").getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "scegli tu: apre il salvato 'Voglio andarci'");
+  await p.screenshot({ path: `${OUT}/26-scegli-tu.png`, caret: "initial" });
+  await p.keyboard.press("Escape");
+  await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
   // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -681,7 +839,9 @@ else {
   await p.getByRole("button", { name: "Salva Rooftop Tre" }).click();
   await p.getByText("Salva locale").waitFor({ timeout: 3000 });
   ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
-  await p.screenshot({ path: `${OUT}/14-salva-da-card.png` });
+  { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
+    ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
+  await p.screenshot({ path: `${OUT}/14-salva-da-card.png`, caret: "initial" });
   await sctx.close();
 
   // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
@@ -709,11 +869,19 @@ else {
   await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
   await v.getByText("Terrazza Uno").first().click();
   await v.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+  // Locale non salvato: "✓ Ci sono stato" in scheda apre Salva con lo stato già scelto
+  await v.getByTestId("stato-rapido").getByRole("button", { name: "✓ Ci sono stato" }).click();
+  await v.locator("div.w-80").getByText("Salva locale").waitFor({ timeout: 3000 });
+  ok((await v.locator("div.w-80").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda non salvata: '✓ Ci sono stato' apre Salva con lo stato già scelto");
+  await v.locator("div.w-80").getByRole("button", { name: "Annulla" }).click();
   await v.locator("button:text-is('Salva')").first().click();
   const modal = v.locator("div.w-80");
+  ok((await modal.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva dal pulsante: nessuno stato rimasto dalla scelta annullata");
   await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
   ok(true, "salva: si apre la finestra con tag e nota");
   await modal.getByRole("button", { name: "Romantico" }).click();
+  await modal.getByTestId("nuovo-tag").click();
+  await modal.getByLabel("Nuovo tag").fill("da rifare");
   await modal.locator("textarea").fill("Tavolo vicino alla ringhiera");
   await modal.getByRole("button", { name: "Salva", exact: true }).click();
   await modal.getByText("Errore durante il salvataggio. Riprova.").waitFor({ timeout: 3000 });
@@ -722,12 +890,12 @@ else {
   await modal.getByRole("button", { name: "Salva", exact: true }).click();
   await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
   const ins = writes.find((w) => w.m === "POST");
-  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
-    "salva: scrive in saved_places l'UUID Supabase con tag e nota");
+  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
+    "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni'] span").first().evaluate((el) => el.scrollWidth <= el.clientWidth), "salvato: la scritta 'Percorso' non viene tagliata");
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
-  await v.screenshot({ path: `${OUT}/17-salvato.png` });
+  await v.screenshot({ path: `${OUT}/17-salvato.png`, caret: "initial" });
   await v.locator("button:text-is('Salvato')").click();
   await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
   const del = writes.find((w) => w.m === "DELETE");
@@ -744,15 +912,28 @@ else {
   const sb = await sheet.getByRole("button", { name: "Fatto" }).boundingBox();
   { const ab = await sheet.getByRole("button", { name: "Annulla" }).boundingBox(); ok(!!sb && !!ab && ab.y + ab.height <= 844 - 56, "salva B: 'Fatto' e 'Annulla' visibili sopra la barra in basso"); }
   ok(await sheet.locator("textarea").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "salva B: la nota non fa zoomare l'iPhone (testo ≥ 16px)");
-  await v.screenshot({ path: `${OUT}/23-salva-foglio.png` });
+  await v.screenshot({ path: `${OUT}/23-salva-foglio.png`, caret: "initial" });
   await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false", "salva B: gli stati si escludono a vicenda");
+  // Scrivere a mano uno stato ("da provare") toglie l'altro, come i pulsanti
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("da provare");
+  await sheet.getByLabel("Nuovo tag").press("Enter");
+  ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true" && (await sheet.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva B: uno stato scritto a mano esclude l'altro");
+  await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   await sheet.getByRole("button", { name: "Con amici" }).click();
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("  brunch  ");
+  await sheet.getByLabel("Nuovo tag").press("Enter");
+  ok((await sheet.getByRole("button", { name: "Brunch" }).getAttribute("aria-pressed")) === "true", "salva B: '+ Nuovo tag' aggiunge un tag scritto da te (già scelto)");
   await sheet.locator("textarea").fill("Prenotare");
-  await sheet.getByRole("button", { name: "Fatto" }).click();
+  // Tag scritto senza Invio e "Fatto" toccato senza che il campo perda il fuoco (come su iPhone).
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("terrazza");
+  await sheet.getByRole("button", { name: "Fatto" }).evaluate((b) => b.click());
   await sheet.waitFor({ state: "detached", timeout: 4000 });
   const ins2 = writes.find((w) => w.m === "POST");
-  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + nota (stessi campi di prima)");
+  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici","Brunch","Terrazza"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + tag nuovi (anche senza Invio) + nota");
   await v.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
   await vctx.close();
 }

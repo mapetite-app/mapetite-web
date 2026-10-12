@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Inter, Newsreader } from "next/font/google";
+import OfflineBanner from "@/components/offline-banner";
 import NavBar from "@/components/nav-bar";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
@@ -80,6 +81,7 @@ export default async function RootLayout({
       <body className="min-h-full">
         <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT }} />
         <NavBar userId={userId} />
+        <OfflineBanner />
         {/*
           Pagine normali (non fixed): pb-16 evita che il contenuto finisca
           sotto la navbar mobile; md:pt-14 fa scendere il contenuto sotto

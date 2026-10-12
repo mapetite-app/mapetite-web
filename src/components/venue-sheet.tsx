@@ -1,5 +1,6 @@
 "use client";
 
+import { tagLabel } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
@@ -51,6 +52,8 @@ type VenueSheetProps = {
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
+  // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
+  onQuickSave?: (status: "Da provare" | "Già visitato") => void;
 };
 
 export default function VenueSheet({
@@ -65,6 +68,7 @@ export default function VenueSheet({
   userPos = null,
   onVisitStatus,
   googlePlaceId = null,
+  onQuickSave,
 }: VenueSheetProps) {
   const {
     name,
@@ -94,6 +98,7 @@ export default function VenueSheet({
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [addressCopied, setAddressCopied] = useState(false);
   const share = async () => {
     const url = mapsUrl;
     const text = verdict ? `${name} — ${verdict}` : name;
@@ -267,7 +272,18 @@ export default function VenueSheet({
         </div>
 
         {address && (
-          <p className="mt-1 text-xs font-sans text-text-muted">{address}</p>
+          // Tocco sull'indirizzo: lo copia (per mandarlo a chi viene con te o incollarlo in un'altra app).
+          <button
+            type="button"
+            data-testid="copia-indirizzo"
+            onClick={async () => {
+              try { await navigator.clipboard.writeText(address); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+            }}
+            className="mt-1 flex min-h-8 items-center gap-1.5 text-left text-xs font-sans text-text-muted"
+          >
+            <span>{address}</span>
+            <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
+          </button>
         )}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs font-display font-semibold text-accent">
           Orari, foto e recensioni su Google Maps →
@@ -464,6 +480,22 @@ export default function VenueSheet({
         </div>
       )}
 
+      {/* Non salvato: le due scelte di Places come primo passo del salvataggio. */}
+      {!isSaved && onQuickSave && (
+        <div className="mx-5 mt-4 flex gap-2" data-testid="stato-rapido">
+          {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onQuickSave(tag)}
+              className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 4. LE TUE NOTE */}
       {showPersonalBlock && (
         <div className="mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4">
@@ -495,7 +527,7 @@ export default function VenueSheet({
                   key={tag}
                   className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
                 >
-                  {tag}
+                  {tagLabel(tag)}
                 </span>
               ))}
             </div>

@@ -1,3 +1,4 @@
+import { sortTags, tagLabel } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 
@@ -38,12 +39,12 @@ export default function PlaceCard({ name, category, address, tags, note }: Place
 
         {tags && tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {tags.map((tag) => (
+            {sortTags(tags).map((tag) => (
               <span
                 key={tag}
                 className="rounded-pill bg-accent-light text-accent px-2.5 py-0.5 text-xs font-display font-medium"
               >
-                {tag}
+                {tagLabel(tag)}
               </span>
             ))}
           </div>

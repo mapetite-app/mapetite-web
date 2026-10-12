@@ -139,12 +139,18 @@ export default function OnboardingPage() {
               onClick={() => setStep((s) => s - 1)}
               disabled={step === 0}
               aria-label="Indietro"
-              className="text-xl font-display font-semibold text-text-muted disabled:opacity-0"
+              className="min-h-11 min-w-11 text-left text-xl font-display font-semibold text-text-muted disabled:opacity-0"
             >
               ‹
             </button>
-            <span className="text-xs font-sans text-text-muted">
-              {step + 1}/{totalSteps}
+            <span className="flex items-center gap-3">
+              <span className="text-xs font-sans text-text-muted">
+                {step + 1}/{totalSteps}
+              </span>
+              {/* Chi vuole provare subito l'app non è obbligato a rispondere: i gusti si danno dopo in "I tuoi gusti". */}
+              <a href="/mappa" data-testid="onboarding-salta" className="min-h-11 inline-flex items-center text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline">
+                Salta
+              </a>
             </span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-pill bg-accent-light">
@@ -237,8 +243,8 @@ export default function OnboardingPage() {
             {step < totalSteps - 1
               ? "Continua →"
               : submitting
-              ? "Un attimo…"
-              : "Esplora Mapetite ✓"}
+              ? "Cerco i posti per te…"
+              : "✨ Mostrami i posti per me"}
           </button>
           {error && (
             <p className="mt-3 text-center text-sm text-red-600">{error}</p>

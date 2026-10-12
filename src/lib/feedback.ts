@@ -17,3 +17,21 @@ export function feedbackMailto(): string {
   ].join("\n");
   return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Feedback su Mapetite")}&body=${encodeURIComponent(body)}`;
 }
+
+// "Questi risultati non vanno?": email con la ricerca e i locali proposti, così Lorenzo
+// può aggiungerla a TEST-RICERCHE.md senza chiedere al tester cosa aveva cercato.
+export function searchFeedbackMailto(query: string, names: string[]): string {
+  const device = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const body = [
+    `Ho cercato: "${query}"`,
+    "",
+    "Cosa non andava (locali fuori tema, zona sbagliata, mancava un posto che conosci…):",
+    "",
+    "",
+    "— Lascia queste righe, ci aiutano a capire —",
+    "Locali proposti:",
+    ...names.slice(0, 10).map((n, i) => `${i + 1}. ${n}`),
+    `Telefono: ${device}`,
+  ].join("\n");
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(`Ricerca da migliorare: ${query.slice(0, 60)}`)}&body=${encodeURIComponent(body)}`;
+}

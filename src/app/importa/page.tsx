@@ -30,6 +30,13 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+// I nostri errori sono già in italiano; quelli del browser ("Failed to fetch", JSON rotto) no.
+function errorText(e: unknown): string {
+  if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
+  if (e instanceof SyntaxError) return "Qualcosa è andato storto, riprova.";
+  return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
+}
+
 export default function ImportaPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -107,7 +114,7 @@ export default function ImportaPage() {
       setSearchResults(results);
       setStep(2);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Qualcosa è andato storto, riprova.");
+      setError(errorText(e));
     } finally {
       setIsReading(false);
     }
@@ -171,7 +178,7 @@ export default function ImportaPage() {
       setSavedName(result.name);
       setStep(3);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Qualcosa è andato storto, riprova.");
+      setError(errorText(e));
     } finally {
       setIsSaving(false);
     }
