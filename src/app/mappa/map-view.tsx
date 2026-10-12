@@ -26,6 +26,7 @@ import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
+import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -540,6 +541,7 @@ function SaveButton({
   isSaved,
   onToggle,
   onSaveRequest,
+  onLoginRequest,
 }: {
   placeId: string;        // UUID canonico Supabase: usato per delete e onToggle
   googlePlaceId: string;  // ID Google: usato per il salvataggio (/api/places/add)
@@ -547,6 +549,7 @@ function SaveButton({
   isSaved: boolean;
   onToggle: (placeId: string, saved: boolean) => void;
   onSaveRequest: (googlePlaceId: string) => void;
+  onLoginRequest?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -554,7 +557,8 @@ function SaveButton({
 
   const handleClick = () => {
     if (!userId) {
-      router.push("/login");
+      if (onLoginRequest) onLoginRequest();
+      else router.push("/login");
       return;
     }
 
@@ -1016,8 +1020,13 @@ export default function MapView({
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
+  const askLoginToSave = (place: Place) => {
+    rememberPendingSave(place);
+    window.location.href = loginToSaveUrl(place.name);
+  };
   const quickSave = async (place: Place) => {
-    if (!userId) { window.location.href = "/login"; return; }
+    if (!userId) { askLoginToSave(place); return; }
     if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
     try {
       const addRes = await fetch("/api/places/add", {
@@ -1046,6 +1055,18 @@ export default function MapView({
       setPendingSavePlaceId(place.id);
     }
   };
+
+  // Rientro dopo l'accesso: salva il locale toccato prima di entrare e lo mostra sulla mappa.
+  useEffect(() => {
+    if (!userId) return;
+    const place = takePendingSave();
+    if (!place) return;
+    setTimeout(() => {
+      setViewState((v) => ({ ...v, latitude: place.lat, longitude: place.lng, zoom: Math.max(v.zoom, 15) }));
+      void quickSave(place);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta, appena si conosce l'utente
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -2604,7 +2625,7 @@ export default function MapView({
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
-                if (!userId) { window.location.href = "/login"; return; }
+                if (!userId) { askLoginToSave(selected); return; }
                 setPendingSaveTags([st]);
                 setPendingSavePlaceId(selected.id);
               }}
@@ -2619,6 +2640,7 @@ export default function MapView({
                   isSaved={isPlaceSaved(selected.id)}
                   onToggle={handleToggle}
                   onSaveRequest={(googlePlaceId) => setPendingSavePlaceId(googlePlaceId)}
+                  onLoginRequest={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : () => askLoginToSave(selected)}
                 />
               }
               communitySlot={

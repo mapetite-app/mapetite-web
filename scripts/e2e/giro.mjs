@@ -977,6 +977,26 @@ else {
   { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
     ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
   await p.screenshot({ path: `${OUT}/14-salva-da-card.png`, caret: "initial" });
+  // Salva senza accesso: si va al login con il nome del locale, e dopo l'accesso si salva da solo.
+  await p.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "33333333-0000-4000-8000-000000000003" } } }));
+  await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { quickInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); } return r.fallback(); });
+  await sctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await p.getByRole("button", { name: "Salva Terrazza Uno" }).click();
+  await p.waitForURL(/\/login\?message=/, { timeout: 5000 });
+  ok(await p.getByText("Accedi o registrati per salvare “Terrazza Uno”: lo aggiungo ai tuoi salvati appena entri.").isVisible(), "salva senza accesso: il login dice quale locale verrà salvato");
+  await p.screenshot({ path: `${OUT}/14c-salva-senza-accesso.png`, caret: "initial" });
+  await sctx.clearCookies({ name: "e2e_anonimo" });
+  quickInsert = null;
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByTestId("salvato-avviso").waitFor({ timeout: 5000 }).then(() => ok(true, "dopo l'accesso: il locale toccato prima si salva da solo ('Salvato')"), () => ok(false, "dopo l'accesso: il locale toccato prima si salva da solo ('Salvato')"));
+  ok(quickInsert?.place_id === "33333333-0000-4000-8000-000000000003" && JSON.stringify(quickInsert?.tags) === '["Da provare"]', "dopo l'accesso: salvato come '📌 Voglio andarci'");
+  ok((await p.getByTestId("salvato-avviso").textContent()).includes("Terrazza Uno"), "dopo l'accesso: l'avviso dice il nome del locale");
+  quickInsert = null;
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForTimeout(800);
+  ok(quickInsert === null, "dopo l'accesso: si salva una volta sola (ricaricare non lo rifà)");
   await sctx.close();
 
   // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
