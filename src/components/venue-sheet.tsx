@@ -162,6 +162,92 @@ export default function VenueSheet({
     .filter(Boolean)
     .join(" · ");
 
+  // Il riquadro scuro "Il verdetto Mapetite" (piace a Lorenzo, 12/10): uguale nelle due schede.
+  const verdictCard = hasVerdictBlock ? (
+      <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
+        {(verdictText != null || synthesis != null) && (
+          <>
+            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+              Il verdetto Mapetite
+            </p>
+            {verdictText && (
+              <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
+                {verdictText}
+              </p>
+            )}
+            {synthesis != null && (
+              <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
+                {synthesis}
+              </p>
+            )}
+          </>
+        )}
+
+        {/* matchReason al centro: solo nei risultati (null nei salvati → niente
+            riga né separatore orfano). Separatore solo se c'è contenuto sopra. */}
+        {matchReasonText && (
+          <div
+            className={
+              verdictText != null || synthesis != null
+                ? "mt-4 border-t border-white/15 pt-3"
+                : ""
+            }
+          >
+            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+              ✦ Per la tua ricerca
+            </p>
+            <p className="mt-1 font-sans text-sm leading-relaxed text-white/90">
+              {matchReasonText}
+            </p>
+          </div>
+        )}
+
+        {/* Chip bipolari in fondo, colori su-teal: orientamento, mai stroncatura. */}
+        {goForChips.length > 0 && (
+          <div
+            className={
+              verdictText != null || synthesis != null || matchReasonText != null
+                ? "mt-4 border-t border-white/15 pt-3"
+                : ""
+            }
+          >
+            <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/80">
+              Ci dovresti andare se
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {goForChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-flex items-center gap-1 rounded-pill bg-white/15 px-2.5 py-1 text-xs font-display font-medium text-white"
+                >
+                  <Check size={12} className="shrink-0" />
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {dontExpectChips.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">
+              Meno adatto se
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {dontExpectChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-flex items-center gap-1 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-display font-medium text-white/60"
+                >
+                  <X size={12} className="shrink-0" />
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+  ) : null;
+
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
       {variant === "a" && (
@@ -291,90 +377,7 @@ export default function VenueSheet({
       </div>
 
       {/* 2. CARD VERDETTO (teal): verdetto + matchReason + chip, tutto dentro. */}
-      {hasVerdictBlock && (
-        <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
-          {(verdictText != null || synthesis != null) && (
-            <>
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                Il verdetto Mapetite
-              </p>
-              {verdictText && (
-                <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">
-                  {verdictText}
-                </p>
-              )}
-              {synthesis != null && (
-                <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
-                  {synthesis}
-                </p>
-              )}
-            </>
-          )}
-
-          {/* matchReason al centro: solo nei risultati (null nei salvati → niente
-              riga né separatore orfano). Separatore solo se c'è contenuto sopra. */}
-          {matchReasonText && (
-            <div
-              className={
-                verdictText != null || synthesis != null
-                  ? "mt-4 border-t border-white/15 pt-3"
-                  : ""
-              }
-            >
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                ✦ Per la tua ricerca
-              </p>
-              <p className="mt-1 font-sans text-sm leading-relaxed text-white/90">
-                {matchReasonText}
-              </p>
-            </div>
-          )}
-
-          {/* Chip bipolari in fondo, colori su-teal: orientamento, mai stroncatura. */}
-          {goForChips.length > 0 && (
-            <div
-              className={
-                verdictText != null || synthesis != null || matchReasonText != null
-                  ? "mt-4 border-t border-white/15 pt-3"
-                  : ""
-              }
-            >
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/80">
-                Ci dovresti andare se
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {goForChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex items-center gap-1 rounded-pill bg-white/15 px-2.5 py-1 text-xs font-display font-medium text-white"
-                  >
-                    <Check size={12} className="shrink-0" />
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {dontExpectChips.length > 0 && (
-            <div className="mt-3">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">
-                Meno adatto se
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {dontExpectChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex items-center gap-1 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-display font-medium text-white/60"
-                  >
-                    <X size={12} className="shrink-0" />
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {verdictCard}
 
         </>
       )}
@@ -388,7 +391,7 @@ export default function VenueSheet({
                 alt={name}
                 width={700}
                 priority
-                className="h-72 w-full rounded-t-card object-cover"
+                className="h-56 w-full rounded-t-card object-cover"
                 fallback={<div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>}
               />
             ) : (
@@ -435,35 +438,8 @@ export default function VenueSheet({
                 {openNow ? "Aperto ora" : "Chiuso ora"}
               </span>
             )}
-            {goForChips.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Ci dovresti andare se">
-                {goForChips.map((chip) => (
-                  <span key={chip} className="rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            )}
-            {(verdictText != null || synthesis != null) && (
-              <div className="mt-5 border-t border-border pt-4">
-                {verdictText && (
-                  <p className="font-title text-xl font-semibold leading-snug text-brand in-data-[titoli=serif]:text-2xl">{verdictText}</p>
-                )}
-                {synthesis != null && (
-                  <p className="mt-2 text-[15px] font-sans leading-relaxed text-text">{synthesis}</p>
-                )}
-              </div>
-            )}
-            {matchReasonText && (
-              <div className="mt-4 rounded-card bg-accent-light px-4 py-3">
-                <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">✦ Per la tua ricerca</p>
-                <p className="mt-1 text-sm font-sans leading-relaxed text-text">{matchReasonText}</p>
-              </div>
-            )}
-            {dontExpectChips.length > 0 && (
-              <p className="mt-3 text-sm font-sans text-text-muted">Meno adatto se: {dontExpectChips.join(" · ")}</p>
-            )}
           </div>
+          {verdictCard}
         </>
       )}
       {/* 3. TAG AI */}
