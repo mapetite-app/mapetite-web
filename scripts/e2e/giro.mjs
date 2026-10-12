@@ -1343,6 +1343,123 @@ else {
   await lctx.close();
 }
 
+// 10b. Aggiungi a mano (nome e città) e link di Instagram/TikTok. Ricerca e salvataggio simulati: niente Google.
+if (!fakeUser) {
+  console.log("SKIP  aggiungi a mano: dev server senza E2E_FAKE_USER");
+} else {
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  const mp = await mctx.newPage();
+  mp.on("pageerror", (e) => errors.push(e.message));
+  const MANO = [
+    { id: "GM1", name: "Pizzeria da Michele", address: "Via Flaminia 1, 00196 Roma RM, Italy", lat: 41.92, lng: 12.47, category: "pizza_restaurant", rating: 4.5, priceLevel: 1 },
+    { id: "GM2", name: "Trattoria Già Salvata", address: "Via Appia 3, 00179 Roma RM, Italy", lat: 41.86, lng: 12.52, category: "restaurant", rating: 4.6, priceLevel: 2 },
+  ];
+  const mSearch = [];
+  const mAdd = [];
+  const mWrites = [];
+  const mFromLink = [];
+  await mctx.route("**/api/places/search", (r) => { mSearch.push(r.request().postDataJSON()); return r.fulfill({ json: { results: MANO } }); });
+  await mctx.route("**/api/places/add", (r) => { const b = r.request().postDataJSON(); mAdd.push(b); return r.fulfill({ json: { place: { id: "00000000-0000-0000-0000-000000000301", name: b.name } } }); });
+  await mctx.route("**/api/places/from-link", (r) => { mFromLink.push(r.request().postDataJSON()); return r.fulfill({ status: 400, json: { error: "Non vedo un link di Google Maps." } }); });
+  await mctx.route("**/rest/v1/saved_places**", (r) => {
+    const req = r.request();
+    if (req.method() === "GET") {
+      // "Già nei tuoi salvati": GM2 è già tra i salvati dell'utente.
+      return r.fulfill({ json: req.url().includes("google_place_id") ? [{ place_id: "00000000-0000-0000-0000-000000000302", places: { google_place_id: "GM2" } }] : [] });
+    }
+    mWrites.push({ m: req.method(), url: req.url(), body: req.postDataJSON?.() ?? null });
+    return r.fulfill({ status: 201, json: [] });
+  });
+
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
+  const [yG, yM, yS] = [await yOf("importa-google"), await yOf("importa-mano"), await yOf("importa-screenshot")];
+  ok(yG >= 0 && yG < yM && yM < yS, `importa: ordine Google Maps → Aggiungi a mano → Da uno screenshot (${yG}, ${yM}, ${yS})`);
+  const DOCS_SHOTS = "docs/autonomia/screenshots/2026-10-13-notte";
+  mkdirSync(DOCS_SHOTS, { recursive: true });
+  await mp.screenshot({ path: `${DOCS_SHOTS}/importa.png`, caret: "initial" });
+  const mano = mp.getByTestId("importa-mano");
+  const field = mano.getByLabel("Nome del locale e città");
+  ok(await field.isVisible() && (await field.getAttribute("placeholder")) === "es. Da Michele Roma", "a mano: un solo campo 'Nome del locale e città' (es. Da Michele Roma)");
+  ok(mSearch.length === 0, "a mano: nessuna ricerca Google prima di toccare Cerca");
+  await field.fill("Pizzeria da Michele Roma");
+  await mano.getByRole("button", { name: "Cerca" }).click();
+  await mano.getByTestId("mano-risultato").nth(1).waitFor({ timeout: 5000 });
+  ok(mSearch.length === 1 && mSearch[0]?.query === "Pizzeria da Michele Roma", "a mano: una sola ricerca con il testo scritto");
+  ok(await mano.getByTestId("mano-risultato").first().getByText("🍕").isVisible() && await mano.getByText("Via Flaminia 1, 00196 Roma RM, Italy").isVisible(), "a mano: risultato con emoji della categoria, nome e indirizzo");
+  const gia = mano.getByTestId("mano-gia-salvato");
+  ok(await gia.count() === 1 && await gia.getByText("Già nei tuoi salvati").isVisible() && (await gia.getAttribute("href")) === "/mappa?salvato=00000000-0000-0000-0000-000000000302", "a mano: 'Già nei tuoi salvati' sul locale già salvato, apre il salvato");
+  await mano.scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/37-importa-a-mano.png`, caret: "initial" });
+  await mano.getByRole("button", { name: "Cerca" }).click();
+  await mp.waitForTimeout(300);
+  ok(mSearch.length === 1, "a mano: la stessa frase non viene cercata due volte");
+  await mano.getByRole("button", { name: "Salva", exact: true }).click();
+  await mano.getByTestId("link-salvato").waitFor({ timeout: 5000 });
+  const mIns = mWrites.find((w) => w.m === "POST");
+  ok(mAdd.at(-1)?.googlePlaceId === "GM1" && JSON.stringify(mIns?.body?.tags) === '["Da provare"]' && mIns?.body?.place_id === "00000000-0000-0000-0000-000000000301", "a mano: Salva mette il locale in '📌 Voglio andarci' (Da provare)");
+  ok(await mano.getByText("Salvato in Mapetite:").isVisible() && await mano.getByText("Lo trovi tra i salvati in 📌 Voglio andarci.").isVisible(), "a mano: conferma 'Salvato in Mapetite'");
+  await mano.getByRole("button", { name: "Aggiungi nota" }).click();
+  await mano.getByLabel("Nota").fill("Me l'ha detto Marco");
+  await mano.getByRole("button", { name: "Salva nota" }).click();
+  await mano.getByText("Nota salvata.").waitFor({ timeout: 4000 });
+  ok(mWrites.some((w) => w.m === "PATCH" && w.body?.note === "Me l'ha detto Marco" && w.url.includes("place_id=eq.00000000-0000-0000-0000-000000000301")), "a mano: nota facoltativa sul salvato");
+  await mp.screenshot({ path: `${OUT}/38-importa-a-mano-salvato.png`, caret: "initial" });
+
+  // Link di Instagram incollato nella card Google Maps: messaggio chiaro, nessuna chiamata.
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const gcard = mp.getByTestId("importa-google");
+  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await gcard.getByLabel("Link di Google Maps").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
+  await gcard.getByRole("button", { name: "Salva", exact: true }).click();
+  const soc = gcard.getByTestId("link-social");
+  ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram e TikTok non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
+  ok(!(await mp.getByText("Non vedo un link di Google Maps", { exact: false }).isVisible()) && mFromLink.length === 0, "instagram: niente 'non è un link di Google Maps', nessuna chiamata al server");
+  const cerca = soc.getByTestId("link-social-cerca");
+  ok(await cerca.isVisible() && (await cerca.textContent())?.includes("Pizzeria Bella a Roma"), "instagram: propone 'Cerca 'Pizzeria Bella a Roma''");
+  await soc.scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${DOCS_SHOTS}/instagram.png`, caret: "initial" });
+  const s0 = mSearch.length;
+  await cerca.click();
+  await mano.getByTestId("mano-risultato").first().waitFor({ timeout: 5000 });
+  ok(mSearch.length === s0 + 1 && mSearch.at(-1)?.query === "Pizzeria Bella a Roma" && (await mano.getByLabel("Nome del locale e città").inputValue()) === "Pizzeria Bella a Roma", "instagram: 'Cerca …' avvia UNA ricerca a mano con il nome");
+  await soc.getByTestId("link-social-screenshot").click();
+  await mp.waitForTimeout(900);
+  const shotBox = await mp.getByTestId("importa-screenshot").boundingBox();
+  ok(shotBox && shotBox.y >= -1 && shotBox.y < 844 / 2, `instagram: 'Carica uno screenshot' porta a 'Da uno screenshot' (y=${Math.round(shotBox?.y ?? -1)})`);
+
+  // TikTok e YouTube Shorts incollati.
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await gcard.getByLabel("Link di Google Maps").fill("https://vm.tiktok.com/ZMabc123/");
+  await gcard.getByRole("button", { name: "Salva", exact: true }).click();
+  ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
+  await gcard.getByLabel("Link di Google Maps").fill("https://www.youtube.com/shorts/abcDEF");
+  await gcard.getByRole("button", { name: "Salva", exact: true }).click();
+  ok(await gcard.getByText("Vale anche per gli Shorts di YouTube.").isVisible() && mFromLink.length === 0, "youtube shorts: stesso messaggio, nessuna chiamata");
+
+  // Condividi (Android) di un link TikTok: niente errore Google Maps.
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
+  ok(await mp.getByTestId("link-social").isVisible() && await mp.getByRole("heading", { name: "Salva un locale" }).isVisible() && !(await mp.getByTestId("link-social-cerca").isVisible()) && mFromLink.length === 0, "condividi tiktok: messaggio specifico, la frase dell'app non diventa una ricerca");
+  await mp.goto(`${BASE}/importa/condividi?title=${encodeURIComponent("Osteria dei Fratelli Milano")}&text=${encodeURIComponent("https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
+  const s1 = mSearch.length;
+  await mp.getByTestId("link-social-cerca").click();
+  await mp.getByTestId("mano-risultato").first().waitFor({ timeout: 5000 });
+  ok(mSearch.length === s1 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano", "condividi tiktok con nome: 'Cerca …' mostra i risultati da salvare");
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
+  await mp.getByTestId("link-social-screenshot").click();
+  await mp.waitForURL(/\/importa#da-screenshot/, { timeout: 5000 }).then(() => ok(true, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"), () => ok(false, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"));
+
+  // Da disconnessi: invito ad accedere, nessuna ricerca.
+  await mctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  ok(await mano.getByTestId("mano-accedi").isVisible() && await mano.getByRole("link", { name: "Accedi" }).isVisible() && !(await mano.getByLabel("Nome del locale e città").isVisible()), "a mano da disconnessi: invito ad accedere, niente campo");
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/ABC/")}`, { waitUntil: "networkidle" });
+  ok(await mp.getByTestId("link-social").isVisible() && !(await mp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa"))), "condividi instagram da disconnessi: messaggio, il link non resta in attesa");
+  await mctx.clearCookies({ name: "e2e_anonimo" });
+  await mctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

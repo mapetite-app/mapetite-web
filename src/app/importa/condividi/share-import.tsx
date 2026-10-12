@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { extractMapsLinks } from "@/lib/maps-link";
+import { findSocialLink, placeHintFromText } from "@/lib/social-link";
+import SocialLinkHelp from "../social-link-help";
+import ManualAddCard from "../manual-add-card";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, rememberPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 
@@ -22,7 +27,12 @@ export default function ShareImport({
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fullText = [title, sharedText].filter(Boolean).join("\n");
-  const [busy, setBusy] = useState(Boolean(fullText && userId));
+  // Link di Instagram/TikTok/YouTube Shorts (senza link di Maps): non si chiama il server.
+  const social = fullText && extractMapsLinks(fullText).length === 0 ? findSocialLink(fullText) : null;
+  const hint = social ? placeHintFromText(fullText) : null;
+  const [manualQuery, setManualQuery] = useState<string | null>(null);
+  const router = useRouter();
+  const [busy, setBusy] = useState(Boolean(fullText && userId && !social));
   const started = useRef(false);
 
   // "In corso" si accende prima: con lo stato iniziale o dal pulsante Riprova.
@@ -33,7 +43,7 @@ export default function ShareImport({
       .finally(() => setBusy(false));
 
   useEffect(() => {
-    if (started.current || !fullText) return;
+    if (started.current || !fullText || social) return;
     started.current = true;
     // Senza accesso il link resta in attesa: lo ritrova la pagina Importa dopo il login.
     if (!userId) { rememberPendingLink(fullText); return; }
@@ -43,7 +53,19 @@ export default function ShareImport({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Salva da Google Maps</h1>
+      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">{social ? "Salva un locale" : "Salva da Google Maps"}</h1>
+
+      {social && (
+        <div className="space-y-6">
+          <SocialLinkHelp
+            source={social}
+            hint={hint}
+            onScreenshot={() => router.push("/importa#da-screenshot")}
+            onSearch={(q) => setManualQuery(q)}
+          />
+          {manualQuery && <ManualAddCard userId={userId} initialQuery={manualQuery} autoSearch />}
+        </div>
+      )}
 
       {!fullText && (
         <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">
@@ -51,7 +73,7 @@ export default function ShareImport({
         </p>
       )}
 
-      {fullText && !userId && (
+      {fullText && !userId && !social && (
         <div className="space-y-3 rounded-card border border-border bg-surface p-5" data-testid="condividi-accedi">
           <p className="text-sm text-text">Per salvare il locale accedi a Mapetite. Il link resta qui: lo ritrovi in Importa dopo l&apos;accesso.</p>
           <div className="flex flex-wrap gap-2">
