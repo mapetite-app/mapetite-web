@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
+import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -139,6 +140,14 @@ export default async function ProfiloPage() {
   }
   const collections = [...byTag.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
 
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci" salvati da almeno 7 giorni, dal più vecchio.
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const visitCandidates: VisitCandidate[] = saved
+    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE) && new Date(r.created_at).getTime() <= weekAgo)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .slice(0, 5)
+    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at }));
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <div className="mb-6 flex items-center gap-4">
@@ -171,6 +180,8 @@ export default async function ProfiloPage() {
           </Link>
         ))}
       </nav>
+
+      <VisitPrompt userId={user.id} candidates={visitCandidates} />
 
       <section className="mb-10">
         <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le tue raccolte</h2>

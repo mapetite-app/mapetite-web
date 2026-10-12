@@ -921,8 +921,8 @@ else {
         { created_at: "2026-10-09", tags: ["Con amici", "Già visitato"], note: null, places: pr("02", "Osteria Due", "restaurant", "Via dei Vascellari 29, Roma") },
         { created_at: "2026-10-08", tags: ["Romantico", "Speciale", "Da provare"], note: null, places: pr("03", "Enoteca Tre", "wine_bar", "Via del Governo Vecchio 12, 00186 Roma RM, Italy") },
         { created_at: "2026-10-07", tags: ["Con amici", "Economico"], note: "Pizza al taglio", places: pr("04", "Forno Quattro", "bakery", "Via Ostiense 50, Roma") },
-        { created_at: "2026-10-06", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy") },
-        { created_at: "2026-10-05", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy") },
+        { created_at: "2026-09-20", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy") },
+        { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy") },
       ],
       reviews: [{ id: "r1", rating: 5, comment: "Vista bellissima, cocktail ottimi.", created_at: "2026-10-01", places: { name: "Terrazza Uno" } }],
     };
@@ -942,6 +942,20 @@ else {
       ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
+      // "Ci sei stato?" (?beta=ci-sei-stato, spento di default): un "Voglio andarci" salvato da più di una settimana
+      ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: spento di default");
+      let visitPatch = null;
+      await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "PATCH") { visitPatch = { url: r.request().url(), body: r.request().postDataJSON() }; return r.fulfill({ status: 204, body: "" }); } return r.fallback(); });
+      await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+      const box = p.getByTestId("ci-sei-stato");
+      await box.waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await box.getByText("Caffè Milano").isVisible() && !(await box.textContent()).includes("Enoteca Tre"), "ci sei stato: propone il 'Voglio andarci' salvato da più di una settimana (non quelli recenti)");
+      await p.screenshot({ path: `${OUT}/29-ci-sei-stato.png`, caret: "initial" });
+      await box.getByRole("button", { name: "✓ Sì, ci sono stato" }).click();
+      await box.getByText("✓ Segnato: sei stato da Caffè Milano.").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(JSON.stringify(visitPatch?.body?.tags) === '["Già visitato"]' && visitPatch.url.includes("place_id=eq.00000000-0000-4000-8000-000000000105"), "ci sei stato: 'Sì' lo segna '✓ Ci sono stato' (al posto di 'Voglio andarci')");
+      await p.unroute("**/rest/v1/saved_places**");
+      await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       // Dal profilo, "Salvati" nella barra in basso apre la mappa sui salvati ed è accesa
       await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
       await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "barra in basso: 'Salvati' apre la mappa sui propri salvati"), () => ok(false, "barra in basso: 'Salvati' apre la mappa sui propri salvati"));
