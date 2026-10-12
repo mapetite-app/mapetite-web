@@ -1634,6 +1634,117 @@ if (!fakeUser) {
   await mctx.close();
 }
 
+// 13. Condividi un locale: link Mapetite (/locali/<UUID>) e pagina pubblica per chi lo riceve.
+{
+  // Dalla scheda di un risultato di ricerca (id = Google Place ID): /api/places/add simulato restituisce l'UUID.
+  const SHARE_UUID = "44444444-0000-4000-8000-000000000004";
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const addCalls = [];
+  let addOk = true;
+  const cEvents = [];
+  await cctx.route("**/api/events", (r) => { cEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await cctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await cctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await cctx.route("**/api/places/add", (r) => { addCalls.push(r.request().postDataJSON()); return addOk ? r.fulfill({ json: { place: { id: SHARE_UUID } } }) : r.fulfill({ status: 401, json: { error: "Devi accedere per aggiungere un locale." } }); });
+  await cctx.route("**/rest/v1/**", (r) => r.request().method() === "GET" ? r.fulfill({ json: [] }) : r.fulfill({ status: 201, body: "" }));
+  const c = await cctx.newPage();
+  c.on("pageerror", (e) => errors.push(e.message));
+  await c.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await c.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await c.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await c.getByText("Terrazza Uno").first().click();
+  await c.getByTestId("verdetto-scheda").waitFor({ timeout: 4000 });
+  await c.evaluate(() => { window.__sharedPlace = null; navigator.share = async (d) => { window.__sharedPlace = d; }; });
+  await c.getByLabel("Condividi Terrazza Uno").click();
+  await c.waitForFunction(() => window.__sharedPlace != null, null, { timeout: 4000 }).catch(() => {});
+  const sp = await c.evaluate(() => window.__sharedPlace);
+  ok(!!sp && sp.url === `${new URL(BASE).origin}/locali/${SHARE_UUID}?foto=places/P1/photos/AbC_P1`, `condividi locale: link Mapetite /locali/<UUID> con la foto (${sp?.url ?? "nessuno"})`);
+  ok(sp?.text === "Terrazza Uno — Vista vera sui tetti di Roma. · su Mapetite", `condividi locale: testo "nome — verdetto · su Mapetite" (${sp?.text ?? ""})`);
+  ok(addCalls.length === 1 && addCalls[0]?.googlePlaceId === "P1" && addCalls[0]?.name === "Terrazza Uno", "condividi locale: il risultato di ricerca diventa una riga in places con /api/places/add (Place ID Google)");
+  ok(cEvents.some((e) => e?.type === "condividi"), "condividi locale: segnale 'condividi' registrato");
+  await c.evaluate(() => { window.__sharedPlace = null; });
+  await c.getByLabel("Condividi Terrazza Uno").click();
+  await c.waitForFunction(() => window.__sharedPlace != null, null, { timeout: 4000 }).catch(() => {});
+  ok(addCalls.length === 1, "condividi locale: il secondo tocco riusa il link già creato (nessuna nuova richiesta)");
+  // Senza accesso (/api/places/add rifiuta): si torna al link di Google Maps.
+  addOk = false;
+  await c.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await c.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await c.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await c.getByText("Terrazza Uno").first().click();
+  await c.getByTestId("verdetto-scheda").waitFor({ timeout: 4000 });
+  await c.evaluate(() => { window.__sharedPlace = null; navigator.share = async (d) => { window.__sharedPlace = d; }; });
+  await c.getByLabel("Condividi Terrazza Uno").click();
+  await c.waitForFunction(() => window.__sharedPlace != null, null, { timeout: 4000 }).catch(() => {});
+  const sp2 = await c.evaluate(() => window.__sharedPlace);
+  ok(!!sp2 && sp2.url.startsWith("https://www.google.com/maps/search/") && !sp2.text.includes("su Mapetite"), `condividi locale: se il link Mapetite non si crea, resta Google Maps (${sp2?.url?.slice(0, 40) ?? "nessuno"})`);
+  await cctx.close();
+}
+if (!fakeUser) console.log("SKIP  pagina pubblica del locale: dev server senza E2E_FAKE_USER");
+else {
+  // Pagina pubblica: il server la legge da Supabase; nel test i dati finti arrivano dal cookie "e2e_locale".
+  const LOC_ID = "44444444-0000-4000-8000-000000000004";
+  const locale = {
+    place: { id: LOC_ID, name: "Trattoria del Vicolo", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, category: "restaurant", rating: 4.6, price_level: 2, google_place_id: "GVICOLO" },
+    synthesis: { verdict: "Cucina romana di quartiere, lontana dai giri turistici.", synthesis: "Carbonara e cacio e pepe come una volta, sala piccola e vivace, servizio di famiglia.", go_for: ["cena tra amici", "cucina romana"], dont_expect: ["serata silenziosa"] },
+  };
+  const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await pctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify(locale)), url: BASE }]);
+  const pubPhotos = [];
+  await pctx.route("**/api/places/photo**", (r) => { pubPhotos.push(r.request().url()); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9774a"/><stop offset="1" stop-color="#5b3a24"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/></svg>' }); });
+  let pubInsert = null;
+  await pctx.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "POST") { pubInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const pp = await pctx.newPage();
+  pp.on("pageerror", (e) => errors.push(e.message));
+  const pres = await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/GVICOLO/photos/AbC_1`, { waitUntil: "networkidle" });
+  ok(pres?.status() === 200 && (await pp.getByRole("heading", { level: 1 }).textContent()) === "Trattoria del Vicolo", "pagina pubblica: si apre con il nome del locale");
+  ok((await pp.title()) === "Trattoria del Vicolo · Roma · Mapetite", `pagina pubblica: titolo per l'anteprima (${await pp.title()})`);
+  const ogDesc = await pp.locator('meta[property="og:description"]').getAttribute("content").catch(() => null);
+  const ogImg = await pp.locator('meta[property="og:image"]').first().getAttribute("content").catch(() => null);
+  ok(ogDesc === "Il verdetto Mapetite: Cucina romana di quartiere, lontana dai giri turistici." && !!ogImg && ogImg.includes(`/locali/${LOC_ID}/opengraph-image`), "pagina pubblica: anteprima WhatsApp con verdetto e immagine");
+  if (ogImg) { const img = await pp.request.get(ogImg.replace(/^https?:\/\/[^/]+/, BASE)); ok(img.status() === 200 && (img.headers()["content-type"] ?? "").startsWith("image/png"), `pagina pubblica: immagine di anteprima generata (${img.status()})`); }
+  ok((await pp.getByTestId("locale-tipo").textContent()) === "Ristorante · €€ · ★ 4,6", "pagina pubblica: riga 'tipo · prezzo · voto'");
+  const vbox = pp.getByTestId("verdetto-pubblico");
+  ok(await vbox.getByText("Il verdetto Mapetite").isVisible() && await vbox.getByText("Cucina romana di quartiere, lontana dai giri turistici.").isVisible() && await vbox.getByText("cena tra amici").isVisible() && await vbox.getByText("serata silenziosa").isVisible(), "pagina pubblica: riquadro 'Il verdetto Mapetite' con sintesi e chip");
+  ok((await pp.getByRole("link", { name: "Percorso" }).getAttribute("href")) === "https://www.google.com/maps/dir/?api=1&destination=41.889,12.469", "pagina pubblica: 'Percorso' porta alle indicazioni");
+  ok(((await pp.getByRole("link", { name: "Apri su Google Maps" }).getAttribute("href")) ?? "").includes("query_place_id=GVICOLO"), "pagina pubblica: 'Apri su Google Maps' con il Place ID");
+  ok(pubPhotos.some((u) => decodeURIComponent(u).includes("ref=places/GVICOLO/photos/AbC_1")) && await pp.locator("main img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "pagina pubblica: foto del locale dal proxy in cache");
+  await pp.waitForTimeout(300);
+  mkdirSync("docs/autonomia/screenshots/2026-10-13-notte", { recursive: true });
+  await pp.screenshot({ path: "docs/autonomia/screenshots/2026-10-13-notte/locale-pubblico.png", caret: "initial" });
+  await pp.screenshot({ path: `${OUT}/50-locale-pubblico.png`, caret: "initial", fullPage: true });
+  // Salva in Mapetite (collegato): saved_places con "Da provare" e l'UUID del locale.
+  await pp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await pp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await pp.getByTestId("salvato-pubblico").isVisible() && pubInsert?.place_id === LOC_ID && JSON.stringify(pubInsert?.tags) === '["Da provare"]' && pubInsert?.user_id === "00000000-0000-0000-0000-000000000001", "pagina pubblica: 'Salva in Mapetite' salva come '📌 Voglio andarci' e lo conferma");
+  ok((await pp.getByRole("link", { name: "Aprilo sulla tua mappa" }).getAttribute("href")) === `/mappa?salvato=${LOC_ID}`, "pagina pubblica: dopo il salvataggio porta al locale sulla mappa");
+  ok((await pp.getByRole("link", { name: "Scopri Mapetite" }).getAttribute("href")) === "/", "pagina pubblica: 'Scopri Mapetite' porta alla home");
+  // Foto di un altro locale nel link: ignorata (resta l'emoji).
+  const before = pubPhotos.length;
+  await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/ALTRO/photos/XyZ`, { waitUntil: "networkidle" });
+  ok(pubPhotos.length === before && (await pp.locator("main img").count()) === 0, "pagina pubblica: una foto che non è di questo locale viene ignorata");
+  // Senza verdetto in cache: niente riquadro (mai testo inventato).
+  await pctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify({ ...locale, synthesis: null })), url: BASE }]);
+  await pp.goto(`${BASE}/locali/${LOC_ID}`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("verdetto-pubblico").count()) === 0 && await pp.getByRole("heading", { name: "Trattoria del Vicolo" }).isVisible(), "pagina pubblica: senza verdetto in cache il riquadro non compare");
+  // Da disconnessi: "Salva in Mapetite" porta a Crea un account.
+  await pctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await pp.goto(`${BASE}/locali/${LOC_ID}`, { waitUntil: "networkidle" });
+  ok(await pp.getByTestId("invito-accedi").isVisible(), "pagina pubblica da disconnessi: spiega di creare un account e riaprire il link");
+  await pp.getByRole("link", { name: "📌 Salva in Mapetite" }).click();
+  await pp.waitForURL(/\/signup$/, { timeout: 5000 }).then(() => ok(true, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account"), () => ok(false, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account"));
+  // Id sconosciuto o non valido: 404 in italiano.
+  const r404a = await pp.goto(`${BASE}/locali/non-esiste`, { waitUntil: "networkidle" });
+  ok(r404a?.status() === 404 && await pp.getByText("Questa pagina non esiste").isVisible(), "pagina pubblica: id non valido → 404 in italiano");
+  const r404b = await pp.goto(`${BASE}/locali/44444444-0000-4000-8000-000000000999`, { waitUntil: "networkidle" });
+  ok(r404b?.status() === 404, "pagina pubblica: UUID sconosciuto → 404");
+  await pctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
