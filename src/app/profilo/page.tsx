@@ -147,7 +147,7 @@ export default async function ProfiloPage() {
             {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
             {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
           </p>
-          <Link href="/me" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+          <Link href="/me" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
             I tuoi gusti →
           </Link>
         </div>
@@ -187,10 +187,10 @@ export default async function ProfiloPage() {
       <ProfiloRicerche />
 
       <section className="mb-10">
-        <div className="mb-3 flex items-baseline justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="font-title text-xl font-semibold text-brand">I miei locali salvati</h2>
           {saved.length > 0 && (
-            <Link href={savedHref()} className="text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
+            <Link href={savedHref()} className="inline-flex min-h-10 shrink-0 items-center text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
           )}
         </div>
         {/* "Importa" non è più nella barra in basso (ora c'è "Salvati"): si raggiunge da qui. */}
