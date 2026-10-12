@@ -514,7 +514,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
                     )}
                     {d?.verdict ? (
-                      <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
+                      <span className="mt-2 block">
+                        {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
+                        <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</span>
+                        <span className="mt-0.5 line-clamp-2 block text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
+                      </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
                     ) : googleLine(d) ? (

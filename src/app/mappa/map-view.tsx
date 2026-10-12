@@ -1922,6 +1922,15 @@ export default function MapView({
         </div>
         {view === "saved" && userId && savedPlaces.length > 0 && (
           <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-2 rounded-card border border-border bg-surface p-2 shadow-float">
+            {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
+            <Link
+              href="/stasera"
+              data-testid="vai-stasera"
+              className="flex min-h-10 items-center justify-between gap-2 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-[0.99]"
+            >
+              <span>🍽️ Stasera dove andiamo?</span>
+              <span aria-hidden className="text-accent">→</span>
+            </Link>
             <input
               type="search"
               value={savedQuery}

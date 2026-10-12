@@ -127,7 +127,7 @@ ok((await page.getByLabel("Cosa cerchi?").inputValue()).startsWith("Rooftop roma
 
 // 4. Scheda locale: barra azioni nel viewport
 await page.getByText("Terrazza Uno").first().click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 const vh = 844;
 for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
   const box = await page.locator(sel).first().boundingBox();
@@ -167,9 +167,9 @@ await page.getByTestId("scheda-trascinabile").evaluate((el) => {
   el.dispatchEvent(new TouchEvent("touchend", { touches: [], bubbles: true }));
 });
 await page.waitForTimeout(400);
-ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "scheda: trascinata verso il basso si chiude");
+ok(!(await page.getByTestId("verdetto-scheda").isVisible()), "scheda: trascinata verso il basso si chiude");
 await page.getByText("Terrazza Uno").first().click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 
 // 4b. Funzioni beta spente di default
 ok((await page.getByLabel(/Condividi/).count()) === 1, "condividi: pulsante presente nella scheda (acceso di default)");
@@ -181,6 +181,7 @@ await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosello presente");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
+ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
@@ -208,10 +209,10 @@ const centerOf = () => page.locator("ul.snap-x").evaluate((ul) => {
 let centered = await centerOf();
 for (let i = 0; i < 15 && centered !== "P1"; i++) { await page.waitForTimeout(200); centered = await centerOf(); }
 ok(centered === "P1", "pin toccato: il carosello porta al centro la sua card");
-ok(!(await page.getByText("Il verdetto Mapetite").isVisible()), "pin toccato una volta: la scheda non si apre ancora");
+ok(!(await page.getByTestId("verdetto-scheda").isVisible()), "pin toccato una volta: la scheda non si apre ancora");
 await page.locator("[data-testid=pin][data-focused=true]", { hasText: "Terrazza Uno" }).waitFor({ timeout: 3000 });
 await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 ok(true, "pin toccato due volte: si apre la scheda");
 await shot("05b-carosello-pin");
 // Più vicini + Affina
@@ -260,7 +261,7 @@ await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condividi: pulsante presente nella scheda");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
@@ -321,16 +322,16 @@ const ask = await page.getByLabel("Fai un'altra domanda").boundingBox();
 ok(!!ask && ask.y + ask.height <= 844 - 56 && ask.y > 600, "articolo: 'Fai un'altra domanda' fisso in basso, sopra la barra");
 await shot("21-articolo");
 await page.getByTestId("articolo").getByRole("button", { name: "Apri Terrazza Uno" }).click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 ok(true, "articolo: tocco sulla foto apre la scheda");
 await page.getByRole("button", { name: "Chiudi" }).first().click();
 await page.waitForTimeout(300);
 ok(await page.getByTestId("articolo").isVisible(), "articolo: chiusa la scheda si torna all'articolo");
 await page.getByTestId("articolo").getByRole("button", { name: "Apri Terrazza Uno" }).click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 3000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
-ok((await page.getByText("Il verdetto Mapetite").count()) === 0 && await page.getByTestId("articolo").isVisible(), "Esc (da computer): chiude la scheda e lascia l'articolo");
+ok((await page.getByTestId("verdetto-scheda").count()) === 0 && await page.getByTestId("articolo").isVisible(), "Esc (da computer): chiude la scheda e lascia l'articolo");
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 ok((await page.getByTestId("articolo").count()) === 0, "Esc: poi chiude l'articolo");
@@ -584,7 +585,7 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().click();
 await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
 await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
-ok(await page.getByText("Il verdetto Mapetite").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
+ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
 ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
 for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
@@ -598,7 +599,7 @@ ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "
 await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().click();
-await page.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 4000 });
 ok(true, "?scheda=a: torna la scheda attuale");
 
 // 7-quater. Primo accesso variante B (?home=b): si scrive subito, senza aprire un altro pannello
@@ -767,6 +768,7 @@ else {
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
+  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera", "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
   ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci · 1' (con quanti sono), come nella scheda");
   await p.getByRole("button", { name: "Filtri", exact: true }).click();
   await p.getByRole("button", { name: "Ristoranti" }).click();

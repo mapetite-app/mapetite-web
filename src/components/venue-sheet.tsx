@@ -171,7 +171,7 @@ export default function VenueSheet({
       <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
         {(verdictText != null || synthesis != null) && (
           <>
-            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            <p data-testid="verdetto-scheda" className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
               Il verdetto Mapetite
             </p>
             {verdictText && (
