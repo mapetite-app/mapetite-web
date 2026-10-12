@@ -575,7 +575,7 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().click();
 await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
 await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
-ok((await page.getByText("Il verdetto Mapetite").count()) === 0, "scheda B: layout Places al posto della card teal");
+ok(await page.getByText("Il verdetto Mapetite").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
 ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
 for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
@@ -928,6 +928,7 @@ else {
   await p.getByTestId("salvato-avviso").waitFor({ timeout: 3000 }).then(() => ok(true, "segnalibro: salva in un tocco e dice 'Salvato'"), () => ok(false, "segnalibro: salva in un tocco e dice 'Salvato'"));
   ok(JSON.stringify(quickInsert?.tags) === '["Da provare"]' && quickInsert?.place_id === "33333333-0000-4000-8000-000000000003", "segnalibro: salvato come '📌 Voglio andarci' con l'UUID giusto");
   ok((await p.getByRole("button", { name: "Rooftop Tre è tra i salvati" }).getAttribute("aria-pressed")) === "true", "segnalibro: diventa pieno subito");
+  ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("etichetta-salvato").textContent()) === "📌 Voglio andarci", "card: un locale già salvato lo dice ('📌 Voglio andarci')");
   await p.screenshot({ path: `${OUT}/14a-salvato-un-tocco.png`, caret: "initial" });
   await p.getByTestId("salvato-avviso").getByRole("button", { name: "Aggiungi nota" }).click();
   await p.getByText("Modifica locale").waitFor({ timeout: 3000 });

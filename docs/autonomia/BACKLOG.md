@@ -11,7 +11,8 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 **In PR #21 (notte 11→12/10):** filtri più chiari e risultati dei filtri con intestazione e mappa che si sposta; "Chiedi all'AI / Oppure cerca con i filtri" anche in home; "+ Nuovo tag"; "Ho capito" leggibile; "Chiuso ora" (card, articolo, pin più chiari); "‹ 2 di 8 ›" nella scheda; "📌 Voglio andarci / ✓ Ci sono stato" nella scheda dei non salvati; "Condividi" la lista dei salvati; "Più vicini" e conteggi dei tag nei salvati; salvati del profilo toccabili; "Cerca in quest'area" dopo i filtri; avviso senza rete; "Salta" e "✨ Mostrami i posti per me" nell'onboarding; Esc da computer; "Copia" indirizzo; ricerche recenti in home con "Cancella"; "Questi risultati non vanno?" in fondo al carosello; articolo con "Condividi" e follow-up che continua la ricerca; "🎲 Scegli tu" (`?beta=sorprendimi`); 🎤 per dettare la ricerca (`?beta=voce`, acceso anche da `?stile=places`); scorciatoie dell'app installata; "Apro la mappa…" mentre carica; errori in italiano (onboarding, gusti, importa); correzioni da tre revisioni del codice.
 **In PR #23 (contiene la #21 e la #22 già unite, senza conflitti tra loro; branch `claude/cool-rubin-vyvnv0`):** in più, i locali di tutt'altro tipo vanno in fondo (pub per la colazione).
 **PR #22 (notte 11→12/10, branch `claude/cool-rubin-s37nql`):** correzioni trovate provando con ricerche Google vere: recensioni e descrizioni in italiano; i primi 5 risultati sempre visibili sulla mappa con il nome; card mai vuote quando manca il verdetto; Da Enzo in fondo nelle ricerche "non turistiche".
-**In PR (12/10 giorno, branch `claude/cool-rubin-s37nql`):** una sola barra di ricerca con frasi d'esempio (mappa e home); "Salvati" nella barra in basso; profilo come "la mia guida"; salva in un tocco; "Nei tuoi salvati" mentre scrivi; pin dei salvati (`?beta=pin-salvati`); "Salva da Google Maps" con link o Condividi (voce 13, livello 1).
+**In produzione dalla PR #25 (12/10):** una sola barra di ricerca con frasi d'esempio (mappa e home); "Salvati" nella barra in basso; profilo come "la mia guida"; salva in un tocco; "Nei tuoi salvati" mentre scrivi; pin dei salvati (`?beta=pin-salvati`); "Salva da Google Maps" con link o Condividi (voce 13, livello 1).
+**In PR #26:** torna il riquadro "Il verdetto Mapetite" nella scheda (Lorenzo 12/10: "come era fatto mi piaceva"); etichetta dei salvati sulle card; riga tipo/voto/prezzo/distanza leggibile.
 **Decisioni di Lorenzo (12/10 mattina):** delle varianti Places tiene solo la **scheda del locale** (ora predefinita per tutti, PR di oggi); per il resto preferisce lo stile attuale, da migliorare perché l'utente trovi subito le informazioni importanti. Ricerca provata da Lorenzo: "va molto meglio"; il verdetto c'è solo sui primi ~10. Nuova priorità: **salvati e profilo** (Fase 2b) e **import semplice dei salvati da Google** (voce 13).
 **Manca:** prova dal vivo con Haiku (Lorenzo deve aggiungere `ANTHROPIC_API_KEY` all'ambiente cloud: istruzioni date il 12/10); giro con un account vero; risposta sulla quota Google per l'import (voce 13).
 
@@ -51,22 +52,22 @@ Casella di ricerca e chip per città. La città si ricava dall\'indirizzo già s
 ## Fase 2b — Salvati e profilo: ritrovare subito i propri locali (decisa da Lorenzo il 12/10)
 Lorenzo: "sviluppare tutte le funzionalità per salvare e accedere facilmente ai locali salvati nel profilo, così la ricerca va molto più spedita". Tutte senza migrazioni e senza chiamate Google in più (usano `saved_places` e i tag già esistenti). Grafica: stile attuale Mapetite, informazioni importanti in vista (stato, città, distanza, nota).
 
-### 11a. "Salvati" nella barra in basso — IN PR (12/10)
+### 11a. "Salvati" nella barra in basso — FATTA (PR #25)
 Voce fissa "Salvati" (icona segnalibro) al posto di "Importa": un tocco apre la mappa sui propri salvati con la lista. "Importa" si sposta dentro Salvati e Profilo ("+ Aggiungi dai tuoi salvati Google").
 
 ### 11b. Lista dei salvati divisa per stato — FATTA (già presente: "Tutti", "📌 Voglio andarci · N", "✓ Ci sono stato · N" in testa ai filtri dei salvati; dal profilo si arriva già filtrati)
 In cima tre schede: "📌 Voglio andarci · N", "✓ Ci sono stato · N", "Tutti · N" (dai tag "Da provare"/"Già visitato"). Restano città, ricerca, tag e "Più vicini". Card con nota, tag, città e distanza in vista.
 
-### 11c. I tuoi salvati sempre sulla mappa — IN PR, IN PROVA (`?beta=pin-salvati`, spenta finché Lorenzo non la vede)
+### 11c. I tuoi salvati sempre sulla mappa — IN PROVA (PR #25) (`?beta=pin-salvati`, spenta finché Lorenzo non la vede)
 Anche in "Esplora" e dopo una ricerca, i locali salvati restano come pin piccoli con il segnalibro corallo (come Mapstr): si vede subito cosa hai già vicino.
 
-### 11d. La ricerca guarda prima nei salvati — IN PR (12/10); manca il badge "📌 Salvato" sulle card AI (oggi il segnalibro è pieno)
+### 11d. La ricerca guarda prima nei salvati — FATTA (PR #25 + etichetta "📌 Voglio andarci / ✓ Ci sono stato" sulle card AI nella PR #26)
 Quando scrivi nella barra, se qualche salvato corrisponde (nome, tag, nota, tipo, città) compare in cima "Nei tuoi salvati: …" con 1–3 card; tocco = scheda. Filtro fatto nel telefono sui dati già caricati: nessun costo. Nei risultati AI le card dei locali già salvati mostrano "📌 Salvato".
 
-### 11e. Profilo come "la mia guida" — IN PR (12/10); stile delle raccolte da confermare
+### 11e. Profilo come "la mia guida" — FATTA (PR #25); stile delle raccolte da confermare
 In cima numeri toccabili (Salvati · Voglio andarci · Ci sono stato · Città), poi le "raccolte" = i tuoi tag (Romantico, Con amici, …) come riquadri con il numero di locali; tocco = mappa filtrata su quel tag. Niente tabelle nuove.
 
-### 11f. Salvataggio in un tocco — IN PR (12/10)
+### 11f. Salvataggio in un tocco — FATTA (PR #25)
 Il segnalibro su card e scheda salva subito come "Voglio andarci" e mostra un avviso in basso "Salvato · Aggiungi nota" (tocco = apre il foglio con tag e nota). Oggi si apre sempre la finestra: un passaggio in più.
 
 ## Fase 3 — Pronta per i tester (notti 10–12)
