@@ -147,7 +147,7 @@ export default function ManualAddCard({
             <button
               type="submit"
               disabled={searching || !query.trim()}
-              className="min-h-12 shrink-0 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white disabled:opacity-60"
+              className="min-h-12 shrink-0 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white disabled:opacity-60"
             >
               {searching ? "Cerco…" : "Cerca"}
             </button>
