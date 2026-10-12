@@ -970,6 +970,40 @@ export default function MapView({
     return uuid != null && savedIds.has(uuid);
   };
 
+  // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Voglio andarci"
+  // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
+  const [savedToast, setSavedToast] = useState<Place | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickSave = async (place: Place) => {
+    if (!userId) { window.location.href = "/login"; return; }
+    if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
+    try {
+      const addRes = await fetch("/api/places/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          googlePlaceId: place.id, name: place.name, address: place.address ?? "",
+          lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
+        }),
+      });
+      if (!addRes.ok) throw new Error("add");
+      const uuid: string = (await addRes.json()).place.id;
+      const tags = [VISIT_WANT];
+      const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
+      if (error && error.code !== "23505") throw new Error("insert");
+      setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
+      setSavedIds((prev) => new Set(prev).add(uuid));
+      const saved = { ...place, id: uuid, tags, note: null };
+      setSavedPlaces((prev) => [...prev.filter((p) => p.id !== uuid), saved]);
+      setSavedToast(saved);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
+    } catch {
+      setPendingSaveTags([VISIT_WANT]);
+      setPendingSavePlaceId(place.id);
+    }
+  };
+
   useEffect(() => {
     if (!userId) return;
 
@@ -2592,6 +2626,23 @@ export default function MapView({
         />
       )}
 
+      {savedToast && (
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+          <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
+            <span className="min-w-0 flex-1 truncate text-sm font-sans">
+              <span className="font-semibold">📌 Salvato</span> · {savedToast.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setPendingEditPlace(savedToast); setSavedToast(null); }}
+              className="min-h-10 shrink-0 rounded-pill bg-white/15 px-3 text-sm font-display font-semibold active:scale-95"
+            >
+              Aggiungi nota
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Ricerca in corso senza card iniziale (link ?q=, home): card fantasma come Places, la mappa non resta muta. */}
       {aiSearching && aiSearch === null && welcomeHidden && overlay.kind === "none" && (
         <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: "var(--nav-height-mobile)" }}>
@@ -2673,12 +2724,8 @@ export default function MapView({
           } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
-          onSave={aiSearch !== null && view === "all" ? (place) => {
-            if (!userId) { window.location.href = "/login"; return; }
-            // Già salvato: la scheda permette di modificarlo o rimuoverlo.
-            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
-            setPendingSavePlaceId(place.id);
-          } : undefined}
+          // Già salvato: la scheda permette di modificarlo o rimuoverlo (vedi quickSave).
+          onSave={aiSearch !== null && view === "all" ? (place) => { void quickSave(place); } : undefined}
           onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
@@ -2710,11 +2757,7 @@ export default function MapView({
           loadingVerdicts={loadingVerdicts}
           origin={userPos ?? searchOrigin}
           isSaved={isPlaceSaved}
-          onSave={(place) => {
-            if (!userId) { window.location.href = "/login"; return; }
-            if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
-            setPendingSavePlaceId(place.id);
-          }}
+          onSave={(place) => { void quickSave(place); }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
           onAsk={(q) => { setArticleOpen(false); setAiQuery(q); void runAISearch(q); }}
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}

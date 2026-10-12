@@ -897,12 +897,22 @@ else {
   await p.keyboard.press("Escape");
   await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
-  // Segnalibro sulla card: con l'account apre "Salva locale" senza passare dalla scheda
+  // Segnalibro sulla card (voce 11f): salva in un tocco come "Voglio andarci", poi "Aggiungi nota"
+  let quickInsert = null;
+  await p.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "33333333-0000-4000-8000-000000000003" } } }));
+  await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { quickInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); } return r.fallback(); });
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
   await p.getByRole("button", { name: "Salva Rooftop Tre" }).click();
-  await p.getByText("Salva locale").waitFor({ timeout: 3000 });
-  ok(true, "segnalibro sulla card: apre 'Salva locale' (tag e nota)");
+  await p.getByTestId("salvato-avviso").waitFor({ timeout: 3000 }).then(() => ok(true, "segnalibro: salva in un tocco e dice 'Salvato'"), () => ok(false, "segnalibro: salva in un tocco e dice 'Salvato'"));
+  ok(JSON.stringify(quickInsert?.tags) === '["Da provare"]' && quickInsert?.place_id === "33333333-0000-4000-8000-000000000003", "segnalibro: salvato come '📌 Voglio andarci' con l'UUID giusto");
+  ok((await p.getByRole("button", { name: "Rooftop Tre è tra i salvati" }).getAttribute("aria-pressed")) === "true", "segnalibro: diventa pieno subito");
+  await p.screenshot({ path: `${OUT}/14a-salvato-un-tocco.png`, caret: "initial" });
+  await p.getByTestId("salvato-avviso").getByRole("button", { name: "Aggiungi nota" }).click();
+  await p.getByText("Modifica locale").waitFor({ timeout: 3000 });
+  ok(true, "'Aggiungi nota': apre tag e nota del locale appena salvato");
+  await p.unroute("**/api/places/add");
+  await p.unroute("**/rest/v1/saved_places**");
   { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
     ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
   await p.screenshot({ path: `${OUT}/14-salva-da-card.png`, caret: "initial" });
@@ -969,7 +979,9 @@ else {
   writes.length = 0;
   await v.goto(`${BASE}/mappa?beta=salva`, { waitUntil: "networkidle" });
   await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
-  await v.getByRole("button", { name: "Salva Rooftop Tre" }).click();
+  // Dalla scheda "Salva" apre il foglio (il segnalibro sulla card ora salva in un tocco).
+  await v.locator("ul.snap-x").getByText("Rooftop Tre").first().click();
+  await v.locator("button:text-is('Salva')").first().click();
   const sheet = v.getByTestId("salva-foglio");
   await sheet.waitFor({ timeout: 3000 });
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "salva B: 'Voglio andarci' già scelto");
