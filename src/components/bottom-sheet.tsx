@@ -47,6 +47,8 @@ export interface BottomSheetProps {
   onRefine?: () => void;
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
+  // Stato del locale già salvato ("📌 Voglio andarci" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
+  savedLabel?: (id: string) => string | null;
   onSave?: (place: Place) => void;
   // Card finale "Questi risultati non vanno?": solo per la ricerca intera, non per un gruppo di pin.
   showSearchFeedback?: boolean;
@@ -150,7 +152,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -489,6 +491,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex flex-wrap justify-end gap-1 ${onSave ? "pr-11" : ""}`}>
                         {gemsOn && isGem(place.rating, d?.userRatingCount) && (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                        )}
+                        {onSave && savedLabel?.(place.id) && (
+                          <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{savedLabel(place.id)}</span>
                         )}
                         {d?.openNow === true && (
                           <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>

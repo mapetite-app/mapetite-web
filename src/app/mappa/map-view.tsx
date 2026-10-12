@@ -2788,6 +2788,12 @@ export default function MapView({
           } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
+          savedLabel={(id) => {
+            const uuid = resolveUuid(id);
+            const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;
+            if (!uuid || !savedIds.has(uuid)) return null;
+            return tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : "📌 Salvato";
+          }}
           // Già salvato: la scheda permette di modificarlo o rimuoverlo (vedi quickSave).
           onSave={aiSearch !== null && view === "all" ? (place) => { void quickSave(place); } : undefined}
           onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
