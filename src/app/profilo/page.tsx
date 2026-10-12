@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
+import ProfiloRicerche from "@/components/profilo-ricerche";
+import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -128,16 +130,10 @@ export default async function ProfiloPage() {
     { label: "Città", value: cityCount, href: savedHref(), id: "citta" },
   ];
 
-  // Raccolte = i tag dell'utente (esclusi i due di stato), dalla più ricca.
-  const byTag = new Map<string, number>();
-  for (const row of saved) {
-    if (!row.places) continue;
-    for (const tag of new Set(row.tags ?? [])) {
-      if (tag === STATE_WANT || tag === STATE_DONE || !tag.trim()) continue;
-      byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
-    }
-  }
-  const collections = [...byTag.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
+  // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
+  const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
+    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, tags: row.tags ?? [] }] : [],
+  );
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -186,36 +182,9 @@ export default async function ProfiloPage() {
         ))}
       </nav>
 
-      <section className="mb-10">
-        <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le tue raccolte</h2>
-        {collections.length === 0 ? (
-          <p data-testid="raccolte-vuote" className="rounded-card border border-dashed border-border p-4 text-sm text-text-muted">
-            Aggiungi un tag ai tuoi salvati (es. Romantico, Con amici): ogni tag diventa una raccolta.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-2">
-            {collections.map(([tag, count]) => (
-              <li key={tag}>
-                <Link
-                  href={savedHref({ tag })}
-                  data-testid="raccolta"
-                  className="flex min-h-[72px] items-center gap-3 rounded-card bg-brand px-3 py-3 text-white shadow-card active:scale-[0.98] transition-transform duration-150"
-                >
-                  <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent font-title text-base font-semibold text-white">
-                    {tag.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-display text-sm font-semibold">{tag}</span>
-                    <span className="block text-xs text-white/75">
-                      {count} {count === 1 ? "locale" : "locali"}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
+
+      <ProfiloRicerche />
 
       <section className="mb-10">
         <div className="mb-3 flex items-baseline justify-between">
