@@ -505,7 +505,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
-                    <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-white/60">
+                    <span className="mt-1 truncate text-[13px] font-sans font-medium text-white/85">
                       {metaLine(place, d, origin)}
                     </span>
                     {d?.verdict ? (
