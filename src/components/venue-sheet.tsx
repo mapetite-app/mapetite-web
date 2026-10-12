@@ -5,6 +5,7 @@ import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "l
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { track } from "@/lib/track";
+import { mapetiteShareUrl } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -106,8 +107,11 @@ export default function VenueSheet({
   const [addressCopied, setAddressCopied] = useState(false);
   const share = async () => {
     signal("condividi");
-    const url = mapsUrl;
-    const text = verdict ? `${name} — ${verdict}` : name;
+    // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
+    const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
+    const url = mapetiteUrl ?? mapsUrl;
+    const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
+    const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({ title: name, text, url });
@@ -116,8 +120,13 @@ export default function VenueSheet({
         setShareNote("Link copiato");
         setTimeout(() => setShareNote(null), 2500);
       }
-    } catch {
-      // l'utente ha chiuso il foglio di condivisione: nessun errore da mostrare
+    } catch (err) {
+      // Chiuso il foglio di condivisione: nessun errore. Se invece il telefono non accetta più il
+      // tocco (attesa per creare il link), il link ora è pronto: basta toccare di nuovo.
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        setShareNote("Link pronto: tocca di nuovo Condividi");
+        setTimeout(() => setShareNote(null), 4000);
+      }
     }
   };
 
