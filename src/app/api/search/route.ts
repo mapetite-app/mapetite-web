@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
-import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
+import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
 import { demoteMainstream } from "@/lib/mainstream";
@@ -123,6 +123,14 @@ export async function POST(request: Request) {
         risultati = places;
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
       }
+    }
+
+    // Il verdetto Mapetite deve esserci su OGNI risultato (VISIONE.md): Haiku lo scrive per i
+    // primi SYNTHESIS_LIMIT, quindi si mostrano solo quelli. Meglio 12 posti con il verdetto che
+    // 20 di cui 8 muti. Nessun costo in più; quelli tagliati sono gli ultimi (spesso già spostati in fondo).
+    if (risultati.length > SYNTHESIS_LIMIT) {
+      console.log(`[search-limite] mostrati ${SYNTHESIS_LIMIT} su ${risultati.length} (solo quelli con il verdetto)`);
+      risultati = risultati.slice(0, SYNTHESIS_LIMIT);
     }
 
     if (risultati.length > 0 && fastPhase) {
