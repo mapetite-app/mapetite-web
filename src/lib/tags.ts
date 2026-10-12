@@ -6,10 +6,11 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function tagLabel(tag: string): string {
-  return STATUS_LABEL[tag] ?? tag;
+  // hasOwn: un tag scritto a mano come "constructor" non deve leggere le proprietà dell'oggetto.
+  return Object.hasOwn(STATUS_LABEL, tag) ? STATUS_LABEL[tag] : tag;
 }
 
 // Stato prima, poi gli altri tag nell'ordine in cui sono stati scelti.
 export function sortTags(tags: string[]): string[] {
-  return [...tags].sort((a, b) => Number(b in STATUS_LABEL) - Number(a in STATUS_LABEL));
+  return [...tags].sort((a, b) => Number(Object.hasOwn(STATUS_LABEL, b)) - Number(Object.hasOwn(STATUS_LABEL, a)));
 }

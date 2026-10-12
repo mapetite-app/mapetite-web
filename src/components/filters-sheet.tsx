@@ -266,7 +266,9 @@ export default function FiltersSheet({
         <div className="border-t border-border bg-surface px-5 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           <button
             type="button"
-            onClick={() => { onApply(local); onClose(); }}
+            // Prima si chiude il pannello, poi si cerca: nei salvati la lista si apre subito
+            // e un CLOSE dopo la richiuderebbe.
+            onClick={() => { onClose(); onApply(local); }}
             className="w-full rounded-pill bg-brand py-3 font-display text-base font-semibold text-white hover:opacity-90 active:scale-95 transition-transform"
           >
             {active > 0 ? `Applica filtri (${active})` : "Applica filtri"}

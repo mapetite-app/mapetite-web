@@ -84,13 +84,16 @@ function SaveModal({
   // Tag scritti dall'utente (come le raccolte di Places): stessa colonna tags, nessuna migrazione.
   const tagOptions = Array.from(new Set([...PRESET_TAGS, ...knownTags, ...selectedTags]));
   const [newTag, setNewTag] = useState<string | null>(null);
+  // Testo scritto → tag (spazi ripuliti, maiuscola iniziale, stesso tag se esiste già).
+  const normalizeNewTag = (text: string | null): string | null => {
+    const raw = (text ?? "").trim().replace(/\s+/g, " ").slice(0, 24);
+    if (raw === "") return null;
+    return tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase()) ?? raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
   const addNewTag = () => {
-    const raw = (newTag ?? "").trim().replace(/\s+/g, " ").slice(0, 24);
+    const tag = normalizeNewTag(newTag);
     setNewTag(null);
-    if (raw === "") return;
-    const existing = tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase());
-    const tag = existing ?? raw.charAt(0).toUpperCase() + raw.slice(1);
-    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+    if (tag) setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
   };
   const newTagControl = (chipClass: string) =>
     newTag === null ? (
@@ -112,11 +115,22 @@ function SaveModal({
       />
     );
 
+  // Mentre salva, Esc non chiude la finestra (l'eventuale errore resterebbe invisibile).
+  useEffect(() => {
+    if (!isPending) return;
+    const block = (e: KeyboardEvent) => { if (e.key === "Escape") e.stopImmediatePropagation(); };
+    window.addEventListener("keydown", block, true);
+    return () => window.removeEventListener("keydown", block, true);
+  }, [isPending]);
+
   const handleSave = () => {
     setError(false);
     startTransition(async () => {
       const supabase = createClient();
-      const tags = selectedTags.length > 0 ? selectedTags : null;
+      // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
+      const pending = normalizeNewTag(newTag);
+      const allTags = pending && !selectedTags.includes(pending) ? [...selectedTags, pending] : selectedTags;
+      const tags = allTags.length > 0 ? allTags : null;
       const noteValue = note.trim() || null;
 
       let savedUuid: string | undefined;
@@ -959,6 +973,10 @@ export default function MapView({
       setSelectedReviews(null);
       return;
     }
+    // Con "‹ ›" si cambia locale in fretta: le recensioni del locale precedente non devono restare
+    // né arrivare in ritardo sul successivo.
+    let cancelled = false;
+    setSelectedReviews(null);
     const supabase = createClient();
     supabase
       .from("reviews")
@@ -966,6 +984,7 @@ export default function MapView({
       .eq("place_id", uuid)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
+        if (cancelled) return;
         if (!data || data.length === 0) {
           setSelectedReviews(null);
           return;
@@ -979,6 +998,7 @@ export default function MapView({
           items: data as ReviewItem[],
         });
       });
+    return () => { cancelled = true; };
   }, [selected?.id, placeUuids]);
 
   useEffect(() => {
@@ -1108,6 +1128,7 @@ export default function MapView({
   };
 
   const runFilteredSearch = async (f: Filters) => {
+    setAiError(null);
     if (view === "saved") {
       const allowed = f.categories;
       const filtered = allowed.length > 0
@@ -1117,6 +1138,7 @@ export default function MapView({
           })
         : savedPlaces;
       setAiSearch({ risultati: filtered, filtri: null });
+      setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });
       return;
     }
@@ -1540,6 +1562,7 @@ export default function MapView({
             onClick={() => {
               setAiSearch(null);
               setAiQuery("");
+              setAiError(null);
               dispatch({ type: "OPEN_FILTERS" });
             }}
             className={`relative flex shrink-0 h-11 items-center justify-center rounded-full bg-surface shadow-float hover:shadow-card transition-shadow ${barOn ? "gap-1.5 px-3.5" : "w-11"}`}
@@ -1554,7 +1577,7 @@ export default function MapView({
           </button>
         </div>
         {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
-        {barOn && aiError && !aiSearching && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed) && (
+        {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed) && (
           <button
             type="button"
             data-testid="errore-barra"
@@ -2013,7 +2036,7 @@ export default function MapView({
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
       {/* Vale anche per i risultati dei filtri: rifà la stessa ricerca a filtri nella zona visibile. */}
-      {aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
+      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
         <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
           <button
             type="button"

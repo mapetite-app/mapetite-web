@@ -681,6 +681,16 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
   ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci' come nella scheda");
+  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByRole("button", { name: "Ristoranti" }).click();
+  await p.getByRole("button", { name: /Applica filtri/ }).click();
+  await p.waitForTimeout(500);
+  ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
+  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByRole("button", { name: "Azzera" }).click();
+  await p.getByRole("button", { name: /Applica filtri/ }).click();
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
@@ -816,10 +826,13 @@ else {
   await sheet.getByLabel("Nuovo tag").press("Enter");
   ok((await sheet.getByRole("button", { name: "Brunch" }).getAttribute("aria-pressed")) === "true", "salva B: '+ Nuovo tag' aggiunge un tag scritto da te (già scelto)");
   await sheet.locator("textarea").fill("Prenotare");
-  await sheet.getByRole("button", { name: "Fatto" }).click();
+  // Tag scritto senza Invio e "Fatto" toccato senza che il campo perda il fuoco (come su iPhone).
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("terrazza");
+  await sheet.getByRole("button", { name: "Fatto" }).evaluate((b) => b.click());
   await sheet.waitFor({ state: "detached", timeout: 4000 });
   const ins2 = writes.find((w) => w.m === "POST");
-  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici","Brunch"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + tag nuovo + nota (stessi campi di prima)");
+  ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici","Brunch","Terrazza"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + tag nuovi (anche senza Invio) + nota");
   await v.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
   await vctx.close();
 }
