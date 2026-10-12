@@ -72,14 +72,14 @@ export default function AuthForm({
           </SubmitButton>
         </form>
 
-        <p className="mt-6 text-center text-sm font-sans text-text-muted">
+        <p className="mt-4 text-center text-sm font-sans text-text-muted">
           {login ? "Non hai un account? " : "Hai già un account? "}
-          <Link href={login ? "/signup" : "/login"} className="font-display font-semibold text-brand underline-offset-2 hover:underline">
+          <Link href={login ? "/signup" : "/login"} className="inline-flex min-h-10 items-center font-display font-semibold text-brand underline-offset-2 hover:underline">
             {login ? "Registrati" : "Accedi"}
           </Link>
         </p>
-        <p className="mt-3 text-center text-sm font-sans">
-          <Link href="/mappa" className="text-text-muted underline underline-offset-2">
+        <p className="text-center text-sm font-sans">
+          <Link href="/mappa" className="inline-flex min-h-10 items-center text-text-muted underline underline-offset-2">
             Intanto prova a cercare senza account
           </Link>
         </p>
