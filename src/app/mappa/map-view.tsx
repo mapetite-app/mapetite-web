@@ -25,6 +25,7 @@ import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track } from "@/lib/track";
+import { labelsToHide } from "@/lib/pin-labels";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -1355,6 +1356,14 @@ export default function MapView({
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
 
+  // Nomi dei primi risultati senza sovrapposizioni: vince quello più in alto in lista.
+  const hiddenLabels = useMemo(() => {
+    if (topPlaces.length < 2) return new Set<string>();
+    const rank = (id: string) => (id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
+    const ordered = [...topPlaces].sort((a, b) => rank(a.id) - rank(b.id));
+    return labelsToHide(ordered.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, big: p.id === focusId })), viewState.zoom);
+  }, [topPlaces, carouselOrder, focusId, viewState.zoom]);
+
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
     const points = mapPlaces.filter((p) => !top.has(p.id)).map((place) => ({
@@ -2465,6 +2474,7 @@ export default function MapView({
               <div
                 className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
+                data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
               >
@@ -2505,7 +2515,7 @@ export default function MapView({
                   </span>
                 )}
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
-                {((aiSearch !== null && clusterPlaces === null ? topPlaces.includes(place) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
+                {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
                     {place.name}
                   </span>

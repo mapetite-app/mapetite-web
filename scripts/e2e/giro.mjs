@@ -494,7 +494,9 @@ await page.waitForTimeout(1500);
 {
   const labels = (await page.getByTestId("pin").allInnerTexts()).map((t) => t.replace(/[^\p{L}\p{N} ]/gu, "").trim());
   const top = ["Folla 1", "Folla 2", "Folla 3", "Folla 4", "Folla 5"];
-  ok(top.every((n) => labels.some((l) => l.trim() === n)), `mappa affollata: i primi 5 risultati hanno il loro pin con nome (${labels.filter(Boolean).length} nomi)`);
+  const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
+  ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
+  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length < 5, `mappa affollata: pin uno sopra l'altro, resta solo il nome del primo (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
   ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Folla 1"), "mappa affollata: il pin della prima card è visibile ed evidenziato");
   await shot("05c-mappa-affollata");
