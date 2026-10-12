@@ -40,7 +40,8 @@ export async function updatePreferences({
     .eq("id", user.id);
 
   if (error) {
-    return { error: error.message };
+    console.error("[preferenze] salvataggio gusti:", error.message);
+    return { error: "Non sono riuscito a salvare i tuoi gusti. Controlla la connessione e riprova." };
   }
 
   return { error: null };

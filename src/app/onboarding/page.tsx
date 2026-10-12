@@ -243,8 +243,8 @@ export default function OnboardingPage() {
             {step < totalSteps - 1
               ? "Continua →"
               : submitting
-              ? "Un attimo…"
-              : "Esplora Mapetite ✓"}
+              ? "Cerco i posti per te…"
+              : "✨ Mostrami i posti per me"}
           </button>
           {error && (
             <p className="mt-3 text-center text-sm text-red-600">{error}</p>

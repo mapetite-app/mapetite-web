@@ -38,7 +38,9 @@ export async function completeOnboarding({
     .eq("id", user.id);
 
   if (error) {
-    return { error: error.message };
+    // Il messaggio del database è in inglese e tecnico: al tester se ne mostra uno chiaro.
+    console.error("[onboarding] salvataggio gusti:", error.message);
+    return { error: "Non sono riuscito a salvare i tuoi gusti. Controlla la connessione e riprova." };
   }
 
   // Momento magia: la mappa si apre già con una ricerca sui gusti appena scelti
