@@ -469,6 +469,20 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
   });
 }
 
+// Salvati che c'entrano con la frase scritta nella barra (voce 11d): basta una parola
+// significativa (4+ lettere) in nome, tipo, indirizzo, nota o tag. Solo dati già nel telefono.
+const STOP_WORDS = new Set(["dove", "posto", "locale", "locali", "vicino", "buono", "buona", "qualcosa", "stasera", "oggi", "questa", "questo", "sera", "tipo", "fare", "andare", "voglio", "cerco"]);
+function savedMatches(list: Place[], query: string, max = 3): Place[] {
+  const words = query.toLocaleLowerCase("it").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !STOP_WORDS.has(w));
+  if (words.length === 0) return [];
+  const scored = list.map((p) => {
+    const text = [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
+      .filter(Boolean).join(" ").toLocaleLowerCase("it");
+    return { p, n: words.filter((w) => text.includes(w)).length };
+  }).filter((x) => x.n > 0);
+  return scored.sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.p);
+}
+
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
 // nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
 type MapStyleApi = {
@@ -1749,15 +1763,42 @@ export default function MapView({
             {aiError} ✕
           </button>
         )}
+        {/* Mentre scrivi: prima i tuoi salvati che c'entrano (un tocco = la sua scheda), poi Invio cerca nel mondo. */}
+        {barOn && view === "all" && aiSearch === null && !aiSearching && aiQuery.trim().length >= 4 && savedMatches(savedPlaces, aiQuery).length > 0 && (
+          <div data-testid="nei-salvati" className="pointer-events-auto rounded-card border border-border bg-surface p-2 shadow-float">
+            <p className="px-1 pb-1 text-xs font-display font-semibold uppercase tracking-wide text-accent">📌 Nei tuoi salvati</p>
+            {savedMatches(savedPlaces, aiQuery).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setView("saved"); setAiQuery(""); dispatch({ type: "OPEN_VENUE", placeId: p.id });
+                  const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+                  if (map) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(viewState.zoom, 15) });
+                }}
+                className="flex w-full items-center gap-2 rounded-btn px-1 py-1.5 text-left active:bg-brand-light"
+              >
+                <span aria-hidden className="text-xl">{getCategoryEmoji(p.category, p.name)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-display font-semibold text-text">{p.name}</span>
+                  <span className="block truncate text-xs font-sans text-text-muted">
+                    {[p.tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : p.tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : null, cityFromAddress(p.address), p.note ? `“${p.note}”` : null].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </button>
+            ))}
+            <p className="px-1 pt-1 text-xs font-sans text-text-muted">Premi Invio per cercare nuovi posti con l&apos;AI.</p>
+          </div>
+        )}
         {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
-        {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
+        {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "" && (
           <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem]">
             {tasteSuggestion && (
               <button
                 type="button"
                 data-testid="suggerimento-per-te"
                 onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
-                className="min-h-10 shrink-0 rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
               >
                 ✨ Per te: {tasteSuggestion}
               </button>

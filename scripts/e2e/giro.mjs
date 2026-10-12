@@ -841,6 +841,17 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Mappa' in basso torna a Esplora"), () => ok(false, "'Mappa' in basso torna a Esplora"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
 
+  // Voce 11d: scrivendo nella barra compaiono prima i propri salvati che c'entrano
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByLabel("Cosa cerchi?").fill("una terrazza per stasera");
+  await p.getByTestId("nei-salvati").waitFor({ timeout: 4000 }).then(async () => {
+    ok(await p.getByTestId("nei-salvati").getByText("Terrazza Uno").isVisible() && (await p.getByTestId("nei-salvati").locator("button").count()) === 1, "barra: scrivendo 'terrazza' compare 'Nei tuoi salvati: Terrazza Uno'");
+    await p.screenshot({ path: `${OUT}/11d-nei-salvati.png`, caret: "initial" });
+    await p.getByTestId("nei-salvati").getByText("Terrazza Uno").click();
+    await p.getByTestId("stato-salvato").waitFor({ timeout: 4000 }).then(() => ok(true, "'Nei tuoi salvati': un tocco apre la sua scheda"), () => ok(false, "'Nei tuoi salvati': un tocco apre la sua scheda"));
+  }, () => ok(false, "barra: scrivendo 'terrazza' compare 'Nei tuoi salvati: Terrazza Uno'"));
+  await p.keyboard.press("Escape");
+
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
   await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
   await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {
