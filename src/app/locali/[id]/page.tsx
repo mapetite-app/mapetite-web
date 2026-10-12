@@ -79,7 +79,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
     <main className="mx-auto min-h-dvh max-w-md bg-bg pb-8" data-testid="locale-pubblico">
       <div className="relative">
         {photoRef ? (
-          <PlacePhoto photoRef={photoRef} alt={place.name} width={800} priority className="h-64 w-full object-cover" fallback={heroFallback} />
+          <PlacePhoto photoRef={photoRef} alt={place.name} width={800} priority className="h-56 w-full object-cover" fallback={heroFallback} />
         ) : (
           heroFallback
         )}
@@ -159,7 +159,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
           href={mapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-95"
+          className="inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-pill border border-border bg-white px-3 text-[13px] font-display font-semibold text-brand active:scale-95"
         >
           Apri su Google Maps
         </a>
