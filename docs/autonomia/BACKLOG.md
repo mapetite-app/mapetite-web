@@ -11,6 +11,7 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 **In PR #21 (notte 11→12/10):** filtri più chiari e risultati dei filtri con intestazione e mappa che si sposta; "Chiedi all'AI / Oppure cerca con i filtri" anche in home; "+ Nuovo tag"; "Ho capito" leggibile; "Chiuso ora" (card, articolo, pin più chiari); "‹ 2 di 8 ›" nella scheda; "📌 Voglio andarci / ✓ Ci sono stato" nella scheda dei non salvati; "Condividi" la lista dei salvati; "Più vicini" e conteggi dei tag nei salvati; salvati del profilo toccabili; "Cerca in quest'area" dopo i filtri; avviso senza rete; "Salta" e "✨ Mostrami i posti per me" nell'onboarding; Esc da computer; "Copia" indirizzo; ricerche recenti in home con "Cancella"; "Questi risultati non vanno?" in fondo al carosello; articolo con "Condividi" e follow-up che continua la ricerca; "🎲 Scegli tu" (`?beta=sorprendimi`); 🎤 per dettare la ricerca (`?beta=voce`, acceso anche da `?stile=places`); scorciatoie dell'app installata; "Apro la mappa…" mentre carica; errori in italiano (onboarding, gusti, importa); correzioni da tre revisioni del codice.
 **In PR #23 (contiene la #21 e la #22 già unite, senza conflitti tra loro; branch `claude/cool-rubin-vyvnv0`):** in più, i locali di tutt'altro tipo vanno in fondo (pub per la colazione).
 **PR #22 (notte 11→12/10, branch `claude/cool-rubin-s37nql`):** correzioni trovate provando con ricerche Google vere: recensioni e descrizioni in italiano; i primi 5 risultati sempre visibili sulla mappa con il nome; card mai vuote quando manca il verdetto; Da Enzo in fondo nelle ricerche "non turistiche".
+**In PR (12/10 giorno, branch `claude/cool-rubin-s37nql`):** una sola barra di ricerca con frasi d'esempio (mappa e home); "Salvati" nella barra in basso; profilo come "la mia guida"; salva in un tocco; "Nei tuoi salvati" mentre scrivi; pin dei salvati (`?beta=pin-salvati`); "Salva da Google Maps" con link o Condividi (voce 13, livello 1).
 **Decisioni di Lorenzo (12/10 mattina):** delle varianti Places tiene solo la **scheda del locale** (ora predefinita per tutti, PR di oggi); per il resto preferisce lo stile attuale, da migliorare perché l'utente trovi subito le informazioni importanti. Ricerca provata da Lorenzo: "va molto meglio"; il verdetto c'è solo sui primi ~10. Nuova priorità: **salvati e profilo** (Fase 2b) e **import semplice dei salvati da Google** (voce 13).
 **Manca:** prova dal vivo con Haiku (Lorenzo deve aggiungere `ANTHROPIC_API_KEY` all'ambiente cloud: istruzioni date il 12/10); giro con un account vero; risposta sulla quota Google per l'import (voce 13).
 
@@ -50,22 +51,22 @@ Casella di ricerca e chip per città. La città si ricava dall\'indirizzo già s
 ## Fase 2b — Salvati e profilo: ritrovare subito i propri locali (decisa da Lorenzo il 12/10)
 Lorenzo: "sviluppare tutte le funzionalità per salvare e accedere facilmente ai locali salvati nel profilo, così la ricerca va molto più spedita". Tutte senza migrazioni e senza chiamate Google in più (usano `saved_places` e i tag già esistenti). Grafica: stile attuale Mapetite, informazioni importanti in vista (stato, città, distanza, nota).
 
-### 11a. "Salvati" nella barra in basso — PRONTA
+### 11a. "Salvati" nella barra in basso — IN PR (12/10)
 Voce fissa "Salvati" (icona segnalibro) al posto di "Importa": un tocco apre la mappa sui propri salvati con la lista. "Importa" si sposta dentro Salvati e Profilo ("+ Aggiungi dai tuoi salvati Google").
 
-### 11b. Lista dei salvati divisa per stato — PRONTA
+### 11b. Lista dei salvati divisa per stato — FATTA (già presente: "Tutti", "📌 Voglio andarci · N", "✓ Ci sono stato · N" in testa ai filtri dei salvati; dal profilo si arriva già filtrati)
 In cima tre schede: "📌 Voglio andarci · N", "✓ Ci sono stato · N", "Tutti · N" (dai tag "Da provare"/"Già visitato"). Restano città, ricerca, tag e "Più vicini". Card con nota, tag, città e distanza in vista.
 
-### 11c. I tuoi salvati sempre sulla mappa — PRONTA (dietro `?beta=pin-salvati` finché Lorenzo non la vede)
+### 11c. I tuoi salvati sempre sulla mappa — IN PR, IN PROVA (`?beta=pin-salvati`, spenta finché Lorenzo non la vede)
 Anche in "Esplora" e dopo una ricerca, i locali salvati restano come pin piccoli con il segnalibro corallo (come Mapstr): si vede subito cosa hai già vicino.
 
-### 11d. La ricerca guarda prima nei salvati — PRONTA
+### 11d. La ricerca guarda prima nei salvati — IN PR (12/10); manca il badge "📌 Salvato" sulle card AI (oggi il segnalibro è pieno)
 Quando scrivi nella barra, se qualche salvato corrisponde (nome, tag, nota, tipo, città) compare in cima "Nei tuoi salvati: …" con 1–3 card; tocco = scheda. Filtro fatto nel telefono sui dati già caricati: nessun costo. Nei risultati AI le card dei locali già salvati mostrano "📌 Salvato".
 
-### 11e. Profilo come "la mia guida" — PRONTA
+### 11e. Profilo come "la mia guida" — IN PR (12/10); stile delle raccolte da confermare
 In cima numeri toccabili (Salvati · Voglio andarci · Ci sono stato · Città), poi le "raccolte" = i tuoi tag (Romantico, Con amici, …) come riquadri con il numero di locali; tocco = mappa filtrata su quel tag. Niente tabelle nuove.
 
-### 11f. Salvataggio in un tocco — PRONTA
+### 11f. Salvataggio in un tocco — IN PR (12/10)
 Il segnalibro su card e scheda salva subito come "Voglio andarci" e mostra un avviso in basso "Salvato · Aggiungi nota" (tocco = apre il foglio con tag e nota). Oggi si apre sempre la finestra: un passaggio in più.
 
 ## Fase 3 — Pronta per i tester (notti 10–12)
@@ -77,20 +78,16 @@ Percorsi completi con Playwright a viewport mobile: registrazione, ricerca, aper
 ### 10. Raccolta feedback dei tester — FATTA 11/10
 Voce "Feedback" nella barra in basso: apre un\'email precompilata verso founder.mapetite@gmail.com con pagina e telefono. Scelta di Lorenzo: la cosa più semplice, leggibile dal telefono. Niente database.
 
-### 13. Import semplice dei salvati da Google Maps — studio fatto 12/10, DA DECIDERE (una sola domanda: la quota)
-Richiesta di Lorenzo (12/10): "importare i locali salvati su Google in maniera semplice".
-**Unica strada ufficiale:** Google Takeout (Google Maps non ha un "esporta" nell'app e leggere le pagine delle liste condivise sarebbe scraping: vietato).
-**Percorso per l'utente (3 passi):** 1) in Mapetite "Importa da Google" apre takeout.google.com con le istruzioni passo passo ("Deseleziona tutto → spunta solo *Salvati* e *Maps (I tuoi luoghi)* → Esporta"); 2) Google manda una mail con lo zip (di solito pochi minuti); 3) si carica lo zip così com'è in Mapetite: niente da aprire o scegliere. Mapetite mostra "Ho trovato 214 locali: 198 sicuri, 16 da controllare", con la lista da spuntare, e salva tutto con tag "Da provare" e il nome della lista Google come tag (es. "Roma pizza").
-**Cosa c'è nello zip:** "Luoghi salvati.json" (le stelle) ha nome, indirizzo e coordinate; le liste ("Salvati/*.csv") hanno solo nome, nota e link.
-**Come trovare ogni locale spendendo zero:** a Mapetite serve il Place ID di Google per ogni locale. Si usa la Text Search di Google chiedendo **solo l'ID** (nel listino 2025 è la fascia "IDs Only", gratuita senza limite — da ricontrollare sul listino prima di attivarla) con nome + zona; per le stelle la zona è un cerchio di 50 m intorno alle coordinate del file → corrispondenza sicura. Per le liste CSV serve 1 Place Details in fascia "Essentials" (indirizzo, coordinate, tipo; 10.000 gratis al mese) per mostrare l'indirizzo da confermare. Voti, foto e verdetti si caricano solo quando apri il locale (come oggi). Stima: import di 300 locali ≈ 0 €.
-**Il blocco:** le quote che hai messo (50 Text Search e 50 Place Details al giorno) contano tutte le chiamate, anche quelle gratuite: con 50/giorno un import di 300 locali richiede 6 giorni. Opzioni: (a) alzare a 1.000/giorno solo la quota "Text Search" e "Place Details" sapendo che le chiamate dell'import sono gratuite (il tetto di spesa resta protetto dall'avviso di budget); (b) tenere 50 e importare a rate, 40 al giorno, in automatico. Il resto (zip, lettura, schermata di conferma, salvataggio) si può costruire subito senza decidere: le chiamate partono solo dopo la scelta.
-Nessuna migrazione: usa `places` + `saved_places` (+ `/api/places/add`). Riusa il lavoro dei diagnostici `scripts/takeout-*.ts` (parser CSV e punteggio di affidabilità).
+### 13. Salvati da Google Maps senza file — livello 1 IN PR (12/10), livello 2 DA DECIDERE
+Lorenzo (12/10): "non posso chiedere alle persone di condividere un CSV, non lo faranno mai". Il Takeout è scartato.
+**Livello 1 — fatto, nessuna approvazione serviva:** "Salva da Google Maps". In Google Maps apri il locale → Condividi → Copia link → in Mapetite "📋 Incolla link" (anche più link insieme). Su Android, con Mapetite installata, Mapetite compare direttamente nel "Condividi" di Google Maps (`share_target`): un tocco e il locale è salvato come "📌 Voglio andarci". Mapetite legge dal link solo nome e coordinate (segue il link corto senza leggere la pagina: niente scraping) e chiede a Google solo l'ID del locale (Text Search con il solo campo `places.id`, fascia gratuita "IDs Only" — da ricontrollare sul listino). Limiti: alcuni link condivisi non hanno coordinate (formato `?q=Nome,+Indirizzo&ftid=…`) e oggi danno un errore chiaro; servirebbe 1 Place Details a pagamento per link (DA DECIDERE). Non provato con link veri (rete chiusa nell'ambiente di prova). Ogni link conta 1 nella quota giornaliera Text Search (50).
+**Livello 2 — "Collega Google Maps" in un tocco (DA DECIDERE):** Google offre la **Data Portability API** (gratuita, pensata per gli utenti UE): l'utente tocca "Collega Google", accetta, e Mapetite riceve in automatico le sue liste salvate (`dataportability.saved.collections`, ambito "Sensibile") e i luoghi con la stella (`dataportability.maps.starred_places`, ambito "Riservato"). Nessun file da gestire. Serve: progetto Google Cloud con schermata di consenso OAuth, verifica dell'app da parte di Google (settimane; per l'ambito "Riservato" anche una valutazione di sicurezza), nuove variabili d'ambiente. Si può iniziare solo con `saved.collections` (verifica più leggera). Poi per ogni locale serve l'ID Google come nel livello 1.
 
 ### 14. Verdetto Mapetite oltre i primi risultati — DA DECIDERE
 Oggi Haiku scrive il verdetto solo per i primi 12 (`SYNTHESIS_LIMIT`); dopo il 12° le card mostrano la descrizione o una recensione di Google. Portarlo a 20 circa raddoppia il costo Haiku per ricerca (i verdetti già in cache non si ripagano). Serve l'ok di Lorenzo (regola: non aumentare `SYNTHESIS_LIMIT` senza approvazione).
 
 ## Dopo il test con utenti
-- Import salvati da Google Maps: ripensato, vedi voce 13.
+- Import salvati da Google Maps: vedi voce 13 (link/Condividi fatto; "Collega Google" da decidere).
 - Backfill verdetti per i salvati senza sintesi (costo Haiku da stimare).
 - Log delle ricerche `search_logs` (migrazione + privacy).
 - Prompt caching Haiku quando i volumi crescono.
@@ -105,6 +102,7 @@ Regole:
 - Le fasi 1–3 restano la priorità: una funzione nuova non deve mai rallentare o rompere la ricerca e la lista risultati.
 
 ### Proposte
+- **Una sola barra di ricerca — IN PR (12/10), accesa per tutti (`?beta=-suggerimenti` per la card di prima)**: richiesta di Lorenzo ("abbiamo ancora due barre, occupiamo solo spazio"; gli piace suggerire frasi pronte). Mappa: niente card in basso, frasi toccabili sotto la barra. Home: frasi tra virgolette e "Filtri" dentro la barra.
 - **Filtri più chiari — IN PR #21, per tutti**: "Che tipo di locale?" in cima, distanza e voto a pulsanti, "Azzera", intestazione "Filtri: Pizzerie · entro 3 km · ★ 4,5+" e mappa che inquadra i risultati. Segue la richiesta di Lorenzo (si deve capire che si cerca anche per filtri). Nessun costo.
 - **PROPOSTA (dalla ricerca su Beli, 12/10) — Classifica personale dei posti visitati**: dopo "Ci sono stato", una domanda "Ti è piaciuto più o meno di X?" e la tua top 10 per città (Beli trasforma i confronti in un voto 1–10 e li usa per consigliare). Aiuta i tester a tornare nell'app e darebbe a Mapetite un segnale di gusto vero per "Per te". Costo: nessuna chiamata. **Serve una colonna nuova (punteggio) in `saved_places`: DA DECIDERE.**
 - **PROPOSTA (Mapstr, 12/10) — Import dei salvati da file Google Takeout/KML/CSV**: Mapstr importa da Google Maps, CSV e KML. Da Takeout arrivano solo nome e link, quindi serve 1 Place Details per locale (con 50/giorno di quota: import grandi impossibili). Possibile solo per file con coordinate (KML) senza costi Google. DA DECIDERE.
