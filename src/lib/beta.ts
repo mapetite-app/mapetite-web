@@ -15,7 +15,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
 //   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
 //   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi";
+//   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche l'articolo e il nuovo "Salva"; ?stile=attuale li spegne.

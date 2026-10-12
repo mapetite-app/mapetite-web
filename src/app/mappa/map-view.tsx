@@ -14,6 +14,7 @@ import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
+import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
@@ -830,6 +831,8 @@ export default function MapView({
   const shareOn = useBeta("condividi");
   // "🎲 Scegli tu" tra i salvati (?beta=sorprendimi, spento di default).
   const pickOn = useOptIn("sorprendimi");
+  // 🎤 nella barra (?beta=voce, spento di default).
+  const voiceOn = useOptIn("voce");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
@@ -1568,6 +1571,9 @@ export default function MapView({
                 aria-label="Chiedi all'AI: cosa cerchi?"
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
+              {voiceOn && aiQuery === "" && aiSearch === null && (
+                <VoiceButton onText={(t) => { setAiQuery(t); setWelcomeDismissed(true); void runAISearch(t); }} />
+              )}
               {(aiQuery !== "" || aiSearch !== null) && (
                 <button
                   type="button"

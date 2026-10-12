@@ -390,6 +390,25 @@ await page.waitForTimeout(300);
 ok((await page.getByTestId("titolo-risposta").count()) === 0 && (await page.getByLabel("Cosa cerchi?").inputValue()) === "", "barra: ✕ cancella la ricerca e i risultati");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+// 5e3b. 🎤 nella barra (?beta=voce): riconoscimento vocale simulato
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+ok((await page.getByTestId("microfono").count()) === 0, "microfono: spento di default");
+await page.addInitScript(() => {
+  // Chromium ha anche SpeechRecognition nativo (senza prefisso): si simulano entrambi.
+  const Fake = class {
+    start() { setTimeout(() => { this.onresult?.({ results: [[{ transcript: "pizza a Testaccio" }]] }); this.onend?.(); }, 100); }
+    stop() { this.onend?.(); }
+  };
+  window.SpeechRecognition = Fake;
+  window.webkitSpeechRecognition = Fake;
+});
+await page.goto(`${BASE}/mappa?beta=voce`, { waitUntil: "networkidle" });
+await page.getByTestId("microfono").click();
+await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("titolo-risposta").textContent())?.includes("pizza a Testaccio"), "microfono: la ricerca dettata parte da sola");
+}, () => ok(false, "microfono: la ricerca dettata parte da sola"));
+await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+
 // 5e4. Senza rete: avviso in alto e messaggio chiaro se si cerca dalla barra
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Chiudi" }).first().click();
