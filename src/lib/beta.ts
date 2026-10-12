@@ -7,7 +7,8 @@ import { useSyncExternalStore } from "react";
 //   condividi     pulsante "Condividi" nella scheda locale
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
 //   barra         campo "Chiedi all'AI" + pulsante "Filtri" sempre in cima alla mappa (dal 11/10, scelta di Lorenzo)
-export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
+//   suggerimenti  frasi d'esempio sotto la barra al posto della card in basso (dal 12/10, Lorenzo: "una sola barra")
+export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "suggerimenti";
 
 // Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
 // quel telefono finché non si apre ?beta=off).
@@ -16,7 +17,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 //   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
 //   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
 //   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce";
+//   pin-salvati   i tuoi salvati restano sulla mappa come piccoli segnalibri anche in Esplora e dopo una ricerca
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.

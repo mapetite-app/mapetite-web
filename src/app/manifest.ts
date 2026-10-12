@@ -15,6 +15,13 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Android, app installata: Mapetite compare nel "Condividi" di Google Maps
+    // e il locale condiviso si salva da /importa/condividi.
+    share_target: {
+      action: "/importa/condividi",
+      method: "GET",
+      params: { title: "title", text: "text", url: "url" },
+    },
     // Tenendo premuta l'icona dell'app installata (Android): si va dritti dove serve.
     shortcuts: [
       { name: "Cerca un locale", short_name: "Cerca", url: "/mappa", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
