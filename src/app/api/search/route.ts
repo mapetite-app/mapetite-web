@@ -6,6 +6,7 @@ import { getSynthesis, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
 import { demoteMainstream } from "@/lib/mainstream";
+import { demoteOffType } from "@/lib/off-type";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -105,6 +106,15 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[search/route] Google Places error:", err);
       risultati = [];
+    }
+    // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
+    // (un pub per la colazione) vanno in fondo, mai esclusi.
+    if (searchIntent === "natural") {
+      const { places, demoted, rule } = demoteOffType(query.trim(), risultati);
+      if (demoted.length > 0) {
+        risultati = places;
+        console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
+      }
     }
     // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
     if (searchIntent === "natural") {

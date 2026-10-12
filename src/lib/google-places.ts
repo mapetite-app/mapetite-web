@@ -132,7 +132,10 @@ export async function searchGooglePlaces(
     locationMode = "bias",
   } = options;
 
-  const requestBody: Record<string, unknown> = { textQuery: query };
+  // Risposte in italiano: riassunto editoriale e recensioni tradotti da Google
+  // (prima arrivavano in inglese nella scheda). È un parametro della richiesta,
+  // non un campo: FIELD_MASK e costo invariati.
+  const requestBody: Record<string, unknown> = { textQuery: query, languageCode: "it" };
   if (includedType) requestBody.includedType = includedType;
   if (typeof lat === "number" && typeof lng === "number" && locationMode !== "none") {
     if (locationMode === "restrict") {

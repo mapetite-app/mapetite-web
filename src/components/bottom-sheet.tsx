@@ -8,6 +8,8 @@ import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
+import { sortTags, tagLabel } from "@/lib/tags";
+import { searchFeedbackMailto } from "@/lib/feedback";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -46,6 +48,10 @@ export interface BottomSheetProps {
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
   onSave?: (place: Place) => void;
+  // Card finale "Questi risultati non vanno?": solo per la ricerca intera, non per un gruppo di pin.
+  showSearchFeedback?: boolean;
+  // Condivide la lista mostrata (salvati): testo con nomi e link Google Maps.
+  onShareList?: (places: Place[]) => Promise<"shared" | "copied" | null>;
   // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
   onOpenArticle?: () => void;
 }
@@ -57,7 +63,18 @@ export type ListDetails = {
   matchReason: string | null;
   goFor: string[] | null;
   photoRef?: string | null;
+  // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
+  editorialSummary?: string | null;
+  selectedReviews?: { text: string }[] | null;
 };
+
+// Riga di ripiego quando manca il verdetto: solo fatti di Google, mai testo inventato.
+export function googleLine(d: ListDetails | undefined): string | null {
+  if (!d) return null;
+  if (d.editorialSummary) return d.editorialSummary;
+  const review = d.selectedReviews?.[0]?.text;
+  return review ? `“${review}”` : null;
+}
 
 function prettyCategory(c: string | null): string | null {
   return categoryLabel(c);
@@ -133,10 +150,12 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
+  // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
+  const nearestOn = origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -334,7 +353,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
-      {quickFiltersOn && origin && (
+      {nearestOn && (
         <button
           type="button"
           aria-pressed={nearestFirst}
@@ -354,16 +373,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0 flex-1">
             {title && (
               <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
                 {title}
-              </p>
-            )}
-            {title && understood.length > 0 && (
-              <p data-testid="ho-capito" className="mt-0.5 truncate text-xs font-sans text-accent">
-                Ho capito: {understood.join(" · ")}
               </p>
             )}
             {!title && heading && (
@@ -399,6 +413,27 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               )}
             </button>
           )}
+          {!title && heading && onShareList && places.length > 0 && (
+            <button
+              type="button"
+              data-testid="condividi-lista"
+              aria-label="Condividi questa lista"
+              onClick={async () => {
+                const r = await onShareList(places);
+                if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
+              }}
+              className="-my-1 ml-2 flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+            >
+              {shared ? "✓ Copiata" : (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                  </svg>
+                  Condividi
+                </>
+              )}
+            </button>
+          )}
           {title && onRefine && (
             <button type="button" onClick={onRefine} className="-my-1 ml-2 min-h-9 shrink-0 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95">
               Affina
@@ -407,8 +442,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-1 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
             ✕
           </button>
+          {/* A tutta larghezza sotto i pulsanti: prima veniva tagliato ("a Ro…"). */}
+          {title && understood.length > 0 && (
+            <p data-testid="ho-capito" className="mt-0.5 basis-full line-clamp-2 text-xs font-sans text-accent">
+              Ho capito: {understood.join(" · ")}
+            </p>
+          )}
         </div>
-        {(quickFiltersOn || onOpenArticle) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
+        {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
         )}
@@ -452,6 +493,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         {d?.openNow === true && (
                           <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
                         )}
+                        {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
+                        {d?.openNow === false && (
+                          <span data-testid="chiuso-ora" className="rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium text-white/80">Chiuso ora</span>
+                        )}
                       </span>
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
@@ -462,6 +507,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
+                    ) : googleLine(d) ? (
+                      <span data-testid="riga-google" className="mt-2 line-clamp-3 block text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
                     {d?.matchReason && (
                       <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
@@ -469,8 +516,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                     {place.tags && place.tags.length > 0 && (
                       <span className="mt-2 flex flex-wrap gap-1.5">
-                        {place.tags.slice(0, 3).map((t) => (
-                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{t}</span>
+                        {sortTags(place.tags).slice(0, 3).map((t) => (
+                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{tagLabel(t)}</span>
                         ))}
                       </span>
                     )}
@@ -489,6 +536,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               </li>
             );
           })}
+          {/* In fondo al carosello: i tester segnalano una ricerca che non va (email già scritta). */}
+          {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
+            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
+              <a
+                data-testid="ricerca-feedback"
+                href={searchFeedbackMailto(title, places.map((p) => p.name))}
+                className="flex h-full min-h-[190px] flex-col justify-center rounded-card border-2 border-dashed border-white/70 bg-surface/95 p-4 text-left shadow-float active:scale-[0.99]"
+              >
+                <span className="text-2xl" aria-hidden>🤔</span>
+                <span className="mt-2 font-title text-base font-semibold leading-snug text-brand">Questi risultati non vanno?</span>
+                <span className="mt-1 text-sm font-sans text-text-muted">Dimmelo: si apre un&apos;email già scritta con la tua ricerca.</span>
+              </a>
+            </li>
+          )}
         </ul>
       </div>
     );
@@ -547,7 +608,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             ✕
           </button>
         </div>
-        {quickFiltersOn && <div className="px-1 pb-2">{quickChips}</div>}
+        {(quickFiltersOn || nearestOn) && <div className="px-1 pb-2">{quickChips}</div>}
         {places.length === 0 && allPlaces.length > 0 && (
           <p className="px-2 py-6 text-center text-sm text-text-muted">{NO_MATCH}</p>
         )}
@@ -579,6 +640,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         Aperto ora
                       </span>
                     )}
+                    {details?.[place.id]?.openNow === false && (
+                      <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-border/60 px-1.5 py-0.5 text-[10px] font-display font-medium text-text-muted">
+                        Chiuso ora
+                      </span>
+                    )}
                     {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount) && (
                       <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-1.5 py-0.5 text-[10px] font-display font-semibold text-accent">
                         💎 Poco conosciuto
@@ -591,6 +657,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                   ) : loadingVerdicts && details ? (
                     <SkeletonLines />
+                  ) : googleLine(details?.[place.id]) ? (
+                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 block text-sm font-sans leading-snug text-text-muted">
+                      {googleLine(details?.[place.id])}
+                    </span>
                   ) : null}
                   {details?.[place.id]?.matchReason && (
                     <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">
@@ -609,9 +679,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                   {place.tags && place.tags.length > 0 && (
                     <span className="mt-2 flex flex-wrap gap-1.5">
-                      {place.tags.map((t) => (
+                      {sortTags(place.tags).map((t) => (
                         <span key={t} className="rounded-pill border border-accent/40 px-2 py-0.5 text-[11px] font-display font-medium text-accent">
-                          {t}
+                          {tagLabel(t)}
                         </span>
                       ))}
                     </span>

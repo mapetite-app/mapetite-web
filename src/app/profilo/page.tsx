@@ -86,6 +86,10 @@ export default async function ProfiloPage() {
     a[0] === "Altre zone" ? 1 : b[0] === "Altre zone" ? -1 : b[1].length - a[1].length,
   );
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
+  // Contatori come il profilo di Places: voglio andarci / ci sono stato / città.
+  const wantCount = saved.filter((r) => r.tags?.includes("Da provare")).length;
+  const doneCount = saved.filter((r) => r.tags?.includes("Già visitato")).length;
+  const cityCount = cityGroups.filter(([c]) => c !== "Altre zone").length;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -99,6 +103,12 @@ export default async function ProfiloPage() {
             {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
             {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
           </p>
+          {saved.length > 0 && (
+            <p data-testid="profilo-contatori" className="mt-0.5 text-sm text-text-muted">
+              📌 {wantCount} da provare · ✓ {doneCount} {doneCount === 1 ? "visitato" : "visitati"}
+              {cityCount > 0 && ` · ${cityCount} ${cityCount === 1 ? "città" : "città"}`}
+            </p>
+          )}
           <Link href="/me" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
             I tuoi gusti →
           </Link>
@@ -129,13 +139,16 @@ export default async function ProfiloPage() {
                 {rows.map(({ places: place, tags, note }, i) =>
                   place ? (
                     <li key={place.id ?? i}>
-                      <PlaceCard
-                        name={place.name}
-                        category={place.category}
-                        address={place.address}
-                        tags={tags ?? undefined}
-                        note={note}
-                      />
+                      {/* Tocco: apre la scheda del locale sulla mappa (prima la card non portava da nessuna parte). */}
+                      <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato" className="block active:scale-[0.99]">
+                        <PlaceCard
+                          name={place.name}
+                          category={place.category}
+                          address={place.address}
+                          tags={tags ?? undefined}
+                          note={note}
+                        />
+                      </Link>
                     </li>
                   ) : null
                 )}
