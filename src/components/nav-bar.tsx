@@ -117,6 +117,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center bg-surface border-t border-border shadow-float pb-[env(safe-area-inset-bottom)] md:hidden">
         <Link
           href="/mappa"
+          aria-current={mapActive ? "page" : undefined}
           className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
             mapActive ? "text-brand" : "text-text-muted"
           }`}
@@ -185,6 +186,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
         <nav className="flex items-center gap-1">
           <Link
             href="/mappa"
+            aria-current={mapActive ? "page" : undefined}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
               mapActive
                 ? "text-white bg-brand"

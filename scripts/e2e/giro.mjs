@@ -825,7 +825,20 @@ else {
   await p.unroute("**/rest/v1/saved_places**");
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
-  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(!p.url().includes("vista="), "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
+  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
+  await p.waitForTimeout(300);
+  ok(p.url().includes("vista=salvati") && (await p.locator("nav").first().getByRole("link", { name: "Salvati" }).getAttribute("aria-current")) === "page", "salvati aperti: 'Salvati' resta acceso nella barra in basso");
+  await p.goto(`${BASE}/mappa?vista=salvati&stato=voglio`, { waitUntil: "networkidle" });
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+  ok((await p.getByTestId("salvati-filtri").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true" && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
+  await p.getByRole("button", { name: "Esplora" }).click();
+  await p.waitForTimeout(300);
+  ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
+  await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "già sulla mappa: 'Salvati' in basso apre i salvati"), () => ok(false, "già sulla mappa: 'Salvati' in basso apre i salvati"));
+  // In sviluppo il pallino "N" di Next copre "Mappa": si tocca il link direttamente.
+  await p.locator("nav").first().getByRole("link", { name: "Mappa" }).evaluate((a) => a.click());
+  await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Mappa' in basso torna a Esplora"), () => ok(false, "'Mappa' in basso torna a Esplora"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
 
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato

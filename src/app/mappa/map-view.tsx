@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -1503,6 +1503,38 @@ export default function MapView({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Tocco su "Salvati" / "Mappa" nella barra in basso mentre si è già sulla mappa: la pagina
+  // non si ricarica, cambia solo ?vista=… e la mappa segue.
+  const vistaParam = useSearchParams().get("vista");
+  const lastVista = useRef(vistaParam);
+  useEffect(() => {
+    if (lastVista.current === vistaParam) return;
+    lastVista.current = vistaParam;
+    // Fuori dal ciclo dell'effetto, come gli altri arrivi dall'indirizzo.
+    if (vistaParam === "salvati" && view !== "saved") {
+      setTimeout(() => {
+        setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
+        setView("saved"); dispatch({ type: "OPEN_LIST" });
+      }, 0);
+    } else if (vistaParam !== "salvati" && view === "saved") {
+      setTimeout(() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); dispatch({ type: "RESET" }); }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- segue solo l'indirizzo
+  }, [vistaParam]);
+
+  // L'indirizzo dice se si stanno guardando i salvati (?vista=salvati): la barra in basso accende "Salvati".
+  // Non al primo disegno: lì è l'indirizzo a decidere la vista (vedi sotto).
+  const viewSynced = useRef(false);
+  useEffect(() => {
+    if (!viewSynced.current) { viewSynced.current = true; return; }
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get("vista") === "salvati") === (view === "saved")) return;
+    if (view === "saved") params.set("vista", "salvati");
+    else params.delete("vista");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, [view]);
+
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
@@ -1520,12 +1552,18 @@ export default function MapView({
       setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
       return;
     }
-    // Scorciatoia dell'app installata: /mappa?vista=salvati apre subito "I miei salvati".
+    // "Salvati" nella barra in basso e scorciatoia dell'app installata: /mappa?vista=salvati apre "I miei salvati".
+    // Dal profilo anche già filtrati: &stato=voglio|fatto oppure &tag=<raccolta>.
+    // vista=salvati resta nell'indirizzo (così "Salvati" resta acceso in basso); stato e tag si tolgono.
     if (params.get("vista") === "salvati") {
-      params.delete("vista");
+      const stato = params.get("stato");
+      const tag = params.get("tag")?.trim().slice(0, 60) || null;
+      const startTag = stato === "voglio" ? VISIT_WANT : stato === "fatto" ? VISIT_DONE : tag;
+      params.delete("stato");
+      params.delete("tag");
       const rest = params.toString();
       window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
-      setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
+      setTimeout(() => { setWelcomeDismissed(true); setActiveTag(startTag); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
       return;
     }
     // Dalla home "Oppure cerca con i filtri" (/mappa?filtri=1): apre subito il pannello dei filtri.
