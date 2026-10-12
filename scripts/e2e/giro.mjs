@@ -296,6 +296,7 @@ await page.getByTestId("articolo").getByText("Vista vera sui tetti di Roma.").wa
 ok((await page.getByTestId("articolo-locale").count()) === 2, "articolo: un paragrafo per ogni locale (l'escluso non c'è)");
 ok((await page.getByTestId("articolo-intro").textContent())?.startsWith("Ho scelto 2 posti per te"), "articolo: frase di apertura con cosa ha capito");
 ok(await page.getByTestId("articolo").getByText("Ha una vera terrazza.").isVisible(), "articolo: verdetto e motivo scritti come un consiglio");
+ok(decodeURIComponent((await page.getByTestId("articolo-feedback").getAttribute("href")) ?? "").includes("2. Rooftop Tre"), "articolo: in fondo 'Questi risultati non vanno?' con i locali mostrati");
 ok(await page.getByTestId("articolo").locator("img[alt='Terrazza Uno']").isVisible(), "articolo: foto grande del locale");
 await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
 await page.getByTestId("articolo-condividi").click();

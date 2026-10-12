@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowUp, Share2 } from "lucide-react";
 import { useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import { followUpQuery } from "@/lib/follow-up";
+import { searchFeedbackMailto } from "@/lib/feedback";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import PlacePhoto from "@/components/place-photo";
@@ -179,6 +180,15 @@ export default function AnswerArticle({
             })}
           </ol>
           {n === 0 && <p className="mt-6 text-sm text-text-muted">Nessun locale con questi filtri: togline qualcuno dalla mappa.</p>}
+          {n > 0 && !loadingVerdicts && (
+            <a
+              data-testid="articolo-feedback"
+              href={searchFeedbackMailto(title, places.map((p) => p.name))}
+              className="mt-10 block rounded-card border-2 border-dashed border-border p-4 text-sm font-sans text-text-muted"
+            >
+              🤔 <span className="font-display font-semibold text-brand">Questi risultati non vanno?</span> Dimmelo: si apre un&apos;email già scritta con la tua ricerca.
+            </a>
+          )}
         </div>
       </div>
 
