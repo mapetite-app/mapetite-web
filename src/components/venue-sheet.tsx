@@ -95,6 +95,7 @@ export default function VenueSheet({
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [addressCopied, setAddressCopied] = useState(false);
   const share = async () => {
     const url = mapsUrl;
     const text = verdict ? `${name} — ${verdict}` : name;
@@ -268,7 +269,18 @@ export default function VenueSheet({
         </div>
 
         {address && (
-          <p className="mt-1 text-xs font-sans text-text-muted">{address}</p>
+          // Tocco sull'indirizzo: lo copia (per mandarlo a chi viene con te o incollarlo in un'altra app).
+          <button
+            type="button"
+            data-testid="copia-indirizzo"
+            onClick={async () => {
+              try { await navigator.clipboard.writeText(address); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+            }}
+            className="mt-1 flex min-h-8 items-center gap-1.5 text-left text-xs font-sans text-text-muted"
+          >
+            <span>{address}</span>
+            <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
+          </button>
         )}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs font-display font-semibold text-accent">
           Orari, foto e recensioni su Google Maps →
