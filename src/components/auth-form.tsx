@@ -66,6 +66,11 @@ export default function AuthForm({
               className={FIELD}
             />
             {!login && <p className="mt-1 text-xs font-sans text-text-muted">Almeno 6 caratteri.</p>}
+            {login && (
+              <Link href="/password-dimenticata" className="mt-1.5 inline-block text-sm font-sans text-text-muted underline underline-offset-2">
+                Password dimenticata?
+              </Link>
+            )}
           </div>
           <SubmitButton className="h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
             {login ? "Accedi" : "Registrati"}

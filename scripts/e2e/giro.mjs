@@ -816,7 +816,7 @@ else {
     pin = await p.getByTestId("pin").first().boundingBox({ timeout: 1000 }).catch(() => null);
     if (pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) break;
   }
-  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
+  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, `filtro Milano: la mappa si sposta su Milano (pin visibile${pin ? "" : ", nessun pin"}${pin && !(pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) ? ` ma a ${Math.round(pin.x)},${Math.round(pin.y)}` : ""})`);
   await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
@@ -1243,6 +1243,51 @@ else {
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   ok(await lp.getByTestId("importa-condividi-android").getByText("Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.").isVisible(), "importa: riga sul Condividi dello screenshot da Android");
   await lctx.close();
+}
+
+// "Password dimenticata?": richiesta del link e nuova password (Supabase Auth simulato, nessuna email).
+{
+  const rctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  let recover = null;
+  let newPassword = null;
+  await rctx.route("**/auth/v1/recover**", (r) => { recover = { url: r.request().url(), body: r.request().postDataJSON() }; return r.fulfill({ json: {} }); });
+  const user = { id: "00000000-0000-0000-0000-000000000009", aud: "authenticated", email: "giulia@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-10-01T00:00:00Z" };
+  await rctx.route("**/auth/v1/user**", (r) => {
+    if (r.request().method() === "PUT") { newPassword = r.request().postDataJSON()?.password ?? null; }
+    return r.fulfill({ json: user });
+  });
+  const rp = await rctx.newPage();
+  rp.on("pageerror", (e) => errors.push(e.message));
+  await rp.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await rp.getByRole("link", { name: "Password dimenticata?" }).click();
+  await rp.waitForURL(/\/password-dimenticata/);
+  await rp.getByLabel("Email").fill("giulia@example.com");
+  await rp.getByRole("button", { name: "Mandami il link" }).click();
+  await rp.getByTestId("reset-inviato").waitFor({ timeout: 5000 });
+  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes("redirect_to=http://localhost:3000/reimposta-password"), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
+  ok(!recover?.body?.code_challenge, "password dimenticata: link che funziona anche aperto in un altro browser (niente PKCE)");
+  await rp.screenshot({ path: `${OUT}/37-password-dimenticata.png`, caret: "initial" });
+  await rp.goto(`${BASE}/reimposta-password`, { waitUntil: "networkidle" });
+  await rp.getByTestId("reset-scaduto").waitFor({ timeout: 4000 });
+  ok(await rp.getByRole("link", { name: "Mandami un nuovo link" }).isVisible(), "reimposta password senza link valido: lo dice e propone un nuovo link");
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const jwt = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const access = `${jwt({ alg: "HS256", typ: "JWT" })}.${jwt({ sub: user.id, exp, aud: "authenticated", email: user.email, role: "authenticated" })}.c2lnbmF0dXJh`;
+  await rp.goto(`${BASE}/login`, { waitUntil: "networkidle" }); // stesso indirizzo con solo l'hash diverso non ricarica la pagina
+  await rp.goto(`${BASE}/reimposta-password#access_token=${access}&refresh_token=rt&expires_in=3600&expires_at=${exp}&token_type=bearer&type=recovery`, { waitUntil: "networkidle" });
+  await rp.getByLabel("Nuova password").waitFor({ timeout: 5000 });
+  ok(!rp.url().includes("access_token"), "reimposta password: il token sparisce dall'indirizzo");
+  await rp.getByLabel("Nuova password").fill("nuova123");
+  await rp.getByLabel("Riscrivila").fill("nuova124");
+  await rp.getByRole("button", { name: "Salva la nuova password" }).click();
+  ok(await rp.getByText("Le due password non coincidono.").isVisible(), "reimposta password: avvisa se le due password sono diverse");
+  await rp.getByLabel("Riscrivila").fill("nuova123");
+  await rp.screenshot({ path: `${OUT}/38-nuova-password.png`, caret: "initial" });
+  await rp.getByRole("button", { name: "Salva la nuova password" }).click();
+  await rp.getByTestId("reset-fatto").waitFor({ timeout: 5000 });
+  ok(newPassword === "nuova123", "reimposta password: salva la nuova password su Supabase");
+  ok(await rp.getByRole("link", { name: "Vai alla mappa" }).isVisible(), "reimposta password: 'Vai alla mappa' dopo il salvataggio");
+  await rctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
