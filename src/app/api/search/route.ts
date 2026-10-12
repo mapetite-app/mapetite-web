@@ -78,6 +78,8 @@ export async function POST(request: Request) {
   let synthInput: SynthesisInput[] | null = null;
   let synthToken: string | null = null;
   let esclusi: string[] = [];
+  // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
+  const daParte: { turistici: string[]; fuori_tema: string[] } = { turistici: [], fuori_tema: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -120,6 +122,7 @@ export async function POST(request: Request) {
       const { places, demoted, rule } = demoteOffType(query.trim(), risultati);
       if (demoted.length > 0) {
         risultati = places;
+        daParte.fuori_tema = demoted.slice(0, 10);
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
@@ -128,6 +131,7 @@ export async function POST(request: Request) {
       const { places, demoted } = demoteMainstream(query.trim(), risultati);
       if (demoted.length > 0) {
         risultati = places;
+        daParte.turistici = demoted.slice(0, 10);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
       }
     }
@@ -404,6 +408,7 @@ ESEMPI (input → output atteso):
   return NextResponse.json({
     risultati: risultatiFinali,
     filtri_usati: filtri,
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 ? { da_parte: daParte } : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
     ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken } } : {}),
   });

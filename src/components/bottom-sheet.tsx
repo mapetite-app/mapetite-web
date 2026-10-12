@@ -39,6 +39,8 @@ export interface BottomSheetProps {
   onOrder?: (ids: string[]) => void;
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
+  // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
+  setAside?: { turistici: string[]; fuori_tema: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -154,7 +156,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -450,6 +452,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {title && understood.length > 0 && (
             <p data-testid="ho-capito" className="mt-0.5 basis-full line-clamp-2 text-xs font-sans text-accent">
               Ho capito: {understood.join(" · ")}
+            </p>
+          )}
+          {title && setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
+            <p data-testid="messi-da-parte" className="mt-0.5 basis-full line-clamp-2 text-xs font-sans text-text-muted">
+              🧭 {[
+                setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale turistico" : `${setAside.turistici.length} locali turistici`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
+                setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
+              ].filter(Boolean).join(" ")}
             </p>
           )}
         </div>

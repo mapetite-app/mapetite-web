@@ -560,6 +560,16 @@ await page.waitForTimeout(1500);
 }
 searchMode = "ok";
 
+// 5d. Il differenziatore si vede: i locali turistici messi da parte sono detti sotto il titolo
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: ["Tonnarello", "Nannarella", "Da Enzo"], fuori_tema: [] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("messi-da-parte").textContent()) === "🧭 Ho messo da parte 3 locali turistici (Tonnarello, Nannarella…)", "risultati: dice quali locali turistici ha messo da parte");
+  await shot("05d-messi-da-parte");
+}, () => ok(false, "risultati: dice quali locali turistici ha messo da parte"));
+await page.unroute("**/api/search");
+
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

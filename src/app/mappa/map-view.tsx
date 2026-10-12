@@ -825,7 +825,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; daParte?: { turistici: string[]; fuori_tema: string[] } | null } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -1483,7 +1483,7 @@ export default function MapView({
         }
         const id = ++searchSeq.current;
         setClusterPlaces(null); setFilterError(null);
-        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q });
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
         setVenueDetails(details); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
@@ -2815,6 +2815,7 @@ export default function MapView({
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
+          setAside={aiSearch?.daParte ?? null}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
