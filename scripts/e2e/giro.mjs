@@ -575,6 +575,16 @@ if (shared) {
   ok(body && Math.abs(body.lat - at[0]) < 1e-6 && Math.abs(body.lng - at[1]) < 1e-6, "link ricerca: cerca nel punto di chi ha condiviso");
   ok(!new URL(page.url()).searchParams.has("q"), "link ricerca: dopo l'apertura 'q' sparisce dall'indirizzo (ricaricare non ripete)");
   await shot("14-link-ricerca");
+  // Link aperto a freddo: i risultati arrivano prima che la mappa sia pronta; la mappa deve
+  // comunque spostarsi sui risultati (qui il punto è Milano, i risultati sono a Roma).
+  await page.goto(`${BASE}/mappa?q=rooftop%20a%20Roma&at=45.46,9.19`, { waitUntil: "networkidle" });
+  let inView = false;
+  for (let t = 0; t < 10 && !inView; t++) {
+    await page.waitForTimeout(500);
+    const boxes = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y }; }));
+    inView = boxes.some((b) => b.x > 0 && b.x < 390 && b.y > 100 && b.y < 844 * 0.6);
+  }
+  ok(inView, "link ricerca aperto a freddo: la mappa si sposta sui risultati");
   await page.unroute("**/api/search");
 }
 

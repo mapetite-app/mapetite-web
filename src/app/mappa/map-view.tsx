@@ -1401,10 +1401,16 @@ export default function MapView({
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
+  // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
+  // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
+  const pendingFitRef = useRef<{ list: Place[]; top: number } | null>(null);
+  // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
+  const mapReadyRef = useRef(false);
   const fitToPlaces = (list: Place[], top = 190) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map) return;
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
+    pendingFitRef.current = null;
     const lngs = list.map((p) => p.lng);
     const lats = list.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -2389,6 +2395,11 @@ export default function MapView({
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        onLoad={() => {
+          mapReadyRef.current = true;
+          const pending = pendingFitRef.current;
+          if (pending) fitToPlaces(pending.list, pending.top);
+        }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
           if (map) hidePoiLabels(map);
