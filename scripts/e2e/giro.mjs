@@ -75,8 +75,8 @@ await ctx.route("**/api/search/synthesis", async (route) => {
 });
 const page = await ctx.newPage();
 const errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
+page.on("pageerror", (e) => errors.push(e.message + (process.env.E2E_DEBUG ? " STACK " + (e.stack ?? "").slice(0, 600) + " @ " + page.url() : "")));
+page.on("console", async (m) => { if (process.env.E2E_DEBUG && m.type() === "error") console.log("CONSOLE-ERR", m.text().slice(0, 200), JSON.stringify(m.location()), await Promise.all(m.args().map((a) => a.evaluate((v) => (v && v.stack) ? String(v.stack).slice(0, 400) : String(v)).catch(() => "?")))); if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
 // caret "initial": nascondere il cursore aggiunge uno stile ai campi e, durante il caricamento, React lo segnala come differenza.
 const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
 
@@ -418,6 +418,7 @@ await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
 // 5e4. Senza rete: avviso in alto e messaggio chiaro se si cerca dalla barra
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.waitForTimeout(1500); // la mappa finisce di scaricare caratteri e riquadri prima di togliere la rete
 await ctx.setOffline(true);
 await page.waitForTimeout(300);
 ok(await page.getByTestId("offline").isVisible(), "senza rete: avviso 'Sei senza connessione'");
@@ -1056,7 +1057,7 @@ else {
     np.on("pageerror", (e) => errors.push(e.message));
     await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
     await np.getByRole("button", { name: "📋 Incolla link" }).click();
-    ok(await np.getByLabel("Link di Google Maps").isVisible({ timeout: 3000 }).catch(() => false), "incolla senza permesso: compare il campo per incollare a mano");
+    ok(await np.getByLabel("Link di Google Maps").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
     await np.getByLabel("Link di Google Maps").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
     await np.getByRole("button", { name: "Salva", exact: true }).click();
     await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
@@ -1080,7 +1081,7 @@ else {
   await lctx.close();
 }
 
-ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
+ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
