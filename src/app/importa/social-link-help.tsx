@@ -20,8 +20,8 @@ export default function SocialLinkHelp({
     <div className="space-y-3 rounded-card border border-accent/40 bg-accent/10 p-4" data-testid="link-social">
       <p className="text-sm text-text">
         <span aria-hidden>📸 </span>
-        Da Instagram e TikTok non posso leggere il post. Fai uno screenshot del post e condividilo a Mapetite (Android)
-        oppure caricalo qui sotto in &apos;Da uno screenshot&apos;.
+        Da Instagram e TikTok non posso leggere il post. Fai uno screenshot del post e caricalo con il pulsante qui
+        sotto: leggo io nome e città del locale. Su Android puoi anche condividerlo direttamente a Mapetite.
       </p>
       {source === "YouTube" && (
         <p className="text-xs text-text-muted">Vale anche per gli Shorts di YouTube.</p>
@@ -42,7 +42,7 @@ export default function SocialLinkHelp({
             data-testid="link-social-cerca"
             className="min-h-11 max-w-full truncate rounded-pill border border-brand bg-white px-4 text-sm font-display font-semibold text-brand"
           >
-            Cerca &lsquo;{hint}&rsquo;
+            Cerca “{hint}”
           </button>
         )}
       </div>
