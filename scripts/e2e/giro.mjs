@@ -77,6 +77,8 @@ await ctx.route("**/api/search/synthesis", async (route) => {
   return route.fulfill({ json: SYNTH });
 });
 const page = await ctx.newPage();
+// L'intro del primo accesso sulla home ha i suoi controlli (5h0, contesto pulito): qui risulta già vista.
+await page.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message + (process.env.E2E_DEBUG ? " STACK " + (e.stack ?? "").slice(0, 600) + " @ " + page.url() : "")));
 page.on("console", async (m) => { if (process.env.E2E_DEBUG && m.type() === "error") console.log("CONSOLE-ERR", m.text().slice(0, 200), JSON.stringify(m.location()), await Promise.all(m.args().map((a) => a.evaluate((v) => (v && v.stack) ? String(v.stack).slice(0, 400) : String(v)).catch(() => "?")))); if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
@@ -448,6 +450,62 @@ await page.getByLabel("Scrivi cosa cerchi").fill("aperitivo sul tetto a Monti");
 await page.getByLabel("Scrivi cosa cerchi").press("Enter");
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitivo sul tetto"), "card iniziale: si scrive e si cerca senza aprire altri pannelli");
+
+// 5h0. Primo accesso alla home: intro in 3 schermate (stile Albo), una sola volta per telefono
+{
+  const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await ictx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+  const ip = await ictx.newPage();
+  ip.on("pageerror", (e) => errors.push(e.message));
+  const intro = ip.getByTestId("intro");
+  await ip.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await intro.isVisible() && (await intro.getAttribute("data-step")) === "1", "intro: chi apre la home la prima volta vede la schermata 1");
+  ok(await ip.getByRole("heading", { name: "Non perdere più i posti che scopri" }).isVisible() && await ip.getByTestId("intro-salta").isVisible(), "intro 1: raccogli (Instagram, TikTok, Google Maps) e 'Salta'");
+  await ip.screenshot({ path: `${OUT}/00-intro-1.png`, caret: "initial" });
+  await ip.getByTestId("intro-avanti").click();
+  ok((await intro.getAttribute("data-step")) === "2" && await ip.getByRole("heading", { name: "Ritrovali quando devi scegliere" }).isVisible(), "intro: 'Avanti' porta alla schermata 2 (ritrova)");
+  await ip.screenshot({ path: `${OUT}/00-intro-2.png`, caret: "initial" });
+  await ip.getByRole("button", { name: "Indietro" }).click();
+  ok((await intro.getAttribute("data-step")) === "1", "intro: la freccia torna indietro");
+  await ip.getByTestId("intro-avanti").click();
+  await ip.getByTestId("intro-avanti").click();
+  ok((await intro.getAttribute("data-step")) === "3" && await ip.getByRole("heading", { name: "Posti giusti per te, non quelli di tutti" }).isVisible(), "intro: schermata 3 (posti giusti per te, verdetto)");
+  ok(await ip.getByTestId("intro-registrati").isVisible() && await ip.getByTestId("intro-prova").isVisible() && !(await ip.getByTestId("intro-salta").isVisible()), "intro 3 senza account: 'Crea il tuo account' e 'Prova senza account'");
+  ok((await ip.getByTestId("intro-registrati").getAttribute("href")) === "/signup", "intro: 'Crea il tuo account' porta alla registrazione");
+  ok((await intro.getByTestId("intro-avanti").count()) === 0, "intro: al massimo 3 schermate");
+  await ip.screenshot({ path: `${OUT}/00-intro-3.png`, caret: "initial" });
+  await ip.getByTestId("intro-prova").click();
+  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible() && (await ip.getByTestId("home-suggerimenti").getByRole("link").count()) === 4, "intro: finisce sulla barra di ricerca con le frasi d'esempio");
+  await ip.reload({ waitUntil: "networkidle" });
+  ok((await intro.count()) === 0, "intro: mostrata una volta sola (ricaricando non torna)");
+  await ip.getByRole("button", { name: "Come funziona" }).click();
+  ok(await intro.isVisible() && (await intro.getAttribute("data-step")) === "1", "home: 'Come funziona' riapre l'intro dalla prima schermata");
+  await ip.getByTestId("intro-salta").click();
+  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible(), "intro: 'Salta' chiude e mostra la ricerca");
+  await ip.goto(`${BASE}/?intro=1`, { waitUntil: "networkidle" });
+  ok(await intro.isVisible(), "intro: /?intro=1 la riapre anche se già vista");
+  await ip.getByTestId("intro-salta").click();
+  ok(!ip.url().includes("intro="), "intro: chiusa, ?intro=1 sparisce dall'indirizzo");
+  await ictx.close();
+
+  // Nessun lampo: prima che React parta (script dell'app bloccati) decide il CSS, guidato dallo script del layout.
+  for (const seen of [false, true]) {
+    const nctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    if (seen) await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await nctx.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => route.abort()); // il CSS resta
+    const np = await nctx.newPage();
+    await np.goto(`${BASE}/`, { waitUntil: "load" });
+    const vis = await np.getByTestId("intro").isVisible();
+    ok(seen ? !vis : vis, seen ? "intro: chi l'ha già vista non la vede nemmeno per un attimo" : "intro: al primo accesso è visibile dal primo disegno (niente lampo della home)");
+    await nctx.close();
+  }
+  // Senza JavaScript: niente intro, la home funziona lo stesso.
+  const jctx = await browser.newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false });
+  const jp = await jctx.newPage();
+  await jp.goto(`${BASE}/`, { waitUntil: "load" });
+  ok(!(await jp.getByTestId("intro").isVisible()) && await jp.getByLabel("Cosa cerchi?").isVisible(), "intro: senza JavaScript non compare e la ricerca resta usabile");
+  await jctx.close();
+}
 
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
