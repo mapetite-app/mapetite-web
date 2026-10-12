@@ -90,10 +90,16 @@ function SaveModal({
     if (raw === "") return null;
     return tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase()) ?? raw.charAt(0).toUpperCase() + raw.slice(1);
   };
+  // Aggiunge un tag; se è uno stato ("Da provare" / "Già visitato") toglie l'altro.
+  const withTag = (prev: string[], tag: string): string[] => {
+    if (prev.includes(tag)) return prev;
+    const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
+    return [...prev.filter((t) => t !== other), tag];
+  };
   const addNewTag = () => {
     const tag = normalizeNewTag(newTag);
     setNewTag(null);
-    if (tag) setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+    if (tag) setSelectedTags((prev) => withTag(prev, tag));
   };
   const newTagControl = (chipClass: string) =>
     newTag === null ? (
@@ -129,7 +135,7 @@ function SaveModal({
       const supabase = createClient();
       // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
       const pending = normalizeNewTag(newTag);
-      const allTags = pending && !selectedTags.includes(pending) ? [...selectedTags, pending] : selectedTags;
+      const allTags = pending ? withTag(selectedTags, pending) : selectedTags;
       const tags = allTags.length > 0 ? allTags : null;
       const noteValue = note.trim() || null;
 
@@ -751,6 +757,8 @@ export default function MapView({
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   // Stato scelto in scheda prima di aprire Salva ("Voglio andarci" / "Ci sono stato"); vuoto dal segnalibro.
   const [pendingSaveTags, setPendingSaveTags] = useState<string[]>([]);
+  // Salvato da aprire appena arrivano i salvati (link dal profilo: /mappa?salvato=UUID).
+  const openSavedRef = useRef<string | null>(null);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
@@ -965,12 +973,11 @@ export default function MapView({
       });
   }, [userId]);
 
+  // UUID del locale aperto: le recensioni si ricaricano solo se cambia davvero locale
+  // (non a ogni aggiornamento di placeUuids, es. dopo un salvataggio dalla scheda).
+  const selectedUuid = selected ? resolveUuid(selected.id) : null;
   useEffect(() => {
-    if (!selected) {
-      setSelectedReviews(null);
-      return;
-    }
-    const uuid = resolveUuid(selected.id);
+    const uuid = selectedUuid;
     if (!uuid) {
       setSelectedReviews(null);
       return;
@@ -1001,7 +1008,7 @@ export default function MapView({
         });
       });
     return () => { cancelled = true; };
-  }, [selected?.id, placeUuids]);
+  }, [selectedUuid]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1089,6 +1096,7 @@ export default function MapView({
         setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dispatch serve solo al link dal profilo, una volta
   }, [userId]);
 
   const handleToggle = (placeId: string, saved: boolean) => {
@@ -1461,7 +1469,6 @@ export default function MapView({
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
-  const openSavedRef = useRef<string | null>(null);
   useEffect(() => {
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
@@ -1831,6 +1838,16 @@ export default function MapView({
                   <span className="line-clamp-2">↻ {r}</span>
                 </button>
               ))}
+              {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearRecentSearches}
+                  aria-label="Cancella le ricerche recenti"
+                  className="min-h-14 shrink-0 rounded-card px-2 text-xs font-sans text-text-muted active:scale-95"
+                >
+                  Cancella
+                </button>
+              )}
               {WELCOME_EXAMPLES.map((ex) => (
                 <button
                   key={ex.query}
@@ -2263,7 +2280,9 @@ export default function MapView({
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
-              onQuickSave={(st) => {
+              // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
+              // rapido, eviterebbe un doppione in places.
+              onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
                 if (!userId) { window.location.href = "/login"; return; }
                 setPendingSaveTags([st]);
                 setPendingSavePlaceId(selected.id);
@@ -2470,6 +2489,7 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
+          showSearchFeedback={clusterPlaces === null}
           onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {
             // Come la mappa condivisibile di Mapstr, ma senza dati pubblici: un messaggio con i link.
             const lines = list.slice(0, 30).map((p) => {

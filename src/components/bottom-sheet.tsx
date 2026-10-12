@@ -48,6 +48,8 @@ export interface BottomSheetProps {
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
   onSave?: (place: Place) => void;
+  // Card finale "Questi risultati non vanno?": solo per la ricerca intera, non per un gruppo di pin.
+  showSearchFeedback?: boolean;
   // Condivide la lista mostrata (salvati): testo con nomi e link Google Maps.
   onShareList?: (places: Place[]) => Promise<"shared" | "copied" | null>;
   // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
@@ -137,7 +139,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, onShareList, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -522,7 +524,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             );
           })}
           {/* In fondo al carosello: i tester segnalano una ricerca che non va (email già scritta). */}
-          {title && !loadingVerdicts && places.length > 0 && (
+          {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
             <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
               <a
                 data-testid="ricerca-feedback"
@@ -593,7 +595,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             ✕
           </button>
         </div>
-        {quickFiltersOn && <div className="px-1 pb-2">{quickChips}</div>}
+        {(quickFiltersOn || nearestOn) && <div className="px-1 pb-2">{quickChips}</div>}
         {places.length === 0 && allPlaces.length > 0 && (
           <p className="px-2 py-6 text-center text-sm text-text-muted">{NO_MATCH}</p>
         )}

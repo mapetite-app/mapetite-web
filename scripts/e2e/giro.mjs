@@ -861,6 +861,12 @@ else {
   await v.screenshot({ path: `${OUT}/23-salva-foglio.png`, caret: "initial" });
   await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false", "salva B: gli stati si escludono a vicenda");
+  // Scrivere a mano uno stato ("da provare") toglie l'altro, come i pulsanti
+  await sheet.getByTestId("nuovo-tag").click();
+  await sheet.getByLabel("Nuovo tag").fill("da provare");
+  await sheet.getByLabel("Nuovo tag").press("Enter");
+  ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true" && (await sheet.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva B: uno stato scritto a mano esclude l'altro");
+  await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
   await sheet.getByRole("button", { name: "Con amici" }).click();
   await sheet.getByTestId("nuovo-tag").click();
   await sheet.getByLabel("Nuovo tag").fill("  brunch  ");
