@@ -1755,6 +1755,55 @@ else {
   await pctx.close();
 }
 
+// QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
+{
+  const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const qRows = [
+    { tags: ["Romantico", "Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000301", name: "Terrazza Uno", category: "bar", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.915, lng: 12.497, google_place_id: "GQ1", rating: 4.6, price_level: 2 } },
+    { tags: ["Economico"], note: null, places: { id: "00000000-0000-4000-8000-000000000302", name: "Forno Due", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.87, lng: 12.48, google_place_id: "GQ2", rating: 4.5, price_level: 1 } },
+  ];
+  await qctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: qRows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: qRows }));
+  await qctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await qctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+  await qctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await qctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  const qp = await qctx.newPage();
+  qp.on("pageerror", (e) => errors.push(e.message));
+  const hscroll = () => qp.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  // Il testo d'esempio di un campo si legge per intero (non "Chiedi all'AI cosa c").
+  const placeholderFits = (sel) => qp.locator(sel).evaluate((i) => { const s = getComputedStyle(i); const c = document.createElement("canvas").getContext("2d"); c.font = s.font; return c.measureText(i.placeholder).width <= i.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - 16; });
+  for (const path of ["/", "/onboarding", "/login", "/signup", "/stasera", "/importa", "/importa/condividi", "/importa/condividi/immagine?errore=x", "/pagina-che-non-esiste"]) {
+    await qp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    ok(await hscroll() <= 0, `360px: ${path} senza scorrimento orizzontale`);
+  }
+  await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
+  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(Apri la mappa|accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 3 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
+  await qp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
+  await qp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
+  ok(await qp.getByTestId("condividi-vuoto").getByRole("link", { name: "Incolla il link in Importa" }).isVisible(), "condividi senza link: c'è un'azione per andare avanti");
+  await qp.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+  { const gap = await qp.evaluate(async () => { scrollTo(0, document.documentElement.scrollHeight); await new Promise((r) => setTimeout(r, 200)); const nav = document.querySelector("nav.fixed"); const m = document.querySelector("main"); return nav && m ? Math.round(nav.getBoundingClientRect().top - m.getBoundingClientRect().bottom) : null; });
+    ok(gap !== null && gap <= 0, `360px stasera: lo sfondo arriva fin sotto la barra, niente striscia bianca (${gap}px)`); }
+  // Raccolte del profilo: nessuna parola spezzata su due righe ("Romantic/o").
+  const pr = (id, name) => ({ id: `00000000-0000-4000-8000-0000000004${id}`, name, category: "bar", address: "Via Po 2, Roma" });
+  const profiloQ = { email: "qa@example.com", reviews: [], saved: [
+    { created_at: "2026-10-10", tags: ["Romantico"], note: null, places: pr("01", "Uno") },
+    { created_at: "2026-10-09", tags: ["Economico", "Speciale"], note: null, places: pr("02", "Due") },
+    { created_at: "2026-10-08", tags: ["Weekend a Napoli con gli amici"], note: null, places: pr("03", "Tre") },
+  ] };
+  await qctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profiloQ)), url: BASE }]);
+  await qp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  if (await qp.getByTestId("raccolta-nome").first().isVisible()) {
+    const spezzate = await qp.getByTestId("raccolta-nome").evaluateAll((els) => els.flatMap((el) => { const t = el.firstChild; if (!t) return []; const out = []; const re = /\S+/g; let m; while ((m = re.exec(t.textContent))) { const r = document.createRange(); r.setStart(t, m.index); r.setEnd(t, m.index + m[0].length); const tops = new Set([...r.getClientRects()].map((x) => Math.round(x.top))); if (tops.size > 1) out.push(m[0]); } return out; }));
+    ok(spezzate.length === 0, `360px profilo: nomi delle raccolte senza parole spezzate${spezzate.length ? " (" + spezzate.join(", ") + ")" : ""}`);
+    ok(await hscroll() <= 0, "360px: /profilo senza scorrimento orizzontale");
+  } else ok(false, "360px profilo: raccolte visibili (serve E2E_FAKE_USER)");
+  await qctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

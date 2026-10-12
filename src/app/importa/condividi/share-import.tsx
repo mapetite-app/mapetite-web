@@ -68,9 +68,15 @@ export default function ShareImport({
       )}
 
       {!fullText && (
-        <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">
-          Non è arrivato nessun link. In Google Maps apri il locale, tocca Condividi e scegli Mapetite.
-        </p>
+        <div className="space-y-3" data-testid="condividi-vuoto">
+          <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">
+            Non è arrivato nessun link. In Google Maps apri il locale, tocca Condividi e scegli Mapetite.
+          </p>
+          {/* Senza un'azione la pagina restava un vicolo cieco. */}
+          <Link href="/importa" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+            Incolla il link in Importa
+          </Link>
+        </div>
       )}
 
       {fullText && !userId && !social && (
@@ -80,7 +86,7 @@ export default function ShareImport({
             <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
               Accedi
             </Link>
-            <Link href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-medium text-text">
+            <Link href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
               Crea un account
             </Link>
           </div>
@@ -100,7 +106,7 @@ export default function ShareImport({
             type="button"
             onClick={() => { setBusy(true); setError(null); if (userId) void save(userId); }}
             disabled={busy}
-            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-medium text-text disabled:opacity-60"
+            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
           >
             Riprova
           </button>
@@ -109,7 +115,7 @@ export default function ShareImport({
 
       {(results || error) && (
         <p className="mt-6 text-sm text-text-muted">
-          <Link href="/importa" className="underline text-text">Salva altri locali</Link>
+          <Link href="/importa" className="inline-flex min-h-11 items-center font-display font-semibold text-brand underline underline-offset-2">Salva altri locali</Link>
         </p>
       )}
     </div>

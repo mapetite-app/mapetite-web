@@ -55,7 +55,7 @@ export default async function Home() {
             required
             minLength={3}
             enterKeyHint="search"
-            placeholder="Chiedi all'AI cosa cerchi…"
+            placeholder="Chiedi all'AI…"
             aria-label="Chiedi all'AI: cosa cerchi?"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
           />
@@ -71,9 +71,10 @@ export default async function Home() {
             →
           </button>
         </form>
-        <p className="mt-3 text-center text-xs font-sans text-text-muted">
-          <Link href="/mappa" className="font-semibold text-brand">Apri la mappa</Link> ·{" "}
-          <Link href="/login" className="font-semibold text-brand">accedi</Link> ·{" "}
+        {/* Link alti 40px (prima 15px): si toccano senza mirare. */}
+        <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs font-sans text-text-muted">
+          <Link href="/mappa" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">Apri la mappa</Link> ·
+          <Link href="/login" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">accedi</Link> ·
           <IntroAgain />
         </p>
       </div>

@@ -57,7 +57,7 @@ function MultiChip({
       type="button"
       onClick={() => onToggle(item.value)}
       className={[
-        "inline-flex items-center gap-1.5 rounded-pill px-4 py-2 text-sm font-display font-semibold transition-colors",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-pill px-4 py-2 text-sm font-display font-semibold transition-colors",
         selected
           ? "bg-brand text-white"
           : "border border-border bg-surface text-brand hover:border-brand",
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
                 {step + 1}/{totalSteps}
               </span>
               {/* Chi vuole provare subito l'app non è obbligato a rispondere: i gusti si danno dopo in "I tuoi gusti". */}
-              <a href="/mappa" data-testid="onboarding-salta" className="min-h-11 inline-flex items-center text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline">
+              <a href="/mappa" data-testid="onboarding-salta" className="-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline">
                 Salta
               </a>
             </span>
@@ -247,7 +247,7 @@ export default function OnboardingPage() {
               : "✨ Mostrami i posti per me"}
           </button>
           {error && (
-            <p className="mt-3 text-center text-sm text-red-600">{error}</p>
+            <p className="mt-3 text-center text-sm text-error">{error}</p>
           )}
         </div>
       </div>

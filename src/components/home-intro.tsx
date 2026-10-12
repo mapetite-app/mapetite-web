@@ -91,7 +91,7 @@ function IlluRitrova() {
   return (
     <div className="mx-auto w-full max-w-xs">
       <div className="mb-3 flex rounded-pill bg-surface p-1 text-sm font-display font-semibold">
-        <span className="flex-1 rounded-pill bg-brand py-1.5 text-center text-white">⭐ Voglio andarci</span>
+        <span className="flex-1 rounded-pill bg-brand py-1.5 text-center text-white">📌 Voglio andarci</span>
         <span className="flex-1 py-1.5 text-center text-text-muted">✓ Ci sono stato</span>
       </div>
       <div
@@ -288,7 +288,7 @@ export function IntroAgain() {
         forced = true;
         emit();
       }}
-      className="font-semibold text-brand"
+      className="inline-flex min-h-10 items-center px-1 font-semibold text-brand"
     >
       Come funziona
     </button>

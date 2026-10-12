@@ -170,13 +170,15 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
             <Link
               href={savedHref(tag)}
               data-testid="raccolta"
-              className="flex min-h-[72px] items-center gap-3 rounded-card bg-brand py-3 pl-3 pr-10 text-white shadow-card active:scale-[0.98] transition-transform duration-150"
+              className="flex min-h-[72px] flex-col items-start gap-2 rounded-card bg-brand p-3 text-white shadow-card active:scale-[0.98] transition-transform duration-150"
             >
-              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent font-title text-base font-semibold text-white">
+              {/* Iniziale sopra e nome a tutta larghezza: affiancati, a 360-390px il nome restava largo
+                  60-75px e si spezzava a metà parola ("Romantic/o"). Le parole vanno a capo intere. */}
+              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-title text-sm font-semibold text-white">
                 {tag.charAt(0).toUpperCase()}
               </span>
-              <span className="min-w-0">
-                <span className="line-clamp-2 break-words font-display text-sm font-semibold leading-tight">{tag}</span>
+              <span className="w-full min-w-0">
+                <span data-testid="raccolta-nome" className="line-clamp-2 font-display text-sm font-semibold leading-tight [overflow-wrap:anywhere] [word-break:normal]">{tag}</span>
                 <span className="mt-0.5 block text-xs text-white/75">{plural(count)}</span>
               </span>
             </Link>
@@ -192,14 +194,14 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
           </li>
         ))}
         {rows.length > 0 && (
-          <li>
+          <li className="flex">
             <button
               type="button"
               data-testid="nuova-raccolta"
               onClick={() => open({ kind: "nuova" })}
-              className="flex min-h-[72px] w-full items-center gap-3 rounded-card border border-dashed border-brand/40 px-3 py-3 text-left text-brand active:scale-[0.98] transition-transform duration-150"
+              className="flex h-full min-h-[72px] w-full flex-col items-start justify-center gap-2 rounded-card border border-dashed border-brand/40 p-3 text-left text-brand active:scale-[0.98] transition-transform duration-150"
             >
-              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light font-title text-lg font-semibold text-accent">+</span>
+              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-light font-title text-lg font-semibold text-accent">+</span>
               <span className="font-display text-sm font-semibold">Nuova raccolta</span>
             </button>
           </li>
