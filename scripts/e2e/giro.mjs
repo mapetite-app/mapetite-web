@@ -924,6 +924,7 @@ else {
       ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/mappa?vista=salvati&tag=Con+amici", "profilo: tocco su una raccolta = mappa filtrata su quel tag");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
+      ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
       // Dal profilo, "Salvati" nella barra in basso apre la mappa sui salvati ed è accesa
