@@ -7,7 +7,8 @@ import { useSyncExternalStore } from "react";
 //   condividi     pulsante "Condividi" nella scheda locale
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
 //   barra         campo "Chiedi all'AI" + pulsante "Filtri" sempre in cima alla mappa (dal 11/10, scelta di Lorenzo)
-export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
+//   suggerimenti  frasi d'esempio sotto la barra al posto della card in basso (dal 12/10, Lorenzo: "una sola barra")
+export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "suggerimenti";
 
 // Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
 // quel telefono finché non si apre ?beta=off).

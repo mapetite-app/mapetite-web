@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
 
-// Home come quella di Places: marchio al centro, esempi e campo "Cosa cerchi?" in basso.
+// Home come quella di Places: marchio al centro, frasi d'esempio e un solo campo "Cosa cerchi?" in basso.
 // Il modulo porta a /mappa?q=..., dove la ricerca parte da sola (funziona anche senza JS).
 const EXAMPLES = [
   { emoji: "🌇", title: "Rooftop romantico", sub: "per due a Roma", q: "Rooftop romantico per due a Roma" },
@@ -26,23 +26,21 @@ export default function Home() {
       <div className="mx-auto w-full max-w-md pb-4">
         {/* Due modi di cercare, chiari subito (Lorenzo 11/10): chiedere all'AI o usare i filtri. */}
         <HomeRecent />
-        <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI, per esempio:</p>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+        {/* Una sola barra (Lorenzo 12/10): sopra, frasi già pronte che mostrano come si chiede all'AI;
+            i filtri sono un pulsante dentro la barra, non un secondo blocco. */}
+        <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI come a un amico, per esempio:</p>
+        <div data-testid="home-suggerimenti" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
           {EXAMPLES.map((e) => (
             <Link
               key={e.q}
               href={`/mappa?q=${encodeURIComponent(e.q)}`}
-              className="flex min-h-16 w-52 shrink-0 items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-left active:scale-[0.98]"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-surface px-3.5 text-sm font-sans text-text active:scale-[0.98]"
             >
-              <span aria-hidden className="text-2xl">{e.emoji}</span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-display font-semibold text-text">{e.title}</span>
-                <span className="block truncate text-xs font-sans text-text-muted">{e.sub}</span>
-              </span>
+              <span aria-hidden>{e.emoji}</span> “{e.q}”
             </Link>
           ))}
         </div>
-        <form action="/mappa" className="flex items-center gap-2 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
+        <form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
           <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
           <input
             type="search"
@@ -54,17 +52,18 @@ export default function Home() {
             aria-label="Chiedi all'AI: cosa cerchi?"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
           />
+          <Link
+            href="/mappa?filtri=1"
+            data-testid="home-filtri"
+            aria-label="Cerca con i filtri"
+            className="flex h-11 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-display font-semibold text-brand active:scale-95"
+          >
+            <SlidersHorizontal size={18} aria-hidden /> Filtri
+          </Link>
           <button type="submit" aria-label="Cerca" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-lg text-white active:scale-95">
             →
           </button>
         </form>
-        <Link
-          href="/mappa?filtri=1"
-          data-testid="home-filtri"
-          className="mt-2 flex min-h-12 items-center justify-center gap-2 rounded-card border border-border bg-white text-sm font-display font-semibold text-brand active:scale-[0.98]"
-        >
-          <SlidersHorizontal size={16} aria-hidden /> Oppure cerca con i filtri
-        </Link>
         <p className="mt-3 text-center text-xs font-sans text-text-muted">
           <Link href="/mappa" className="font-semibold text-brand">Apri la mappa</Link> ·{" "}
           <Link href="/login" className="font-semibold text-brand">accedi</Link>

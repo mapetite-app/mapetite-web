@@ -85,13 +85,11 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda stile Places (B) predefinita per chi arriva la prima volta (scelta di Lorenzo, 12/10)");
 // Il giro principale controlla anche la vecchia scheda (?scheda=a); la B ha i suoi controlli più avanti.
 await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
-ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible(), "primo accesso: card con esempi 'Chiedi all'AI' visibile");
-ok(await page.getByTestId("benvenuto-filtri").isVisible(), "primo accesso: si vede anche la ricerca per filtri ('Oppure usa i filtri')");
+ok((await page.getByTestId("benvenuto").count()) === 0 && await page.getByTestId("suggerimenti-barra").isVisible(), "una sola barra: niente card in basso, frasi d'esempio sotto la barra in alto (Lorenzo 12/10)");
 ok(await page.getByRole("button", { name: "Filtri", exact: true }).getByText("Filtri").isVisible(), "barra in alto: pulsante 'Filtri' con la scritta");
 ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "barra in alto: si capisce che è la ricerca con l'AI");
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
-const bh = (await page.getByTestId("benvenuto").boundingBox())?.height ?? 999;
-ok(bh < 844 * 0.3, `primo accesso: la card lascia vedere la mappa (altezza ${Math.round(bh)}px < 30% schermo)`);
+{ const sb = await page.getByTestId("suggerimenti-barra").boundingBox(); ok(!!sb && sb.y < 160 && sb.height < 60, `suggerimenti: una riga sotto la barra (y ${Math.round(sb?.y ?? 0)}, alta ${Math.round(sb?.height ?? 0)}px)`); }
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
 await shot("01-benvenuto");
 
@@ -361,8 +359,8 @@ const loc = await page.getByRole("button", { name: "La mia posizione", exact: tr
 ok(!!bar && !!loc && bar.y < 80 && bar.x + bar.width <= loc.x, "barra: in cima, non copre il pulsante posizione");
 ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella card iniziale niente secondo campo");
 await shot("22-barra");
-await page.getByTestId("benvenuto-filtri").click();
-await page.getByText(/Applica filtri/).first().waitFor({ timeout: 3000 }).then(() => ok(true, "card iniziale: 'Oppure usa i filtri' apre i filtri"), () => ok(false, "card iniziale: 'Oppure usa i filtri' apre i filtri"));
+await page.getByRole("button", { name: "Filtri", exact: true }).click();
+await page.getByText(/Applica filtri/).first().waitFor({ timeout: 3000 }).then(() => ok(true, "barra: 'Filtri' apre i filtri"), () => ok(false, "barra: 'Filtri' apre i filtri"));
 await shot("24-filtri");
 ok((await page.getByText("Reset").count()) === 0 && await page.getByRole("button", { name: "Azzera" }).isVisible(), "filtri: tutto in italiano ('Azzera')");
 { const b = await page.getByRole("button", { name: "Pizzerie" }).boundingBox(); ok(!!b && b.height >= 40, `filtri: scelte comode col dito (${Math.round(b?.height ?? 0)}px)`); }
@@ -420,7 +418,6 @@ await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
 // 5e4. Senza rete: avviso in alto e messaggio chiaro se si cerca dalla barra
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: "Chiudi" }).first().click();
 await ctx.setOffline(true);
 await page.waitForTimeout(300);
 ok(await page.getByTestId("offline").isVisible(), "senza rete: avviso 'Sei senza connessione'");
@@ -445,10 +442,12 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
-ok(await page.getByText("Chiedi all'AI, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
+ok(await page.getByText("Chiedi all'AI come a un amico, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
+ok((await page.getByTestId("home-suggerimenti").getByRole("link").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
+{ const f = await page.getByTestId("home-filtri").boundingBox(); const bar = await page.getByLabel("Cosa cerchi?").boundingBox(); ok(!!f && !!bar && Math.abs((f.y + f.height / 2) - (bar.y + bar.height / 2)) < 12, "home: 'Filtri' dentro la barra, non un secondo blocco"); }
 ok((await page.getByTestId("home-recenti").getByRole("link").count()) >= 1, "home: le ultime ricerche fatte su questo telefono, a un tocco");
 await page.getByTestId("home-filtri").click();
-await page.getByText(/Applica filtri/).first().waitFor({ timeout: 5000 }).then(() => ok(true, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"), () => ok(false, "home: 'Oppure cerca con i filtri' apre la mappa con i filtri aperti"));
+await page.getByText(/Applica filtri/).first().waitFor({ timeout: 5000 }).then(() => ok(true, "home: 'Filtri' apre la mappa con i filtri aperti"), () => ok(false, "home: 'Filtri' apre la mappa con i filtri aperti"));
 ok(!page.url().includes("filtri=1"), "home → filtri: il parametro sparisce dall'indirizzo (ricaricare non riapre i filtri)");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("pizza napoletana a Testaccio");
@@ -509,12 +508,12 @@ await page.getByText("Non ho trovato nulla").waitFor({ timeout: 4000 });
 ok(await page.getByRole("button", { name: "Correggi la ricerca" }).isVisible(), "nessun risultato: pulsante 'Correggi la ricerca'");
 await shot("06b-nessun-risultato");
 await page.getByRole("button", { name: "Vedi esempi" }).click();
-ok(await page.getByTestId("benvenuto").isVisible(), "nessun risultato: 'Vedi esempi' riporta alla card iniziale");
+ok(await page.getByTestId("suggerimenti-barra").isVisible(), "nessun risultato: 'Vedi esempi' riporta alle frasi d'esempio");
 searchMode = "ok";
 
 // 7. Posizione: negata
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: "Usa la mia posizione" }).click();
+await page.getByRole("button", { name: "La mia posizione", exact: true }).click();
 await page.getByText(/Non ho il permesso/).waitFor({ timeout: 4000 });
 ok(true, "posizione negata: messaggio con alternativa");
 await shot("07-posizione-negata");
@@ -522,7 +521,7 @@ await shot("07-posizione-negata");
 const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 45.4642, longitude: 9.19 } });
 const p2 = await ctx2.newPage();
 await p2.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await p2.getByRole("button", { name: "Usa la mia posizione" }).click();
+await p2.getByRole("button", { name: "La mia posizione", exact: true }).click();
 await p2.waitForTimeout(1500);
 ok((await p2.getByTestId("benvenuto").count()) === 0, "posizione concessa: la card si chiude");
 ok(await p2.getByTestId("tu-sei-qui").isVisible(), "posizione concessa: punto blu 'tu sei qui' sulla mappa");
@@ -537,7 +536,7 @@ await ctx3.route("**/api/search", (route) => route.fulfill({ json: SEARCH_FAST }
 await ctx3.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
 const p3 = await ctx3.newPage();
 await p3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-await p3.getByRole("button", { name: "Usa la mia posizione" }).click();
+await p3.getByRole("button", { name: "La mia posizione", exact: true }).click();
 await p3.waitForTimeout(1200);
 await p3.getByLabel("Cosa cerchi?").fill("rooftop");
 await p3.getByLabel("Cosa cerchi?").press("Enter");
@@ -604,7 +603,9 @@ await page.getByLabel("Cosa cerchi?").press("Enter");
 await page.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
 ok(/rooftop con vista/i.test(await page.getByTestId("titolo-risposta").innerText()), "home B: Invio avvia la ricerca scritta");
 await page.goto(`${BASE}/mappa?home=a`, { waitUntil: "networkidle" });
-ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible(), "?home=a: torna il primo accesso attuale");
+ok(await page.getByTestId("suggerimenti-barra").isVisible(), "?home=a: torna il primo accesso attuale (barra con frasi d'esempio)");
+await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
+ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").isVisible() && (await page.getByTestId("suggerimenti-barra").count()) === 0, "?beta=-suggerimenti: torna la card in basso di prima");
 
 // 7-quinquies. Pin con foto (?pin=b): stesse foto delle card, nessuna foto in più
 await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
@@ -637,13 +638,13 @@ ok(await page.evaluate(() => { const d = document.documentElement.dataset; retur
 
 // 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
-await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
 { const f = await titleFont(); ok(/Poppins/i.test(f), `titoli: Poppins di default (${f.slice(0, 40)})`); }
-await page.goto(`${BASE}/mappa?titoli=serif`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa?titoli=serif&beta=-suggerimenti`, { waitUntil: "networkidle" });
 ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
-await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
 ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
-await page.goto(`${BASE}/mappa?titoli=sans`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/mappa?titoli=sans&beta=-suggerimenti`, { waitUntil: "networkidle" });
 ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
 
 // 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
@@ -719,7 +720,7 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
 } else {
   await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
   await page.getByRole("button", { name: "Cerca un locale" }).click();
-  ok(await page.getByTestId("benvenuto").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
+  ok(await page.getByTestId("suggerimenti-barra").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
 }
 
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.

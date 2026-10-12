@@ -859,6 +859,11 @@ export default function MapView({
     () => (document.documentElement.dataset.home === "b" ? "b" : "a"),
     () => null,
   );
+  // Una sola barra (Lorenzo, 12/10: "abbiamo due barre per la ricerca, occupiamo solo spazio"):
+  // i suggerimenti di testo stanno sotto la barra in alto e la card in basso sparisce.
+  // ?beta=-suggerimenti riporta la card di prima.
+  const chipsOn = useBeta("suggerimenti") && barOn && homeVariant === "a";
+  const welcomeHidden = welcomeDismissed || chipsOn;
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
@@ -1432,7 +1437,7 @@ export default function MapView({
         const denied = err.code === err.PERMISSION_DENIED;
         setGeoState(denied ? "denied" : "unavailable");
         // A card iniziale chiusa il messaggio non si vedrebbe: avviso in sovrimpressione.
-        if (welcomeDismissed) setFilterError(denied ? "Posizione non permessa: attivala nelle impostazioni del browser" : "Posizione non disponibile ora");
+        if (welcomeHidden) setFilterError(denied ? "Non ho il permesso di vedere dove sei: attivalo nelle impostazioni del browser, oppure scrivi la zona (es. “a Trastevere”)." : "Non riesco a trovare la tua posizione: scrivi la zona (es. “a Trastevere”).");
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
     );
@@ -1662,7 +1667,7 @@ export default function MapView({
           </button>
         </div>
         {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
-        {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed) && (
+        {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden) && (
           <button
             type="button"
             data-testid="errore-barra"
@@ -1671,6 +1676,64 @@ export default function MapView({
           >
             {aiError} ✕
           </button>
+        )}
+        {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
+        {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
+          <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem]">
+            {tasteSuggestion && (
+              <button
+                type="button"
+                data-testid="suggerimento-per-te"
+                onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
+                className="min-h-10 shrink-0 rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+              >
+                ✨ Per te: {tasteSuggestion}
+              </button>
+            )}
+            {momentExample && (
+              <button
+                type="button"
+                data-testid="suggerimento-momento"
+                onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setAiQuery(q); void runAISearch(q); }}
+                className="min-h-10 shrink-0 rounded-pill border border-brand/40 bg-surface px-3.5 text-sm font-sans font-semibold text-brand shadow-float active:scale-95"
+              >
+                {momentExample}
+              </button>
+            )}
+            {recentOn && (JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
+              <button
+                key={`r-${r}`}
+                type="button"
+                data-testid="recenti"
+                onClick={() => { setAiQuery(r); void runAISearch(r); }}
+                className="min-h-10 shrink-0 rounded-pill bg-accent-light px-3.5 text-sm font-sans text-accent shadow-float active:scale-95"
+              >
+                ↻ {r}
+              </button>
+            ))}
+            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+              <button
+                type="button"
+                data-testid="cancella-recenti"
+                onClick={clearRecentSearches}
+                aria-label="Cancella le ricerche recenti"
+                className="min-h-10 shrink-0 rounded-pill bg-surface/90 px-3 text-xs font-sans text-text-muted shadow-float active:scale-95"
+              >
+                Cancella
+              </button>
+            )}
+            {WELCOME_EXAMPLES.map(({ query: example }) => (
+              <button
+                key={example}
+                type="button"
+                aria-label={example}
+                onClick={() => { setAiQuery(example); void runAISearch(example); }}
+                className="min-h-10 shrink-0 rounded-pill bg-surface px-3.5 text-sm font-sans text-text shadow-float active:scale-95"
+              >
+                “{example}”
+              </button>
+            ))}
+          </div>
         )}
         {/* Pannello AI espandibile */}
         {overlay.kind === "ai" && (
@@ -1993,8 +2056,16 @@ export default function MapView({
         </div>
       )}
 
+      {/* Senza la card in basso, l'invito ad aggiungere alla Home resta per chi torna (ha già cercato). */}
+      {chipsOn && view === "all" && aiSearch === null && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+        <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}>
+          <div className="w-full max-w-md empty:hidden">
+            <InstallHint />
+          </div>
+        </div>
+      )}
       {/* Primo accesso: barra compatta in basso (la mappa resta visibile). */}
-      {homeVariant === "a" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
+      {homeVariant === "a" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden && (
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
@@ -2484,7 +2555,7 @@ export default function MapView({
       )}
 
       {/* Ricerca in corso senza card iniziale (link ?q=, home): card fantasma come Places, la mappa non resta muta. */}
-      {aiSearching && aiSearch === null && welcomeDismissed && overlay.kind === "none" && (
+      {aiSearching && aiSearch === null && welcomeHidden && overlay.kind === "none" && (
         <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: "var(--nav-height-mobile)" }}>
           <div className="mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface px-4 py-2 shadow-float">
             <p className="truncate font-title text-base font-semibold text-brand first-letter:uppercase">{aiQuery}</p>
