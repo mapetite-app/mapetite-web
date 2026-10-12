@@ -43,7 +43,7 @@ export default function ShareImport({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-2 font-title text-3xl font-semibold text-brand">Salva da Google Maps</h1>
+      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Salva da Google Maps</h1>
 
       {!fullText && (
         <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">
