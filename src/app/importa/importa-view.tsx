@@ -202,25 +202,27 @@ export default function ImportaView({ userId }: { userId: string | null }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Importa</h1>
+      <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
+      <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
 
-      <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
+      <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} />
 
       <div className="mt-6">
-        <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} />
+        <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
       </div>
 
-      <h2
+      <section
         id="da-screenshot"
         data-testid="importa-screenshot"
-        className={`mt-10 mb-2 scroll-mt-4 rounded-btn font-display text-lg font-semibold text-brand transition-colors ${flashShot ? "bg-accent/15" : ""}`}
+        className={`mt-6 scroll-mt-4 rounded-card border bg-surface p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
       >
+      <h2 className="mb-1 font-display text-lg font-semibold text-brand">
         <span aria-hidden>📸 </span>Da uno screenshot
       </h2>
       <p className="text-sm text-text-muted mb-2">
         Carica uno screenshot di un post social e aggiungi il locale alla tua mappa in pochi passi.
       </p>
-      <p className="text-sm text-text-muted mb-6" data-testid="importa-condividi-android">
+      <p className="text-sm text-text-muted mb-5" data-testid="importa-condividi-android">
         Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.
       </p>
 
@@ -228,7 +230,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       {step === 1 && (
         <div className="space-y-5">
           {/* Area grande da toccare (stile "Aggiungi qualsiasi cosa" di Albo): niente "Choose File" in inglese. */}
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-border bg-surface px-4 py-8 text-center active:scale-[0.99]">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-border bg-white px-4 py-8 text-center active:scale-[0.99]">
             <span aria-hidden className="text-4xl">📸</span>
             <span className="font-display text-base font-semibold text-brand">
               {file ? "Cambia screenshot" : "Scegli uno screenshot"}
@@ -264,7 +266,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       {step === 2 && extracted && (
         <div className="space-y-6">
           {/* Estratto dall'AI */}
-          <div className="rounded-btn border border-border bg-surface p-4 space-y-2">
+          <div className="rounded-btn border border-border bg-white p-4 space-y-2">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
               Letto dall&apos;AI
             </p>
@@ -383,6 +385,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
           {error}
         </p>
       )}
+      </section>
     </div>
   );
 }
