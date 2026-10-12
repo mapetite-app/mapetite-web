@@ -97,13 +97,17 @@ const CATEGORY_TYPE_MAP: Record<string, string[]> = {
   wine_bar: ["wine_bar"],
 };
 
-// Bayesian-style quality score: bilancia rating e numero di recensioni
-// così un 4.8 con molte recensioni batte un 5.0 con pochissime.
+// Punteggio per le ricerche con i filtri: conta il VOTO, non la fama (VISIONE.md).
+// Le recensioni servono solo a fidarsi del voto: oltre REVIEWS_ENOUGH non aggiungono nulla.
+// Prima (media bayesiana senza tetto) un 4,4 con 10.000 recensioni turistiche batteva
+// un 4,7 di quartiere con 180: il sistema premiava i locali di massa, contro la richiesta.
+// Ora: 4,7 con 180 → 4,53; 4,4 con 10.000 → 4,30; 4,9 con 25 (poco affidabile) → 4,30.
 const GLOBAL_AVG_RATING = 4.0;
 const CONFIDENCE = 50;
-function qualityScore(rating: number | null, count: number | null): number {
+const REVIEWS_ENOUGH = 150;
+export function qualityScore(rating: number | null, count: number | null): number {
   const r = rating ?? 0;
-  const n = count ?? 0;
+  const n = Math.min(count ?? 0, REVIEWS_ENOUGH);
   return (CONFIDENCE * GLOBAL_AVG_RATING + n * r) / (CONFIDENCE + n);
 }
 
