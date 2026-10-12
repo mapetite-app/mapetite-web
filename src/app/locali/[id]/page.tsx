@@ -6,9 +6,10 @@ import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
+import SalvaLocale from "./salva-locale";
 import {
   cleanList,
-
+  currentUserId,
   loadPublicPlace,
   priceLabel,
   ratingLabel,
@@ -55,7 +56,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const sp = await searchParams;
   const fotoParam = Array.isArray(sp.foto) ? sp.foto[0] : sp.foto;
   const photoRef = validPhotoRef(fotoParam, place.google_place_id);
-
+  const userId = await currentUserId();
 
   const emoji = getCategoryEmoji(place.category, place.name);
   const city = cityFromAddress(place.address);
@@ -164,6 +165,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         </a>
       </div>
 
+      <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} />
     </main>
   );
 }
