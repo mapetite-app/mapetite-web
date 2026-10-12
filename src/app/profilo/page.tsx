@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
+import ProfiloRicerche from "@/components/profilo-ricerche";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 
 type SavedPlaceRow = {
@@ -182,6 +183,8 @@ export default async function ProfiloPage() {
       </nav>
 
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
+
+      <ProfiloRicerche />
 
       <section className="mb-10">
         <div className="mb-3 flex items-baseline justify-between">
