@@ -4,6 +4,7 @@ import { tagLabel } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
+import { track } from "@/lib/track";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -92,6 +93,8 @@ export default function VenueSheet({
     personalTags,
     personalNote,
   } = venue;
+  // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
+  const signal = (type: "percorso" | "chiama" | "sito" | "condividi") => track(type, { id: venue.id, lat, lng });
 
   // Scheda completa su Google Maps (orari, foto, tutte le recensioni): con il Place ID se c'è.
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}${googlePlaceId ? `&query_place_id=${encodeURIComponent(googlePlaceId)}` : ""}`;
@@ -100,6 +103,7 @@ export default function VenueSheet({
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
   const share = async () => {
+    signal("condividi");
     const url = mapsUrl;
     const text = verdict ? `${name} — ${verdict}` : name;
     try {
@@ -564,7 +568,7 @@ export default function VenueSheet({
         {saveSlot}
 
         <a
-          href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+          href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`} onClick={() => signal("percorso")}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
@@ -576,7 +580,7 @@ export default function VenueSheet({
 
         {phone != null && (
           <a
-            href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+            href={`tel:${phone.replace(/[^\d+]/g, "")}`} onClick={() => signal("chiama")}
             aria-label={`Chiama ${name}`}
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-brand active:scale-95"
           >
@@ -586,7 +590,7 @@ export default function VenueSheet({
 
         {websiteUri != null && (
           <a
-            href={websiteUri}
+            href={websiteUri} onClick={() => signal("sito")}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Sito di ${name}`}
@@ -603,7 +607,7 @@ export default function VenueSheet({
           <div className="flex max-w-full items-center gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
             {saveSlot}
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+              href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`} onClick={() => signal("percorso")}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
@@ -613,13 +617,13 @@ export default function VenueSheet({
               {walk != null ? `${walk} min` : "Percorso"}
             </a>
             {phone != null && (
-              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} aria-label={`Chiama ${name}`} className={TILE}>
+              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className={TILE}>
                 <Phone size={18} />
                 Chiama
               </a>
             )}
             {websiteUri != null && (
-              <a href={websiteUri} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={TILE}>
+              <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={TILE}>
                 <Globe size={18} />
                 Sito
               </a>

@@ -51,6 +51,9 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 let searchMode = "ok";
 let photoMode = "ok";
 let photoCalls = 0;
+// Segnali di comportamento (/api/events): si registrano qui per controllarli, senza scrivere nulla.
+const events = [];
+await ctx.route("**/api/events", (route) => { events.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
 await ctx.route("**/api/places/photo**", async (route) => {
   photoCalls++;
   if (photoMode === "off") return route.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } });
@@ -148,6 +151,12 @@ await shot("04c-scheda-successivo");
 await page.getByRole("button", { name: "Locale precedente" }).click();
 await page.waitForTimeout(300);
 await shot("04-scheda");
+{ const ev = events.find((e) => e.type === "apri_scheda");
+  ok(!!ev && ev.googlePlaceId === "P1" && ev.placeId === null && typeof ev.anonId === "string" && !("query" in ev), "segnali: aprire la scheda registra 'apri_scheda' (Place ID, nessun testo)"); }
+{ const r1 = await page.request.post(`${BASE}/api/events`, { data: { type: "apri_scheda", googlePlaceId: "P1" } });
+  const r2 = await page.request.post(`${BASE}/api/events`, { data: { type: "ricerca" } });
+  const r3 = await page.request.post(`${BASE}/api/events`, { data: { type: "qualsiasi" } });
+  ok(r1.status() === 204 && r2.status() === 400 && r3.status() === 400, `segnali: /api/events accetta solo i tipi previsti (${r1.status()}/${r2.status()}/${r3.status()}), anche senza la tabella`); }
 
 // 4a. Scheda: trascinando verso il basso si chiude
 await page.getByTestId("scheda-trascinabile").evaluate((el) => {
@@ -862,6 +871,16 @@ else {
   }, () => ok(false, "barra: scrivendo 'terrazza' compare 'Nei tuoi salvati: Terrazza Uno'"));
   await p.keyboard.press("Escape");
 
+  // "Per te" dai salvati: un risultato dello stesso tipo e prezzo di un salvato lo dice sulla card
+  await p.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await p.locator("ul.snap-x li[data-id=P2]").waitFor({ timeout: 5000 });
+  ok((await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").textContent()) === "✨ Come Terrazza Uno, che hai salvato", "per te: 'Come Terrazza Uno, che hai salvato' su un bar simile");
+  ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("simile-a").count()) === 0, "per te: niente indicazione se il tipo è diverso (cocktail bar)");
+  await p.screenshot({ path: `${OUT}/28-per-te-simile.png`, caret: "initial" });
+  await p.unroute("**/api/search/synthesis");
+
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
   await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
   await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {
@@ -1039,7 +1058,8 @@ else {
 // 10. Salva da Google Maps: Condividi (Android) e "Incolla link" (iPhone). API simulata, niente Google.
 {
   const man = await (await fetch(`${BASE}/manifest.webmanifest`)).json().catch(() => ({}));
-  ok(man.share_target?.action === "/importa/condividi" && man.share_target?.method === "GET" && man.share_target?.params?.text === "text", "manifest: Mapetite compare nel Condividi di Android (share_target)");
+  ok(man.share_target?.action === "/importa/condividi/ricevi" && man.share_target?.method === "POST" && man.share_target?.enctype === "multipart/form-data" && man.share_target?.params?.text === "text" && man.share_target?.params?.url === "url", "manifest: Mapetite compare nel Condividi di Android (share_target POST, link)");
+  { const f = man.share_target?.params?.files?.[0]; ok(f?.name === "immagini" && JSON.stringify(f?.accept) === '["image/*"]', "manifest: il Condividi accetta anche immagini (screenshot da Instagram/TikTok)"); }
 
   const lctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
   const lp = await lctx.newPage();
@@ -1124,7 +1144,84 @@ else {
     ok(await lp.getByText(/Non vedo un link di Google Maps/).isVisible(), "condividi senza link: errore in italiano con 'Riprova'");
     await lp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
     ok(await lp.getByText("Non è arrivato nessun link.", { exact: false }).isVisible(), "condividi vuoto: spiega cosa fare");
+
+    // Condividi via POST (share_target): il link di Google Maps va alla pagina di sempre.
+    const lr = await lctx.request.post(`${BASE}/importa/condividi/ricevi`, { multipart: { title: "Bar Rossi", text: "https://maps.app.goo.gl/AAA111", url: "" }, maxRedirects: 0 });
+    const linkLoc = lr.headers()["location"] ?? "";
+    ok(lr.status() === 303 && linkLoc.includes("/importa/condividi?") && decodeURIComponent(linkLoc.replace(/\+/g, " ")).includes("text=https://maps.app.goo.gl/AAA111") && !linkLoc.includes("url="), `condividi POST con link: va a /importa/condividi con il link (${lr.status()})`);
+    await lp.goto(new URL(linkLoc, BASE).href, { waitUntil: "networkidle" });
+    await lp.getByTestId("link-salvato").waitFor({ timeout: 5000 });
+    ok(await lp.getByText("Bar Rossi", { exact: true }).isVisible() && apiCalls.at(-1)?.title === "Bar Rossi", "condividi POST con link: il locale di Google Maps si salva come prima");
+
+    // Condividi uno screenshot (Instagram/TikTok). Lettura finta dal cookie e2e_lettura: niente Haiku.
+    const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489", "hex");
+    const img = (name) => ({ name, mimeType: "image/png", buffer: PNG });
+    const setLettura = (v) => lctx.addCookies([{ name: "e2e_lettura", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+    const shareImages = async (fields) => {
+      const fd = new FormData();
+      for (const [k, v] of fields) { if (typeof v === "string") fd.append(k, v); else fd.append(k, new Blob([v.buffer], { type: v.mimeType }), v.name); }
+      const r = await lctx.request.post(`${BASE}/importa/condividi/ricevi`, { multipart: fd, maxRedirects: 0 });
+      return { status: r.status(), loc: r.headers()["location"] ?? "" };
+    };
+    const SEARCH = [
+      { id: "GBR1", name: "Bar Rossi", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, category: "bar", rating: 4.6, priceLevel: 2 },
+      { id: "GBR2", name: "Bar Rossi Bis", address: "Via Tuscolana 10, 00182 Roma RM, Italy", lat: 41.88, lng: 12.52, category: "bar", rating: 4.4, priceLevel: 1 },
+    ];
+    const searchCalls = [];
+    const addCalls = [];
+    await lctx.route("**/api/places/search", (route) => { searchCalls.push(route.request().postDataJSON()); return route.fulfill({ json: { results: SEARCH } }); });
+    await lctx.route("**/api/places/add", (route) => { const b = route.request().postDataJSON(); addCalls.push(b); return route.fulfill({ json: { place: { id: b.googlePlaceId === "GBR2" ? "00000000-0000-0000-0000-000000000202" : "00000000-0000-0000-0000-000000000201", name: b.name } } }); });
+
+    await setLettura({ nome: "Bar Rossi", citta: "Roma", categoria: "bar" });
+    const s1 = await shareImages([["immagini", img("story1.png")], ["immagini", img("story2.png")], ["text", "Guarda questo post"]]);
+    ok(s1.status === 303 && s1.loc.includes("/importa/condividi/immagine?") && s1.loc.includes("piu=1") && s1.loc.includes("nome=Bar+Rossi") && s1.loc.includes("citta=Roma"), `condividi screenshot: letto nome e città, poi pagina dell'esito (${s1.status} ${s1.loc})`);
+    await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
+    await lp.getByTestId("screenshot-trovato").waitFor({ timeout: 5000 });
+    ok(await lp.getByTestId("screenshot-trovato").getByText("Bar Rossi, Roma").isVisible() && await lp.getByText("Ho trovato").isVisible(), "condividi screenshot: 'Ho trovato: Bar Rossi, Roma'");
+    ok(await lp.getByTestId("screenshot-piu").isVisible(), "condividi screenshot: con più immagini dice che ha letto solo la prima");
+    ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "condividi screenshot: una sola ricerca Google con nome e città");
+    await lp.screenshot({ path: `${OUT}/33-condividi-screenshot.png`, caret: "initial" });
+    const w0 = lwrites.length;
+    await lp.getByTestId("screenshot-salva").click();
+    await lp.getByTestId("link-salvato").waitFor({ timeout: 5000 });
+    const ins = lwrites.slice(w0).find((w) => w.m === "POST");
+    ok(addCalls.at(-1)?.googlePlaceId === "GBR1" && JSON.stringify(ins?.body?.tags) === '["Da provare"]' && ins?.body?.place_id === "00000000-0000-0000-0000-000000000201", "condividi screenshot: Salva aggiunge il locale in '📌 Voglio andarci'");
+    ok(await lp.getByText("Salvato in Mapetite:").isVisible() && await lp.getByRole("link", { name: "Apri sulla mappa" }).isVisible(), "condividi screenshot: conferma con 'Apri sulla mappa'");
+    await lp.screenshot({ path: `${OUT}/34-condividi-screenshot-salvato.png`, caret: "initial" });
+
+    // "Non è questo": gli altri risultati già arrivati + import manuale.
+    await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
+    await lp.getByTestId("screenshot-non-e-questo").click();
+    ok(await lp.getByTestId("screenshot-altri").getByText("Bar Rossi Bis").isVisible() && await lp.getByTestId("screenshot-manuale").getAttribute("href") === "/importa", "condividi screenshot: 'Non è questo' mostra le alternative e porta all'import manuale");
+    ok(searchCalls.length === 2, "condividi screenshot: 'Non è questo' non rifà la ricerca");
+
+    // Immagine senza locale e file che non è un'immagine: errori in italiano.
+    await setLettura({ nome: null, citta: null, categoria: null });
+    const s2 = await shareImages([["immagini", img("tramonto.png")]]);
+    ok(s2.loc.includes("errore=illeggibile") && !s2.loc.includes("piu="), `condividi screenshot illeggibile: esito con errore (${s2.loc})`);
+    await lp.goto(new URL(s2.loc, BASE).href, { waitUntil: "networkidle" });
+    ok(await lp.getByText("Non riesco a leggere un locale in questa immagine.").isVisible() && await lp.getByTestId("screenshot-manuale").isVisible(), "condividi screenshot illeggibile: messaggio in italiano e import manuale");
+    await lp.screenshot({ path: `${OUT}/35-condividi-screenshot-errore.png`, caret: "initial" });
+    const s3 = await shareImages([["immagini", { name: "nota.png", mimeType: "image/png", buffer: Buffer.from("non sono un'immagine") }]]);
+    ok(s3.loc.includes("errore=formato"), "condividi: un file che non è un'immagine dà errore di formato (niente Haiku)");
+    await lctx.clearCookies({ name: "e2e_lettura" });
   }
+
+  // Screenshot condiviso senza accesso: si va al login con un messaggio chiaro (prima di qualsiasi lettura).
+  await lctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  {
+    const fd = new FormData();
+    fd.append("immagini", new Blob([Buffer.from("89504e470d0a1a0a", "hex")], { type: "image/png" }), "story.png");
+    const r = await lctx.request.post(`${BASE}/importa/condividi/ricevi`, { multipart: fd, maxRedirects: 0 });
+    const loc = r.headers()["location"] ?? "";
+    ok(r.status() === 303 && loc.includes("/login?message="), `condividi screenshot da disconnessi: rimanda al login (${r.status()} ${loc.slice(0, 40)})`);
+    await lp.goto(new URL(loc, BASE).href, { waitUntil: "networkidle" });
+    ok(await lp.getByText("Accedi a Mapetite, poi condividi di nuovo lo screenshot", { exact: false }).isVisible(), "condividi screenshot da disconnessi: messaggio in italiano sul login");
+    await lp.screenshot({ path: `${OUT}/36-condividi-screenshot-login.png`, caret: "initial" });
+  }
+  await lctx.clearCookies({ name: "e2e_anonimo" });
+  await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  ok(await lp.getByTestId("importa-condividi-android").getByText("Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.").isVisible(), "importa: riga sul Condividi dello screenshot da Android");
   await lctx.close();
 }
 

@@ -24,6 +24,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
+import { track } from "@/lib/track";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -481,6 +482,22 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
     return { p, n: words.filter((w) => text.includes(w)).length };
   }).filter((x) => x.n > 0);
   return scored.sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.p);
+}
+
+// "Per te" dai comportamenti (VISIONE.md): un risultato somiglia a un tuo salvato se è dello
+// stesso tipo e della stessa fascia di prezzo (±1). Si sceglie il salvato più vicino. Solo
+// un'indicazione sulla card: l'ordine resta quello della richiesta (mai sopra un posto più adatto).
+function similarSaved(place: Place, saved: Place[]): string | null {
+  const kind = categoryLabel(place.category);
+  if (!kind) return null;
+  let best: { name: string; d: number } | null = null;
+  for (const s of saved) {
+    if (s.name === place.name || categoryLabel(s.category) !== kind) continue;
+    if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
+    const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
+    if (!best || d < best.d) best = { name: s.name, d };
+  }
+  return best?.name ?? null;
 }
 
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
@@ -985,6 +1002,15 @@ export default function MapView({
     return uuid != null && savedIds.has(uuid);
   };
 
+  // Segnale "apri_scheda" (una volta per locale aperto): vedi src/lib/track.ts.
+  const trackedVenue = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selected || trackedVenue.current === selected.id) return;
+    trackedVenue.current = selected.id;
+    track("apri_scheda", { id: resolveUuid(selected.id) ?? selected.id, lat: selected.lat, lng: selected.lng }, { fonte: view === "saved" ? "salvati" : aiSearch ? "ricerca" : "mappa" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando cambia il locale aperto
+  }, [selected?.id]);
+
   // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Voglio andarci"
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
@@ -1011,6 +1037,7 @@ export default function MapView({
       const saved = { ...place, id: uuid, tags, note: null };
       setSavedPlaces((prev) => [...prev.filter((p) => p.id !== uuid), saved]);
       setSavedToast(saved);
+      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: VISIT_WANT });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
@@ -1171,6 +1198,7 @@ export default function MapView({
       return next;
     });
     if (!saved) {
+      track("rimuovi", { id: uuid });
       setSavedPlaces((prev) => prev.filter((p) => p.id !== uuid));
       if (view === "saved") dispatch({ type: "CLOSE" });
     }
@@ -1195,6 +1223,7 @@ export default function MapView({
       }
       const base = currentTags.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
       const tags = currentTags.includes(status) ? base : [...base, status];
+      if (!currentTags.includes(status)) track(status === VISIT_DONE ? "ci_sono_stato" : "voglio_andarci", { id: uuid });
       const previous = savedPlaces;
       setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
       const { error } = await supabase.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", uuid);
@@ -2655,6 +2684,7 @@ export default function MapView({
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
             onSaved={(tags, note, uuid) => {
+              track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", tag: (tags ?? []).join(",").slice(0, 40) });
               if (uuid) {
                 setPlaceUuids((prev) => ({ ...prev, [pendingPlace.id]: uuid }));
                 setSavedIds((prev) => new Set(prev).add(uuid));
@@ -2788,6 +2818,11 @@ export default function MapView({
           } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
+          similarTo={aiSearch !== null && view === "all" && savedPlaces.length > 0 ? (id) => {
+            if (isPlaceSaved(id)) return null;
+            const place = displayedPlaces.find((p) => p.id === id);
+            return place ? similarSaved(place, savedPlaces) : null;
+          } : undefined}
           savedLabel={(id) => {
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;

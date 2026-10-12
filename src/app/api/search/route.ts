@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
+import { recordEvent } from "@/lib/events";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
@@ -368,6 +369,31 @@ ESEMPI (input → output atteso):
     `[search-funnel] sent=${JSON.stringify(query.trim())} branch=${source} ` +
       `haiku=${haikuInvoked} verdicts=${verdictsCount} matchReasons=${matchReasonsCount}`,
   );
+
+  // Segnale "ricerca" (VISIONE.md: dati sui comportamenti di scoperta, utili anche ai ristoratori).
+  // Mai la frase scritta: solo cosa ha capito l'AI o i filtri scelti. Dopo la risposta, senza attese.
+  if (source === "world") {
+    after(async () => {
+      const { data } = await (await createClient()).auth.getUser();
+      await recordEvent({
+        type: "ricerca",
+        userId: data?.user?.id ?? null,
+        lat,
+        lng,
+        props: {
+          modo: searchIntent === "natural" ? "ai" : "filtri",
+          tipo: filtri.categoria,
+          requisiti: filtri.parole_chiave.slice(0, 6),
+          zona: filtri.zona ?? null,
+          vicino_a_me: filtri.vicino_a_me,
+          categorie: Array.isArray(body?.categories) ? body.categories.slice(0, 6) : null,
+          voto_min: typeof body?.minRating === "number" ? body.minRating : null,
+          prezzo_max: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : null,
+          risultati: risultati.length,
+        },
+      });
+    });
+  }
 
   return NextResponse.json({
     risultati: risultatiFinali,
