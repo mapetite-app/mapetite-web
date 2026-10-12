@@ -901,6 +901,16 @@ else {
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   await p.waitForTimeout(500);
   ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
+  // "Com'era?" compare dopo "Ci sono stato": 👍 / 👎 si escludono, gli altri tag restano
+  await p.getByTestId("com-era").waitFor({ timeout: 3000 }).then(async () => {
+    await p.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click();
+    await p.waitForTimeout(400);
+    const t1 = patched?.tags ?? [];
+    await p.getByTestId("com-era").getByRole("button", { name: "👎 Non fa per me" }).click();
+    await p.waitForTimeout(400);
+    const t2 = patched?.tags ?? [];
+    ok(t1.includes("Mi è piaciuto") && t1.includes("Già visitato") && t2.includes("Non fa per me") && !t2.includes("Mi è piaciuto") && t2.includes("Già visitato"), `com'era: 👍/👎 si escludono e lo stato resta (${JSON.stringify(t2)})`);
+  }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");

@@ -3,7 +3,13 @@
 const STATUS_LABEL: Record<string, string> = {
   "Da provare": "📌 Voglio andarci",
   "Già visitato": "✓ Ci sono stato",
+  // "Com'era?" dopo "Ci sono stato" (segnale per i suggerimenti): anche questi non sono raccolte.
+  "Mi è piaciuto": "👍 Mi è piaciuto",
+  "Non fa per me": "👎 Non fa per me",
 };
+
+export const OPINION_LIKE = "Mi è piaciuto";
+export const OPINION_DISLIKE = "Non fa per me";
 
 export function tagLabel(tag: string): string {
   // hasOwn: un tag scritto a mano come "constructor" non deve leggere le proprietà dell'oggetto.

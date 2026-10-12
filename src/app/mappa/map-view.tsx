@@ -19,7 +19,7 @@ import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { sortTags, tagLabel } from "@/lib/tags";
+import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -492,7 +492,7 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   if (!kind) return null;
   let best: { name: string; d: number } | null = null;
   for (const s of saved) {
-    if (s.name === place.name || categoryLabel(s.category) !== kind) continue;
+    if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE)) continue;
     if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
     const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
     if (!best || d < best.d) best = { name: s.name, d };
@@ -895,14 +895,15 @@ export default function MapView({
   // ne hai di più, cercato "poco conosciuto" (così i locali di massa vanno in fondo). Una ricerca
   // parte solo se la tocchi.
   const savedSuggestion = useMemo(() => {
-    if (savedPlaces.length < 3) return null;
+    const liked = savedPlaces.filter((p) => !p.tags?.includes(OPINION_DISLIKE));
+    if (liked.length < 3) return null;
     const top = (values: (string | null)[]) => {
       const counts = new globalThis.Map<string, number>();
       for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
       return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
     };
-    const kind = top(savedPlaces.map((p) => categoryLabel(p.category)));
-    const city = top(savedPlaces.map((p) => cityFromAddress(p.address)));
+    const kind = top(liked.map((p) => categoryLabel(p.category)));
+    const city = top(liked.map((p) => cityFromAddress(p.address)));
     if (!kind || kind[1] < 2 || !city) return null;
     return { label: `${kind[0]} a ${city[0]}, poco conosciuti`, query: `${kind[0]} poco conosciuti a ${city[0]}` };
   }, [savedPlaces]);
@@ -1223,7 +1224,8 @@ export default function MapView({
   // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
   const visitBusy = useRef(false);
-  const setVisitStatus = async (placeId: string, status: VisitStatus) => {
+  // pair: i due tag che si escludono (stato della visita, oppure "Com'era?").
+  const setVisitStatus = async (placeId: string, status: string, pair: readonly [string, string] = [VISIT_WANT, VISIT_DONE]) => {
     const uuid = resolveUuid(placeId);
     if (!userId || !uuid || visitBusy.current) return;
     visitBusy.current = true;
@@ -1237,9 +1239,13 @@ export default function MapView({
         if (error || !data) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
         currentTags = (data.tags as string[] | null) ?? [];
       }
-      const base = currentTags.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+      const base = currentTags.filter((t) => t !== pair[0] && t !== pair[1]);
       const tags = currentTags.includes(status) ? base : [...base, status];
-      if (!currentTags.includes(status)) track(status === VISIT_DONE ? "ci_sono_stato" : "voglio_andarci", { id: uuid });
+      if (!currentTags.includes(status)) {
+        if (status === VISIT_DONE) track("ci_sono_stato", { id: uuid });
+        else if (status === VISIT_WANT) track("voglio_andarci", { id: uuid });
+        else track("ci_sono_stato", { id: uuid }, { stato: status });
+      }
       const previous = savedPlaces;
       setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
       const { error } = await supabase.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", uuid);
@@ -2616,6 +2622,7 @@ export default function MapView({
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
+              onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {

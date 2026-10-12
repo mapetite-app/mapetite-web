@@ -4,6 +4,7 @@
 import { distanceMeters } from "@/lib/distance";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { cityFromAddress } from "@/lib/city";
+import { isStateTag, OPINION_DISLIKE } from "@/lib/tags";
 
 export const STATE_WANT = "Da provare"; // si legge "📌 Voglio andarci"
 export const STATE_DONE = "Già visitato"; // si legge "✓ Ci sono stato"
@@ -35,7 +36,7 @@ export function collectionsOf(spots: SavedSpot[]): string[] {
   const count = new Map<string, number>();
   for (const s of spots) {
     for (const t of new Set(s.tags)) {
-      if (t === STATE_WANT || t === STATE_DONE || !t.trim()) continue;
+      if (isStateTag(t) || !t.trim()) continue;
       count.set(t, (count.get(t) ?? 0) + 1);
     }
   }
@@ -54,6 +55,8 @@ export function citiesOf(spots: SavedSpot[]): string[] {
 
 export function matches(s: SavedSpot, c: Choices): boolean {
   if (c.city && cityFromAddress(s.address) !== c.city) return false;
+  // "👎 Non fa per me": non si ripropone mai.
+  if (s.tags.includes(OPINION_DISLIKE)) return false;
   if (c.occasion && !s.tags.includes(c.occasion)) return false;
   if (c.onlyNew && s.tags.includes(STATE_DONE)) return false;
   if (c.near) {
