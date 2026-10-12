@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowUp } from "lucide-react";
+import { ArrowLeft, ArrowUp, Share2 } from "lucide-react";
+import { useOptIn } from "@/lib/beta";
+import { isGem } from "@/lib/gem";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import PlacePhoto from "@/components/place-photo";
@@ -23,6 +25,7 @@ export default function AnswerArticle({
   onSelect,
   onAsk,
   onClose,
+  shareAt = null,
 }: {
   title: string;
   understood: string[];
@@ -35,7 +38,21 @@ export default function AnswerArticle({
   onSelect: (place: Place) => void;
   onAsk?: (q: string) => void;
   onClose: () => void;
+  // Punto della ricerca: il link condiviso la rifà lì (come "Condividi" del carosello).
+  shareAt?: { lat: number; lng: number } | null;
 }) {
+  const gemsOn = useOptIn("gemme");
+  const [shared, setShared] = useState(false);
+  const share = async () => {
+    const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
+    const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
+    try {
+      if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
+      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
+    } catch {
+      // foglio di condivisione chiuso
+    }
+  };
   const [followUp, setFollowUp] = useState("");
   // Il tasto "indietro" del telefono chiude l'articolo, non la pagina.
   const onCloseRef = useRef(onClose);
@@ -62,9 +79,12 @@ export default function AnswerArticle({
       className="fixed inset-x-0 top-0 z-40 flex flex-col bg-surface md:top-14"
       style={{ bottom: "var(--nav-height-mobile)" }}
     >
-      <div className="flex items-center px-3 pt-3">
+      <div className="flex items-center justify-between px-3 pt-3">
         <button type="button" onClick={close} aria-label="Torna alla mappa" className="flex min-h-11 items-center gap-1.5 rounded-pill bg-white pl-3 pr-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95">
           <ArrowLeft size={18} aria-hidden /> Mappa
+        </button>
+        <button type="button" onClick={share} aria-label="Condividi questa ricerca" data-testid="articolo-condividi" className="flex min-h-11 items-center gap-1.5 rounded-pill bg-white px-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95">
+          <Share2 size={16} aria-hidden /> {shared ? "Link copiato" : "Condividi"}
         </button>
       </div>
 
@@ -91,6 +111,9 @@ export default function AnswerArticle({
                   <button type="button" onClick={() => onSelect(place)} className="flex w-full items-center gap-2 text-left">
                     <span className="text-xl leading-none" aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>
                     <span className="font-title text-lg in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand">{place.name}</span>
+                    {gemsOn && isGem(place.rating, d?.userRatingCount) && (
+                      <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-semibold text-accent">💎 Poco conosciuto</span>
+                    )}
                   </button>
                   {d?.verdict || d?.matchReason ? (
                     <p className="mt-1.5 text-[15px] font-sans leading-relaxed text-text">

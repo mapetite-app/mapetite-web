@@ -2524,6 +2524,7 @@ export default function MapView({
           }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
           onAsk={(q) => { setArticleOpen(false); setAiQuery(q); void runAISearch(q); }}
+          shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
           onClose={() => setArticleOpen(false)}
         />
       )}

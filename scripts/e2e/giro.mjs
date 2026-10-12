@@ -297,6 +297,9 @@ ok((await page.getByTestId("articolo-locale").count()) === 2, "articolo: un para
 ok((await page.getByTestId("articolo-intro").textContent())?.startsWith("Ho scelto 2 posti per te"), "articolo: frase di apertura con cosa ha capito");
 ok(await page.getByTestId("articolo").getByText("Ha una vera terrazza.").isVisible(), "articolo: verdetto e motivo scritti come un consiglio");
 ok(await page.getByTestId("articolo").locator("img[alt='Terrazza Uno']").isVisible(), "articolo: foto grande del locale");
+await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+await page.getByTestId("articolo-condividi").click();
+ok(decodeURIComponent((await page.evaluate(() => window.__shared?.url)) ?? "").includes("/mappa?q=Rooftop romantico per due a Roma&at="), "articolo: 'Condividi' manda il link che rifà la ricerca");
 const ask = await page.getByLabel("Fai un'altra domanda").boundingBox();
 ok(!!ask && ask.y + ask.height <= 844 - 56 && ask.y > 600, "articolo: 'Fai un'altra domanda' fisso in basso, sopra la barra");
 await shot("21-articolo");
