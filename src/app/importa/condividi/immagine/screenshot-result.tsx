@@ -85,7 +85,7 @@ export default function ScreenshotResult({
     <Link
       href="/importa"
       data-testid="screenshot-manuale"
-      className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-medium text-text"
+      className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
     >
       {label}
     </Link>
@@ -146,7 +146,7 @@ export default function ScreenshotResult({
             type="button"
             onClick={() => { setSearching(true); setSearchError(null); void search(); }}
             disabled={searching}
-            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-medium text-text disabled:opacity-60"
+            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
           >
             Riprova
           </button>
@@ -194,7 +194,7 @@ export default function ScreenshotResult({
                   onClick={() => setOthers(true)}
                   disabled={saving !== null}
                   data-testid="screenshot-non-e-questo"
-                  className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-medium text-text disabled:opacity-60"
+                  className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
                 >
                   Non è questo
                 </button>
@@ -235,7 +235,7 @@ export default function ScreenshotResult({
 
       {saved && (
         <p className="mt-6 text-sm text-text-muted">
-          <Link href="/importa" className="underline text-text">Salva altri locali</Link>
+          <Link href="/importa" className="inline-flex min-h-11 items-center font-display font-semibold text-brand underline underline-offset-2">Salva altri locali</Link>
         </p>
       )}
     </div>
