@@ -242,7 +242,7 @@ export default function StaseraView({ userId }: { userId: string }) {
   const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
 
   return (
-    <main data-testid="stasera" className="min-h-[calc(100dvh-4rem)] bg-brand text-white md:min-h-[calc(100dvh-3.5rem)]">
+    <main data-testid="stasera" className="-mb-16 min-h-dvh bg-brand pb-16 text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
       <div className="mx-auto max-w-md px-4 pb-32 pt-6">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/profilo" aria-label="Torna al profilo" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl text-white/90 active:bg-white/10">
