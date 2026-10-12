@@ -153,6 +153,10 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **"Stasera dove andiamo?" — IN PR**: `/stasera`, tre proposte dai propri salvati (occasione = le tue raccolte, dove = vicino / città / ovunque, mai provati o anche visitati), prima i "Voglio andarci" e i più vicini, mai il voto Google (VISIONE: non il più popolare). Dal profilo, da "I miei salvati" e dalla scorciatoia dell'app.
 - **Aggiungi a mano + link Instagram/TikTok — IN PR**: su Importa "✍️ Aggiungi a mano" (nome e città → 5 risultati → Salva, 1 ricerca Google per tocco su Cerca); i link di Instagram/TikTok/Shorts spiegano di fare uno screenshot e propongono "Cerca '…'" se nel testo c'è un nome.
 - **Etichetta "Il verdetto Mapetite" sulle card — IN PR.**
+- **Organizza nel profilo — IN PR**: ogni raccolta ha "⋯" con Rinomina / Unisci con… / Elimina (i locali restano salvati); "+ Nuova raccolta" scegliendo tra i salvati; "Le tue ricerche" (come `places-12`) con "Cerca di nuovo". Nessuna migrazione: le raccolte sono i tag.
+- **Salvati vuoti — IN PR**: "La tua mappa è ancora vuota" con Da Google Maps / Da uno screenshot / A mano.
+- **"🧭 Ho messo da parte N locali turistici (…)" — IN PR**: il differenziatore si vede sotto "Ho capito".
+- **"✨ Dai tuoi salvati: Bar a Roma, poco conosciuti" — IN PR**: proposta dal tipo e dalla città dei tuoi salvati, cercata "poco conosciuti".
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
