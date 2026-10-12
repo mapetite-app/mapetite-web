@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import GoogleMapsCard from "./google-maps-card";
+import ManualAddCard from "./manual-add-card";
 
 type ImportResult = {
   nome: string | null;
@@ -193,7 +194,11 @@ export default function ImportaView({ userId }: { userId: string | null }) {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Importa</h1>
 
-      <GoogleMapsCard userId={userId} />
+      <ManualAddCard userId={userId} />
+
+      <div className="mt-6">
+        <GoogleMapsCard userId={userId} />
+      </div>
 
       <h2 className="mt-10 mb-2 font-display text-lg font-semibold text-brand">Da uno screenshot</h2>
       <p className="text-sm text-text-muted mb-2">
