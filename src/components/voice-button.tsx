@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Mic } from "lucide-react";
 
 // Microfono nel campo di ricerca (come Places): usa il riconoscimento vocale del browser,
@@ -10,7 +10,7 @@ type Recognition = {
   interimResults: boolean;
   maxAlternatives: number;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -22,10 +22,18 @@ function getCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-export default function VoiceButton({ onText }: { onText: (text: string) => void }) {
+export default function VoiceButton({ onText, onError }: { onText: (text: string) => void; onError?: (message: string) => void }) {
   const supported = useSyncExternalStore(() => () => {}, () => getCtor() != null, () => false);
   const [listening, setListening] = useState(false);
   const rec = useRef<Recognition | null>(null);
+  // Se il pulsante sparisce (si scrive, si tocca un esempio) si smette di ascoltare:
+  // un risultato in ritardo farebbe partire una seconda ricerca.
+  useEffect(() => () => {
+    const r = rec.current;
+    if (!r) return;
+    r.onresult = null; r.onend = null; r.onerror = null;
+    try { r.stop(); } catch { /* già fermo */ }
+  }, []);
   if (!supported) return null;
   return (
     <button
@@ -45,7 +53,13 @@ export default function VoiceButton({ onText }: { onText: (text: string) => void
           const text = e.results[0]?.[0]?.transcript?.trim();
           if (text) onText(text);
         };
-        r.onerror = () => setListening(false);
+        r.onerror = (e) => {
+          setListening(false);
+          // "no-speech" / "aborted": niente da dire. Il resto si spiega in italiano.
+          if (e?.error === "not-allowed" || e?.error === "service-not-allowed") onError?.("Microfono non disponibile: controlla i permessi del browser, oppure scrivi.");
+          else if (e?.error === "network") onError?.("Per dettare serve la connessione: riprova o scrivi.");
+          else if (e?.error && e.error !== "no-speech" && e.error !== "aborted") onError?.("Non ho capito: riprova o scrivi.");
+        };
         r.onend = () => setListening(false);
         rec.current = r;
         setListening(true);

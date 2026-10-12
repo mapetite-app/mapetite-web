@@ -89,7 +89,9 @@ function SaveModal({
   const normalizeNewTag = (text: string | null): string | null => {
     const raw = (text ?? "").trim().replace(/\s+/g, " ").slice(0, 24);
     if (raw === "") return null;
-    return tagOptions.find((t) => t.toLowerCase() === raw.toLowerCase()) ?? raw.charAt(0).toUpperCase() + raw.slice(1);
+    // Anche l'etichetta mostrata ("voglio andarci") porta allo stato salvato ("Da provare").
+    const same = (t: string) => t.toLowerCase() === raw.toLowerCase() || tagLabel(t).replace(/^[^\p{L}]+/u, "").toLowerCase() === raw.toLowerCase();
+    return tagOptions.find(same) ?? raw.charAt(0).toUpperCase() + raw.slice(1);
   };
   // Aggiunge un tag; se è uno stato ("Da provare" / "Già visitato") toglie l'altro.
   const withTag = (prev: string[], tag: string): string[] => {
@@ -1572,7 +1574,18 @@ export default function MapView({
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
               {voiceOn && aiQuery === "" && aiSearch === null && (
-                <VoiceButton onText={(t) => { setAiQuery(t); setWelcomeDismissed(true); void runAISearch(t); }} />
+                <VoiceButton
+                  onError={setAiError}
+                  onText={(t) => {
+                    // Stessi controlli dell'invio scritto: niente ricerca a pagamento per un "sì".
+                    const q = t.trim();
+                    setAiQuery(q);
+                    if (q.length < 3 || aiSearching) return;
+                    setWelcomeDismissed(true);
+                    if (overlay.kind === "ai") dispatch({ type: "CLOSE" });
+                    void runAISearch(q);
+                  }}
+                />
               )}
               {(aiQuery !== "" || aiSearch !== null) && (
                 <button
