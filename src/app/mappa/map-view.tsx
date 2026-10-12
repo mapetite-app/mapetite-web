@@ -891,6 +891,22 @@ export default function MapView({
     () => (document.documentElement.dataset.home === "b" ? "b" : "a"),
     () => null,
   );
+  // "Fatti suggerire" dai salvati (VISIONE.md): il tipo di posto che salvi di più, nella città dove
+  // ne hai di più, cercato "poco conosciuto" (così i locali di massa vanno in fondo). Una ricerca
+  // parte solo se la tocchi.
+  const savedSuggestion = useMemo(() => {
+    if (savedPlaces.length < 3) return null;
+    const top = (values: (string | null)[]) => {
+      const counts = new globalThis.Map<string, number>();
+      for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    };
+    const kind = top(savedPlaces.map((p) => categoryLabel(p.category)));
+    const city = top(savedPlaces.map((p) => cityFromAddress(p.address)));
+    if (!kind || kind[1] < 2 || !city) return null;
+    return { label: `${kind[0]} a ${city[0]}, poco conosciuti`, query: `${kind[0]} poco conosciuti a ${city[0]}` };
+  }, [savedPlaces]);
+
   // Una sola barra (Lorenzo, 12/10: "abbiamo due barre per la ricerca, occupiamo solo spazio"):
   // i suggerimenti di testo stanno sotto la barra in alto e la card in basso sparisce.
   // ?beta=-suggerimenti riporta la card di prima.
@@ -1831,6 +1847,16 @@ export default function MapView({
                 className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
               >
                 ✨ Per te: {tasteSuggestion}
+              </button>
+            )}
+            {savedSuggestion && (
+              <button
+                type="button"
+                data-testid="suggerimento-salvati"
+                onClick={() => { setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }}
+                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+              >
+                ✨ Dai tuoi salvati: {savedSuggestion.label}
               </button>
             )}
             {momentExample && (

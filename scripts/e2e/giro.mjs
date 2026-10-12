@@ -932,6 +932,19 @@ else {
   }, () => ok(false, "pin dei salvati: segnalibri sulla mappa in Esplora"));
   await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+  // "Fatti suggerire": con 3 salvati di cui 2 bar a Roma compare "✨ Dai tuoi salvati: Bar a Roma, poco conosciuti"
+  {
+    const rows3 = [rows[0], { ...rows[1], places: { ...rows[1].places, category: "bar" } }, rows[2]];
+    const p3s = await sctx.newPage();
+    await p3s.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3 }));
+    await p3s.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p3s.getByTestId("suggerimento-salvati").waitFor({ timeout: 5000 }).then(async () => {
+      ok((await p3s.getByTestId("suggerimento-salvati").textContent()) === "✨ Dai tuoi salvati: Bar a Roma, poco conosciuti", "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati");
+    }, () => ok(false, "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati"));
+    await p3s.close();
+    ok((await p.getByTestId("suggerimento-salvati").count()) === 0, "fatti suggerire: niente proposta se i salvati sono tutti di tipo diverso");
+  }
+
   // Voce 11d: scrivendo nella barra compaiono prima i propri salvati che c'entrano
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await p.getByLabel("Cosa cerchi?").fill("una terrazza per stasera");
