@@ -39,6 +39,10 @@ const newsreader = Newsreader({
 // Gira prima del primo disegno, così non si vede il cambio.
 const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(t==="poppins")t="sans";if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}if(!localStorage.getItem("mapetite.scheda"))document.documentElement.dataset.scheda="b"}catch(e){}`;
 
+// Primo accesso (src/components/home-intro.tsx): sulla home, se l'intro non è mai stata vista
+// (o con ?intro=1), segna <html data-intro="nuovo"> prima del disegno, così non c'è lampo.
+const INTRO_SCRIPT = `try{if(location.pathname==="/"&&(new URLSearchParams(location.search).get("intro")==="1"||!localStorage.getItem("mapetite.intro")))document.documentElement.dataset.intro="nuovo"}catch(e){}`;
+
 export const metadata: Metadata = {
   title: "Mapetite",
   description: "I locali giusti per te, non quelli di tutti. Scrivi cosa cerchi come lo diresti a un amico.",
@@ -79,7 +83,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full">
-        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT + INTRO_SCRIPT }} />
         <NavBar userId={userId} />
         <OfflineBanner />
         {/*
