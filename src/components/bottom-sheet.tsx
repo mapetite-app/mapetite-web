@@ -9,6 +9,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 import { sortTags, tagLabel } from "@/lib/tags";
+import { searchFeedbackMailto } from "@/lib/feedback";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -520,6 +521,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               </li>
             );
           })}
+          {/* In fondo al carosello: i tester segnalano una ricerca che non va (email già scritta). */}
+          {title && !loadingVerdicts && places.length > 0 && (
+            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
+              <a
+                data-testid="ricerca-feedback"
+                href={searchFeedbackMailto(title, places.map((p) => p.name))}
+                className="flex h-full min-h-[190px] flex-col justify-center rounded-card border-2 border-dashed border-white/70 bg-surface/95 p-4 text-left shadow-float active:scale-[0.99]"
+              >
+                <span className="text-2xl" aria-hidden>🤔</span>
+                <span className="mt-2 font-title text-base font-semibold leading-snug text-brand">Questi risultati non vanno?</span>
+                <span className="mt-1 text-sm font-sans text-text-muted">Dimmelo: si apre un&apos;email già scritta con la tua ricerca.</span>
+              </a>
+            </li>
+          )}
         </ul>
       </div>
     );
