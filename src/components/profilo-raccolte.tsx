@@ -103,17 +103,17 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if ("error" in res) { setError(res.error); return; }
     if (res.tag === from) { setSheet(null); return; }
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, res.tag));
-    if (failed === 0) setNotice(allTags.includes(res.tag) ? `"${from}" è confluita in "${res.tag}".` : `Raccolta rinominata in "${res.tag}".`);
+    if (failed === 0) setNotice(allTags.includes(res.tag) ? `“${from}” è confluita in “${res.tag}”.` : `Raccolta rinominata in “${res.tag}”.`);
   }
 
   async function merge(from: string, into: string) {
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, into));
-    if (failed === 0) setNotice(`"${from}" è confluita in "${into}".`);
+    if (failed === 0) setNotice(`“${from}” è confluita in “${into}”.`);
   }
 
   async function remove(tag: string) {
     const failed = await apply(withTag(tag), (tags) => tags.filter((t) => t !== tag));
-    if (failed === 0) setNotice(`Raccolta "${tag}" eliminata. I locali restano tra i salvati.`);
+    if (failed === 0) setNotice(`Raccolta “${tag}” eliminata. I locali restano tra i salvati.`);
   }
 
   async function create() {
@@ -122,7 +122,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if (picked.size === 0) { setError("Scegli almeno un locale."); return; }
     const targets = rows.filter((r) => picked.has(r.placeId) && !r.tags.includes(res.tag));
     const failed = await apply(targets, (tags) => [...tags, res.tag]);
-    if (failed === 0) setNotice(`Raccolta "${res.tag}" pronta: ${plural(picked.size)}.`);
+    if (failed === 0) setNotice(`Raccolta “${res.tag}” pronta: ${plural(picked.size)}.`);
   }
 
   // Salvati per la scelta in "Nuova raccolta": filtro per nome/indirizzo, raggruppati per città.
@@ -143,7 +143,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
   const sheetTitle =
     sheet?.kind === "nuova" ? "Nuova raccolta"
       : sheet?.kind === "rinomina" ? "Rinomina raccolta"
-      : sheet?.kind === "unisci" ? `Unisci "${sheet.tag}" con…`
+      : sheet?.kind === "unisci" ? `Unisci “${sheet.tag}” con…`
       : sheet?.kind === "elimina" ? "Eliminare la raccolta?"
       : sheet ? sheet.tag : "";
 
@@ -176,8 +176,8 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
                 {tag.charAt(0).toUpperCase()}
               </span>
               <span className="min-w-0">
-                <span className="block truncate font-display text-sm font-semibold">{tag}</span>
-                <span className="block text-xs text-white/75">{plural(count)}</span>
+                <span className="line-clamp-2 break-words font-display text-sm font-semibold leading-tight">{tag}</span>
+                <span className="mt-0.5 block text-xs text-white/75">{plural(count)}</span>
               </span>
             </Link>
             <button
@@ -245,7 +245,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
 
             {sheet.kind === "unisci" && (
               <div className="flex min-h-0 flex-col gap-2">
-                <p className="text-sm text-text-muted">I locali di &quot;{sheet.tag}&quot; passano nella raccolta che scegli; &quot;{sheet.tag}&quot; sparisce.</p>
+                <p className="text-sm text-text-muted">I locali di “{sheet.tag}” passano nella raccolta che scegli; “{sheet.tag}” sparisce.</p>
                 <ul className="min-h-0 space-y-2 overflow-y-auto">
                   {collections.filter(([t]) => t !== sheet.tag).map(([t, n]) => (
                     <li key={t}>
@@ -270,7 +270,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
             {sheet.kind === "elimina" && (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-text">
-                  La raccolta <strong>&quot;{sheet.tag}&quot;</strong> sparisce dai tuoi {plural(withTag(sheet.tag).length)}.
+                  La raccolta <strong>“{sheet.tag}”</strong> sparisce dai tuoi {plural(withTag(sheet.tag).length)}.
                   I locali restano tra i tuoi salvati, con le loro note.
                 </p>
                 <button type="button" data-testid="conferma-elimina" disabled={busy} onClick={() => void remove(sheet.tag)} className={`${primary} bg-error`}>
