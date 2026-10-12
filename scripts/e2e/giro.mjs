@@ -848,7 +848,7 @@ else {
   // In sviluppo il pallino "N" di Next copre "Mappa": si tocca il link direttamente.
   await p.locator("nav").first().getByRole("link", { name: "Mappa" }).evaluate((a) => a.click());
   await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Mappa' in basso torna a Esplora"), () => ok(false, "'Mappa' in basso torna a Esplora"));
-  { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
+  { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 4, "app installata: 4 scorciatoie (Cerca, Salvati, Stasera, Filtri)"); ok((m.shortcuts ?? []).some((x) => x.url === "/stasera" && x.short_name === "Stasera"), "app installata: scorciatoia 'Stasera' → /stasera"); }
 
   // Voce 11c (?beta=pin-salvati, spenta di default): i salvati restano sulla mappa anche in Esplora
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -916,6 +916,7 @@ else {
       ok(raccolte.length === 4 && raccolte[0].includes("Con amici") && raccolte[0].includes("3 locali") && raccolte[1].includes("Romantico") && !raccolte.some((t) => /Da provare|Già visitato/.test(t)), `profilo: raccolte = tag dell'utente con il numero, senza i due stati (${raccolte.join(" | ")})`);
       ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/mappa?vista=salvati&tag=Con+amici", "profilo: tocco su una raccolta = mappa filtrata su quel tag");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
+      ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
       ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
@@ -924,6 +925,121 @@ else {
       await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "barra in basso: 'Salvati' apre la mappa sui propri salvati"), () => ok(false, "barra in basso: 'Salvati' apre la mappa sui propri salvati"));
     }
     await sctx.clearCookies({ name: "e2e_profilo" });
+  }
+
+  // "Stasera dove andiamo?" (/stasera): tre proposte dai propri salvati. Supabase simulato dal browser.
+  {
+    const sp = (n, name, category, address, lat, lng, tags, note = null, gid = null) => ({ tags, note, places: { id: `00000000-0000-4000-8000-0000000002${n}`, name, category, address, lat, lng, google_place_id: gid ?? `GS${n}`, rating: 4.9, price_level: 2 } });
+    const stRows = [
+      sp("01", "Terrazza Uno", "bar", "Via Po, 2/a, 00198 Roma RM, Italy", 41.915, 12.497, ["Romantico", "Da provare"], "Tavolo in terrazza al tramonto", "G1"),
+      sp("02", "Osteria Due", "restaurant", "Via dei Vascellari 29, Roma", 41.888, 12.477, ["Con amici", "Festa", "Già visitato"]),
+      sp("03", "Enoteca Tre", "wine_bar", "Via del Governo Vecchio 12, 00186 Roma RM, Italy", 41.898, 12.47, ["Romantico", "Da provare"]),
+      sp("04", "Forno Quattro", "bakery", "Via Ostiense 50, Roma", 41.87, 12.48, ["Con amici"]),
+      sp("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy", 45.468, 9.2, ["Da provare"], "Brunch domenica"),
+      sp("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy", 45.45, 9.16, ["Con amici", "Già visitato"]),
+      sp("07", "Pizzeria Sette", "pizza_restaurant", "Via Natale del Grande 15, 00153 Roma RM, Italy", 41.887, 12.469, ["Con amici", "Da provare"]),
+      sp("08", "Sushi Otto", "sushi_restaurant", "Via Merulana 100, 00185 Roma RM, Italy", 41.894, 12.503, []),
+    ];
+    let stData = stRows;
+    const stCtx = (opts = {}) => browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, ...opts }).then(async (c) => {
+      await c.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: stData.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: stData }));
+      await c.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "G1", verdict: "Vista vera sui tetti, cocktail fatti con cura." }] }));
+      await c.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+      await c.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+      await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+      return c;
+    });
+    const stc = await stCtx();
+    const sq = await stc.newPage();
+    sq.on("pageerror", (e) => errors.push(e.message));
+    await sq.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+    await sq.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+    ok(await sq.getByRole("heading", { name: "Stasera dove andiamo?" }).isVisible(), "stasera: la domanda grande 'Stasera dove andiamo?'");
+    const occ = await sq.getByTestId("stasera-occasione").getByRole("button").allTextContents();
+    ok(occ[0] === "Qualsiasi" && occ[1] === "Con amici" && occ.includes("Romantico") && occ.includes("Festa") && !occ.some((t) => /Da provare|Già visitato/.test(t)), `stasera: occasioni = le raccolte dell'utente + Qualsiasi (${occ.join(" | ")})`);
+    ok((await sq.getByTestId("stasera-novita").getByRole("button", { name: "📌 Mai provati" }).getAttribute("aria-pressed")) === "true" && (await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).getAttribute("aria-pressed")) === "true", "stasera: di partenza 'Mai provati' e 'Ovunque'");
+    ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("6 salvati"), `stasera: conteggio dei salvati che rispettano le scelte (${await sq.getByTestId("stasera-conteggio").textContent()})`);
+    await sq.screenshot({ path: `${OUT}/40-stasera-scelte.png`, caret: "initial" });
+    // Città dei salvati come scelta rapida (più di una città): Roma = 5 mai provati
+    const dove = await sq.getByTestId("stasera-distanza").getByRole("button").allTextContents();
+    ok(dove.join("|") === "📍 Vicino a me|Roma|Milano|Ovunque", `stasera: 'Dove?' con le città dei salvati (${dove.join(" | ")})`);
+    await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Roma" }).click();
+    ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), "stasera: 'Roma' tiene solo i salvati di Roma");
+    await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).click();
+    // Romantico: 2 posti
+    await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Romantico" }).click();
+    ok((await sq.getByTestId("stasera-proponi").textContent()) === "Proponimi i 2 posti", "stasera: con 'Romantico' restano 2 posti");
+    // Festa + Mai provati: nessuno → si allarga con un tocco
+    await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
+    ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante");
+    await sq.getByTestId("stasera-allarga").filter({ hasText: "Anche già visitati" }).click();
+    ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("1 salvato") && (await sq.getByTestId("stasera-novita").getByRole("button", { name: "Anche già visitati" }).getAttribute("aria-pressed")) === "true", "stasera: 'Anche già visitati' allarga con un tocco (1 salvato)");
+    await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Qualsiasi" }).click();
+    await sq.getByTestId("stasera-novita").getByRole("button", { name: "📌 Mai provati" }).click();
+    // Proposte: 3, tutte "Voglio andarci" (ce ne sono 4 su 6)
+    await sq.getByTestId("stasera-proponi").click();
+    await sq.getByTestId("stasera-proposta").first().waitFor({ timeout: 3000 }).catch(() => {});
+    const first = await sq.getByTestId("stasera-proposta").evaluateAll((els) => els.map((e) => ({ id: e.getAttribute("data-id"), t: e.textContent })));
+    ok(first.length === 3 && first.every((x) => x.t.includes("📌 Voglio andarci")), `stasera: 3 proposte, prima i 'Voglio andarci' (${first.map((x) => x.t.slice(0, 18)).join(" | ")})`);
+    ok(await sq.getByRole("heading", { name: "Ecco 3 idee per stasera" }).isVisible(), "stasera: titolo 'Ecco 3 idee per stasera'");
+    const terr = sq.getByTestId("stasera-proposta").filter({ hasText: "Terrazza Uno" });
+    if (await terr.count()) {
+      ok(await terr.getByTestId("stasera-verdetto").getByText("Vista vera sui tetti, cocktail fatti con cura.").isVisible() && await terr.getByTestId("stasera-nota").getByText("“Tavolo in terrazza al tramonto”").isVisible() && await terr.getByText("Romantico").isVisible(), "stasera: card con nota tra virgolette, raccolte e verdetto in cache");
+    }
+    ok((await sq.getByTestId("stasera-verdetto").count()) <= 1, "stasera: verdetto solo dove c'è in cache (mai inventato)");
+    const card0 = sq.getByTestId("stasera-proposta").first();
+    ok(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d/.test((await card0.getByTestId("stasera-percorso").getAttribute("href")) ?? "") && (await card0.getByTestId("stasera-mappa").getAttribute("href")) === `/mappa?salvato=${first[0].id}`, "stasera: 'Percorso' apre Google Maps, 'Apri nella mappa' apre il salvato");
+    await sq.screenshot({ path: `${OUT}/41-stasera-proposte.png`, caret: "initial" });
+    // Altri 3: niente ripetizioni finché ce ne sono; poi si ricomincia il giro
+    await sq.getByTestId("stasera-altri").click();
+    const second = await sq.getByTestId("stasera-proposta").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+    ok(second.length === 3 && second.every((id) => !first.some((x) => x.id === id)), "stasera: 'Altri 3' propone posti diversi");
+    ok((await sq.getByTestId("stasera-altri").count()) === 1, "stasera: 'Altri 3' resta disponibile");
+    await sq.getByTestId("stasera-altri").click();
+    ok(await sq.getByTestId("stasera-ricomincio").isVisible() && (await sq.getByTestId("stasera-proposta").count()) === 3, "stasera: visti tutti, 'Altri 3' ricomincia il giro");
+    // Apri nella mappa: si apre la scheda del salvato
+    const target = sq.getByTestId("stasera-proposta").first();
+    const targetName = (await target.locator("h2").textContent()) ?? "";
+    await target.getByTestId("stasera-mappa").click();
+    await sq.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).then(async () => {
+      ok(await sq.getByText(targetName).last().isVisible(), `stasera → mappa: si apre la scheda di '${targetName}'`);
+    }, () => ok(false, "stasera → mappa: si apre la scheda del salvato"));
+    // Posizione negata (simulata: il permesso rifiutato dal telefono): si spiega e si resta su Ovunque
+    await sq.addInitScript(() => { navigator.geolocation.getCurrentPosition = (_ok, err) => setTimeout(() => err({ code: 1, PERMISSION_DENIED: 1, message: "negata" }), 50); });
+    await sq.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+    await sq.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+    await sq.getByTestId("stasera-distanza").getByRole("button", { name: "📍 Vicino a me" }).click();
+    await sq.getByTestId("stasera-posizione-negata").waitFor({ timeout: 4000 }).then(async () => {
+      ok((await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).getAttribute("aria-pressed")) === "true", "stasera: posizione negata → spiegazione e si cerca ovunque");
+    }, () => ok(false, "stasera: posizione negata → spiegazione e si cerca ovunque"));
+    await stc.close();
+
+    // Posizione già permessa (Roma): "Vicino a me" si accende da solo, niente salvati di Milano, distanza sulla card
+    const stg = await stCtx({ permissions: ["geolocation"], geolocation: { latitude: 41.9, longitude: 12.49 } });
+    const sg = await stg.newPage();
+    sg.on("pageerror", (e) => errors.push(e.message));
+    await sg.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+    await sg.waitForFunction(() => document.querySelector("[data-testid=stasera-distanza] button[aria-pressed=true]")?.textContent?.includes("Vicino a me"), null, { timeout: 5000 }).catch(() => {});
+    ok((await sg.getByTestId("stasera-distanza").getByRole("button", { name: "📍 Vicino a me" }).getAttribute("aria-pressed")) === "true", "stasera: posizione già permessa → 'Vicino a me' acceso");
+    ok((await sg.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), `stasera: vicino a me esclude i salvati di Milano (${await sg.getByTestId("stasera-conteggio").textContent()})`);
+    await sg.getByTestId("stasera-proponi").click();
+    const near = await sg.getByTestId("stasera-proposta").allTextContents();
+    ok(near.length === 3 && !near.some((t) => t.includes("Caffè Milano")) && near.every((t) => / · a \d/.test(t)) && (await sg.getByTestId("stasera-riepilogo").textContent())?.includes("vicino a te"), "stasera: proposte vicine con la distanza sulla card");
+    await stg.close();
+
+    // Nessun salvato: invito a cercare o importare
+    stData = [];
+    const ste = await stCtx();
+    const se = await ste.newPage();
+    await se.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+    await se.getByTestId("stasera-vuoto").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(await se.getByTestId("stasera-vuoto").isVisible() && await se.getByRole("link", { name: "Cerca un locale" }).getAttribute("href") === "/mappa" && await se.getByRole("link", { name: "Importa i tuoi posti" }).getAttribute("href") === "/importa", "stasera: senza salvati invita a cercare o importare");
+    // Senza accesso: invito ad accedere
+    await ste.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    await se.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+    ok(await se.getByTestId("stasera-accedi").isVisible() && await se.getByRole("link", { name: "Accedi" }).first().getAttribute("href") === "/login", "stasera: senza accesso invita ad accedere");
+    await ste.close();
+    stData = stRows;
   }
 
   // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
