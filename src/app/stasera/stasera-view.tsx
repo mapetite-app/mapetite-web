@@ -11,6 +11,7 @@ import { track } from "@/lib/track";
 import {
   STATE_DONE,
   STATE_WANT,
+  citiesOf,
   collectionsOf,
   directionsUrl,
   matches,
@@ -165,6 +166,7 @@ export default function StaseraView({ userId }: { userId: string }) {
   const [occasion, setOccasion] = useState<string | null>(null);
   const [onlyNew, setOnlyNew] = useState(true);
   const [wantNear, setWantNear] = useState(false);
+  const [city, setCity] = useState<string | null>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const [geo, setGeo] = useState<Geo>("idle");
   const [proposals, setProposals] = useState<SavedSpot[] | null>(null);
@@ -185,6 +187,7 @@ export default function StaseraView({ userId }: { userId: string }) {
     if (!("geolocation" in navigator)) { setGeo("assente"); setWantNear(false); return; }
     setGeo("cerco");
     setWantNear(true);
+    setCity(null);
     navigator.geolocation.getCurrentPosition(
       (p) => { setPos({ lat: p.coords.latitude, lng: p.coords.longitude }); setGeo("ok"); },
       (err) => { setGeo(err.code === err.PERMISSION_DENIED ? "negata" : "assente"); setWantNear(false); },
@@ -202,10 +205,11 @@ export default function StaseraView({ userId }: { userId: string }) {
   }, [askPosition]);
 
   const choices: Choices = useMemo(
-    () => ({ occasion, onlyNew, near: wantNear && pos ? pos : null }),
-    [occasion, onlyNew, wantNear, pos],
+    () => ({ occasion, onlyNew, near: wantNear && pos ? pos : null, city }),
+    [occasion, onlyNew, wantNear, pos, city],
   );
   const collections = useMemo(() => collectionsOf(spots ?? []), [spots]);
+  const cities = useMemo(() => citiesOf(spots ?? []), [spots]);
   const matchCount = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)).length, [spots, choices]);
 
   const propose = () => {
@@ -235,7 +239,7 @@ export default function StaseraView({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const summary = [occasion ?? "Qualsiasi occasione", choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
+  const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
 
   return (
     <main data-testid="stasera" className="min-h-[calc(100dvh-4rem)] bg-brand text-white md:min-h-[calc(100dvh-3.5rem)]">
@@ -290,7 +294,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} />
               ))}
             </ul>
-            <div className="sticky bottom-[calc(var(--nav-height-mobile)+0.75rem)] mt-5 flex gap-2">
+            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-brand from-60% to-transparent px-4 pb-3 pt-6">
               <button
                 type="button"
                 onClick={() => setProposals(null)}
@@ -313,7 +317,7 @@ export default function StaseraView({ userId }: { userId: string }) {
         ) : (
           <section aria-label="Le tue scelte">
             <h1 className="font-display text-[32px] font-bold leading-[1.1]">Stasera dove andiamo?</h1>
-            <p className="mt-2 text-[15px] text-white/75">Tre tocchi e scegli tra i {spots.length} posti che hai salvato.</p>
+            <p className="mt-2 text-[15px] text-white/75">Tre tocchi e scegli tra i tuoi {spots.length === 1 ? "unico salvato" : `${spots.length} salvati`}.</p>
 
             <h2 className="mb-2.5 mt-7 font-display text-sm font-semibold text-white/70">Che occasione?</h2>
             <div data-testid="stasera-occasione" className="flex flex-wrap gap-2">
@@ -329,7 +333,10 @@ export default function StaseraView({ userId }: { userId: string }) {
             <h2 className="mb-2.5 mt-6 font-display text-sm font-semibold text-white/70">Dove?</h2>
             <div data-testid="stasera-distanza" className="flex flex-wrap gap-2">
               <Pill active={wantNear} onClick={askPosition}>{geo === "cerco" ? "Cerco dove sei…" : "📍 Vicino a me"}</Pill>
-              <Pill active={!wantNear} onClick={() => setWantNear(false)}>Ovunque</Pill>
+              {cities.length > 1 && cities.slice(0, 3).map((c) => (
+                <Pill key={c} active={!wantNear && city === c} onClick={() => { setWantNear(false); setCity(city === c ? null : c); }}>{c}</Pill>
+              ))}
+              <Pill active={!wantNear && !city} onClick={() => { setWantNear(false); setCity(null); }}>Ovunque</Pill>
             </div>
             {geo === "negata" && (
               <p data-testid="stasera-posizione-negata" role="status" className="mt-2 text-xs text-white/75">
@@ -356,8 +363,8 @@ export default function StaseraView({ userId }: { userId: string }) {
                       Qualsiasi occasione
                     </button>
                   )}
-                  {choices.near && (
-                    <button type="button" data-testid="stasera-allarga" onClick={() => setWantNear(false)} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
+                  {(choices.near || city) && (
+                    <button type="button" data-testid="stasera-allarga" onClick={() => { setWantNear(false); setCity(null); }} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
                       Cerca ovunque
                     </button>
                   )}
@@ -369,7 +376,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 </div>
               </div>
             ) : (
-              <div className="sticky bottom-[calc(var(--nav-height-mobile)+0.75rem)] mt-8">
+              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-brand from-70% to-transparent px-4 pb-3 pt-4">
                 <button
                   type="button"
                   onClick={propose}

@@ -3,6 +3,7 @@
 // il voto Google NON entra nella scelta, così non vincono i posti più popolari (VISIONE.md).
 import { distanceMeters } from "@/lib/distance";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { cityFromAddress } from "@/lib/city";
 
 export const STATE_WANT = "Da provare"; // si legge "📌 Voglio andarci"
 export const STATE_DONE = "Già visitato"; // si legge "✓ Ci sono stato"
@@ -25,6 +26,7 @@ export type SavedSpot = {
 export type Choices = {
   occasion: string | null; // una raccolta dell'utente, null = Qualsiasi
   near: { lat: number; lng: number } | null; // null = Ovunque
+  city: string | null; // città ricavata dall'indirizzo (es. "Roma"), null = tutte
   onlyNew: boolean; // true = Mai provati (esclusi i "Ci sono stato")
 };
 
@@ -40,7 +42,18 @@ export function collectionsOf(spots: SavedSpot[]): string[] {
   return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it")).map(([t]) => t);
 }
 
+// Città dei salvati (dall'indirizzo), dalla più ricca: servono solo se sono almeno due.
+export function citiesOf(spots: SavedSpot[]): string[] {
+  const count = new Map<string, number>();
+  for (const s of spots) {
+    const c = cityFromAddress(s.address);
+    if (c) count.set(c, (count.get(c) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it")).map(([c]) => c);
+}
+
 export function matches(s: SavedSpot, c: Choices): boolean {
+  if (c.city && cityFromAddress(s.address) !== c.city) return false;
   if (c.occasion && !s.tags.includes(c.occasion)) return false;
   if (c.onlyNew && s.tags.includes(STATE_DONE)) return false;
   if (c.near) {
