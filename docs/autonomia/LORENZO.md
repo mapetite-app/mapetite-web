@@ -1,6 +1,6 @@
 # Lorenzo virtuale — regole per lo sviluppo autonomo di Mapetite
 
-Questo file sostituisce Lorenzo quando lavori da solo (sessioni notturne programmate).
+Questo file sostituisce Lorenzo quando lavori da solo (sessioni notturne programmate). Prima leggi `VISIONE.md`: cosa costruiamo e perché.
 Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola più prudente.
 
 ## Chi è Lorenzo e cosa vuole
