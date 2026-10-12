@@ -761,6 +761,11 @@ else {
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
 
+  // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
+  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
+  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(!p.url().includes("vista="), "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
+  { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
+
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
   await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
   await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {

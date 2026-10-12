@@ -1483,6 +1483,14 @@ export default function MapView({
       setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
       return;
     }
+    // Scorciatoia dell'app installata: /mappa?vista=salvati apre subito "I miei salvati".
+    if (params.get("vista") === "salvati") {
+      params.delete("vista");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
+      return;
+    }
     // Dalla home "Oppure cerca con i filtri" (/mappa?filtri=1): apre subito il pannello dei filtri.
     if (params.get("filtri") === "1") {
       params.delete("filtri");
