@@ -127,17 +127,20 @@ export default function ManualAddCard({
         </div>
       ) : (
         <>
+          <label htmlFor="mano-campo" className="mt-4 mb-1.5 block text-sm font-medium text-text">
+            Nome del locale e città
+          </label>
           <form
-            className="mt-4 flex gap-2"
+            className="flex gap-2"
             onSubmit={(e) => { e.preventDefault(); void search(query); }}
           >
             <input
+              id="mano-campo"
               type="search"
               enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nome del locale e città (es. Pizzeria da Michele Roma)"
-              aria-label="Nome del locale e città"
+              placeholder="es. Da Michele Roma"
               maxLength={120}
               className="min-h-12 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base focus:border-brand focus:outline-none"
             />

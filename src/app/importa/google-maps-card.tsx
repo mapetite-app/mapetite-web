@@ -151,15 +151,16 @@ export default function GoogleMapsCard({
             </button>
           )}
 
-          <p className="mt-3 text-xs text-text-muted">
-            Su Android, con Mapetite installata, puoi anche scegliere Mapetite direttamente da Condividi.
-          </p>
-
           {social && (
             <div className="mt-4">
               <SocialLinkHelp source={social.source} hint={social.hint} onScreenshot={onScreenshot} onSearch={onSearch} />
             </div>
           )}
+
+          <p className="mt-3 text-xs text-text-muted">
+            Su Android, con Mapetite installata, puoi anche scegliere Mapetite direttamente da Condividi.
+          </p>
+
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error">{error}</p>}
           {results && <div className="mt-4"><LinkResults results={results} userId={userId} /></div>}
         </>
