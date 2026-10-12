@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractPlace, type ImportResult } from "@/lib/import-caption";
+import { allowAi, clientKey } from "@/lib/ai-limit";
 
 // Destinazione del "Condividi" di Android (share_target POST nel manifest).
 // Arrivano due cose diverse:
@@ -95,8 +96,12 @@ export async function POST(request: NextRequest) {
   const mediaType = sniffImageType(bytes);
   if (!mediaType) return result({ errore: "formato" });
 
+  // Tetto AI (src/lib/ai-limit.ts): conta solo le letture vere con Haiku.
+  const finta = fakeReading(request);
+  if (!finta && !allowAi("screenshot", clientKey(request, userId))) return result({ errore: "limite" });
+
   const lettura =
-    fakeReading(request) ??
+    finta ??
     (await extractPlace({ image: { mediaType, data: Buffer.from(bytes).toString("base64") } }));
   console.log("[condividi/ricevi] screenshot letto:", lettura.nome ? "trovato" : "nessun locale");
 

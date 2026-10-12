@@ -6,6 +6,7 @@ import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
 import { recordEvent } from "@/lib/events";
+import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
@@ -57,6 +58,11 @@ export async function POST(request: Request) {
       { error: "La query non può superare i 500 caratteri." },
       { status: 400 }
     );
+  }
+
+  // Tetto alle chiamate AI (src/lib/ai-limit.ts): le ricerche scritte usano Haiku.
+  if (source === "world" && searchIntent === "natural" && !allowAi("ricerca", clientKey(request))) {
+    return NextResponse.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
   }
 
   let filtri: SearchFilters = {

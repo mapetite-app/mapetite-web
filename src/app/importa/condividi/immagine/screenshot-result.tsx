@@ -8,6 +8,7 @@ import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-
 
 const ERRORI: Record<string, string> = {
   illeggibile: "Non riesco a leggere un locale in questa immagine.",
+  limite: "Hai condiviso tante immagini in poco tempo: riprova tra qualche minuto.",
   formato: "Non riesco ad aprire questa immagine: prova con uno screenshot (PNG o JPG).",
   grande: "L'immagine è troppo grande (massimo 5 MB): prova con uno screenshot.",
 };
