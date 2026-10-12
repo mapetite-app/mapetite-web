@@ -2043,7 +2043,7 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
-                      ? "Tocca il segnalibro su un locale per ritrovarlo qui, con note e tag."
+                      ? "Qui ritrovi i posti che non vuoi perdere: dalla ricerca, da Google Maps o da uno screenshot di Instagram."
                       : "Sposta la mappa o cambia vista"}
               </p>
               {aiSearch === null && view === "saved" && !savedFiltered && (
@@ -2054,6 +2054,15 @@ export default function MapView({
                 >
                   Cerca un locale
                 </button>
+              )}
+              {aiSearch === null && view === "saved" && !savedFiltered && (
+                <Link
+                  href="/importa"
+                  data-testid="salvati-vuoti-importa"
+                  className="mx-auto mt-2 flex min-h-11 w-fit items-center justify-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand active:scale-95"
+                >
+                  Salva da Google Maps
+                </Link>
               )}
               {aiSearch !== null && (
                 <div className="mt-4 flex justify-center gap-2">

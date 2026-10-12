@@ -738,6 +738,8 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
   console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
 } else {
   await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
+  ok((await page.getByTestId("salvati-vuoti-importa").getAttribute("href")) === "/importa", "salvati vuoti: secondo modo per iniziare, 'Salva da Google Maps'");
+  await shot("11z-salvati-vuoti");
   await page.getByRole("button", { name: "Cerca un locale" }).click();
   ok(await page.getByTestId("suggerimenti-barra").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
 }
