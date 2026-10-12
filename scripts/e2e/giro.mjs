@@ -695,7 +695,7 @@ else {
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
-  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci' come nella scheda");
+  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci · 1' (con quanti sono), come nella scheda");
   await p.getByRole("button", { name: "Filtri", exact: true }).click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();

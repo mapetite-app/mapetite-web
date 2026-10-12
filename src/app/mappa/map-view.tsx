@@ -1722,7 +1722,7 @@ export default function MapView({
                   onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
                   className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
                 >
-                  {tagLabel(tag)}
+                  {tagLabel(tag)} · {savedPlaces.filter((p) => p.tags?.includes(tag)).length}
                 </button>
               ))}
             </div>
