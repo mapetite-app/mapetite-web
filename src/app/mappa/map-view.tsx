@@ -484,6 +484,22 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
   return scored.sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.p);
 }
 
+// "Per te" dai comportamenti (VISIONE.md): un risultato somiglia a un tuo salvato se è dello
+// stesso tipo e della stessa fascia di prezzo (±1). Si sceglie il salvato più vicino. Solo
+// un'indicazione sulla card: l'ordine resta quello della richiesta (mai sopra un posto più adatto).
+function similarSaved(place: Place, saved: Place[]): string | null {
+  const kind = categoryLabel(place.category);
+  if (!kind) return null;
+  let best: { name: string; d: number } | null = null;
+  for (const s of saved) {
+    if (s.name === place.name || categoryLabel(s.category) !== kind) continue;
+    if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
+    const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
+    if (!best || d < best.d) best = { name: s.name, d };
+  }
+  return best?.name ?? null;
+}
+
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
 // nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
 type MapStyleApi = {
@@ -2802,6 +2818,11 @@ export default function MapView({
           } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
+          similarTo={aiSearch !== null && view === "all" && savedPlaces.length > 0 ? (id) => {
+            if (isPlaceSaved(id)) return null;
+            const place = displayedPlaces.find((p) => p.id === id);
+            return place ? similarSaved(place, savedPlaces) : null;
+          } : undefined}
           savedLabel={(id) => {
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;

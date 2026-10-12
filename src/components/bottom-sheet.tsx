@@ -49,6 +49,8 @@ export interface BottomSheetProps {
   isSaved?: (id: string) => boolean;
   // Stato del locale già salvato ("📌 Voglio andarci" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
   savedLabel?: (id: string) => string | null;
+  // "Per te" dai salvati: nome di un tuo salvato simile (stesso tipo e prezzo), mostrato sulla card.
+  similarTo?: (id: string) => string | null;
   onSave?: (place: Place) => void;
   // Card finale "Questi risultati non vanno?": solo per la ricerca intera, non per un gruppo di pin.
   showSearchFeedback?: boolean;
@@ -152,7 +154,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
@@ -508,6 +510,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     <span className="mt-1 truncate text-[13px] font-sans font-medium text-white/85">
                       {metaLine(place, d, origin)}
                     </span>
+                    {similarTo?.(place.id) && (
+                      <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
+                    )}
                     {d?.verdict ? (
                       <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
                     ) : loadingVerdicts && details ? (

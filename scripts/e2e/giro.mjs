@@ -871,6 +871,16 @@ else {
   }, () => ok(false, "barra: scrivendo 'terrazza' compare 'Nei tuoi salvati: Terrazza Uno'"));
   await p.keyboard.press("Escape");
 
+  // "Per te" dai salvati: un risultato dello stesso tipo e prezzo di un salvato lo dice sulla card
+  await p.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await p.locator("ul.snap-x li[data-id=P2]").waitFor({ timeout: 5000 });
+  ok((await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").textContent()) === "✨ Come Terrazza Uno, che hai salvato", "per te: 'Come Terrazza Uno, che hai salvato' su un bar simile");
+  ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("simile-a").count()) === 0, "per te: niente indicazione se il tipo è diverso (cocktail bar)");
+  await p.screenshot({ path: `${OUT}/28-per-te-simile.png`, caret: "initial" });
+  await p.unroute("**/api/search/synthesis");
+
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
   await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
   await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {
