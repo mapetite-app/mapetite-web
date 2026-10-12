@@ -10,6 +10,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 import { sortTags, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
+import { cityFromAddress } from "@/lib/city";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -58,6 +59,10 @@ export interface BottomSheetProps {
   onShareList?: (places: Place[]) => Promise<"shared" | "copied" | null>;
   // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
   onOpenArticle?: () => void;
+  // Lista dei propri salvati: niente filtri rapidi (mancano orari e conteggi).
+  savedMode?: boolean;
+  // Città sulla riga dei metadati (salvati di più città: "Ristorante · ★ 4,6 · Roma · 600 m").
+  showCity?: boolean;
 }
 
 export type ListDetails = {
@@ -93,8 +98,8 @@ function formatCount(n: number | null): string | null {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
 }
 
-// Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
-export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null): string {
+// Riga di metadati: categoria · ★ voto (n) · prezzo · [città] · distanza.
+export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null, withCity = false): string {
   const parts: string[] = [];
   const cat = prettyCategory(place.category);
   if (cat) parts.push(cat);
@@ -104,6 +109,8 @@ export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat
   }
   const price = priceLabel(place.priceLevel);
   if (price) parts.push(price);
+  const city = withCity ? cityFromAddress(place.address) : null;
+  if (city) parts.push(city);
   if (origin) parts.push(distanceLabel(origin, place));
   return parts.join(" · ");
 }
@@ -154,10 +161,10 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], savedMode = false, showCity = false }: BottomSheetProps) {
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
-  const quickFiltersOn = useBeta("filtri-lista") && details != null;
+  const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
   const nearestOn = origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
@@ -508,7 +515,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
                     <span className="mt-1 truncate text-[13px] font-sans font-medium text-white/85">
-                      {metaLine(place, d, origin)}
+                      {metaLine(place, d, origin, showCity)}
                     </span>
                     {similarTo?.(place.id) && (
                       <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
@@ -644,7 +651,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
-                    <span className="truncate">{metaLine(place, details?.[place.id], origin)}</span>
+                    <span className="truncate">{metaLine(place, details?.[place.id], origin, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora

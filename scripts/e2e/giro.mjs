@@ -755,7 +755,8 @@ else {
   ];
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
-  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  // Verdetto già in cache per Terrazza Uno (G1): deve comparire sulla card dei salvati.
+  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "G1", synthesis: "Terrazza tranquilla.", tags: [], verdict: "Aperitivo lento sui tetti, lontano dalla folla.", go_for: ["tramonto"], dont_expect: [] }] }));
   await sctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" }] }));
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
@@ -784,10 +785,14 @@ else {
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
     ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
+  { const card = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
+    ok(await card.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible(), "salvati: la card mostra il verdetto Mapetite già in cache");
+    ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
+  ok(!(await p.locator("ul.snap-x li").first().textContent()).includes("· Milano"), "filtro Milano: la città non si ripete sulla card (è già nel titolo)");
   ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
   // L'animazione della mappa può durare un po': si aspetta (al massimo 4 s) che il pin sia in vista.
   let pin = null;

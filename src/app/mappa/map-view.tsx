@@ -2784,7 +2784,10 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
-          details={aiSearch !== null ? venueDetails : undefined}
+          // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
+          details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
+          savedMode={view === "saved" && aiSearch === null}
+          showCity={view === "saved" && aiSearch === null && activeCity === null}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
