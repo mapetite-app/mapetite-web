@@ -2043,7 +2043,7 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Nessun salvato con questi filtri"
                     : view === "saved"
-                      ? "Nessun posto salvato"
+                      ? "La tua mappa è ancora vuota"
                       : "Nessun posto da mostrare"}
               </p>
               <p className="mt-1 text-sm font-sans text-text-muted">
@@ -2052,7 +2052,7 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
-                      ? "Tocca il segnalibro su un locale per ritrovarlo qui, con note e tag."
+                      ? "Salva i posti che scopri, da qualsiasi app: li ritrovi qui quando devi scegliere."
                       : "Sposta la mappa o cambia vista"}
               </p>
               {aiSearch === null && view === "saved" && !savedFiltered && (
@@ -2063,6 +2063,16 @@ export default function MapView({
                 >
                   Cerca un locale
                 </button>
+              )}
+              {/* Zero salvati (VISIONE.md "Raccogli"): i modi di salvare, a un tocco. */}
+              {aiSearch === null && view === "saved" && !savedFiltered && (
+                <div data-testid="raccogli-vuoto" className="mt-3 flex flex-wrap justify-center gap-2">
+                  {([["📍 Da Google Maps", "/importa"], ["📸 Da uno screenshot", "/importa#da-screenshot"], ["✍️ A mano", "/importa#a-mano"]] as const).map(([label, href]) => (
+                    <Link key={href} href={href} className="inline-flex min-h-10 items-center rounded-pill border border-border bg-white px-3.5 text-sm font-display font-semibold text-brand active:scale-95">
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               )}
               {aiSearch !== null && (
                 <div className="mt-4 flex justify-center gap-2">

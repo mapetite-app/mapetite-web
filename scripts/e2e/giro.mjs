@@ -796,7 +796,9 @@ ok((await page.getByTestId("recenti").count()) === 0 && (await page.getByTestId(
 if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {
   console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
 } else {
-  await page.getByText("Nessun posto salvato").waitFor({ timeout: 4000 });
+  await page.getByText("La tua mappa è ancora vuota").waitFor({ timeout: 4000 });
+  ok((await page.getByTestId("raccogli-vuoto").getByRole("link").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).join(" ") === "/importa /importa#da-screenshot /importa#a-mano", "salvati vuoti: i modi per salvare (Google Maps, screenshot, a mano) a un tocco");
+  await page.screenshot({ path: `${OUT}/08b-salvati-vuoti.png`, caret: "initial" });
   await page.getByRole("button", { name: "Cerca un locale" }).click();
   ok(await page.getByTestId("suggerimenti-barra").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca");
 }
@@ -849,9 +851,9 @@ else {
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
   ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
-  // L'animazione della mappa può durare un po': si aspetta (al massimo 4 s) che il pin sia in vista.
+  // L'animazione della mappa può durare un po' (di più se la macchina è carica): si aspetta fino a 8 s.
   let pin = null;
-  for (let t = 0; t < 8; t++) {
+  for (let t = 0; t < 16; t++) {
     await p.waitForTimeout(500);
     // Con un solo salvato mostrato c'è un solo pin (il nome compare solo da vicino).
     pin = await p.getByTestId("pin").first().boundingBox({ timeout: 1000 }).catch(() => null);
