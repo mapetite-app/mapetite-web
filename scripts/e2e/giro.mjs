@@ -128,6 +128,9 @@ ok(await page.locator("img[alt='Terrazza Uno']").first().isVisible(), "scheda: f
 ok(await page.getByText("Foto: Maria R.").isVisible(), "scheda: autore della foto indicato (condizioni Google)");
 ok(((await page.getByRole("link", { name: /su Google Maps/ }).first().getAttribute("href")) ?? "").includes("query_place_id=P1"), "scheda: link a orari e foto su Google Maps con il Place ID");
 ok((await page.locator("a[href^='tel:']").first().getAttribute("href")) === "tel:+390612345678", "scheda: numero ripulito per tel:");
+await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); });
+await page.getByTestId("copia-indirizzo").click();
+ok((await page.getByTestId("copia-indirizzo").textContent())?.includes("✓ Copiato") && (await page.evaluate(() => window.__copied)) === "Via di Prova 1, Roma", "scheda: tocco sull'indirizzo lo copia");
 ok((await page.getByTestId("citta-distanza").textContent())?.match(/^Roma · \d+ m$/) != null, "scheda: riga 'Roma · distanza' (come Places)");
 ok(await page.getByText("Bar", { exact: true }).first().isVisible(), "scheda: tipo di locale in italiano");
 ok((await page.getByTestId("scheda-nav").textContent())?.includes("1 di 2"), "scheda: '‹ 1 di 2 ›' per passare agli altri risultati");
@@ -648,6 +651,12 @@ await page.waitForURL(/\/mappa/, { timeout: 5000 }).then(() => ok(true, "onboard
 await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
+
+// 8a. "Cancella" le ricerche recenti
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByTestId("cancella-recenti").click();
+await page.waitForTimeout(200);
+ok((await page.getByTestId("recenti").count()) === 0 && (await page.getByTestId("cancella-recenti").count()) === 0, "ricerche recenti: 'Cancella' le toglie subito");
 
 // 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
 if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {

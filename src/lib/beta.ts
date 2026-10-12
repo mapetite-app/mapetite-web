@@ -69,6 +69,23 @@ export function loadRecentSearches(): string[] {
   }
 }
 
+// Avvisa chi mostra le recenti (mappa, home) che sono cambiate.
+export const RECENT_EVENT = "mapetite-recenti";
+export function subscribeRecent(cb: () => void): () => void {
+  window.addEventListener(RECENT_EVENT, cb);
+  return () => window.removeEventListener(RECENT_EVENT, cb);
+}
+
+// "Cancella" le ricerche recenti (es. se si presta il telefono).
+export function clearRecentSearches(): void {
+  try {
+    window.localStorage.removeItem(RECENT_KEY);
+  } catch {
+    // localStorage non disponibile: niente da cancellare
+  }
+  window.dispatchEvent(new Event(RECENT_EVENT));
+}
+
 export function saveRecentSearch(q: string): void {
   try {
     const next = [q, ...loadRecentSearches().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 5);

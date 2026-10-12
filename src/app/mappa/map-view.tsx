@@ -16,7 +16,7 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import DragToClose from "@/components/drag-to-close";
 import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
-import { loadRecentSearches, saveRecentSearch, useBeta, useOptIn, useVariant } from "@/lib/beta";
+import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel } from "@/lib/tags";
 import { categoryLabel } from "@/lib/category-label";
@@ -828,7 +828,7 @@ export default function MapView({
   const barInputRef = useRef<HTMLInputElement>(null);
   const [articleOpen, setArticleOpen] = useState(false);
   const recentSearches = useSyncExternalStore(
-    () => () => {},
+    subscribeRecent,
     () => (recentOn ? JSON.stringify(loadRecentSearches()) : "[]"),
     () => "[]",
   );
@@ -1930,6 +1930,17 @@ export default function MapView({
                   ↻ {r}
                 </button>
               ))}
+              {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+                <button
+                  type="button"
+                  data-testid="cancella-recenti"
+                  onClick={clearRecentSearches}
+                  aria-label="Cancella le ricerche recenti"
+                  className="min-h-11 shrink-0 rounded-pill px-2 text-xs font-sans text-text-muted underline-offset-2 active:scale-95"
+                >
+                  Cancella
+                </button>
+              )}
               {tasteSuggestion && (
                 <button
                   key="per-te"
