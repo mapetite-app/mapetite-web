@@ -2411,7 +2411,8 @@ export default function MapView({
           details={aiSearch !== null ? venueDetails : undefined}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
-          origin={userPos ?? searchOrigin}
+          // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
+          origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null

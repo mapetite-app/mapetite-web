@@ -140,6 +140,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null;
+  // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
+  const nearestOn = origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
@@ -337,7 +339,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
-      {quickFiltersOn && origin && (
+      {nearestOn && (
         <button
           type="button"
           aria-pressed={nearestFirst}
@@ -433,7 +435,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             </p>
           )}
         </div>
-        {(quickFiltersOn || onOpenArticle) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
+        {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
         )}

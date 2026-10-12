@@ -693,6 +693,13 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
+  await sctx.grantPermissions(["geolocation"]);
+  await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
+  await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
+  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
+  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
+  await p.getByRole("button", { name: "Più vicini" }).click();
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
@@ -701,7 +708,7 @@ else {
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
-  ok((await p.getByTestId("filtri-lista").count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
+  ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
   await p.waitForTimeout(1500);
   const pin = await p.getByTestId("pin").first().boundingBox();
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
