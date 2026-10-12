@@ -1034,6 +1034,17 @@ export default function MapView({
 
       setSavedPlaces(fetched);
       setPlaceUuids((prev) => ({ ...prev, ...uuidMap }));
+      // Arrivo dal profilo (/mappa?salvato=UUID): apre la scheda di quel salvato.
+      const wanted = fetched.find((p) => p.id === openSavedRef.current);
+      openSavedRef.current = null;
+      if (wanted) {
+        setTimeout(() => {
+          setFocusedId(wanted.id);
+          dispatch({ type: "OPEN_VENUE", placeId: wanted.id });
+          const map = (mapRef.current as { getMap?: () => { jumpTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+          if (map) map.jumpTo({ center: [wanted.lng, wanted.lat], zoom: 15 });
+        }, 0);
+      }
 
       // Verdetto editoriale anche sui salvati: legge la cache place_synthesis
       // (RLS read-all pubblica) per i Google Place ID e popola venueDetails
@@ -1448,10 +1459,21 @@ export default function MapView({
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
+  const openSavedRef = useRef<string | null>(null);
   useEffect(() => {
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
+    // Dal profilo: /mappa?salvato=UUID apre i salvati e poi la scheda (quando arrivano).
+    const savedId = params.get("salvato");
+    if (savedId && /^[0-9a-f-]{36}$/i.test(savedId)) {
+      openSavedRef.current = savedId;
+      params.delete("salvato");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => { setWelcomeDismissed(true); setView("saved"); dispatch({ type: "OPEN_LIST" }); }, 0);
+      return;
+    }
     // Dalla home "Oppure cerca con i filtri" (/mappa?filtri=1): apre subito il pannello dei filtri.
     if (params.get("filtri") === "1") {
       params.delete("filtri");

@@ -139,13 +139,16 @@ export default async function ProfiloPage() {
                 {rows.map(({ places: place, tags, note }, i) =>
                   place ? (
                     <li key={place.id ?? i}>
-                      <PlaceCard
-                        name={place.name}
-                        category={place.category}
-                        address={place.address}
-                        tags={tags ?? undefined}
-                        note={note}
-                      />
+                      {/* Tocco: apre la scheda del locale sulla mappa (prima la card non portava da nessuna parte). */}
+                      <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato" className="block active:scale-[0.99]">
+                        <PlaceCard
+                          name={place.name}
+                          category={place.category}
+                          address={place.address}
+                          tags={tags ?? undefined}
+                          note={note}
+                        />
+                      </Link>
                     </li>
                   ) : null
                 )}

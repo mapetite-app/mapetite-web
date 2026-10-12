@@ -705,13 +705,6 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
-  ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
-  await sctx.grantPermissions(["geolocation"]);
-  await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
-  await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
-  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
-  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
-  await p.getByRole("button", { name: "Più vicini" }).click();
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
@@ -741,6 +734,13 @@ else {
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
+  ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
+  await sctx.grantPermissions(["geolocation"]);
+  await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
+  await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
+  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
+  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
+  await p.getByRole("button", { name: "Più vicini" }).click();
   await p.getByRole("button", { name: "Tutti", exact: true }).click();
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
@@ -757,6 +757,13 @@ else {
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
+
+  // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato
+  await p.goto(`${BASE}/mappa?salvato=00000000-0000-4000-8000-000000000001`, { waitUntil: "networkidle" });
+  await p.getByTestId("stato-salvato").waitFor({ timeout: 5000 }).then(async () => {
+    ok(await p.getByText("Terrazza Uno").last().isVisible() && !p.url().includes("salvato="), "profilo → mappa: il salvato toccato si apre nella sua scheda");
+  }, () => ok(false, "profilo → mappa: il salvato toccato si apre nella sua scheda"));
+  await p.keyboard.press("Escape");
 
   // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
   ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: spento di default");
