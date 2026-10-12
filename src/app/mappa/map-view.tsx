@@ -2121,7 +2121,13 @@ export default function MapView({
               }}
               style={{ zIndex: focusId === place.id || selected?.id === place.id ? 2 : 1 }}
             >
-              <div className="flex cursor-pointer flex-col items-center" data-testid="pin" data-focused={focusId === place.id ? "true" : undefined}>
+              {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
+              <div
+                className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                data-testid="pin"
+                data-focused={focusId === place.id ? "true" : undefined}
+                data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+              >
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     className={`block overflow-hidden rounded-xl border-2 bg-white shadow-float transition-transform ${

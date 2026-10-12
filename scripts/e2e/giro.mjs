@@ -107,6 +107,7 @@ await page.waitForTimeout(1200);
 const pinBoxes = [];
 for (const pin of await page.getByTestId("pin").all()) { const b = await pin.boundingBox(); if (b) pinBoxes.push(b); }
 ok(pinBoxes.length >= 2, `mappa: ${pinBoxes.length} pin con nome sulla mappa dopo la ricerca`);
+ok((await page.locator("[data-testid=pin][data-closed=true]").count()) === 1 && (await page.locator("[data-testid=pin][data-closed=true]").innerText()).includes("Rooftop Tre"), "mappa: il pin del locale chiuso è più chiaro (solo quello)");
 ok(pinBoxes.every((b) => b.y > 0 && b.y + b.height < 844 * 0.55 && b.x >= 0 && b.x + b.width <= 390), "mappa: la mappa si sposta sui risultati (pin sopra la lista, dentro lo schermo)");
 
 // 3. La ricerca resta scritta nella barra in alto
