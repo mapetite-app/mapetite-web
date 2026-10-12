@@ -795,6 +795,12 @@ export default function MapView({
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  // Salvati letti almeno una volta (il salvataggio rimandato dopo il login aspetta questo).
+  const [savedLoaded, setSavedLoaded] = useState(false);
+  const [savedIdsLoaded, setSavedIdsLoaded] = useState(false);
+  // Verdetti dei salvati (place_synthesis, per UUID): restano anche quando una ricerca
+  // sostituisce venueDetails.
+  const savedSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
@@ -1021,12 +1027,12 @@ export default function MapView({
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
-  const askLoginToSave = (place: Place) => {
-    rememberPendingSave(place);
+  const askLoginToSave = (place: Place, tags: string[] = [VISIT_WANT]) => {
+    rememberPendingSave(place, tags);
     window.location.href = loginToSaveUrl(place.name);
   };
-  const quickSave = async (place: Place) => {
-    if (!userId) { askLoginToSave(place); return; }
+  const quickSave = async (place: Place, tags: string[] = [VISIT_WANT]) => {
+    if (!userId) { askLoginToSave(place, tags); return; }
     if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
     try {
       const addRes = await fetch("/api/places/add", {
@@ -1039,7 +1045,6 @@ export default function MapView({
       });
       if (!addRes.ok) throw new Error("add");
       const uuid: string = (await addRes.json()).place.id;
-      const tags = [VISIT_WANT];
       const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
       if (error && error.code !== "23505") throw new Error("insert");
       setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
@@ -1047,26 +1052,28 @@ export default function MapView({
       const saved = { ...place, id: uuid, tags, note: null };
       setSavedPlaces((prev) => [...prev.filter((p) => p.id !== uuid), saved]);
       setSavedToast(saved);
-      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: VISIT_WANT });
+      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: tags.includes(VISIT_DONE) ? VISIT_DONE : VISIT_WANT });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
-      setPendingSaveTags([VISIT_WANT]);
+      setPendingSaveTags(tags);
       setPendingSavePlaceId(place.id);
     }
   };
 
   // Rientro dopo l'accesso: salva il locale toccato prima di entrare e lo mostra sulla mappa.
+  // Aspetta i salvati: se il locale c'era già, si apre la sua scheda invece di rifarlo da zero.
   useEffect(() => {
-    if (!userId) return;
-    const place = takePendingSave();
-    if (!place) return;
+    if (!userId || !savedLoaded || !savedIdsLoaded) return;
+    const pending = takePendingSave();
+    if (!pending) return;
+    const { place, tags } = pending;
     setTimeout(() => {
       setViewState((v) => ({ ...v, latitude: place.lat, longitude: place.lng, zoom: Math.max(v.zoom, 15) }));
-      void quickSave(place);
+      void quickSave(place, tags);
     }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta, appena si conosce l'utente
-  }, [userId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta, quando utente e salvati sono pronti
+  }, [userId, savedLoaded, savedIdsLoaded]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1082,6 +1089,7 @@ export default function MapView({
           return;
         }
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
+        setSavedIdsLoaded(true);
       });
   }, [userId]);
 
@@ -1135,6 +1143,7 @@ export default function MapView({
         .eq("user_id", userId);
 
       setLoadingSaved(false);
+      setSavedLoaded(true);
       if (error) {
         console.error("Errore nel caricamento dei locali salvati:", error);
         return;
@@ -1205,6 +1214,7 @@ export default function MapView({
         };
       }
       if (Object.keys(savedDetails).length > 0) {
+        savedSynthRef.current = savedDetails;
         setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
       }
     })();
@@ -1337,7 +1347,7 @@ export default function MapView({
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
-      setVenueDetails(details);
+      setVenueDetails({ ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati.
       fitToPlaces(places);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
@@ -1520,7 +1530,7 @@ export default function MapView({
         const id = ++searchSeq.current;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q });
-        setVenueDetails(details); setFilters(EMPTY_FILTERS);
+        setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -2625,7 +2635,7 @@ export default function MapView({
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
-                if (!userId) { askLoginToSave(selected); return; }
+                if (!userId) { askLoginToSave(selected, [st]); return; }
                 setPendingSaveTags([st]);
                 setPendingSavePlaceId(selected.id);
               }}

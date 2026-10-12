@@ -804,7 +804,15 @@ else {
     ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)");
     await card.scrollIntoViewIfNeeded();
     await p.waitForTimeout(600);
-    await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" }); }
+    await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" });
+    // Dopo una ricerca, tornando ai salvati il verdetto c'è ancora (la ricerca non lo cancella).
+    await p.getByRole("button", { name: "Esplora" }).click();
+    await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+    await p.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
+    await p.getByRole("button", { name: "I miei salvati" }).click();
+    await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+    const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
+    ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
