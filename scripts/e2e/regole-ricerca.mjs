@@ -1,0 +1,22 @@
+// Controlli delle regole di ordinamento della ricerca (nessuna chiamata, nessun costo).
+//   node --experimental-strip-types scripts/e2e/regole-ricerca.mjs
+import { demoteOffType } from "../../src/lib/off-type.ts";
+import { demoteMainstream } from "../../src/lib/mainstream.ts";
+
+let failed = 0;
+const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
+const p = (name, category, userRatingCount = 500) => ({ name, category, userRatingCount });
+const colazione = [p("The Irish Pub", "irish_pub"), p("Bar Rossi", "cafe"), p("Forno Campo", "bakery"), p("Caffè X", "coffee_shop"), p("Pasticceria Y", "pastry_shop")];
+
+ok(demoteOffType("colazione buona vicino a me", colazione).places.at(-1)?.name === "The Irish Pub", "colazione: il pub irlandese va in fondo");
+ok(demoteOffType("colazione e poi una birra", colazione).demoted.length === 0, "colazione + birra: il pub resta");
+ok(demoteOffType("pizza a Roma", colazione).demoted.length === 0, "richiesta senza tipo chiaro: nessuno spostamento");
+ok(demoteOffType("cocktail bar elegante", [p("Flumen cocktail house", "pub"), p("A", "cocktail_bar"), p("B", "cocktail_bar"), p("C", "bar")]).demoted.length === 0, "cocktail: un 'pub' che si chiama cocktail house resta");
+ok(demoteOffType("ristorante romantico su un rooftop", [p("Terrazza Les Étoiles", "bar"), p("A", "restaurant"), p("B", "restaurant"), p("C", "restaurant")]).demoted.length === 0, "ristorante su terrazza con tipo 'bar' resta");
+ok(demoteOffType("cocktail bar", [p("Pub 1", "pub"), p("Pub 2", "pub"), p("Pub 3", "pub"), p("A", "cocktail_bar")]).demoted.length === 0, "quasi tutti fuori tema: nessuno spostamento (forse il tipo è capito male)");
+const trastevere = [p("Da Enzo", "restaurant", 10239), p("A", "restaurant", 3900), p("B", "restaurant", 2000), p("C", "restaurant", 4100), p("D", "restaurant", 3000)];
+ok(demoteMainstream("trattoria autentica non turistica a Trastevere", trastevere).places.at(-1)?.name === "Da Enzo", "non turistico: Da Enzo in fondo");
+ok(demoteMainstream("trattoria a Trastevere", trastevere).demoted.length === 0, "richiesta normale: Da Enzo resta");
+
+console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
+process.exit(failed === 0 ? 0 : 1);
