@@ -749,6 +749,8 @@ export default function MapView({
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
+  // Stato scelto in scheda prima di aprire Salva ("Voglio andarci" / "Ci sono stato"); vuoto dal segnalibro.
+  const [pendingSaveTags, setPendingSaveTags] = useState<string[]>([]);
   const [pendingEditPlace, setPendingEditPlace] = useState<Place | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
@@ -1435,7 +1437,7 @@ export default function MapView({
   const closeTopmost = useRef<() => void>(() => {});
   useEffect(() => {
     closeTopmost.current = () => {
-      if (pendingSavePlaceId) { setPendingSavePlaceId(null); return; }
+      if (pendingSavePlaceId) { setPendingSavePlaceId(null); setPendingSaveTags([]); return; }
       if (pendingEditPlace) { setPendingEditPlace(null); return; }
       if (overlay.kind === "venue" || overlay.kind === "filters" || overlay.kind === "ai") { dispatch({ type: "CLOSE" }); return; }
       if (articleOpen) {
@@ -2261,6 +2263,11 @@ export default function MapView({
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
+              onQuickSave={(st) => {
+                if (!userId) { window.location.href = "/login"; return; }
+                setPendingSaveTags([st]);
+                setPendingSavePlaceId(selected.id);
+              }}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
               userPos={userPos}
@@ -2361,6 +2368,7 @@ export default function MapView({
         return pendingPlace && userId ? (
           <SaveModal
             place={pendingPlace}
+            initialTags={pendingSaveTags}
             knownTags={availableTags}
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
@@ -2375,8 +2383,9 @@ export default function MapView({
                 { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note },
               ]);
               setPendingSavePlaceId(null);
+              setPendingSaveTags([]);
             }}
-            onCancel={() => setPendingSavePlaceId(null)}
+            onCancel={() => { setPendingSavePlaceId(null); setPendingSaveTags([]); }}
           />
         ) : null;
       })()}

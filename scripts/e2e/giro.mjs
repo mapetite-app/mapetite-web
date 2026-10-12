@@ -815,8 +815,14 @@ else {
   await v.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
   await v.getByText("Terrazza Uno").first().click();
   await v.getByText("Il verdetto Mapetite").waitFor({ timeout: 4000 });
+  // Locale non salvato: "✓ Ci sono stato" in scheda apre Salva con lo stato già scelto
+  await v.getByTestId("stato-rapido").getByRole("button", { name: "✓ Ci sono stato" }).click();
+  await v.locator("div.w-80").getByText("Salva locale").waitFor({ timeout: 3000 });
+  ok((await v.locator("div.w-80").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda non salvata: '✓ Ci sono stato' apre Salva con lo stato già scelto");
+  await v.locator("div.w-80").getByRole("button", { name: "Annulla" }).click();
   await v.locator("button:text-is('Salva')").first().click();
   const modal = v.locator("div.w-80");
+  ok((await modal.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva dal pulsante: nessuno stato rimasto dalla scelta annullata");
   await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
   ok(true, "salva: si apre la finestra con tag e nota");
   await modal.getByRole("button", { name: "Romantico" }).click();

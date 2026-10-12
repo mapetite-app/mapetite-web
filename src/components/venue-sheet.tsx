@@ -52,6 +52,8 @@ type VenueSheetProps = {
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
+  // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
+  onQuickSave?: (status: "Da provare" | "Già visitato") => void;
 };
 
 export default function VenueSheet({
@@ -66,6 +68,7 @@ export default function VenueSheet({
   userPos = null,
   onVisitStatus,
   googlePlaceId = null,
+  onQuickSave,
 }: VenueSheetProps) {
   const {
     name,
@@ -473,6 +476,22 @@ export default function VenueSheet({
             >
               {tag}
             </span>
+          ))}
+        </div>
+      )}
+
+      {/* Non salvato: le due scelte di Places come primo passo del salvataggio. */}
+      {!isSaved && onQuickSave && (
+        <div className="mx-5 mt-4 flex gap-2" data-testid="stato-rapido">
+          {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onQuickSave(tag)}
+              className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
+            >
+              {label}
+            </button>
           ))}
         </div>
       )}
