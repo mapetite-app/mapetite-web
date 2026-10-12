@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import ShareImport from "./share-import";
 
@@ -18,8 +19,11 @@ export default async function CondividiPage({
 
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
-  // Solo in sviluppo locale: utente finto per il test automatico (scripts/e2e/giro.mjs).
-  const e2eUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
+  // Solo in sviluppo locale: utente finto per il test automatico (scripts/e2e/giro.mjs);
+  // il cookie "e2e_anonimo" simula chi non ha fatto l'accesso.
+  const dev = process.env.NODE_ENV === "development";
+  const anonimo = dev && (await cookies()).has("e2e_anonimo");
+  const e2eUser = dev && !anonimo ? process.env.E2E_FAKE_USER ?? null : null;
 
-  return <ShareImport title={title} sharedText={sharedText} userId={e2eUser ?? userData?.user?.id ?? null} />;
+  return <ShareImport title={title} sharedText={sharedText} userId={anonimo ? null : e2eUser ?? userData?.user?.id ?? null} />;
 }
