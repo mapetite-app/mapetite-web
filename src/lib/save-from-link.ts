@@ -49,6 +49,33 @@ export async function saveFromLinks(text: string, userId: string, title?: string
   return out;
 }
 
+// Locale scelto tra i risultati di Google (screenshot condiviso da Android): lo crea se serve
+// e lo aggiunge ai salvati con lo stato "Da provare", come i link di Google Maps.
+export type SearchPlace = {
+  id: string; name: string; address: string; lat: number | null; lng: number | null;
+  category: string | null; rating: number | null; priceLevel: number | null;
+};
+export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<LinkOutcome> {
+  if (r.lat == null || r.lng == null) throw new Error("Questo locale non ha una posizione su Google Maps.");
+  const res = await fetch("/api/places/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      googlePlaceId: r.id, name: r.name, address: r.address, lat: r.lat, lng: r.lng,
+      category: r.category, rating: r.rating, priceLevel: r.priceLevel,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.place?.id) throw new Error(data?.error ?? "Errore nel salvataggio del locale.");
+  const place = { id: data.place.id as string, name: r.name };
+  const { error } = await createClient()
+    .from("saved_places")
+    .insert({ user_id: userId, place_id: place.id, tags: [WANT_TAG], note: null });
+  if (error && error.code === "23505") return { link: "", place, alreadySaved: true };
+  if (error) throw new Error("Non sono riuscito ad aggiungerlo ai tuoi salvati. Riprova.");
+  return { link: "", place };
+}
+
 export async function saveNote(userId: string, placeId: string, note: string) {
   const { error } = await createClient()
     .from("saved_places")
