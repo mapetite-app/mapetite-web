@@ -16,7 +16,7 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel } from "@/lib/tags";
@@ -853,6 +853,7 @@ export default function MapView({
   const pickOn = useOptIn("sorprendimi");
   // 🎤 nella barra (?beta=voce, spento di default).
   const voiceOn = useOptIn("voce");
+  const savedPinsOn = useOptIn("pin-salvati");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
@@ -2465,6 +2466,28 @@ export default function MapView({
           );
         })}
 
+        {/* I tuoi salvati sempre in vista (?beta=pin-salvati, come Mapstr): piccoli segnalibri anche in Esplora. */}
+        {savedPinsOn && view === "all" && (() => {
+          const shown = new Set(mapPlaces.map((p) => resolveUuid(p.id) ?? p.id));
+          return savedPlaces.filter((p) => !shown.has(p.id)).map((p) => (
+            <Marker
+              key={`salvato-${p.id}`}
+              longitude={p.lng}
+              latitude={p.lat}
+              anchor="bottom"
+              style={{ zIndex: 0 }}
+              onClick={(e) => { e.originalEvent.stopPropagation(); setView("saved"); dispatch({ type: "OPEN_VENUE", placeId: p.id }); }}
+            >
+              <span
+                data-testid="pin-salvato"
+                aria-label={`${p.name}, tra i tuoi salvati`}
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-accent text-white shadow-float"
+              >
+                <Bookmark size={14} fill="currentColor" aria-hidden />
+              </span>
+            </Marker>
+          ));
+        })()}
         {userPos && (
           <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">

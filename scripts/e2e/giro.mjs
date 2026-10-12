@@ -841,6 +841,16 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Mappa' in basso torna a Esplora"), () => ok(false, "'Mappa' in basso torna a Esplora"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
 
+  // Voce 11c (?beta=pin-salvati, spenta di default): i salvati restano sulla mappa anche in Esplora
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  ok((await p.getByTestId("pin-salvato").count()) === 0, "pin dei salvati: spenti di default");
+  await p.goto(`${BASE}/mappa?beta=pin-salvati`, { waitUntil: "networkidle" });
+  await p.getByTestId("pin-salvato").first().waitFor({ timeout: 5000 }).then(async () => {
+    ok((await p.getByTestId("pin-salvato").count()) === rows.length, `pin dei salvati: ${await p.getByTestId("pin-salvato").count()} segnalibri sulla mappa in Esplora`);
+    await p.screenshot({ path: `${OUT}/11c-pin-salvati.png`, caret: "initial" });
+  }, () => ok(false, "pin dei salvati: segnalibri sulla mappa in Esplora"));
+  await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
+
   // Voce 11d: scrivendo nella barra compaiono prima i propri salvati che c'entrano
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await p.getByLabel("Cosa cerchi?").fill("una terrazza per stasera");
