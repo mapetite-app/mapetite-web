@@ -19,8 +19,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra";
 export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce";
 const OPTIN_KEY = "mapetite.beta";
 
-// ?stile=places accende anche l'articolo e il nuovo "Salva"; ?stile=attuale li spegne.
-const PLACES_OPTIN = ["articolo", "salva"];
+// ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.
+const PLACES_OPTIN = ["articolo", "salva", "voce"];
 function readOptIn(): string {
   const url = readFlags();
   if (url.split(",").includes("off")) return EMPTY;
