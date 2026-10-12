@@ -137,6 +137,16 @@ Regole:
 - **Ricerche recenti — FATTA e ACCESA per tutti dall'11/10**: nella card iniziale, le ultime 5 ricerche fatte su quel telefono (salvate solo nel browser). Nessun costo, nessuna migrazione.
 
 
+## Fase 6 — Dalla visione (VISIONE.md, 12/10): cosa manca per superare i concorrenti
+Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo e sul differenziatore.
+- **Ranking contro la fama — FATTO (PR del 12/10 pomeriggio)**: le ricerche con i filtri usavano ancora la media bayesiana senza tetto (premiava i locali di massa). Ora oltre 150 recensioni non contano più: vince il voto. Da controllare ogni nuova soglia con la domanda di VISIONE.md.
+- **Verdetto sempre — FATTO (stessa PR)**: si mostrano solo i 12 risultati con il verdetto (prima 20, di cui 8 muti). Resta da fare: verdetto anche per i salvati che non l'hanno (backfill Haiku, costo da stimare: DA DECIDERE).
+- **"Per te" dai comportamenti — PRONTA, nessun costo né migrazione**: i risultati AI si riordinano un poco verso ciò che la persona ha già salvato (tipi, fascia di prezzo, zone, tag come "Romantico") e la card lo dice: "✨ Simile a Trattoria X che hai salvato". Primo uso concreto dei segnali impliciti, calcolato nel telefono sui dati già caricati. Mai sopra un locale più adatto alla richiesta: solo a parità.
+- **Raccogli dai social in un gesto — PRONTA (Android)**: oggi da Instagram/TikTok si condivide solo il link (la didascalia non si può leggere senza scraping). Mapetite diventa destinazione anche per le **immagini** condivise: screenshot di un post o di una storia → "Condividi" → Mapetite → l'import da screenshot che esiste già (Haiku legge nome e città) → salvato. Costo: quello attuale dell'import da screenshot. Su iPhone resta "Importa → screenshot".
+- **Segnali di comportamento registrati — DA DECIDERE (migrazione)**: tabella `events` (utente, tipo: ricerca / filtro / apertura scheda / salvataggio / "ci sono stato" / percorso, locale, zona, momento; mai testo libero personale). È la base del motore di raccomandazione e dei dati per i ristoratori ("cosa cerca la gente nella tua zona"), che vanno progettati da subito. Serve: migrazione + RLS + informativa privacy. Prima si raccoglie, prima i dati valgono.
+- **Collega Google Maps in un tocco — DA DECIDERE** (voce 13, livello 2).
+- **Densità Roma e Milano**: le ricerche di prova (TEST-RICERCHE) sono tutte su Roma. Aggiungere 5 casi su Milano per non scoprire in demo che lì la ricerca è peggiore.
+
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
 - Profili utente pubblici, seguire persone, feed attività, curatori.
