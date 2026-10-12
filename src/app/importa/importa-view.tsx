@@ -196,8 +196,11 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       <GoogleMapsCard userId={userId} />
 
       <h2 className="mt-10 mb-2 font-display text-lg font-semibold text-brand">Da uno screenshot</h2>
-      <p className="text-sm text-text-muted mb-6">
+      <p className="text-sm text-text-muted mb-2">
         Carica uno screenshot di un post social e aggiungi il locale alla tua mappa in pochi passi.
+      </p>
+      <p className="text-sm text-text-muted mb-6" data-testid="importa-condividi-android">
+        Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.
       </p>
 
       {/* ── Step 1: carica immagine ── */}
