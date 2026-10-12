@@ -327,6 +327,11 @@ await page.getByLabel("Fai un'altra domanda").fill("cocktail bar elegante a Mont
 await page.getByLabel("Fai un'altra domanda").press("Enter");
 await page.waitForTimeout(800);
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("cocktail bar elegante"), "articolo: 'Fai un'altra domanda' avvia una nuova ricerca");
+await page.getByTestId("apri-articolo").click();
+await page.getByLabel("Fai un'altra domanda").fill("più economico");
+await page.getByLabel("Fai un'altra domanda").press("Enter");
+await page.waitForTimeout(800);
+ok((await page.getByTestId("titolo-risposta").textContent()) === "cocktail bar elegante a Monti più economico", "articolo: una domanda breve ('più economico') continua la ricerca precedente");
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).first().click();

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUp, Share2 } from "lucide-react";
 import { useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
+import { followUpQuery } from "@/lib/follow-up";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import PlacePhoto from "@/components/place-photo";
@@ -189,7 +190,7 @@ export default function AnswerArticle({
             const q = followUp.trim();
             if (q.length < 3) return;
             if (window.history.state?.articolo) window.history.back();
-            onAsk(q);
+            onAsk(followUpQuery(title, q));
           }}
         >
           <div className="mx-auto flex max-w-xl items-center gap-2 rounded-pill border border-border bg-white pl-4 pr-1 shadow-float">
@@ -198,7 +199,7 @@ export default function AnswerArticle({
               enterKeyHint="search"
               value={followUp}
               onChange={(e) => setFollowUp(e.target.value)}
-              placeholder="Fai un'altra domanda"
+              placeholder="Fai un'altra domanda (es. più economico)"
               aria-label="Fai un'altra domanda"
               className="min-h-12 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
             />
