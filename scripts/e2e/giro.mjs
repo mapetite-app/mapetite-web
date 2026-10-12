@@ -667,6 +667,15 @@ await fb.click();
 const fbHref = decodeURIComponent((await fb.getAttribute("href")) ?? "");
 ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /mappa?lista=b"), "feedback: email precompilata con la pagina in cui si trova il tester");
 
+// 7b'. Barra in basso (voce 11a): "Salvati" al posto di "Importa", apre la mappa sui salvati
+{
+  const nav = page.locator("nav").first();
+  const sv = nav.getByRole("link", { name: "Salvati" });
+  ok(await sv.isVisible() && (await sv.getAttribute("href")) === "/mappa?vista=salvati", "barra in basso: voce 'Salvati' che apre la mappa sui salvati");
+  ok((await nav.getByRole("link", { name: "Importa" }).count()) === 0, "barra in basso: 'Importa' non c'è più (si trova nel profilo)");
+  ok((await nav.getByRole("link", { name: "Mappa" }).getAttribute("class"))?.includes("text-brand") && !(await sv.getAttribute("class"))?.includes("text-brand"), "barra in basso: su /mappa è accesa 'Mappa', non 'Salvati'");
+}
+
 // 7c. iPhone: invito ad aggiungere alla Home (solo a chi ha già cercato)
 const ctxIos = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
 const pi = await ctxIos.newPage();
@@ -814,8 +823,7 @@ else {
   await p.unroute("**/rest/v1/saved_places**");
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
-  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
-  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(!p.url().includes("vista="), "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
+  await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(!p.url().includes("vista="), "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 3, "app installata: 3 scorciatoie (Cerca, Salvati, Filtri)"); }
 
   // Dal profilo: /mappa?salvato=UUID apre la scheda di quel salvato

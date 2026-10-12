@@ -122,6 +122,14 @@ export default async function ProfiloPage() {
             <Link href="/mappa" className="text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
           )}
         </div>
+        {/* "Importa" non è più nella barra in basso (ora c'è "Salvati"): si raggiunge da qui. */}
+        <Link
+          href="/importa"
+          data-testid="profilo-importa"
+          className="mb-3 flex min-h-11 items-center justify-center rounded-pill border border-dashed border-brand/40 px-4 text-sm font-display font-semibold text-brand active:scale-[0.99]"
+        >
+          + Importa locali
+        </Link>
         {saved.length === 0 ? (
           <div className="rounded-card border border-border bg-surface p-5 text-center">
             <p className="text-sm text-text-muted">Non hai ancora salvato nessun locale.</p>
