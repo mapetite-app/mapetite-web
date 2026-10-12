@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import SubmitButton from "@/components/submit-button";
+import PendingSaveNote from "@/components/pending-save-note";
 
 // Accesso e registrazione con lo stesso aspetto del resto dell'app.
 // Campi a 16px: sotto quella misura Safari su iPhone ingrandisce la pagina al tocco.
@@ -39,6 +40,7 @@ export default function AuthForm({
             {message}
           </p>
         )}
+        {!login && !message && <PendingSaveNote />}
         {error && (
           <p role="alert" className="mt-6 rounded-btn bg-error/10 px-4 py-3 text-sm font-sans text-error">
             {error}

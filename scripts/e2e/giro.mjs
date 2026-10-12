@@ -801,7 +801,10 @@ else {
     ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
   { const card = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await card.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible(), "salvati: la card mostra il verdetto Mapetite già in cache");
-    ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)"); }
+    ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)");
+    await card.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(600);
+    await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" }); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
@@ -987,6 +990,8 @@ else {
   await p.waitForURL(/\/login\?message=/, { timeout: 5000 });
   ok(await p.getByText("Accedi o registrati per salvare “Terrazza Uno”: lo aggiungo ai tuoi salvati appena entri.").isVisible(), "salva senza accesso: il login dice quale locale verrà salvato");
   await p.screenshot({ path: `${OUT}/14c-salva-senza-accesso.png`, caret: "initial" });
+  await p.getByRole("link", { name: "Registrati" }).click();
+  await p.getByTestId("salva-dopo-accesso").waitFor({ timeout: 4000 }).then(() => ok(true, "salva senza accesso: anche 'Registrati' ricorda quale locale verrà salvato"), () => ok(false, "salva senza accesso: anche 'Registrati' ricorda quale locale verrà salvato"));
   await sctx.clearCookies({ name: "e2e_anonimo" });
   quickInsert = null;
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

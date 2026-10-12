@@ -24,6 +24,19 @@ export function takePendingSave(): Place | null {
   }
 }
 
+// Solo lettura (per dirlo nella pagina di registrazione), senza cancellarlo.
+export function peekPendingSaveName(): string | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const { place, at } = JSON.parse(raw) as { place?: { name?: string }; at?: number };
+    if (typeof at !== "number" || Date.now() - at > MAX_AGE_MS) return null;
+    return place?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function loginToSaveUrl(name: string): string {
   return `/login?message=${encodeURIComponent(`Accedi o registrati per salvare “${name}”: lo aggiungo ai tuoi salvati appena entri.`)}`;
 }
