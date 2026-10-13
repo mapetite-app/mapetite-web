@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Form from "next/form";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
 import { cookies } from "next/headers";
@@ -27,6 +28,8 @@ async function savedCounts(supabase: Awaited<ReturnType<typeof createClient>>, u
 
 // Home come quella di Places: marchio al centro, frasi d'esempio e un solo campo "Cosa cerchi?" in basso.
 // Il modulo porta a /mappa?q=..., dove la ricerca parte da sola (funziona anche senza JS).
+// <Form> di Next: con JS niente ricaricamento completo (navigazione interna come i suggerimenti),
+// e la pagina /mappa si precarica mentre si scrive: la ricerca parte prima.
 const EXAMPLES = [
   { emoji: "🌇", title: "Rooftop romantico", sub: "per due a Roma", q: "Rooftop romantico per due a Roma" },
   { emoji: "🍝", title: "Trattoria vera", sub: "non turistica a Trastevere", q: "Trattoria autentica non turistica a Trastevere" },
@@ -70,7 +73,7 @@ export default async function Home() {
             </Link>
           ))}
         </div>
-        <form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
+        <Form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
           <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
           <input
             type="search"
@@ -93,7 +96,7 @@ export default async function Home() {
           <button type="submit" aria-label="Cerca" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-lg text-white active:scale-95">
             →
           </button>
-        </form>
+        </Form>
         {/* Link alti 40px (prima 15px): si toccano senza mirare. */}
         <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs font-sans text-text-muted">
           <Link href="/mappa" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">Apri la mappa</Link> ·
