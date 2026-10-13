@@ -30,7 +30,7 @@ export type GuideSource =
 
 export type GuideRating = {
   source: GuideSource;
-  label: string; // nome mostrato ("Guida Michelin")
+  label: string; // nome mostrato ("Michelin")
   mark: string; // logo testuale breve ("M"), non il marchio della fonte
   rating?: number; // voto, solo se arriva da una fonte reale
   scale?: number; // scala del voto (5 per Google)
@@ -95,7 +95,7 @@ export function guideRatings(input: GuideInput, extra: GuideExtra = {}): GuideRa
       ...(input.userRatingCount != null ? { count: input.userRatingCount } : {}),
       url: googleMapsUrl(name, input.googlePlaceId),
     },
-    link("michelin", "Guida Michelin", "M"),
+    link("michelin", "Michelin", "M"),
     link("tripadvisor", "TripAdvisor", "TA"),
     link("gamberorosso", "Gambero Rosso", "GR"),
   ];
