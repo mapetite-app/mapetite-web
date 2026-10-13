@@ -48,3 +48,4 @@ export function allowAi(action: AiAction, key: string, now = Date.now()): boolea
 }
 
 export const AI_LIMIT_MESSAGE = "Hai fatto tante ricerche in poco tempo: riprova tra qualche minuto.";
+export const AI_LIMIT_SCREENSHOT_MESSAGE = "Hai letto tanti screenshot in poco tempo: riprova tra qualche minuto.";

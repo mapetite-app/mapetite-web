@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractPlace, type ImportImage } from "@/lib/import-caption";
-import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
+import { allowAi, clientKey, AI_LIMIT_SCREENSHOT_MESSAGE } from "@/lib/ai-limit";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   if (!allowAi("screenshot", clientKey(request))) {
-    return NextResponse.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
+    return NextResponse.json({ error: AI_LIMIT_SCREENSHOT_MESSAGE }, { status: 429 });
   }
 
   let img: ImportImage | undefined;
