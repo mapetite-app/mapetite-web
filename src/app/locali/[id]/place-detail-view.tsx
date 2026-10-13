@@ -4,12 +4,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Review } from "./page";
+import GuideRatings from "@/components/guide-ratings";
+import { guideRatings } from "@/lib/guide-sources";
+import { cityFromAddress } from "@/lib/city";
 
 type Place = {
   id: string;
   name: string;
   category: string | null;
   address: string | null;
+  rating: number | null;
+  google_place_id: string | null;
 };
 
 function Stars({ rating, max = 5 }: { rating: number; max?: number }) {
@@ -209,6 +214,12 @@ export default function PlaceDetailView({
           </span>
         </div>
       )}
+
+      {/* Confronto con le guide: voto solo da Google (salvato nel locale), le altre come ricerca in uscita. */}
+      <GuideRatings
+        className="mt-6"
+        rows={guideRatings({ name: place.name, city: cityFromAddress(place.address), googlePlaceId: place.google_place_id, rating: place.rating })}
+      />
 
       <hr className="my-8 border-zinc-200" />
 

@@ -22,7 +22,7 @@ export default async function PlaceDetailPage({
     await Promise.all([
       supabase
         .from("places")
-        .select("id, name, category, address")
+        .select("id, name, category, address, rating, google_place_id")
         .eq("id", id)
         .single(),
       supabase
@@ -37,7 +37,7 @@ export default async function PlaceDetailPage({
 
   return (
     <PlaceDetailView
-      place={place as { id: string; name: string; category: string | null; address: string | null }}
+      place={place as { id: string; name: string; category: string | null; address: string | null; rating: number | null; google_place_id: string | null }}
       reviews={(reviews ?? []) as Review[]}
       userId={userData?.user?.id ?? null}
       placeId={id}
