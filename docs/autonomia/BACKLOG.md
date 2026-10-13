@@ -7,6 +7,7 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
+**Aggiornato 13/10 alle 04:30 (sessione delle 03:05, PR #32).** Le due PR della sera (#30 e #31) sono unite in una sola, senza conflitti rimasti: basta fare il merge della #32 e chiudere le altre due. Nessuna voce PRONTA rimasta: tutto il resto aspetta una decisione (elenco sotto, "Cosa serve decidere").
 **Aggiornato 13/10 mattina (notte 12→13, PR #30).** Fatto in questa notte: primo accesso in 10 secondi, "Stasera dove andiamo?", raccolte organizzabili, condividi un locale con link Mapetite + ritorno dopo la registrazione, "Com'era?", aggiungi a mano, link Instagram/TikTok, il differenziatore visibile (verdetto etichettato, "🧭 messi da parte", "Dai tuoi salvati"), QA completo a 390/360px (27 difetti), copione demo.
 **Manca per il 25/10:** chiave Haiku nell'ambiente di prova (verdetti mai visti dal vivo da Claude); migrazione `events` da applicare; prova su iPhone e Android veri; "Collega Google Maps" (da decidere); scelte sulle grafiche fatte in una sola versione; contrasto del corallo (palette).
 Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista B collegata alla mappa con foto; home nuova; mappa pulita; feedback; salvati per città; "Ci sono stato"; momento magia e "✨ Per te"; ricerca in corso con card fantasma; link Google Maps per gli orari; ricerche "non turistiche"; barra "✨ Chiedi all'AI…" + "Filtri"; in prova articolo (`?beta=articolo`) e nuovo Salva (`?beta=salva`), accesi da `?stile=places`.
@@ -177,6 +178,21 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **Copione della demo in 3 minuti — `docs/autonomia/DEMO.md`.**
 - **Dopo l'accesso si torna dove si era — IN PR**: parametro `next` controllato (niente rimandi verso altri siti) da login, registrazione, email di conferma e onboarding; il locale condiviso torna con "Ci sei! Tocca qui sotto per salvarlo". DA FARE da Lorenzo: in Supabase → Authentication → URL Configuration, controllare che i "Redirect URLs" accettino `…/login?next=…` (es. `https://<dominio>/login*`).
 - **Controllo qualità della mappa e della scheda — IN PR**: 11 difetti corretti (verdetto delle card di nuovo su 2 righe: le card non coprono più i pin; avviso "Salvato" sopra la barra azioni; "›" apre il locale dall'inizio; zoom iPhone sul commento; pulsanti piccoli). DA DECIDERE (in `QA-2026-10-13-mappa.md`): a 360px l'intestazione dei risultati lascia poca mappa; pulsanti secondari da 36px.
+
+## Mattina 13/10 (sessione delle 03:05, PR #32)
+- **PR #30 + PR #31 in una sola — IN PR #32**: 8 file in conflitto risolti tenendo entrambe le parti (salvati vuoti con i tre modi di salvare; "Ci sei stato?" sopra le raccolte; verdetti dei salvati riusati anche nelle ricerche con "🧭 messi da parte"). Giro automatico: 497 controlli, TUTTO OK.
+- **Cocktail bar con 🍸 — IN PR #32**: avevano il boccale di birra su pin e card (visto nella ricerca vera sui Navigli). Regola aggiunta prima di "bar", nessuna regola spostata: cambia solo chi aveva 🍺 e ha "cocktail" nel tipo o nel nome.
+- **5 ricerche Google vere (casi 2, 3, 5, 6, 9)**: tutte con almeno 3 risultati giusti nei primi 5 e nessun locale "da non proporre". "🧭 Ho messo da parte" funziona dal vivo (Trastevere: Da Enzo, Nannarella, Tonnarello…; Navigli: Spritz Navigli, La Prosciutteria…). Verdetti Haiku non provati: manca `ANTHROPIC_API_KEY` nell'ambiente di prova.
+
+## Cosa serve decidere (in ordine di impatto per il 25/10)
+1. **Merge della PR #32** (contiene #30 e #31), poi in Supabase → Authentication → URL Configuration aggiungere ai Redirect URLs `…/login*` e `…/reimposta-password`.
+2. **Migrazione `events`** (`supabase/migrations/20261012_create_events.sql`, DA APPROVARE): senza, i segnali di comportamento non si registrano. Prima parte, prima i dati valgono.
+3. **`ANTHROPIC_API_KEY` nell'ambiente cloud di prova**: i verdetti non sono mai stati provati dal vivo da Claude.
+4. **Voce 14**: verdetto su 20 risultati invece di 12 (`SYNTHESIS_LIMIT`, raddoppia il costo Haiku per ricerca).
+5. **Grafiche fatte in una sola versione**: primo accesso (3 schermate); accendere per tutti "Ci sei stato?" (`?beta=ci-sei-stato`), pin dei salvati (`?beta=pin-salvati`), gemme (`?beta=gemme`), nuovo Salva (`?beta=salva`, mostra il nome del locale).
+6. **Voce 13, livello 2**: "Collega Google Maps" con la Data Portability API.
+7. **Classifica personale dei visitati** (serve una colonna in `saved_places`).
+8. **Eliminare le pagine vecchie non collegate** (`/miei-locali`, `site-header`).
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
