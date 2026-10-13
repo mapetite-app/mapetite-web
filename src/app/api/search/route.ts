@@ -122,7 +122,8 @@ export async function POST(request: Request) {
       const { places, demoted, rule } = demoteOffType(query.trim(), risultati);
       if (demoted.length > 0) {
         risultati = places;
-        daParte.fuori_tema = demoted.slice(0, 10);
+        // Al telefono solo i nomi: "Nome (irish_pub)" è il formato del log, in inglese.
+        daParte.fuori_tema = places.slice(places.length - demoted.length).map((p) => p.name).slice(0, 10);
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
