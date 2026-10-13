@@ -386,7 +386,7 @@ export default function VenueSheet({
             <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
           </button>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs font-display font-semibold text-accent">
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex min-h-10 items-center text-xs font-display font-semibold text-accent">
           Orari, foto e recensioni su Google Maps →
         </a>
       </div>
@@ -440,7 +440,7 @@ export default function VenueSheet({
             </h2>
             {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
             {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
               Orari e foto su Google Maps →
             </a>
             {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
@@ -552,7 +552,7 @@ export default function VenueSheet({
             <button
               type="button"
               onClick={onEdit}
-              className="mt-3 rounded-btn border border-border px-3 py-1 text-xs font-display font-semibold text-text-muted hover:text-text"
+              className="mt-3 min-h-10 rounded-btn border border-border px-4 py-1 text-sm font-display font-semibold text-text-muted hover:text-text"
             >
               Modifica
             </button>
