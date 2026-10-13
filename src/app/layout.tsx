@@ -65,6 +65,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#1a3c40",
+  // App installata su iPhone: senza "cover" la safe area vale 0 e la barra in basso
+  // resta sotto la linea della Home. La barra di stato resta "default" (niente contenuto sotto).
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -87,12 +90,12 @@ export default async function RootLayout({
         <NavBar userId={userId} />
         <OfflineBanner />
         {/*
-          Pagine normali (non fixed): pb-16 evita che il contenuto finisca
+          Pagine normali (non fixed): pb uguale all'altezza della navbar (safe area inclusa) evita che il contenuto finisca
           sotto la navbar mobile; md:pt-14 fa scendere il contenuto sotto
           la navbar desktop. La pagina /mappa usa fixed inset-0 ed è fuori
           dal flusso, quindi gestisce da sola il proprio offset.
         */}
-        <div className="pb-16 md:pb-0 md:pt-14">{children}</div>
+        <div className="pb-[var(--nav-height-mobile)] md:pb-0 md:pt-14">{children}</div>
       </body>
     </html>
   );
