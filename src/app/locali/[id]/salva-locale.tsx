@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { withNext } from "@/lib/next-path";
 
 // Invito per chi ha ricevuto il link: salvarlo in Mapetite ("📌 Voglio andarci", tag "Da provare",
 // lo stesso dei salvataggi da link e dalla scheda) oppure scoprire l'app.
@@ -12,7 +13,22 @@ const WANT_TAG = "Da provare";
 const PRIMARY =
   "inline-flex min-h-12 w-full items-center justify-center rounded-pill bg-accent px-5 text-[15px] font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-70";
 
-export default function SalvaLocale({ placeId, placeName, userId }: { placeId: string; placeName: string; userId: string | null }) {
+// Chi non ha l'accesso va a login/registrazione con `returnPath`: finito (anche l'onboarding)
+// torna qui con "salva=1" e trova il pulsante evidenziato (`highlight`). Il salvataggio
+// parte SOLO dal suo tocco: nessuna scrittura automatica.
+export default function SalvaLocale({
+  placeId,
+  placeName,
+  userId,
+  returnPath,
+  highlight = false,
+}: {
+  placeId: string;
+  placeName: string;
+  userId: string | null;
+  returnPath: string;
+  highlight?: boolean;
+}) {
   const [state, setState] = useState<"idle" | "saving" | "saved" | "already" | "error">("idle");
 
   const save = async () => {
@@ -37,8 +53,8 @@ export default function SalvaLocale({ placeId, placeName, userId }: { placeId: s
         </p>
         {!userId && (
           <p data-testid="invito-accedi" className="mt-2 text-sm font-sans text-text-muted">
-            Crea un account gratis, poi riapri questo link e salvalo con un tocco.{" "}
-            <Link href="/login" className="font-display font-semibold text-brand">Hai già un account? Accedi</Link>
+            Crea un account gratis: poi torni qui e lo salvi con un tocco.{" "}
+            <Link href={withNext("/login", returnPath)} className="font-display font-semibold text-brand">Hai già un account? Accedi</Link>
           </p>
         )}
         <Link
@@ -63,11 +79,23 @@ export default function SalvaLocale({ placeId, placeName, userId }: { placeId: s
             </Link>
           </div>
         ) : userId ? (
-          <button type="button" onClick={save} disabled={state === "saving"} className={PRIMARY}>
-            {state === "saving" ? "Salvo…" : "📌 Salva in Mapetite"}
-          </button>
+          <>
+            {highlight && (
+              <p data-testid="salva-evidenziato" className="mb-2 rounded-card bg-brand px-4 py-2.5 text-center text-sm font-display font-semibold text-white shadow-float">
+                Ci sei! Tocca qui sotto per salvarlo nella tua mappa.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={save}
+              disabled={state === "saving"}
+              className={`${PRIMARY}${highlight ? " ring-4 ring-accent/35 ring-offset-2 ring-offset-bg" : ""}`}
+            >
+              {state === "saving" ? "Salvo…" : "📌 Salva in Mapetite"}
+            </button>
+          </>
         ) : (
-          <Link href="/signup" className={PRIMARY}>
+          <Link href={withNext("/signup", returnPath)} className={PRIMARY}>
             📌 Salva in Mapetite
           </Link>
         )}

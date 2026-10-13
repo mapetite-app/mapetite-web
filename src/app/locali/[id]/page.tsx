@@ -7,6 +7,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import SalvaLocale from "./salva-locale";
+import { safeNext } from "@/lib/next-path";
 import {
   cleanList,
   currentUserId,
@@ -57,6 +58,13 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const fotoParam = Array.isArray(sp.foto) ? sp.foto[0] : sp.foto;
   const photoRef = validPhotoRef(fotoParam, place.google_place_id);
   const userId = await currentUserId();
+  // Ritorno dopo accesso/registrazione: di nuovo qui, con "salva=1" per evidenziare il pulsante
+  // (il salvataggio resta un tocco esplicito). La foto si tiene se il percorso non diventa troppo lungo.
+  const backBase = `/locali/${place.id}?salva=1`;
+  const returnPath =
+    (photoRef ? safeNext(`${backBase}&foto=${encodeURIComponent(photoRef)}`) : null) ?? backBase;
+  const salvaParam = Array.isArray(sp.salva) ? sp.salva[0] : sp.salva;
+  const highlightSave = userId != null && salvaParam === "1";
 
   const emoji = getCategoryEmoji(place.category, place.name);
   const city = cityFromAddress(place.address);
@@ -165,7 +173,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         </a>
       </div>
 
-      <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} />
+      <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} returnPath={returnPath} highlight={highlightSave} />
     </main>
   );
 }
