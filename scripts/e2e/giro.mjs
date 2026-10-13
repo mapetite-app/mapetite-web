@@ -23,7 +23,7 @@ const mk = (id, name, lat, lng, extra = {}) => ({
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R." }),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
-  mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180, category: "cocktail_bar" }),
+  mk("P3", "Rooftop Tre", 41.902, 12.494, { address: "Corso Como 10, 20154 Milano MI, Italy", openNow: false, rating: 4.7, userRatingCount: 180, category: "cocktail_bar" }),
 ];
 // Molti locali vicinissimi + uno lontano (la mappa si allarga): i primi 5 non devono finire in un cerchio.
 const FOLLA = [
@@ -148,8 +148,30 @@ await page.getByRole("button", { name: "Locale successivo" }).click();
 await page.waitForTimeout(400);
 ok((await page.getByTestId("scheda-nav").textContent())?.includes("2 di 2") && await page.getByRole("heading", { name: "Rooftop Tre" }).or(page.getByText("Rooftop Tre").last()).first().isVisible(), "scheda: '›' apre il locale successivo senza tornare alla lista");
 await shot("04c-scheda-successivo");
+// "Cosa dicono le guide" su un locale di Milano: niente Puntarella Rossa (solo Roma), c'è Dissapore.
+ok((await page.getByTestId("guida-puntarellarossa").count()) === 0 && (await page.getByTestId("guida-dissapore").count()) === 1, "guide: a Milano niente Puntarella Rossa, c'è Dissapore");
 await page.getByRole("button", { name: "Locale precedente" }).click();
 await page.waitForTimeout(300);
+// "Cosa dicono le guide": sotto il verdetto, voto vero solo da Google, le altre fonti come ricerca in uscita.
+{ const guide = page.getByTestId("guide");
+  ok(await guide.isVisible(), "guide: c'è la sezione 'Cosa dicono le guide'");
+  const vBox = await page.getByText("Il verdetto Mapetite").boundingBox();
+  const gBox = await guide.boundingBox();
+  ok(!!vBox && !!gBox && vBox.y < gBox.y, "guide: il verdetto Mapetite viene prima delle guide");
+  const g = page.getByTestId("guida-google");
+  ok((await g.textContent())?.includes("★ 4,5 · 812") && ((await g.getAttribute("href")) ?? "").includes("query_place_id=P1"), "guide: Google mostra voto e recensioni, link alla scheda Maps");
+  for (const [id, site] of [["tripadvisor", "tripadvisor.it"], ["michelin", "guide.michelin.com"]]) {
+    const a = page.getByTestId(`guida-${id}`);
+    const href = (await a.getAttribute("href")) ?? "";
+    ok(href.includes(encodeURIComponent(`site:${site} Terrazza Uno Roma`)) && (await a.getAttribute("target")) === "_blank" && ((await a.getAttribute("rel")) ?? "").includes("noopener") && (await a.textContent())?.includes("Cerca"), `guide: ${id} senza voto inventato, 'Cerca' con nome + città codificati`);
+  }
+  ok((await page.getByTestId("guida-puntarellarossa").count()) === 1 && (await page.getByTestId("guida-dissapore").count()) === 0, "guide: a Roma c'è Puntarella Rossa");
+  ok(await guide.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), "guide: nessuna riga esce dallo schermo");
+  await guide.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await shot("04d-scheda-guide");
+  await guide.evaluate((el) => { for (let n = el.parentElement; n; n = n.parentElement) n.scrollTop = 0; });
+  await page.waitForTimeout(200);
+}
 await shot("04-scheda");
 { const ev = events.find((e) => e.type === "apri_scheda");
   ok(!!ev && ev.googlePlaceId === "P1" && ev.placeId === null && typeof ev.anonId === "string" && !("query" in ev), "segnali: aprire la scheda registra 'apri_scheda' (Place ID, nessun testo)"); }
@@ -592,7 +614,10 @@ for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["S
   ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
 }
 ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
+ok(await page.getByTestId("guide").isVisible() && (await page.getByTestId("guida-google").textContent())?.includes("★ 4,5"), "scheda B: c'è 'Cosa dicono le guide' con il voto Google");
 await shot("15-scheda-b");
+await page.getByTestId("guide").evaluate((el) => el.scrollIntoView({ block: "center" }));
+await shot("15b-scheda-b-guide");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
 await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
