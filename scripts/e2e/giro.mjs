@@ -1122,6 +1122,18 @@ else {
       await box.getByText("✓ Segnato: sei stato da Caffè Milano.").waitFor({ timeout: 3000 }).catch(() => {});
       ok(JSON.stringify(visitPatch?.body?.tags) === '["Già visitato"]' && visitPatch.url.includes("place_id=eq.00000000-0000-4000-8000-000000000105"), "ci sei stato: 'Sì' lo segna '✓ Ci sono stato' (al posto di 'Voglio andarci')");
       await p.unroute("**/rest/v1/saved_places**");
+      // Copertine delle raccolte (?beta=copertine, spenta di default): emoji e nomi dei locali al posto dell'iniziale
+      ok((await p.getByTestId("raccolta-copertina").count()) === 0, "copertine: spente di default (resta l'iniziale)");
+      await p.goto(`${BASE}/profilo?beta=copertine`, { waitUntil: "networkidle" });
+      const amici = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
+      await amici.getByTestId("raccolta-copertina").waitFor({ timeout: 4000 }).catch(() => {});
+      const emojiAmici = (await amici.getByTestId("raccolta-copertina").locator("span").allTextContents()).length;
+      const anteprima = (await amici.getByTestId("raccolta-anteprima").textContent().catch(() => "")) ?? "";
+      ok(emojiAmici === 3 && anteprima.startsWith("3 locali · ") && anteprima.includes("Birreria Sei"), `copertine: 'Con amici' mostra 3 emoji e i nomi dei locali (${anteprima})`);
+      const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; return c.getBoundingClientRect().right > m.getBoundingClientRect().left; }));
+      ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
+      await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
+      await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       // Dal profilo, "Salvati" nella barra in basso apre la mappa sui salvati ed è accesa
       await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();

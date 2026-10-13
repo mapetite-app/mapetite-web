@@ -133,7 +133,7 @@ export default async function ProfiloPage() {
 
   // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
   const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
-    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, tags: row.tags ?? [] }] : [],
+    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
 
   // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).

@@ -19,7 +19,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 //   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
 //   pin-salvati   i tuoi salvati restano sulla mappa come piccoli segnalibri anche in Esplora e dopo una ricerca
 //   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Voglio andarci" salvato da più di una settimana
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato";
+//   copertine     nel profilo: ogni raccolta mostra le emoji e i nomi dei suoi locali invece dell'iniziale
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.
