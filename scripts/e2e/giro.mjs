@@ -46,6 +46,23 @@ const SYNTH = {
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
 
+// 0. Ritorno dopo l'accesso: il parametro `next` accetta solo percorsi interni (niente open redirect).
+//    Node 22.18+ legge il .ts direttamente (tipi rimossi), senza server né rete.
+{
+  let np = null;
+  try { np = await import(new URL("../../src/lib/next-path.ts", import.meta.url).href); } catch (e) { ok(false, `next: modulo src/lib/next-path.ts importabile (${e.message})`); }
+  if (np) {
+    const { safeNext, withNext, afterLoginPath } = np;
+    for (const p of ["/locali/abc", "/locali/44444444-0000-4000-8000-000000000004?salva=1", "/stasera", "/importa", "/importa/condividi/immagine?nome=Da+Enzo&citta=Roma"]) ok(safeNext(p) === p, `next: "${p}" accettato`);
+    for (const p of ["//evil.com", "https://evil.com", "http:/evil.com", "/\\evil.com", "/\\/evil.com", "javascript:alert(1)", "/..//evil.com", "/.//evil.com", "/\tevil", " //evil.com", "/login?next=/x", "/signup", "/api/search", "locali/abc", "", "/" + "a".repeat(600)]) ok(safeNext(p) === null, `next: ${JSON.stringify(p.length > 40 ? p.slice(0, 20) + "…" : p)} rifiutato`);
+    ok(safeNext(undefined) === null && safeNext(["/x"]) === null, "next: valori non testuali rifiutati");
+    ok(withNext("/login", "/locali/abc") === "/login?next=%2Flocali%2Fabc" && withNext("/login?error=x", "/stasera") === "/login?error=x&next=%2Fstasera" && withNext("/login", "//evil.com") === "/login", "next: withNext aggiunge solo percorsi validi");
+    ok(afterLoginPath("/locali/abc?salva=1", true) === "/locali/abc?salva=1", "dopo l'accesso: chi ha già fatto l'onboarding torna a next");
+    ok(afterLoginPath(null, true) === "/mappa" && afterLoginPath("https://evil.com", true) === "/mappa", "dopo l'accesso: senza next (o con next non valido) si va alla mappa come prima");
+    ok(afterLoginPath("/stasera", false) === "/onboarding?next=%2Fstasera" && afterLoginPath(null, false) === "/onboarding", "dopo l'accesso: chi è nuovo passa dall'onboarding portandosi dietro next");
+  }
+}
+
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: [] });
 let searchMode = "ok";
@@ -796,6 +813,53 @@ await shot("08-onboarding");
 await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
 ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da disconnessi: invito ad accedere");
 
+// 8-bis. Ritorno dopo l'accesso: login, registrazione e onboarding portano con sé `next`.
+{
+  const hiddenNext = () => page.locator('form input[type=hidden][name=next]').evaluateAll((els) => els.map((e) => e.value));
+  await page.goto(`${BASE}/login?next=${encodeURIComponent("/locali/abc?salva=1")}`, { waitUntil: "networkidle" });
+  ok(JSON.stringify(await hiddenNext()) === '["/locali/abc?salva=1"]', "login con next: campo nascosto con il percorso di ritorno");
+  ok(await page.getByTestId("auth-ritorno").textContent() === "Poi torni al locale che stavi guardando, pronto da salvare.", "login con next: spiega che dopo si torna al locale");
+  ok(await page.getByRole("link", { name: "Registrati" }).getAttribute("href") === "/signup?next=%2Flocali%2Fabc%3Fsalva%3D1", "login con next: 'Registrati' conserva next");
+  ok(await page.getByRole("link", { name: "Entra" }).first().getAttribute("href") === "/login?next=%2Flocali%2Fabc%3Fsalva%3D1", "login con next: 'Entra' nella barra conserva next");
+  await page.goto(`${BASE}/signup?next=%2Fstasera`, { waitUntil: "networkidle" });
+  ok(JSON.stringify(await hiddenNext()) === '["/stasera"]' && await page.getByRole("link", { name: "Accedi" }).last().getAttribute("href") === "/login?next=%2Fstasera", "registrazione con next: campo nascosto e 'Accedi' conserva next");
+  for (const bad of ["//evil.com", "https://evil.com", "/\\evil.com", "javascript:alert(1)"]) {
+    await page.goto(`${BASE}/login?next=${encodeURIComponent(bad)}`, { waitUntil: "networkidle" });
+    ok((await hiddenNext()).length === 0 && (await page.getByTestId("auth-ritorno").count()) === 0 && await page.getByRole("link", { name: "Registrati" }).getAttribute("href") === "/signup", `login con next pericoloso ${JSON.stringify(bad)}: ignorato`);
+  }
+  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  ok((await hiddenNext()).length === 0, "login senza next: nessun campo nascosto (comportamento di prima)");
+  // Onboarding: "Salta" va a next; senza next (o con next non valido) alla mappa.
+  await page.goto(`${BASE}/onboarding?next=%2Flocali%2Fabc%3Fsalva%3D1`, { waitUntil: "networkidle" });
+  ok(await page.getByTestId("onboarding-salta").getAttribute("href") === "/locali/abc?salva=1", "onboarding con next: 'Salta' riporta alla pagina di partenza");
+  await page.goto(`${BASE}/onboarding?next=%2F%2Fevil.com`, { waitUntil: "networkidle" });
+  ok(await page.getByTestId("onboarding-salta").getAttribute("href") === "/mappa", "onboarding con next pericoloso: 'Salta' resta sulla mappa");
+  // "Entra" nella barra: dalle pagine diverse dalla mappa porta con sé la pagina corrente.
+  await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  ok(await page.getByRole("link", { name: "Entra" }).first().getAttribute("href") === "/login?next=%2Fimporta", "barra: 'Entra' da Importa riporta a Importa");
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  ok(await page.getByRole("link", { name: "Entra" }).first().getAttribute("href") === "/login", "barra: 'Entra' dalla mappa resta /login");
+  await page.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await page.getByRole("link", { name: "Accedi" }).getAttribute("href") === "/login?next=%2Fprofilo" && await page.getByRole("link", { name: "Crea un account" }).getAttribute("href") === "/signup?next=%2Fprofilo", "profilo da disconnessi: Accedi/Crea un account riportano al profilo");
+  // Il form di login invia next all'azione del server (l'accesso vero con Supabase non si simula qui).
+  // Contesto a parte: la richiesta viene fermata qui (nessun tentativo verso Supabase).
+  const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let sentNext = null;
+  await actx.route("**/login**", (r) => {
+    if (r.request().method() !== "POST") return r.continue();
+    sentNext = r.request().postData() ?? "";
+    return r.fulfill({ status: 204, body: "" });
+  });
+  const ap = await actx.newPage();
+  await ap.goto(`${BASE}/login?next=%2Fstasera`, { waitUntil: "networkidle" });
+  await ap.getByLabel("Email").fill("prova@example.com");
+  await ap.getByLabel("Password").fill("password-di-prova");
+  await ap.locator("form").getByRole("button", { name: "Accedi" }).click();
+  for (let i = 0; i < 20 && sentNext === null; i++) await ap.waitForTimeout(100);
+  ok(!!sentNext && /name="(_?\d+_)?next"\s*\r?\n\r?\n\/stasera\r?\n/.test(sentNext), "login con next: il modulo invia next all'azione del server");
+  await actx.close();
+}
+
 // 8a. "Cancella" le ricerche recenti
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByTestId("cancella-recenti").click();
@@ -1223,7 +1287,7 @@ else {
     // Senza accesso: invito ad accedere
     await ste.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
     await se.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
-    ok(await se.getByTestId("stasera-accedi").isVisible() && await se.getByRole("link", { name: "Accedi" }).first().getAttribute("href") === "/login", "stasera: senza accesso invita ad accedere");
+    ok(await se.getByTestId("stasera-accedi").isVisible() && await se.getByRole("link", { name: "Accedi" }).first().getAttribute("href") === "/login?next=%2Fstasera" && await se.getByRole("link", { name: "Crea un account" }).getAttribute("href") === "/signup?next=%2Fstasera", "stasera: senza accesso invita ad accedere (e poi si torna a Stasera)");
     await ste.close();
     stData = stRows;
   }
@@ -1744,9 +1808,28 @@ else {
   // Da disconnessi: "Salva in Mapetite" porta a Crea un account.
   await pctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await pp.goto(`${BASE}/locali/${LOC_ID}`, { waitUntil: "networkidle" });
-  ok(await pp.getByTestId("invito-accedi").isVisible(), "pagina pubblica da disconnessi: spiega di creare un account e riaprire il link");
+  ok(await pp.getByTestId("invito-accedi").isVisible(), "pagina pubblica da disconnessi: spiega di creare un account e poi tornare qui");
+  const back = encodeURIComponent(`/locali/${LOC_ID}?salva=1`);
+  ok(await pp.getByTestId("invito-accedi").getByRole("link", { name: "Hai già un account? Accedi" }).getAttribute("href") === `/login?next=${back}`, "pagina pubblica da disconnessi: 'Accedi' riporta al locale (next)");
+  ok(await pp.getByRole("link", { name: "Entra" }).first().getAttribute("href") === `/login?next=${encodeURIComponent(`/locali/${LOC_ID}`)}`, "pagina pubblica da disconnessi: 'Entra' nella barra riporta al locale");
   await pp.getByRole("link", { name: "📌 Salva in Mapetite" }).click();
-  await pp.waitForURL(/\/signup$/, { timeout: 5000 }).then(() => ok(true, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account"), () => ok(false, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account"));
+  await pp.waitForURL((u) => u.pathname === "/signup" && u.searchParams.get("next") === `/locali/${LOC_ID}?salva=1`, { timeout: 5000 }).then(() => ok(true, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account con il ritorno al locale"), () => ok(false, `pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account con il ritorno al locale (${pp.url()})`));
+  ok(JSON.stringify(await pp.locator("form input[type=hidden][name=next]").evaluateAll((els) => els.map((e) => e.value))) === JSON.stringify([`/locali/${LOC_ID}?salva=1`]) && await pp.getByTestId("auth-ritorno").isVisible(), "registrazione dal locale: next nel modulo e frase 'poi torni al locale'");
+  // Con la foto nel link condiviso il ritorno la conserva.
+  await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/GVICOLO/photos/AbC_1`, { waitUntil: "networkidle" });
+  ok(await pp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href") === `/signup?next=${encodeURIComponent(`/locali/${LOC_ID}?salva=1&foto=${encodeURIComponent("places/GVICOLO/photos/AbC_1")}`)}`, "pagina pubblica da disconnessi: il ritorno conserva la foto del locale");
+  // Di ritorno dopo l'accesso (?salva=1): pulsante in evidenza, ma si salva SOLO al tocco.
+  await pctx.clearCookies({ name: "e2e_anonimo" });
+  pubInsert = null;
+  await pp.goto(`${BASE}/locali/${LOC_ID}?salva=1`, { waitUntil: "networkidle" });
+  await pp.waitForTimeout(400);
+  ok(await pp.getByTestId("salva-evidenziato").isVisible() && await pp.getByRole("button", { name: "📌 Salva in Mapetite" }).isVisible() && pubInsert === null, "ritorno al locale (?salva=1): 'Salva' in evidenza, nessun salvataggio senza tocco");
+  await pp.screenshot({ path: `${OUT}/51-locale-ritorno-salva.png`, caret: "initial" });
+  await pp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await pp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await pp.getByTestId("salvato-pubblico").isVisible() && pubInsert?.place_id === LOC_ID, "ritorno al locale: un tocco e il locale è salvato");
+  await pp.goto(`${BASE}/locali/${LOC_ID}`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("salva-evidenziato").count()) === 0, "locale aperto normalmente: nessuna evidenza sul pulsante");
   // Id sconosciuto o non valido: 404 in italiano.
   const r404a = await pp.goto(`${BASE}/locali/non-esiste`, { waitUntil: "networkidle" });
   ok(r404a?.status() === 404 && await pp.getByText("Questa pagina non esiste").isVisible(), "pagina pubblica: id non valido → 404 in italiano");
