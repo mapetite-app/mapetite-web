@@ -605,6 +605,21 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 }, () => ok(false, "risultati: dice perché un locale è turistico (cosa dicono le recensioni)"));
 await page.unroute("**/api/search");
 
+// 5f. Stellato: nessun badge, una riga onesta su come sono ordinati i risultati
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, michelin: { citati: 2 } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("nota-michelin").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("nota-michelin").textContent()) === "⭐ Senza una fonte Michelin ufficiale metto in cima chi ne parla nelle recensioni (2 locali)", "stellato: dice che senza fonte Michelin ordina per chi ne parla nelle recensioni");
+  ok((await page.getByText(/stellat/i).count()) === 0, "stellato: nessun badge 'stellato' sulle card");
+  await shot("05f-nota-michelin");
+}, () => ok(false, "stellato: dice che senza fonte Michelin ordina per chi ne parla nelle recensioni"));
+await page.unroute("**/api/search");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("messi-da-parte").or(page.locator("[data-testid=pin]").first()).first().waitFor({ timeout: 5000 }).catch(() => {});
+ok((await page.getByTestId("nota-michelin").count()) === 0, "ricerca normale: nessuna riga Michelin");
+
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
