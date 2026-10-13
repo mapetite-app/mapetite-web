@@ -157,6 +157,10 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **Salvati vuoti — IN PR**: "La tua mappa è ancora vuota" con Da Google Maps / Da uno screenshot / A mano.
 - **"🧭 Ho messo da parte N locali turistici (…)" — IN PR**: il differenziatore si vede sotto "Ho capito".
 - **"✨ Dai tuoi salvati: Bar a Roma, poco conosciuti" — IN PR**: proposta dal tipo e dalla città dei tuoi salvati, cercata "poco conosciuti".
+- **Condividi un locale con un link Mapetite — IN PR**: "Condividi" manda `/locali/<id>`, pagina pubblica con foto, verdetto Mapetite (solo se già in cache), Percorso e "📌 Salva in Mapetite" per chi la riceve; anteprima per WhatsApp. Sostituisce la vecchia pagina `/locali/[id]` non collegata (il suo modulo recensioni resta nella scheda della mappa). Limite: dopo la registrazione l'amico non torna alla pagina (serve un "next" nel flusso di accesso).
+- **"Com'era?" — IN PR**: dopo "Ci sono stato", 👍 Mi è piaciuto / 👎 Non fa per me (tag, nessuna migrazione); "Stasera" non ripropone i 👎 e i suggerimenti dai salvati li ignorano.
+- **Controllo qualità a 390 e 360 px — IN PR**: 16 difetti corretti (nomi delle raccolte spezzati, testi tagliati nei campi, link troppo piccoli, striscia bianca su Stasera, pulsanti fuori stile, barra su iPhone installata); elenco e difetti lasciati in `docs/autonomia/QA-2026-10-13.md`.
+- **Copione della demo in 3 minuti — `docs/autonomia/DEMO.md`.**
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
