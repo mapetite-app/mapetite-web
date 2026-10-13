@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
 import { cityFromAddress } from "@/lib/city";
+import { withNext } from "@/lib/next-path";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 
 const ERRORI: Record<string, string> = {
@@ -125,9 +126,10 @@ export default function ScreenshotResult({
       {!errore && nome && !userId && (
         <div className="space-y-3 rounded-card border border-border bg-surface p-5" data-testid="screenshot-accedi">
           <p className="text-sm text-text">
-            Ho letto <span className="font-semibold">{[nome, citta].filter(Boolean).join(", ")}</span>. Per salvarlo accedi a Mapetite, poi condividi di nuovo lo screenshot.
+            Ho letto <span className="font-semibold">{[nome, citta].filter(Boolean).join(", ")}</span>. Per salvarlo accedi a Mapetite: poi torni qui e lo cerco su Google Maps.
           </p>
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
+          {/* Dopo l'accesso si torna a questa pagina con lo stesso nome letto (nessuna nuova lettura AI). */}
+          <Link href={withNext("/login", `/importa/condividi/immagine?${new URLSearchParams({ nome, ...(citta ? { citta } : {}) })}`)} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
             Accedi
           </Link>
         </div>

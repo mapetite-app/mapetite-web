@@ -83,10 +83,10 @@ export default function ShareImport({
         <div className="space-y-3 rounded-card border border-border bg-surface p-5" data-testid="condividi-accedi">
           <p className="text-sm text-text">Per salvare il locale accedi a Mapetite. Il link resta qui: lo ritrovi in Importa dopo l&apos;accesso.</p>
           <div className="flex flex-wrap gap-2">
-            <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
+            <Link href="/login?next=%2Fimporta" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
               Accedi
             </Link>
-            <Link href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
+            <Link href="/signup?next=%2Fimporta" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
               Crea un account
             </Link>
           </div>

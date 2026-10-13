@@ -17,7 +17,7 @@ export default async function MieiLocaliPage() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
   if (userError || !userData?.user) {
-    redirect("/login");
+    redirect("/login?next=%2Fmiei-locali");
   }
 
   const { data, error } = await supabase

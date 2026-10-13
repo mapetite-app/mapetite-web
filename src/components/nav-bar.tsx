@@ -6,6 +6,18 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
 import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
+import { withNext } from "@/lib/next-path";
+
+// "Entra" riporta alla pagina dov'eri (es. un locale condiviso, Stasera, Importa).
+// Dalla mappa e dalla home no: dopo l'accesso si va comunque alla mappa.
+// Da /login o /signup si conserva il `next` già presente.
+function entraHref(pathname: string, search: string | null): string {
+  if (pathname === "/login" || pathname === "/signup") {
+    return withNext("/login", new URLSearchParams(search ?? "").get("next"));
+  }
+  if (pathname === "/" || pathname === "/mappa" || pathname.startsWith("/mappa/") || pathname.startsWith("/onboarding")) return "/login";
+  return withNext("/login", `${pathname}${search ? `?${search}` : ""}`);
+}
 
 function MapIcon({ filled }: { filled: boolean }) {
   return (
@@ -89,19 +101,20 @@ const SAVED_HREF = "/mappa?vista=salvati";
 export default function NavBar({ userId }: { userId: string | null }) {
   // useSearchParams va dentro Suspense; il fallback è la stessa barra senza i parametri.
   return (
-    <Suspense fallback={<NavBarInner userId={userId} vista={null} />}>
+    <Suspense fallback={<NavBarInner userId={userId} vista={null} search={null} />}>
       <NavBarWithParams userId={userId} />
     </Suspense>
   );
 }
 
 function NavBarWithParams({ userId }: { userId: string | null }) {
-  const vista = useSearchParams().get("vista");
-  return <NavBarInner userId={userId} vista={vista} />;
+  const params = useSearchParams();
+  return <NavBarInner userId={userId} vista={params.get("vista")} search={params.toString()} />;
 }
 
-function NavBarInner({ userId, vista }: { userId: string | null; vista: string | null }) {
+function NavBarInner({ userId, vista, search }: { userId: string | null; vista: string | null; search: string | null }) {
   const pathname = usePathname();
+  const loginHref = entraHref(pathname, search);
 
   const onMap = pathname === "/mappa" || pathname.startsWith("/mappa/");
   const savedActive = onMap && vista === "salvati";
@@ -170,7 +183,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
           </form>
         ) : (
           <Link
-            href="/login"
+            href={loginHref}
             aria-current={authActive ? "page" : undefined}
             className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
               authActive ? "text-brand" : "text-text-muted"
@@ -245,7 +258,7 @@ function NavBarInner({ userId, vista }: { userId: string | null; vista: string |
           </form>
         ) : (
           <Link
-            href="/login"
+            href={loginHref}
             className="rounded-btn bg-brand text-white px-4 py-2 text-sm font-display font-semibold hover:opacity-90 transition-opacity duration-150"
           >
             Entra

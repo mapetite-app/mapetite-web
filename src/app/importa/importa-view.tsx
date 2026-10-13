@@ -334,7 +334,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
 
             {!userId && (
               <p className="mt-4 text-sm text-text-muted">
-                <Link href="/login" className="underline text-text">
+                <Link href="/login?next=%2Fimporta" className="underline text-text">
                   Accedi
                 </Link>{" "}
                 per salvare un locale.

@@ -37,10 +37,10 @@ export default async function StaseraPage() {
           Accedi per scegliere tra i locali che hai salvato: ti proponiamo tre posti per stasera.
         </p>
         <div className="flex gap-2">
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-accent px-5 font-display text-sm font-semibold text-white">
+          <Link href="/login?next=%2Fstasera" className="inline-flex min-h-11 items-center rounded-pill bg-accent px-5 font-display text-sm font-semibold text-white">
             Accedi
           </Link>
-          <Link href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-white/40 px-5 font-display text-sm font-semibold text-white">
+          <Link href="/signup?next=%2Fstasera" className="inline-flex min-h-11 items-center rounded-pill border border-white/40 px-5 font-display text-sm font-semibold text-white">
             Crea un account
           </Link>
         </div>

@@ -79,10 +79,10 @@ export default async function ProfiloPage() {
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>
         <div className="flex gap-2">
-          <a href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+          <a href="/login?next=%2Fprofilo" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
             Accedi
           </a>
-          <a href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
+          <a href="/signup?next=%2Fprofilo" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
             Crea un account
           </a>
         </div>

@@ -103,7 +103,7 @@ export default function GoogleMapsCard({
 
       {!userId ? (
         <p className="mt-4 text-sm text-text-muted">
-          <Link href="/login" className="underline text-text">Accedi</Link> per salvare i locali.
+          <Link href="/login?next=%2Fimporta" className="underline text-text">Accedi</Link> per salvare i locali.
         </p>
       ) : (
         <>

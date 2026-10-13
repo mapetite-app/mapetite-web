@@ -118,10 +118,10 @@ export default function ManualAddCard({
       {!userId ? (
         <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="mano-accedi">
           <p className="w-full text-sm text-text">Accedi per cercare e salvare i locali nella tua mappa.</p>
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
+          <Link href="/login?next=%2Fimporta" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
             Accedi
           </Link>
-          <Link href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-medium text-text">
+          <Link href="/signup?next=%2Fimporta" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-medium text-text">
             Crea un account
           </Link>
         </div>
