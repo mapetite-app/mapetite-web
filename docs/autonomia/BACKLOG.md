@@ -7,6 +7,7 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
+**Aggiornato 14/10 notte (sessione delle 22:00, PR della notte).** PR #30, #31, #32 unite in produzione. Nessuna voce PRONTA e nessun commento nuovo di Lorenzo: stanotte solo controlli dal vivo e 2 difetti visti corretti (cocktail bar con 🍝; mappa con "Rome"/"Milan" in inglese). Le 10 ricerche di TEST-RICERCHE sono ora tutte provate con Google vero almeno una volta: tutte passano. Per andare avanti servono le decisioni in fondo ("Cosa serve decidere").
 **Aggiornato 13/10 alle 04:30 (sessione delle 03:05, PR #32).** Le due PR della sera (#30 e #31) sono unite in una sola, senza conflitti rimasti: basta fare il merge della #32 e chiudere le altre due. Nessuna voce PRONTA rimasta: tutto il resto aspetta una decisione (elenco sotto, "Cosa serve decidere").
 **Aggiornato 13/10 mattina (notte 12→13, PR #30).** Fatto in questa notte: primo accesso in 10 secondi, "Stasera dove andiamo?", raccolte organizzabili, condividi un locale con link Mapetite + ritorno dopo la registrazione, "Com'era?", aggiungi a mano, link Instagram/TikTok, il differenziatore visibile (verdetto etichettato, "🧭 messi da parte", "Dai tuoi salvati"), QA completo a 390/360px (27 difetti), copione demo.
 **Manca per il 25/10:** chiave Haiku nell'ambiente di prova (verdetti mai visti dal vivo da Claude); migrazione `events` da applicare; prova su iPhone e Android veri; "Collega Google Maps" (da decidere); scelte sulle grafiche fatte in una sola versione; contrasto del corallo (palette).
@@ -184,8 +185,15 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **Cocktail bar con 🍸 — IN PR #32**: avevano il boccale di birra su pin e card (visto nella ricerca vera sui Navigli). Regola aggiunta prima di "bar", nessuna regola spostata: cambia solo chi aveva 🍺 e ha "cocktail" nel tipo o nel nome.
 - **5 ricerche Google vere (casi 2, 3, 5, 6, 9)**: tutte con almeno 3 risultati giusti nei primi 5 e nessun locale "da non proporre". "🧭 Ho messo da parte" funziona dal vivo (Trastevere: Da Enzo, Nannarella, Tonnarello…; Navigli: Spritz Navigli, La Prosciutteria…). Verdetti Haiku non provati: manca `ANTHROPIC_API_KEY` nell'ambiente di prova.
 
+## Notte 13→14/10 (sessione delle 22:00)
+- **Controlli su main dopo il merge della #32**: giro automatico 497 controlli TUTTO OK; `tsc` ok; eslint invariato (11 errori, 5 warning preesistenti).
+- **5 ricerche Google vere (casi 1, 4, 7, 8, 10)**: tutte con almeno 3 risultati giusti nei primi 5 e nessun locale "da non proporre". Insieme a quelle del 13/10 mattina (2, 3, 5, 6, 9) i 10 casi sono tutti provati dal vivo. Verdetti Haiku ancora non provati (manca `ANTHROPIC_API_KEY`).
+- **Cocktail bar con 🍸 anche se il nome dice "Restaurant" — IN PR**: "The Vista Rooftop | Pantheon Terrace Bar & Restaurant" (tipo Google cocktail_bar) aveva gli spaghetti. Sui 60 locali delle ricerche vere cambia solo lui. Controlli in `scripts/e2e/regole-ricerca.mjs`.
+- **Mappa in italiano — IN PR**: "Roma", "Milano" invece di "Rome", "Milan" (opzione `language` di Mapbox, nessun costo).
+- **Dubbio da decidere (ricerca)**: con "trattoria milanese **autentica** con cotoletta" la regola dei locali di massa mette da parte Al Garghet (trattoria fuori dal centro) e lo annuncia sotto "🧭 Ho messo da parte … turistici". "Autentico" oggi vale come "non turistico": una trattoria con tante recensioni ma lontana dai giri turistici finisce in fondo ed è chiamata turistica, cosa forse non vera (VISIONE: mai inventare). Non ho verificato i numeri di Al Garghet: era oltre il 12° posto. Proposta: far scattare la regola solo con "non turistico / poco conosciuto / nascosto / dove vanno i …", non con "autentico" da solo. Non toccato senza ok.
+
 ## Cosa serve decidere (in ordine di impatto per il 25/10)
-1. **Merge della PR #32** (contiene #30 e #31), poi in Supabase → Authentication → URL Configuration aggiungere ai Redirect URLs `…/login*` e `…/reimposta-password`.
+1. ~~Merge della PR #32~~ (fatto 13/10). Resta: in Supabase → Authentication → URL Configuration aggiungere ai Redirect URLs `…/login*` e `…/reimposta-password`.
 2. **Migrazione `events`** (`supabase/migrations/20261012_create_events.sql`, DA APPROVARE): senza, i segnali di comportamento non si registrano. Prima parte, prima i dati valgono.
 3. **`ANTHROPIC_API_KEY` nell'ambiente cloud di prova**: i verdetti non sono mai stati provati dal vivo da Claude.
 4. **Voce 14**: verdetto su 20 risultati invece di 12 (`SYNTHESIS_LIMIT`, raddoppia il costo Haiku per ricerca).
@@ -193,6 +201,7 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 6. **Voce 13, livello 2**: "Collega Google Maps" con la Data Portability API.
 7. **Classifica personale dei visitati** (serve una colonna in `saved_places`).
 8. **Eliminare le pagine vecchie non collegate** (`/miei-locali`, `site-header`).
+9. **"Autentico" = "non turistico"?** (dubbio della notte 13→14/10, sopra): oggi sì; proposta di no.
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
