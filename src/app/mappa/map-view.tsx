@@ -836,7 +836,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; daParte?: { turistici: string[]; fuori_tema: string[] } | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; daParte?: { turistici: string[]; perche_turistici?: string[]; fuori_tema: string[] } | null } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);

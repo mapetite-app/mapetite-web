@@ -41,7 +41,8 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[] } | null;
+  // perche_turistici (allineato a turistici): cosa dicono le recensioni, si legge aprendo la riga.
+  setAside?: { turistici: string[]; perche_turistici?: string[]; fuori_tema: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -470,6 +471,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale turistico" : `${setAside.turistici.length} locali turistici`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
                 setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
               ].filter(Boolean).join(" ")}
+              {setAside.turistici.length > 0 && setAside.perche_turistici?.[0] ? ` · ${setAside.turistici[0]}: ${setAside.perche_turistici[0]}` : null}
             </p>
           )}
         </div>
