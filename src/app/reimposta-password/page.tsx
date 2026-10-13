@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,6 +15,7 @@ const FIELD =
 type Stato = "verifica" | "pronto" | "salvo" | "fatto" | "scaduto";
 
 export default function ReimpostaPasswordPage() {
+  const router = useRouter();
   const [stato, setStato] = useState<Stato>("verifica");
   const [password, setPassword] = useState("");
   const [conferma, setConferma] = useState("");
@@ -58,6 +60,8 @@ export default function ReimpostaPasswordPage() {
       return;
     }
     setStato("fatto");
+    // La sessione è nuova solo nel browser: senza refresh la barra in basso resterebbe su "Entra".
+    router.refresh();
   };
 
   return (
