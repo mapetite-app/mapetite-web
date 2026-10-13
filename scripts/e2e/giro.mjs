@@ -559,6 +559,7 @@ await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 let noPhotos = false;
 for (let i = 0; i < 15 && !noPhotos; i++) { await page.waitForTimeout(200); noPhotos = (await page.locator("ul img").count()) === 0; }
 ok(noPhotos && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto: con quota finita le card mostrano l'emoji");
+ok((await page.locator("ul li[data-id=P3]").getByText("🍸").count()) >= 1 && (await page.locator("ul li[data-id=P3]").getByText("🍺").count()) === 0, "emoji: un cocktail bar ha 🍸, non il boccale di birra");
 photoMode = "ok";
 
 // 5c. Mappa affollata: i primi 5 risultati sempre come pin con nome, gli altri raggruppati o senza nome

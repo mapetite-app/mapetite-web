@@ -11,6 +11,9 @@ const EMOJI_RULES: [string[], string][] = [
   [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian"], "🍜"],
   [["steak", "grill", "brace", "carne", "macelleria"], "🥩"],
   [["italian_restaurant", "ristorante", "restaurant", "trattoria", "osteria"], "🍝"],
+  // Prima di "bar": "cocktail_bar" mostrava il boccale di birra. Regola aggiunta (13/10), non
+  // spostata: cambia solo i locali che oggi hanno 🍺 e hanno "cocktail" nel tipo o nel nome.
+  [["cocktail", "speakeasy", "mixolog"], "🍸"],
   // "bar" in ultima posizione: è substring di "bakery", "wine_bar", ecc.
   [["bar", "pub", "birrer", "brewery"], "🍺"],
 ];
