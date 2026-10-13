@@ -1898,6 +1898,12 @@ else {
     await qp.getByLabel("Chiedi all'AI: cosa cerchi?").fill("Ristorante romantico con terrazza a Trastevere");
     await qp.getByLabel("Chiedi all'AI: cosa cerchi?").press("Enter");
     await qp.locator("ul.snap-x li[data-id=L1]").getByTestId("etichetta-verdetto").waitFor({ timeout: 8000 });
+    { const h = () => qp.getByTestId("titolo-risposta").first().evaluate((el) => Math.round(el.closest(".rounded-card")?.getBoundingClientRect().height ?? 999));
+      const chiusa = await h();
+      await qp.getByTestId("titolo-risposta").first().click();
+      const aperta = await h();
+      await qp.getByTestId("titolo-risposta").first().click();
+      ok(chiusa <= 100 && aperta > chiusa, `360px: intestazione dei risultati compatta (${chiusa}px), un tocco la apre (${aperta}px)`); }
     await qp.waitForTimeout(300);
     { const m = await qp.locator("ul.snap-x li[data-id=L1]").evaluate((li) => {
         const card = li.getBoundingClientRect(); const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
