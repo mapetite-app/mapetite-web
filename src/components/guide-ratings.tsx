@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import { formatCount, formatRating, type GuideRating } from "@/lib/guide-sources";
 
 // "Cosa dicono le guide": griglia compatta 2 colonne di chip da 44px, sotto il
@@ -33,11 +32,11 @@ export default function GuideRatings({ rows, className = "" }: { rows: GuideRati
                 rel="noopener noreferrer"
                 data-testid={`guida-${g.source}`}
                 aria-label={aria}
-                className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-white px-2.5 py-1.5 active:scale-[0.98]"
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-white px-2 py-1.5 active:scale-[0.98]"
               >
                 <span
                   aria-hidden
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-display font-bold ${hasValue ? "bg-brand text-white" : "bg-brand/10 text-brand"}`}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-display font-bold ${hasValue ? "bg-brand text-white" : "bg-brand/10 text-brand"}`}
                 >
                   {g.mark}
                 </span>
@@ -53,12 +52,12 @@ export default function GuideRatings({ rows, className = "" }: { rows: GuideRati
                       ) : (
                         value
                       )}
+                      <span aria-hidden className="text-text-muted"> ↗</span>
                     </span>
                   ) : (
-                    <span className="truncate text-xs font-sans text-text-muted">Cerca</span>
+                    <span className="truncate text-xs font-sans text-text-muted">Cerca ↗</span>
                   )}
                 </span>
-                <ArrowUpRight size={14} aria-hidden className="shrink-0 text-text-muted" />
               </a>
             </li>
           );
