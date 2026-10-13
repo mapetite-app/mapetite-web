@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
+import { withNext } from "@/lib/next-path";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 
 const ERRORI: Record<string, string> = {
@@ -85,7 +86,7 @@ export default function ScreenshotResult({
     <Link
       href="/importa"
       data-testid="screenshot-manuale"
-      className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-medium text-text"
+      className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
     >
       {label}
     </Link>
@@ -125,9 +126,10 @@ export default function ScreenshotResult({
       {!errore && nome && !userId && (
         <div className="space-y-3 rounded-card border border-border bg-surface p-5" data-testid="screenshot-accedi">
           <p className="text-sm text-text">
-            Ho letto <span className="font-semibold">{[nome, citta].filter(Boolean).join(", ")}</span>. Per salvarlo accedi a Mapetite, poi condividi di nuovo lo screenshot.
+            Ho letto <span className="font-semibold">{[nome, citta].filter(Boolean).join(", ")}</span>. Per salvarlo accedi a Mapetite: poi torni qui e lo cerco su Google Maps.
           </p>
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
+          {/* Dopo l'accesso si torna a questa pagina con lo stesso nome letto (nessuna nuova lettura AI). */}
+          <Link href={withNext("/login", `/importa/condividi/immagine?${new URLSearchParams({ nome, ...(citta ? { citta } : {}) })}`)} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
             Accedi
           </Link>
         </div>
@@ -146,7 +148,7 @@ export default function ScreenshotResult({
             type="button"
             onClick={() => { setSearching(true); setSearchError(null); void search(); }}
             disabled={searching}
-            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-medium text-text disabled:opacity-60"
+            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
           >
             Riprova
           </button>
@@ -176,7 +178,7 @@ export default function ScreenshotResult({
             <p className="mt-1 font-display text-xl font-semibold text-brand">
               {top.name}{where(top) ? `, ${where(top)}` : ""}
             </p>
-            <p className="mt-0.5 text-xs text-text-muted">{top.address}</p>
+            <p className="mt-0.5 text-xs text-text-muted">{displayAddress(top.address)}</p>
             <p className="mt-3 text-sm text-text">Lo salvo in <span className="font-medium">📌 Voglio andarci</span>.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -194,7 +196,7 @@ export default function ScreenshotResult({
                   onClick={() => setOthers(true)}
                   disabled={saving !== null}
                   data-testid="screenshot-non-e-questo"
-                  className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-medium text-text disabled:opacity-60"
+                  className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
                 >
                   Non è questo
                 </button>
@@ -219,7 +221,7 @@ export default function ScreenshotResult({
                           className="w-full rounded-btn border border-border bg-white px-4 py-3 text-left disabled:opacity-60"
                         >
                           <p className="text-sm font-semibold text-text">{saving === r.id ? "Salvo..." : r.name}</p>
-                          <p className="mt-0.5 text-xs text-text-muted">{r.address}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">{displayAddress(r.address)}</p>
                         </button>
                       </li>
                     ))}
@@ -235,7 +237,7 @@ export default function ScreenshotResult({
 
       {saved && (
         <p className="mt-6 text-sm text-text-muted">
-          <Link href="/importa" className="underline text-text">Salva altri locali</Link>
+          <Link href="/importa" className="inline-flex min-h-11 items-center font-display font-semibold text-brand underline underline-offset-2">Salva altri locali</Link>
         </p>
       )}
     </div>

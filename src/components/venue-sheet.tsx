@@ -1,15 +1,16 @@
 "use client";
 
-import { tagLabel } from "@/lib/tags";
+import { tagLabel, isStateTag } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { track } from "@/lib/track";
+import { mapetiteShareUrl } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
 
 const TILE =
@@ -52,6 +53,7 @@ type VenueSheetProps = {
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
+  onOpinion?: (opinion: "Mi è piaciuto" | "Non fa per me") => void; // "Com'era?" dopo "Ci sono stato"
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
   // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
@@ -68,6 +70,7 @@ export default function VenueSheet({
   origin = null,
   userPos = null,
   onVisitStatus,
+  onOpinion,
   googlePlaceId = null,
   onQuickSave,
 }: VenueSheetProps) {
@@ -104,8 +107,11 @@ export default function VenueSheet({
   const [addressCopied, setAddressCopied] = useState(false);
   const share = async () => {
     signal("condividi");
-    const url = mapsUrl;
-    const text = verdict ? `${name} — ${verdict}` : name;
+    // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
+    const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
+    const url = mapetiteUrl ?? mapsUrl;
+    const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
+    const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({ title: name, text, url });
@@ -114,8 +120,13 @@ export default function VenueSheet({
         setShareNote("Link copiato");
         setTimeout(() => setShareNote(null), 2500);
       }
-    } catch {
-      // l'utente ha chiuso il foglio di condivisione: nessun errore da mostrare
+    } catch (err) {
+      // Chiuso il foglio di condivisione: nessun errore. Se invece il telefono non accetta più il
+      // tocco (attesa per creare il link), il link ora è pronto: basta toccare di nuovo.
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        setShareNote("Link pronto: tocca di nuovo Condividi");
+        setTimeout(() => setShareNote(null), 4000);
+      }
     }
   };
 
@@ -171,7 +182,7 @@ export default function VenueSheet({
       <div className="mx-5 mt-4 rounded-card bg-brand p-5 shadow-card">
         {(verdictText != null || synthesis != null) && (
           <>
-            <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            <p data-testid="verdetto-scheda" className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
               Il verdetto Mapetite
             </p>
             {verdictText && (
@@ -367,15 +378,15 @@ export default function VenueSheet({
             type="button"
             data-testid="copia-indirizzo"
             onClick={async () => {
-              try { await navigator.clipboard.writeText(address); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+              try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
             }}
             className="mt-1 flex min-h-8 items-center gap-1.5 text-left text-xs font-sans text-text-muted"
           >
-            <span>{address}</span>
+            <span>{displayAddress(address)}</span>
             <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
           </button>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs font-display font-semibold text-accent">
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex min-h-10 items-center text-xs font-display font-semibold text-accent">
           Orari, foto e recensioni su Google Maps →
         </a>
       </div>
@@ -429,7 +440,7 @@ export default function VenueSheet({
             </h2>
             {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
             {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
               Orari e foto su Google Maps →
             </a>
             {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
@@ -500,9 +511,31 @@ export default function VenueSheet({
               })}
             </div>
           )}
+          {/* "Com'era?" (segnale per i suggerimenti, VISIONE.md): solo dopo "Ci sono stato". */}
+          {onOpinion && personalTags?.includes("Già visitato") && (
+            <div className="mt-3" data-testid="com-era">
+              <p className="text-sm font-display font-semibold text-text">Com&apos;era?</p>
+              <div className="mt-1.5 flex gap-2">
+                {([["Mi è piaciuto", "👍 Mi è piaciuto"], ["Non fa per me", "👎 Non fa per me"]] as const).map(([tag, label]) => {
+                  const on = personalTags?.includes(tag) ?? false;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => onOpinion(tag)}
+                      className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-accent bg-accent text-white" : "border-border bg-white text-brand"}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {hasPersonalTags && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {personalTags!.filter((t) => !onVisitStatus || (t !== "Da provare" && t !== "Già visitato")).map((tag) => (
+              {personalTags!.filter((t) => !onVisitStatus || !isStateTag(t)).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
@@ -519,7 +552,7 @@ export default function VenueSheet({
             <button
               type="button"
               onClick={onEdit}
-              className="mt-3 rounded-btn border border-border px-3 py-1 text-xs font-display font-semibold text-text-muted hover:text-text"
+              className="mt-3 min-h-10 rounded-btn border border-border px-4 py-1 text-sm font-display font-semibold text-text-muted hover:text-text"
             >
               Modifica
             </button>

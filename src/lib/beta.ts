@@ -18,7 +18,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 //   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
 //   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
 //   pin-salvati   i tuoi salvati restano sulla mappa come piccoli segnalibri anche in Esplora e dopo una ricerca
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati";
+//   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Voglio andarci" salvato da più di una settimana
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.

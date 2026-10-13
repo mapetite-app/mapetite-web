@@ -10,6 +10,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 import { sortTags, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
+import { cityFromAddress } from "@/lib/city";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -39,6 +40,8 @@ export interface BottomSheetProps {
   onOrder?: (ids: string[]) => void;
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
+  // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
+  setAside?: { turistici: string[]; fuori_tema: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -58,6 +61,10 @@ export interface BottomSheetProps {
   onShareList?: (places: Place[]) => Promise<"shared" | "copied" | null>;
   // Apre la risposta "come un articolo" (?beta=articolo): chip "Leggi" prima dei filtri rapidi.
   onOpenArticle?: () => void;
+  // Lista dei propri salvati: niente filtri rapidi (mancano orari e conteggi).
+  savedMode?: boolean;
+  // Città sulla riga dei metadati (salvati di più città: "Ristorante · ★ 4,6 · Roma · 600 m").
+  showCity?: boolean;
 }
 
 export type ListDetails = {
@@ -93,8 +100,8 @@ function formatCount(n: number | null): string | null {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
 }
 
-// Riga di metadati: categoria · ★ voto (n) · prezzo · distanza.
-export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null): string {
+// Riga di metadati: categoria · ★ voto (n) · prezzo · [città] · distanza.
+export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null, withCity = false): string {
   const parts: string[] = [];
   const cat = prettyCategory(place.category);
   if (cat) parts.push(cat);
@@ -104,6 +111,8 @@ export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat
   }
   const price = priceLabel(place.priceLevel);
   if (price) parts.push(price);
+  const city = withCity ? cityFromAddress(place.address) : null;
+  if (city) parts.push(city);
   if (origin) parts.push(distanceLabel(origin, place));
   return parts.join(" · ");
 }
@@ -154,10 +163,13 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
+  // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
+  // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
+  const [headerOpen, setHeaderOpen] = useState(false);
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
-  const quickFiltersOn = useBeta("filtri-lista") && details != null;
+  const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
   const nearestOn = origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
@@ -380,7 +392,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0 flex-1">
             {title && (
-              <p data-testid="titolo-risposta" className="line-clamp-2 font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase">
+              <p data-testid="titolo-risposta" onClick={() => setHeaderOpen((v) => !v)} className={`${headerOpen ? "" : "line-clamp-1"} font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase`}>
                 {title}
               </p>
             )}
@@ -448,8 +460,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           </button>
           {/* A tutta larghezza sotto i pulsanti: prima veniva tagliato ("a Ro…"). */}
           {title && understood.length > 0 && (
-            <p data-testid="ho-capito" className="mt-0.5 basis-full line-clamp-2 text-xs font-sans text-accent">
+            <p data-testid="ho-capito" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-accent`}>
               Ho capito: {understood.join(" · ")}
+            </p>
+          )}
+          {title && setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
+            <p data-testid="messi-da-parte" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-text-muted`}>
+              🧭 {[
+                setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale turistico" : `${setAside.turistici.length} locali turistici`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
+                setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
+              ].filter(Boolean).join(" ")}
             </p>
           )}
         </div>
@@ -508,20 +528,24 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                     <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
                     <span className="mt-1 truncate text-[13px] font-sans font-medium text-white/85">
-                      {metaLine(place, d, origin)}
+                      {metaLine(place, d, origin, showCity)}
                     </span>
                     {similarTo?.(place.id) && (
                       <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
                     )}
                     {d?.verdict ? (
-                      <span className="mt-2 line-clamp-2 block text-sm font-sans leading-snug text-white/90">{d.verdict}</span>
+                      <span className="mt-2 block">
+                        {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
+                        <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</span>
+                        <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
+                      </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
                     ) : googleLine(d) ? (
-                      <span data-testid="riga-google" className="mt-2 line-clamp-3 block text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
+                      <span data-testid="riga-google" className="mt-2 line-clamp-3 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
                     {d?.matchReason && (
-                      <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
+                      <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
                     )}
                     {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                     {place.tags && place.tags.length > 0 && (
@@ -532,7 +556,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     )}
                     {place.note && (
-                      <span className="mt-1 line-clamp-1 block text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
+                      <span className="mt-1 line-clamp-1 text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
                     )}
                     {(d?.goFor ?? []).length > 0 && (
                       <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
@@ -644,7 +668,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
-                    <span className="truncate">{metaLine(place, details?.[place.id], origin)}</span>
+                    <span className="truncate">{metaLine(place, details?.[place.id], origin, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
@@ -668,12 +692,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   ) : loadingVerdicts && details ? (
                     <SkeletonLines />
                   ) : googleLine(details?.[place.id]) ? (
-                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 block text-sm font-sans leading-snug text-text-muted">
+                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 text-sm font-sans leading-snug text-text-muted">
                       {googleLine(details?.[place.id])}
                     </span>
                   ) : null}
                   {details?.[place.id]?.matchReason && (
-                    <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">
+                    <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-text-muted">
                       {details[place.id]!.matchReason}
                     </span>
                   )}
@@ -697,7 +721,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                   )}
                   {place.note && (
-                    <span className="mt-1.5 line-clamp-2 block text-xs font-sans italic text-text">
+                    <span className="mt-1.5 line-clamp-2 text-xs font-sans italic text-text">
                       “{place.note}”
                     </span>
                   )}

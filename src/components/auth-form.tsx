@@ -1,6 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import SubmitButton from "@/components/submit-button";
+import { withNext } from "@/lib/next-path";
+import PendingSaveNote from "@/components/pending-save-note";
+
+// Frase sotto il titolo quando dopo l'accesso si torna a una pagina precisa.
+function returnHint(next: string): string {
+  if (next.startsWith("/locali/")) return "Poi torni al locale che stavi guardando, pronto da salvare.";
+  if (next.startsWith("/stasera")) return "Poi torni a “Stasera dove andiamo?”.";
+  if (next.startsWith("/importa")) return "Poi torni a Importa: il link che stavi salvando resta lì.";
+  return "Poi torni alla pagina di prima.";
+}
 
 // Accesso e registrazione con lo stesso aspetto del resto dell'app.
 // Campi a 16px: sotto quella misura Safari su iPhone ingrandisce la pagina al tocco.
@@ -12,11 +22,14 @@ export default function AuthForm({
   action,
   error,
   message,
+  next = null,
 }: {
   mode: "login" | "signup";
   action: (formData: FormData) => Promise<void>;
   error?: string;
   message?: string;
+  // Percorso già validato (safeNext) dove tornare dopo l'accesso.
+  next?: string | null;
 }) {
   const login = mode === "login";
   return (
@@ -32,6 +45,11 @@ export default function AuthForm({
               ? "Ritrova i tuoi locali salvati, le note e le ricerche."
               : "Salva i posti che ti piacciono, con note e tag, e ritrovali sulla mappa."}
           </p>
+          {next && (
+            <p data-testid="auth-ritorno" className="mt-1 text-sm font-sans text-text-muted">
+              {returnHint(next)}
+            </p>
+          )}
         </div>
 
         {message && (
@@ -39,6 +57,7 @@ export default function AuthForm({
             {message}
           </p>
         )}
+        {!login && !message && <PendingSaveNote />}
         {error && (
           <p role="alert" className="mt-6 rounded-btn bg-error/10 px-4 py-3 text-sm font-sans text-error">
             {error}
@@ -46,6 +65,7 @@ export default function AuthForm({
         )}
 
         <form action={action} className="mt-6 space-y-4">
+          {next && <input type="hidden" name="next" value={next} />}
           <div>
             <label htmlFor="email" className="block text-sm font-display font-medium text-text">
               Email
@@ -66,20 +86,25 @@ export default function AuthForm({
               className={FIELD}
             />
             {!login && <p className="mt-1 text-xs font-sans text-text-muted">Almeno 6 caratteri.</p>}
+            {login && (
+              <Link href="/password-dimenticata" className="mt-1.5 inline-block text-sm font-sans text-text-muted underline underline-offset-2">
+                Password dimenticata?
+              </Link>
+            )}
           </div>
           <SubmitButton className="h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
             {login ? "Accedi" : "Registrati"}
           </SubmitButton>
         </form>
 
-        <p className="mt-6 text-center text-sm font-sans text-text-muted">
+        <p className="mt-4 text-center text-sm font-sans text-text-muted">
           {login ? "Non hai un account? " : "Hai già un account? "}
-          <Link href={login ? "/signup" : "/login"} className="font-display font-semibold text-brand underline-offset-2 hover:underline">
+          <Link href={withNext(login ? "/signup" : "/login", next)} className="inline-flex min-h-10 items-center font-display font-semibold text-brand underline-offset-2 hover:underline">
             {login ? "Registrati" : "Accedi"}
           </Link>
         </p>
-        <p className="mt-3 text-center text-sm font-sans">
-          <Link href="/mappa" className="text-text-muted underline underline-offset-2">
+        <p className="text-center text-sm font-sans">
+          <Link href="/mappa" className="inline-flex min-h-10 items-center text-text-muted underline underline-offset-2">
             Intanto prova a cercare senza account
           </Link>
         </p>

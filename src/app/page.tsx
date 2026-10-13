@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
+import HomeIntro, { IntroAgain } from "@/components/home-intro";
+import { createClient } from "@/lib/supabase/server";
 
 // Home come quella di Places: marchio al centro, frasi d'esempio e un solo campo "Cosa cerchi?" in basso.
 // Il modulo porta a /mappa?q=..., dove la ricerca parte da sola (funziona anche senza JS).
@@ -12,9 +14,14 @@ const EXAMPLES = [
   { emoji: "🥐", title: "Colazione buona", sub: "a Prati, con cornetti veri", q: "Colazione buona a Prati con cornetti veri" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Serve solo all'ultima schermata dell'intro: "Crea il tuo account" o "Inizia a cercare".
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const loggedIn = !!data?.user;
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white px-4 md:min-h-[calc(100dvh-3.5rem)]">
+      <HomeIntro loggedIn={loggedIn} />
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <span aria-hidden className="text-5xl">🍽️</span>
         <h1 className="mt-3 font-title text-5xl font-semibold tracking-tight text-brand">Mapetite</h1>
@@ -48,7 +55,7 @@ export default function Home() {
             required
             minLength={3}
             enterKeyHint="search"
-            placeholder="Chiedi all'AI cosa cerchi…"
+            placeholder="Chiedi all'AI…"
             aria-label="Chiedi all'AI: cosa cerchi?"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
           />
@@ -64,9 +71,11 @@ export default function Home() {
             →
           </button>
         </form>
-        <p className="mt-3 text-center text-xs font-sans text-text-muted">
-          <Link href="/mappa" className="font-semibold text-brand">Apri la mappa</Link> ·{" "}
-          <Link href="/login" className="font-semibold text-brand">accedi</Link>
+        {/* Link alti 40px (prima 15px): si toccano senza mirare. */}
+        <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs font-sans text-text-muted">
+          <Link href="/mappa" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">Apri la mappa</Link> ·
+          <Link href="/login" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">accedi</Link> ·
+          <IntroAgain />
         </p>
       </div>
     </div>

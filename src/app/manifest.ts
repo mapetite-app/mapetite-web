@@ -34,6 +34,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Cerca un locale", short_name: "Cerca", url: "/mappa", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
       { name: "I miei salvati", short_name: "Salvati", url: "/mappa?vista=salvati", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "Stasera dove andiamo?", short_name: "Stasera", url: "/stasera", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
       { name: "Cerca con i filtri", short_name: "Filtri", url: "/mappa?filtri=1", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
     ],
   };

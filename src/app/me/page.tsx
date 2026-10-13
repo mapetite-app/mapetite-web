@@ -8,7 +8,7 @@ export default async function MePage() {
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data?.user) {
-    redirect("/login");
+    redirect("/login?next=%2Fme");
   }
 
   const user = data.user;

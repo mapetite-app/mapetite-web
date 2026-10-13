@@ -19,12 +19,14 @@ import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { sortTags, tagLabel } from "@/lib/tags";
+import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track } from "@/lib/track";
+import { labelsToHide } from "@/lib/pin-labels";
+import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -291,14 +293,14 @@ function SaveModal({
               onClick={() => toggleTag(tag)}
               className={
                 selectedTags.includes(tag)
-                  ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
-                  : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
+                  ? "min-h-10 rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
+                  : "min-h-10 rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
               {tagLabel(tag)}
             </button>
           ))}
-          {newTagControl("rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
+          {newTagControl("min-h-10 rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
         </div>
 
         <p className="mb-1 text-xs font-sans text-text-muted">Nota personale</p>
@@ -321,7 +323,7 @@ function SaveModal({
             type="button"
             onClick={handleSave}
             disabled={isPending}
-            className="flex-1 rounded-btn bg-brand px-3 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 flex-1 rounded-btn bg-brand px-3 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? "..." : "Salva"}
           </button>
@@ -329,7 +331,7 @@ function SaveModal({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="flex-1 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-display font-semibold text-text-muted hover:text-text disabled:opacity-60"
+            className="min-h-11 flex-1 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-display font-semibold text-text-muted hover:text-text disabled:opacity-60"
           >
             Annulla
           </button>
@@ -364,7 +366,7 @@ function StarPicker({
           onMouseEnter={() => setHovered(star)}
           onMouseLeave={() => setHovered(0)}
           aria-label={`${star} stelle`}
-          className="text-xl leading-none focus:outline-none"
+          className="flex h-10 w-9 items-center justify-center text-2xl leading-none focus:outline-none"
         >
           <span className={(hovered || value) >= star ? "text-star" : "text-border"}>
             ★
@@ -434,7 +436,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Commento (opzionale)"
         rows={2}
-        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand"
+        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-base font-sans focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {status === "error" && (
         <p className="text-xs text-error">{errorMsg}</p>
@@ -445,7 +447,7 @@ function ReviewForm({
       <button
         type="submit"
         disabled={status === "saving"}
-        className="rounded-btn bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-10 rounded-btn bg-brand px-4 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {status === "saving" ? "..." : existing ? "Aggiorna" : "Pubblica recensione"}
       </button>
@@ -454,9 +456,9 @@ function ReviewForm({
 }
 
 const OTHER_CITY = "Altre zone";
-const CHIP_ON = "rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
-const CHIP_OFF = "rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
-const CHIP_CITY = "rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
+const CHIP_ON = "min-h-10 rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
+const CHIP_OFF = "min-h-10 rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
+const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag).
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
@@ -492,7 +494,7 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   if (!kind) return null;
   let best: { name: string; d: number } | null = null;
   for (const s of saved) {
-    if (s.name === place.name || categoryLabel(s.category) !== kind) continue;
+    if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE)) continue;
     if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
     const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
     if (!best || d < best.d) best = { name: s.name, d };
@@ -539,6 +541,7 @@ function SaveButton({
   isSaved,
   onToggle,
   onSaveRequest,
+  onLoginRequest,
 }: {
   placeId: string;        // UUID canonico Supabase: usato per delete e onToggle
   googlePlaceId: string;  // ID Google: usato per il salvataggio (/api/places/add)
@@ -546,6 +549,7 @@ function SaveButton({
   isSaved: boolean;
   onToggle: (placeId: string, saved: boolean) => void;
   onSaveRequest: (googlePlaceId: string) => void;
+  onLoginRequest?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -553,7 +557,8 @@ function SaveButton({
 
   const handleClick = () => {
     if (!userId) {
-      router.push("/login");
+      if (onLoginRequest) onLoginRequest();
+      else router.push("/login");
       return;
     }
 
@@ -790,6 +795,12 @@ export default function MapView({
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  // Salvati letti almeno una volta (il salvataggio rimandato dopo il login aspetta questo).
+  const [savedLoaded, setSavedLoaded] = useState(false);
+  const [savedIdsLoaded, setSavedIdsLoaded] = useState(false);
+  // Verdetti dei salvati (place_synthesis, per UUID): restano anche quando una ricerca
+  // sostituisce venueDetails.
+  const savedSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
@@ -825,7 +836,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; daParte?: { turistici: string[]; fuori_tema: string[] } | null } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -891,6 +902,23 @@ export default function MapView({
     () => (document.documentElement.dataset.home === "b" ? "b" : "a"),
     () => null,
   );
+  // "Fatti suggerire" dai salvati (VISIONE.md): il tipo di posto che salvi di più, nella città dove
+  // ne hai di più, cercato "poco conosciuto" (così i locali di massa vanno in fondo). Una ricerca
+  // parte solo se la tocchi.
+  const savedSuggestion = useMemo(() => {
+    const liked = savedPlaces.filter((p) => !p.tags?.includes(OPINION_DISLIKE));
+    if (liked.length < 3) return null;
+    const top = (values: (string | null)[]) => {
+      const counts = new globalThis.Map<string, number>();
+      for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    };
+    const kind = top(liked.map((p) => categoryLabel(p.category)));
+    const city = top(liked.map((p) => cityFromAddress(p.address)));
+    if (!kind || kind[1] < 2 || !city) return null;
+    return { label: `${kind[0]} a ${city[0]}, poco conosciuti`, query: `${kind[0]} poco conosciuti a ${city[0]}` };
+  }, [savedPlaces]);
+
   // Una sola barra (Lorenzo, 12/10: "abbiamo due barre per la ricerca, occupiamo solo spazio"):
   // i suggerimenti di testo stanno sotto la barra in alto e la card in basso sparisce.
   // ?beta=-suggerimenti riporta la card di prima.
@@ -1015,8 +1043,13 @@ export default function MapView({
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const quickSave = async (place: Place) => {
-    if (!userId) { window.location.href = "/login"; return; }
+  // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
+  const askLoginToSave = (place: Place, tags: string[] = [VISIT_WANT]) => {
+    rememberPendingSave(place, tags);
+    window.location.href = loginToSaveUrl(place.name);
+  };
+  const quickSave = async (place: Place, tags: string[] = [VISIT_WANT]) => {
+    if (!userId) { askLoginToSave(place, tags); return; }
     if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
     try {
       const addRes = await fetch("/api/places/add", {
@@ -1029,7 +1062,6 @@ export default function MapView({
       });
       if (!addRes.ok) throw new Error("add");
       const uuid: string = (await addRes.json()).place.id;
-      const tags = [VISIT_WANT];
       const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
       if (error && error.code !== "23505") throw new Error("insert");
       setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
@@ -1037,14 +1069,28 @@ export default function MapView({
       const saved = { ...place, id: uuid, tags, note: null };
       setSavedPlaces((prev) => [...prev.filter((p) => p.id !== uuid), saved]);
       setSavedToast(saved);
-      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: VISIT_WANT });
+      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: tags.includes(VISIT_DONE) ? VISIT_DONE : VISIT_WANT });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
-      setPendingSaveTags([VISIT_WANT]);
+      setPendingSaveTags(tags);
       setPendingSavePlaceId(place.id);
     }
   };
+
+  // Rientro dopo l'accesso: salva il locale toccato prima di entrare e lo mostra sulla mappa.
+  // Aspetta i salvati: se il locale c'era già, si apre la sua scheda invece di rifarlo da zero.
+  useEffect(() => {
+    if (!userId || !savedLoaded || !savedIdsLoaded) return;
+    const pending = takePendingSave();
+    if (!pending) return;
+    const { place, tags } = pending;
+    setTimeout(() => {
+      setViewState((v) => ({ ...v, latitude: place.lat, longitude: place.lng, zoom: Math.max(v.zoom, 15) }));
+      void quickSave(place, tags);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta, quando utente e salvati sono pronti
+  }, [userId, savedLoaded, savedIdsLoaded]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1060,6 +1106,7 @@ export default function MapView({
           return;
         }
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
+        setSavedIdsLoaded(true);
       });
   }, [userId]);
 
@@ -1113,6 +1160,7 @@ export default function MapView({
         .eq("user_id", userId);
 
       setLoadingSaved(false);
+      setSavedLoaded(true);
       if (error) {
         console.error("Errore nel caricamento dei locali salvati:", error);
         return;
@@ -1183,6 +1231,7 @@ export default function MapView({
         };
       }
       if (Object.keys(savedDetails).length > 0) {
+        savedSynthRef.current = savedDetails;
         setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
       }
     })();
@@ -1207,7 +1256,8 @@ export default function MapView({
   // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
   const visitBusy = useRef(false);
-  const setVisitStatus = async (placeId: string, status: VisitStatus) => {
+  // pair: i due tag che si escludono (stato della visita, oppure "Com'era?").
+  const setVisitStatus = async (placeId: string, status: string, pair: readonly [string, string] = [VISIT_WANT, VISIT_DONE]) => {
     const uuid = resolveUuid(placeId);
     if (!userId || !uuid || visitBusy.current) return;
     visitBusy.current = true;
@@ -1221,9 +1271,13 @@ export default function MapView({
         if (error || !data) { setFilterError("Non sono riuscito a salvare: riprova."); return; }
         currentTags = (data.tags as string[] | null) ?? [];
       }
-      const base = currentTags.filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+      const base = currentTags.filter((t) => t !== pair[0] && t !== pair[1]);
       const tags = currentTags.includes(status) ? base : [...base, status];
-      if (!currentTags.includes(status)) track(status === VISIT_DONE ? "ci_sono_stato" : "voglio_andarci", { id: uuid });
+      if (!currentTags.includes(status)) {
+        if (status === VISIT_DONE) track("ci_sono_stato", { id: uuid });
+        else if (status === VISIT_WANT) track("voglio_andarci", { id: uuid });
+        else track("ci_sono_stato", { id: uuid }, { stato: status });
+      }
       const previous = savedPlaces;
       setSavedPlaces((prev) => prev.map((p) => (p.id === uuid ? { ...p, tags } : p)));
       const { error } = await supabase.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", uuid);
@@ -1315,7 +1369,7 @@ export default function MapView({
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
-      setVenueDetails(details);
+      setVenueDetails({ ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati.
       fitToPlaces(places);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
@@ -1354,6 +1408,14 @@ export default function MapView({
     const ids = new Set(topKey ? topKey.split(",") : []);
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
+
+  // Nomi dei primi risultati senza sovrapposizioni: vince quello più in alto in lista.
+  const hiddenLabels = useMemo(() => {
+    if (topPlaces.length < 2) return new Set<string>();
+    const rank = (id: string) => (id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
+    const ordered = [...topPlaces].sort((a, b) => rank(a.id) - rank(b.id));
+    return labelsToHide(ordered.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, big: p.id === focusId })), viewState.zoom);
+  }, [topPlaces, carouselOrder, focusId, viewState.zoom]);
 
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
@@ -1401,10 +1463,16 @@ export default function MapView({
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
+  // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
+  // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
+  const pendingFitRef = useRef<{ list: Place[]; top: number } | null>(null);
+  // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
+  const mapReadyRef = useRef(false);
   const fitToPlaces = (list: Place[], top = 190) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map) return;
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
+    pendingFitRef.current = null;
     const lngs = list.map((p) => p.lng);
     const lats = list.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -1483,8 +1551,8 @@ export default function MapView({
         }
         const id = ++searchSeq.current;
         setClusterPlaces(null); setFilterError(null);
-        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q });
-        setVenueDetails(details); setFilters(EMPTY_FILTERS);
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
+        setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -1740,7 +1808,7 @@ export default function MapView({
                   type="button"
                   aria-label="Cancella la ricerca"
                   onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-text-muted"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center text-base text-text-muted"
                 >
                   ✕
                 </button>
@@ -1833,6 +1901,16 @@ export default function MapView({
                 ✨ Per te: {tasteSuggestion}
               </button>
             )}
+            {savedSuggestion && (
+              <button
+                type="button"
+                data-testid="suggerimento-salvati"
+                onClick={() => { setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }}
+                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+              >
+                ✨ Dai tuoi salvati: {savedSuggestion.label}
+              </button>
+            )}
             {momentExample && (
               <button
                 type="button"
@@ -1902,8 +1980,8 @@ export default function MapView({
             onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
-                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             Esplora
@@ -1913,8 +1991,8 @@ export default function MapView({
             onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
-                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             I miei salvati
@@ -1922,6 +2000,15 @@ export default function MapView({
         </div>
         {view === "saved" && userId && savedPlaces.length > 0 && (
           <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-2 rounded-card border border-border bg-surface p-2 shadow-float">
+            {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
+            <Link
+              href="/stasera"
+              data-testid="vai-stasera"
+              className="flex min-h-10 items-center justify-between gap-2 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-[0.99]"
+            >
+              <span>🍽️ Stasera dove andiamo?</span>
+              <span aria-hidden className="text-accent">→</span>
+            </Link>
             <input
               type="search"
               value={savedQuery}
@@ -2034,7 +2121,7 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Nessun salvato con questi filtri"
                     : view === "saved"
-                      ? "Nessun posto salvato"
+                      ? "La tua mappa è ancora vuota"
                       : "Nessun posto da mostrare"}
               </p>
               <p className="mt-1 text-sm font-sans text-text-muted">
@@ -2043,7 +2130,7 @@ export default function MapView({
                   : view === "saved" && savedFiltered
                     ? "Cambia la ricerca o tocca “Tutti”"
                     : view === "saved"
-                      ? "Tocca il segnalibro su un locale per ritrovarlo qui, con note e tag."
+                      ? "Salva i posti che scopri, da qualsiasi app: li ritrovi qui quando devi scegliere."
                       : "Sposta la mappa o cambia vista"}
               </p>
               {aiSearch === null && view === "saved" && !savedFiltered && (
@@ -2054,6 +2141,16 @@ export default function MapView({
                 >
                   Cerca un locale
                 </button>
+              )}
+              {/* Zero salvati (VISIONE.md "Raccogli"): i modi di salvare, a un tocco. */}
+              {aiSearch === null && view === "saved" && !savedFiltered && (
+                <div data-testid="raccogli-vuoto" className="mt-3 flex flex-wrap justify-center gap-2">
+                  {([["📍 Da Google Maps", "/importa"], ["📸 Da uno screenshot", "/importa#da-screenshot"], ["✍️ A mano", "/importa#a-mano"]] as const).map(([label, href]) => (
+                    <Link key={href} href={href} className="inline-flex min-h-10 items-center rounded-pill border border-border bg-white px-3.5 text-sm font-display font-semibold text-brand active:scale-95">
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               )}
               {aiSearch !== null && (
                 <div className="mt-4 flex justify-center gap-2">
@@ -2380,6 +2477,11 @@ export default function MapView({
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        onLoad={() => {
+          mapReadyRef.current = true;
+          const pending = pendingFitRef.current;
+          if (pending) fitToPlaces(pending.list, pending.top);
+        }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
           if (map) hidePoiLabels(map);
@@ -2445,6 +2547,7 @@ export default function MapView({
               <div
                 className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
+                data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
               >
@@ -2485,7 +2588,7 @@ export default function MapView({
                   </span>
                 )}
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
-                {((aiSearch !== null && clusterPlaces === null ? topPlaces.includes(place) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
+                {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
                     {place.name}
                   </span>
@@ -2551,7 +2654,8 @@ export default function MapView({
               </div>
             );
           })()}
-          <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
+          {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -2571,10 +2675,11 @@ export default function MapView({
               isSaved={isPlaceSaved(selected.id)}
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
+              onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
-                if (!userId) { window.location.href = "/login"; return; }
+                if (!userId) { askLoginToSave(selected, [st]); return; }
                 setPendingSaveTags([st]);
                 setPendingSavePlaceId(selected.id);
               }}
@@ -2589,6 +2694,7 @@ export default function MapView({
                   isSaved={isPlaceSaved(selected.id)}
                   onToggle={handleToggle}
                   onSaveRequest={(googlePlaceId) => setPendingSavePlaceId(googlePlaceId)}
+                  onLoginRequest={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : () => askLoginToSave(selected)}
                 />
               }
               communitySlot={
@@ -2720,8 +2826,9 @@ export default function MapView({
         />
       )}
 
+      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
       {savedToast && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 truncate text-sm font-sans">
               <span className="font-semibold">📌 Salvato</span> · {savedToast.name}
@@ -2784,7 +2891,10 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
-          details={aiSearch !== null ? venueDetails : undefined}
+          // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
+          details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
+          savedMode={view === "saved" && aiSearch === null}
+          showCity={view === "saved" && aiSearch === null && activeCity === null}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
@@ -2796,6 +2906,7 @@ export default function MapView({
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
+          setAside={aiSearch?.daParte ?? null}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}

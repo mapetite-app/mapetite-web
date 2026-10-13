@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import MapView from "./map-view";
 
@@ -19,7 +20,9 @@ export default async function MappaPage() {
 
   // Solo in sviluppo locale: utente finto per il test automatico dei salvati
   // (scripts/e2e/giro.mjs). In produzione NODE_ENV è sempre "production".
-  const e2eUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
+  // Il cookie "e2e_anonimo" simula chi non ha fatto l'accesso.
+  const dev = process.env.NODE_ENV === "development";
+  const e2eUser = dev && !(await cookies()).get("e2e_anonimo") ? process.env.E2E_FAKE_USER ?? null : null;
 
   return <MapView places={normalized} userId={e2eUser ?? userData?.user?.id ?? null} />;
 }

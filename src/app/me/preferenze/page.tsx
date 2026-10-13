@@ -7,7 +7,7 @@ export default async function PreferencePage() {
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data?.user) {
-    redirect("/login");
+    redirect("/login?next=%2Fme%2Fpreferenze");
   }
 
   const user = data.user;

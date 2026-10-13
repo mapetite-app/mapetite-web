@@ -39,6 +39,10 @@ const newsreader = Newsreader({
 // Gira prima del primo disegno, così non si vede il cambio.
 const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(t==="poppins")t="sans";if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}if(!localStorage.getItem("mapetite.scheda"))document.documentElement.dataset.scheda="b"}catch(e){}`;
 
+// Primo accesso (src/components/home-intro.tsx): sulla home, se l'intro non è mai stata vista
+// (o con ?intro=1), segna <html data-intro="nuovo"> prima del disegno, così non c'è lampo.
+const INTRO_SCRIPT = `try{if(location.pathname==="/"&&(new URLSearchParams(location.search).get("intro")==="1"||!localStorage.getItem("mapetite.intro")))document.documentElement.dataset.intro="nuovo"}catch(e){}`;
+
 export const metadata: Metadata = {
   title: "Mapetite",
   description: "I locali giusti per te, non quelli di tutti. Scrivi cosa cerchi come lo diresti a un amico.",
@@ -61,6 +65,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#1a3c40",
+  // App installata su iPhone: senza "cover" la safe area vale 0 e la barra in basso
+  // resta sotto la linea della Home. La barra di stato resta "default" (niente contenuto sotto).
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -79,16 +86,16 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full">
-        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT + INTRO_SCRIPT }} />
         <NavBar userId={userId} />
         <OfflineBanner />
         {/*
-          Pagine normali (non fixed): pb-16 evita che il contenuto finisca
+          Pagine normali (non fixed): pb uguale all'altezza della navbar (safe area inclusa) evita che il contenuto finisca
           sotto la navbar mobile; md:pt-14 fa scendere il contenuto sotto
           la navbar desktop. La pagina /mappa usa fixed inset-0 ed è fuori
           dal flusso, quindi gestisce da sola il proprio offset.
         */}
-        <div className="pb-16 md:pb-0 md:pt-14">{children}</div>
+        <div className="pb-[var(--nav-height-mobile)] md:pb-0 md:pt-14">{children}</div>
       </body>
     </html>
   );

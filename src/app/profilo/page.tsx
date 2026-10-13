@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
+import ProfiloRicerche from "@/components/profilo-ricerche";
+import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
+import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -77,10 +80,10 @@ export default async function ProfiloPage() {
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>
         <div className="flex gap-2">
-          <a href="/login" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+          <a href="/login?next=%2Fprofilo" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
             Accedi
           </a>
-          <a href="/signup" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
+          <a href="/signup?next=%2Fprofilo" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
             Crea un account
           </a>
         </div>
@@ -128,16 +131,17 @@ export default async function ProfiloPage() {
     { label: "Città", value: cityCount, href: savedHref(), id: "citta" },
   ];
 
-  // Raccolte = i tag dell'utente (esclusi i due di stato), dalla più ricca.
-  const byTag = new Map<string, number>();
-  for (const row of saved) {
-    if (!row.places) continue;
-    for (const tag of new Set(row.tags ?? [])) {
-      if (tag === STATE_WANT || tag === STATE_DONE || !tag.trim()) continue;
-      byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
-    }
-  }
-  const collections = [...byTag.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
+  // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
+  const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
+    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, tags: row.tags ?? [] }] : [],
+  );
+
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).
+  const visitCandidates: VisitCandidate[] = saved
+    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .slice(0, 20)
+    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at }));
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -151,11 +155,25 @@ export default async function ProfiloPage() {
             {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
             {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
           </p>
-          <Link href="/me" className="mt-1 inline-block text-sm font-display font-semibold text-accent">
+          <Link href="/me" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
             I tuoi gusti →
           </Link>
         </div>
       </div>
+
+      {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
+      <Link
+        href="/stasera"
+        data-testid="profilo-stasera"
+        className="mb-4 flex min-h-[84px] items-center gap-4 rounded-card bg-brand px-4 py-4 text-white shadow-float active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-2xl">🍽️</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-lg font-semibold leading-tight">Stasera dove andiamo?</span>
+          <span className="mt-0.5 block text-sm text-white/75">Scegli tra i tuoi salvati</span>
+        </span>
+        <span aria-hidden className="text-xl text-white/70">→</span>
+      </Link>
 
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
@@ -172,42 +190,17 @@ export default async function ProfiloPage() {
         ))}
       </nav>
 
-      <section className="mb-10">
-        <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le tue raccolte</h2>
-        {collections.length === 0 ? (
-          <p data-testid="raccolte-vuote" className="rounded-card border border-dashed border-border p-4 text-sm text-text-muted">
-            Aggiungi un tag ai tuoi salvati (es. Romantico, Con amici): ogni tag diventa una raccolta.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-2">
-            {collections.map(([tag, count]) => (
-              <li key={tag}>
-                <Link
-                  href={savedHref({ tag })}
-                  data-testid="raccolta"
-                  className="flex min-h-[72px] items-center gap-3 rounded-card bg-brand px-3 py-3 text-white shadow-card active:scale-[0.98] transition-transform duration-150"
-                >
-                  <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent font-title text-base font-semibold text-white">
-                    {tag.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-display text-sm font-semibold">{tag}</span>
-                    <span className="block text-xs text-white/75">
-                      {count} {count === 1 ? "locale" : "locali"}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <VisitPrompt userId={user.id} candidates={visitCandidates} />
+
+      <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
+
+      <ProfiloRicerche />
 
       <section className="mb-10">
-        <div className="mb-3 flex items-baseline justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="font-title text-xl font-semibold text-brand">I miei locali salvati</h2>
           {saved.length > 0 && (
-            <Link href={savedHref()} className="text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
+            <Link href={savedHref()} className="inline-flex min-h-10 shrink-0 items-center text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
           )}
         </div>
         {/* "Importa" non è più nella barra in basso (ora c'è "Salvati"): si raggiunge da qui. */}

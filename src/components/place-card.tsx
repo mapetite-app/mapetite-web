@@ -1,6 +1,7 @@
 import { sortTags, tagLabel } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
+import { displayAddress } from "@/lib/city";
 
 type PlaceCardProps = {
   name: string;
@@ -33,7 +34,7 @@ export default function PlaceCard({ name, category, address, tags, note }: Place
         {address && (
           <p className="flex items-center gap-1 text-xs text-text-muted mt-1 truncate">
             <PinIcon />
-            {address}
+            {displayAddress(address)}
           </p>
         )}
 

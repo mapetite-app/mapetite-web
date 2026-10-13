@@ -4,6 +4,9 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
+import { extractMapsLinks } from "@/lib/maps-link";
+import { findSocialLink, placeHintFromText, type SocialSource } from "@/lib/social-link";
+import SocialLinkHelp from "./social-link-help";
 
 const HAS_LINK = /https?:\/\/\S+/;
 
@@ -14,7 +17,15 @@ function errorText(e: unknown): string {
 
 // "Da Google Maps": su iPhone le app web non compaiono nel Condividi, quindi si copia
 // il link in Google Maps e lo si incolla qui (anche più link, uno per riga).
-export default function GoogleMapsCard({ userId }: { userId: string | null }) {
+export default function GoogleMapsCard({
+  userId,
+  onScreenshot,
+  onSearch,
+}: {
+  userId: string | null;
+  onScreenshot: () => void;
+  onSearch: (q: string) => void;
+}) {
   // Link arrivato da Condividi prima dell'accesso (vedi /importa/condividi).
   const pending = useSyncExternalStore(() => () => {}, readPendingLink, () => null);
   const [draft, setDraft] = useState<string | null>(null);
@@ -22,13 +33,24 @@ export default function GoogleMapsCard({ userId }: { userId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
+  const [social, setSocial] = useState<{ source: SocialSource; hint: string | null } | null>(null);
   const text = draft ?? pending ?? "";
 
   const save = async (value: string) => {
     if (!userId) return;
+    setSocial(null);
     if (!HAS_LINK.test(value)) {
       setShowField(true);
       setError("Non vedo un link. In Google Maps tocca Condividi e poi Copia link, poi torna qui.");
+      return;
+    }
+    // Link di Instagram/TikTok senza link di Maps: niente chiamata, si spiega cosa fare.
+    const source = extractMapsLinks(value).length === 0 ? findSocialLink(value) : null;
+    if (source) {
+      setShowField(true);
+      setError(null);
+      setResults(null);
+      setSocial({ source, hint: placeHintFromText(value) });
       return;
     }
     setBusy(true);
@@ -81,7 +103,7 @@ export default function GoogleMapsCard({ userId }: { userId: string | null }) {
 
       {!userId ? (
         <p className="mt-4 text-sm text-text-muted">
-          <Link href="/login" className="underline text-text">Accedi</Link> per salvare i locali.
+          <Link href="/login?next=%2Fimporta" className="underline text-text">Accedi</Link> per salvare i locali.
         </p>
       ) : (
         <>
@@ -123,10 +145,16 @@ export default function GoogleMapsCard({ userId }: { userId: string | null }) {
             <button
               type="button"
               onClick={() => setShowField(true)}
-              className="mt-2 w-full text-center text-sm text-text-muted underline"
+              className="mt-1 min-h-11 w-full text-center text-sm text-text-muted underline"
             >
               Oppure incolla a mano
             </button>
+          )}
+
+          {social && (
+            <div className="mt-4">
+              <SocialLinkHelp source={social.source} hint={social.hint} onScreenshot={onScreenshot} onSearch={onSearch} />
+            </div>
           )}
 
           <p className="mt-3 text-xs text-text-muted">
