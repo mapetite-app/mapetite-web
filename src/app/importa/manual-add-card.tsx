@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
@@ -17,7 +17,7 @@ function errorText(e: unknown): string {
 // Solo una lettura su Supabase (gratis): nessuna chiamata Google in più.
 async function alreadySavedMap(userId: string, googleIds: string[]): Promise<Record<string, string>> {
   if (googleIds.length === 0) return {};
-  const { data, error } = await createClient()
+  const { data, error } = await (await browserClient())
     .from("saved_places")
     .select("place_id, places!inner(google_place_id)")
     .eq("user_id", userId)

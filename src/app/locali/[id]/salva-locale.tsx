@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { withNext } from "@/lib/next-path";
 
 // Invito per chi ha ricevuto il link: salvarlo in Mapetite ("📌 Voglio andarci", tag "Da provare",
@@ -34,7 +34,7 @@ export default function SalvaLocale({
   const save = async () => {
     if (!userId || state === "saving") return;
     setState("saving");
-    const { error } = await createClient()
+    const { error } = await (await browserClient())
       .from("saved_places")
       .insert({ user_id: userId, place_id: placeId, tags: [WANT_TAG], note: null });
     if (error && error.code === "23505") setState("already");

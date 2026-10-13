@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
 import ManualAddCard from "./manual-add-card";
 import { displayAddress } from "@/lib/city";
@@ -174,7 +174,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       const addData = await addRes.json();
       const placeUuid: string = addData.place.id;
 
-      const { error: spError } = await createClient()
+      const { error: spError } = await (await browserClient())
         .from("saved_places")
         .insert({ user_id: userId, place_id: placeUuid, tags: null, note: null });
       if (spError && spError.code !== "23505") {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { isStateTag, normalizeTagName, replaceTag } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -79,10 +79,10 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
   // Applica "change" a ogni salvato toccato, una riga alla volta, e aggiorna subito l'elenco.
   // Ritorna il numero di righe non aggiornate (0 = tutto ok).
   async function apply(targets: RaccoltaRow[], change: (tags: string[]) => string[]): Promise<number> {
-    const supabase = createClient();
     let failed = 0;
     setError(null);
     setProgress({ done: 0, total: targets.length });
+    const supabase = await browserClient();
     for (const [i, row] of targets.entries()) {
       // Tag attuali dal database, non quelli caricati con la pagina: nel frattempo "Ci sei stato?"
       // (o un altro telefono) può averli cambiati, e riscrivere la copia vecchia cancellerebbe la visita.
