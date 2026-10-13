@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
 import { isStateTag, normalizeTagName, replaceTag } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
@@ -352,7 +352,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
                                 />
                                 <span className="min-w-0">
                                   <span className="block truncate font-display text-sm font-semibold text-text">{r.name}</span>
-                                  {r.address && <span className="block truncate text-xs text-text-muted">{r.address}</span>}
+                                  {r.address && <span className="block truncate text-xs text-text-muted">{displayAddress(r.address)}</span>}
                                 </span>
                               </label>
                             </li>

@@ -5,7 +5,7 @@ import { Check, X, Navigation, MapPin } from "lucide-react";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
 import SalvaLocale from "./salva-locale";
 import { safeNext } from "@/lib/next-path";
 import {
@@ -149,7 +149,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
       {place.address && (
         <p className="mx-5 mt-5 flex items-start gap-2 text-sm font-sans text-text-muted">
           <MapPin size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-          <span>{place.address}</span>
+          <span>{displayAddress(place.address)}</span>
         </p>
       )}
 

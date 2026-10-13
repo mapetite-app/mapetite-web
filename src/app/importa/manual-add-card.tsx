@@ -5,6 +5,7 @@ import Link from "next/link";
 import LinkResults from "@/components/link-results";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 
 function errorText(e: unknown): string {
@@ -177,7 +178,7 @@ export default function ManualAddCard({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-text">{r.name}</p>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{r.address}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{displayAddress(r.address)}</p>
                     </div>
                     {savedUuid ? (
                       <Link
