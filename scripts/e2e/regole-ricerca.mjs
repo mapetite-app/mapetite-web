@@ -26,6 +26,16 @@ ok(getCategoryEmoji("bar", "Rooftop Jim's Bar") === "🍺", "emoji: bar resta �
 ok(getCategoryEmoji("restaurant", "Trattoria da Augusto") === "🍝", "emoji: trattoria resta 🍝");
 ok(getCategoryEmoji("restaurant", "Pizzeria Ai Marmi") === "🍕", "emoji: pizzeria con tipo 'restaurant' resta 🍕");
 ok(getCategoryEmoji("seafood_restaurant", "Terrazza Calabritto cocktail") === "🐟", "emoji: ristorante di pesce resta 🐟");
+// Cucine e dolci (14/10): prima indiano, messicano, vegano, brunch avevano 🍝 e le pasticcerie 🥖.
+ok(getCategoryEmoji("indian_restaurant", "Jaipur") === "🍛", "emoji: indiano 🍛");
+ok(getCategoryEmoji("mexican_restaurant", "La Cucaracha") === "🌮", "emoji: messicano 🌮");
+ok(getCategoryEmoji("middle_eastern_restaurant", "Mezè") === "🥙", "emoji: mediorientale 🥙");
+ok(getCategoryEmoji("vegan_restaurant", "Rifugio Romano") === "🥗", "emoji: vegano 🥗");
+ok(getCategoryEmoji("restaurant", "Panfuwa | Brunch & Café - Milano Isola") === "🥞", "emoji: brunch 🥞");
+ok(getCategoryEmoji("pastry_shop", "I Dolci Di Checco Er Carettiere") === "🥐", "emoji: pasticceria 🥐");
+ok(getCategoryEmoji("bakery", "Antico Forno Roscioli") === "🥖", "emoji: forno resta 🥖");
+ok(getCategoryEmoji("restaurant", "Pizzeria Vegana") === "🍕", "emoji: pizzeria vegana resta 🍕");
+ok(getCategoryEmoji("steak_house", "Steak & Tea") === "🥩", "emoji: steakhouse resta 🥩 (\"tea\" non conta)");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
