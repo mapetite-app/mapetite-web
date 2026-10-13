@@ -161,6 +161,8 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **"Com'era?" — IN PR**: dopo "Ci sono stato", 👍 Mi è piaciuto / 👎 Non fa per me (tag, nessuna migrazione); "Stasera" non ripropone i 👎 e i suggerimenti dai salvati li ignorano.
 - **Controllo qualità a 390 e 360 px — IN PR**: 16 difetti corretti (nomi delle raccolte spezzati, testi tagliati nei campi, link troppo piccoli, striscia bianca su Stasera, pulsanti fuori stile, barra su iPhone installata); elenco e difetti lasciati in `docs/autonomia/QA-2026-10-13.md`.
 - **Copione della demo in 3 minuti — `docs/autonomia/DEMO.md`.**
+- **Dopo l'accesso si torna dove si era — IN PR**: parametro `next` controllato (niente rimandi verso altri siti) da login, registrazione, email di conferma e onboarding; il locale condiviso torna con "Ci sei! Tocca qui sotto per salvarlo". DA FARE da Lorenzo: in Supabase → Authentication → URL Configuration, controllare che i "Redirect URLs" accettino `…/login?next=…` (es. `https://<dominio>/login*`).
+- **Controllo qualità della mappa e della scheda — IN PR**: 11 difetti corretti (verdetto delle card di nuovo su 2 righe: le card non coprono più i pin; avviso "Salvato" sopra la barra azioni; "›" apre il locale dall'inizio; zoom iPhone sul commento; pulsanti piccoli). DA DECIDERE (in `QA-2026-10-13-mappa.md`): a 360px l'intestazione dei risultati lascia poca mappa; pulsanti secondari da 36px.
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
