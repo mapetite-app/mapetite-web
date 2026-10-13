@@ -434,7 +434,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Commento (opzionale)"
         rows={2}
-        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand"
+        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-base font-sans focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {status === "error" && (
         <p className="text-xs text-error">{errorMsg}</p>
