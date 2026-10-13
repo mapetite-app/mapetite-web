@@ -2,6 +2,7 @@
 //   node --experimental-strip-types scripts/e2e/regole-ricerca.mjs
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
+import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -17,6 +18,14 @@ ok(demoteOffType("cocktail bar", [p("Pub 1", "pub"), p("Pub 2", "pub"), p("Pub 3
 const trastevere = [p("Da Enzo", "restaurant", 10239), p("A", "restaurant", 3900), p("B", "restaurant", 2000), p("C", "restaurant", 4100), p("D", "restaurant", 3000)];
 ok(demoteMainstream("trattoria autentica non turistica a Trastevere", trastevere).places.at(-1)?.name === "Da Enzo", "non turistico: Da Enzo in fondo");
 ok(demoteMainstream("trattoria a Trastevere", trastevere).demoted.length === 0, "richiesta normale: Da Enzo resta");
+
+// Emoji (src/lib/emoji.ts): visto dal vivo il 13/10 sera, un cocktail bar con "Restaurant" nel nome aveva 🍝.
+ok(getCategoryEmoji("cocktail_bar", "The Vista Rooftop Roma | Pantheon Terrace Bar & Restaurant") === "🍸", "emoji: cocktail bar con 'Restaurant' nel nome ha 🍸");
+ok(getCategoryEmoji("cocktail_bar", "Rooftop Tre") === "🍸", "emoji: cocktail bar ha 🍸");
+ok(getCategoryEmoji("bar", "Rooftop Jim's Bar") === "🍺", "emoji: bar resta 🍺");
+ok(getCategoryEmoji("restaurant", "Trattoria da Augusto") === "🍝", "emoji: trattoria resta 🍝");
+ok(getCategoryEmoji("restaurant", "Pizzeria Ai Marmi") === "🍕", "emoji: pizzeria con tipo 'restaurant' resta 🍕");
+ok(getCategoryEmoji("seafood_restaurant", "Terrazza Calabritto cocktail") === "🐟", "emoji: ristorante di pesce resta 🐟");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
