@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
+import { searchGooglePlaces, withoutReviewOrigins, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
@@ -79,7 +79,8 @@ export async function POST(request: Request) {
   let synthToken: string | null = null;
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
-  const daParte: { turistici: string[]; fuori_tema: string[] } = { turistici: [], fuori_tema: [] };
+  // perche_turistici: allineato a turistici, il motivo letto nelle recensioni (es. "4 recensioni su 5 in inglese").
+  const daParte: { turistici: string[]; perche_turistici: string[]; fuori_tema: string[] } = { turistici: [], perche_turistici: [], fuori_tema: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -126,13 +127,17 @@ export async function POST(request: Request) {
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
-    // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
+    // "Non turistico", "autentico"…: i locali che le recensioni descrivono come turistici
+    // vanno in fondo (mai esclusi). Motivo per ogni locale nei log.
     if (searchIntent === "natural") {
-      const { places, demoted } = demoteMainstream(query.trim(), risultati);
+      const { places, demoted, reasons, log } = demoteMainstream(query.trim(), risultati);
+      if (log.length > 0) {
+        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} ${demoted.length} in fondo:\n  ${log.join("\n  ")}`);
+      }
       if (demoted.length > 0) {
         risultati = places;
         daParte.turistici = demoted.slice(0, 10);
-        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
+        daParte.perche_turistici = reasons.slice(0, 10);
       }
     }
 
@@ -352,7 +357,8 @@ ESEMPI (input → output atteso):
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
-    const { reviewTexts, ...rest } = p;
+    // reviewOrigins (lingua delle recensioni) resta sul server come reviewTexts.
+    const { reviewTexts, ...rest } = withoutReviewOrigins(p);
     return {
       ...rest,
       selectedReviews: selectQualityReviews(reviewTexts),
