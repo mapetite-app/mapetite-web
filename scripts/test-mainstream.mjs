@@ -66,7 +66,14 @@ const ultimo = (r) => r.places.at(-1)?.name;
   const s3 = touristScore(place("X", 500, [en("Non è una trappola per turisti", "Not a tourist trap at all"), it("Ok"), it("Ok")]), false);
   ok(Object.keys(s3.touristHits).length === 0, "'not a tourist trap' non è un segnale turistico", JSON.stringify(s3));
   const s4 = touristScore(place("X", 500, [en("Cibo autentico", "Authentic food"), it("Cucina autentica"), it("Ok")]), false);
-  ok(s4.localHits["autentico"] === 1, "'autentico' conta solo nelle recensioni scritte in italiano", JSON.stringify(s4));
+  ok(!s4.localHits["autentico"] && s4.score === 0, "'autentico' non salva più un locale (lo scrivono anche i turisti)", JSON.stringify(s4));
+  // Casi dal vivo del 13/10 (Trastevere): Google dà recensioni quasi tutte in italiano.
+  const enzo = touristScore(place("Trattoria Da Enzo", 10241, [it("Classico posto da turisti. Il ristorante è frequentato dal 99% da turisti"), it("Carbonara autentica"), it("Ok")]), true);
+  ok(enzo.demote && enzo.touristHits["posto da turisti"] === 1, "Da Enzo: 'posto da turisti' + tante recensioni → in fondo", JSON.stringify(enzo));
+  const nann = touristScore(place("Nannarella", 47503, [it("Cucina autentica"), it("Autentico"), it("Autentica trattoria")]), true);
+  ok(nann.demote, "Nannarella: recensioni tutte in italiano non la salvano, 'autentico' nemmeno → in fondo", JSON.stringify(nann));
+  const teo = touristScore(place("Trattoria Da Teo", 3975, [it("Non è per niente turistico"), it("Ok"), it("Ok")]), true);
+  ok(!teo.demote, "Da Teo: tante recensioni ma 'non turistico' nelle recensioni → resta", JSON.stringify(teo));
 }
 {
   const s = touristScore(place("X", 500, [it("Nonostante sia in una delle zone più turistiche della città, dentro sembra un pub di quartiere"), it("Ok"), it("Ok")]), false);

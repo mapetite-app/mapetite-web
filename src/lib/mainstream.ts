@@ -57,6 +57,7 @@ const TURISTICI: Segnale[] = [
   { re: /\bacchiappa\s*-?\s*turisti/, label: "acchiappaturisti", peso: 1.5 },
   { re: /\bmen[uù]\s+turistic|\btourist(?:ic)?\s+men[uù]/, label: "menu turistico", peso: 1.5 },
   { re: /\bprezzi\s+da\s+turisti|\btourist\s+prices/, label: "prezzi da turisti", peso: 1.5 },
+  { re: /\b(?:posto|locale|ristorante|trattoria|osteria)\s+(?:da|per)\s+turisti\b|\bfrequentat[oa]\s+(?:soprattutto\s+|quasi\s+solo\s+|solo\s+|dal?\s+\d+\s*%\s+)?(?:da|dai)\s+turisti\b/, label: "posto da turisti", peso: 1.5 },
   { re: /\bpien[oa]\s+di\s+turisti|\bsolo\s+turisti|\btutti\s+turisti|\bfull\s+of\s+tourists|\bonly\s+tourists|\bmostly\s+tourists/, label: "pieno di turisti", peso: 1 },
   { re: /\bturistic\w*|\btouristy\b/, label: "turistico", peso: 1 },
   { re: /\boverpriced\b|\bcar[oa]\s+per\s+(?:quello\s+che|quel\s+che|la\s+qualità)|\bsovrapprezzat|\bprezzi\s+esagerat|\brip[-\s]?off\b|\bfregatura\b/, label: "caro per quello che è", peso: 0.5 },
@@ -69,9 +70,8 @@ const LOCALI: Segnale[] = [
   { re: /\bcome\s+a\s+casa\b/, label: "come a casa", peso: 1 },
   { re: /\blocals\b|\bwhere\s+(?:the\s+)?(?:romans|milanese|italians)\s+(?:eat|go)/, label: "locals", peso: 1 },
 ];
-// "Autentico" lo scrivono anche i turisti ("authentic Italian food"): conta poco e solo
-// nelle recensioni scritte in italiano.
-const AUTENTICO: Segnale = { re: /\bautentic\w*/, label: "autentico", peso: 0.5 };
+// "Autentico" non è un segnale locale: dal vivo lo scrivono anche le recensioni di Nannarella
+// (47k, ×3) e Tonnarello (110k, ×2), e li salvava. Tolto il 13/10.
 const NEGAZIONE_LABEL = "non turistico";
 
 export type TouristInput = {
@@ -95,6 +95,10 @@ export type TouristScore = {
 
 export function wantsOffTheBeatenPath(query: string): boolean {
   return OFF_THE_BEATEN_PATH.test(query);
+}
+
+function foreignLangsCount(langs: string[]): number {
+  return langs.filter((l) => !isItalian(l)).length;
 }
 
 function isItalian(lang: string | null | undefined): boolean {
@@ -145,9 +149,6 @@ export function touristScore(p: TouristInput, massive: boolean): TouristScore {
     } else if (negated) {
       localHits[NEGAZIONE_LABEL] = (localHits[NEGAZIONE_LABEL] ?? 0) + 1;
       localPts += 1;
-    } else if (isItalian(o?.lang) && AUTENTICO.re.test(s)) {
-      localHits[AUTENTICO.label] = (localHits[AUTENTICO.label] ?? 0) + 1;
-      localPts += AUTENTICO.peso;
     }
   });
 
@@ -155,7 +156,10 @@ export function touristScore(p: TouristInput, massive: boolean): TouristScore {
   const langKnown = langs.length;
   const foreignLangs = langs.filter((l) => !isItalian(l));
   const foreign = foreignLangs.length;
-  const hasLang = langKnown >= MIN_RECENSIONI_LINGUA;
+  // Prova dal vivo (13/10, Trastevere): con languageCode=it Google sceglie quasi sempre recensioni
+  // scritte in italiano, anche per Tonnarello (110k). "Tutte in italiano" quindi non dice nulla:
+  // la lingua conta solo quando ci sono recensioni straniere, altrimenti vale come dato assente.
+  const hasLang = langKnown >= MIN_RECENSIONI_LINGUA && foreignLangsCount(langs) > 0;
   const share = hasLang ? foreign / langKnown : 0;
   const langPts = !hasLang ? 0 : share >= 0.8 ? 2 : share >= 0.6 ? 1 : 0;
   const massPts = massive ? (hasLang ? PESO_MASSA_CON_LINGUA : PESO_MASSA_SENZA_LINGUA) : 0;
@@ -172,8 +176,6 @@ export function touristScore(p: TouristInput, massive: boolean): TouristScore {
     const top = [...byLang.entries()].sort((a, b) => b[1] - a[1]);
     const only = top.length === 1 ? LINGUE[top[0][0]] : null;
     parts.push(`${foreign} recensioni su ${langKnown} in ${only ?? "lingua straniera"}`);
-  } else if (hasLang) {
-    parts.push(`recensioni tutte in italiano`);
   }
   parts.push(...hitsText(touristHits));
   if (massive) parts.push(`${fmt(p.userRatingCount ?? 0)} recensioni, molte più degli altri`);
