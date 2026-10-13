@@ -2477,6 +2477,8 @@ export default function MapView({
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
+        language="it"
         onLoad={() => {
           mapReadyRef.current = true;
           const pending = pendingFitRef.current;
