@@ -140,12 +140,11 @@ export default async function ProfiloPage() {
   }
   const collections = [...byTag.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
 
-  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci" salvati da almeno 7 giorni, dal più vecchio.
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).
   const visitCandidates: VisitCandidate[] = saved
-    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE) && new Date(r.created_at).getTime() <= weekAgo)
+    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
-    .slice(0, 5)
+    .slice(0, 20)
     .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at }));
 
   return (

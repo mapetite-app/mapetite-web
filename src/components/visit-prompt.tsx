@@ -44,7 +44,8 @@ export default function VisitPrompt({ userId, candidates }: { userId: string; ca
   useEffect(() => {
     const s = snoozed();
     const now = Date.now();
-    setTimeout(() => setQueue(candidates.filter((c) => !(s[c.id] && now - s[c.id] < SNOOZE_MS))), 0);
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    setTimeout(() => setQueue(candidates.filter((c) => new Date(c.savedAt).getTime() <= weekAgo && !(s[c.id] && now - s[c.id] < SNOOZE_MS))), 0);
   }, [candidates]);
 
   if (!on || queue === null) return null;
