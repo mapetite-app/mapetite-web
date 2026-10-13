@@ -276,7 +276,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
             {sheet.kind === "rinomina" && (
               <form onSubmit={(e) => { e.preventDefault(); void rename(sheet.tag); }} className="flex flex-col gap-3">
                 <label className="text-sm text-text-muted" htmlFor="raccolta-nome">Nuovo nome</label>
-                <input id="raccolta-nome" autoFocus maxLength={40} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+                <input id="raccolta-nome" autoFocus maxLength={24} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
                 <p className="text-xs text-text-muted">Cambia su tutti i {plural(withTag(sheet.tag).length)}. Se scegli il nome di un&apos;altra raccolta, le due si uniscono.</p>
                 <button type="submit" disabled={busy || !name.trim()} className={primary}>{busy ? progressText : "Salva"}</button>
               </form>
@@ -325,7 +325,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
                   aria-label="Nome della raccolta"
                   placeholder="Nome (es. Weekend a Napoli)"
                   autoFocus
-                  maxLength={40}
+                  maxLength={24}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={inputClass}
