@@ -6,7 +6,7 @@ import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
@@ -141,7 +141,7 @@ function SaveModal({
   const handleSave = () => {
     setError(false);
     startTransition(async () => {
-      const supabase = createClient();
+      const supabase = await browserClient();
       // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
       const pending = normalizeNewTag(newTag);
       const allTags = pending ? withTag(selectedTags, pending) : selectedTags;
@@ -403,7 +403,7 @@ function ReviewForm({
     setStatus("saving");
     setErrorMsg("");
 
-    const supabase = createClient();
+    const supabase = await browserClient();
     const { error } = await supabase.from("reviews").upsert(
       { place_id: placeId, user_id: userId, rating, comment: comment.trim() || null },
       { onConflict: "user_id,place_id" }
@@ -574,7 +574,7 @@ function SaveButton({
 
     setError(false);
     startTransition(async () => {
-      const supabase = createClient();
+      const supabase = await browserClient();
       const { error } = await supabase
         .from("saved_places")
         .delete()
@@ -818,11 +818,12 @@ export default function MapView({
   useEffect(() => {
     if (!userId) return;
     let alive = true;
-    createClient()
-      .from("profiles")
-      .select("cuisines, occasions, atmospheres, price_range")
-      .eq("id", userId)
-      .maybeSingle()
+    browserClient()
+      .then((supabase) => supabase
+        .from("profiles")
+        .select("cuisines, occasions, atmospheres, price_range")
+        .eq("id", userId)
+        .maybeSingle())
       .then(({ data }) => {
         if (!alive || !data) return;
         setTasteSuggestion(tasteQuery({
@@ -1103,7 +1104,7 @@ export default function MapView({
       });
       if (!addRes.ok) throw new Error("add");
       const uuid: string = (await addRes.json()).place.id;
-      const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
+      const { error } = await (await browserClient()).from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
       if (error && error.code !== "23505") throw new Error("insert");
       setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
       setSavedIds((prev) => new Set(prev).add(uuid));
@@ -1136,11 +1137,11 @@ export default function MapView({
   useEffect(() => {
     if (!userId) return;
 
-    const supabase = createClient();
-    supabase
-      .from("saved_places")
-      .select("place_id")
-      .eq("user_id", userId)
+    browserClient()
+      .then((supabase) => supabase
+        .from("saved_places")
+        .select("place_id")
+        .eq("user_id", userId))
       .then(({ data, error }) => {
         if (error) {
           console.error("Errore nel caricamento dei locali salvati:", error);
@@ -1164,12 +1165,12 @@ export default function MapView({
     // né arrivare in ritardo sul successivo.
     let cancelled = false;
     setSelectedReviews(null);
-    const supabase = createClient();
-    supabase
-      .from("reviews")
-      .select("user_id, rating, comment, created_at")
-      .eq("place_id", uuid)
-      .order("created_at", { ascending: false })
+    browserClient()
+      .then((supabase) => supabase
+        .from("reviews")
+        .select("user_id, rating, comment, created_at")
+        .eq("place_id", uuid)
+        .order("created_at", { ascending: false }))
       .then(({ data }) => {
         if (cancelled) return;
         if (!data || data.length === 0) {
@@ -1192,9 +1193,9 @@ export default function MapView({
     if (!userId) return;
 
     setLoadingSaved(true);
-    const supabase = createClient();
 
     (async () => {
+      const supabase = await browserClient();
       const { data, error } = await supabase
         .from("saved_places")
         .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
@@ -1303,7 +1304,7 @@ export default function MapView({
     if (!userId || !uuid || visitBusy.current) return;
     visitBusy.current = true;
     try {
-      const supabase = createClient();
+      const supabase = await browserClient();
       // Tag attuali: dalla lista dei salvati, o dal database se lì non c'è (mai scrivere alla cieca).
       let currentTags = savedPlaces.find((p) => p.id === uuid)?.tags ?? null;
       if (currentTags === null) {
