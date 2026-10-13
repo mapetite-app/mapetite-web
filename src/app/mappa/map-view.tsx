@@ -1272,7 +1272,13 @@ export default function MapView({
         currentTags = (data.tags as string[] | null) ?? [];
       }
       const base = currentTags.filter((t) => t !== pair[0] && t !== pair[1]);
-      const tags = currentTags.includes(status) ? base : [...base, status];
+      let tags = currentTags.includes(status) ? base : [...base, status];
+      // "Com'era?" (👍/👎) vale solo con "Ci sono stato" e si cambia solo da lì: se la visita
+      // non è più segnata, l'opinione resterebbe nascosta e un 👎 toglierebbe il locale da
+      // "Stasera" per sempre. Quindi va via insieme alla visita.
+      if (pair[0] === VISIT_WANT && !tags.includes(VISIT_DONE)) {
+        tags = tags.filter((t) => t !== OPINION_LIKE && t !== OPINION_DISLIKE);
+      }
       if (!currentTags.includes(status)) {
         if (status === VISIT_DONE) track("ci_sono_stato", { id: uuid });
         else if (status === VISIT_WANT) track("voglio_andarci", { id: uuid });

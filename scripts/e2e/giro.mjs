@@ -1003,6 +1003,13 @@ else {
     await p.waitForTimeout(400);
     const t2 = patched?.tags ?? [];
     ok(t1.includes("Mi è piaciuto") && t1.includes("Già visitato") && t2.includes("Non fa per me") && !t2.includes("Mi è piaciuto") && t2.includes("Già visitato"), `com'era: 👍/👎 si escludono e lo stato resta (${JSON.stringify(t2)})`);
+    // Ripensamento: "Voglio andarci" dopo un 👎 toglie anche il 👎 (altrimenti resterebbe nascosto e fuori da Stasera)
+    await p.getByTestId("stato-salvato").getByRole("button", { name: "📌 Voglio andarci" }).click();
+    await p.waitForTimeout(400);
+    const t3 = patched?.tags ?? [];
+    ok(t3.includes("Da provare") && !t3.includes("Già visitato") && !t3.includes("Non fa per me"), `com'era: tornando a 'Voglio andarci' il 👎 va via (${JSON.stringify(t3)})`);
+    await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
+    await p.waitForTimeout(400);
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
