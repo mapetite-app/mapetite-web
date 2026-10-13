@@ -46,12 +46,13 @@ Oggi queste regole mi impongono di fermarmi e aspettare te. Dimmi quali togliere
 Dall'elenco "Cosa serve decidere" di `BACKLOG.md`:
 15. Migrazione `events` (segnali di comportamento): applicarla?
 16. Verdetto su 20 risultati invece di 12 (circa il doppio del costo Haiku per ricerca)?
-17. Accendere per tutti: primo accesso (3 schermate), "Ci sei stato?", pin dei salvati, gemme 💎, nuovo Salva, copertine delle raccolte.
+17. Accendere per tutti: primo accesso (3 schermate), "Ci sei stato?", pin dei salvati, gemme 💎, nuovo Salva, copertine delle raccolte, home "La tua mappa".
 18. "Collega Google Maps" con la Data Portability API (richiede la verifica dell'app da parte di Google: settimane, quindi va avviata presto).
 19. Classifica personale dei posti visitati (serve una colonna nuova).
 20. "Autentico" deve contare come "non turistico"? (vedi la PR #33).
+21. "Salva da Google Maps" con i link che non hanno coordinate (oggi errore): 1 Place Details per link, cioè circa 1 chiamata a pagamento in più per ogni salvataggio da quel tipo di link.
 
 ## D. Cose che solo tu (o un telefono vero) potete fare
 
-21. **Prova su iPhone e Android veri.** Posso simulare solo il browser del telefono. In alternativa, un servizio di dispositivi remoti (es. BrowserStack) è a pagamento: decidi tu.
-22. **5 amici tester.** Basta un messaggio con il link. Le loro segnalazioni ("Feedback" e "Questi risultati non vanno?") oggi arrivano per email solo a te, e io non le vedo. Per farle arrivare anche a me: una tabella `feedback` in Supabase (migrazione, vedi punto 9) oppure incollale in un commento della PR della notte.
+22. **Prova su iPhone e Android veri.** Posso simulare solo il browser del telefono. In alternativa, un servizio di dispositivi remoti (es. BrowserStack) è a pagamento: decidi tu.
+23. **5 amici tester.** Basta un messaggio con il link. Le loro segnalazioni ("Feedback" e "Questi risultati non vanno?") oggi arrivano per email solo a te, e io non le vedo. Per farle arrivare anche a me: una tabella `feedback` in Supabase (migrazione, vedi punto 9) oppure incollale in un commento della PR della notte.

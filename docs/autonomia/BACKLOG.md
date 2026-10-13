@@ -190,6 +190,15 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 - **5 ricerche Google vere (casi 1, 4, 7, 8, 10)**: tutte con almeno 3 risultati giusti nei primi 5 e nessun locale "da non proporre". Insieme a quelle del 13/10 mattina (2, 3, 5, 6, 9) i 10 casi sono tutti provati dal vivo. Verdetti Haiku ancora non provati (manca `ANTHROPIC_API_KEY`).
 - **Cocktail bar con 🍸 anche se il nome dice "Restaurant" — IN PR #33**: "The Vista Rooftop | Pantheon Terrace Bar & Restaurant" (tipo Google cocktail_bar) aveva gli spaghetti. Sui 60 locali delle ricerche vere cambia solo lui. Controlli in `scripts/e2e/regole-ricerca.mjs`.
 - **Mappa in italiano — IN PR #33**: "Roma", "Milano" invece di "Rome", "Milan" (opzione `language` di Mapbox, nessun costo).
+- **Su richiesta di Lorenzo ("continua tutta la notte") — IN PR #33:**
+  - **Emoji delle cucine**: indiano 🍛, messicano 🌮, mediorientale/greco 🥙, spagnolo 🥘, vegano 🥗, brunch 🥞, pasticceria 🥐 (era 🥖), dolci 🍰, succhi 🥤, sala da tè 🫖. Prima tutti i ristoranti non italiani avevano 🍝. Sui 60 locali delle ricerche vere cambiano 7 (brunch e pasticcerie).
+  - **Copertine delle raccolte — IN PROVA (`?beta=copertine`)**: nel profilo ogni raccolta mostra le emoji e i nomi dei suoi primi 3 locali invece dell'iniziale.
+  - **Home "La tua mappa" — IN PROVA (`?beta=home-salvati`)**: chi ha salvati vede in home "3 posti da provare", "Stasera dove andiamo?" e "I miei 6". Inoltre "accedi" non compare più a chi ha già fatto l'accesso.
+  - **Indirizzi senza ", Italy"** anche nella pagina pubblica del locale, in "Aggiungi a mano" e in "Nuova raccolta".
+  - **Correzioni da due revisioni del codice in produzione (PR #24–#32)**: (1) rinominare/unire/eliminare una raccolta cancellava un "Ci sono stato" appena segnato; (2) tornare a "Voglio andarci" lasciava un 👎 nascosto che toglieva il locale da "Stasera" per sempre; (3) "messi da parte" mostrava "(irish_pub)"; (4) dopo la nuova password la barra restava su "Entra"; (5) nome della raccolta tagliato in silenzio a 24 caratteri; (6) "tra i tuoi unico salvato" e 👍/👎 come raccolte in Stasera; (7) tetto AI per rete Wi-Fi invece che per persona (a una demo bloccava tutti), e ricerca con i filtri e tra i salvati fuori dal tetto; (8) ricaricare la pagina di condivisione o dello screenshot rifaceva la chiamata a Google (quota 50/giorno).
+  - **Velocità**: controllo in corso (vedi PR).
+  - **Cosa sbloccare per lavorare in piena libertà**: `docs/autonomia/SBLOCCHI.md`.
+- **Da decidere (dalla revisione, costano chiamate Google)**: (a) "Salva da Google Maps" con link senza coordinate (`?q=Nome,+Indirizzo&ftid=…`, `/place/Nome/data=…`, `?cid=`) oggi dà errore e ricondividere non aiuta: servirebbe 1 Place Details per link o il campo `places.location` nella ricerca (aumento FIELD_MASK); (b) un link può salvare un omonimo vicino (oggi Google "preferisce" la zona, non la impone): proposta `locationRestriction` stretta + controllo del nome, da provare con link veri prima.
 - **Dubbio da decidere (ricerca)**: con "trattoria milanese **autentica** con cotoletta" la regola dei locali di massa mette da parte Al Garghet (trattoria fuori dal centro) e lo annuncia sotto "🧭 Ho messo da parte … turistici". "Autentico" oggi vale come "non turistico": una trattoria con tante recensioni ma lontana dai giri turistici finisce in fondo ed è chiamata turistica, cosa forse non vera (VISIONE: mai inventare). Non ho verificato i numeri di Al Garghet: era oltre il 12° posto. Proposta: far scattare la regola solo con "non turistico / poco conosciuto / nascosto / dove vanno i …", non con "autentico" da solo. Non toccato senza ok.
 
 ## Cosa serve decidere (in ordine di impatto per il 25/10)
@@ -202,6 +211,9 @@ Rilettura del prodotto contro la visione di Lorenzo. Ordine = impatto sulla demo
 7. **Classifica personale dei visitati** (serve una colonna in `saved_places`).
 8. **Eliminare le pagine vecchie non collegate** (`/miei-locali`, `site-header`).
 9. **"Autentico" = "non turistico"?** (dubbio della notte 13→14/10, sopra): oggi sì; proposta di no.
+10. **Link di Google Maps senza coordinate** (sopra, "Da decidere dalla revisione"): 1 Place Details per link?
+11. **Accendere per tutti le prove nuove**: copertine delle raccolte (`?beta=copertine`), home "La tua mappa" (`?beta=home-salvati`).
+12. **Tutto l'elenco di `SBLOCCHI.md`** (accessi e regole da allentare).
 
 ## Fase 5 — Social e profili dei locali (dopo il 25/10, DA DECIDERE)
 Lorenzo vuole sviluppare un layout completo per la parte social e per i profili dei locali. Riferimenti: Places (`places-06` Discover, `places-08` attività, `places-09` curatori) e Albo (`albo-09` post social collegato al locale).
