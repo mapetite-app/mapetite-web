@@ -5,6 +5,7 @@ import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
+import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -135,6 +136,13 @@ export default async function ProfiloPage() {
     row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, tags: row.tags ?? [] }] : [],
   );
 
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).
+  const visitCandidates: VisitCandidate[] = saved
+    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .slice(0, 20)
+    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at }));
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <div className="mb-6 flex items-center gap-4">
@@ -181,6 +189,8 @@ export default async function ProfiloPage() {
           </Link>
         ))}
       </nav>
+
+      <VisitPrompt userId={user.id} candidates={visitCandidates} />
 
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 

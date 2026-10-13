@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import GoogleMapsCard from "./google-maps-card";
 import ManualAddCard from "./manual-add-card";
+import { displayAddress } from "@/lib/city";
 
 type ImportResult = {
   nome: string | null;
@@ -294,7 +295,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
                         disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
                     >
                       <p className="text-sm font-semibold text-text">{r.name}</p>
-                      <p className="text-xs text-text-muted mt-0.5">{r.address}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{displayAddress(r.address)}</p>
                     </button>
                   </li>
                 ))}

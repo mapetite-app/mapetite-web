@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import SubmitButton from "@/components/submit-button";
 import { withNext } from "@/lib/next-path";
+import PendingSaveNote from "@/components/pending-save-note";
 
 // Frase sotto il titolo quando dopo l'accesso si torna a una pagina precisa.
 function returnHint(next: string): string {
@@ -56,6 +57,7 @@ export default function AuthForm({
             {message}
           </p>
         )}
+        {!login && !message && <PendingSaveNote />}
         {error && (
           <p role="alert" className="mt-6 rounded-btn bg-error/10 px-4 py-3 text-sm font-sans text-error">
             {error}
@@ -84,6 +86,11 @@ export default function AuthForm({
               className={FIELD}
             />
             {!login && <p className="mt-1 text-xs font-sans text-text-muted">Almeno 6 caratteri.</p>}
+            {login && (
+              <Link href="/password-dimenticata" className="mt-1.5 inline-block text-sm font-sans text-text-muted underline underline-offset-2">
+                Password dimenticata?
+              </Link>
+            )}
           </div>
           <SubmitButton className="h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
             {login ? "Accedi" : "Registrati"}

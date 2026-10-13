@@ -10,7 +10,7 @@ import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
 
 const TILE =
@@ -378,11 +378,11 @@ export default function VenueSheet({
             type="button"
             data-testid="copia-indirizzo"
             onClick={async () => {
-              try { await navigator.clipboard.writeText(address); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+              try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
             }}
             className="mt-1 flex min-h-8 items-center gap-1.5 text-left text-xs font-sans text-text-muted"
           >
-            <span>{address}</span>
+            <span>{displayAddress(address)}</span>
             <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
           </button>
         )}

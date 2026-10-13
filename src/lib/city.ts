@@ -18,3 +18,12 @@ export function cityFromAddress(address: string | null | undefined): string | nu
   if (!last || parts.length < 2 || STREET.test(last) || /\d/.test(last)) return null;
   return last;
 }
+
+// Indirizzo da mostrare: senza il paese in fondo ("…, 00198 Roma RM, Italy" → "…, 00198 Roma RM").
+// Per i locali in Italia il paese è rumore (e spesso in inglese); il CAP resta, serve ai taxi.
+export function displayAddress(address: string | null | undefined): string {
+  if (!address) return "";
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1 && COUNTRY.test(parts[parts.length - 1])) parts.pop();
+  return parts.join(", ");
+}

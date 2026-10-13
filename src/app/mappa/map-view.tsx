@@ -25,6 +25,8 @@ import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track } from "@/lib/track";
+import { labelsToHide } from "@/lib/pin-labels";
+import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -539,6 +541,7 @@ function SaveButton({
   isSaved,
   onToggle,
   onSaveRequest,
+  onLoginRequest,
 }: {
   placeId: string;        // UUID canonico Supabase: usato per delete e onToggle
   googlePlaceId: string;  // ID Google: usato per il salvataggio (/api/places/add)
@@ -546,6 +549,7 @@ function SaveButton({
   isSaved: boolean;
   onToggle: (placeId: string, saved: boolean) => void;
   onSaveRequest: (googlePlaceId: string) => void;
+  onLoginRequest?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -553,7 +557,8 @@ function SaveButton({
 
   const handleClick = () => {
     if (!userId) {
-      router.push("/login");
+      if (onLoginRequest) onLoginRequest();
+      else router.push("/login");
       return;
     }
 
@@ -790,6 +795,12 @@ export default function MapView({
   const [view, setView] = useState<ViewMode>("all");
   const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  // Salvati letti almeno una volta (il salvataggio rimandato dopo il login aspetta questo).
+  const [savedLoaded, setSavedLoaded] = useState(false);
+  const [savedIdsLoaded, setSavedIdsLoaded] = useState(false);
+  // Verdetti dei salvati (place_synthesis, per UUID): restano anche quando una ricerca
+  // sostituisce venueDetails.
+  const savedSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
@@ -1032,8 +1043,13 @@ export default function MapView({
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const quickSave = async (place: Place) => {
-    if (!userId) { window.location.href = "/login"; return; }
+  // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
+  const askLoginToSave = (place: Place, tags: string[] = [VISIT_WANT]) => {
+    rememberPendingSave(place, tags);
+    window.location.href = loginToSaveUrl(place.name);
+  };
+  const quickSave = async (place: Place, tags: string[] = [VISIT_WANT]) => {
+    if (!userId) { askLoginToSave(place, tags); return; }
     if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
     try {
       const addRes = await fetch("/api/places/add", {
@@ -1046,7 +1062,6 @@ export default function MapView({
       });
       if (!addRes.ok) throw new Error("add");
       const uuid: string = (await addRes.json()).place.id;
-      const tags = [VISIT_WANT];
       const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
       if (error && error.code !== "23505") throw new Error("insert");
       setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
@@ -1054,14 +1069,28 @@ export default function MapView({
       const saved = { ...place, id: uuid, tags, note: null };
       setSavedPlaces((prev) => [...prev.filter((p) => p.id !== uuid), saved]);
       setSavedToast(saved);
-      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: VISIT_WANT });
+      track("salva", { id: uuid, lat: place.lat, lng: place.lng }, { fonte: "segnalibro", stato: tags.includes(VISIT_DONE) ? VISIT_DONE : VISIT_WANT });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
-      setPendingSaveTags([VISIT_WANT]);
+      setPendingSaveTags(tags);
       setPendingSavePlaceId(place.id);
     }
   };
+
+  // Rientro dopo l'accesso: salva il locale toccato prima di entrare e lo mostra sulla mappa.
+  // Aspetta i salvati: se il locale c'era già, si apre la sua scheda invece di rifarlo da zero.
+  useEffect(() => {
+    if (!userId || !savedLoaded || !savedIdsLoaded) return;
+    const pending = takePendingSave();
+    if (!pending) return;
+    const { place, tags } = pending;
+    setTimeout(() => {
+      setViewState((v) => ({ ...v, latitude: place.lat, longitude: place.lng, zoom: Math.max(v.zoom, 15) }));
+      void quickSave(place, tags);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta, quando utente e salvati sono pronti
+  }, [userId, savedLoaded, savedIdsLoaded]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1077,6 +1106,7 @@ export default function MapView({
           return;
         }
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
+        setSavedIdsLoaded(true);
       });
   }, [userId]);
 
@@ -1130,6 +1160,7 @@ export default function MapView({
         .eq("user_id", userId);
 
       setLoadingSaved(false);
+      setSavedLoaded(true);
       if (error) {
         console.error("Errore nel caricamento dei locali salvati:", error);
         return;
@@ -1200,6 +1231,7 @@ export default function MapView({
         };
       }
       if (Object.keys(savedDetails).length > 0) {
+        savedSynthRef.current = savedDetails;
         setVenueDetails((prev) => ({ ...prev, ...savedDetails }));
       }
     })();
@@ -1337,7 +1369,7 @@ export default function MapView({
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
-      setVenueDetails(details);
+      setVenueDetails({ ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati.
       fitToPlaces(places);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
@@ -1376,6 +1408,14 @@ export default function MapView({
     const ids = new Set(topKey ? topKey.split(",") : []);
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
+
+  // Nomi dei primi risultati senza sovrapposizioni: vince quello più in alto in lista.
+  const hiddenLabels = useMemo(() => {
+    if (topPlaces.length < 2) return new Set<string>();
+    const rank = (id: string) => (id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
+    const ordered = [...topPlaces].sort((a, b) => rank(a.id) - rank(b.id));
+    return labelsToHide(ordered.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, big: p.id === focusId })), viewState.zoom);
+  }, [topPlaces, carouselOrder, focusId, viewState.zoom]);
 
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
@@ -1423,10 +1463,16 @@ export default function MapView({
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
+  // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
+  // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
+  const pendingFitRef = useRef<{ list: Place[]; top: number } | null>(null);
+  // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
+  const mapReadyRef = useRef(false);
   const fitToPlaces = (list: Place[], top = 190) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map) return;
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
+    pendingFitRef.current = null;
     const lngs = list.map((p) => p.lng);
     const lats = list.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -1506,7 +1552,7 @@ export default function MapView({
         const id = ++searchSeq.current;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
-        setVenueDetails(details); setFilters(EMPTY_FILTERS);
+        setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -2431,6 +2477,11 @@ export default function MapView({
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        onLoad={() => {
+          mapReadyRef.current = true;
+          const pending = pendingFitRef.current;
+          if (pending) fitToPlaces(pending.list, pending.top);
+        }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
           if (map) hidePoiLabels(map);
@@ -2496,6 +2547,7 @@ export default function MapView({
               <div
                 className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
+                data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
               >
@@ -2536,7 +2588,7 @@ export default function MapView({
                   </span>
                 )}
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
-                {((aiSearch !== null && clusterPlaces === null ? topPlaces.includes(place) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
+                {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
                     {place.name}
                   </span>
@@ -2627,7 +2679,7 @@ export default function MapView({
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
-                if (!userId) { window.location.href = "/login"; return; }
+                if (!userId) { askLoginToSave(selected, [st]); return; }
                 setPendingSaveTags([st]);
                 setPendingSavePlaceId(selected.id);
               }}
@@ -2642,6 +2694,7 @@ export default function MapView({
                   isSaved={isPlaceSaved(selected.id)}
                   onToggle={handleToggle}
                   onSaveRequest={(googlePlaceId) => setPendingSavePlaceId(googlePlaceId)}
+                  onLoginRequest={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : () => askLoginToSave(selected)}
                 />
               }
               communitySlot={
@@ -2838,7 +2891,10 @@ export default function MapView({
       {overlay.kind === "list" && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
-          details={aiSearch !== null ? venueDetails : undefined}
+          // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
+          details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
+          savedMode={view === "saved" && aiSearch === null}
+          showCity={view === "saved" && aiSearch === null && activeCity === null}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.

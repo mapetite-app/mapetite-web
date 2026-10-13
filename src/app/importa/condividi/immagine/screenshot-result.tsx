@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
 import { withNext } from "@/lib/next-path";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 
@@ -178,7 +178,7 @@ export default function ScreenshotResult({
             <p className="mt-1 font-display text-xl font-semibold text-brand">
               {top.name}{where(top) ? `, ${where(top)}` : ""}
             </p>
-            <p className="mt-0.5 text-xs text-text-muted">{top.address}</p>
+            <p className="mt-0.5 text-xs text-text-muted">{displayAddress(top.address)}</p>
             <p className="mt-3 text-sm text-text">Lo salvo in <span className="font-medium">📌 Voglio andarci</span>.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -221,7 +221,7 @@ export default function ScreenshotResult({
                           className="w-full rounded-btn border border-border bg-white px-4 py-3 text-left disabled:opacity-60"
                         >
                           <p className="text-sm font-semibold text-text">{saving === r.id ? "Salvo..." : r.name}</p>
-                          <p className="mt-0.5 text-xs text-text-muted">{r.address}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">{displayAddress(r.address)}</p>
                         </button>
                       </li>
                     ))}

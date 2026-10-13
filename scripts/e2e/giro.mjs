@@ -570,7 +570,9 @@ await page.waitForTimeout(1500);
 {
   const labels = (await page.getByTestId("pin").allInnerTexts()).map((t) => t.replace(/[^\p{L}\p{N} ]/gu, "").trim());
   const top = ["Folla 1", "Folla 2", "Folla 3", "Folla 4", "Folla 5"];
-  ok(top.every((n) => labels.some((l) => l.trim() === n)), `mappa affollata: i primi 5 risultati hanno il loro pin con nome (${labels.filter(Boolean).length} nomi)`);
+  const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
+  ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
+  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length < 5, `mappa affollata: pin uno sopra l'altro, resta solo il nome del primo (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
   ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Folla 1"), "mappa affollata: il pin della prima card è visibile ed evidenziato");
   await shot("05c-mappa-affollata");
@@ -661,6 +663,16 @@ if (shared) {
   ok(body && Math.abs(body.lat - at[0]) < 1e-6 && Math.abs(body.lng - at[1]) < 1e-6, "link ricerca: cerca nel punto di chi ha condiviso");
   ok(!new URL(page.url()).searchParams.has("q"), "link ricerca: dopo l'apertura 'q' sparisce dall'indirizzo (ricaricare non ripete)");
   await shot("14-link-ricerca");
+  // Link aperto a freddo: i risultati arrivano prima che la mappa sia pronta; la mappa deve
+  // comunque spostarsi sui risultati (qui il punto è Milano, i risultati sono a Roma).
+  await page.goto(`${BASE}/mappa?q=rooftop%20a%20Roma&at=45.46,9.19`, { waitUntil: "networkidle" });
+  let inView = false;
+  for (let t = 0; t < 10 && !inView; t++) {
+    await page.waitForTimeout(500);
+    const boxes = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y }; }));
+    inView = boxes.some((b) => b.x > 0 && b.x < 390 && b.y > 100 && b.y < 844 * 0.6);
+  }
+  ok(inView, "link ricerca aperto a freddo: la mappa si sposta sui risultati");
   await page.unroute("**/api/search");
 }
 
@@ -890,7 +902,8 @@ else {
   ];
   const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await sctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows }));
-  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  // Verdetto già in cache per Terrazza Uno (G1): deve comparire sulla card dei salvati.
+  await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "G1", synthesis: "Terrazza tranquilla.", tags: [], verdict: "Aperitivo lento sui tetti, lontano dalla folla.", go_for: ["tramonto"], dont_expect: [] }] }));
   await sctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" }] }));
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
@@ -920,10 +933,25 @@ else {
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
     ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
+  { const card = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
+    ok(await card.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible(), "salvati: la card mostra il verdetto Mapetite già in cache");
+    ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)");
+    await card.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(600);
+    await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" });
+    // Dopo una ricerca, tornando ai salvati il verdetto c'è ancora (la ricerca non lo cancella).
+    await p.getByRole("button", { name: "Esplora" }).click();
+    await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+    await p.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
+    await p.getByRole("button", { name: "I miei salvati" }).click();
+    await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+    const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
+    ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
+  ok(!(await p.locator("ul.snap-x li").first().textContent()).includes("· Milano"), "filtro Milano: la città non si ripete sulla card (è già nel titolo)");
   ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
   // L'animazione della mappa può durare un po' (di più se la macchina è carica): si aspetta fino a 8 s.
   let pin = null;
@@ -933,7 +961,7 @@ else {
     pin = await p.getByTestId("pin").first().boundingBox({ timeout: 1000 }).catch(() => null);
     if (pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) break;
   }
-  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, "filtro Milano: la mappa si sposta su Milano (pin visibile)");
+  ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, `filtro Milano: la mappa si sposta su Milano (pin visibile${pin ? "" : ", nessun pin"}${pin && !(pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) ? ` ma a ${Math.round(pin.x)},${Math.round(pin.y)}` : ""})`);
   await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
@@ -1058,8 +1086,8 @@ else {
         { created_at: "2026-10-09", tags: ["Con amici", "Già visitato"], note: null, places: pr("02", "Osteria Due", "restaurant", "Via dei Vascellari 29, Roma") },
         { created_at: "2026-10-08", tags: ["Romantico", "Speciale", "Da provare"], note: null, places: pr("03", "Enoteca Tre", "wine_bar", "Via del Governo Vecchio 12, 00186 Roma RM, Italy") },
         { created_at: "2026-10-07", tags: ["Con amici", "Economico"], note: "Pizza al taglio", places: pr("04", "Forno Quattro", "bakery", "Via Ostiense 50, Roma") },
-        { created_at: "2026-10-06", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy") },
-        { created_at: "2026-10-05", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy") },
+        { created_at: "2026-09-20", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy") },
+        { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy") },
       ],
       reviews: [{ id: "r1", rating: 5, comment: "Vista bellissima, cocktail ottimi.", created_at: "2026-10-01", places: { name: "Terrazza Uno" } }],
     };
@@ -1077,8 +1105,23 @@ else {
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
       ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
+      ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
+      // "Ci sei stato?" (?beta=ci-sei-stato, spento di default): un "Voglio andarci" salvato da più di una settimana
+      ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: spento di default");
+      let visitPatch = null;
+      await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "PATCH") { visitPatch = { url: r.request().url(), body: r.request().postDataJSON() }; return r.fulfill({ status: 204, body: "" }); } return r.fallback(); });
+      await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+      const box = p.getByTestId("ci-sei-stato");
+      await box.waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await box.getByText("Caffè Milano").isVisible() && !(await box.textContent()).includes("Enoteca Tre"), "ci sei stato: propone il 'Voglio andarci' salvato da più di una settimana (non quelli recenti)");
+      await p.screenshot({ path: `${OUT}/29-ci-sei-stato.png`, caret: "initial" });
+      await box.getByRole("button", { name: "✓ Sì, ci sono stato" }).click();
+      await box.getByText("✓ Segnato: sei stato da Caffè Milano.").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(JSON.stringify(visitPatch?.body?.tags) === '["Già visitato"]' && visitPatch.url.includes("place_id=eq.00000000-0000-4000-8000-000000000105"), "ci sei stato: 'Sì' lo segna '✓ Ci sono stato' (al posto di 'Voglio andarci')");
+      await p.unroute("**/rest/v1/saved_places**");
+      await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       // Dal profilo, "Salvati" nella barra in basso apre la mappa sui salvati ed è accesa
       await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
       await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "barra in basso: 'Salvati' apre la mappa sui propri salvati"), () => ok(false, "barra in basso: 'Salvati' apre la mappa sui propri salvati"));
@@ -1323,6 +1366,28 @@ else {
   { const m = p.locator("div.w-80"); await m.getByRole("button", { name: "📌 Voglio andarci" }).click(); await m.getByRole("button", { name: "✓ Ci sono stato" }).click();
     ok((await m.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "false" && (await m.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "salva: 'Voglio andarci' e 'Ci sono stato' con le parole della scheda, uno esclude l'altro"); }
   await p.screenshot({ path: `${OUT}/14-salva-da-card.png`, caret: "initial" });
+  // Salva senza accesso: si va al login con il nome del locale, e dopo l'accesso si salva da solo.
+  await p.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "33333333-0000-4000-8000-000000000003" } } }));
+  await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { quickInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); } return r.fallback(); });
+  await sctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await p.getByRole("button", { name: "Salva Terrazza Uno" }).click();
+  await p.waitForURL(/\/login\?message=/, { timeout: 5000 });
+  ok(await p.getByText("Accedi o registrati per salvare “Terrazza Uno”: lo aggiungo ai tuoi salvati appena entri.").isVisible(), "salva senza accesso: il login dice quale locale verrà salvato");
+  await p.screenshot({ path: `${OUT}/14c-salva-senza-accesso.png`, caret: "initial" });
+  await p.getByRole("link", { name: "Registrati" }).click();
+  await p.getByTestId("salva-dopo-accesso").waitFor({ timeout: 4000 }).then(() => ok(true, "salva senza accesso: anche 'Registrati' ricorda quale locale verrà salvato"), () => ok(false, "salva senza accesso: anche 'Registrati' ricorda quale locale verrà salvato"));
+  await sctx.clearCookies({ name: "e2e_anonimo" });
+  quickInsert = null;
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.getByTestId("salvato-avviso").waitFor({ timeout: 5000 }).then(() => ok(true, "dopo l'accesso: il locale toccato prima si salva da solo ('Salvato')"), () => ok(false, "dopo l'accesso: il locale toccato prima si salva da solo ('Salvato')"));
+  ok(quickInsert?.place_id === "33333333-0000-4000-8000-000000000003" && JSON.stringify(quickInsert?.tags) === '["Da provare"]', "dopo l'accesso: salvato come '📌 Voglio andarci'");
+  ok((await p.getByTestId("salvato-avviso").textContent()).includes("Terrazza Uno"), "dopo l'accesso: l'avviso dice il nome del locale");
+  quickInsert = null;
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForTimeout(800);
+  ok(quickInsert === null, "dopo l'accesso: si salva una volta sola (ricaricare non lo rifà)");
   await sctx.close();
 
   // 9b. Salvare un locale da una ricerca (voce 9): Supabase e /api/places/add simulati, nessuna scrittura vera.
@@ -1938,6 +2003,51 @@ else {
     await qp.unroute("**/api/search"); await qp.unroute("**/api/search/synthesis"); await qp.unroute("**/api/places/add"); await qp.unroute("**/rest/v1/saved_places**");
   }
   await qctx.close();
+}
+
+// "Password dimenticata?": richiesta del link e nuova password (Supabase Auth simulato, nessuna email).
+{
+  const rctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  let recover = null;
+  let newPassword = null;
+  await rctx.route("**/auth/v1/recover**", (r) => { recover = { url: r.request().url(), body: r.request().postDataJSON() }; return r.fulfill({ json: {} }); });
+  const user = { id: "00000000-0000-0000-0000-000000000009", aud: "authenticated", email: "giulia@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-10-01T00:00:00Z" };
+  await rctx.route("**/auth/v1/user**", (r) => {
+    if (r.request().method() === "PUT") { newPassword = r.request().postDataJSON()?.password ?? null; }
+    return r.fulfill({ json: user });
+  });
+  const rp = await rctx.newPage();
+  rp.on("pageerror", (e) => errors.push(e.message));
+  await rp.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await rp.getByRole("link", { name: "Password dimenticata?" }).click();
+  await rp.waitForURL(/\/password-dimenticata/);
+  await rp.getByLabel("Email").fill("giulia@example.com");
+  await rp.getByRole("button", { name: "Mandami il link" }).click();
+  await rp.getByTestId("reset-inviato").waitFor({ timeout: 5000 });
+  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes("redirect_to=http://localhost:3000/reimposta-password"), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
+  ok(!recover?.body?.code_challenge, "password dimenticata: link che funziona anche aperto in un altro browser (niente PKCE)");
+  await rp.screenshot({ path: `${OUT}/37-password-dimenticata.png`, caret: "initial" });
+  await rp.goto(`${BASE}/reimposta-password`, { waitUntil: "networkidle" });
+  await rp.getByTestId("reset-scaduto").waitFor({ timeout: 4000 });
+  ok(await rp.getByRole("link", { name: "Mandami un nuovo link" }).isVisible(), "reimposta password senza link valido: lo dice e propone un nuovo link");
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const jwt = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const access = `${jwt({ alg: "HS256", typ: "JWT" })}.${jwt({ sub: user.id, exp, aud: "authenticated", email: user.email, role: "authenticated" })}.c2lnbmF0dXJh`;
+  await rp.goto(`${BASE}/login`, { waitUntil: "networkidle" }); // stesso indirizzo con solo l'hash diverso non ricarica la pagina
+  await rp.goto(`${BASE}/reimposta-password#access_token=${access}&refresh_token=rt&expires_in=3600&expires_at=${exp}&token_type=bearer&type=recovery`, { waitUntil: "networkidle" });
+  await rp.getByLabel("Nuova password").waitFor({ timeout: 5000 });
+  ok(!rp.url().includes("access_token"), "reimposta password: il token sparisce dall'indirizzo");
+  await rp.getByLabel("Nuova password").fill("nuova123");
+  await rp.getByLabel("Riscrivila").fill("nuova124");
+  await rp.getByRole("button", { name: "Salva la nuova password" }).click();
+  ok(await rp.getByText("Le due password non coincidono.").isVisible(), "reimposta password: avvisa se le due password sono diverse");
+  await rp.getByLabel("Riscrivila").fill("nuova123");
+  await rp.screenshot({ path: `${OUT}/38-nuova-password.png`, caret: "initial" });
+  await rp.getByRole("button", { name: "Salva la nuova password" }).click();
+  await rp.getByTestId("reset-fatto").waitFor({ timeout: 5000 });
+  ok(newPassword === "nuova123", "reimposta password: salva la nuova password su Supabase");
+  ok(await rp.getByRole("link", { name: "Vai alla mappa" }).isVisible(), "reimposta password: 'Vai alla mappa' dopo il salvataggio");
+  await rctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
