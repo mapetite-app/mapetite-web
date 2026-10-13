@@ -291,14 +291,14 @@ function SaveModal({
               onClick={() => toggleTag(tag)}
               className={
                 selectedTags.includes(tag)
-                  ? "rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
-                  : "rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
+                  ? "min-h-10 rounded-pill bg-brand px-3 py-1 text-xs font-display font-semibold text-white"
+                  : "min-h-10 rounded-pill bg-accent-light px-3 py-1 text-xs font-display font-semibold text-accent hover:opacity-80"
               }
             >
               {tagLabel(tag)}
             </button>
           ))}
-          {newTagControl("rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
+          {newTagControl("min-h-10 rounded-pill border border-dashed border-accent/60 px-3 py-1 text-xs font-display font-semibold text-accent")}
         </div>
 
         <p className="mb-1 text-xs font-sans text-text-muted">Nota personale</p>
@@ -321,7 +321,7 @@ function SaveModal({
             type="button"
             onClick={handleSave}
             disabled={isPending}
-            className="flex-1 rounded-btn bg-brand px-3 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 flex-1 rounded-btn bg-brand px-3 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? "..." : "Salva"}
           </button>
@@ -329,7 +329,7 @@ function SaveModal({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="flex-1 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-display font-semibold text-text-muted hover:text-text disabled:opacity-60"
+            className="min-h-11 flex-1 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-display font-semibold text-text-muted hover:text-text disabled:opacity-60"
           >
             Annulla
           </button>
@@ -364,7 +364,7 @@ function StarPicker({
           onMouseEnter={() => setHovered(star)}
           onMouseLeave={() => setHovered(0)}
           aria-label={`${star} stelle`}
-          className="text-xl leading-none focus:outline-none"
+          className="flex h-10 w-9 items-center justify-center text-2xl leading-none focus:outline-none"
         >
           <span className={(hovered || value) >= star ? "text-star" : "text-border"}>
             ★
@@ -434,7 +434,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Commento (opzionale)"
         rows={2}
-        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-brand"
+        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-base font-sans focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {status === "error" && (
         <p className="text-xs text-error">{errorMsg}</p>
@@ -445,7 +445,7 @@ function ReviewForm({
       <button
         type="submit"
         disabled={status === "saving"}
-        className="rounded-btn bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-10 rounded-btn bg-brand px-4 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {status === "saving" ? "..." : existing ? "Aggiorna" : "Pubblica recensione"}
       </button>
@@ -454,9 +454,9 @@ function ReviewForm({
 }
 
 const OTHER_CITY = "Altre zone";
-const CHIP_ON = "rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
-const CHIP_OFF = "rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
-const CHIP_CITY = "rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
+const CHIP_ON = "min-h-10 rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
+const CHIP_OFF = "min-h-10 rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
+const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag).
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
@@ -1762,7 +1762,7 @@ export default function MapView({
                   type="button"
                   aria-label="Cancella la ricerca"
                   onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-text-muted"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center text-base text-text-muted"
                 >
                   ✕
                 </button>
@@ -1934,8 +1934,8 @@ export default function MapView({
             onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
-                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             Esplora
@@ -1945,8 +1945,8 @@ export default function MapView({
             onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
-                ? "px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
+                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
             }
           >
             I miei salvati
@@ -2602,7 +2602,8 @@ export default function MapView({
               </div>
             );
           })()}
-          <DragToClose onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
+          {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -2772,8 +2773,9 @@ export default function MapView({
         />
       )}
 
+      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
       {savedToast && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 truncate text-sm font-sans">
               <span className="font-semibold">📌 Salvato</span> · {savedToast.name}

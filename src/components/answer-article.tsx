@@ -211,7 +211,7 @@ export default function AnswerArticle({
               enterKeyHint="search"
               value={followUp}
               onChange={(e) => setFollowUp(e.target.value)}
-              placeholder="Fai un'altra domanda (es. più economico)"
+              placeholder="Fai un'altra domanda…"
               aria-label="Fai un'altra domanda"
               className="min-h-12 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
             />

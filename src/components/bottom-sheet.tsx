@@ -527,15 +527,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className="mt-2 block">
                         {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
                         <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</span>
-                        <span className="mt-0.5 line-clamp-2 block text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
+                        <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
                     ) : googleLine(d) ? (
-                      <span data-testid="riga-google" className="mt-2 line-clamp-3 block text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
+                      <span data-testid="riga-google" className="mt-2 line-clamp-3 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
                     {d?.matchReason && (
-                      <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
+                      <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
                     )}
                     {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
                     {place.tags && place.tags.length > 0 && (
@@ -546,7 +546,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     )}
                     {place.note && (
-                      <span className="mt-1 line-clamp-1 block text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
+                      <span className="mt-1 line-clamp-1 text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
                     )}
                     {(d?.goFor ?? []).length > 0 && (
                       <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
@@ -682,12 +682,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   ) : loadingVerdicts && details ? (
                     <SkeletonLines />
                   ) : googleLine(details?.[place.id]) ? (
-                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 block text-sm font-sans leading-snug text-text-muted">
+                    <span data-testid="riga-google" className="mt-1.5 line-clamp-2 text-sm font-sans leading-snug text-text-muted">
                       {googleLine(details?.[place.id])}
                     </span>
                   ) : null}
                   {details?.[place.id]?.matchReason && (
-                    <span className="mt-1 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">
+                    <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-text-muted">
                       {details[place.id]!.matchReason}
                     </span>
                   )}
@@ -711,7 +711,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     </span>
                   )}
                   {place.note && (
-                    <span className="mt-1.5 line-clamp-2 block text-xs font-sans italic text-text">
+                    <span className="mt-1.5 line-clamp-2 text-xs font-sans italic text-text">
                       “{place.note}”
                     </span>
                   )}

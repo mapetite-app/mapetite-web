@@ -1884,6 +1884,53 @@ else {
     ok(spezzate.length === 0, `360px profilo: nomi delle raccolte senza parole spezzate${spezzate.length ? " (" + spezzate.join(", ") + ")" : ""}`);
     ok(await hscroll() <= 0, "360px: /profilo senza scorrimento orizzontale");
   } else ok(false, "360px profilo: raccolte visibili (serve E2E_FAKE_USER)");
+
+  // QA mappa a 360px (13/10): nomi lunghi veri, verdetti lunghi, foto mancanti.
+  {
+    const LUNGO = "Una terrazza vera sopra i tetti di Trastevere, con cucina romana curata e una carta dei vini sorprendentemente ampia per un locale così raccolto.";
+    const nomi = ["L'Uliveto Roof Garden - Ristorante panoramico", "Panfuwa | Brunch & Café - Milano Isola", "Osteria dell'Antiquario e Bottega dei Sapori Romani"];
+    const lunghi = nomi.map((n, i) => mk(`L${i + 1}`, n, 41.889 + i * 0.002, 12.469, { category: "restaurant", photoRef: i === 1 ? null : `places/L${i + 1}/photos/x` }));
+    await qp.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: lunghi, sintesi_pendente: { places: [], token: "x" } } }));
+    await qp.route("**/api/search/synthesis", (r) => r.fulfill({ json: { esclusi: [], dettagli: Object.fromEntries(lunghi.map((p) => [p.id, { synthesis: "Tavoli all'aperto, luci basse, servizio attento ma non invadente.", tags: [], verdict: LUNGO, goFor: ["cena a due con vista sulla città", "tramonto"], dontExpect: [], matchReason: "Ha una terrazza panoramica vera e le recensioni parlano spesso di serate romantiche a lume di candela." }])) } }));
+    await qp.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "33333333-0000-4000-8000-000000000360" } } }));
+    await qp.route("**/rest/v1/saved_places**", (r) => r.request().method() === "POST" ? r.fulfill({ status: 201, body: "" }) : r.fulfill({ json: [] }));
+    await qp.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+    await qp.getByLabel("Chiedi all'AI: cosa cerchi?").fill("Ristorante romantico con terrazza a Trastevere");
+    await qp.getByLabel("Chiedi all'AI: cosa cerchi?").press("Enter");
+    await qp.locator("ul.snap-x li[data-id=L1]").getByTestId("etichetta-verdetto").waitFor({ timeout: 8000 });
+    await qp.waitForTimeout(300);
+    { const m = await qp.locator("ul.snap-x li[data-id=L1]").evaluate((li) => {
+        const card = li.getBoundingClientRect(); const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+        const v = li.querySelector("[data-testid=etichetta-verdetto]")?.nextElementSibling; const lh = v ? parseFloat(getComputedStyle(v).lineHeight) : 0;
+        const fuori = [...li.querySelectorAll("span")].filter((s) => { const r = s.getBoundingClientRect(); return r.width > 0 && (r.right > card.right + 1 || r.bottom > card.bottom + 1); }).length;
+        return { verdetto: v ? Math.round(v.getBoundingClientRect().height / lh) : 99, fuori, sopraNav: card.bottom <= nav + 1, alta: Math.round(card.height) };
+      });
+      ok(m.verdetto <= 2 && m.fuori === 0 && m.sopraNav, `360px card: nome e verdetto lungo dentro la card, verdetto su 2 righe al massimo (${m.verdetto} righe, alta ${m.alta}px)`); }
+    await qp.screenshot({ path: `${OUT}/qa360-mappa-card.png`, caret: "initial" });
+    // Salvato dalla card, poi aperta la scheda: l'avviso non copre la barra azioni.
+    await qp.getByRole("button", { name: `Salva ${nomi[0]}` }).click();
+    await qp.getByTestId("salvato-avviso").waitFor({ timeout: 3000 });
+    await qp.locator("ul.snap-x li[data-id=L1] > button:not([aria-pressed])").click({ position: { x: 30, y: 60 } });
+    await qp.getByTestId("scheda-nav").waitFor({ timeout: 3000 });
+    await qp.waitForTimeout(300);
+    { const r = await qp.evaluate(() => {
+        const a = document.querySelector("a[aria-label^='Indicazioni']"); const bar = a?.parentElement?.getBoundingClientRect();
+        const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+        const t = document.querySelector("[data-testid=salvato-avviso]")?.getBoundingClientRect();
+        const btns = a ? [...a.parentElement.children].map((e) => e.getBoundingClientRect()) : [];
+        return { dentro: !!bar && bar.bottom <= nav + 1 && bar.top >= 0 && btns.every((b) => b.left >= 0 && b.right <= innerWidth && b.height >= 40), toast: t ? t.bottom <= (bar?.top ?? 0) + 1 : null };
+      });
+      ok(r.dentro, "360px scheda: barra Salva/Percorso/Chiama/Sito dentro lo schermo, sopra la barra in basso");
+      ok(r.toast === true, `360px scheda: l'avviso 'Salvato · Aggiungi nota' non copre la barra azioni (${r.toast})`); }
+    await qp.screenshot({ path: `${OUT}/qa360-mappa-avviso-scheda.png`, caret: "initial" });
+    // ‹ › con la scheda scorsa in basso: il locale successivo si apre dalla foto e dal nome.
+    await qp.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
+    await qp.getByRole("button", { name: "Locale successivo" }).click();
+    await qp.waitForTimeout(400);
+    ok(await qp.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTop === 0) && await qp.locator("h2", { hasText: nomi[1] }).isVisible(), "360px scheda: '›' apre il locale successivo dall'inizio (nome visibile)");
+    await qp.keyboard.press("Escape");
+    await qp.unroute("**/api/search"); await qp.unroute("**/api/search/synthesis"); await qp.unroute("**/api/places/add"); await qp.unroute("**/rest/v1/saved_places**");
+  }
   await qctx.close();
 }
 
