@@ -1608,6 +1608,11 @@ else {
     ok(apiCalls.length === before + 1 && apiCalls.at(-1)?.title === "Bar Rossi", "condividi: una sola chiamata, con il nome condiviso");
     ok(await lp.getByRole("button", { name: "Aggiungi nota" }).isVisible() && await lp.getByRole("link", { name: "Apri sulla mappa" }).isVisible(), "condividi: pulsanti 'Apri sulla mappa' e 'Aggiungi nota'");
     await lp.screenshot({ path: `${OUT}/32-condividi-salvato.png`, caret: "initial" });
+    // Ricaricare la pagina (o riaprirla dalle app recenti) non rifà la chiamata a Google
+    const beforeReload = apiCalls.length;
+    await lp.reload({ waitUntil: "networkidle" });
+    await lp.getByTestId("link-salvato").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(apiCalls.length === beforeReload && await lp.getByText("Bar Rossi", { exact: true }).isVisible(), "condividi: ricaricando si vede lo stesso esito, senza un'altra chiamata a Google");
     await lp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("guarda che bel posto")}`, { waitUntil: "networkidle" });
     await lp.getByRole("button", { name: "Riprova" }).waitFor({ timeout: 5000 });
     ok(await lp.getByText(/Non vedo un link di Google Maps/).isVisible(), "condividi senza link: errore in italiano con 'Riprova'");
@@ -1662,7 +1667,7 @@ else {
     await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
     await lp.getByTestId("screenshot-non-e-questo").click();
     ok(await lp.getByTestId("screenshot-altri").getByText("Bar Rossi Bis").isVisible() && await lp.getByTestId("screenshot-manuale").getAttribute("href") === "/importa", "condividi screenshot: 'Non è questo' mostra le alternative e porta all'import manuale");
-    ok(searchCalls.length === 2, "condividi screenshot: 'Non è questo' non rifà la ricerca");
+    ok(searchCalls.length === 1, "condividi screenshot: riaprire la pagina e 'Non è questo' non rifanno la ricerca Google");
 
     // Immagine senza locale e file che non è un'immagine: errori in italiano.
     await setLettura({ nome: null, citta: null, categoria: null });

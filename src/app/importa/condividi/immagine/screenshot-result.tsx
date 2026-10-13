@@ -19,6 +19,8 @@ function errorText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
 }
 
+const SEARCH_KEY = "mapetite.screenshot-ricerca";
+
 export default function ScreenshotResult({
   nome,
   citta,
@@ -53,7 +55,9 @@ export default function ScreenshotResult({
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error("Non riesco a cercare il locale su Google Maps. Riprova.");
-        setResults(((data.results ?? []) as SearchPlace[]).slice(0, 5));
+        const found = ((data.results ?? []) as SearchPlace[]).slice(0, 5);
+        setResults(found);
+        try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify({ query, found })); } catch { /* storage non disponibile */ }
       })
       .catch((e) => setSearchError(errorText(e)))
       .finally(() => setSearching(false));
@@ -61,6 +65,14 @@ export default function ScreenshotResult({
   useEffect(() => {
     if (started.current || !canSearch) return;
     started.current = true;
+    // Ricaricata o riaperta: stessi risultati di prima, senza una seconda ricerca Google a pagamento.
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(SEARCH_KEY) ?? "null");
+      if (cached?.query === query && Array.isArray(cached.found)) {
+        void Promise.resolve(cached.found as SearchPlace[]).then((found) => { setResults(found); setSearching(false); });
+        return;
+      }
+    } catch { /* storage non disponibile */ }
     void search();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
