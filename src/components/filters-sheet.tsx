@@ -248,7 +248,7 @@ export default function FiltersSheet({
               aria-checked={local.openNowOnly}
               onClick={() => setLocal((p) => ({ ...p, openNowOnly: !p.openNowOnly }))}
               className={[
-                "relative inline-flex h-7 w-12 items-center rounded-full border-2 transition-colors",
+                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 transition-colors before:absolute before:-inset-x-1 before:-inset-y-2",
                 local.openNowOnly ? "bg-brand border-brand" : "bg-surface border-border",
               ].join(" ")}
             >
