@@ -84,7 +84,12 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     setError(null);
     setProgress({ done: 0, total: targets.length });
     for (const [i, row] of targets.entries()) {
-      const next = change(row.tags);
+      // Tag attuali dal database, non quelli caricati con la pagina: nel frattempo "Ci sei stato?"
+      // (o un altro telefono) può averli cambiati, e riscrivere la copia vecchia cancellerebbe la visita.
+      const { data: fresh } = await supabase
+        .from("saved_places").select("tags").eq("user_id", userId).eq("place_id", row.placeId).maybeSingle();
+      const current = fresh ? ((fresh.tags as string[] | null) ?? []) : row.tags;
+      const next = change(current);
       const { error: err } = await supabase
         .from("saved_places")
         .update({ tags: next.length > 0 ? next : null })

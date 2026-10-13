@@ -1160,7 +1160,14 @@ else {
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       let patches = [];
       let patchFail = false;
+      // Tag "freschi" dal database (letti prima di ogni scrittura): per simulare "Ci sei stato?" fatto dopo il caricamento.
+      let freshTags = {};
       await p.route("**/rest/v1/saved_places**", (r) => {
+        if (r.request().method() === "GET") {
+          const pid = new URL(r.request().url()).searchParams.get("place_id")?.replace(/^eq\./, "");
+          if (pid && freshTags[pid]) return r.fulfill({ json: { tags: freshTags[pid] } });
+          return r.fallback();
+        }
         if (r.request().method() !== "PATCH") return r.fallback();
         const u = new URL(r.request().url()).searchParams;
         patches.push({ id: u.get("place_id")?.replace(/^eq\./, ""), tags: r.request().postDataJSON()?.tags, user: u.get("user_id") });
@@ -1182,10 +1189,13 @@ else {
       await sheet.getByLabel("Nuovo nome").fill("da provare");
       await sheet.getByRole("button", { name: "Salva" }).click();
       ok(/stato del locale/.test((await errText()) ?? "") && patches.length === 0, "raccolte: non si può rinominare con il nome di uno stato (Da provare)");
+      // Nel frattempo Terrazza Uno (01) è stata segnata "Ci sono stato" (es. da "Ci sei stato?"): la visita non si perde
+      freshTags = { [id("01")]: ["Romantico", "Già visitato"] };
       await sheet.getByLabel("Nuovo nome").fill("  cena   romantica ");
       await sheet.getByRole("button", { name: "Salva" }).click();
       await waitClosed();
-      ok(patches.length === 2 && has(patches, "01", ["Cena romantica", "Da provare"]) && has(patches, "03", ["Cena romantica", "Speciale", "Da provare"]) && patches.every((x) => x.user === "eq.00000000-0000-0000-0000-000000000001"), `raccolte: rinomina = un PATCH per salvato col nuovo nome, stati intatti (${JSON.stringify(patches)})`);
+      freshTags = {};
+      ok(patches.length === 2 && has(patches, "01", ["Cena romantica", "Già visitato"]) && has(patches, "03", ["Cena romantica", "Speciale", "Da provare"]) && patches.every((x) => x.user === "eq.00000000-0000-0000-0000-000000000001"), `raccolte: rinomina = un PATCH per salvato col nuovo nome, stati intatti anche se cambiati dopo il caricamento (${JSON.stringify(patches)})`);
       ok(await tile("Cena romantica").isVisible() && (await tile("Romantico").count()) === 0 && (await tile("Cena romantica").textContent()).includes("2 locali"), "raccolte: la raccolta rinominata compare subito col nuovo nome");
 
       // Unisci "Economico" con "Con amici"
