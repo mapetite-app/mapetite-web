@@ -11,6 +11,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
+import { guideRatings, googleMapsUrl } from "@/lib/guide-sources";
+import GuideRatings from "@/components/guide-ratings";
 
 const TILE =
   "flex min-h-[52px] min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-display font-semibold text-white active:scale-95";
@@ -97,7 +99,7 @@ export default function VenueSheet({
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi") => track(type, { id: venue.id, lat, lng });
 
   // Scheda completa su Google Maps (orari, foto, tutte le recensioni): con il Place ID se c'è.
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}${googlePlaceId ? `&query_place_id=${encodeURIComponent(googlePlaceId)}` : ""}`;
+  const mapsUrl = googleMapsUrl(name, googlePlaceId);
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
@@ -252,6 +254,14 @@ export default function VenueSheet({
       </div>
   ) : null;
 
+  // "Cosa dicono le guide": subito sotto il verdetto (che resta il primo blocco). Voti solo veri.
+  const guidesBlock = (
+    <GuideRatings
+      className="mx-5 mt-4"
+      rows={guideRatings({ name, city: cityFromAddress(address), googlePlaceId, rating, userRatingCount })}
+    />
+  );
+
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
       {variant === "a" && (
@@ -382,6 +392,7 @@ export default function VenueSheet({
 
       {/* 2. CARD VERDETTO (teal): verdetto + matchReason + chip, tutto dentro. */}
       {verdictCard}
+      {guidesBlock}
 
         </>
       )}
@@ -444,6 +455,7 @@ export default function VenueSheet({
             )}
           </div>
           {verdictCard}
+          {guidesBlock}
         </>
       )}
       {/* 3. TAG AI */}
