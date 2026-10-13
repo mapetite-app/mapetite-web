@@ -1,6 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import SubmitButton from "@/components/submit-button";
+import { withNext } from "@/lib/next-path";
+
+// Frase sotto il titolo quando dopo l'accesso si torna a una pagina precisa.
+function returnHint(next: string): string {
+  if (next.startsWith("/locali/")) return "Poi torni al locale che stavi guardando, pronto da salvare.";
+  if (next.startsWith("/stasera")) return "Poi torni a “Stasera dove andiamo?”.";
+  if (next.startsWith("/importa")) return "Poi torni a Importa: il link che stavi salvando resta lì.";
+  return "Poi torni alla pagina di prima.";
+}
 
 // Accesso e registrazione con lo stesso aspetto del resto dell'app.
 // Campi a 16px: sotto quella misura Safari su iPhone ingrandisce la pagina al tocco.
@@ -12,11 +21,14 @@ export default function AuthForm({
   action,
   error,
   message,
+  next = null,
 }: {
   mode: "login" | "signup";
   action: (formData: FormData) => Promise<void>;
   error?: string;
   message?: string;
+  // Percorso già validato (safeNext) dove tornare dopo l'accesso.
+  next?: string | null;
 }) {
   const login = mode === "login";
   return (
@@ -32,6 +44,11 @@ export default function AuthForm({
               ? "Ritrova i tuoi locali salvati, le note e le ricerche."
               : "Salva i posti che ti piacciono, con note e tag, e ritrovali sulla mappa."}
           </p>
+          {next && (
+            <p data-testid="auth-ritorno" className="mt-1 text-sm font-sans text-text-muted">
+              {returnHint(next)}
+            </p>
+          )}
         </div>
 
         {message && (
@@ -46,6 +63,7 @@ export default function AuthForm({
         )}
 
         <form action={action} className="mt-6 space-y-4">
+          {next && <input type="hidden" name="next" value={next} />}
           <div>
             <label htmlFor="email" className="block text-sm font-display font-medium text-text">
               Email
@@ -74,7 +92,7 @@ export default function AuthForm({
 
         <p className="mt-4 text-center text-sm font-sans text-text-muted">
           {login ? "Non hai un account? " : "Hai già un account? "}
-          <Link href={login ? "/signup" : "/login"} className="inline-flex min-h-10 items-center font-display font-semibold text-brand underline-offset-2 hover:underline">
+          <Link href={withNext(login ? "/signup" : "/login", next)} className="inline-flex min-h-10 items-center font-display font-semibold text-brand underline-offset-2 hover:underline">
             {login ? "Registrati" : "Accedi"}
           </Link>
         </p>

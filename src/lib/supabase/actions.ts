@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { afterLoginPath, safeNext, withNext } from "@/lib/next-path";
 
 // Messaggi di Supabase Auth in italiano semplice (arrivano in inglese).
 function authErrorIt(error: { code?: string; message: string }): string {
@@ -31,6 +32,8 @@ export async function login(formData: FormData) {
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  // Dove tornare dopo l'accesso (link condiviso, Stasera, Importa…): solo percorsi interni.
+  const next = safeNext(formData.get("next"));
 
   const { data: auth, error } = await supabase.auth.signInWithPassword({
     email,
@@ -39,11 +42,12 @@ export async function login(formData: FormData) {
 
   if (error) {
     console.error("[auth] login:", error.code, error.message);
-    redirect(`/login?error=${encodeURIComponent(authErrorIt(error))}`);
+    redirect(withNext(`/login?error=${encodeURIComponent(authErrorIt(error))}`, next));
   }
 
-  // Dopo l'accesso si torna alla mappa (è lì che si usa l'app); solo chi non ha
-  // ancora indicato i suoi gusti passa dall'onboarding. Le preferenze restano in /me.
+  // Dopo l'accesso si torna dov'eri (`next`) oppure alla mappa (è lì che si usa l'app);
+  // solo chi non ha ancora indicato i suoi gusti passa prima dall'onboarding, che poi
+  // prosegue verso `next`. Le preferenze restano in /me.
   const { data: profile } = await supabase
     .from("profiles")
     .select("onboarding_completed")
@@ -51,7 +55,7 @@ export async function login(formData: FormData) {
     .single();
 
   revalidatePath("/", "layout");
-  redirect(profile?.onboarding_completed ? "/mappa" : "/onboarding");
+  redirect(afterLoginPath(next, Boolean(profile?.onboarding_completed)));
 }
 
 export async function signup(formData: FormData) {
@@ -59,30 +63,36 @@ export async function signup(formData: FormData) {
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const next = safeNext(formData.get("next"));
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mapetite-web.vercel.app";
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${siteUrl}/login` },
+    // Il link di conferma via email riporta al login con lo stesso `next`.
+    options: { emailRedirectTo: `${siteUrl}${withNext("/login", next)}` },
   });
 
   if (error) {
     console.error("[auth] signup:", error.code, error.message);
-    redirect(`/signup?error=${encodeURIComponent(authErrorIt(error))}`);
+    redirect(withNext(`/signup?error=${encodeURIComponent(authErrorIt(error))}`, next));
   }
 
   if (data.session) {
     // La conferma email è disabilitata sul progetto Supabase:
-    // l'utente ha già una sessione attiva.
+    // l'utente ha già una sessione attiva. Con `next` passa dall'onboarding e poi torna lì;
+    // senza, resta il comportamento di sempre (/me).
     revalidatePath("/", "layout");
-    redirect("/me");
+    redirect(next ? withNext("/onboarding", next) : "/me");
   }
 
   redirect(
-    `/login?message=${encodeURIComponent(
-      "Registrazione effettuata. Controlla la tua email per confermare l'account."
-    )}`
+    withNext(
+      `/login?message=${encodeURIComponent(
+        "Registrazione effettuata. Controlla la tua email per confermare l'account."
+      )}`,
+      next
+    )
   );
 }
 
