@@ -7,6 +7,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import SalvaLocale from "./salva-locale";
+import GuideRatings from "@/components/guide-ratings";
+import { guideRatings } from "@/lib/guide-sources";
 import { safeNext } from "@/lib/next-path";
 import {
   cleanList,
@@ -145,6 +147,12 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
           )}
         </section>
       )}
+
+      {/* Confronto con le guide sotto il verdetto: voto solo da Google, le altre come ricerca in uscita. */}
+      <GuideRatings
+        className="mx-5 mt-5"
+        rows={guideRatings({ name: place.name, city, googlePlaceId: place.google_place_id, rating: place.rating })}
+      />
 
       {place.address && (
         <p className="mx-5 mt-5 flex items-start gap-2 text-sm font-sans text-text-muted">
