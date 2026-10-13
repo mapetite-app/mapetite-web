@@ -41,7 +41,11 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[] } | null;
+  // perche_turistici (allineato a turistici): cosa dicono le recensioni, si legge aprendo la riga.
+  setAside?: { turistici: string[]; perche_turistici?: string[]; fuori_tema: string[] } | null;
+  // Ricerche di "stellato": quanti risultati citano la stella Michelin nelle recensioni (null = altra ricerca).
+  // Non c'è una fonte Michelin: lo si dice, invece di promettere.
+  michelinCited?: number | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -163,7 +167,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, michelinCited = null, savedMode = false, showCity = false }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -470,6 +474,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale turistico" : `${setAside.turistici.length} locali turistici`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
                 setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
               ].filter(Boolean).join(" ")}
+              {setAside.turistici.length > 0 && setAside.perche_turistici?.[0] ? ` · ${setAside.turistici[0]}: ${setAside.perche_turistici[0]}` : null}
+            </p>
+          )}
+          {title && michelinCited != null && places.length > 0 && (
+            <p data-testid="nota-michelin" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-text-muted`}>
+              {michelinCited > 0
+                ? `⭐ Senza una fonte Michelin ufficiale metto in cima chi ne parla nelle recensioni (${michelinCited === 1 ? "1 locale" : `${michelinCited} locali`})`
+                : "⭐ Senza una fonte Michelin ufficiale: in queste recensioni nessuno cita la stella"}
             </p>
           )}
         </div>

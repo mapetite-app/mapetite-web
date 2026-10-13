@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import type { PlaceResult } from "@/lib/google-places";
+import { wantsMichelin } from "@/lib/michelin";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -64,7 +65,8 @@ Struttura esatta:
 romantico, informale, gruppi, business, veloce, aperitivo, famiglia, intimo, vivace, tradizionale, raffinato, economico
 - verdict: massimo 12 parole, tono diretto. VINCOLO CRITICO: il verdetto deve essere verificabile parola per parola contro le recensioni fornite. Non affermare MAI il contrario di ciò che dicono le recensioni. Se non sei certo del senso di un'informazione, ometti quel dettaglio invece di rischiare di invertirlo. Meglio un verdetto più povero che un verdetto sbagliato.
 - go_for: array di CHIP brevissime (1-4 parole ciascuna), MASSIMO 3. Ogni chip è un motivo CONCRETO e RICORRENTE per andarci, ricavato dai punti di forza citati più volte nelle recensioni. Esempio: ["carbonara","forno a legna","servizio veloce"]. Niente chip generiche ('buon cibo', 'bella atmosfera'): dì cosa specifico. Se non ci sono motivi forti e ricorrenti, array più corto o vuoto [].
-- dont_expect: DEFAULT array vuoto []. Array di CHIP brevissime (1-4 parole), MASSIMO 2. Lo popoli SOLO se nelle recensioni esiste un limite REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: []. Meglio [] che un difetto inventato. Tono onesto, non stroncatorio.`;
+- dont_expect: DEFAULT array vuoto []. Array di CHIP brevissime (1-4 parole), MASSIMO 2. Lo popoli SOLO se nelle recensioni esiste un limite REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: []. Meglio [] che un difetto inventato. Tono onesto, non stroncatorio.
+- In nessun campo scrivere "stellato", "stella Michelin" o simili se non è scritto esplicitamente nella descrizione, nelle recensioni o in enrichment.`;
 
 const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
@@ -81,7 +83,8 @@ Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":
 - id identico a quello ricevuto
 - matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo.
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
-- fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.`;
+- fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
+- Richieste di locale "stellato" / "stella Michelin" (stellato = almeno una stella Michelin): è un requisito ESPLICITO, ma non hai una fonte Michelin. Non affermare MAI che un locale ha la stella se la descrizione o le recensioni fornite non lo dicono esplicitamente. Se lo dicono, puoi scriverlo in matchReason ("le recensioni parlano della stella Michelin"); se non lo dicono, scrivi in matchReason che dai dati non risulta la stella. fit=false solo se i dati mostrano chiaramente un locale semplice e lontano dall'alta cucina (es. prezzi bassi, trattoria alla buona, pizzeria, fast food); la sola assenza di menzione della stella NON basta: nel dubbio true.`;
 
 function costOf(inputTokens: number, outputTokens: number): number {
   return (
@@ -277,6 +280,9 @@ export async function getSynthesis(
         name: p.name,
         category: p.category,
         types: (p.types ?? []).slice(0, 6),
+        // Fascia di prezzo Google (0-4): serve a riconoscere un locale chiaramente semplice
+        // quando la richiesta chiede uno stellato. Pochi token in input, max_tokens invariato.
+        priceLevel: p.priceLevel,
         editorialSummary: p.editorialSummary,
         reviewTexts: (p.reviewTexts ?? [])
           .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
@@ -294,6 +300,10 @@ export async function getSynthesis(
             taste.declared.atmospheres.length > 0 ||
             taste.declared.priceRange != null)) ||
           taste.byCategory.length > 0);
+      // "Stellato": requisito esplicito, ricordato a Haiku (regole nel prompt di sistema).
+      const michelinBlock = wantsMichelin(query)
+        ? `\nRequisito esplicito: locale stellato (almeno una stella Michelin). Nessuna fonte Michelin: vale solo ciò che dicono descrizione e recensioni.`
+        : "";
       const tasteBlock = hasTaste
         ? `\n\nGusti dell'utente:\n${JSON.stringify({
             dichiarati: taste!.declared,
@@ -312,7 +322,7 @@ export async function getSynthesis(
         messages: [
           {
             role: "user",
-            content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
+            content: `Richiesta dell'utente: ${query}${michelinBlock}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
           },
         ],
       });

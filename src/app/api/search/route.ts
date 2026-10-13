@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
+import { searchGooglePlaces, withoutReviewOrigins, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
@@ -9,6 +9,7 @@ import { recordEvent } from "@/lib/events";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
+import { michelinGoogleQuery, promoteMichelin } from "@/lib/michelin";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -79,7 +80,10 @@ export async function POST(request: Request) {
   let synthToken: string | null = null;
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
-  const daParte: { turistici: string[]; fuori_tema: string[] } = { turistici: [], fuori_tema: [] };
+  // perche_turistici: allineato a turistici, il motivo letto nelle recensioni (es. "4 recensioni su 5 in inglese").
+  const daParte: { turistici: string[]; perche_turistici: string[]; fuori_tema: string[] } = { turistici: [], perche_turistici: [], fuori_tema: [] };
+  // Richieste di "stellato": quanti locali citano la stella nelle recensioni (null = non è questa richiesta).
+  let michelinCitati: number | null = null;
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -97,9 +101,16 @@ export async function POST(request: Request) {
     // Zona nominata → è già nel testo della query: nessun bias sulla posizione della mappa.
     // "Vicino a me" → solo risultati nell'area intorno al centro mappa. Altrimenti bias.
     const locationMode = intent?.zona ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    // "Stellato": la query a Google tiene "stellato Michelin" e non si restringe a un tipo di cucina.
+    const google = searchIntent === "natural"
+      ? michelinGoogleQuery(query.trim(), intent?.queryGoogle ?? query.trim(), intent?.includedType)
+      : { queryGoogle: intent?.queryGoogle ?? query.trim(), includedType: intent?.includedType, changed: [] };
+    if (google.changed.length > 0) {
+      console.log(`[search-michelin] q=${JSON.stringify(query.trim().slice(0, 80))} ${google.changed.join("; ")}`);
+    }
     try {
-      risultati = await searchGooglePlaces(intent?.queryGoogle ?? query.trim(), {
-        includedType: intent?.includedType ?? undefined,
+      risultati = await searchGooglePlaces(google.queryGoogle, {
+        includedType: google.includedType ?? undefined,
         locationMode,
         lat,
         lng,
@@ -126,13 +137,27 @@ export async function POST(request: Request) {
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
-    // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
+    // "Non turistico", "autentico"…: i locali che le recensioni descrivono come turistici
+    // vanno in fondo (mai esclusi). Motivo per ogni locale nei log.
     if (searchIntent === "natural") {
-      const { places, demoted } = demoteMainstream(query.trim(), risultati);
+      const { places, demoted, reasons, log } = demoteMainstream(query.trim(), risultati);
+      if (log.length > 0) {
+        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} ${demoted.length} in fondo:\n  ${log.join("\n  ")}`);
+      }
       if (demoted.length > 0) {
         risultati = places;
         daParte.turistici = demoted.slice(0, 10);
-        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
+        daParte.perche_turistici = reasons.slice(0, 10);
+      }
+    }
+    // "Stellato" / "stella Michelin": in cima chi ne parla nelle recensioni o nella descrizione
+    // Google. Nessuna fonte Michelin: non si afferma mai che un locale è stellato.
+    if (searchIntent === "natural") {
+      const { places, applied, cited, log } = promoteMichelin(query.trim(), risultati);
+      if (applied) {
+        risultati = places;
+        michelinCitati = Math.min(cited.length, SYNTHESIS_LIMIT); // si mostrano solo i primi SYNTHESIS_LIMIT
+        console.log(`[search-michelin] q=${JSON.stringify(query.trim().slice(0, 80))} in cima ${cited.length} su ${places.length} (citano la stella): ${JSON.stringify(log)}`);
       }
     }
 
@@ -352,7 +377,8 @@ ESEMPI (input → output atteso):
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
-    const { reviewTexts, ...rest } = p;
+    // reviewOrigins (lingua delle recensioni) resta sul server come reviewTexts.
+    const { reviewTexts, ...rest } = withoutReviewOrigins(p);
     return {
       ...rest,
       selectedReviews: selectQualityReviews(reviewTexts),
@@ -409,6 +435,8 @@ ESEMPI (input → output atteso):
     risultati: risultatiFinali,
     filtri_usati: filtri,
     ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 ? { da_parte: daParte } : {}),
+    // Solo per le richieste di "stellato": quanti risultati citano la stella nelle recensioni.
+    ...(michelinCitati !== null ? { michelin: { citati: michelinCitati } } : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
     ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken } } : {}),
   });

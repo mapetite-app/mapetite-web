@@ -590,6 +590,36 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 }, () => ok(false, "risultati: dice quali locali turistici ha messo da parte"));
 await page.unroute("**/api/search");
 
+// 5e. Turistici v2: il motivo letto nelle recensioni si legge aprendo la riga
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: ["Tonnarello", "Da Enzo"], perche_turistici: ["4 recensioni su 5 in inglese, «trappola per turisti» ×2", "10.239 recensioni, molte più degli altri"], fuori_tema: [] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async () => {
+  const riga = page.getByTestId("messi-da-parte");
+  ok((await riga.textContent()) === "🧭 Ho messo da parte 2 locali turistici (Tonnarello, Da Enzo) · Tonnarello: 4 recensioni su 5 in inglese, «trappola per turisti» ×2", "risultati: dice perché un locale è turistico (cosa dicono le recensioni)");
+  const h1 = await riga.evaluate((el) => el.getBoundingClientRect().height);
+  await riga.click();
+  const h2 = await riga.evaluate((el) => el.getBoundingClientRect().height);
+  ok(h2 >= h1, `risultati: la riga dei turistici si apre con un tocco (${Math.round(h1)} → ${Math.round(h2)}px)`);
+  await shot("05e-turistici-motivo");
+}, () => ok(false, "risultati: dice perché un locale è turistico (cosa dicono le recensioni)"));
+await page.unroute("**/api/search");
+
+// 5f. Stellato: nessun badge, una riga onesta su come sono ordinati i risultati
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, michelin: { citati: 2 } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("nota-michelin").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("nota-michelin").textContent()) === "⭐ Senza una fonte Michelin ufficiale metto in cima chi ne parla nelle recensioni (2 locali)", "stellato: dice che senza fonte Michelin ordina per chi ne parla nelle recensioni");
+  ok((await page.getByText(/stellat/i).count()) === 0, "stellato: nessun badge 'stellato' sulle card");
+  await shot("05f-nota-michelin");
+}, () => ok(false, "stellato: dice che senza fonte Michelin ordina per chi ne parla nelle recensioni"));
+await page.unroute("**/api/search");
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("messi-da-parte").or(page.locator("[data-testid=pin]").first()).first().waitFor({ timeout: 5000 }).catch(() => {});
+ok((await page.getByTestId("nota-michelin").count()) === 0, "ricerca normale: nessuna riga Michelin");
+
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

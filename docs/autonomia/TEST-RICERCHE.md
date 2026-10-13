@@ -15,6 +15,7 @@ Criterio generale (Lorenzo): la ricerca deve rispettare **tutti** i requisiti es
 | 8 | trattoria milanese autentica con cotoletta | trattorie di cucina milanese tradizionale | pizzerie, catene, cucina non milanese |
 | 9 | cocktail bar nascosto a Milano per un appuntamento | speakeasy e cocktail bar curati, atmosfera intima | pub sportivi, birrerie |
 | 10 | brunch buono a Isola nel weekend | bistrot e caffè con brunch a Isola | locali fuori zona, ristoranti solo serali |
+| 11 | ristorante stellato dove mangiare pesce (Lorenzo, 13/10) | in cima ristoranti di pesce con almeno una stella Michelin (le recensioni o la descrizione Google ne parlano) | semplici ristoranti di pesce davanti agli stellati; badge "stellato" senza una fonte |
 
 Esito atteso per ogni caso: almeno 3 risultati nella top 5 che soddisfano tutti i requisiti della colonna "Deve proporre" e nessuno della colonna "Non deve proporre" nella top 5.
 I casi 3–5 e 6–10 (Milano, 12/10: VISIONE.md, densità su Roma e Milano) sono stati aggiunti da Claude come esempi dello stesso criterio: Lorenzo può correggerli.

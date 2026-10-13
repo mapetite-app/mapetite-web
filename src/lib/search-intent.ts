@@ -39,7 +39,8 @@ Rispondi SOLO con un oggetto JSON valido, senza backtick e senza testo aggiuntiv
 - tipo: tipo di locale in italiano (es. "ristorante", "cocktail bar", "trattoria"). Deducilo dal contesto ("cena" → ristorante, "aperitivo" → bar, "colazione" → bar/caffè). null se davvero assente.
 - included_type: UNO tra [${ALLOWED_INCLUDED_TYPES.join(", ")}] solo se il tipo è chiaro; altrimenti null. Per "rooftop"/"terrazza" senza altro tipo usa "bar"; per cena/ristorante "restaurant".
 - requisiti: caratteristiche esplicite della richiesta, brevi: fisiche (rooftop, vista, giardino, all'aperto), occasione (coppia, amici, lavoro), atmosfera (romantico, vivace, autentico). Solo ciò che è scritto o chiaramente implicito.
-- query_google: query breve in italiano per la ricerca testuale: tipo + caratteristiche fisiche chiave + zona se presente. Non includere "vicino a me". Es: "ristorante rooftop terrazza panoramica Roma".`;
+- query_google: query breve in italiano per la ricerca testuale: tipo + caratteristiche fisiche chiave + zona se presente. Non includere "vicino a me". Es: "ristorante rooftop terrazza panoramica Roma".
+- Se la frase chiede un locale "stellato" / con "stella Michelin" (stellato = almeno una stella Michelin; "cielo stellato" NON lo è): metti "stellato Michelin" nei requisiti e "stellato Michelin" in query_google, e come included_type usa "restaurant" (mai un tipo di cucina né "fine_dining_restaurant": molti stellati non sono registrati così). Es: "ristorante stellato dove mangiare pesce a Roma" → query_google "ristorante pesce stellato Michelin Roma".`;
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {
   let text = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();

@@ -13,7 +13,15 @@ type GooglePlace = {
   types?: string[];
   websiteUri?: string;
   editorialSummary?: { text?: string };
-  reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
+  // text = recensione tradotta in italiano (languageCode "it" nella richiesta);
+  // originalText = testo e lingua in cui l'ha scritta la persona. Entrambi fanno
+  // già parte di places.reviews: nessun campo in più nel FIELD_MASK, costo invariato.
+  reviews?: {
+    text?: { text?: string; languageCode?: string };
+    originalText?: { text?: string; languageCode?: string };
+    rating?: number;
+    relativePublishTimeDescription?: string;
+  }[];
   nationalPhoneNumber?: string;
   photos?: { name: string; authorAttributions?: { displayName?: string }[] }[];
 };
@@ -37,10 +45,23 @@ export type PlaceResult = {
   websiteUri: string | null;
   editorialSummary: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
+  // Solo server, allineato a reviewTexts: lingua in cui è stata scritta ogni recensione
+  // e il testo originale se diverso da quello tradotto. Serve a capire chi frequenta il
+  // locale (src/lib/mainstream.ts). Assente o null = dato non disponibile: si degrada.
+  reviewOrigins?: ReviewOrigin[] | null;
   phone: string | null;
   photoRef: string | null;   // il campo "name" della PRIMA foto, o null
   photoAuthor?: string | null; // autore della prima foto: Google chiede di mostrarlo
 };
+
+export type ReviewOrigin = { lang: string | null; text: string | null };
+
+// reviewOrigins è solo per il server: si toglie prima di rispondere al client.
+export function withoutReviewOrigins<T extends { reviewOrigins?: unknown }>(p: T): Omit<T, "reviewOrigins"> {
+  const copy = { ...p };
+  delete copy.reviewOrigins;
+  return copy;
+}
 
 export type SearchOptions = {
   lat?: number;
@@ -194,12 +215,22 @@ export async function searchGooglePlaces(
     types: place.types ?? null,
     websiteUri: place.websiteUri ?? null,
     editorialSummary: place.editorialSummary?.text ?? null,
-    reviewTexts: (() => {
-      const texts = (place.reviews ?? [])
-        .map((r) => r.text?.text)
-        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    ...(() => {
+      const reviews = (place.reviews ?? [])
+        .map((r) => ({ text: r.text?.text, original: r.originalText }))
+        .filter((r): r is { text: string; original: typeof r.original } => typeof r.text === "string" && r.text.trim().length > 0)
         .slice(0, 5);
-      return texts.length > 0 ? texts : null;
+      if (reviews.length === 0) return { reviewTexts: null, reviewOrigins: null };
+      return {
+        reviewTexts: reviews.map((r) => r.text),
+        reviewOrigins: reviews.map((r): ReviewOrigin => {
+          const original = r.original?.text?.trim() || null;
+          return {
+            lang: r.original?.languageCode ?? null,
+            text: original && original !== r.text.trim() ? original : null,
+          };
+        }),
+      };
     })(),
     phone: place.nationalPhoneNumber ?? null,
     photoRef: place.photos?.[0]?.name ?? null,
