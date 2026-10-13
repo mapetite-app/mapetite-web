@@ -20,7 +20,8 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 //   pin-salvati   i tuoi salvati restano sulla mappa come piccoli segnalibri anche in Esplora e dopo una ricerca
 //   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Voglio andarci" salvato da più di una settimana
 //   copertine     nel profilo: ogni raccolta mostra le emoji e i nomi dei suoi locali invece dell'iniziale
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine";
+//   home-salvati  in home, per chi ha salvati: "N posti da provare" con "Stasera dove andiamo?" e "I miei N"
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati";
 const OPTIN_KEY = "mapetite.beta";
 
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.

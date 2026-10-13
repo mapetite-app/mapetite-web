@@ -1133,7 +1133,15 @@ else {
       const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; return c.getBoundingClientRect().right > m.getBoundingClientRect().left; }));
       ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
       await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
-      await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine").join(",")); } catch { /* niente */ } });
+      // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
+      await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
+      ok((await p.getByTestId("home-salvati").count()) === 0, "home salvati: spenta di default");
+      await p.goto(`${BASE}/?beta=home-salvati`, { waitUntil: "networkidle" });
+      const hs = p.getByTestId("home-salvati");
+      await hs.waitFor({ timeout: 4000 }).catch(() => {});
+      ok((await hs.textContent().catch(() => ""))?.includes("3 posti da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I miei 6") && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home salvati: '3 posti da provare', 'Stasera dove andiamo?' e 'I miei 6'");
+      await p.screenshot({ path: `${OUT}/00c-home-salvati.png`, caret: "initial" });
+      await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine" && f !== "home-salvati").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       // Dal profilo, "Salvati" nella barra in basso apre la mappa sui salvati ed è accesa
       await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
@@ -1712,7 +1720,7 @@ if (!fakeUser) {
   await mano.getByRole("button", { name: "Cerca" }).click();
   await mano.getByTestId("mano-risultato").nth(1).waitFor({ timeout: 5000 });
   ok(mSearch.length === 1 && mSearch[0]?.query === "Pizzeria da Michele Roma", "a mano: una sola ricerca con il testo scritto");
-  ok(await mano.getByTestId("mano-risultato").first().getByText("🍕").isVisible() && await mano.getByText("Via Flaminia 1, 00196 Roma RM, Italy").isVisible(), "a mano: risultato con emoji della categoria, nome e indirizzo");
+  ok(await mano.getByTestId("mano-risultato").first().getByText("🍕").isVisible() && await mano.getByText("Via Flaminia 1, 00196 Roma RM", { exact: true }).isVisible(), "a mano: risultato con emoji della categoria, nome e indirizzo (senza ', Italy')");
   const gia = mano.getByTestId("mano-gia-salvato");
   ok(await gia.count() === 1 && await gia.getByText("Già nei tuoi salvati").isVisible() && (await gia.getAttribute("href")) === "/mappa?salvato=00000000-0000-0000-0000-000000000302", "a mano: 'Già nei tuoi salvati' sul locale già salvato, apre il salvato");
   await mano.scrollIntoViewIfNeeded();
@@ -1865,6 +1873,7 @@ else {
   ok((await pp.getByRole("link", { name: "Percorso" }).getAttribute("href")) === "https://www.google.com/maps/dir/?api=1&destination=41.889,12.469", "pagina pubblica: 'Percorso' porta alle indicazioni");
   ok(((await pp.getByRole("link", { name: "Apri su Google Maps" }).getAttribute("href")) ?? "").includes("query_place_id=GVICOLO"), "pagina pubblica: 'Apri su Google Maps' con il Place ID");
   ok(pubPhotos.some((u) => decodeURIComponent(u).includes("ref=places/GVICOLO/photos/AbC_1")) && await pp.locator("main img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "pagina pubblica: foto del locale dal proxy in cache");
+  ok(!(await pp.content()).includes(", Italy<"), "pagina pubblica: indirizzo senza ', Italy' in fondo");
   await pp.waitForTimeout(300);
   mkdirSync("docs/autonomia/screenshots/2026-10-13-notte", { recursive: true });
   await pp.screenshot({ path: "docs/autonomia/screenshots/2026-10-13-notte/locale-pubblico.png", caret: "initial" });
