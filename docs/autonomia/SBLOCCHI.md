@@ -27,6 +27,8 @@ Per ogni voce: cosa fare, dove, quanto tempo serve.
 
 6. **Supabase → Authentication → URL Configuration** (2 min, dal 13/10 ancora da fare). Ai Redirect URLs aggiungi `https://<dominio>/login*` e `https://<dominio>/reimposta-password`. Senza, "Password dimenticata?" e il ritorno dopo la registrazione rischiano di non funzionare in produzione. Con il token del punto 2 lo potrei fare io.
 
+6b. **Modello dell'email di conferma** (3 min, Supabase → Authentication → Emails → "Confirm signup"). Dal 14/10 chi tocca il link entra subito, ma solo se apre il link nello stesso browser in cui si è registrato. Se lo apre dentro l'app della posta, l'email risulta confermata ma deve accedere a mano. Per farlo entrare sempre, sostituisci il link del modello con `{{ .SiteURL }}/auth/conferma?token_hash={{ .TokenHash }}&type=email`. Il codice per questo formato c'è già.
+
 7. **Dipendenze già installate a inizio sessione** (lo faccio io se mi dici sì). Ogni sessione parte senza `node_modules` e perde minuti a installarle. Basta uno script di avvio nel repository (`.claude/settings.json`, comando `npm ci`).
 
 ## B. Regole di `LORENZO.md` da allentare (una riga di risposta ciascuna)
