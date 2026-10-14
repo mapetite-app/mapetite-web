@@ -25,7 +25,8 @@ const HAIKU_OUTPUT_PER_MTOK = 5.0;
 export const SYNTHESIS_LIMIT = 12;
 
 // Locali per chiamata Haiku: le chiamate dei gruppi partono insieme (latenza ~1/3 con 12 locali).
-const HAIKU_BATCH = 4;
+// 5 ≥ i gruppi che il telefono chiede (2, 3, 3, 4: vedi VERDICT_GROUPS): una chiamata ciascuno.
+const HAIKU_BATCH = 5;
 function inBatches<T>(items: T[]): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += HAIKU_BATCH) out.push(items.slice(i, i + HAIKU_BATCH));

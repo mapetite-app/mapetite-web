@@ -27,6 +27,9 @@ type SearchFilters = {
   zona?: string | null; // zona nominata nella frase (solo per mostrarla: "Ho capito: … · a Trastevere")
 };
 
+// Gruppi di verdetti chiesti in parallelo dal telefono (somma = SYNTHESIS_LIMIT).
+const VERDICT_GROUPS = [2, 3, 3, 4];
+
 // Strip chars that could break PostgREST or() filter string syntax
 const sanitize = (s: string): string =>
   s.replace(/[^a-zA-ZÀ-ÿ0-9 ]/g, "").trim().slice(0, 100);
@@ -85,6 +88,7 @@ export async function POST(request: Request) {
   let sintesi: Record<string, PlaceSynthesis> = {};
   let synthInput: SynthesisInput[] | null = null;
   let synthToken: string | null = null;
+  const synthGroups: { places: SynthesisInput[]; token: string }[] = [];
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
   const daParte: { turistici: string[]; fuori_tema: string[] } = { turistici: [], fuori_tema: [] };
@@ -181,6 +185,14 @@ export async function POST(request: Request) {
       try {
         synthInput = buildSynthesisInput(risultati);
         synthToken = signSynthesisInput(query.trim(), synthInput);
+        // Verdetti a gruppi chiesti in parallelo: prima le 2 card che si vedono (pronte in ~3-4 s),
+        // poi le altre. Stesse chiamate Haiku di prima, solo divise diversamente.
+        let from = 0;
+        for (const size of VERDICT_GROUPS) {
+          const part = synthInput.slice(from, from + size);
+          from += size;
+          if (part.length > 0) synthGroups.push({ places: part, token: signSynthesisInput(query.trim(), part) });
+        }
       } catch (err) {
         console.error("[search/route] firma sintesi non disponibile:", err);
         synthInput = null;
@@ -442,6 +454,6 @@ ESEMPI (input → output atteso):
     filtri_usati: filtri,
     ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 ? { da_parte: daParte } : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
-    ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken } } : {}),
+    ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken, gruppi: synthGroups } } : {}),
   });
 }

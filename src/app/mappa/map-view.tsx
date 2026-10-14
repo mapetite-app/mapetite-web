@@ -652,7 +652,7 @@ type AIFiltri = {
 };
 
 // Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
-type PendingSynthesis = { places: unknown[]; token: string };
+type PendingSynthesis = { places: unknown[]; token: string; gruppi?: { places: unknown[]; token: string }[] };
 
 // Cosa ha capito la ricerca: tipo, requisiti, "vicino a te" o la zona nominata.
 function filtriParts(filtri: AIFiltri): string[] {
@@ -1704,28 +1704,43 @@ export default function MapView({
     if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
     try {
-      const res = await fetch("/api/search/synthesis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchedQuery, places: pending.places, token: pending.token }),
-      });
-      if (!res.ok || searchSeq.current !== id) return;
-      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> } = await res.json();
-      const esclusi = new Set(data.esclusi ?? []);
-      const livelli = data.livelli ?? {};
-      setVenueDetails((prev) => {
-        const next = { ...prev };
-        for (const [pid, d] of Object.entries(data.dettagli ?? {})) {
-          next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+      type VerdictReply = { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> };
+      // A gruppi in parallelo (le prime 2 card arrivano per prime, ~3-4 s): ogni verdetto si mostra
+      // appena pronto; esclusioni e ordine si applicano una volta sola, a gruppi arrivati.
+      const groups = pending.gruppi?.length ? pending.gruppi : [{ places: pending.places, token: pending.token }];
+      const replies = await Promise.all(groups.map(async (g): Promise<VerdictReply | null> => {
+        try {
+          const res = await fetch("/api/search/synthesis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: searchedQuery, places: g.places, token: g.token }),
+          });
+          if (!res.ok || searchSeq.current !== id) return null;
+          const part: VerdictReply = await res.json();
+          if (searchSeq.current !== id) return null;
+          setVenueDetails((prev) => {
+            const next = { ...prev };
+            for (const [pid, d] of Object.entries(part.dettagli ?? {})) {
+              next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+            }
+            return next;
+          });
+          return part;
+        } catch {
+          return null; // un gruppo perso non ferma gli altri: quelle card restano con i dati Google
         }
-        return next;
-      });
+      }));
+      if (searchSeq.current !== id) return;
+      const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
+      const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
           // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
           // chiudeva la scheda sotto le dita e lasciava solo la mappa.
           let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Se l'AI scartasse tutti i locali (sommando i gruppi) non si esclude niente: nel dubbio il locale resta.
+          if (risultati.length === 0) risultati = prev.risultati;
           // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
           // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
           // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
