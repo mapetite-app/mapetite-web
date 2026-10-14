@@ -27,7 +27,7 @@ Aggiornata il 13/10 notte: usa solo funzioni già nella PR della notte o in prod
 **1:25 — Scegli: "Stasera dove andiamo?".** Da "I miei salvati" o dal Profilo: occasione "Romantico", "Vicino a me", "Mai provati" → "Proponimi 3 posti". Tre posti tuoi, con la tua nota. "Percorso" e si parte.
 
 **1:55 — Il differenziatore: chiedi all'AI.** Esplora → scrivi "trattoria autentica non turistica a Trastevere".
-- Sotto il titolo: "🧭 Ho messo da parte 7 locali turistici (Da Enzo, Nannarella…)": Google li metterebbe in cima, noi no.
+- Sotto il titolo: "🧭 Ho messo da parte 7 locali molto famosi (Da Enzo, Nannarella…)": Google li metterebbe in cima, noi no.
 - Ogni card ha **"Il verdetto Mapetite"**: una frase onesta scritta dalle recensioni vere, mai inventata.
 - Tocca una card: scheda con foto, verdetto, "Per la tua ricerca", "Ci dovresti andare se".
 
