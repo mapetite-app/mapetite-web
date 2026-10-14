@@ -76,14 +76,16 @@ export type ListDetails = {
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
   editorialSummary?: string | null;
-  selectedReviews?: { text: string }[] | null;
+  selectedReviews?: { text: string; rating?: number | null }[] | null;
 };
 
 // Riga di ripiego quando manca il verdetto: solo fatti di Google, mai testo inventato.
+// Come riga della card solo una recensione da 4-5 stelle: prima la prima card poteva dire
+// "“Pessimo, con 13 euro due Hugo…”" (la recensione era scelta solo per lunghezza).
 export function googleLine(d: ListDetails | undefined): string | null {
   if (!d) return null;
   if (d.editorialSummary) return d.editorialSummary;
-  const review = d.selectedReviews?.[0]?.text;
+  const review = d.selectedReviews?.find((r) => r.rating == null || r.rating >= 4)?.text;
   return review ? `“${review}”` : null;
 }
 

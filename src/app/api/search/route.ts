@@ -372,10 +372,10 @@ ESEMPI (input → output atteso):
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
-    const { reviewTexts, ...rest } = p;
+    const { reviewTexts, reviewItems, ...rest } = p;
     return {
       ...rest,
-      selectedReviews: selectQualityReviews(reviewTexts),
+      selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
       synthesis: s?.synthesis || null,
       tags: s?.tags?.length ? s.tags : rest.tags ?? null,
       verdict: s?.verdict || null,

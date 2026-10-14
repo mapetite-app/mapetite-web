@@ -7,7 +7,8 @@ const IDEAL_LENGTH = 250;       // lunghezza "sweet spot" per la scheda
 const MAX_RESULTS = 3;
 const TRUNCATE_AT = 400;        // taglio finale del testo mostrato
 
-export type SelectedReview = { text: string };
+// rating: stelle date dall'autore della recensione (Google), se note.
+export type SelectedReview = { text: string; rating?: number | null };
 
 function uppercaseRatio(text: string): number {
   let letters = 0;
@@ -29,16 +30,19 @@ function truncate(text: string): string {
   return cut + "…";
 }
 
-export function selectQualityReviews(texts: string[] | null): SelectedReview[] {
-  if (!texts) return [];
+export function selectQualityReviews(
+  input: string[] | { text: string; rating: number | null }[] | null,
+): SelectedReview[] {
+  if (!input) return [];
 
-  return texts
-    .filter((t) => typeof t === "string")
-    .map((t) => t.trim())
-    .filter((t) => t.length >= MIN_LENGTH)
-    .filter((t) => t.length <= MAX_LENGTH)
-    .filter((t) => uppercaseRatio(t) <= MAX_UPPERCASE_RATIO)
-    .sort((a, b) => Math.abs(a.length - IDEAL_LENGTH) - Math.abs(b.length - IDEAL_LENGTH))
+  return input
+    .map((r) => (typeof r === "string" ? { text: r, rating: null } : r))
+    .filter((r) => typeof r.text === "string")
+    .map((r) => ({ text: r.text.trim(), rating: r.rating }))
+    .filter((r) => r.text.length >= MIN_LENGTH)
+    .filter((r) => r.text.length <= MAX_LENGTH)
+    .filter((r) => uppercaseRatio(r.text) <= MAX_UPPERCASE_RATIO)
+    .sort((a, b) => Math.abs(a.text.length - IDEAL_LENGTH) - Math.abs(b.text.length - IDEAL_LENGTH))
     .slice(0, MAX_RESULTS)
-    .map((t) => ({ text: truncate(t) }));
+    .map((r) => ({ text: truncate(r.text), rating: r.rating }));
 }
