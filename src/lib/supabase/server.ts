@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -26,3 +27,8 @@ export async function createClient() {
     }
   );
 }
+
+// Utente della richiesta: layout e pagina lo chiedono entrambi, ma a Supabase si chiede una
+// volta sola per richiesta (cache di React). Un viaggio di rete in meno a ogni pagina per chi ha
+// fatto l'accesso. Solo per i componenti del server, non per le route API.
+export const getUser = cache(async () => (await createClient()).auth.getUser());

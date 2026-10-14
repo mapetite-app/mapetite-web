@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import MapView from "./map-view";
 
 export default async function MappaPage() {
@@ -14,7 +14,7 @@ export default async function MappaPage() {
     console.error("Errore nel caricamento di places:", error);
   }
 
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData } = await getUser();
 
   const normalized = (places ?? []).map((p) => ({ ...p, tags: null, note: null, rating: null, priceLevel: null }));
 

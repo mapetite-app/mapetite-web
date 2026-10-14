@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import StaseraView from "./stasera-view";
 
 export const metadata: Metadata = {
@@ -23,8 +23,7 @@ export default async function StaseraPage() {
   if (fake) {
     userId = fake === "anonimo" ? null : fake;
   } else {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
+    const { data } = await getUser();
     userId = data?.user?.id ?? null;
   }
 

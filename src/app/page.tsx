@@ -5,7 +5,7 @@ import HomeRecent from "@/components/home-recent";
 import { cookies } from "next/headers";
 import HomeIntro, { IntroAgain } from "@/components/home-intro";
 import HomeSaved from "@/components/home-saved";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 
 // Quanti salvati e quanti "Voglio andarci" (tag "Da provare"). In sviluppo con E2E_FAKE_USER
 // li legge dal cookie "e2e_profilo" del giro automatico, come il profilo.
@@ -41,7 +41,7 @@ const EXAMPLES = [
 export default async function Home() {
   // Serve solo all'ultima schermata dell'intro: "Crea il tuo account" o "Inizia a cercare".
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
+  const { data } = await getUser();
   const loggedIn = !!data?.user;
   const counts = await savedCounts(supabase, data?.user?.id ?? null);
   return (

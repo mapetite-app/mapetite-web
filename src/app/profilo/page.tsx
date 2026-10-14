@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
@@ -69,7 +69,7 @@ function Stars({ rating }: { rating: number }) {
 export default async function ProfiloPage() {
   const supabase = await createClient();
   const fake = await e2eProfile();
-  const { data: userData } = fake ? { data: null } : await supabase.auth.getUser();
+  const { data: userData } = fake ? { data: null } : await getUser();
   const user = fake ? { id: process.env.E2E_FAKE_USER!, email: fake.email } : userData?.user ?? null;
 
   if (!user) {

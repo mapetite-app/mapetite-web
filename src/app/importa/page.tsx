@@ -1,10 +1,9 @@
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import ImportaView from "./importa-view";
 
 export default async function ImportaPage() {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData } = await getUser();
   // Solo in sviluppo locale: utente finto per il test automatico (scripts/e2e/giro.mjs);
   // il cookie "e2e_anonimo" simula chi non ha fatto l'accesso.
   const dev = process.env.NODE_ENV === "development";
