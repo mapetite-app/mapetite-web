@@ -20,6 +20,7 @@ import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "luc
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { distanceMeters } from "@/lib/distance";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -498,6 +499,9 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 // "Per te" dai comportamenti (VISIONE.md): un risultato somiglia a un tuo salvato se è dello
 // stesso tipo e della stessa fascia di prezzo (±1). Si sceglie il salvato più vicino. Solo
 // un'indicazione sulla card: l'ordine resta quello della richiesta (mai sopra un posto più adatto).
+// Solo salvati entro SIMILAR_MAX_METERS (14/10): prima un ristorante salvato a Milano finiva
+// su quasi ogni "Ristorante" cercato a Roma, un'affermazione senza fondamento.
+const SIMILAR_MAX_METERS = 15_000;
 function similarSaved(place: Place, saved: Place[]): string | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
@@ -505,7 +509,8 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   for (const s of saved) {
     if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE)) continue;
     if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
-    const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
+    const d = distanceMeters(s, place);
+    if (d > SIMILAR_MAX_METERS) continue;
     if (!best || d < best.d) best = { name: s.name, d };
   }
   return best?.name ?? null;
@@ -930,10 +935,17 @@ export default function MapView({
       for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
       return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
     };
-    const kind = top(liked.map((p) => categoryLabel(p.category)));
-    const city = top(liked.map((p) => cityFromAddress(p.address)));
-    if (!kind || kind[1] < 2 || !city) return null;
-    return { label: `${kind[0]} a ${city[0]}, poco conosciuti`, query: `${kind[0]} poco conosciuti a ${city[0]}` };
+    // Tipo e città insieme (prima erano scelti separatamente: "Sushi a Roma" anche con tutti i sushi a
+    // Milano). Testo senza accordi sbagliati ("Pizzeria … poco conosciuti"): "fuori dai soliti giri"
+    // fa scattare lo stesso la regola dei locali di massa (src/lib/mainstream.ts).
+    const pair = top(liked.map((p) => {
+      const k = categoryLabel(p.category);
+      const c = cityFromAddress(p.address);
+      return k && c ? `${k}\u0000${c}` : null;
+    }));
+    if (!pair || pair[1] < 2) return null;
+    const [kind, city] = pair[0].split("\u0000");
+    return { label: `${kind} a ${city}, fuori dai soliti giri`, query: `${kind} fuori dai soliti giri a ${city}` };
   }, [savedPlaces]);
 
   // Una sola barra (Lorenzo, 12/10: "abbiamo due barre per la ricerca, occupiamo solo spazio"):
@@ -2878,7 +2890,8 @@ export default function MapView({
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
             onSaved={(tags, note, uuid) => {
-              track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", tag: (tags ?? []).join(",").slice(0, 40) });
+              track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", ...((tags ?? []).includes(VISIT_DONE) ? { stato: VISIT_DONE } : (tags ?? []).includes(VISIT_WANT) ? { stato: VISIT_WANT } : {}) });
+              // Mai i nomi delle raccolte: sono testo scritto dall'utente ("Cena con Giulia").
               if (uuid) {
                 setPlaceUuids((prev) => ({ ...prev, [pendingPlace.id]: uuid }));
                 setSavedIds((prev) => new Set(prev).add(uuid));
