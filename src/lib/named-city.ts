@@ -4,19 +4,45 @@
 // ai risultati (visto il 14/10 con Google vero). Solo ordine e modo di cercare: nessuna chiamata in più.
 
 // Nome come compare nella frase → nome nell'indirizzo Google in italiano ("20123 Milano MI").
-const CITIES: { name: string; re: RegExp }[] = [
-  { name: "Roma", re: /\broma\b/i },
-  { name: "Milano", re: /\bmilano\b/i },
-  { name: "Torino", re: /\btorino\b/i },
-  { name: "Napoli", re: /\bnapoli\b/i },
-  { name: "Firenze", re: /\bfirenze\b/i },
-  { name: "Bologna", re: /\bbologna\b/i },
-  { name: "Venezia", re: /\bvenezia\b/i },
-  { name: "Genova", re: /\bgenova\b/i },
-  { name: "Palermo", re: /\bpalermo\b/i },
-  { name: "Bari", re: /\bbari\b/i },
-  { name: "Verona", re: /\bverona\b/i },
+// Coordinate del centro: servono a dire in che città è la mappa (cityNear), senza chiamate.
+const CITIES: { name: string; re: RegExp; lat: number; lng: number }[] = [
+  { name: "Roma", re: /\broma\b/i, lat: 41.893, lng: 12.483 },
+  { name: "Milano", re: /\bmilano\b/i, lat: 45.464, lng: 9.19 },
+  { name: "Torino", re: /\btorino\b/i, lat: 45.07, lng: 7.686 },
+  { name: "Napoli", re: /\bnapoli\b/i, lat: 40.852, lng: 14.268 },
+  { name: "Firenze", re: /\bfirenze\b/i, lat: 43.769, lng: 11.256 },
+  { name: "Bologna", re: /\bbologna\b/i, lat: 44.494, lng: 11.343 },
+  { name: "Venezia", re: /\bvenezia\b/i, lat: 45.438, lng: 12.327 },
+  { name: "Genova", re: /\bgenova\b/i, lat: 44.407, lng: 8.934 },
+  { name: "Palermo", re: /\bpalermo\b/i, lat: 38.116, lng: 13.361 },
+  { name: "Bari", re: /\bbari\b/i, lat: 41.117, lng: 16.872 },
+  { name: "Verona", re: /\bverona\b/i, lat: 45.438, lng: 10.992 },
 ];
+
+// Città della mappa: la più vicina entro 25 km dal centro, altrimenti null.
+export function cityNear(lat: number, lng: number): string | null {
+  let best: string | null = null;
+  let bestKm = 25;
+  for (const c of CITIES) {
+    const dy = (c.lat - lat) * 111.32;
+    const dx = (c.lng - lng) * 111.32 * Math.cos((lat * Math.PI) / 180);
+    const km = Math.hypot(dx, dy);
+    if (km < bestKm) { bestKm = km; best = c.name; }
+  }
+  return best;
+}
+
+// "trattoria Monti" → "trattoria quartiere Monti": da solo il nome del quartiere viene preso per il
+// nome di un locale (1 risultato invece di 20). "centro" diventa "zona centro". Se la parola
+// davanti è già quartiere/rione/zona, o il quartiere non compare nella query, non cambia nulla.
+export function withDistrict(query: string, zona: string): string {
+  const i = query.toLowerCase().indexOf(zona.toLowerCase());
+  if (i === -1) return query;
+  const before = query.slice(0, i);
+  if (/(quartiere|rione|zona)\s*$/i.test(before)) return query;
+  const prefix = /^centro\b/i.test(zona) ? "zona" : "quartiere";
+  return `${before}${prefix} ${query.slice(i)}`;
+}
 
 // Una sola città nominata: con due ("tra Roma e Milano") non si sceglie.
 // "Cucina romana", "alla milanese" non contano: servono le parole intere.

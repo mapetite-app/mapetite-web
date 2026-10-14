@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -70,6 +70,10 @@ ok(findVideoLink("Guarda questo video su TikTok https://vm.tiktok.com/ZMabc123/.
 // Verdetti in italiano (14/10): "vibe lounge", "food pairings", "vista breathtaking" visti in memoria.
 ok(hasEnglish("Cocktail ben fatti, food pairings, vibe lounge e curato.") && hasEnglish("vista breathtaking") && hasEnglish("cocktail handmade curati"), "italiano: parole inglesi copiate dalle recensioni riconosciute");
 ok(!hasEnglish("Drink di qualità e staff professionale in una location piacevole.") && !hasEnglish("Rooftop con cocktail e brunch, atmosfera lounge") && !hasEnglish("Vista mozzafiato, servizio attento"), "italiano: i prestiti entrati nell'italiano (drink, staff, location, rooftop…) vanno bene");
+
+// Quartiere senza città (15/10): "trattoria Monti" dava solo "Trattoria Monti Roma".
+ok(withDistrict("trattoria Monti", "Monti") === "trattoria quartiere Monti" && withDistrict("bar rione Monti", "Monti") === "bar rione Monti" && withDistrict("aperitivo centro storico", "centro storico") === "aperitivo zona centro storico" && withDistrict("bar Pigneto", "Trastevere") === "bar Pigneto", "quartiere: 'quartiere X' davanti al nome, una volta sola");
+ok(cityNear(41.8986, 12.4769) === "Roma" && cityNear(45.45, 9.18) === "Milano" && cityNear(43.0, 12.0) === null, "città della mappa: Roma, Milano, nessuna lontano dalle città note");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

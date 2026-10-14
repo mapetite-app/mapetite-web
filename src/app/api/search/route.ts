@@ -9,7 +9,7 @@ import { recordEvent } from "@/lib/events";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, demoteOtherCity } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity } from "@/lib/named-city";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -110,10 +110,23 @@ export async function POST(request: Request) {
     // "Vicino a me" → solo risultati nell'area intorno al centro mappa. Altrimenti bias.
     // Senza Haiku la città scritta nella frase ("a Milano") si riconosce comunque: niente bias sulla
     // mappa, che altrimenti con la mappa su Roma mescolava locali di Roma a quelli di Milano.
+    // Quartiere senza città ("trattoria a Monti", "aperitivo in centro"): la mappa resta una
+    // preferenza larga (25 km), altrimenti Google poteva rispondere con un "Monti" di un'altra
+    // città. Il testo resta più forte: un quartiere di un'altra città si trova comunque.
     const city = searchIntent === "natural" ? namedCity(query) : null;
-    const locationMode = intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    const zonaQuartiere = !!intent?.zona && !city && !namedCity(intent.zona);
+    // Google da solo legge "trattoria Monti" come un nome (1 risultato, visto il 15/10): si aggiunge
+    // la città in cui è la mappa, se è una delle città note e la frase non ne nomina un'altra.
+    const mapCity = zonaQuartiere && typeof lat === "number" && typeof lng === "number" ? cityNear(lat, lng) : null;
+    // E "quartiere Monti" invece di "Monti": 20 trattorie del rione invece della sola "Trattoria Monti".
+    let queryGoogle = intent ? intent.queryGoogle : query.trim();
+    if (intent && zonaQuartiere) {
+      queryGoogle = withDistrict(queryGoogle, intent.zona!);
+      if (mapCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${mapCity}`;
+    }
+    const locationMode = zonaQuartiere ? "bias" : intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
     try {
-      risultati = await searchGooglePlaces(intent?.queryGoogle ?? query.trim(), {
+      risultati = await searchGooglePlaces(queryGoogle, {
         includedType: intent?.includedType ?? undefined,
         locationMode,
         lat,
@@ -123,7 +136,7 @@ export async function POST(request: Request) {
         minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,
         maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
         openNowOnly: body?.openNowOnly === true ? true : undefined,
-        radius: typeof body?.radius === "number" ? body.radius : intent?.vicino_a_me ? 3000 : undefined,
+        radius: typeof body?.radius === "number" ? body.radius : zonaQuartiere ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
         maxDistanceMeters: typeof body?.radius === "number" ? body.radius : undefined,
         sortMode: searchIntent === "natural" ? "relevance" : "quality",
