@@ -183,7 +183,16 @@ function SaveModal({
         const { error } = await supabase
           .from("saved_places")
           .insert({ user_id: userId, place_id: placeUuid, tags, note: noteValue });
-        if (error && error.code !== "23505") { setError(true); return; }
+        if (error?.code === "23505") {
+          // Era già salvato (la mappa non lo sapeva ancora): si aggiornano tag e nota scelti
+          // qui, invece di mostrarli e perderli al prossimo caricamento.
+          const { error: upErr } = await supabase
+            .from("saved_places")
+            .update({ tags, note: noteValue })
+            .eq("user_id", userId)
+            .eq("place_id", placeUuid);
+          if (upErr) { setError(true); return; }
+        } else if (error) { setError(true); return; }
       }
 
       onSaved(tags, noteValue, savedUuid);
