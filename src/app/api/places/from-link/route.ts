@@ -52,7 +52,35 @@ async function resolveShortLink(start: URL): Promise<URL | null> {
   return isShortMapsLink(current) ? null : current;
 }
 
-async function findPlaceId(apiKey: string, textQuery: string, lat: number, lng: number): Promise<string | null> {
+// Link senza coordinate ("?q=Nome,+Indirizzo&ftid=…", decisione 10 del backlog, 15/10): dopo l'ID
+// (gratuito) si chiedono a Place Details SOLO posizione, nome e indirizzo, fascia "Essentials"
+// (10.000 gratuite al mese, poi ~5 $ ogni 1.000). Conta 1 nella quota Place Details (50/giorno).
+async function placeEssentials(apiKey: string, placeId: string): Promise<{ name: string | null; address: string; lat: number; lng: number } | null> {
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=it`, {
+    headers: {
+      "X-Goog-Api-Key": apiKey,
+      // Solo campi Essentials. Non aggiungere campi qui.
+      "X-Goog-FieldMask": "id,displayName,formattedAddress,location",
+    },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) {
+    console.error("[from-link] Place Details (Essentials) errore", res.status, (await res.text()).slice(0, 300));
+    throw new Error("google");
+  }
+  const d: { displayName?: { text?: string }; formattedAddress?: string; location?: { latitude?: number; longitude?: number } } = await res.json();
+  const lat = d.location?.latitude;
+  const lng = d.location?.longitude;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  return {
+    name: d.displayName?.text?.trim() || null,
+    address: (d.formattedAddress ?? "").replace(/,\s*Ital(ia|y)$/i, ""),
+    lat,
+    lng,
+  };
+}
+
+async function findPlaceId(apiKey: string, textQuery: string, lat?: number, lng?: number): Promise<string | null> {
   const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
     headers: {
@@ -65,7 +93,9 @@ async function findPlaceId(apiKey: string, textQuery: string, lat: number, lng: 
       textQuery,
       pageSize: 1,
       languageCode: "it",
-      locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 100 } },
+      ...(lat != null && lng != null
+        ? { locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 100 } } }
+        : {}),
     }),
   });
   if (!res.ok) {
@@ -94,8 +124,25 @@ async function resolveOne(apiKey: string, link: string, fallbackName: string | n
   const info = parseMapsUrl(finalUrl.toString());
   const name = info.name ?? fallbackName;
   if (info.lat == null || info.lng == null) {
-    console.log("[from-link] link senza coordinate:", finalUrl.origin + finalUrl.pathname);
-    return { link, error: NO_COORDS };
+    // Senza coordinate serve il testo del link (nome e indirizzo) o un Place ID.
+    const text = info.query ?? name;
+    console.log("[from-link] link senza coordinate:", finalUrl.origin + finalUrl.pathname, text ? "→ cerco per nome" : "");
+    if (!text && !info.placeId) return { link, error: NO_COORDS };
+    let full;
+    try {
+      const id = info.placeId ?? (await findPlaceId(apiKey, text!));
+      if (!id) return { link, error: `Non trovo "${name ?? text}" su Google. Prova con un altro link.` };
+      full = await placeEssentials(apiKey, id);
+      if (!full) return { link, error: NO_COORDS };
+      const stored = await findOrCreatePlace(
+        { googlePlaceId: id, name: full.name ?? name ?? text!, address: full.address, lat: full.lat, lng: full.lng },
+        "from-link",
+      );
+      if ("error" in stored) return { link, error: stored.error };
+      return { link, place: stored.place };
+    } catch {
+      return { link, error: "Google non risponde in questo momento. Riprova tra poco." };
+    }
   }
   if (!name) return { link, error: NO_COORDS };
 
