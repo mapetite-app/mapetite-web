@@ -6,6 +6,7 @@ import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
+import { hasEnglish } from "../../src/lib/italian-check.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -65,6 +66,10 @@ ok(videoSourceOf("https://vm.tiktok.com/ZMabc123/") === "TikTok" && videoSourceO
 ok(videoSourceOf("https://www.youtube.com/shorts/abcDEF") === "YouTube" && videoSourceOf("https://youtu.be/abc") === "YouTube", "video: Shorts e youtu.be riconosciuti");
 ok(videoSourceOf("https://www.instagram.com/reel/ABC/") === null && videoSourceOf("https://evil.com/tiktok.com") === null && videoSourceOf("https://tiktok.com.evil.com/x") === null && videoSourceOf("file:///etc/passwd") === null && videoSourceOf("https://www.youtube.com/watch?v=x") === null, "video: Instagram, altri siti e video lunghi di YouTube esclusi");
 ok(findVideoLink("Guarda questo video su TikTok https://vm.tiktok.com/ZMabc123/.") === "https://vm.tiktok.com/ZMabc123/", "video: link trovato nel testo condiviso");
+
+// Verdetti in italiano (14/10): "vibe lounge", "food pairings", "vista breathtaking" visti in memoria.
+ok(hasEnglish("Cocktail ben fatti, food pairings, vibe lounge e curato.") && hasEnglish("vista breathtaking") && hasEnglish("cocktail handmade curati"), "italiano: parole inglesi copiate dalle recensioni riconosciute");
+ok(!hasEnglish("Drink di qualità e staff professionale in una location piacevole.") && !hasEnglish("Rooftop con cocktail e brunch, atmosfera lounge") && !hasEnglish("Vista mozzafiato, servizio attento"), "italiano: i prestiti entrati nell'italiano (drink, staff, location, rooftop…) vanno bene");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
