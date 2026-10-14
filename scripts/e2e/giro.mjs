@@ -1149,8 +1149,10 @@ else {
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 4, "app installata: 4 scorciatoie (Cerca, Salvati, Stasera, Filtri)"); ok((m.shortcuts ?? []).some((x) => x.url === "/stasera" && x.short_name === "Stasera"), "app installata: scorciatoia 'Stasera' → /stasera"); }
 
   // Voce 11c (?beta=pin-salvati, spenta di default): i salvati restano sulla mappa anche in Esplora
-  await p.goto(`${BASE}/mappa?beta=-pin-salvati`, { waitUntil: "networkidle" });
-  ok((await p.getByTestId("pin-salvato").count()) === 0, "pin dei salvati: si spengono con ?beta=-pin-salvati (accesi di default)");
+  // Lorenzo (14/10): i salvati NON compaiono sulla mappa generale, solo in "I miei salvati".
+  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await p.waitForTimeout(800);
+  ok((await p.getByTestId("pin-salvato").count()) === 0, "pin dei salvati: spenti di default (i salvati solo in 'I miei salvati')");
   await p.goto(`${BASE}/mappa?beta=pin-salvati`, { waitUntil: "networkidle" });
   await p.getByTestId("pin-salvato").first().waitFor({ timeout: 5000 }).then(async () => {
     ok((await p.getByTestId("pin-salvato").count()) === rows.length, `pin dei salvati: ${await p.getByTestId("pin-salvato").count()} segnalibri sulla mappa in Esplora`);

@@ -24,7 +24,7 @@ Aggiornata il 14/10 sera: tutto ciò che è qui è in produzione (PR #36 e #37),
 - iPhone: Profilo → "+ Importa locali" → "📋 Incolla link" con il link di Google Maps.
 - Fai notare: finisce in "📌 Voglio andarci", senza moduli da compilare.
 
-**1:05 — Ritrova.** Apri la mappa: i tuoi salvati sono i segnalibri corallo. Tocca il pulsante della posizione: "📌 A 300 m c'è X, che volevi provare" → **Apri**. "Te lo ricorda quando ci passi vicino." Poi **Salvati** in basso: la tua mappa, divisa per città e stato; scrivi "terrazza" nella barra: compare "📌 Nei tuoi salvati".
+**1:05 — Ritrova.** Apri la mappa e tocca il pulsante della posizione: "📌 A 300 m c'è X, che volevi provare" → **Apri**. "Te lo ricorda quando ci passi vicino." Poi **Salvati** in basso: la tua mappa, divisa per città e stato; scrivi "terrazza" nella barra: compare "📌 Nei tuoi salvati".
 
 **1:25 — Scegli: "Stasera dove andiamo?".** Da "I miei salvati" o dal Profilo: occasione "Romantico", "Vicino a me", "Mai provati" → "Proponimi 3 posti". Tre posti tuoi, con la tua nota. "Percorso" e si parte.
 
