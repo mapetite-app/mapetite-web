@@ -1155,6 +1155,24 @@ else {
   }, () => ok(false, "pin dei salvati: segnalibri sulla mappa in Esplora"));
   await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
+  // "📌 A 100 m c'è X, che volevi provare" (14/10): toccando "La mia posizione" vicino a un "Voglio andarci"
+  {
+    await sctx.grantPermissions(["geolocation"]);
+    await sctx.setGeolocation({ latitude: 41.8906, longitude: 12.4705 });
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.waitForTimeout(800);
+    await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
+    const near = p.getByTestId("vicino-salvato");
+    await near.waitFor({ timeout: 5000 }).catch(() => {});
+    const t = (await near.textContent().catch(() => "")) ?? "";
+    ok(t.includes("Osteria Due") && t.includes("che volevi provare") && !t.includes("Terrazza Uno"), `vicino a un salvato: avviso con il "Voglio andarci" a due passi (${t.slice(0, 70)})`);
+    await p.screenshot({ path: `${OUT}/11d-vicino-salvato.png`, caret: "initial" });
+    await near.getByRole("button", { name: "Apri" }).click().catch(() => {});
+    await p.waitForTimeout(1200);
+    ok(await p.getByRole("heading", { name: "Osteria Due" }).first().isVisible().catch(() => false), "vicino a un salvato: 'Apri' apre la sua scheda");
+    await sctx.clearPermissions();
+  }
+
   // "Fatti suggerire": con 3 salvati di cui 2 bar a Roma compare "✨ Dai tuoi salvati: Bar a Roma, fuori dai soliti giri"
   {
     const rows3 = [rows[0], { ...rows[1], places: { ...rows[1].places, category: "bar" } }, rows[2]];
