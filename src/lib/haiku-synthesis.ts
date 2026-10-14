@@ -24,6 +24,7 @@ const HAIKU_OUTPUT_PER_MTOK = 5.0;
 // place_synthesis ne assorbe gran parte — i locali già visti non ripagano la
 // chiamata synthesis — quindi il costo marginale reale grava sui soli locali nuovi.
 export const SYNTHESIS_LIMIT = 12;
+const SYNTHESIS_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 // Locali per chiamata Haiku: le chiamate dei gruppi partono insieme (latenza ~1/3 con 12 locali).
 // 5 ≥ i gruppi che il telefono chiede (2, 3, 3, 4: vedi VERDICT_GROUPS): una chiamata ciascuno.
@@ -392,11 +393,12 @@ export async function getSynthesis(
 
   // 2. Legge la cache.
   const cached = new Map<string, CachedSynthesis>();
+  const stale = new Set<string>();
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("place_synthesis")
-      .select("place_id, synthesis, tags, verdict, go_for, dont_expect")
+      .select("place_id, synthesis, tags, verdict, go_for, dont_expect, generated_at")
       .in("place_id", ids);
     if (error) {
       console.error("[haiku-synthesis] cache read error:", error);
@@ -405,6 +407,11 @@ export async function getSynthesis(
         // Verdetto vuoto in cache (risposta dell'AI incompleta): conta come mancante e si rigenera,
         // altrimenti quel locale resterebbe senza verdetto per sempre (VISIONE: verdetto SEMPRE).
         if (typeof row.verdict !== "string" || row.verdict.trim() === "") continue;
+        // Verdetto vecchio (decisione 24 del backlog, 15/10): si riscrive con le recensioni di oggi,
+        // che arrivano già con la ricerca (nessuna chiamata Google in più; ~0,3 centesimi Haiku a
+        // locale ogni 90 giorni). Se la riscrittura fallisce resta quello vecchio.
+        const at = Date.parse(String(row.generated_at ?? ""));
+        if (Number.isFinite(at) && Date.now() - at > SYNTHESIS_MAX_AGE_MS) stale.add(row.place_id as string);
         cached.set(row.place_id as string, {
           synthesis: (row.synthesis as string) ?? "",
           tags: (row.tags as string[] | null) ?? [],
@@ -419,7 +426,8 @@ export async function getSynthesis(
   }
 
   // 3. cached vs missing
-  const missing = targets.filter((p) => !cached.has(p.id));
+  const missing = targets.filter((p) => !cached.has(p.id) || stale.has(p.id));
+  if (stale.size > 0) console.log(`[haiku-synthesis] verdetti da rinnovare (oltre 90 giorni): ${stale.size}`);
 
   // 4. UNA chiamata Haiku in batch SOLO per i missing.
   const generated = new Map<string, CachedSynthesis>();
@@ -529,6 +537,8 @@ export async function getSynthesis(
           verdict: s.verdict,
           go_for: s.goFor,
           dont_expect: s.dontExpect,
+          // L'upsert non riscrive il default: senza, un verdetto rinnovato resterebbe "vecchio".
+          generated_at: new Date().toISOString(),
         }));
         const { error } = rows.length === 0 ? { error: null } : await supabase
           .from("place_synthesis")
