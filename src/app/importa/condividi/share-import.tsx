@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { extractMapsLinks } from "@/lib/maps-link";
 import { findSocialLink, placeHintFromText } from "@/lib/social-link";
 import SocialLinkHelp from "../social-link-help";
+import { findVideoLink } from "@/lib/video-caption";
 import ManualAddCard from "../manual-add-card";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, rememberPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
@@ -42,6 +43,7 @@ export default function ShareImport({
   // Link di Instagram/TikTok/YouTube Shorts (senza link di Maps): non si chiama il server.
   const social = fullText && extractMapsLinks(fullText).length === 0 ? findSocialLink(fullText) : null;
   const hint = social ? placeHintFromText(fullText) : null;
+  const video = social ? findVideoLink(fullText) : null;
   const [manualQuery, setManualQuery] = useState<string | null>(null);
   const router = useRouter();
   const [busy, setBusy] = useState(Boolean(fullText && userId && !social));
@@ -78,6 +80,8 @@ export default function ShareImport({
             hint={hint}
             onScreenshot={() => router.push("/importa#da-screenshot")}
             onSearch={(q) => setManualQuery(q)}
+            // Condiviso da TikTok/YouTube: Importa legge la didascalia del video e propone il locale.
+            onReadVideo={video ? () => router.push(`/importa?video=${encodeURIComponent(video)}#da-screenshot`) : undefined}
           />
           {manualQuery && <ManualAddCard userId={userId} initialQuery={manualQuery} autoSearch />}
         </div>

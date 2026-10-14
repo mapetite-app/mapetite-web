@@ -5,6 +5,7 @@ import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
+import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -58,6 +59,12 @@ ok(refineCategory("bar", ["bar", "cocktail_bar", "point_of_interest"]) === "cock
 ok(refineCategory("bar", ["bar", "wine_bar", "lounge_bar"]) === "bar", "categoria: bar con wine_bar resta bar");
 ok(refineCategory("bar", ["bar", "cafe", "cocktail_bar"]) === "bar", "categoria: bar che è anche caffetteria resta bar (non va in fondo a 'colazione')");
 ok(refineCategory("bar", ["bar", "point_of_interest"]) === "bar" && refineCategory("restaurant", ["restaurant", "cocktail_bar"]) === "restaurant" && refineCategory(null, null) === null, "categoria: solo il 'bar' generico cambia, gli altri tipi restano");
+
+// Video TikTok/YouTube (14/10): solo link di video veri; il server non deve chiamare altri indirizzi.
+ok(videoSourceOf("https://vm.tiktok.com/ZMabc123/") === "TikTok" && videoSourceOf("https://www.tiktok.com/@mario/video/123") === "TikTok", "video: link TikTok riconosciuti");
+ok(videoSourceOf("https://www.youtube.com/shorts/abcDEF") === "YouTube" && videoSourceOf("https://youtu.be/abc") === "YouTube", "video: Shorts e youtu.be riconosciuti");
+ok(videoSourceOf("https://www.instagram.com/reel/ABC/") === null && videoSourceOf("https://evil.com/tiktok.com") === null && videoSourceOf("https://tiktok.com.evil.com/x") === null && videoSourceOf("file:///etc/passwd") === null && videoSourceOf("https://www.youtube.com/watch?v=x") === null, "video: Instagram, altri siti e video lunghi di YouTube esclusi");
+ok(findVideoLink("Guarda questo video su TikTok https://vm.tiktok.com/ZMabc123/.") === "https://vm.tiktok.com/ZMabc123/", "video: link trovato nel testo condiviso");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

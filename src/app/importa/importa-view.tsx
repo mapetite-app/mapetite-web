@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
@@ -104,21 +104,20 @@ export default function ImportaView({ userId }: { userId: string | null }) {
     setSavedName(null);
   };
 
-  const handleRead = async () => {
-    // Leggere lo screenshot costa (AI + Google): solo per chi può poi salvare il locale.
-    if (!file || !userId) return;
+  const readPlace = async (body: () => Promise<{ image: string } | { link: string }>) => {
     setIsReading(true);
     setError(null);
 
     try {
-      const dataUrl = await screenshotForUpload(file);
-
       const extractRes = await fetch("/api/import-caption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl }),
+        body: JSON.stringify(await body()),
       });
-      if (!extractRes.ok) throw new Error("Impossibile leggere il locale dallo screenshot.");
+      if (!extractRes.ok) {
+        const d = await extractRes.json().catch(() => ({}));
+        throw new Error((d as { error?: string }).error ?? "Impossibile leggere il locale.");
+      }
       const extractedData: ImportResult = await extractRes.json();
       setExtracted(extractedData);
 
@@ -148,6 +147,39 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       setIsReading(false);
     }
   };
+
+  const handleRead = () => {
+    // Leggere lo screenshot costa (AI + Google): solo per chi può poi salvare il locale.
+    if (!file || !userId) return;
+    void readPlace(async () => ({ image: await screenshotForUpload(file) }));
+  };
+
+  // Link di un video TikTok/YouTube: il server legge la didascalia (oEmbed ufficiale) e l'AI ne
+  // ricava nome e città, poi stessi passi dello screenshot (scelta del locale su Google, salva).
+  const readVideo = (url: string) => {
+    if (!userId) return;
+    goToScreenshot();
+    setFile(null);
+    setPreviewUrl(null);
+    setSavedName(null);
+    setSearchResults([]);
+    setExtracted(null);
+    setStep(1);
+    void readPlace(async () => ({ link: url }));
+  };
+
+  // Arrivati da "Condividi" di TikTok (Android): /importa?video=<link>.
+  const videoStarted = useRef(false);
+  useEffect(() => {
+    if (videoStarted.current || !userId) return;
+    const url = new URLSearchParams(window.location.search).get("video");
+    if (!url) return;
+    videoStarted.current = true;
+    window.history.replaceState(null, "", `${window.location.pathname}#da-screenshot`);
+    // Fuori dal ciclo dell'effetto: gli aggiornamenti di stato partono dopo il primo disegno.
+    setTimeout(() => readVideo(url), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const handleManualSearch = async () => {
     if (!manualQuery.trim()) return;
@@ -229,7 +261,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
       <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
 
-      <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} />
+      <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
 
       <div className="mt-6">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />

@@ -1869,7 +1869,7 @@ if (!fakeUser) {
   await gcard.getByLabel("Link di Google Maps").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   const soc = gcard.getByTestId("link-social");
-  ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram e TikTok non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
+  ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
   ok(!(await mp.getByText("Non vedo un link di Google Maps", { exact: false }).isVisible()) && mFromLink.length === 0, "instagram: niente 'non è un link di Google Maps', nessuna chiamata al server");
   const cerca = soc.getByTestId("link-social-cerca");
   ok(await cerca.isVisible() && (await cerca.textContent())?.includes("Pizzeria Bella a Roma"), "instagram: propone 'Cerca 'Pizzeria Bella a Roma''");
@@ -1890,9 +1890,20 @@ if (!fakeUser) {
   await gcard.getByLabel("Link di Google Maps").fill("https://vm.tiktok.com/ZMabc123/");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
+  // "✨ Trova il locale dal video" (14/10): la didascalia del video (oEmbed) va all'AI, poi si sceglie il locale.
+  const capBodies = [];
+  await mctx.route("**/api/import-caption", (r) => { capBodies.push(r.request().postDataJSON()); return r.fulfill({ json: { nome: "Osteria dei Fratelli", citta: "Milano", categoria: "ristorante" } }); });
+  ok(await gcard.getByTestId("link-social-video").isVisible(), "tiktok: pulsante '✨ Trova il locale dal video'");
+  const s2 = mSearch.length;
+  await gcard.getByTestId("link-social-video").click();
+  await mp.getByText("Seleziona il locale corretto").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(capBodies.at(-1)?.link === "https://vm.tiktok.com/ZMabc123/" && mSearch.length === s2 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano" && await mp.getByText("Seleziona il locale corretto").isVisible(), "tiktok: dal video legge nome e città e propone i locali da salvare");
+  await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
   await gcard.getByLabel("Link di Google Maps").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
-  ok(await gcard.getByText("Vale anche per gli Shorts di YouTube.").isVisible() && mFromLink.length === 0, "youtube shorts: stesso messaggio, nessuna chiamata");
+  ok(await gcard.getByText("Leggo la descrizione del video di YouTube", { exact: false }).isVisible() && await gcard.getByTestId("link-social-video").isVisible() && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps");
 
   // Condividi (Android) di un link TikTok: niente errore Google Maps.
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
@@ -1902,6 +1913,13 @@ if (!fakeUser) {
   await mp.getByTestId("link-social-cerca").click();
   await mp.getByTestId("mano-risultato").first().waitFor({ timeout: 5000 });
   ok(mSearch.length === s1 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano", "condividi tiktok con nome: 'Cerca …' mostra i risultati da salvare");
+  // Condividi da TikTok: "Trova il locale dal video" apre Importa e legge subito il video.
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
+  const c0 = capBodies.length;
+  await mp.getByTestId("link-social-video").click();
+  await mp.getByText("Seleziona il locale corretto").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.length === c0 + 1 && capBodies.at(-1)?.link === "https://www.tiktok.com/@mario/video/123" && !mp.url().includes("video="), "condividi tiktok: 'Trova il locale dal video' legge il video in Importa (una sola volta)");
+  await mctx.unroute("**/api/import-caption");
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
   await mp.getByTestId("link-social-screenshot").click();
   await mp.waitForURL(/\/importa#da-screenshot/, { timeout: 5000 }).then(() => ok(true, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"), () => ok(false, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"));
