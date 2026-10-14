@@ -82,7 +82,13 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     let failed = 0;
     setError(null);
     setProgress({ done: 0, total: targets.length });
-    const supabase = await browserClient();
+    const supabase = await browserClient().catch(() => null);
+    if (!supabase) {
+      // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non attesa infinita.
+      setProgress(null);
+      setError("Non sono riuscito ad aggiornare la raccolta: controlla la connessione e riprova.");
+      return targets.length;
+    }
     for (const [i, row] of targets.entries()) {
       // Tag attuali dal database, non quelli caricati con la pagina: nel frattempo "Ci sei stato?"
       // (o un altro telefono) può averli cambiati, e riscrivere la copia vecchia cancellerebbe la visita.

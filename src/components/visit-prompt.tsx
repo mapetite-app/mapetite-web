@@ -59,7 +59,10 @@ export default function VisitPrompt({ userId, candidates }: { userId: string; ca
     setBusy(true);
     setError(false);
     const tags = [...current.tags.filter((t) => t !== WANT && t !== DONE), DONE];
-    const { error: err } = await (await browserClient()).from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", current.id);
+    // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non pulsante bloccato.
+    const client = await browserClient().catch(() => null);
+    if (!client) { setBusy(false); setError(true); return; }
+    const { error: err } = await client.from("saved_places").update({ tags }).eq("user_id", userId).eq("place_id", current.id);
     setBusy(false);
     if (err) { setError(true); return; }
     track("ci_sono_stato", { id: current.id }, { fonte: "ci-sei-stato" });

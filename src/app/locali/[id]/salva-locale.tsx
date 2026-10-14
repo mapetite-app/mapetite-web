@@ -34,7 +34,10 @@ export default function SalvaLocale({
   const save = async () => {
     if (!userId || state === "saving") return;
     setState("saving");
-    const { error } = await (await browserClient())
+    // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non pulsante bloccato.
+    const client = await browserClient().catch(() => null);
+    if (!client) { setState("error"); return; }
+    const { error } = await client
       .from("saved_places")
       .insert({ user_id: userId, place_id: placeId, tags: [WANT_TAG], note: null });
     if (error && error.code === "23505") setState("already");
