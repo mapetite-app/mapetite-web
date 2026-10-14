@@ -56,6 +56,11 @@ const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if
     for (const p of ["/locali/abc", "/locali/44444444-0000-4000-8000-000000000004?salva=1", "/stasera", "/importa", "/importa/condividi/immagine?nome=Da+Enzo&citta=Roma"]) ok(safeNext(p) === p, `next: "${p}" accettato`);
     for (const p of ["//evil.com", "https://evil.com", "http:/evil.com", "/\\evil.com", "/\\/evil.com", "javascript:alert(1)", "/..//evil.com", "/.//evil.com", "/\tevil", " //evil.com", "/login?next=/x", "/signup", "/api/search", "locali/abc", "", "/" + "a".repeat(600)]) ok(safeNext(p) === null, `next: ${JSON.stringify(p.length > 40 ? p.slice(0, 20) + "…" : p)} rifiutato`);
     ok(safeNext(undefined) === null && safeNext(["/x"]) === null, "next: valori non testuali rifiutati");
+    // Link dell'email di conferma: /login?code=… passa alla route che apre la sessione; link scaduto in italiano
+    const conf = await fetch(`${BASE}/login?code=abc123&next=%2Fstasera`, { redirect: "manual" });
+    ok(conf.status === 307 && (conf.headers.get("location") ?? "").endsWith("/auth/conferma?code=abc123&next=%2Fstasera"), `conferma email: il link apre la sessione (${conf.status} ${conf.headers.get("location")})`);
+    const scad = await (await fetch(`${BASE}/login?error=access_denied&error_code=otp_expired`)).text();
+    ok(scad.includes("Il link non è più valido") && !scad.includes(">access_denied<"), "conferma email: link scaduto spiegato in italiano");
     ok(safeNext("/password-dimenticata") === null && safeNext("/reimposta-password?x=1") === null, "next: dopo l'accesso non si torna alle pagine della password");
     ok(withNext("/login", "/locali/abc") === "/login?next=%2Flocali%2Fabc" && withNext("/login?error=x", "/stasera") === "/login?error=x&next=%2Fstasera" && withNext("/login", "//evil.com") === "/login", "next: withNext aggiunge solo percorsi validi");
     ok(afterLoginPath("/locali/abc?salva=1", true) === "/locali/abc?salva=1", "dopo l'accesso: chi ha già fatto l'onboarding torna a next");
@@ -843,6 +848,23 @@ ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").is
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
 await page.getByLabel("Scegli uno screenshot").setInputFiles({ name: "post.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
 ok(await page.getByText("Cambia screenshot").isVisible() && await page.getByText("post.png").isVisible(), "importa: area grande per scegliere lo screenshot, in italiano");
+// Screenshot grande (come un PNG di iPhone): parte rimpicciolito in JPEG, sotto il limite delle richieste
+{
+  let captionBody = null;
+  await page.route("**/api/import-caption", (r) => { captionBody = r.request().postDataJSON(); return r.fulfill({ json: { name: null, city: null } }); });
+  await page.evaluate(async () => {
+    const c = document.createElement("canvas"); c.width = 3000; c.height = 2000;
+    const g = c.getContext("2d");
+    for (let i = 0; i < 2000; i += 4) { g.fillStyle = `hsl(${(i * 7) % 360},80%,${30 + (i % 40)}%)`; g.fillRect(0, i, 3000, 4); }
+    const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+    const dt = new DataTransfer(); dt.items.add(new File([blob], "grande.png", { type: "image/png" }));
+    const input = document.querySelector("input[type=file]"); input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "Leggi locale" }).click();
+  for (let i = 0; i < 20 && !captionBody; i++) await page.waitForTimeout(200);
+  ok(captionBody?.image?.startsWith("data:image/jpeg") && captionBody.image.length < 1_500_000, `importa: screenshot grande rimpicciolito prima dell'invio (${captionBody?.image?.slice(0, 15)}, ${Math.round((captionBody?.image?.length ?? 0) / 1000)} kB)`);
+  await page.unroute("**/api/import-caption");
+}
 await page.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
 const covered = await page.evaluate(() => {
   const b = [...document.querySelectorAll("button")].find((x) => /Continua/.test(x.textContent ?? ""));
@@ -876,9 +898,10 @@ ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da dis
   ok((await hiddenNext()).length === 0, "login senza next: nessun campo nascosto (comportamento di prima)");
   // Onboarding: "Salta" va a next; senza next (o con next non valido) alla mappa.
   await page.goto(`${BASE}/onboarding?next=%2Flocali%2Fabc%3Fsalva%3D1`, { waitUntil: "networkidle" });
-  ok(await page.getByTestId("onboarding-salta").getAttribute("href") === "/locali/abc?salva=1", "onboarding con next: 'Salta' riporta alla pagina di partenza");
+  const saltaNext = () => page.locator("form", { has: page.getByTestId("onboarding-salta") }).locator("input[name=next]").evaluateAll((els) => els.map((e) => e.value));
+  ok(JSON.stringify(await saltaNext()) === '["/locali/abc?salva=1"]', "onboarding con next: 'Salta' riporta alla pagina di partenza");
   await page.goto(`${BASE}/onboarding?next=%2F%2Fevil.com`, { waitUntil: "networkidle" });
-  ok(await page.getByTestId("onboarding-salta").getAttribute("href") === "/mappa", "onboarding con next pericoloso: 'Salta' resta sulla mappa");
+  ok((await saltaNext()).length === 0, "onboarding con next pericoloso: 'Salta' resta sulla mappa");
   // "Entra" nella barra: dalle pagine diverse dalla mappa porta con sé la pagina corrente.
   await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   ok(await page.getByRole("link", { name: "Entra" }).first().getAttribute("href") === "/login?next=%2Fimporta", "barra: 'Entra' da Importa riporta a Importa");
@@ -1175,10 +1198,11 @@ else {
       // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
       await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
       ok((await p.getByTestId("home-salvati").count()) === 0, "home salvati: spenta di default");
+      await p.evaluate(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* niente */ } });
       await p.goto(`${BASE}/?beta=home-salvati`, { waitUntil: "networkidle" });
       const hs = p.getByTestId("home-salvati");
       await hs.waitFor({ timeout: 4000 }).catch(() => {});
-      ok((await hs.textContent().catch(() => ""))?.includes("3 posti da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I miei 6") && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home salvati: '3 posti da provare', 'Stasera dove andiamo?' e 'I miei 6'");
+      ok(await hs.isVisible() && (await hs.textContent().catch(() => ""))?.includes("3 posti da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I miei 6") && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home salvati: '3 posti da provare', 'Stasera dove andiamo?' e 'I miei 6'");
       await p.screenshot({ path: `${OUT}/00c-home-salvati.png`, caret: "initial" });
       await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine" && f !== "home-salvati").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -1842,6 +1866,8 @@ if (!fakeUser) {
   await mctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   ok(await mano.getByTestId("mano-accedi").isVisible() && await mano.getByRole("link", { name: "Accedi" }).isVisible() && !(await mano.getByLabel("Nome del locale e città").isVisible()), "a mano da disconnessi: invito ad accedere, niente campo");
+  ok(await mp.getByTestId("screenshot-accedi").isVisible() && await mp.getByRole("button", { name: "Leggi locale" }).isDisabled(), "screenshot da disconnessi: 'Leggi locale' spento e invito ad accedere (niente AI e Google senza poter salvare)");
+  { const r = await mctx.request.post(`${BASE}/api/places/search`, { data: { query: "x".repeat(201) } }); ok(r.status() === 400, `ricerca locali: testo oltre 200 caratteri rifiutato senza chiamare Google (${r.status()})`); }
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/ABC/")}`, { waitUntil: "networkidle" });
   ok(await mp.getByTestId("link-social").isVisible() && !(await mp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa"))), "condividi instagram da disconnessi: messaggio, il link non resta in attesa");
   await mctx.clearCookies({ name: "e2e_anonimo" });
