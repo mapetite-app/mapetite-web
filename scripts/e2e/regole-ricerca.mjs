@@ -4,6 +4,7 @@ import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity } from "../../src/lib/named-city.ts";
+import { refineCategory } from "../../src/lib/refine-category.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -51,6 +52,12 @@ ok(namedCity("trattoria a Trastevere") === null, "città: un quartiere non è un
   ok(demoteOtherCity("Roma", milano).demoted.length === 0, "città: se quasi tutti sono fuori città non si tocca nulla");
   ok(demoteOtherCity("Milano", [a("Senza indirizzo", null), ...milano.slice(0, 1)]).demoted.length === 0, "città: un locale senza indirizzo resta");
 }
+
+// Tipo "bar" generico con cocktail_bar tra i tipi Google (14/10): The Doping Milan aveva 🍺 in "cocktail bar a Milano".
+ok(refineCategory("bar", ["bar", "cocktail_bar", "point_of_interest"]) === "cocktail_bar", "categoria: bar segnato anche cocktail_bar da Google → cocktail bar");
+ok(refineCategory("bar", ["bar", "wine_bar", "lounge_bar"]) === "bar", "categoria: bar con wine_bar resta bar");
+ok(refineCategory("bar", ["bar", "cafe", "cocktail_bar"]) === "bar", "categoria: bar che è anche caffetteria resta bar (non va in fondo a 'colazione')");
+ok(refineCategory("bar", ["bar", "point_of_interest"]) === "bar" && refineCategory("restaurant", ["restaurant", "cocktail_bar"]) === "restaurant" && refineCategory(null, null) === null, "categoria: solo il 'bar' generico cambia, gli altri tipi restano");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

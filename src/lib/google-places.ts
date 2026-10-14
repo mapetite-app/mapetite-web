@@ -1,5 +1,6 @@
 import { distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
+import { refineCategory } from "@/lib/refine-category";
 const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos";
 
 type GooglePlace = {
@@ -180,7 +181,7 @@ export async function searchGooglePlaces(
     address: place.formattedAddress ?? "",
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
-    category: place.primaryType ?? null,
+    category: refineCategory(place.primaryType ?? null, place.types ?? null),
     rating: place.rating ?? null,
     userRatingCount: place.userRatingCount ?? null,
     priceLevel:
