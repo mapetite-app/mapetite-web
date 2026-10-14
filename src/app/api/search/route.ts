@@ -117,6 +117,7 @@ export async function POST(request: Request) {
         openNowOnly: body?.openNowOnly === true ? true : undefined,
         radius: typeof body?.radius === "number" ? body.radius : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
+        maxDistanceMeters: typeof body?.radius === "number" ? body.radius : undefined,
         sortMode: searchIntent === "natural" ? "relevance" : "quality",
       });
     } catch (err) {
