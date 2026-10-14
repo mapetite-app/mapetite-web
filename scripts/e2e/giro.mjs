@@ -982,6 +982,13 @@ else {
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati + filtri: 'Ristoranti' tiene solo i ristoranti salvati");
+  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByRole("button", { name: "Ristoranti" }).click();
+  await p.getByRole("button", { name: "Caffè e Bar" }).click();
+  await p.getByRole("button", { name: /Applica filtri/ }).click();
+  await p.waitForTimeout(500);
+  ok((await p.locator("ul.snap-x").getByText("Caffè Milano").count()) === 1 && (await p.locator("ul.snap-x").getByText("Osteria Due").count()) === 0, "salvati + filtri: 'Caffè e Bar' trova il caffè salvato (tipi Google, non testo)");
   await p.getByRole("button", { name: "Filtri", exact: true }).click();
   await p.getByRole("button", { name: "Azzera" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
