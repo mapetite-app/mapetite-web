@@ -466,8 +466,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           )}
           {title && setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
             <p data-testid="messi-da-parte" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-text-muted`}>
+              {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
+                  Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
               🧭 {[
-                setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale turistico" : `${setAside.turistici.length} locali turistici`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
+                setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
                 setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
               ].filter(Boolean).join(" ")}
             </p>
