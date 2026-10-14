@@ -298,11 +298,8 @@ export default function VenueSheet({
             width={700}
             priority
             className="h-44 w-full rounded-t-card object-cover"
-            credit={venue.photoAuthor && (
-              <span className="absolute bottom-2 left-3 rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white">
-                Foto: {venue.photoAuthor}
-              </span>
-            )}
+            credit={venue.photoAuthor}
+            creditClassName="absolute bottom-2 left-3"
           />
         </div>
       )}
@@ -408,9 +405,7 @@ export default function VenueSheet({
                 priority
                 className="h-56 w-full rounded-t-card object-cover"
                 fallback={<div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>}
-                credit={venue.photoAuthor && (
-                  <span className="absolute bottom-2 right-3 rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white">Foto: {venue.photoAuthor}</span>
-                )}
+                credit={venue.photoAuthor}
               />
             ) : (
               <div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>

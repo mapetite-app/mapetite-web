@@ -4,7 +4,7 @@ Scritto il 14/10/2026 notte, su richiesta di Lorenzo. Escluso il tetto di spesa 
 L'ordine segue l'impatto: le prime cose sono quelle che oggi mi fermano più spesso.
 Per ogni voce: cosa fare, dove, quanto tempo serve.
 
-**Prima di tutto:** il merge della **PR #34**. La #33 è stata unita alle 00:44 con la sola prima parte della notte; tutto il resto (sicurezza, conferma email, velocità, 39 difetti) è nella #34.
+**Prima di tutto:** il merge della **PR #34**. La #33 è stata unita alle 00:44 con la sola prima parte della notte; tutto il resto (sicurezza, conferma email, velocità, 45 difetti) è nella #34.
 
 ## A. Accessi tecnici (5–30 minuti ciascuno)
 

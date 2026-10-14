@@ -12,6 +12,7 @@ export default function PlacePhoto({
   fallback = null,
   priority = false,
   credit = null,
+  creditClassName = "absolute bottom-2 right-3",
 }: {
   photoRef: string | null | undefined;
   alt: string;
@@ -19,9 +20,10 @@ export default function PlacePhoto({
   width?: number;
   fallback?: ReactNode;
   priority?: boolean;
-  // Didascalia "Foto: …": solo sopra una foto vera. Prima restava sopra l'emoji quando la foto
-  // non caricava (quota foto finita, rete), attribuendo a qualcuno un'immagine che non c'è.
-  credit?: ReactNode;
+  // Autore della foto (Google chiede di mostrarlo): solo se la foto c'è davvero. Prima il credito
+  // restava sopra l'emoji anche quando la foto non arrivava (quota giornaliera finita).
+  credit?: string | null;
+  creditClassName?: string;
 }) {
   const [failed, setFailed] = useState(false);
   if (!photoRef || failed) return <>{fallback}</>;
@@ -36,7 +38,9 @@ export default function PlacePhoto({
         onError={() => setFailed(true)}
         className={className}
       />
-      {credit}
+      {credit && (
+        <span className={`${creditClassName} rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white`}>Foto: {credit}</span>
+      )}
     </>
   );
 }
