@@ -58,10 +58,37 @@ function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, 120) : null;
 }
 
+// Memoria delle frasi già capite (per istanza del server): le frasi d'esempio della home e le
+// ricerche ripetute (anche "Cerca di nuovo") non aspettano di nuovo Haiku (~1–2 s) e non lo
+// ripagano. Solo l'output di Haiku, nessun dato Google. Le richieste uguali in contemporanea
+// condividono la stessa chiamata.
+const INTENT_TTL_MS = 24 * 60 * 60 * 1000;
+const INTENT_MAX = 500;
+const intentCache = new Map<string, { at: number; value: Promise<SearchIntent | null> }>();
+
+function intentKey(query: string): string {
+  return query.toLowerCase().replace(/\s+/g, " ").replace(/[.!?…]+$/, "").trim();
+}
+
 // Estrae l'intento con Haiku PRIMA della ricerca Google. Degrada in sicurezza:
 // qualsiasi errore o timeout → null e il chiamante usa la frase originale.
 export async function extractSearchIntent(query: string): Promise<SearchIntent | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
+  const key = intentKey(query);
+  const hit = intentCache.get(key);
+  if (hit && Date.now() - hit.at < INTENT_TTL_MS) {
+    console.log(`[search-intent] dalla memoria: "${key.slice(0, 60)}"`);
+    return hit.value;
+  }
+  const value = askIntent(query);
+  intentCache.set(key, { at: Date.now(), value });
+  if (intentCache.size > INTENT_MAX) intentCache.delete(intentCache.keys().next().value!);
+  // Un fallimento (null) non resta in memoria: la prossima volta si riprova.
+  value.then((v) => { if (!v && intentCache.get(key)?.value === value) intentCache.delete(key); });
+  return value;
+}
+
+async function askIntent(query: string): Promise<SearchIntent | null> {
   try {
     const message = await anthropic.messages.create(
       {
