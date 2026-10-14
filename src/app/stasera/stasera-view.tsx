@@ -144,7 +144,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
           target="_blank"
           rel="noopener noreferrer"
           data-testid="stasera-percorso"
-          onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { da: "stasera" })}
+          onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { fonte: "stasera" })}
           className="flex min-h-11 items-center justify-center rounded-pill bg-brand font-display text-sm font-semibold text-white active:scale-[0.98]"
         >
           Percorso
