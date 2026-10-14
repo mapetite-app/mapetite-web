@@ -956,6 +956,15 @@ ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da dis
   ok(JSON.stringify(await saltaNext()) === '["/locali/abc?salva=1"]', "onboarding con next: 'Salta' riporta alla pagina di partenza");
   await page.goto(`${BASE}/onboarding?next=%2F%2Fevil.com`, { waitUntil: "networkidle" });
   ok((await saltaNext()).length === 0, "onboarding con next pericoloso: 'Salta' resta sulla mappa");
+  // Senza accesso l'onboarding chiede prima la registrazione (le risposte si perdevano), portando next.
+  {
+    const octx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await octx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    const op = await octx.newPage();
+    await op.goto(`${BASE}/onboarding?next=%2Fstasera`, { waitUntil: "networkidle" });
+    ok(new URL(op.url()).pathname === "/signup" && new URL(op.url()).searchParams.get("next") === "/stasera", `onboarding senza accesso: prima la registrazione, con next (${op.url().replace(BASE, "")})`);
+    await octx.close();
+  }
   // "Entra" nella barra: dalle pagine diverse dalla mappa porta con sé la pagina corrente.
   await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   ok(await page.getByRole("link", { name: "Entra" }).first().getAttribute("href") === "/login?next=%2Fimporta", "barra: 'Entra' da Importa riporta a Importa");
