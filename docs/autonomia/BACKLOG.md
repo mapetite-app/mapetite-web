@@ -224,6 +224,10 @@ Nessun commento nuovo di Lorenzo e nessuna voce PRONTA. La sessione delle 22:00 
 - **Accese per tutti — FATTA**: pin dei salvati, "Ci sei stato?", copertine delle raccolte, home "La tua mappa", gemme 💎, "🎲 Scegli tu". Si spengono con `?beta=-nome`. Restano spente articolo, nuovo Salva, 🎤 (Lorenzo 12/10).
 - **Salva da TikTok e YouTube — FATTA, non provata dal vivo**: "✨ Trova il locale dal video" legge la didascalia dal servizio oEmbed ufficiale, l'AI trova nome e città, si sceglie il locale. Anche dal "Condividi" di TikTok su Android. Instagram resta con lo screenshot (oEmbed con token Meta). TikTok e YouTube non sono raggiungibili dall'ambiente di prova: da provare sul telefono.
 - **Foto vere**: viste per la prima volta (rete aperta da Lorenzo).
+- **Giro con un account vero — FATTO (voce 9, in sospeso dall'11/10)**: in produzione con l'utente di prova `claude-e2e@example.com` (creato con la chiave di servizio, nessuna email; la password si reimposta a ogni test, non è salvata da nessuna parte). Ricerca → salva → pin in Esplora → I miei salvati → profilo → home "La tua mappa": tutto funziona. Visto e corretto "I miei 1" → "Salvati · 1".
+- **Verdetti a gruppi — PR #37**: le 2 card che si vedono hanno il verdetto ~4 s dopo la lista, le altre arrivano mentre si legge (gruppi 2, 3, 3, 4 in parallelo). Stesse chiamate Haiku.
+- **"📌 A 100 m c'è X, che volevi provare" — PR #37**: toccando "La mia posizione" vicino (800 m) a un "Voglio andarci". Nessun costo.
+- **TikTok/YouTube**: da Vercel l'oEmbed risponde (prova in produzione con un video d'esempio: didascalia letta, nessun locale trovato, come atteso). Manca la prova con un video vero di un locale.
 - **Prossimi passi proposti**: migrazione `events` (stanotte); risposta più veloce dalla home (oggi ~5 s alla prima card: la comprensione della frase con Haiku e Google sono in fila); verdetto che compare card per card invece che tutto insieme; notifica "sei vicino a un locale che hai salvato" (Mapstr).
 
 ## Cosa serve decidere (in ordine di impatto per il 25/10)

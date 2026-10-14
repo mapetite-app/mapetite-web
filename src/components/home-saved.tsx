@@ -29,7 +29,7 @@ export default function HomeSaved({ total, want }: { total: number; want: number
           data-testid="home-salvati-tutti"
           className="flex min-h-11 shrink-0 items-center justify-center rounded-pill border border-white/30 px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
         >
-          I miei {total}
+          Salvati · {total}
         </Link>
       </div>
     </section>

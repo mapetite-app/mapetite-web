@@ -20,7 +20,7 @@ import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "luc
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
-import { distanceMeters } from "@/lib/distance";
+import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
@@ -503,6 +503,8 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 // Solo salvati entro SIMILAR_MAX_METERS (14/10): prima un ristorante salvato a Milano finiva
 // su quasi ogni "Ristorante" cercato a Roma, un'affermazione senza fondamento.
 const SIMILAR_MAX_METERS = 15_000;
+// "Sei vicino a un locale che volevi provare": entro ~10 minuti a piedi.
+const NEARBY_SAVED_METERS = 800;
 function similarSaved(place: Place, saved: Place[]): string | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
@@ -652,7 +654,7 @@ type AIFiltri = {
 };
 
 // Dati firmati dal server per chiedere i verdetti dopo la prima risposta.
-type PendingSynthesis = { places: unknown[]; token: string };
+type PendingSynthesis = { places: unknown[]; token: string; gruppi?: { places: unknown[]; token: string }[] };
 
 // Cosa ha capito la ricerca: tipo, requisiti, "vicino a te" o la zona nominata.
 function filtriParts(filtri: AIFiltri): string[] {
@@ -1116,6 +1118,10 @@ export default function MapView({
   // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Voglio andarci"
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
+  // "📌 A 300 m c'è X, che volevi provare" (come Mapstr, ma senza notifiche): quando l'utente tocca
+  // "La mia posizione" e un suo "Voglio andarci" è a due passi. Ritrova il locale nel momento giusto.
+  const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
+  const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
   const askLoginToSave = (place: Place, tags: string[] = [VISIT_WANT]) => {
@@ -1685,6 +1691,17 @@ export default function MapView({
       (pos) => {
         setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setViewState((v) => ({ ...v, latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 14 }));
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const near = savedPlaces
+          .filter((p) => p.tags?.includes(VISIT_WANT))
+          .map((p) => ({ place: p, meters: distanceMeters(here, p) }))
+          .filter((x) => x.meters <= NEARBY_SAVED_METERS)
+          .sort((a, b) => a.meters - b.meters)[0];
+        if (near) {
+          setNearbySaved(near);
+          if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
+          nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
+        }
         setGeoState("idle");
         setWelcomeDismissed(true);
       },
@@ -1704,28 +1721,43 @@ export default function MapView({
     if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
     try {
-      const res = await fetch("/api/search/synthesis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchedQuery, places: pending.places, token: pending.token }),
-      });
-      if (!res.ok || searchSeq.current !== id) return;
-      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> } = await res.json();
-      const esclusi = new Set(data.esclusi ?? []);
-      const livelli = data.livelli ?? {};
-      setVenueDetails((prev) => {
-        const next = { ...prev };
-        for (const [pid, d] of Object.entries(data.dettagli ?? {})) {
-          next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+      type VerdictReply = { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> };
+      // A gruppi in parallelo (le prime 2 card arrivano per prime, ~3-4 s): ogni verdetto si mostra
+      // appena pronto; esclusioni e ordine si applicano una volta sola, a gruppi arrivati.
+      const groups = pending.gruppi?.length ? pending.gruppi : [{ places: pending.places, token: pending.token }];
+      const replies = await Promise.all(groups.map(async (g): Promise<VerdictReply | null> => {
+        try {
+          const res = await fetch("/api/search/synthesis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: searchedQuery, places: g.places, token: g.token }),
+          });
+          if (!res.ok || searchSeq.current !== id) return null;
+          const part: VerdictReply = await res.json();
+          if (searchSeq.current !== id) return null;
+          setVenueDetails((prev) => {
+            const next = { ...prev };
+            for (const [pid, d] of Object.entries(part.dettagli ?? {})) {
+              next[pid] = { ...(prev[pid] as VenueDetails), ...d } as VenueDetails;
+            }
+            return next;
+          });
+          return part;
+        } catch {
+          return null; // un gruppo perso non ferma gli altri: quelle card restano con i dati Google
         }
-        return next;
-      });
+      }));
+      if (searchSeq.current !== id) return;
+      const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
+      const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
           // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
           // chiudeva la scheda sotto le dita e lasciava solo la mappa.
           let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Se l'AI scartasse tutti i locali (sommando i gruppi) non si esclude niente: nel dubbio il locale resta.
+          if (risultati.length === 0) risultati = prev.risultati;
           // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
           // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
           // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
@@ -2954,6 +2986,22 @@ export default function MapView({
       )}
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
+      {nearbySaved && !savedToast && !selected && (
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+          <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
+            <span className="min-w-0 flex-1 text-sm font-sans">
+              <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
+            </span>
+            <button
+              type="button"
+              onClick={() => { dispatch({ type: "OPEN_VENUE", placeId: nearbySaved.place.id }); setNearbySaved(null); }}
+              className="min-h-10 shrink-0 rounded-pill bg-accent px-4 text-sm font-display font-semibold active:scale-95"
+            >
+              Apri
+            </button>
+          </div>
+        </div>
+      )}
       {savedToast && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">

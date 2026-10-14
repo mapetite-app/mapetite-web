@@ -9,7 +9,8 @@
 // "luoghi" non è AI ma una ricerca Google a pagamento (Importa): stesso freno per persona.
 export type AiAction = "ricerca" | "verdetti" | "screenshot" | "luoghi";
 
-const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 40, screenshot: 20, luoghi: 20 };
+// verdetti: 4 richieste per ricerca dal 14/10 (gruppi da 2, 3, 3, 4) → 160 = le stesse 40 ricerche di prima.
+const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 160, screenshot: 20, luoghi: 20 };
 const PER_DAY = 1500;
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
