@@ -170,6 +170,8 @@ export async function searchGooglePlaces(
       "X-Goog-FieldMask": FIELD_MASK,
     },
     body: JSON.stringify(requestBody),
+    // Senza limite una risposta lenta di Google teneva la ricerca appesa fino al timeout della piattaforma.
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!googleResponse.ok) {

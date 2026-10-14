@@ -511,6 +511,13 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   return best?.name ?? null;
 }
 
+// Salvati non caricati: senza rete o con la pagina che cambia a metà richiesta ("Failed to fetch")
+// è normale e non va segnalato come errore; il resto sì.
+function logSavedError(error: { message?: string }) {
+  if (/Failed to fetch|NetworkError|Load failed/i.test(error.message ?? "")) console.warn("Salvati non caricati (rete):", error.message);
+  else console.error("Errore nel caricamento dei locali salvati:", error);
+}
+
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
 // nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
 type MapStyleApi = {
@@ -1153,7 +1160,7 @@ export default function MapView({
         .eq("user_id", userId))
       .then(({ data, error }) => {
         if (error) {
-          console.error("Errore nel caricamento dei locali salvati:", error);
+          logSavedError(error);
           return;
         }
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
@@ -1213,7 +1220,7 @@ export default function MapView({
       setLoadingSaved(false);
       setSavedLoaded(true);
       if (error) {
-        console.error("Errore nel caricamento dei locali salvati:", error);
+        logSavedError(error);
         return;
       }
 
@@ -1409,7 +1416,7 @@ export default function MapView({
       });
       const data = await res.json();
       if (searchSeq.current !== ticket) return;
-      if (!res.ok) { setFilterError("Ricerca non riuscita. Riprova."); return; }
+      if (!res.ok) { setFilterError(data.error ?? "Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
         id: string; name: string; category: string | null; lat: number | null; lng: number | null;
         rating: number | null; priceLevel: number | null; address: string | null;

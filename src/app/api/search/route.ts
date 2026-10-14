@@ -120,8 +120,18 @@ export async function POST(request: Request) {
         sortMode: searchIntent === "natural" ? "relevance" : "quality",
       });
     } catch (err) {
+      // Un errore di Google (quota giornaliera finita, rete, lentezza) non è "nessun risultato":
+      // il telefono mostrerebbe "Non ho trovato nulla, prova con meno requisiti", che è falso.
       console.error("[search/route] Google Places error:", err);
-      risultati = [];
+      const quota = err instanceof Error && /error 429/.test(err.message);
+      return NextResponse.json(
+        {
+          error: quota
+            ? "Oggi le ricerche sono finite: riprova domani, oppure cerca tra i tuoi salvati."
+            : "La ricerca non è disponibile in questo momento: riprova tra poco.",
+        },
+        { status: 503 },
+      );
     }
     // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
     // (un pub per la colazione) vanno in fondo, mai esclusi.
@@ -365,12 +375,12 @@ ESEMPI (input → output atteso):
     return {
       ...rest,
       selectedReviews: selectQualityReviews(reviewTexts),
-      synthesis: s?.synthesis ?? null,
-      tags: s?.tags ?? rest.tags ?? null,
-      verdict: s?.verdict ?? null,
+      synthesis: s?.synthesis || null,
+      tags: s?.tags?.length ? s.tags : rest.tags ?? null,
+      verdict: s?.verdict || null,
       goFor: s?.goFor ?? null,
       dontExpect: s?.dontExpect ?? null,
-      matchReason: s?.matchReason ?? null,
+      matchReason: s?.matchReason || null,
     };
   });
 
