@@ -40,6 +40,8 @@ export type PlaceResult = {
   websiteUri: string | null;
   editorialSummary: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
+  // Le stesse recensioni con il voto (per la riga di ripiego della card: mai una stroncatura). Solo server.
+  reviewItems?: { text: string; rating: number | null }[] | null;
   phone: string | null;
   photoRef: string | null;   // il campo "name" della PRIMA foto, o null
   photoAuthor?: string | null; // autore della prima foto: Google chiede di mostrarlo
@@ -196,6 +198,13 @@ export async function searchGooglePlaces(
         .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
         .slice(0, 5);
       return texts.length > 0 ? texts : null;
+    })(),
+    reviewItems: (() => {
+      const items = (place.reviews ?? [])
+        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
+        .slice(0, 5)
+        .map((r) => ({ text: r.text!.text!, rating: typeof r.rating === "number" ? r.rating : null }));
+      return items.length > 0 ? items : null;
     })(),
     phone: place.nationalPhoneNumber ?? null,
     photoRef: place.photos?.[0]?.name ?? null,

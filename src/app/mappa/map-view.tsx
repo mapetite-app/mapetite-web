@@ -1672,7 +1672,10 @@ export default function MapView({
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
       if (view === "all") saveRecentSearch(q);
-      setSearchOrigin(at);
+      // Distanze solo se hanno senso: senza la posizione del telefono si misura dal centro della mappa,
+      // e cercando "a Milano" con la mappa su Roma ogni card diceva "479 km".
+      const nearAt = places.filter((p) => distanceMeters(at, p) < 20_000).length;
+      setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
       fitToPlaces(places);
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
