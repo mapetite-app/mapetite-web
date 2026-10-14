@@ -1010,6 +1010,9 @@ export default function MapView({
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
   // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
+  // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
+  const focusedIdRef = useRef<string | null>(null);
+  useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1707,8 +1710,9 @@ export default function MapView({
         body: JSON.stringify({ query: searchedQuery, places: pending.places, token: pending.token }),
       });
       if (!res.ok || searchSeq.current !== id) return;
-      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[] } = await res.json();
+      const data: { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> } = await res.json();
       const esclusi = new Set(data.esclusi ?? []);
+      const livelli = data.livelli ?? {};
       setVenueDetails((prev) => {
         const next = { ...prev };
         for (const [pid, d] of Object.entries(data.dettagli ?? {})) {
@@ -1716,14 +1720,24 @@ export default function MapView({
         }
         return next;
       });
-      if (esclusi.size > 0) {
-        setAiSearch((prev) =>
-          prev && prev.id === id
-            // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
-            // chiudeva la scheda sotto le dita e lasciava solo la mappa.
-            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current) }
-            : prev,
-        );
+      if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
+        setAiSearch((prev) => {
+          if (!prev || prev.id !== id) return prev;
+          // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
+          // chiudeva la scheda sotto le dita e lasciava solo la mappa.
+          let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
+          // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
+          // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
+          // restano in fondo: il giudizio non li riporta su.
+          const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? [])]);
+          const touched = openVenueIdRef.current != null || (focusedIdRef.current != null && focusedIdRef.current !== prev.risultati[0]?.id);
+          if (!touched) {
+            const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
+            risultati = risultati.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
+          }
+          return { ...prev, risultati };
+        });
       }
     } catch {
       // Degrada: la lista Google resta, senza verdetti.

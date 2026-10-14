@@ -10,8 +10,8 @@ import { useSyncExternalStore } from "react";
 //   suggerimenti  frasi d'esempio sotto la barra al posto della card in basso (dal 12/10, Lorenzo: "una sola barra")
 export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "suggerimenti";
 
-// Funzioni nuove SPENTE di default: si accendono con ?beta=nome (resta acceso su
-// quel telefono finché non si apre ?beta=off).
+// Funzioni in prova: si accendono con ?beta=nome e si spengono con ?beta=-nome (la scelta resta su
+// quel telefono; ?beta=off le spegne tutte). Quelle in DEFAULT_ON sono già accese per tutti.
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
 //   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
@@ -24,6 +24,10 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati";
 const OPTIN_KEY = "mapetite.beta";
 
+// Accese per tutti dal 14/10 (Lorenzo: carta bianca, "accendi quello che hai verificato").
+// Restano spente articolo, salva e voce: varianti in stile Places che Lorenzo ha scartato il 12/10.
+const DEFAULT_ON: OptInFlag[] = ["gemme", "sorprendimi", "pin-salvati", "ci-sei-stato", "copertine", "home-salvati"];
+
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.
 const PLACES_OPTIN = ["articolo", "salva", "voce"];
 function readOptIn(): string {
@@ -34,7 +38,11 @@ function readOptIn(): string {
     const stored = window.localStorage.getItem(OPTIN_KEY) ?? EMPTY;
     const saved = stile === "attuale" ? stored.split(",").filter((f) => !PLACES_OPTIN.includes(f)).join(",") : stored;
     const extra = stile === "places" ? PLACES_OPTIN : [];
-    const merged = Array.from(new Set([...saved.split(","), ...url.split(","), ...extra].map((f) => f.trim()).filter(Boolean))).join(",");
+    // L'ultima scelta vince: ?beta=gemme cancella un "-gemme" salvato prima, e viceversa.
+    const fromUrl = [...url.split(","), ...extra].map((f) => f.trim()).filter(Boolean);
+    const opposite = (f: string) => (f.startsWith("-") ? f.slice(1) : `-${f}`);
+    const kept = saved.split(",").map((f) => f.trim()).filter((f) => f && !fromUrl.some((u) => opposite(u) === f));
+    const merged = Array.from(new Set([...kept, ...fromUrl])).join(",");
     if (merged !== stored) window.localStorage.setItem(OPTIN_KEY, merged);
     return merged;
   } catch {
@@ -44,7 +52,11 @@ function readOptIn(): string {
 
 export function useOptIn(flag: OptInFlag): boolean {
   const raw = useSyncExternalStore(() => () => {}, readOptIn, () => EMPTY);
-  return raw.split(",").includes(flag);
+  const url = useSyncExternalStore(() => () => {}, readFlags, () => EMPTY);
+  if (url.split(",").includes("off")) return false;
+  const list = raw.split(",");
+  if (list.includes(`-${flag}`)) return false;
+  return list.includes(flag) || DEFAULT_ON.includes(flag);
 }
 
 const EMPTY = "";

@@ -7,6 +7,7 @@ import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } fr
 import { extractMapsLinks } from "@/lib/maps-link";
 import { findSocialLink, placeHintFromText, type SocialSource } from "@/lib/social-link";
 import SocialLinkHelp from "./social-link-help";
+import { findVideoLink } from "@/lib/video-caption";
 
 const HAS_LINK = /https?:\/\/\S+/;
 
@@ -21,10 +22,13 @@ export default function GoogleMapsCard({
   userId,
   onScreenshot,
   onSearch,
+  onReadVideo,
 }: {
   userId: string | null;
   onScreenshot: () => void;
   onSearch: (q: string) => void;
+  // Link di TikTok/YouTube: legge la didascalia del video e cerca il locale (vedi ImportaView).
+  onReadVideo?: (url: string) => void;
 }) {
   // Link arrivato da Condividi prima dell'accesso (vedi /importa/condividi).
   const pending = useSyncExternalStore(() => () => {}, readPendingLink, () => null);
@@ -33,7 +37,7 @@ export default function GoogleMapsCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
-  const [social, setSocial] = useState<{ source: SocialSource; hint: string | null } | null>(null);
+  const [social, setSocial] = useState<{ source: SocialSource; hint: string | null; video: string | null } | null>(null);
   const text = draft ?? pending ?? "";
 
   const save = async (value: string) => {
@@ -50,7 +54,7 @@ export default function GoogleMapsCard({
       setShowField(true);
       setError(null);
       setResults(null);
-      setSocial({ source, hint: placeHintFromText(value) });
+      setSocial({ source, hint: placeHintFromText(value), video: findVideoLink(value) });
       return;
     }
     setBusy(true);
@@ -153,7 +157,13 @@ export default function GoogleMapsCard({
 
           {social && (
             <div className="mt-4">
-              <SocialLinkHelp source={social.source} hint={social.hint} onScreenshot={onScreenshot} onSearch={onSearch} />
+              <SocialLinkHelp
+                source={social.source}
+                hint={social.hint}
+                onScreenshot={onScreenshot}
+                onSearch={onSearch}
+                onReadVideo={social.video && onReadVideo ? () => onReadVideo(social.video as string) : undefined}
+              />
             </div>
           )}
 
