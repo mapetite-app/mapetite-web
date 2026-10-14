@@ -24,6 +24,14 @@ const HAIKU_OUTPUT_PER_MTOK = 5.0;
 // chiamata synthesis — quindi il costo marginale reale grava sui soli locali nuovi.
 export const SYNTHESIS_LIMIT = 12;
 
+// Locali per chiamata Haiku: le chiamate dei gruppi partono insieme (latenza ~1/3 con 12 locali).
+const HAIKU_BATCH = 4;
+function inBatches<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += HAIKU_BATCH) out.push(items.slice(i, i + HAIKU_BATCH));
+  return out;
+}
+
 // Vocabolario chiuso dei tag: ogni tag fuori da questa lista viene scartato lato server.
 export const ALLOWED_TAGS = ["romantico","informale","gruppi","business","veloce","aperitivo","famiglia","intimo","vivace","tradizionale","raffinato","economico"] as const;
 
@@ -43,7 +51,11 @@ export type PlaceSynthesis = {
   // nel dubbio true. Il chiamante sposta/esclude i false e ne logga il motivo.
   fit: boolean;
   fitReason: string;
+  // Quanto è adatto alla richiesta (giudizio di Haiku sulle recensioni). Serve all'ordine:
+  // "basso" in fondo, "alto" in cima. Nel dubbio "medio".
+  match: MatchLevel;
 };
+export type MatchLevel = "alto" | "medio" | "basso";
 
 // Riga cache: matchReason NON è persistito (dipende dalla query).
 type CachedSynthesis = {
@@ -81,11 +93,12 @@ Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è a
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
-Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string}]
+Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
 - id identico a quello ricevuto
 - matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
-- fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.`;
+- fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
+- match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.`;
 
 function costOf(inputTokens: number, outputTokens: number): number {
   return (
@@ -270,23 +283,14 @@ export async function getSynthesis(
   const matchReasonWork = async (): Promise<{
     matchReasons: Map<string, string>;
     fits: Map<string, { fit: boolean; fitReason: string }>;
+    levels: Map<string, MatchLevel>;
     cost: number;
   }> => {
     const matchReasons = new Map<string, string>();
     const fits = new Map<string, { fit: boolean; fitReason: string }>();
+    const levels = new Map<string, MatchLevel>();
     let cost = 0;
     try {
-      const userPayload = targets.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        types: (p.types ?? []).slice(0, 6),
-        editorialSummary: p.editorialSummary,
-        reviewTexts: (p.reviewTexts ?? [])
-          .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
-          .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
-      }));
-
       // Gusti dell'utente: iniettati solo se disponibili. Profilo vuoto e zero
       // reviews → taste vuoto → il prompt degrada su richiesta + dati del locale.
       const taste = userId ? await getUserTaste(userId) : null;
@@ -305,48 +309,69 @@ export async function getSynthesis(
           })}`
         : "";
 
-      const message = await anthropic.messages.create({
-        model: HAIKU_MODEL,
-        // Il payload matchReason porta ora le recensioni grezze (id+name+category+
-        // reviewTexts × ~12 locali): l'input è salito a ~3700 token e l'output pieno
-        // (12 frasi + overhead JSON) sfora 1024, causando troncamento a metà stringa
-        // e parse error. 3000 dà margine per tutti i 12 senza taglio.
-        max_tokens: 3000,
-        system: MATCH_REASON_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
-          },
-        ],
-      });
+      // A gruppi di HAIKU_BATCH in parallelo: una sola chiamata scriveva i 12 "perché" in fila
+      // (~1.100 token d'uscita, 12-14 s misurati il 14/10). Tre chiamate da 4 finiscono in ~1/3 del
+      // tempo; costa solo il prompt di sistema ripetuto (~0,1 centesimi a ricerca).
+      await Promise.all(inBatches(targets).map(async (batch) => {
+        try {
+          const userPayload = batch.map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            types: (p.types ?? []).slice(0, 6),
+            editorialSummary: p.editorialSummary,
+            reviewTexts: (p.reviewTexts ?? [])
+              .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
+              .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
+          }));
 
-      const { input_tokens, output_tokens } = message.usage;
-      cost = costOf(input_tokens, output_tokens);
-      console.log(
-        `[haiku-synthesis] call=matchReason places=${targets.length} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${cost.toFixed(6)}`,
-      );
-      if (message.stop_reason === "max_tokens") {
-        console.error(
-          `[haiku-synthesis] TRONCAMENTO call=matchReason stop=max_tokens places=${targets.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
-        );
-      }
-
-      const rawText =
-        message.content[0]?.type === "text" ? message.content[0].text : "";
-      const arr = parseJsonArray(rawText);
-      for (const item of arr) {
-        if (!item || typeof item !== "object") continue;
-        const o = item as Record<string, unknown>;
-        if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
-        if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
-        if (typeof o.fit === "boolean") {
-          fits.set(o.id, {
-            fit: o.fit,
-            fitReason: typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "",
+          const message = await anthropic.messages.create({
+            model: HAIKU_MODEL,
+            // Il payload matchReason porta ora le recensioni grezze (id+name+category+
+            // reviewTexts × ~12 locali): l'input è salito a ~3700 token e l'output pieno
+            // (12 frasi + overhead JSON) sfora 1024, causando troncamento a metà stringa
+            // e parse error. 3000 dà margine per tutti i 12 senza taglio.
+            max_tokens: 3000,
+            system: MATCH_REASON_SYSTEM,
+            messages: [
+              {
+                role: "user",
+                content: `Richiesta dell'utente: ${query}${tasteBlock}\n\nLocali:\n${JSON.stringify(userPayload)}`,
+              },
+            ],
           });
+
+          const { input_tokens, output_tokens } = message.usage;
+          cost += costOf(input_tokens, output_tokens);
+          console.log(
+            `[haiku-synthesis] call=matchReason places=${batch.length} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${costOf(input_tokens, output_tokens).toFixed(6)}`,
+          );
+          if (message.stop_reason === "max_tokens") {
+            console.error(
+              `[haiku-synthesis] TRONCAMENTO call=matchReason stop=max_tokens places=${batch.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
+            );
+          }
+
+          const rawText =
+            message.content[0]?.type === "text" ? message.content[0].text : "";
+          const arr = parseJsonArray(rawText);
+          for (const item of arr) {
+            if (!item || typeof item !== "object") continue;
+            const o = item as Record<string, unknown>;
+            if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
+            if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
+            if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, o.match);
+            if (typeof o.fit === "boolean") {
+              fits.set(o.id, {
+                fit: o.fit,
+                fitReason: typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "",
+              });
+            }
+          }
+        } catch (err) {
+          console.error("[haiku-synthesis] matchReason batch exception:", err);
         }
-      }
+      }));
       if (matchReasons.size < targets.length) {
         const missingIds = targets.map((p) => p.id).filter((id) => !matchReasons.has(id));
         console.warn(
@@ -356,7 +381,7 @@ export async function getSynthesis(
     } catch (err) {
       console.error("[haiku-synthesis] matchReason call exception:", err);
     }
-    return { matchReasons, fits, cost };
+    return { matchReasons, fits, levels, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = matchReasonWork();
@@ -401,75 +426,82 @@ export async function getSynthesis(
       // o in errore, la sintesi procede solo sulle recensioni.
       const enrichmentByPlace = await getEnrichmentForPlaces(missing.map((p) => p.id));
 
-      const userPayload = missing.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        rating: p.rating,
-        userRatingCount: p.userRatingCount,
-        priceLevel: p.priceLevel,
-        editorialSummary: p.editorialSummary,
-        reviewTexts: (p.reviewTexts ?? [])
-          .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
-          .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
-        // Mai TripAdvisor nella sintesi (regola di LORENZO.md), anche se una riga finisse nel database.
-        enrichment: (enrichmentByPlace.get(p.id) ?? []).filter((e) => e.source !== "tripadvisor").map((e) => ({
-          source: e.source,
-          kind: e.source_kind,
-          rating: e.rating_value,
-          scale: e.rating_scale,
-          ranking: e.ranking,
-          comment: e.comment,
-        })),
-      }));
+      // Stessa divisione a gruppi paralleli del "perché" (vedi sopra).
+      await Promise.all(inBatches(missing).map(async (batch) => {
+        try {
+          const userPayload = batch.map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            rating: p.rating,
+            userRatingCount: p.userRatingCount,
+            priceLevel: p.priceLevel,
+            editorialSummary: p.editorialSummary,
+            reviewTexts: (p.reviewTexts ?? [])
+              .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
+              .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
+            // Mai TripAdvisor nella sintesi (regola di LORENZO.md), anche se una riga finisse nel database.
+            enrichment: (enrichmentByPlace.get(p.id) ?? []).filter((e) => e.source !== "tripadvisor").map((e) => ({
+              source: e.source,
+              kind: e.source_kind,
+              rating: e.rating_value,
+              scale: e.rating_scale,
+              ranking: e.ranking,
+              comment: e.comment,
+            })),
+          }));
 
-      const message = await anthropic.messages.create({
-        model: HAIKU_MODEL,
-        // 12 locali a cache fredda × 5 campi (synthesis, tags, verdict, go_for,
-        // dont_expect) ≈ ~180-200 tok/oggetto → ~2200-2400 tok di fabbisogno pieno.
-        // 1536 troncava (~65% del necessario); 4000 dà ~1.7× di margine.
-        max_tokens: 4000,
-        system: SYNTHESIS_SYSTEM,
-        messages: [{ role: "user", content: JSON.stringify(userPayload) }],
-      });
+          const message = await anthropic.messages.create({
+            model: HAIKU_MODEL,
+            // 12 locali a cache fredda × 5 campi (synthesis, tags, verdict, go_for,
+            // dont_expect) ≈ ~180-200 tok/oggetto → ~2200-2400 tok di fabbisogno pieno.
+            // 1536 troncava (~65% del necessario); 4000 dà ~1.7× di margine.
+            max_tokens: 4000,
+            system: SYNTHESIS_SYSTEM,
+            messages: [{ role: "user", content: JSON.stringify(userPayload) }],
+          });
 
-      const { input_tokens, output_tokens } = message.usage;
-      const cost = costOf(input_tokens, output_tokens);
-      totalCost += cost;
-      console.log(
-        `[haiku-synthesis] call=synthesis places=${missing.length} cached=${cached.size} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${cost.toFixed(6)}`,
-      );
-      if (message.stop_reason === "max_tokens") {
-        console.error(
-          `[haiku-synthesis] TRONCAMENTO call=synthesis stop=max_tokens places=${missing.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
-        );
-      }
+          const { input_tokens, output_tokens } = message.usage;
+          const cost = costOf(input_tokens, output_tokens);
+          totalCost += cost;
+          console.log(
+            `[haiku-synthesis] call=synthesis places=${batch.length} cached=${cached.size} in=${input_tokens} out=${output_tokens} stop=${message.stop_reason} cost=$${cost.toFixed(6)}`,
+          );
+          if (message.stop_reason === "max_tokens") {
+            console.error(
+              `[haiku-synthesis] TRONCAMENTO call=synthesis stop=max_tokens places=${batch.length} out=${output_tokens}: risposta tagliata, possibile perdita di risultati. Chiamata comunque a pagamento — alza max_tokens.`,
+            );
+          }
 
-      const rawText =
-        message.content[0]?.type === "text" ? message.content[0].text : "";
-      const arr = parseJsonArray(rawText);
-      for (const item of arr) {
-        if (!item || typeof item !== "object") continue;
-        const o = item as Record<string, unknown>;
-        // VALIDAZIONE ANTI-ALLUCINAZIONE: scarta id non in input.
-        if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
-        const rawTags = Array.isArray(o.tags)
-          ? o.tags.filter((t): t is string => typeof t === "string").map((t) => t.toLowerCase().trim())
-          : [];
-        const validTags = rawTags.filter((t) => (ALLOWED_TAGS as readonly string[]).includes(t)).slice(0, 3);
-        const scartati = rawTags.filter((t) => !(ALLOWED_TAGS as readonly string[]).includes(t));
-        if (scartati.length > 0) {
-          console.warn("[haiku-synthesis] tag scartati:", JSON.stringify(scartati));
+          const rawText =
+            message.content[0]?.type === "text" ? message.content[0].text : "";
+          const arr = parseJsonArray(rawText);
+          for (const item of arr) {
+            if (!item || typeof item !== "object") continue;
+            const o = item as Record<string, unknown>;
+            // VALIDAZIONE ANTI-ALLUCINAZIONE: scarta id non in input.
+            if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
+            const rawTags = Array.isArray(o.tags)
+              ? o.tags.filter((t): t is string => typeof t === "string").map((t) => t.toLowerCase().trim())
+              : [];
+            const validTags = rawTags.filter((t) => (ALLOWED_TAGS as readonly string[]).includes(t)).slice(0, 3);
+            const scartati = rawTags.filter((t) => !(ALLOWED_TAGS as readonly string[]).includes(t));
+            if (scartati.length > 0) {
+              console.warn("[haiku-synthesis] tag scartati:", JSON.stringify(scartati));
+            }
+            generated.set(o.id, {
+              synthesis: typeof o.synthesis === "string" ? o.synthesis : "",
+              tags: validTags,
+              verdict: typeof o.verdict === "string" ? o.verdict : "",
+              // Il prompt non li produce ancora (arriva in un commit successivo): default "".
+              goFor: normalizeChips(o.go_for, 3),
+              dontExpect: normalizeChips(o.dont_expect, 2),
+            });
+          }
+        } catch (err) {
+          console.error("[haiku-synthesis] synthesis batch exception:", err);
         }
-        generated.set(o.id, {
-          synthesis: typeof o.synthesis === "string" ? o.synthesis : "",
-          tags: validTags,
-          verdict: typeof o.verdict === "string" ? o.verdict : "",
-          // Il prompt non li produce ancora (arriva in un commit successivo): default "".
-          goFor: normalizeChips(o.go_for, 3),
-          dontExpect: normalizeChips(o.dont_expect, 2),
-        });
-      }
+      }));
       if (generated.size < missing.length) {
         const missingIds = missing.map((p) => p.id).filter((id) => !generated.has(id));
         console.warn(
@@ -510,7 +542,7 @@ export async function getSynthesis(
 
   // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
   //    Girava mentre sopra completavano cache read + synthesis + upsert.
-  const { matchReasons, fits, cost: matchReasonCost } = await matchReasonPromise;
+  const { matchReasons, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
   totalCost += matchReasonCost;
 
   console.log(
@@ -536,6 +568,7 @@ export async function getSynthesis(
       // Nel dubbio il locale resta: fit mancante = true.
       fit: fits.get(id)?.fit ?? true,
       fitReason: fits.get(id)?.fitReason ?? "",
+      match: levels.get(id) ?? "medio",
     };
     if (fits.get(id)?.fit === false) {
       const name = targets.find((p) => p.id === id)?.name ?? id;

@@ -631,6 +631,18 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 }, () => ok(false, "risultati: dice quali locali molto famosi ha messo da parte (non 'turistici': non lo sappiamo)"));
 await page.unroute("**/api/search");
 
+// 5f. Ordine per quanto il locale è adatto (giudizio di Haiku): "alto" in cima, "basso" in fondo, mai esclusi
+{
+  await page.route("**/api/search/synthesis", (r) => r.fulfill({ json: { ...SYNTH, esclusi: [], livelli: { P1: "basso", P2: "medio", P3: "alto" } } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(300);
+  const ordine = (await page.locator("ul.snap-x li[data-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")))).filter(Boolean);
+  ok(ordine.join(",") === "P3,P2,P1", `ordine: il locale più adatto in cima e il meno adatto in fondo, nessuno escluso (${ordine.join(",")})`);
+  await page.unroute("**/api/search/synthesis");
+}
+
 // 5e. Ricerca in un'altra città con la mappa su Roma e la posizione mai chiesta: niente "479 km" sulle card
 {
   const MILANO = PLACES.map((p, i) => ({ ...p, address: "Via di Prova 1, Milano", lat: 45.46 + i * 0.001, lng: 9.19 }));
