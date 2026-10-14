@@ -191,7 +191,7 @@ export default function AnswerArticle({
               href={searchFeedbackMailto(title, places.map((p) => p.name))}
               className="mt-10 block rounded-card border-2 border-dashed border-border p-4 text-sm font-sans text-text-muted"
             >
-              🤔 <span className="font-display font-semibold text-brand">Questi risultati non vanno?</span> Dimmelo: si apre un&apos;email già scritta con la tua ricerca.
+              🤔 <span className="font-display font-semibold text-brand">Questi risultati non vanno?</span>{" "}Dimmelo: si apre un&apos;email già scritta con la tua ricerca.
             </a>
           )}
         </div>
