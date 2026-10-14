@@ -3,6 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
+import { namedCity, demoteOtherCity } from "../../src/lib/named-city.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -36,6 +37,20 @@ ok(getCategoryEmoji("pastry_shop", "I Dolci Di Checco Er Carettiere") === "🥐"
 ok(getCategoryEmoji("bakery", "Antico Forno Roscioli") === "🥖", "emoji: forno resta 🥖");
 ok(getCategoryEmoji("restaurant", "Pizzeria Vegana") === "🍕", "emoji: pizzeria vegana resta 🍕");
 ok(getCategoryEmoji("steak_house", "Steak & Tea") === "🥩", "emoji: steakhouse resta 🥩 (\"tea\" non conta)");
+
+// Città nominata senza Haiku (14/10, visto con Google vero): "a Milano" con la mappa su Roma mescolava 3 bar di Roma.
+ok(namedCity("cocktail bar nascosto a Milano per un appuntamento") === "Milano", "città: 'a Milano' riconosciuta");
+ok(namedCity("trattoria di cucina romana") === null && namedCity("cotoletta alla milanese") === null, "città: 'romana', 'milanese' non sono città");
+ok(namedCity("tra Roma e Milano") === null, "città: due città nominate, nessuna scelta");
+ok(namedCity("trattoria a Trastevere") === null, "città: un quartiere non è una città (resta la mappa)");
+{
+  const a = (name, address) => ({ name, address });
+  const milano = [a("White Rabbit", "Via Garigliano, 4, 20159 Milano MI, Italia"), a("The Race Club Roma", "Via Labicana, 52, 00184 Roma RM, Italia"), a("1930", "Via E. de Amicis, 22, 20123 Milano MI, Italia"), a("Vice", "Corso di Porta Romana, 123, 20122 Milano MI, Italia"), a("Jerry Thomas", "Vicolo Cellini, 30, 00186 Roma RM, Italia")];
+  const r = demoteOtherCity("Milano", milano);
+  ok(r.places.slice(-2).map((x) => x.name).join(",") === "The Race Club Roma,Jerry Thomas" && r.demoted.length === 2, "città: i bar di Roma vanno in fondo a 'a Milano', mai esclusi");
+  ok(demoteOtherCity("Roma", milano).demoted.length === 0, "città: se quasi tutti sono fuori città non si tocca nulla");
+  ok(demoteOtherCity("Milano", [a("Senza indirizzo", null), ...milano.slice(0, 1)]).demoted.length === 0, "città: un locale senza indirizzo resta");
+}
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

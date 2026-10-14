@@ -9,6 +9,7 @@ import { recordEvent } from "@/lib/events";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
+import { namedCity, demoteOtherCity } from "@/lib/named-city";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -103,7 +104,10 @@ export async function POST(request: Request) {
     }
     // Zona nominata → è già nel testo della query: nessun bias sulla posizione della mappa.
     // "Vicino a me" → solo risultati nell'area intorno al centro mappa. Altrimenti bias.
-    const locationMode = intent?.zona ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    // Senza Haiku la città scritta nella frase ("a Milano") si riconosce comunque: niente bias sulla
+    // mappa, che altrimenti con la mappa su Roma mescolava locali di Roma a quelli di Milano.
+    const city = searchIntent === "natural" ? namedCity(query) : null;
+    const locationMode = intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
     try {
       risultati = await searchGooglePlaces(intent?.queryGoogle ?? query.trim(), {
         includedType: intent?.includedType ?? undefined,
@@ -141,7 +145,7 @@ export async function POST(request: Request) {
       if (demoted.length > 0) {
         risultati = places;
         // Al telefono solo i nomi: "Nome (irish_pub)" è il formato del log, in inglese.
-        daParte.fuori_tema = places.slice(places.length - demoted.length).map((p) => p.name).slice(0, 10);
+        daParte.fuori_tema = [...daParte.fuori_tema, ...places.slice(places.length - demoted.length).map((p) => p.name)].slice(0, 10);
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
@@ -152,6 +156,15 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.turistici = demoted.slice(0, 10);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (troppe recensioni per una richiesta "non turistica"): ${JSON.stringify(demoted)}`);
+      }
+    }
+    // Città nominata ("a Milano"): i locali di un'altra città vanno in fondo (mai esclusi), per ultimi.
+    if (city) {
+      const { places, demoted } = demoteOtherCity(city, risultati);
+      if (demoted.length > 0) {
+        risultati = places;
+        daParte.fuori_tema = [...daParte.fuori_tema, ...demoted].slice(0, 10);
+        console.log(`[search-zona] q=${JSON.stringify(query.trim().slice(0, 80))} citta=${city} in fondo (fuori città): ${JSON.stringify(demoted)}`);
       }
     }
 
