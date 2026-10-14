@@ -3,8 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { findOrCreatePlace } from "@/lib/places-store";
 
 export async function POST(request: Request) {
-  console.log("[add/route] env check — NEXT_PUBLIC_SUPABASE_URL:", !!process.env.NEXT_PUBLIC_SUPABASE_URL, "| SUPABASE_SECRET_KEY:", !!process.env.SUPABASE_SECRET_KEY);
-
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
 
@@ -22,7 +20,17 @@ export async function POST(request: Request) {
     name.trim() === "" ||
     typeof address !== "string" ||
     typeof lat !== "number" ||
-    typeof lng !== "number"
+    typeof lng !== "number" ||
+    // Il catalogo `places` è condiviso: il primo che salva un locale ne scrive i dati per tutti.
+    // Almeno forma e limiti plausibili (Place ID di Google, coordinate vere, testi corti).
+    !/^[A-Za-z0-9_-]{10,300}$/.test(googlePlaceId) ||
+    name.length > 200 ||
+    address.length > 300 ||
+    !Number.isFinite(lat) || lat < -90 || lat > 90 ||
+    !Number.isFinite(lng) || lng < -180 || lng > 180 ||
+    (category != null && (typeof category !== "string" || category.length > 80)) ||
+    (rating != null && (typeof rating !== "number" || rating < 0 || rating > 5)) ||
+    (priceLevel != null && (typeof priceLevel !== "number" || priceLevel < 0 || priceLevel > 4))
   ) {
     return NextResponse.json({ error: "Dati del locale non validi." }, { status: 400 });
   }

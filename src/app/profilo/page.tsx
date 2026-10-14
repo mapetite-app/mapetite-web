@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
@@ -69,7 +69,7 @@ function Stars({ rating }: { rating: number }) {
 export default async function ProfiloPage() {
   const supabase = await createClient();
   const fake = await e2eProfile();
-  const { data: userData } = fake ? { data: null } : await supabase.auth.getUser();
+  const { data: userData } = fake ? { data: null } : await getUser();
   const user = fake ? { id: process.env.E2E_FAKE_USER!, email: fake.email } : userData?.user ?? null;
 
   if (!user) {
@@ -133,7 +133,7 @@ export default async function ProfiloPage() {
 
   // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
   const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
-    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, tags: row.tags ?? [] }] : [],
+    row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
 
   // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).

@@ -8,6 +8,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel } from "@/lib/distance";
 import { track } from "@/lib/track";
+import { isStateTag } from "@/lib/tags";
 import {
   STATE_DONE,
   STATE_WANT,
@@ -91,7 +92,8 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
   const where = [categoryLabel(spot.category), city, dist ? `a ${dist}` : null].filter(Boolean).join(" · ");
   const want = spot.tags.includes(STATE_WANT);
   const done = spot.tags.includes(STATE_DONE);
-  const raccolte = spot.tags.filter((t) => t !== STATE_WANT && t !== STATE_DONE && t.trim());
+  // Raccolte = tag scritti dall'utente: niente stati né "Com'era?" (👍/👎 non sono raccolte).
+  const raccolte = spot.tags.filter((t) => !isStateTag(t) && t.trim());
   const mapHref = spot.lat != null && spot.lng != null ? `/mappa?salvato=${spot.id}` : "/mappa?vista=salvati";
 
   return (
@@ -142,7 +144,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
           target="_blank"
           rel="noopener noreferrer"
           data-testid="stasera-percorso"
-          onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { da: "stasera" })}
+          onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { fonte: "stasera" })}
           className="flex min-h-11 items-center justify-center rounded-pill bg-brand font-display text-sm font-semibold text-white active:scale-[0.98]"
         >
           Percorso
@@ -317,7 +319,7 @@ export default function StaseraView({ userId }: { userId: string }) {
         ) : (
           <section aria-label="Le tue scelte">
             <h1 className="font-display text-[32px] font-bold leading-[1.1]">Stasera dove andiamo?</h1>
-            <p className="mt-2 text-[15px] text-white/75">Tre tocchi e scegli tra i tuoi {spots.length === 1 ? "unico salvato" : `${spots.length} salvati`}.</p>
+            <p className="mt-2 text-[15px] text-white/75">{spots.length === 1 ? "Tre tocchi e scegli: per ora hai un solo salvato." : `Tre tocchi e scegli tra i tuoi ${spots.length} salvati.`}</p>
 
             <h2 className="mb-2.5 mt-7 font-display text-sm font-semibold text-white/70">Che occasione?</h2>
             <div data-testid="stasera-occasione" className="flex flex-wrap gap-2">

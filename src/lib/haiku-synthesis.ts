@@ -3,8 +3,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import type { PlaceResult } from "@/lib/google-places";
 
+// Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
+// (l'SDK ne concede 10 minuti): una risposta a freddo per 12 locali richiede ~15 s.
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 1,
+  timeout: 25_000,
 });
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -79,7 +83,7 @@ Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudi
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
 Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string}]
 - id identico a quello ricevuto
-- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo.
+- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.`;
 
@@ -369,6 +373,9 @@ export async function getSynthesis(
       console.error("[haiku-synthesis] cache read error:", error);
     } else {
       for (const row of data ?? []) {
+        // Verdetto vuoto in cache (risposta dell'AI incompleta): conta come mancante e si rigenera,
+        // altrimenti quel locale resterebbe senza verdetto per sempre (VISIONE: verdetto SEMPRE).
+        if (typeof row.verdict !== "string" || row.verdict.trim() === "") continue;
         cached.set(row.place_id as string, {
           synthesis: (row.synthesis as string) ?? "",
           tags: (row.tags as string[] | null) ?? [],
@@ -405,7 +412,8 @@ export async function getSynthesis(
         reviewTexts: (p.reviewTexts ?? [])
           .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
           .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
-        enrichment: (enrichmentByPlace.get(p.id) ?? []).map((e) => ({
+        // Mai TripAdvisor nella sintesi (regola di LORENZO.md), anche se una riga finisse nel database.
+        enrichment: (enrichmentByPlace.get(p.id) ?? []).filter((e) => e.source !== "tripadvisor").map((e) => ({
           source: e.source,
           kind: e.source_kind,
           rating: e.rating_value,
@@ -476,7 +484,8 @@ export async function getSynthesis(
     if (generated.size > 0) {
       try {
         const supabase = createAdminClient();
-        const rows = Array.from(generated.entries()).map(([place_id, s]) => ({
+        // Solo verdetti veri: uno vuoto in cache bloccherebbe il locale senza verdetto.
+        const rows = Array.from(generated.entries()).filter(([, s]) => s.verdict.trim() !== "").map(([place_id, s]) => ({
           place_id,
           synthesis: s.synthesis,
           tags: s.tags,
@@ -484,7 +493,7 @@ export async function getSynthesis(
           go_for: s.goFor,
           dont_expect: s.dontExpect,
         }));
-        const { error } = await supabase
+        const { error } = rows.length === 0 ? { error: null } : await supabase
           .from("place_synthesis")
           .upsert(rows, { onConflict: "place_id" });
         if (error) console.error("[haiku-synthesis] upsert error:", error);
@@ -510,6 +519,12 @@ export async function getSynthesis(
 
   // 7. Record<place_id, PlaceSynthesis>
   const result: Record<string, PlaceSynthesis> = {};
+  // Anche i locali senza sintesi (risposta dell'AI tagliata o fallita): il "perché" e il giudizio
+  // sulla richiesta sono già pagati e valgono lo stesso; i campi del verdetto restano vuoti.
+  const EMPTY: CachedSynthesis = { synthesis: "", tags: [], verdict: "", goFor: [], dontExpect: [] };
+  for (const p of targets) {
+    if (!base.has(p.id) && (matchReasons.has(p.id) || fits.has(p.id))) base.set(p.id, EMPTY);
+  }
   for (const [id, s] of base) {
     result[id] = {
       synthesis: s.synthesis,

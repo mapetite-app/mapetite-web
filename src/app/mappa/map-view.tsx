@@ -6,7 +6,7 @@ import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
 import VenueSheet from "@/components/venue-sheet";
@@ -20,6 +20,8 @@ import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "luc
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { distanceMeters } from "@/lib/distance";
+import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -141,7 +143,7 @@ function SaveModal({
   const handleSave = () => {
     setError(false);
     startTransition(async () => {
-      const supabase = createClient();
+      const supabase = await browserClient();
       // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
       const pending = normalizeNewTag(newTag);
       const allTags = pending ? withTag(selectedTags, pending) : selectedTags;
@@ -183,7 +185,16 @@ function SaveModal({
         const { error } = await supabase
           .from("saved_places")
           .insert({ user_id: userId, place_id: placeUuid, tags, note: noteValue });
-        if (error && error.code !== "23505") { setError(true); return; }
+        if (error?.code === "23505") {
+          // Era già salvato (la mappa non lo sapeva ancora): si aggiornano tag e nota scelti
+          // qui, invece di mostrarli e perderli al prossimo caricamento.
+          const { error: upErr } = await supabase
+            .from("saved_places")
+            .update({ tags, note: noteValue })
+            .eq("user_id", userId)
+            .eq("place_id", placeUuid);
+          if (upErr) { setError(true); return; }
+        } else if (error) { setError(true); return; }
       }
 
       onSaved(tags, noteValue, savedUuid);
@@ -403,7 +414,7 @@ function ReviewForm({
     setStatus("saving");
     setErrorMsg("");
 
-    const supabase = createClient();
+    const supabase = await browserClient();
     const { error } = await supabase.from("reviews").upsert(
       { place_id: placeId, user_id: userId, rating, comment: comment.trim() || null },
       { onConflict: "user_id,place_id" }
@@ -489,6 +500,9 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 // "Per te" dai comportamenti (VISIONE.md): un risultato somiglia a un tuo salvato se è dello
 // stesso tipo e della stessa fascia di prezzo (±1). Si sceglie il salvato più vicino. Solo
 // un'indicazione sulla card: l'ordine resta quello della richiesta (mai sopra un posto più adatto).
+// Solo salvati entro SIMILAR_MAX_METERS (14/10): prima un ristorante salvato a Milano finiva
+// su quasi ogni "Ristorante" cercato a Roma, un'affermazione senza fondamento.
+const SIMILAR_MAX_METERS = 15_000;
 function similarSaved(place: Place, saved: Place[]): string | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
@@ -496,10 +510,18 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   for (const s of saved) {
     if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE)) continue;
     if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
-    const d = (s.lat - place.lat) ** 2 + (s.lng - place.lng) ** 2;
+    const d = distanceMeters(s, place);
+    if (d > SIMILAR_MAX_METERS) continue;
     if (!best || d < best.d) best = { name: s.name, d };
   }
   return best?.name ?? null;
+}
+
+// Salvati non caricati: senza rete o con la pagina che cambia a metà richiesta ("Failed to fetch")
+// è normale e non va segnalato come errore; il resto sì.
+function logSavedError(error: { message?: string }) {
+  if (/Failed to fetch|NetworkError|Load failed/i.test(error.message ?? "")) console.warn("Salvati non caricati (rete):", error.message);
+  else console.error("Errore nel caricamento dei locali salvati:", error);
 }
 
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
@@ -574,7 +596,7 @@ function SaveButton({
 
     setError(false);
     startTransition(async () => {
-      const supabase = createClient();
+      const supabase = await browserClient();
       const { error } = await supabase
         .from("saved_places")
         .delete()
@@ -818,11 +840,12 @@ export default function MapView({
   useEffect(() => {
     if (!userId) return;
     let alive = true;
-    createClient()
-      .from("profiles")
-      .select("cuisines, occasions, atmospheres, price_range")
-      .eq("id", userId)
-      .maybeSingle()
+    browserClient()
+      .then((supabase) => supabase
+        .from("profiles")
+        .select("cuisines, occasions, atmospheres, price_range")
+        .eq("id", userId)
+        .maybeSingle())
       .then(({ data }) => {
         if (!alive || !data) return;
         setTasteSuggestion(tasteQuery({
@@ -913,10 +936,17 @@ export default function MapView({
       for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
       return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
     };
-    const kind = top(liked.map((p) => categoryLabel(p.category)));
-    const city = top(liked.map((p) => cityFromAddress(p.address)));
-    if (!kind || kind[1] < 2 || !city) return null;
-    return { label: `${kind[0]} a ${city[0]}, poco conosciuti`, query: `${kind[0]} poco conosciuti a ${city[0]}` };
+    // Tipo e città insieme (prima erano scelti separatamente: "Sushi a Roma" anche con tutti i sushi a
+    // Milano). Testo senza accordi sbagliati ("Pizzeria … poco conosciuti"): "fuori dai soliti giri"
+    // fa scattare lo stesso la regola dei locali di massa (src/lib/mainstream.ts).
+    const pair = top(liked.map((p) => {
+      const k = categoryLabel(p.category);
+      const c = cityFromAddress(p.address);
+      return k && c ? `${k}\u0000${c}` : null;
+    }));
+    if (!pair || pair[1] < 2) return null;
+    const [kind, city] = pair[0].split("\u0000");
+    return { label: `${kind} a ${city}, fuori dai soliti giri`, query: `${kind} fuori dai soliti giri a ${city}` };
   }, [savedPlaces]);
 
   // Una sola barra (Lorenzo, 12/10: "abbiamo due barre per la ricerca, occupiamo solo spazio"):
@@ -979,6 +1009,47 @@ export default function MapView({
 
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
+  // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
+  const openVenueIdRef = useRef<string | null>(null);
+  useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
+
+  // Tasto "indietro" del telefono (Android, app installata, swipe su iPhone): con la scheda di un
+  // locale aperta la chiude e torna alla lista, invece di uscire dalla mappa e perdere la ricerca.
+  // Stesso schema dell'articolo: una voce nella cronologia quando la scheda si apre, tolta quando
+  // si chiude dall'interfaccia. Lo stato di Next resta (si copia history.state).
+  const venueOpen = overlay.kind === "venue";
+  const venueInHistory = useRef(false);
+  const dispatchRef = useRef(dispatch);
+  useEffect(() => { dispatchRef.current = dispatch; });
+  useEffect(() => {
+    if (venueOpen && !venueInHistory.current) {
+      window.history.pushState({ ...(window.history.state ?? {}), scheda: true }, "");
+      venueInHistory.current = true;
+    } else if (!venueOpen && venueInHistory.current) {
+      venueInHistory.current = false;
+      if (window.history.state?.scheda) window.history.back();
+    }
+  }, [venueOpen]);
+  useEffect(() => {
+    // Pagina ricaricata con la scheda o l'articolo aperti: quelle voci non valgono più (i pannelli
+    // ripartono chiusi); senza toglierle, il prossimo "indietro" uscirebbe dalla mappa.
+    const st = window.history.state;
+    if (st?.scheda || st?.articolo) {
+      const rest = { ...st };
+      delete rest.scheda;
+      delete rest.articolo;
+      window.history.replaceState(rest, "");
+    }
+    const onPop = () => {
+      if (venueInHistory.current && !window.history.state?.scheda) {
+        venueInHistory.current = false;
+        dispatchRef.current({ type: "CLOSE" });
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   const selected = useMemo<Place | null>(() => {
     if (overlay.kind !== "venue") return null;
     const id = overlay.placeId;
@@ -1062,7 +1133,7 @@ export default function MapView({
       });
       if (!addRes.ok) throw new Error("add");
       const uuid: string = (await addRes.json()).place.id;
-      const { error } = await createClient().from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
+      const { error } = await (await browserClient()).from("saved_places").insert({ user_id: userId, place_id: uuid, tags, note: null });
       if (error && error.code !== "23505") throw new Error("insert");
       setPlaceUuids((prev) => ({ ...prev, [place.id]: uuid }));
       setSavedIds((prev) => new Set(prev).add(uuid));
@@ -1095,14 +1166,14 @@ export default function MapView({
   useEffect(() => {
     if (!userId) return;
 
-    const supabase = createClient();
-    supabase
-      .from("saved_places")
-      .select("place_id")
-      .eq("user_id", userId)
+    browserClient()
+      .then((supabase) => supabase
+        .from("saved_places")
+        .select("place_id")
+        .eq("user_id", userId))
       .then(({ data, error }) => {
         if (error) {
-          console.error("Errore nel caricamento dei locali salvati:", error);
+          logSavedError(error);
           return;
         }
         setSavedIds(new Set((data ?? []).map((row) => row.place_id as string)));
@@ -1123,12 +1194,12 @@ export default function MapView({
     // né arrivare in ritardo sul successivo.
     let cancelled = false;
     setSelectedReviews(null);
-    const supabase = createClient();
-    supabase
-      .from("reviews")
-      .select("user_id, rating, comment, created_at")
-      .eq("place_id", uuid)
-      .order("created_at", { ascending: false })
+    browserClient()
+      .then((supabase) => supabase
+        .from("reviews")
+        .select("user_id, rating, comment, created_at")
+        .eq("place_id", uuid)
+        .order("created_at", { ascending: false }))
       .then(({ data }) => {
         if (cancelled) return;
         if (!data || data.length === 0) {
@@ -1151,9 +1222,9 @@ export default function MapView({
     if (!userId) return;
 
     setLoadingSaved(true);
-    const supabase = createClient();
 
     (async () => {
+      const supabase = await browserClient();
       const { data, error } = await supabase
         .from("saved_places")
         .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
@@ -1162,7 +1233,7 @@ export default function MapView({
       setLoadingSaved(false);
       setSavedLoaded(true);
       if (error) {
-        console.error("Errore nel caricamento dei locali salvati:", error);
+        logSavedError(error);
         return;
       }
 
@@ -1262,7 +1333,7 @@ export default function MapView({
     if (!userId || !uuid || visitBusy.current) return;
     visitBusy.current = true;
     try {
-      const supabase = createClient();
+      const supabase = await browserClient();
       // Tag attuali: dalla lista dei salvati, o dal database se lì non c'è (mai scrivere alla cieca).
       let currentTags = savedPlaces.find((p) => p.id === uuid)?.tags ?? null;
       if (currentTags === null) {
@@ -1272,7 +1343,13 @@ export default function MapView({
         currentTags = (data.tags as string[] | null) ?? [];
       }
       const base = currentTags.filter((t) => t !== pair[0] && t !== pair[1]);
-      const tags = currentTags.includes(status) ? base : [...base, status];
+      let tags = currentTags.includes(status) ? base : [...base, status];
+      // "Com'era?" (👍/👎) vale solo con "Ci sono stato" e si cambia solo da lì: se la visita
+      // non è più segnata, l'opinione resterebbe nascosta e un 👎 toglierebbe il locale da
+      // "Stasera" per sempre. Quindi va via insieme alla visita.
+      if (pair[0] === VISIT_WANT && !tags.includes(VISIT_DONE)) {
+        tags = tags.filter((t) => t !== OPINION_LIKE && t !== OPINION_DISLIKE);
+      }
       if (!currentTags.includes(status)) {
         if (status === VISIT_DONE) track("ci_sono_stato", { id: uuid });
         else if (status === VISIT_WANT) track("voglio_andarci", { id: uuid });
@@ -1294,16 +1371,36 @@ export default function MapView({
     seafood: "ristorante di pesce", steakhouse: "steakhouse", wine_bar: "wine bar",
   };
 
+  // Azzerare una ricerca invalida anche le risposte ancora in viaggio (searchSeq): senza, dopo ✕,
+  // un cambio di scheda o i filtri, i risultati vecchi ricomparivano qualche secondo dopo.
+  const clearAiSearch = () => {
+    searchSeq.current++;
+    setLoadingVerdicts(false);
+    setAiSearching(false);
+    setAiSearch(null);
+  };
+
   const runFilteredSearch = async (f: Filters) => {
+    const ticket = ++searchSeq.current;
+    setLoadingVerdicts(false);
+    setAiSearching(false);
     setAiError(null);
     if (view === "saved") {
-      const allowed = f.categories;
-      const filtered = allowed.length > 0
-        ? savedPlaces.filter((p) => {
-            const cat = (p.category ?? "").toLowerCase();
-            return allowed.some((c) => cat.includes(c));
-          })
-        : savedPlaces;
+      // Salvati: si applicano i filtri che i dati salvati permettono (tipo, voto, prezzo, distanza).
+      // Prima solo il tipo, e con un confronto di testo: "Gelaterie" non trovava ice_cream_shop.
+      const allowedTypes = f.categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
+      const center = userPos ?? { lat: viewState.latitude, lng: viewState.longitude };
+      const filtered = savedPlaces.filter((p) => {
+        if (f.categories.length > 0) {
+          const cat = (p.category ?? "").toLowerCase();
+          if (!allowedTypes.includes(cat) && !f.categories.some((c) => cat.includes(c))) return false;
+        }
+        if (f.minRating != null && p.rating != null && p.rating < f.minRating) return false;
+        if (f.maxPriceLevel != null && p.priceLevel != null && p.priceLevel > f.maxPriceLevel) return false;
+        if (f.minPriceLevel != null && p.priceLevel != null && p.priceLevel < f.minPriceLevel) return false;
+        if (f.radiusKm != null && distanceMeters(center, p) > f.radiusKm * 1000) return false;
+        return true;
+      });
       setAiSearch({ risultati: filtered, filtri: null });
       setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });
@@ -1339,7 +1436,8 @@ export default function MapView({
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setFilterError("Ricerca non riuscita. Riprova."); return; }
+      if (searchSeq.current !== ticket) return;
+      if (!res.ok) { setFilterError(data.error ?? "Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
         id: string; name: string; category: string | null; lat: number | null; lng: number | null;
         rating: number | null; priceLevel: number | null; address: string | null;
@@ -1490,6 +1588,10 @@ export default function MapView({
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
+    // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
+    // o i filtri ha un numero vecchio e si scarta.
+    const ticket = ++searchSeq.current;
+    setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);
       try {
@@ -1506,6 +1608,7 @@ export default function MapView({
           }),
         });
         const data = await res.json();
+        if (searchSeq.current !== ticket) return;
         if (!res.ok) {
           setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
           return;
@@ -1549,7 +1652,7 @@ export default function MapView({
             editorialSummary: p.editorialSummary ?? null,
           };
         }
-        const id = ++searchSeq.current;
+        const id = ticket;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
         setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
@@ -1557,13 +1660,16 @@ export default function MapView({
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
       if (view === "all") saveRecentSearch(q);
-      setSearchOrigin(at);
+      // Distanze solo se hanno senso: senza la posizione del telefono si misura dal centro della mappa,
+      // e cercando "a Milano" con la mappa su Roma ogni card diceva "479 km".
+      const nearAt = places.filter((p) => distanceMeters(at, p) < 20_000).length;
+      setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
       fitToPlaces(places);
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
       } finally {
-        setAiSearching(false);
+        if (searchSeq.current === ticket) setAiSearching(false);
       }
 
   };
@@ -1592,7 +1698,7 @@ export default function MapView({
   // Secondo tempo della ricerca AI: verdetti e motivi arrivano dopo la lista.
   // Se nel frattempo l'utente ha cambiato o azzerato la ricerca (id diverso) si scarta.
   const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
-    if (!pending) return;
+    if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
     try {
       const res = await fetch("/api/search/synthesis", {
@@ -1613,7 +1719,9 @@ export default function MapView({
       if (esclusi.size > 0) {
         setAiSearch((prev) =>
           prev && prev.id === id
-            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id)) }
+            // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
+            // chiudeva la scheda sotto le dita e lasciava solo la mappa.
+            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current) }
             : prev,
         );
       }
@@ -1659,7 +1767,7 @@ export default function MapView({
     // Fuori dal ciclo dell'effetto, come gli altri arrivi dall'indirizzo.
     if (vistaParam === "salvati" && view !== "saved") {
       setTimeout(() => {
-        setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
+        clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
         setView("saved"); dispatch({ type: "OPEN_LIST" });
       }, 0);
     } else if (vistaParam !== "salvati" && view === "saved") {
@@ -1807,7 +1915,7 @@ export default function MapView({
                 <button
                   type="button"
                   aria-label="Cancella la ricerca"
-                  onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+                  onClick={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
                   className="flex h-10 w-10 shrink-0 items-center justify-center text-base text-text-muted"
                 >
                   ✕
@@ -1834,7 +1942,7 @@ export default function MapView({
             type="button"
             aria-label="Filtri"
             onClick={() => {
-              setAiSearch(null);
+              clearAiSearch();
               setAiQuery("");
               setAiError(null);
               dispatch({ type: "OPEN_FILTERS" });
@@ -1966,7 +2074,7 @@ export default function MapView({
               onSubmit={(q) => { void runAISearch(q); }}
               isSearching={aiSearching}
               error={aiError}
-              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+              onClear={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               recent={recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : []}
@@ -1977,7 +2085,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -1988,7 +2096,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+            onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -2040,7 +2148,7 @@ export default function MapView({
               )}
               <button
                 type="button"
-                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                 className={`shrink-0 ${!savedFiltered ? CHIP_ON : CHIP_OFF}`}
               >
                 Tutti
@@ -2052,7 +2160,7 @@ export default function MapView({
                   aria-pressed={activeCity === city}
                   onClick={() => {
                     const next = activeCity === city ? null : city;
-                    setActiveCity(next); setAiSearch(null); setClusterPlaces(null); setFilterError(null);
+                    setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
                     // sotto il riquadro dei filtri salvati (~220px)
                     fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 230);
                   }}
@@ -2066,7 +2174,7 @@ export default function MapView({
                   key={tag}
                   type="button"
                   aria-pressed={activeTag === tag}
-                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                   className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
                 >
                   {tagLabel(tag)} · {savedPlaces.filter((p) => p.tags?.includes(tag)).length}
@@ -2163,7 +2271,7 @@ export default function MapView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setAiSearch(null); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                    onClick={() => { clearAiSearch(); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
                     className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
                   >
                     Vedi esempi
@@ -2284,7 +2392,7 @@ export default function MapView({
                 <button
                   type="button"
                   data-testid="benvenuto-filtri"
-                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  onClick={() => { clearAiSearch(); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95"
                 >
                   <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
@@ -2430,7 +2538,7 @@ export default function MapView({
                 <button
                   type="button"
                   data-testid="benvenuto-filtri"
-                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  onClick={() => { clearAiSearch(); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
                   className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
                 >
                   <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
@@ -2453,7 +2561,9 @@ export default function MapView({
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
       {/* Vale anche per i risultati dei filtri: rifà la stessa ricerca a filtri nella zona visibile. */}
-      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
+      {/* Niente "Cerca in quest'area" se la ricerca nomina già una zona ("a Trastevere"): il server
+          ignora la posizione della mappa e restituirebbe la stessa lista, pagando un'altra ricerca. */}
+      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && !(aiSearch.query != null && aiSearch.filtri?.zona && aiQuery.trim() === aiSearch.query.trim()) && (overlay.kind === "list" || overlay.kind === "none") && (
         <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
           <button
             type="button"
@@ -2792,7 +2902,8 @@ export default function MapView({
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
             onSaved={(tags, note, uuid) => {
-              track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", tag: (tags ?? []).join(",").slice(0, 40) });
+              track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", ...((tags ?? []).includes(VISIT_DONE) ? { stato: VISIT_DONE } : (tags ?? []).includes(VISIT_WANT) ? { stato: VISIT_WANT } : {}) });
+              // Mai i nomi delle raccolte: sono testo scritto dall'utente ("Cena con Giulia").
               if (uuid) {
                 setPlaceUuids((prev) => ({ ...prev, [pendingPlace.id]: uuid }));
                 setSavedIds((prev) => new Set(prev).add(uuid));
@@ -2957,7 +3068,7 @@ export default function MapView({
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
-          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
+          onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
 

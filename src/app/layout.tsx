@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Inter, Newsreader } from "next/font/google";
 import OfflineBanner from "@/components/offline-banner";
 import NavBar from "@/components/nav-bar";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -75,8 +75,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
+  const { data } = await getUser();
   const userId = data?.user?.id ?? null;
 
   return (

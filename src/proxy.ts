@@ -11,6 +11,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Esclusi anche le foto dei locali (cache di 7 giorni), il manifest e i font: la sessione
+    // non serve e ogni richiesta pagava un controllo con Supabase (20 foto = 20 controlli).
+    "/((?!_next/static|_next/image|favicon.ico|api/places/photo|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

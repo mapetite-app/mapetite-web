@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { completeOnboarding } from "./actions";
+import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
@@ -148,9 +148,12 @@ export default function OnboardingView({ next = null }: { next?: string | null }
                 {step + 1}/{totalSteps}
               </span>
               {/* Chi vuole provare subito l'app non è obbligato a rispondere: i gusti si danno dopo in "I tuoi gusti". */}
-              <a href={next ?? "/mappa"} data-testid="onboarding-salta" className="-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline">
-                Salta
-              </a>
+              <form action={skipOnboarding}>
+                {next && <input type="hidden" name="next" value={next} />}
+                <button type="submit" data-testid="onboarding-salta" className="-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline">
+                  Salta
+                </button>
+              </form>
             </span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-pill bg-accent-light">

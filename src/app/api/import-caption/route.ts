@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractPlace, type ImportImage } from "@/lib/import-caption";
-import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
+import { allowAi, clientKey, AI_LIMIT_SCREENSHOT_MESSAGE } from "@/lib/ai-limit";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -25,8 +25,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Immagine: solo i formati che l'AI legge e una dimensione ragionevole (il telefono la rimpicciolisce già).
+  if (hasImage) {
+    const type = (image as string).slice(5, (image as string).indexOf(";"));
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type)) {
+      return NextResponse.json({ error: "Formato non supportato: usa uno screenshot (JPG o PNG)." }, { status: 415 });
+    }
+    if ((image as string).length > 6_000_000) {
+      return NextResponse.json({ error: "Immagine troppo grande: prova con uno screenshot più piccolo." }, { status: 413 });
+    }
+  }
+
   if (!allowAi("screenshot", clientKey(request))) {
-    return NextResponse.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
+    return NextResponse.json({ error: AI_LIMIT_SCREENSHOT_MESSAGE }, { status: 429 });
   }
 
   let img: ImportImage | undefined;

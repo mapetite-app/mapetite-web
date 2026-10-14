@@ -60,8 +60,11 @@ export default function AnswerArticle({
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => {
-    window.history.pushState({ articolo: true }, "");
-    const onPop = () => onCloseRef.current();
+    // Una voce sola: se l'articolo si rimonta (es. dopo "indietro" dalla scheda di un locale)
+    // la voce c'è già, e aggiungerne un'altra farebbe servire due "indietro" per chiuderlo.
+    if (!window.history.state?.articolo) window.history.pushState({ articolo: true }, "");
+    // Se sopra l'articolo era aperta la scheda di un locale, "indietro" chiude solo quella.
+    const onPop = () => { if (!window.history.state?.articolo) onCloseRef.current(); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -146,7 +149,8 @@ export default function AnswerArticle({
                         <span className="flex h-20 items-center px-4 text-3xl" aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>
                       )}
                       <span className="block bg-white px-4 py-3">
-                        <span className="block truncate font-mono text-[11px] uppercase tracking-wider text-text-muted">{metaLine(place, d, origin)}</span>
+                        {/* Su due righe e senza maiuscolo: prima "RISTORANTE ITALIANO · ★ 4,1 (2,8K) · €€ · 2…" tagliava distanza e prezzo. */}
+                        <span className="line-clamp-2 font-mono text-[11px] tracking-wider text-text-muted">{metaLine(place, d, origin)}</span>
                         {(d?.openNow != null || (d?.goFor ?? []).length > 0) && (
                           <span className="mt-2 flex flex-wrap gap-1.5">
                             {d?.openNow === true && (
@@ -188,7 +192,7 @@ export default function AnswerArticle({
               href={searchFeedbackMailto(title, places.map((p) => p.name))}
               className="mt-10 block rounded-card border-2 border-dashed border-border p-4 text-sm font-sans text-text-muted"
             >
-              🤔 <span className="font-display font-semibold text-brand">Questi risultati non vanno?</span> Dimmelo: si apre un&apos;email già scritta con la tua ricerca.
+              🤔 <span className="font-display font-semibold text-brand">Questi risultati non vanno?</span>{" "}Dimmelo: si apre un&apos;email già scritta con la tua ricerca.
             </a>
           )}
         </div>

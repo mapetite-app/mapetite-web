@@ -1,3 +1,5 @@
+import { distanceMeters } from "@/lib/distance";
+import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos";
 
 type GooglePlace = {
@@ -37,6 +39,8 @@ export type PlaceResult = {
   websiteUri: string | null;
   editorialSummary: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
+  // Le stesse recensioni con il voto (per la riga di ripiego della card: mai una stroncatura). Solo server.
+  reviewItems?: { text: string; rating: number | null }[] | null;
   phone: string | null;
   photoRef: string | null;   // il campo "name" della PRIMA foto, o null
   photoAuthor?: string | null; // autore della prima foto: Google chiede di mostrarlo
@@ -53,6 +57,9 @@ export type SearchOptions = {
   maxPriceLevel?: number;
   openNowOnly?: boolean;
   categories?: string[];
+  // Distanza scelta dall'utente nei filtri ("entro 1 km"): Google la tratta solo come preferenza,
+  // quindi i locali più lontani si tolgono dopo. Senza questo, "1 km" mostrava posti a 5-8 km.
+  maxDistanceMeters?: number;
   // "quality" (default): ordina per qualityScore. "relevance": preserva l'ordine
   // di rilevanza di Google (nessun sort). Floor e filtri utente invariati in entrambi.
   sortMode?: "relevance" | "quality";
@@ -82,20 +89,7 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
 };
 
-const CATEGORY_TYPE_MAP: Record<string, string[]> = {
-  restaurant: ["restaurant", "italian_restaurant", "fine_dining_restaurant"],
-  cafe: ["cafe", "coffee_shop", "breakfast_restaurant"],
-  pizza: ["pizza_restaurant"],
-  sushi: ["sushi_restaurant", "japanese_restaurant"],
-  pub: ["bar", "pub", "wine_bar"],
-  gelato: ["ice_cream_shop", "dessert_shop"],
-  bakery: ["bakery"],
-  fastfood: ["fast_food_restaurant", "hamburger_restaurant"],
-  vegetarian: ["vegetarian_restaurant", "vegan_restaurant"],
-  seafood: ["seafood_restaurant"],
-  steakhouse: ["steak_house", "barbecue_restaurant"],
-  wine_bar: ["wine_bar"],
-};
+// Categorie dei Filtri → tipi Google: in src/lib/category-types.ts (servono anche ai salvati, nel telefono).
 
 // Punteggio per le ricerche con i filtri: conta il VOTO, non la fama (VISIONE.md).
 // Le recensioni servono solo a fidarsi del voto: oltre REVIEWS_ENOUGH non aggiungono nulla.
@@ -131,6 +125,7 @@ export async function searchGooglePlaces(
     maxPriceLevel,
     openNowOnly,
     categories,
+    maxDistanceMeters,
     sortMode = "quality",
     includedType,
     locationMode = "bias",
@@ -170,6 +165,8 @@ export async function searchGooglePlaces(
       "X-Goog-FieldMask": FIELD_MASK,
     },
     body: JSON.stringify(requestBody),
+    // Senza limite una risposta lenta di Google teneva la ricerca appesa fino al timeout della piattaforma.
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!googleResponse.ok) {
@@ -201,6 +198,13 @@ export async function searchGooglePlaces(
         .slice(0, 5);
       return texts.length > 0 ? texts : null;
     })(),
+    reviewItems: (() => {
+      const items = (place.reviews ?? [])
+        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
+        .slice(0, 5)
+        .map((r) => ({ text: r.text!.text!, rating: typeof r.rating === "number" ? r.rating : null }));
+      return items.length > 0 ? items : null;
+    })(),
     phone: place.nationalPhoneNumber ?? null,
     photoRef: place.photos?.[0]?.name ?? null,
     photoAuthor: place.photos?.[0]?.authorAttributions?.[0]?.displayName ?? null,
@@ -213,12 +217,20 @@ export async function searchGooglePlaces(
     // Filtri utente: possono solo alzare l'asticella.
     if (minRating != null && (p.rating ?? 0) < minRating) return false;
     if (minReviews != null && (p.userRatingCount ?? 0) < minReviews) return false;
-    if (minPriceLevel != null && (p.priceLevel ?? -1) < minPriceLevel) return false;
-    if (maxPriceLevel != null && (p.priceLevel ?? 99) > maxPriceLevel) return false;
+    // Prezzo: chi non ha la fascia su Google resta. Spesso sono proprio i locali di quartiere poco
+    // recensiti: escluderli lasciava solo i posti più documentati, cioè i più famosi (VISIONE.md).
+    if (minPriceLevel != null && p.priceLevel != null && p.priceLevel < minPriceLevel) return false;
+    if (maxPriceLevel != null && p.priceLevel != null && p.priceLevel > maxPriceLevel) return false;
     if (openNowOnly === true && p.openNow !== true) return false;
     if (categories != null && categories.length > 0) {
+      // Tutti i tipi del locale, non solo il principale: una pizzeria segnata "restaurant" con il
+      // tipo "pizza_restaurant" tra gli altri spariva da "Pizzerie".
       const allowedTypes = categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
-      if (p.category == null || !allowedTypes.includes(p.category)) return false;
+      const placeTypes = [p.category, ...(p.types ?? [])];
+      if (!placeTypes.some((t) => t != null && allowedTypes.includes(t))) return false;
+    }
+    if (maxDistanceMeters != null && lat != null && lng != null && p.lat != null && p.lng != null) {
+      if (distanceMeters({ lat, lng }, { lat: p.lat, lng: p.lng }) > maxDistanceMeters) return false;
     }
     return true;
   });

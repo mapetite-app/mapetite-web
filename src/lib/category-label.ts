@@ -44,6 +44,7 @@ const LABELS: Record<string, string> = {
   pastry_shop: "Pasticceria",
   cake_shop: "Pasticceria",
   dessert_shop: "Dolci",
+  dessert_restaurant: "Dolci",
   ice_cream_shop: "Gelateria",
   confectionery: "Dolciumi",
   deli: "Gastronomia",
@@ -58,7 +59,11 @@ export function categoryLabel(category: string | null | undefined): string | nul
   if (!category) return null;
   const known = LABELS[category.toLowerCase()];
   if (known) return known;
-  // Tipo non in elenco: niente trattini bassi, prima lettera maiuscola.
+  // Tipo di Google non in elenco: mai in inglese sulla card ("Dessert restaurant").
+  if (/_restaurant$/.test(category)) return "Ristorante";
+  if (/_bar$/.test(category)) return "Bar";
+  if (/_(?:shop|store)$/.test(category)) return "Negozio";
+  // Categoria scritta a mano ("Trattoria"): niente trattini bassi, prima lettera maiuscola.
   const t = category.replace(/_/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);
 }

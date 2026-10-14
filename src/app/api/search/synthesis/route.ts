@@ -26,7 +26,10 @@ export async function POST(request: Request) {
   }
 
   // Oltre il tetto AI: niente verdetti, restano i dati Google (le card mostrano descrizione o recensione).
-  if (!allowAi("verdetti", clientKey(request))) {
+  // Utente letto prima del tetto: il limite conta per persona, non per rete Wi-Fi condivisa.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!allowAi("verdetti", clientKey(request, user?.id))) {
     return NextResponse.json({ dettagli: {}, esclusi: [] });
   }
 
@@ -51,8 +54,6 @@ export async function POST(request: Request) {
 
   let sintesi: Awaited<ReturnType<typeof getSynthesis>> = {};
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
     sintesi = await getSynthesis(stubs, query.trim(), user?.id ?? null);
   } catch (err) {
     console.error("[search/synthesis] errore Haiku:", err);

@@ -15,6 +15,18 @@ function errorText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
 }
 
+// Esito già ottenuto in questa sessione del browser per lo stesso testo condiviso.
+const DONE_KEY = "mapetite.condividi-fatto";
+function readDone(text: string): LinkOutcome[] | null {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DONE_KEY) ?? "null");
+    return saved?.text === text && Array.isArray(saved.results) ? saved.results : null;
+  } catch { return null; }
+}
+function rememberDone(text: string, results: LinkOutcome[]) {
+  try { sessionStorage.setItem(DONE_KEY, JSON.stringify({ text, results })); } catch { /* storage non disponibile */ }
+}
+
 export default function ShareImport({
   title,
   sharedText,
@@ -38,7 +50,7 @@ export default function ShareImport({
   // "In corso" si accende prima: con lo stato iniziale o dal pulsante Riprova.
   const save = (uid: string) =>
     saveFromLinks(fullText, uid, title)
-      .then((r) => { setResults(r); clearPendingLink(); })
+      .then((r) => { setResults(r); clearPendingLink(); rememberDone(fullText, r); })
       .catch((e) => setError(errorText(e)))
       .finally(() => setBusy(false));
 
@@ -47,6 +59,10 @@ export default function ShareImport({
     started.current = true;
     // Senza accesso il link resta in attesa: lo ritrova la pagina Importa dopo il login.
     if (!userId) { rememberPendingLink(fullText); return; }
+    // Ricaricata (o riaperta dalle app recenti): si mostra l'esito di prima senza richiamare
+    // Google, che costerebbe di nuovo 1 ricerca per link sulle 50 al giorno.
+    const done = readDone(fullText);
+    if (done) { void Promise.resolve(done).then((r) => { setResults(r); setBusy(false); }); return; }
     void save(userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

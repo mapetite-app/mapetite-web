@@ -12,7 +12,8 @@
 export const NEXT_MAX_LENGTH = 512;
 
 // Pagine verso cui non ha senso tornare (rimanderebbero di nuovo all'accesso o sono API).
-const NO_RETURN = /^\/(login|signup|onboarding|api)(\/|\?|#|$)/;
+// Anche le pagine della password: dopo l'accesso tornarci non serve ("reimposta" senza link dice "scaduto").
+const NO_RETURN = /^\/(login|signup|onboarding|api|password-dimenticata|reimposta-password)(\/|\?|#|$)/;
 
 export function safeNext(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

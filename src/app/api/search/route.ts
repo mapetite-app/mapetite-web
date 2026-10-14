@@ -60,8 +60,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Utente (se ha fatto l'accesso): serve al tetto AI per persona, ai gusti nei verdetti e alla
+  // ricerca tra i salvati. Letto una volta sola. Il tetto conta per utente, non per indirizzo IP:
+  // a una demo o tra tester sulla stessa rete Wi-Fi non si bloccano a vicenda.
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const aiKey = clientKey(request, authUser?.id);
+
   // Tetto alle chiamate AI (src/lib/ai-limit.ts): le ricerche scritte usano Haiku.
-  if (source === "world" && searchIntent === "natural" && !allowAi("ricerca", clientKey(request))) {
+  if (source === "world" && searchIntent === "natural" && !allowAi("ricerca", aiKey)) {
     return NextResponse.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
   }
 
@@ -110,11 +117,22 @@ export async function POST(request: Request) {
         openNowOnly: body?.openNowOnly === true ? true : undefined,
         radius: typeof body?.radius === "number" ? body.radius : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
+        maxDistanceMeters: typeof body?.radius === "number" ? body.radius : undefined,
         sortMode: searchIntent === "natural" ? "relevance" : "quality",
       });
     } catch (err) {
+      // Un errore di Google (quota giornaliera finita, rete, lentezza) non è "nessun risultato":
+      // il telefono mostrerebbe "Non ho trovato nulla, prova con meno requisiti", che è falso.
       console.error("[search/route] Google Places error:", err);
-      risultati = [];
+      const quota = err instanceof Error && /error 429/.test(err.message);
+      return NextResponse.json(
+        {
+          error: quota
+            ? "Oggi le ricerche sono finite: riprova domani, oppure cerca tra i tuoi salvati."
+            : "La ricerca non è disponibile in questo momento: riprova tra poco.",
+        },
+        { status: 503 },
+      );
     }
     // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
     // (un pub per la colazione) vanno in fondo, mai esclusi.
@@ -122,7 +140,8 @@ export async function POST(request: Request) {
       const { places, demoted, rule } = demoteOffType(query.trim(), risultati);
       if (demoted.length > 0) {
         risultati = places;
-        daParte.fuori_tema = demoted.slice(0, 10);
+        // Al telefono solo i nomi: "Nome (irish_pub)" è il formato del log, in inglese.
+        daParte.fuori_tema = places.slice(places.length - demoted.length).map((p) => p.name).slice(0, 10);
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
       }
     }
@@ -157,9 +176,10 @@ export async function POST(request: Request) {
       try {
         // Utente opzionale: la ricerca world è pubblica. Se autenticato, i suoi
         // gusti personalizzano matchReason; altrimenti degrada su richiesta+locale.
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        sintesi = await getSynthesis(risultati, query.trim(), user?.id ?? null);
+        // Ricerca con i filtri (verdetti subito, senza primo tempo): conta nel tetto AI come
+        // /api/search/synthesis. Oltre il tetto restano i dati Google, senza errori.
+        if (!allowAi("verdetti", aiKey)) throw new Error("tetto AI raggiunto: verdetti saltati");
+        sintesi = await getSynthesis(risultati, query.trim(), authUser?.id ?? null);
         // Esclusione dei locali che chiaramente non rispettano la richiesta
         // (approvata da Lorenzo il 10/10). Se Haiku li scarta tutti, non si esclude nulla.
         esclusi = risultati.filter((p) => sintesi[p.id]?.fit === false).map((p) => p.id);
@@ -170,6 +190,13 @@ export async function POST(request: Request) {
       }
     }
   } else {
+    // Ricerca tra i salvati: solo con l'accesso (prima Haiku partiva anche senza) e dentro il tetto AI.
+    if (!authUser) {
+      return NextResponse.json({ error: "Autenticazione richiesta." }, { status: 401 });
+    }
+    if (!allowAi("ricerca", aiKey)) {
+      return NextResponse.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
+    }
     try {
       const message = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -246,14 +273,7 @@ ESEMPI (input → output atteso):
 
     // Client server AUTENTICATO: la ricerca "tra i miei salvati" deve rispettare la RLS
     // e leggere saved_places dell'utente, non il catalogo globale places.
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: "Autenticazione richiesta." },
-        { status: 401 }
-      );
-    }
+    const user = authUser;
 
     const categoria = filtri.categoria ? sanitize(filtri.categoria) : null;
     const keywords = filtri.parole_chiave
@@ -352,16 +372,16 @@ ESEMPI (input → output atteso):
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
-    const { reviewTexts, ...rest } = p;
+    const { reviewTexts, reviewItems, ...rest } = p;
     return {
       ...rest,
-      selectedReviews: selectQualityReviews(reviewTexts),
-      synthesis: s?.synthesis ?? null,
-      tags: s?.tags ?? rest.tags ?? null,
-      verdict: s?.verdict ?? null,
+      selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
+      synthesis: s?.synthesis || null,
+      tags: s?.tags?.length ? s.tags : rest.tags ?? null,
+      verdict: s?.verdict || null,
       goFor: s?.goFor ?? null,
       dontExpect: s?.dontExpect ?? null,
-      matchReason: s?.matchReason ?? null,
+      matchReason: s?.matchReason || null,
     };
   });
 
@@ -384,10 +404,9 @@ ESEMPI (input → output atteso):
   // Mai la frase scritta: solo cosa ha capito l'AI o i filtri scelti. Dopo la risposta, senza attese.
   if (source === "world") {
     after(async () => {
-      const { data } = await (await createClient()).auth.getUser();
       await recordEvent({
         type: "ricerca",
-        userId: data?.user?.id ?? null,
+        userId: authUser?.id ?? null,
         lat,
         lng,
         props: {

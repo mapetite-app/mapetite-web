@@ -57,3 +57,20 @@ export async function completeOnboarding({
   const q = tasteQuery({ cuisines, occasions, atmospheres, priceRange });
   redirect(q ? `/mappa?q=${encodeURIComponent(q)}` : "/mappa");
 }
+
+// "Salta": chi vuole provare subito l'app non risponde alle domande, ma l'onboarding conta come
+// fatto. Prima restava "da fare": ogni accesso riportava qui e "I tuoi gusti" (/me) rimandava
+// all'onboarding. I gusti restano vuoti e si possono dare dopo da "I tuoi gusti".
+export async function skipOnboarding(formData: FormData): Promise<never> {
+  const back = safeNext(formData.get("next"));
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+    if (error) console.error("[onboarding] salta:", error.message);
+  }
+  redirect(back ?? "/mappa");
+}

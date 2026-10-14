@@ -15,8 +15,11 @@ import {
   upsertEnrichment,
   type EditorialInput,
 } from "@/lib/enrichment";
+import { adminOnly } from "@/lib/admin-guard";
 
 export async function POST(req: NextRequest) {
+  const blocked = adminOnly(req);
+  if (blocked) return blocked;
   let body: any;
   try {
     body = await req.json();

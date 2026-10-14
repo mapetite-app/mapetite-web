@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 
 function errorText(e: unknown): string {
@@ -16,7 +17,7 @@ function errorText(e: unknown): string {
 // Solo una lettura su Supabase (gratis): nessuna chiamata Google in più.
 async function alreadySavedMap(userId: string, googleIds: string[]): Promise<Record<string, string>> {
   if (googleIds.length === 0) return {};
-  const { data, error } = await createClient()
+  const { data, error } = await (await browserClient())
     .from("saved_places")
     .select("place_id, places!inner(google_place_id)")
     .eq("user_id", userId)
@@ -177,7 +178,7 @@ export default function ManualAddCard({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-text">{r.name}</p>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{r.address}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{displayAddress(r.address)}</p>
                     </div>
                     {savedUuid ? (
                       <Link

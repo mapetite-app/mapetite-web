@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { afterLoginPath, safeNext, withNext } from "@/lib/next-path";
@@ -65,12 +66,15 @@ export async function signup(formData: FormData) {
   const password = formData.get("password") as string;
   const next = safeNext(formData.get("next"));
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mapetite-web.vercel.app";
+  // Indirizzo del sito: dalla variabile d'ambiente, altrimenti da dove arriva la richiesta
+  // (anteprima Vercel, produzione, locale). Niente indirizzi scritti nel codice (regola anti-Simone).
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await headers()).get("origin");
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // Il link di conferma via email riporta al login con lo stesso `next`.
-    options: { emailRedirectTo: `${siteUrl}${withNext("/login", next)}` },
+    // Il link di conferma via email riporta al login con lo stesso `next`
+    // (il login lo gira a /auth/conferma, che apre la sessione).
+    options: siteUrl ? { emailRedirectTo: `${siteUrl}${withNext("/login", next)}` } : undefined,
   });
 
   if (error) {

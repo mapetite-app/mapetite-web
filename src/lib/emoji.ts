@@ -1,6 +1,9 @@
 const EMOJI_RULES: [string[], string][] = [
   // Specifiche prima — così "bakery" non viene catturato da "bar"
-  [["forno", "panific", "panetteria", "bakery", "pasticc", "pastry"], "🥖"],
+  // Pasticcerie e cornetti (14/10): prima avevano la baguette 🥖 come i forni.
+  [["pasticc", "pastry", "cornett", "croissant"], "🥐"],
+  [["dessert", "cake", "cioccolat", "chocolate", "confectioner", "dolci"], "🍰"],
+  [["forno", "panific", "panetteria", "bakery"], "🥖"],
   [["pizza", "pizzeria"], "🍕"],
   [["sushi", "giappones", "japanese"], "🍣"],
   [["pesce", "fish", "seafood", "frutti di mare"], "🐟"],
@@ -8,8 +11,17 @@ const EMOJI_RULES: [string[], string][] = [
   [["caff", "cafe", "coffee"], "☕️"],
   [["enotec", "wine"], "🍷"],
   [["burger", "hamburger", "panino", "paninote"], "🍔"],
-  [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian"], "🍜"],
+  [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian", "korean", "corean", "vietnam"], "🍜"],
   [["steak", "grill", "brace", "carne", "macelleria"], "🥩"],
+  // Cucine (14/10): prima un ristorante indiano, messicano o vegano aveva gli spaghetti 🍝.
+  [["indian", "indiano", "curry"], "🍛"],
+  [["mexican", "messican", "taco", "burrito"], "🌮"],
+  [["middle_eastern", "mediorient", "lebanese", "libanes", "turkish", "kebab", "falafel", "greek", "gyros"], "🥙"],
+  [["spanish", "spagnol", "tapas", "paella"], "🥘"],
+  [["vegan", "vegetarian"], "🥗"],
+  [["brunch", "breakfast"], "🥞"],
+  [["juice", "smoothie", "centrifug"], "🥤"],
+  [["tea_house", "sala da tè"], "🫖"],
   // Prima di "restaurant" (spostata il 13/10 sera): "The Vista Rooftop | Pantheon Terrace Bar &
   // Restaurant", tipo Google cocktail_bar, aveva 🍝 perché "Restaurant" nel nome batteva il tipo.
   // Cambia solo i locali con "cocktail/speakeasy/mixolog" nel tipo o nel nome e una parola da

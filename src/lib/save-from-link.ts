@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/client-lazy";
 
 // "Salva da Google Maps" lato telefono: chiede al server di trovare i locali dai link,
 // poi li aggiunge ai salvati dell'utente con lo stato "Da provare" ("📌 Voglio andarci"),
@@ -34,7 +34,7 @@ export async function saveFromLinks(text: string, userId: string, title?: string
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error ?? "Qualcosa è andato storto, riprova.");
 
-  const supabase = createClient();
+  const supabase = await browserClient();
   const out: LinkOutcome[] = [];
   for (const r of (data.risultati ?? []) as LinkOutcome[]) {
     if (!r.place) { out.push({ link: r.link, error: r.error ?? "Link non valido." }); continue; }
@@ -68,7 +68,7 @@ export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<L
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data?.place?.id) throw new Error(data?.error ?? "Errore nel salvataggio del locale.");
   const place = { id: data.place.id as string, name: r.name };
-  const { error } = await createClient()
+  const { error } = await (await browserClient())
     .from("saved_places")
     .insert({ user_id: userId, place_id: place.id, tags: [WANT_TAG], note: null });
   if (error && error.code === "23505") return { link: "", place, alreadySaved: true };
@@ -77,7 +77,7 @@ export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<L
 }
 
 export async function saveNote(userId: string, placeId: string, note: string) {
-  const { error } = await createClient()
+  const { error } = await (await browserClient())
     .from("saved_places")
     .update({ note: note.trim() || null })
     .eq("user_id", userId)

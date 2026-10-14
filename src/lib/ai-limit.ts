@@ -6,9 +6,10 @@
 //  2. per istanza: al massimo PER_DAY azioni AI al giorno, chiunque le faccia.
 // Superato il limite l'app non si rompe: la ricerca risponde con un messaggio chiaro,
 // i verdetti si saltano (restano i dati Google).
-export type AiAction = "ricerca" | "verdetti" | "screenshot";
+// "luoghi" non è AI ma una ricerca Google a pagamento (Importa): stesso freno per persona.
+export type AiAction = "ricerca" | "verdetti" | "screenshot" | "luoghi";
 
-const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 40, screenshot: 20 };
+const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 40, screenshot: 20, luoghi: 20 };
 const PER_DAY = 1500;
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -48,3 +49,4 @@ export function allowAi(action: AiAction, key: string, now = Date.now()): boolea
 }
 
 export const AI_LIMIT_MESSAGE = "Hai fatto tante ricerche in poco tempo: riprova tra qualche minuto.";
+export const AI_LIMIT_SCREENSHOT_MESSAGE = "Hai letto tanti screenshot in poco tempo: riprova tra qualche minuto.";
