@@ -123,10 +123,14 @@ ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: s
 await shot("01-benvenuto");
 
 // 2. Ricerca da esempio: lista subito, verdetti dopo, escluso sparisce
+// Verdetti finti più lenti solo qui (3 s invece di 0,9): i due controlli "prima dei verdetti"
+// a volte arrivavano dopo, in sviluppo con la prima compilazione della pagina (instabile 1 volta su 6).
+synthDelay = 3000;
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.getByText(/preparo i verdetti/).isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
 ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
+synthDelay = 900;
 await shot("02-lista-caricamento");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(true, "lista: il verdetto compare dopo");
@@ -1097,14 +1101,14 @@ else {
   }, () => ok(false, "pin dei salvati: segnalibri sulla mappa in Esplora"));
   await p.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 
-  // "Fatti suggerire": con 3 salvati di cui 2 bar a Roma compare "✨ Dai tuoi salvati: Bar a Roma, poco conosciuti"
+  // "Fatti suggerire": con 3 salvati di cui 2 bar a Roma compare "✨ Dai tuoi salvati: Bar a Roma, fuori dai soliti giri"
   {
     const rows3 = [rows[0], { ...rows[1], places: { ...rows[1].places, category: "bar" } }, rows[2]];
     const p3s = await sctx.newPage();
     await p3s.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3 }));
     await p3s.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await p3s.getByTestId("suggerimento-salvati").waitFor({ timeout: 5000 }).then(async () => {
-      ok((await p3s.getByTestId("suggerimento-salvati").textContent()) === "✨ Dai tuoi salvati: Bar a Roma, poco conosciuti", "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati");
+      ok((await p3s.getByTestId("suggerimento-salvati").textContent()) === "✨ Dai tuoi salvati: Bar a Roma, fuori dai soliti giri", "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati");
     }, () => ok(false, "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati"));
     await p3s.close();
     ok((await p.getByTestId("suggerimento-salvati").count()) === 0, "fatti suggerire: niente proposta se i salvati sono tutti di tipo diverso");
