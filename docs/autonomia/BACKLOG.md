@@ -7,7 +7,7 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-**In corso adesso:** nessuna sessione. La sessione chiesta da Lorenzo il 14/10 si è chiusa alle 22:30 con merge in produzione (PR #38); la routine delle 00:05 riparte da main.
+**In corso adesso:** nessuna sessione (14/10 sera chiusa con merge della PR #39). La routine delle 00:05 riparte da main.
 **Aggiornato 14/10 sera (sessione di giorno chiesta da Lorenzo, PR della sera).** Lorenzo ha dato carta bianca (resta suo solo budget e orari) e ha sbloccato chiave Haiku, token Vercel, rete per le foto, anteprime senza login. Fatto: prima prova con Haiku vero (verdetti 2× più veloci, locali più adatti in cima), 6 funzioni accese per tutti, "Salva da TikTok e YouTube". Foto vere viste per la prima volta. Da fare stanotte: migrazione `events` (token Supabase pronto dalla prossima sessione).
 **Aggiornato 14/10 alle 06:15 (sessione delle 22:00, PR #33 unita + PR #34).** Nessuna voce PRONTA: su richiesta di Lorenzo la notte è andata in 7 riletture del codice in produzione (45 difetti corretti, 2 di sicurezza), velocità (ricerca dalla home in 0,7 s invece di 1,4), conferma email che fa entrare, emoji delle cucine, 2 prove nuove spente e l'elenco di cosa sbloccare (`SBLOCCHI.md`). Le 10 ricerche di TEST-RICERCHE sono ora tutte provate con Google vero almeno una volta: tutte passano. Per andare avanti servono le decisioni in fondo ("Cosa serve decidere").
 **Aggiornato 13/10 alle 04:30 (sessione delle 03:05, PR #32).** Le due PR della sera (#30 e #31) sono unite in una sola, senza conflitti rimasti: basta fare il merge della #32 e chiudere le altre due. Nessuna voce PRONTA rimasta: tutto il resto aspetta una decisione (elenco sotto, "Cosa serve decidere").
@@ -65,7 +65,7 @@ Voce fissa "Salvati" (icona segnalibro) al posto di "Importa": un tocco apre la 
 ### 11b. Lista dei salvati divisa per stato — FATTA (già presente: "Tutti", "📌 Voglio andarci · N", "✓ Ci sono stato · N" in testa ai filtri dei salvati; dal profilo si arriva già filtrati)
 In cima tre schede: "📌 Voglio andarci · N", "✓ Ci sono stato · N", "Tutti · N" (dai tag "Da provare"/"Già visitato"). Restano città, ricerca, tag e "Più vicini". Card con nota, tag, città e distanza in vista.
 
-### 11c. I tuoi salvati sempre sulla mappa — IN PROVA (PR #25) (`?beta=pin-salvati`, spenta finché Lorenzo non la vede)
+### 11c. I tuoi salvati sempre sulla mappa — SCARTATA da Lorenzo (14/10): i salvati solo in "I miei salvati", mai sulla mappa generale (`?beta=pin-salvati` resta solo come prova)
 Anche in "Esplora" e dopo una ricerca, i locali salvati restano come pin piccoli con il segnalibro corallo (come Mapstr): si vede subito cosa hai già vicino.
 
 ### 11d. La ricerca guarda prima nei salvati — FATTA (PR #25 + etichetta "📌 Voglio andarci / ✓ Ci sono stato" sulle card AI nella PR #26)
@@ -221,7 +221,7 @@ Nessun commento nuovo di Lorenzo e nessuna voce PRONTA. La sessione delle 22:00 
 - **Prima prova con Haiku vero — FATTA**: comprensione della frase, verdetti, "perché" ed esclusioni funzionano e sono onesti (es. "la vista non è memorabile"). Due problemi corretti:
   - **Tempi**: i verdetti arrivavano 14 s dopo la lista. Ora Haiku lavora a gruppi da 4 in parallelo: 10 s per una ricerca mai vista, 6,5 s se i verdetti sono in memoria. Costo ~3 centesimi per ricerca nuova.
   - **Ordine**: il "perché" diceva "meno adatto per un anniversario" ma il locale restava a metà. Ora Haiku dà anche alto/medio/basso: "alto" in cima, "basso" in fondo, mai esclusi; solo finché l'utente non ha scorso le card.
-- **Accese per tutti — FATTA**: pin dei salvati, "Ci sei stato?", copertine delle raccolte, home "La tua mappa", gemme 💎, "🎲 Scegli tu". Si spengono con `?beta=-nome`. Restano spente articolo, nuovo Salva, 🎤 (Lorenzo 12/10).
+- **Accese per tutti — FATTA**: (pin dei salvati spenti di nuovo la sera stessa su richiesta di Lorenzo) "Ci sei stato?", copertine delle raccolte, home "La tua mappa", gemme 💎, "🎲 Scegli tu". Si spengono con `?beta=-nome`. Restano spente articolo, nuovo Salva, 🎤 (Lorenzo 12/10).
 - **Salva da TikTok e YouTube — FATTA, non provata dal vivo**: "✨ Trova il locale dal video" legge la didascalia dal servizio oEmbed ufficiale, l'AI trova nome e città, si sceglie il locale. Anche dal "Condividi" di TikTok su Android. Instagram resta con lo screenshot (oEmbed con token Meta). TikTok e YouTube non sono raggiungibili dall'ambiente di prova: da provare sul telefono.
 - **Foto vere**: viste per la prima volta (rete aperta da Lorenzo).
 - **Giro con un account vero — FATTO (voce 9, in sospeso dall'11/10)**: in produzione con l'utente di prova `claude-e2e@example.com` (creato con la chiave di servizio, nessuna email; la password si reimposta a ogni test, non è salvata da nessuna parte). Ricerca → salva → pin in Esplora → I miei salvati → profilo → home "La tua mappa": tutto funziona. Visto e corretto "I miei 1" → "Salvati · 1".

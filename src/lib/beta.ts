@@ -26,7 +26,8 @@ const OPTIN_KEY = "mapetite.beta";
 
 // Accese per tutti dal 14/10 (Lorenzo: carta bianca, "accendi quello che hai verificato").
 // Restano spente articolo, salva e voce: varianti in stile Places che Lorenzo ha scartato il 12/10.
-const DEFAULT_ON: OptInFlag[] = ["gemme", "sorprendimi", "pin-salvati", "ci-sei-stato", "copertine", "home-salvati"];
+// Spenta anche pin-salvati: Lorenzo (14/10) non vuole i suoi salvati sulla mappa generale, solo in "I miei salvati".
+const DEFAULT_ON: OptInFlag[] = ["gemme", "sorprendimi", "ci-sei-stato", "copertine", "home-salvati"];
 
 // ?stile=places accende anche articolo, nuovo "Salva" e 🎤 (tutti come Places); ?stile=attuale li spegne.
 const PLACES_OPTIN = ["articolo", "salva", "voce"];
