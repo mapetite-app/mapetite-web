@@ -2631,7 +2631,9 @@ export default function MapView({
         onMove={(evt) => setViewState(evt.viewState)}
         onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
         ref={mapRef}
-        style={{ width: "100%", height: "100%" }}
+        // isolation: i livelli dei pin (fino a 100, vedi sotto) restano dentro la mappa e non salgono
+        // mai sopra barra, pulsanti e card della pagina.
+        style={{ width: "100%", height: "100%", isolation: "isolate" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
         // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
         language="it"
@@ -2699,7 +2701,9 @@ export default function MapView({
                 }
                 dispatch({ type: "OPEN_VENUE", placeId: place.id });
               }}
-              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 3 : topPlaces.includes(place) ? 2 : 1 }}
+              // Tra i primi risultati, il più in alto in lista sta sopra: il suo nome non finisce sotto il
+              // pin di uno che viene dopo (visto dal vivo il 14/10). Stesso ordine di labelsToHide.
+              style={{ zIndex: focusId === place.id || selected?.id === place.id ? 100 : topPlaces.includes(place) ? 50 - Math.max(0, carouselOrder.indexOf(place.id)) : 1 }}
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
