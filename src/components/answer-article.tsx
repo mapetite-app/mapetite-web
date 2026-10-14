@@ -60,8 +60,11 @@ export default function AnswerArticle({
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => {
-    window.history.pushState({ articolo: true }, "");
-    const onPop = () => onCloseRef.current();
+    // Una voce sola: se l'articolo si rimonta (es. dopo "indietro" dalla scheda di un locale)
+    // la voce c'è già, e aggiungerne un'altra farebbe servire due "indietro" per chiuderlo.
+    if (!window.history.state?.articolo) window.history.pushState({ articolo: true }, "");
+    // Se sopra l'articolo era aperta la scheda di un locale, "indietro" chiude solo quella.
+    const onPop = () => { if (!window.history.state?.articolo) onCloseRef.current(); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);

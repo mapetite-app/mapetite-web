@@ -88,6 +88,7 @@ await ctx.route("**/api/search", async (route) => {
   if (searchMode === "error") return route.fulfill({ status: 500, json: { error: "Qualcosa è andato storto. Riprova." } });
   if (searchMode === "empty") return route.fulfill({ json: { ...SEARCH_FAST, risultati: [], sintesi_pendente: null } });
   if (searchMode === "folla") return route.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, sintesi_pendente: null } });
+  if (searchMode === "senza-zona") return route.fulfill({ json: { ...SEARCH_FAST, filtri_usati: { ...SEARCH_FAST.filtri_usati, zona: null } } });
   return route.fulfill({ json: SEARCH_FAST });
 });
 await ctx.route("**/api/search/synthesis", async (route) => {
@@ -262,7 +263,16 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.locator("ul.snap-x").count() === 0, "?lista=a: torna la lista verticale");
 
+// "Cerca in quest'area" non compare se la frase nomina già una zona (la posizione della mappa non conterebbe)
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(1200);
+ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "ricerca con una zona ('a Roma'): niente 'Cerca in quest'area' (darebbe la stessa lista)");
+
 // 5b. Beta: filtri lista, condividi, recenti
+searchMode = "senza-zona";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
@@ -279,10 +289,31 @@ await shot("09c-cerca-in-area");
 await page.getByRole("button", { name: "Cerca in quest'area" }).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Cerca in quest'area" }).count()) === 0, "'Cerca in quest'area' rifà la ricerca e scompare");
+searchMode = "ok";
 await shot("09-beta-filtri");
 await page.getByText("Terrazza Uno").first().click();
 await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condividi: pulsante presente nella scheda");
+// Tasto "indietro" del telefono con la scheda aperta: chiude la scheda, resta sulla mappa con i risultati
+await page.goBack();
+await page.getByTestId("verdetto-scheda").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+ok(new URL(page.url()).pathname === "/mappa" && (await page.getByTestId("verdetto-scheda").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, `indietro del telefono: chiude la scheda e torna ai risultati, senza uscire dalla mappa (${page.url()})`);
+// Chiusa dall'interfaccia, la voce aggiunta alla cronologia sparisce: un altro "indietro" non riapre niente
+await page.getByText("Terrazza Uno").first().click();
+await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
+await page.keyboard.press("Escape");
+await page.waitForTimeout(500);
+ok((await page.getByTestId("verdetto-scheda").count()) === 0 && (await page.evaluate(() => !window.history.state?.scheda)), "scheda chiusa dall'interfaccia: tolta anche dalla cronologia");
+// ✕ mentre la ricerca è in corso: i risultati non devono ricomparire quando la risposta arriva
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+searchDelay = 1500;
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByTestId("ricerca-in-corso").waitFor({ timeout: 3000 }).catch(() => {});
+// Click diretto sul pulsante: in sviluppo l'azione di Playwright resta in attesa mentre la ricerca è in corso.
+await page.getByRole("button", { name: "Cancella la ricerca" }).first().evaluate((el) => el.click());
+await page.waitForTimeout(2500);
+searchDelay = 0;
+ok((await page.getByLabel("Cosa cerchi?").inputValue()) === "" && (await page.locator("ul").getByText("Terrazza Uno").count()) === 0 && (await page.getByTestId("ricerca-in-corso").count()) === 0, "✕ durante la ricerca: i risultati non ricompaiono quando arriva la risposta");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("recenti").filter({ hasText: /Rooftop romantico/ }).count()) >= 1, "beta recenti: la ricerca fatta compare tra le recenti");
 await shot("10-beta-recenti");

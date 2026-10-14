@@ -979,6 +979,47 @@ export default function MapView({
 
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
+  // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
+  const openVenueIdRef = useRef<string | null>(null);
+  useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
+
+  // Tasto "indietro" del telefono (Android, app installata, swipe su iPhone): con la scheda di un
+  // locale aperta la chiude e torna alla lista, invece di uscire dalla mappa e perdere la ricerca.
+  // Stesso schema dell'articolo: una voce nella cronologia quando la scheda si apre, tolta quando
+  // si chiude dall'interfaccia. Lo stato di Next resta (si copia history.state).
+  const venueOpen = overlay.kind === "venue";
+  const venueInHistory = useRef(false);
+  const dispatchRef = useRef(dispatch);
+  useEffect(() => { dispatchRef.current = dispatch; });
+  useEffect(() => {
+    if (venueOpen && !venueInHistory.current) {
+      window.history.pushState({ ...(window.history.state ?? {}), scheda: true }, "");
+      venueInHistory.current = true;
+    } else if (!venueOpen && venueInHistory.current) {
+      venueInHistory.current = false;
+      if (window.history.state?.scheda) window.history.back();
+    }
+  }, [venueOpen]);
+  useEffect(() => {
+    // Pagina ricaricata con la scheda o l'articolo aperti: quelle voci non valgono più (i pannelli
+    // ripartono chiusi); senza toglierle, il prossimo "indietro" uscirebbe dalla mappa.
+    const st = window.history.state;
+    if (st?.scheda || st?.articolo) {
+      const rest = { ...st };
+      delete rest.scheda;
+      delete rest.articolo;
+      window.history.replaceState(rest, "");
+    }
+    const onPop = () => {
+      if (venueInHistory.current && !window.history.state?.scheda) {
+        venueInHistory.current = false;
+        dispatchRef.current({ type: "CLOSE" });
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   const selected = useMemo<Place | null>(() => {
     if (overlay.kind !== "venue") return null;
     const id = overlay.placeId;
@@ -1300,7 +1341,19 @@ export default function MapView({
     seafood: "ristorante di pesce", steakhouse: "steakhouse", wine_bar: "wine bar",
   };
 
+  // Azzerare una ricerca invalida anche le risposte ancora in viaggio (searchSeq): senza, dopo ✕,
+  // un cambio di scheda o i filtri, i risultati vecchi ricomparivano qualche secondo dopo.
+  const clearAiSearch = () => {
+    searchSeq.current++;
+    setLoadingVerdicts(false);
+    setAiSearching(false);
+    setAiSearch(null);
+  };
+
   const runFilteredSearch = async (f: Filters) => {
+    const ticket = ++searchSeq.current;
+    setLoadingVerdicts(false);
+    setAiSearching(false);
     setAiError(null);
     if (view === "saved") {
       const allowed = f.categories;
@@ -1345,6 +1398,7 @@ export default function MapView({
         }),
       });
       const data = await res.json();
+      if (searchSeq.current !== ticket) return;
       if (!res.ok) { setFilterError("Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
         id: string; name: string; category: string | null; lat: number | null; lng: number | null;
@@ -1496,6 +1550,10 @@ export default function MapView({
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
+    // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
+    // o i filtri ha un numero vecchio e si scarta.
+    const ticket = ++searchSeq.current;
+    setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);
       try {
@@ -1512,6 +1570,7 @@ export default function MapView({
           }),
         });
         const data = await res.json();
+        if (searchSeq.current !== ticket) return;
         if (!res.ok) {
           setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
           return;
@@ -1555,7 +1614,7 @@ export default function MapView({
             editorialSummary: p.editorialSummary ?? null,
           };
         }
-        const id = ++searchSeq.current;
+        const id = ticket;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
         setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
@@ -1569,7 +1628,7 @@ export default function MapView({
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
       } finally {
-        setAiSearching(false);
+        if (searchSeq.current === ticket) setAiSearching(false);
       }
 
   };
@@ -1598,7 +1657,7 @@ export default function MapView({
   // Secondo tempo della ricerca AI: verdetti e motivi arrivano dopo la lista.
   // Se nel frattempo l'utente ha cambiato o azzerato la ricerca (id diverso) si scarta.
   const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
-    if (!pending) return;
+    if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
     try {
       const res = await fetch("/api/search/synthesis", {
@@ -1619,7 +1678,9 @@ export default function MapView({
       if (esclusi.size > 0) {
         setAiSearch((prev) =>
           prev && prev.id === id
-            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id)) }
+            // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
+            // chiudeva la scheda sotto le dita e lasciava solo la mappa.
+            ? { ...prev, risultati: prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current) }
             : prev,
         );
       }
@@ -1665,7 +1726,7 @@ export default function MapView({
     // Fuori dal ciclo dell'effetto, come gli altri arrivi dall'indirizzo.
     if (vistaParam === "salvati" && view !== "saved") {
       setTimeout(() => {
-        setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
+        clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
         setView("saved"); dispatch({ type: "OPEN_LIST" });
       }, 0);
     } else if (vistaParam !== "salvati" && view === "saved") {
@@ -1813,7 +1874,7 @@ export default function MapView({
                 <button
                   type="button"
                   aria-label="Cancella la ricerca"
-                  onClick={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+                  onClick={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
                   className="flex h-10 w-10 shrink-0 items-center justify-center text-base text-text-muted"
                 >
                   ✕
@@ -1840,7 +1901,7 @@ export default function MapView({
             type="button"
             aria-label="Filtri"
             onClick={() => {
-              setAiSearch(null);
+              clearAiSearch();
               setAiQuery("");
               setAiError(null);
               dispatch({ type: "OPEN_FILTERS" });
@@ -1972,7 +2033,7 @@ export default function MapView({
               onSubmit={(q) => { void runAISearch(q); }}
               isSearching={aiSearching}
               error={aiError}
-              onClear={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
+              onClear={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); setAiError(null); dispatch({ type: "RESET" }); }}
               activeFiltri={aiSearch?.filtri ?? null}
               activeCount={aiSearch?.risultati.length ?? null}
               recent={recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : []}
@@ -1983,7 +2044,7 @@ export default function MapView({
         <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
           <button
             type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
             className={
               view === "all"
                 ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -1994,7 +2055,7 @@ export default function MapView({
           </button>
           <button
             type="button"
-            onClick={() => { setView("saved"); setAiSearch(null); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+            onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
             className={
               view === "saved"
                 ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
@@ -2046,7 +2107,7 @@ export default function MapView({
               )}
               <button
                 type="button"
-                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                 className={`shrink-0 ${!savedFiltered ? CHIP_ON : CHIP_OFF}`}
               >
                 Tutti
@@ -2058,7 +2119,7 @@ export default function MapView({
                   aria-pressed={activeCity === city}
                   onClick={() => {
                     const next = activeCity === city ? null : city;
-                    setActiveCity(next); setAiSearch(null); setClusterPlaces(null); setFilterError(null);
+                    setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
                     // sotto il riquadro dei filtri salvati (~220px)
                     fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 230);
                   }}
@@ -2072,7 +2133,7 @@ export default function MapView({
                   key={tag}
                   type="button"
                   aria-pressed={activeTag === tag}
-                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); setAiSearch(null); setClusterPlaces(null); setFilterError(null); }}
+                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                   className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
                 >
                   {tagLabel(tag)} · {savedPlaces.filter((p) => p.tags?.includes(tag)).length}
@@ -2169,7 +2230,7 @@ export default function MapView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setAiSearch(null); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                    onClick={() => { clearAiSearch(); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
                     className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
                   >
                     Vedi esempi
@@ -2290,7 +2351,7 @@ export default function MapView({
                 <button
                   type="button"
                   data-testid="benvenuto-filtri"
-                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  onClick={() => { clearAiSearch(); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand shadow-card active:scale-95"
                 >
                   <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
@@ -2436,7 +2497,7 @@ export default function MapView({
                 <button
                   type="button"
                   data-testid="benvenuto-filtri"
-                  onClick={() => { setAiSearch(null); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
+                  onClick={() => { clearAiSearch(); setAiQuery(""); dispatch({ type: "OPEN_FILTERS" }); }}
                   className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
                 >
                   <SlidersHorizontal size={16} aria-hidden /> Oppure usa i filtri
@@ -2459,7 +2520,9 @@ export default function MapView({
 
       {/* Dopo aver spostato la mappa: rifà la stessa ricerca nella zona visibile. */}
       {/* Vale anche per i risultati dei filtri: rifà la stessa ricerca a filtri nella zona visibile. */}
-      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && (overlay.kind === "list" || overlay.kind === "none") && (
+      {/* Niente "Cerca in quest'area" se la ricerca nomina già una zona ("a Trastevere"): il server
+          ignora la posizione della mappa e restituirebbe la stessa lista, pagando un'altra ricerca. */}
+      {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && !(aiSearch.query != null && aiSearch.filtri?.zona && aiQuery.trim() === aiSearch.query.trim()) && (overlay.kind === "list" || overlay.kind === "none") && (
         <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
           <button
             type="button"
@@ -2963,7 +3026,7 @@ export default function MapView({
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
-          onClose={() => { setClusterPlaces(null); setFilterError(null); setAiSearch(null); setAiQuery(""); dispatch({ type: "RESET" }); }}
+          onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
 
