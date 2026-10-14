@@ -12,8 +12,11 @@ import {
   upsertEnrichment,
   getEnrichment,
 } from "@/lib/enrichment";
+import { adminOnly } from "@/lib/admin-guard";
 
 export async function GET(req: NextRequest) {
+  const blocked = adminOnly(req);
+  if (blocked) return blocked;
   const placeId = req.nextUrl.searchParams.get("placeId");
   if (!placeId) {
     return NextResponse.json({ error: "placeId mancante" }, { status: 400 });
@@ -23,6 +26,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = adminOnly(req);
+  if (blocked) return blocked;
   let body: any;
   try {
     body = await req.json();

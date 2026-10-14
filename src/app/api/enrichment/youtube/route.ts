@@ -9,8 +9,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchYouTubeVideos } from "@/lib/youtube";
 import { mapYouTubeToEnrichment, upsertEnrichment } from "@/lib/enrichment";
+import { adminOnly } from "@/lib/admin-guard";
 
 export async function GET(req: NextRequest) {
+  const blocked = adminOnly(req);
+  if (blocked) return blocked;
   const { searchParams } = new URL(req.url);
   const name = searchParams.get("name") ?? "";
   const city = searchParams.get("city") ?? undefined;
