@@ -11,6 +11,7 @@ export default function PlacePhoto({
   width = 400,
   fallback = null,
   priority = false,
+  credit = null,
 }: {
   photoRef: string | null | undefined;
   alt: string;
@@ -18,18 +19,24 @@ export default function PlacePhoto({
   width?: number;
   fallback?: ReactNode;
   priority?: boolean;
+  // Didascalia "Foto: …": solo sopra una foto vera. Prima restava sopra l'emoji quando la foto
+  // non caricava (quota foto finita, rete), attribuendo a qualcuno un'immagine che non c'è.
+  credit?: ReactNode;
 }) {
   const [failed, setFailed] = useState(false);
   if (!photoRef || failed) return <>{fallback}</>;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`/api/places/photo?ref=${encodeURIComponent(photoRef)}&w=${width}`}
-      alt={alt}
-      loading={priority ? "eager" : "lazy"}
-      decoding="async"
-      onError={() => setFailed(true)}
-      className={className}
-    />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/api/places/photo?ref=${encodeURIComponent(photoRef)}&w=${width}`}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        onError={() => setFailed(true)}
+        className={className}
+      />
+      {credit}
+    </>
   );
 }

@@ -696,6 +696,7 @@ await p3.getByText("Terrazza Uno").first().click();
 await p3.locator("a[aria-label^='Indicazioni']").first().waitFor({ timeout: 4000 });
 const walkLabel = (await p3.locator("a[aria-label^='Indicazioni']").first().getAttribute("aria-label")) ?? "";
 ok(/Indicazioni: \d+ min a piedi/.test(walkLabel), `scheda: minuti a piedi sul pulsante percorso (${walkLabel})`);
+ok((await p3.getByText("Foto: Maria R.").count()) === 0, "scheda: foto non caricata (quota finita) → niente didascalia 'Foto: …' sopra l'emoji");
 await p3.screenshot({ path: `${OUT}/04b-scheda-a-piedi.png`, caret: "initial" });
 await ctx3.close();
 
