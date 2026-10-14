@@ -503,8 +503,6 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 // Solo salvati entro SIMILAR_MAX_METERS (14/10): prima un ristorante salvato a Milano finiva
 // su quasi ogni "Ristorante" cercato a Roma, un'affermazione senza fondamento.
 const SIMILAR_MAX_METERS = 15_000;
-// Oltre questa distanza dal punto della ricerca i risultati sono in un'altra città: niente distanza sulle card.
-const ORIGIN_MAX_METERS = 30_000;
 function similarSaved(place: Place, saved: Place[]): string | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
@@ -986,16 +984,6 @@ export default function MapView({
       : view === "all"
         ? []
         : filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
-
-  // Distanze sulle card: dalla posizione vera; senza, dal punto della mappa da cui è partita la ricerca,
-  // ma solo se i risultati sono lì intorno. Con la mappa su Roma (partenza predefinita, posizione mai
-  // chiesta) e "cocktail bar a Milano", ogni card diceva "479 km": un numero che non riguarda l'utente.
-  const resultsOrigin = (() => {
-    if (userPos) return userPos;
-    if (!searchOrigin || aiSearch === null || aiSearch.risultati.length === 0) return searchOrigin;
-    const nearest = Math.min(...aiSearch.risultati.map((p) => distanceMeters(searchOrigin, p)));
-    return nearest <= ORIGIN_MAX_METERS ? searchOrigin : null;
-  })();
 
   // --- Overlay: autorità unica sulla visibilità dei pannelli ---
   // Un solo pannello visibile alla volta. Il dispatch è avvolto in una
@@ -2782,7 +2770,7 @@ export default function MapView({
           <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
             <VenueSheet
               key={selected.id}
-              origin={resultsOrigin}
+              origin={userPos ?? searchOrigin}
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
@@ -3023,7 +3011,7 @@ export default function MapView({
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
-          origin={view === "saved" ? userPos : resultsOrigin}
+          origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
@@ -3096,7 +3084,7 @@ export default function MapView({
           })()}
           details={venueDetails}
           loadingVerdicts={loadingVerdicts}
-          origin={resultsOrigin}
+          origin={userPos ?? searchOrigin}
           isSaved={isPlaceSaved}
           onSave={(place) => { void quickSave(place); }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}
