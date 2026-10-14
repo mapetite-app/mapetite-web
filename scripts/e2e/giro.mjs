@@ -631,6 +631,17 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 }, () => ok(false, "risultati: dice quali locali turistici ha messo da parte"));
 await page.unroute("**/api/search");
 
+// 5e. Ricerca in un'altra città con la mappa su Roma e la posizione mai chiesta: niente "479 km" sulle card
+{
+  const MILANO = PLACES.map((p, i) => ({ ...p, address: "Via di Prova 1, Milano", lat: 45.46 + i * 0.001, lng: 9.19 }));
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: MILANO, filtri_usati: { ...SEARCH_FAST.filtri_usati, zona: "Milano" } } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
+  ok((await page.locator("ul").getByText(/\d{3},\d km/).count()) === 0, "altra città: le card non mostrano la distanza dal centro di Roma (es. '479 km')");
+  await page.unroute("**/api/search");
+}
+
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
