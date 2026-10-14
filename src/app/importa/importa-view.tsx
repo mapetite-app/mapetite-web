@@ -33,6 +33,28 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+// Lo screenshot di un iPhone è spesso un PNG da 3–5 MB: in base64 supera il limite delle
+// richieste di Vercel (4,5 MB) e il tester vedeva "Impossibile leggere" su un'immagine buona.
+// Si rimpicciolisce nel telefono a 1568 px sul lato lungo (quanto basta all'AI per leggere)
+// e si manda in JPEG: qualche centinaio di kB. Se il browser non ci riesce, si manda com'è.
+const MAX_SIDE = 1568;
+async function screenshotForUpload(file: File): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } catch {
+    return readFileAsDataUrl(file);
+  }
+}
+
 // I nostri errori sono già in italiano; quelli del browser ("Failed to fetch", JSON rotto) no.
 function errorText(e: unknown): string {
   if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
@@ -83,12 +105,13 @@ export default function ImportaView({ userId }: { userId: string | null }) {
   };
 
   const handleRead = async () => {
-    if (!file) return;
+    // Leggere lo screenshot costa (AI + Google): solo per chi può poi salvare il locale.
+    if (!file || !userId) return;
     setIsReading(true);
     setError(null);
 
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const dataUrl = await screenshotForUpload(file);
 
       const extractRes = await fetch("/api/import-caption", {
         method: "POST",
@@ -254,12 +277,17 @@ export default function ImportaView({ userId }: { userId: string | null }) {
           <button
             type="button"
             onClick={handleRead}
-            disabled={!file || isReading}
+            disabled={!file || isReading || !userId}
             className="min-h-12 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white
               hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
           >
             {isReading ? "Lettura in corso..." : "Leggi locale"}
           </button>
+          {!userId && (
+            <p data-testid="screenshot-accedi" className="text-sm text-text-muted">
+              <Link href="/login?next=%2Fimporta" className="font-semibold text-brand underline">Accedi</Link> per leggere uno screenshot e salvare il locale.
+            </p>
+          )}
         </div>
       )}
 
