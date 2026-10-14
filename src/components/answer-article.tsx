@@ -149,7 +149,8 @@ export default function AnswerArticle({
                         <span className="flex h-20 items-center px-4 text-3xl" aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>
                       )}
                       <span className="block bg-white px-4 py-3">
-                        <span className="block truncate font-mono text-[11px] uppercase tracking-wider text-text-muted">{metaLine(place, d, origin)}</span>
+                        {/* Su due righe e senza maiuscolo: prima "RISTORANTE ITALIANO · ★ 4,1 (2,8K) · €€ · 2…" tagliava distanza e prezzo. */}
+                        <span className="line-clamp-2 font-mono text-[11px] tracking-wider text-text-muted">{metaLine(place, d, origin)}</span>
                         {(d?.openNow != null || (d?.goFor ?? []).length > 0) && (
                           <span className="mt-2 flex flex-wrap gap-1.5">
                             {d?.openNow === true && (
