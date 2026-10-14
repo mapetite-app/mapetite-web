@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import type { PlaceResult } from "@/lib/google-places";
@@ -67,7 +68,7 @@ type CachedSynthesis = {
   dontExpect: string[];
 };
 
-const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo.
+const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo. Esempi di errori da non fare: "vibe" → atmosfera, "food" → cibo, "view" o "breathtaking" → vista mozzafiato, "handmade" → fatto a mano, "chill" → rilassato, "food pairing" → abbinamenti. Ammessi solo i prestiti entrati nell'italiano: cocktail, drink, staff, brunch, rooftop, lounge, location.
 
 Sei il curatore editoriale di Mapetite, piattaforma di scoperta food & beverage.
 Ricevi una lista di locali con dati e recensioni reali da Google. Ogni locale può includere un campo "enrichment": segnali da altre fonti (Google aggregato, guide editoriali come Michelin, Gambero Rosso, Puntarella Rossa). Usa enrichment come CONFERMA o contesto, MAI come sostituto delle recensioni, e non citarne la fonte se non aggiunge valore reale.
@@ -186,6 +187,8 @@ function normalizeChips(value: unknown, cap: number): string[] {
     if (typeof item !== "string") continue;
     const trimmed = item.trim();
     if (trimmed === "") continue;
+    // Chip con parole inglesi copiate dalle recensioni ("vibe informale"): meglio un chip in meno.
+    if (hasEnglish(trimmed)) continue;
     const key = trimmed.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -517,8 +520,9 @@ export async function getSynthesis(
     if (generated.size > 0) {
       try {
         const supabase = createAdminClient();
-        // Solo verdetti veri: uno vuoto in cache bloccherebbe il locale senza verdetto.
-        const rows = Array.from(generated.entries()).filter(([, s]) => s.verdict.trim() !== "").map(([place_id, s]) => ({
+        // Solo verdetti veri: uno vuoto in cache bloccherebbe il locale senza verdetto. Uno con parole
+        // inglesi si mostra questa volta ma non si salva: la prossima ricerca lo riscrive.
+        const rows = Array.from(generated.entries()).filter(([, s]) => s.verdict.trim() !== "" && !hasEnglish(`${s.verdict} ${s.synthesis}`)).map(([place_id, s]) => ({
           place_id,
           synthesis: s.synthesis,
           tags: s.tags,

@@ -663,6 +663,9 @@ await page.unroute("**/api/search");
   await page.waitForTimeout(300);
   const ordine = (await page.locator("ul.snap-x li[data-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")))).filter(Boolean);
   ok(ordine.join(",") === "P3,P2,P1", `ordine: il locale più adatto in cima e il meno adatto in fondo, nessuno escluso (${ordine.join(",")})`);
+  const z = async (id) => Number(await page.locator(`[data-testid=pin][data-place=${id}]`).first().evaluate((el) => getComputedStyle(el.closest(".mapboxgl-marker") ?? el).zIndex).catch(() => "0"));
+  const [z2, z1] = [await z("P2"), await z("P1")];
+  ok(z2 > z1, `mappa: il pin del 2° risultato sta sopra quello del 3° (il suo nome non finisce coperto) (${z2} > ${z1})`);
   await page.unroute("**/api/search/synthesis");
 }
 
