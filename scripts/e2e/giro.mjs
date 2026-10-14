@@ -337,11 +337,15 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "?beta=off: i filtri rapidi spariscono");
 
-// 5e. Beta "gemme" (spenta di default): badge sui locali amati ma poco recensiti
+// 5e. "Gemme" (accese di default dal 14/10, ?beta=-gemme per spegnerle): badge sui locali amati ma poco recensiti
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
-ok((await page.getByTestId("gemma").count()) === 0, "gemme: spente di default");
+ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("gemma").count()) === 1, "gemme: accese di default");
+await page.goto(`${BASE}/mappa?beta=-gemme`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+ok((await page.getByTestId("gemma").count()) === 0, "gemme: si spengono con ?beta=-gemme");
 await page.goto(`${BASE}/mappa?beta=gemme`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
@@ -353,8 +357,8 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) >= 1, "gemme: restano accese su questo telefono");
+// Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
-await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) === 0, "?beta=off: spegne anche le gemme");
@@ -1123,8 +1127,8 @@ else {
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 4, "app installata: 4 scorciatoie (Cerca, Salvati, Stasera, Filtri)"); ok((m.shortcuts ?? []).some((x) => x.url === "/stasera" && x.short_name === "Stasera"), "app installata: scorciatoia 'Stasera' → /stasera"); }
 
   // Voce 11c (?beta=pin-salvati, spenta di default): i salvati restano sulla mappa anche in Esplora
-  await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-  ok((await p.getByTestId("pin-salvato").count()) === 0, "pin dei salvati: spenti di default");
+  await p.goto(`${BASE}/mappa?beta=-pin-salvati`, { waitUntil: "networkidle" });
+  ok((await p.getByTestId("pin-salvato").count()) === 0, "pin dei salvati: si spengono con ?beta=-pin-salvati (accesi di default)");
   await p.goto(`${BASE}/mappa?beta=pin-salvati`, { waitUntil: "networkidle" });
   await p.getByTestId("pin-salvato").first().waitFor({ timeout: 5000 }).then(async () => {
     ok((await p.getByTestId("pin-salvato").count()) === rows.length, `pin dei salvati: ${await p.getByTestId("pin-salvato").count()} segnalibri sulla mappa in Esplora`);
@@ -1207,7 +1211,8 @@ else {
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
       // "Ci sei stato?" (?beta=ci-sei-stato, spento di default): un "Voglio andarci" salvato da più di una settimana
-      ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: spento di default");
+      await p.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
+      ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: si spegne con ?beta=-ci-sei-stato (acceso di default)");
       let visitPatch = null;
       await p.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "PATCH") { visitPatch = { url: r.request().url(), body: r.request().postDataJSON() }; return r.fulfill({ status: 204, body: "" }); } return r.fallback(); });
       await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
@@ -1220,7 +1225,8 @@ else {
       ok(JSON.stringify(visitPatch?.body?.tags) === '["Già visitato"]' && visitPatch.url.includes("place_id=eq.00000000-0000-4000-8000-000000000105"), "ci sei stato: 'Sì' lo segna '✓ Ci sono stato' (al posto di 'Voglio andarci')");
       await p.unroute("**/rest/v1/saved_places**");
       // Copertine delle raccolte (?beta=copertine, spenta di default): emoji e nomi dei locali al posto dell'iniziale
-      ok((await p.getByTestId("raccolta-copertina").count()) === 0, "copertine: spente di default (resta l'iniziale)");
+      await p.goto(`${BASE}/profilo?beta=-copertine`, { waitUntil: "networkidle" });
+      ok((await p.getByTestId("raccolta-copertina").count()) === 0, "copertine: si spengono con ?beta=-copertine (resta l'iniziale; accese di default)");
       await p.goto(`${BASE}/profilo?beta=copertine`, { waitUntil: "networkidle" });
       const amici = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
       await amici.getByTestId("raccolta-copertina").waitFor({ timeout: 4000 }).catch(() => {});
@@ -1231,8 +1237,8 @@ else {
       ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
       await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
       // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
-      await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
-      ok((await p.getByTestId("home-salvati").count()) === 0, "home salvati: spenta di default");
+      await p.goto(`${BASE}/?beta=-home-salvati`, { waitUntil: "networkidle" });
+      ok((await p.getByTestId("home-salvati").count()) === 0, "home salvati: si spegne con ?beta=-home-salvati (accesa di default)");
       await p.evaluate(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* niente */ } });
       await p.goto(`${BASE}/?beta=home-salvati`, { waitUntil: "networkidle" });
       const hs = p.getByTestId("home-salvati");
@@ -1465,7 +1471,10 @@ else {
   }
 
   // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
-  ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: spento di default");
+  await p.goto(`${BASE}/mappa?beta=-sorprendimi`, { waitUntil: "networkidle" });
+  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.waitForTimeout(800);
+  ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: si spegne con ?beta=-sorprendimi (acceso di default)");
   await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("scegli-tu").click();
