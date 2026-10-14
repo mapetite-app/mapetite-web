@@ -21,6 +21,7 @@ import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRec
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceMeters } from "@/lib/distance";
+import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
@@ -1397,13 +1398,21 @@ export default function MapView({
     setAiSearching(false);
     setAiError(null);
     if (view === "saved") {
-      const allowed = f.categories;
-      const filtered = allowed.length > 0
-        ? savedPlaces.filter((p) => {
-            const cat = (p.category ?? "").toLowerCase();
-            return allowed.some((c) => cat.includes(c));
-          })
-        : savedPlaces;
+      // Salvati: si applicano i filtri che i dati salvati permettono (tipo, voto, prezzo, distanza).
+      // Prima solo il tipo, e con un confronto di testo: "Gelaterie" non trovava ice_cream_shop.
+      const allowedTypes = f.categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
+      const center = userPos ?? { lat: viewState.latitude, lng: viewState.longitude };
+      const filtered = savedPlaces.filter((p) => {
+        if (f.categories.length > 0) {
+          const cat = (p.category ?? "").toLowerCase();
+          if (!allowedTypes.includes(cat) && !f.categories.some((c) => cat.includes(c))) return false;
+        }
+        if (f.minRating != null && p.rating != null && p.rating < f.minRating) return false;
+        if (f.maxPriceLevel != null && p.priceLevel != null && p.priceLevel > f.maxPriceLevel) return false;
+        if (f.minPriceLevel != null && p.priceLevel != null && p.priceLevel < f.minPriceLevel) return false;
+        if (f.radiusKm != null && distanceMeters(center, p) > f.radiusKm * 1000) return false;
+        return true;
+      });
       setAiSearch({ risultati: filtered, filtri: null });
       setMovedSinceSearch(false);
       dispatch({ type: "OPEN_LIST" });

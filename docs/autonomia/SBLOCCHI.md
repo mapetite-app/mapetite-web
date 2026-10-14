@@ -4,6 +4,8 @@ Scritto il 14/10/2026 notte, su richiesta di Lorenzo. Escluso il tetto di spesa 
 L'ordine segue l'impatto: le prime cose sono quelle che oggi mi fermano più spesso.
 Per ogni voce: cosa fare, dove, quanto tempo serve.
 
+**Prima di tutto:** il merge della **PR #34**. La #33 è stata unita alle 00:44 con la sola prima parte della notte; tutto il resto (sicurezza, conferma email, velocità, 39 difetti) è nella #34.
+
 ## A. Accessi tecnici (5–30 minuti ciascuno)
 
 1. **Chiave Haiku nell'ambiente cloud di prova** (5 min). È il blocco più grave: il "verdetto Mapetite" è il cuore del prodotto e non l'ho mai visto funzionare dal vivo. Senza chiave anche la comprensione della frase non parte, quindi ogni ricerca che provo è "solo Google".
@@ -29,6 +31,8 @@ Per ogni voce: cosa fare, dove, quanto tempo serve.
 
 6b. **Modello dell'email di conferma** (3 min, Supabase → Authentication → Emails → "Confirm signup"). Dal 14/10 chi tocca il link entra subito, ma solo se apre il link nello stesso browser in cui si è registrato. Se lo apre dentro l'app della posta, l'email risulta confermata ma deve accedere a mano. Per farlo entrare sempre, sostituisci il link del modello con `{{ .SiteURL }}/auth/conferma?token_hash={{ .TokenHash }}&type=email`. Il codice per questo formato c'è già.
 
+6c. **Route di servizio dell'arricchimento** (nessuna azione, solo da sapere). Dal 14/10 `/api/enrichment/*` online risponde solo con l'intestazione `x-admin-key` uguale alla chiave segreta di Supabase già su Vercel. Se le usi a mano per inserire le guide, aggiungi quell'intestazione.
+
 7. **Dipendenze già installate a inizio sessione** (lo faccio io se mi dici sì). Ogni sessione parte senza `node_modules` e perde minuti a installarle. Basta uno script di avvio nel repository (`.claude/settings.json`, comando `npm ci`).
 
 ## B. Regole di `LORENZO.md` da allentare (una riga di risposta ciascuna)
@@ -37,7 +41,7 @@ Oggi queste regole mi impongono di fermarmi e aspettare te. Dimmi quali togliere
 
 8. **Merge su `main`.** Proposta: posso fare merge da solo quando il giro automatico è tutto ok, tsc passa e la PR è aperta da almeno N ore senza tuoi commenti. Tu ricontrolli dopo, in produzione. Alternativa più prudente: un branch `staging` collegato a un secondo dominio Vercel, dove faccio merge io, e tu porti su `main` una volta al giorno.
 9. **Migrazioni Supabase.** Proposta: libere sul progetto di prova (punto 2); su produzione solo migrazioni che *aggiungono* (tabelle o colonne nuove, mai cancellazioni), con il file in PR.
-10. **Scelte grafiche definitive.** Oggi faccio tutto dietro un flag spento e aspetto il tuo sì: per questo 7 funzioni sono ancora spente (`?beta=...`). Proposta: posso accendere per tutti ciò che ha superato il giro automatico, e tu mi dici "torna indietro" se non ti piace.
+10. **Scelte grafiche definitive.** Oggi faccio tutto dietro un flag spento e aspetto il tuo sì: per questo 9 funzioni sono ancora spente (`?beta=...`). Proposta: posso accendere per tutti ciò che ha superato il giro automatico, e tu mi dici "torna indietro" se non ti piace.
 11. **`SYNTHESIS_LIMIT`, `max_tokens`, FIELD_MASK, modello AI.** Rientrano nella spesa: se il tetto mensile è garantito dai crediti prepagati (punto 1) e dalle quote Google, posso regolarli io dentro quel tetto, scrivendo in PR la stima del costo.
 12. **Cancellare pagine e codice vecchi** (`/miei-locali`, `site-header`): proposta di sì quando nessun link ci porta più.
 13. **Voci "DA DECIDERE".** Proposta: se una voce resta senza risposta per 48 ore, scelgo io l'opzione più prudente e lo scrivo in PR.
@@ -53,6 +57,9 @@ Dall'elenco "Cosa serve decidere" di `BACKLOG.md`:
 19. Classifica personale dei posti visitati (serve una colonna nuova).
 20. "Autentico" deve contare come "non turistico"? (vedi la PR #33).
 21. "Salva da Google Maps" con i link che non hanno coordinate (oggi errore): 1 Place Details per link, cioè circa 1 chiamata a pagamento in più per ogni salvataggio da quel tipo di link.
+22. Con una zona nella frase ("trattoria a Monti") la posizione della mappa oggi non conta per niente: tenerla come preferenza?
+23. `/onboarding` aperto senza accesso: chiedere l'accesso prima delle 4 domande (oggi le risposte si perdono)?
+24. Verdetti in cache che non si rinnovano mai: rinnovarli ogni N mesi (costo Haiku da stimare)?
 
 ## D. Cose che solo tu (o un telefono vero) potete fare
 
