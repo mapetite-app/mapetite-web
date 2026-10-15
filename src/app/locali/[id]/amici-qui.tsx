@@ -35,7 +35,7 @@ export default async function AmiciQui({ placeId }: { placeId: string }) {
           <span key={p.user_id}>
             {i > 0 && ", "}
             <Link href={profilePath(p.handle)} className="font-display font-semibold text-text">{personName(p)}</Link>
-            {visitati.includes(p) ? " (ci è stato)" : " (vuole provarlo)"}
+            {visitati.includes(p) ? " (l'ha provato)" : " (vuole provarlo)"}
           </span>
         ))}
         {people.length > 6 && ` e altri ${people.length - 6}`}

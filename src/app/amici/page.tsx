@@ -103,13 +103,13 @@ export default async function AmiciPage() {
                         </Link>
                         <p className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text-muted">
                           <Link href={profilePath(first.handle)} className="font-display font-semibold text-text">{name}</Link>{" "}
-                          {isVisited(first) ? "è stato da" : "ha salvato"}{" "}
+                          {isVisited(first) ? "ha provato" : "ha salvato"}{" "}
                           <span className="font-display font-semibold text-text">{first.name}</span>
                           {others > 0 && <> e {others === 1 ? "un altro posto" : `altri ${others} posti`}</>}
                           <span className="block text-xs text-text-muted">{whenLabel(first.created_at)}</span>
                         </p>
                       </div>
-                      <div className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+                      <div className="-mx-4 mt-3 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
                         {group.slice(0, 10).map((s) => (
                           <PostoCard key={s.place_id} spot={s} />
                         ))}

@@ -71,7 +71,7 @@ export function PostoCard({ spot }: { spot: Spot }) {
       </span>
       <span className="relative flex items-center gap-2">
         <span className={`rounded-pill px-2.5 py-1 text-[11px] font-display font-semibold ${visited ? "bg-accent text-white" : "bg-white/15 text-white"}`}>
-          {visited ? "✓ C'è stato" : "📌 Vuole provarlo"}
+          {visited ? "✓ Provato" : "📌 Vuole provarlo"}
         </span>
         {city && <span className="truncate text-xs font-sans text-white/75">{city}</span>}
       </span>

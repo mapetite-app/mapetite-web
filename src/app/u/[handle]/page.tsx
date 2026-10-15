@@ -176,7 +176,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
         <>
           {visited.length > 0 && (
             <section className="mt-6 px-4" aria-labelledby="visitati-titolo">
-              <h2 id="visitati-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Ci è stato</h2>
+              <h2 id="visitati-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Già provati</h2>
               <ul className="space-y-2">
                 {visited.slice(0, 30).map((s) => (
                   <li key={s.place_id}><PostoRiga spot={s} /></li>
@@ -186,7 +186,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           )}
           {want.length > 0 && (
             <section className="mt-6 px-4" aria-labelledby="voglio-titolo">
-              <h2 id="voglio-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Vuole provare</h2>
+              <h2 id="voglio-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Da provare</h2>
               <ul className="space-y-2">
                 {want.slice(0, 30).map((s) => (
                   <li key={s.place_id}><PostoRiga spot={s} /></li>
