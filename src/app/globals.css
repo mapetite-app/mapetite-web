@@ -24,9 +24,9 @@
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 4px 20px rgba(0, 0, 0, 0.12);
 
-  /* Layout — altezza della nav bar mobile: 56px (min-h-14) + safe area.
+  /* Layout — altezza della nav bar mobile: 64px (h-16 in nav-bar.tsx) + safe area.
      Unica fonte di verità: i consumer la usano come offset dal fondo. */
-  --nav-height-mobile: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  --nav-height-mobile: calc(4rem + env(safe-area-inset-bottom, 0px));
 
   /* Altezza massima dei bottom-sheet. Base in vh come fallback per browser
      senza dvh; l'@supports sotto la promuove a dvh (esclude la barra URL iOS). */

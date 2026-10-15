@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bookmark, Users } from "lucide-react";
+import { Bookmark, Compass, LogIn, Sparkles, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
-import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
 import { withNext } from "@/lib/next-path";
+
+// Barra principale (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
+// "Dai un feedback" ed "Esci" stanno nel profilo (sezione "Account"). Da non registrati
+// l'ultima voce è "Entra": porta all'accesso e poi riporta alla pagina dov'eri.
 
 // "Entra" riporta alla pagina dov'eri (es. un locale condiviso, Stasera, Importa).
 // Dalla mappa e dalla home no: dopo l'accesso si va comunque alla mappa.
@@ -19,84 +22,35 @@ function entraHref(pathname: string, search: string | null): string {
   return withNext("/login", `${pathname}${search ? `?${search}` : ""}`);
 }
 
-function MapIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={filled ? 0 : 1.5}
-      className="w-6 h-6"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"
-      />
-    </svg>
-  );
-}
-
-function ProfileIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={filled ? 0 : 1.5}
-      className="w-6 h-6"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-      />
-    </svg>
-  );
-}
-
-function AuthIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-6 h-6"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"
-      />
-    </svg>
-  );
-}
-
-function FeedbackIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-6 h-6"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"
-      />
-    </svg>
-  );
-}
-
 // Link della voce "Salvati": la mappa aperta su "I miei salvati" (letto da map-view).
 const SAVED_HREF = "/mappa?vista=salvati";
+
+type Voce = {
+  id: "esplora" | "assistente" | "salvati" | "amici" | "profilo" | "entra";
+  label: string;
+  href: string;
+  Icon: LucideIcon;
+  active: boolean;
+};
+
+const under = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`);
+
+function voci(pathname: string, vista: string | null, search: string | null, loggedIn: boolean): Voce[] {
+  const onMap = under(pathname, "/mappa");
+  // Salvati: la mappa sui salvati e le pagine che nascono dai salvati (raccolte, "Stasera").
+  const savedActive = (onMap && vista === "salvati") || under(pathname, "/raccolte") || under(pathname, "/stasera");
+  return [
+    // Esplora: la mappa e la home di ricerca.
+    { id: "esplora", label: "Esplora", href: "/mappa", Icon: Compass, active: (onMap && !savedActive) || pathname === "/" },
+    { id: "assistente", label: "Assistente", href: "/assistente", Icon: Sparkles, active: under(pathname, "/assistente") },
+    { id: "salvati", label: "Salvati", href: SAVED_HREF, Icon: Bookmark, active: savedActive },
+    // Amici: il feed e i profili delle persone (/u/<nome>).
+    { id: "amici", label: "Amici", href: "/amici", Icon: UsersRound, active: under(pathname, "/amici") || under(pathname, "/u") },
+    loggedIn
+      ? { id: "profilo", label: "Profilo", href: "/profilo", Icon: UserRound, active: under(pathname, "/profilo") || under(pathname, "/me") }
+      : { id: "entra", label: "Entra", href: entraHref(pathname, search), Icon: LogIn, active: under(pathname, "/login") || under(pathname, "/signup") || under(pathname, "/profilo") },
+  ];
+}
 
 export default function NavBar({ userId }: { userId: string | null }) {
   // useSearchParams va dentro Suspense; il fallback è la stessa barra senza i parametri.
@@ -114,98 +68,53 @@ function NavBarWithParams({ userId }: { userId: string | null }) {
 
 function NavBarInner({ userId, vista, search }: { userId: string | null; vista: string | null; search: string | null }) {
   const pathname = usePathname();
-  const loginHref = entraHref(pathname, search);
-
-  const onMap = pathname === "/mappa" || pathname.startsWith("/mappa/");
-  const savedActive = onMap && vista === "salvati";
-  const mapActive = onMap && !savedActive;
-  const profileActive = pathname === "/profilo" || pathname.startsWith("/profilo/");
-  // Amici: il feed e i profili delle persone (/u/<nome>).
-  const friendsActive = pathname === "/amici" || pathname.startsWith("/u/");
-  const authActive = pathname === "/login" || pathname === "/signup";
+  const items = voci(pathname, vista, search, !!userId);
 
   return (
     <>
-      {/* ── Mobile: barra fissa in basso ──
-          Altezza effettiva = min-h-14 (56px, sui Link) + pb env(safe-area-inset-bottom).
-          VALORE GEMELLO: --nav-height-mobile in globals.css deve restare sincronizzato
-          con questi due (3.5rem + safe area). Se cambi min-h-14 qui, aggiorna anche la var. */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center bg-surface border-t border-border shadow-float pb-[env(safe-area-inset-bottom)] md:hidden">
-        <Link
-          href="/mappa"
-          aria-current={mapActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
-            mapActive ? "text-brand" : "text-text-muted"
-          }`}
-        >
-          <MapIcon filled={false} />
-          <span className="text-[11px] font-display">Mappa</span>
-        </Link>
-
-        <Link
-          href={SAVED_HREF}
-          aria-current={savedActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
-            savedActive ? "text-brand" : "text-text-muted"
-          }`}
-        >
-          <Bookmark aria-hidden className="w-6 h-6" strokeWidth={1.5} fill={savedActive ? "currentColor" : "none"} />
-          <span className="text-[11px] font-display">Salvati</span>
-        </Link>
-
-        <Link
-          href="/amici"
-          aria-current={friendsActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
-            friendsActive ? "text-brand" : "text-text-muted"
-          }`}
-        >
-          <Users aria-hidden className="w-6 h-6" strokeWidth={1.5} />
-          <span className="text-[11px] font-display">Amici</span>
-        </Link>
-
-        <Link
-          href="/profilo"
-          aria-current={profileActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
-            profileActive ? "text-brand" : "text-text-muted"
-          }`}
-        >
-          <ProfileIcon filled={false} />
-          <span className="text-[11px] font-display">Profilo</span>
-        </Link>
-
-        <a
-          href={`mailto:${FEEDBACK_EMAIL}`}
-          onClick={(e) => { e.currentTarget.href = feedbackMailto(); }}
-          className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
-        >
-          <FeedbackIcon />
-          <span className="text-[11px] font-display">Feedback</span>
-        </a>
-
-        {userId ? (
-          <form action={logout} className="flex-1 flex">
-            <button
-              type="submit"
-              className="flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 text-text-muted active:scale-95 transition-all duration-150"
-            >
-              <AuthIcon />
-              <span className="text-[11px] font-display">Esci</span>
-            </button>
-          </form>
-        ) : (
-          <Link
-            href={loginHref}
-            aria-current={authActive ? "page" : undefined}
-            className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
-              authActive ? "text-brand" : "text-text-muted"
-            }`}
-          >
-            <AuthIcon />
-            <span className="text-[11px] font-display">Entra</span>
-          </Link>
-        )}
+      {/* ── Mobile: barra fissa in basso, da app ──
+          Altezza = h-16 (64px, comoda per il pollice) + pb env(safe-area-inset-bottom).
+          VALORE GEMELLO: --nav-height-mobile in globals.css (4rem + safe area) deve restare
+          sincronizzato con h-16. Se cambi l'altezza qui, aggiorna anche la variabile. */}
+      <nav
+        aria-label="Navigazione principale"
+        data-testid="barra"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      >
+        <ul className="mx-auto grid h-16 max-w-lg grid-cols-5">
+          {items.map(({ id, label, href, Icon, active }) => {
+            const ai = id === "assistente";
+            return (
+              <li key={id} className="flex">
+                <Link
+                  href={href}
+                  data-testid={`barra-${id}`}
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex flex-1 flex-col items-center justify-center gap-1 select-none outline-none [-webkit-tap-highlight-color:transparent] transition-colors duration-150 ${
+                    active ? "text-brand" : "text-text-muted"
+                  }`}
+                >
+                  {/* Indicatore della voce attiva: pillola teal chiara dietro l'icona (dimensioni fisse: nessun salto). */}
+                  <span
+                    aria-hidden
+                    className={`relative flex h-8 w-14 items-center justify-center rounded-pill transition-[background-color,transform] duration-200 group-active:scale-90 ${
+                      active ? "bg-brand/10" : "bg-transparent"
+                    }`}
+                  >
+                    <Icon
+                      className={`h-[22px] w-[22px] ${ai && !active ? "text-accent" : ""}`}
+                      strokeWidth={active ? 2.25 : 1.75}
+                      fill={active && id === "salvati" ? "currentColor" : "none"}
+                    />
+                  </span>
+                  <span className={`text-[11px] leading-none font-display tracking-[0.01em] ${active ? "font-semibold" : "font-medium"}`}>
+                    {label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* ── Desktop: barra fissa in alto ── */}
@@ -214,62 +123,22 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
           Mapetite
         </Link>
 
-        <nav className="flex items-center gap-1">
-          <Link
-            href="/mappa"
-            aria-current={mapActive ? "page" : undefined}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
-              mapActive
-                ? "text-white bg-brand"
-                : "text-text-muted hover:text-text hover:bg-brand-light"
-            }`}
-          >
-            <MapIcon filled={false} />
-            Mappa
-          </Link>
-          <Link
-            href={SAVED_HREF}
-            aria-current={savedActive ? "page" : undefined}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
-              savedActive
-                ? "text-white bg-brand"
-                : "text-text-muted hover:text-text hover:bg-brand-light"
-            }`}
-          >
-            <Bookmark aria-hidden className="w-6 h-6" strokeWidth={1.5} />
-            Salvati
-          </Link>
-          <Link
-            href="/amici"
-            aria-current={friendsActive ? "page" : undefined}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
-              friendsActive
-                ? "text-white bg-brand"
-                : "text-text-muted hover:text-text hover:bg-brand-light"
-            }`}
-          >
-            <Users aria-hidden className="w-6 h-6" strokeWidth={1.5} />
-            Amici
-          </Link>
-          <Link
-            href="/profilo"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
-              profileActive
-                ? "text-white bg-brand"
-                : "text-text-muted hover:text-text hover:bg-brand-light"
-            }`}
-          >
-            <ProfileIcon filled={false} />
-            Profilo
-          </Link>
-          <a
-            href={`mailto:${FEEDBACK_EMAIL}`}
-            onClick={(e) => { e.currentTarget.href = feedbackMailto(); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display text-text-muted hover:text-text hover:bg-brand-light transition-colors duration-150"
-          >
-            <FeedbackIcon />
-            Dai un feedback
-          </a>
+        <nav aria-label="Navigazione principale" className="flex items-center gap-1">
+          {items
+            .filter((v) => v.id !== "entra")
+            .map(({ id, label, href, Icon, active }) => (
+              <Link
+                key={id}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
+                  active ? "text-white bg-brand" : "text-text-muted hover:text-text hover:bg-brand/10"
+                }`}
+              >
+                <Icon aria-hidden className={`h-5 w-5 ${id === "assistente" && !active ? "text-accent" : ""}`} strokeWidth={1.75} />
+                {label}
+              </Link>
+            ))}
         </nav>
 
         {userId ? (
@@ -283,7 +152,7 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
           </form>
         ) : (
           <Link
-            href={loginHref}
+            href={entraHref(pathname, search)}
             className="rounded-btn bg-brand text-white px-4 py-2 text-sm font-display font-semibold hover:opacity-90 transition-opacity duration-150"
           >
             Entra

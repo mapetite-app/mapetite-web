@@ -945,14 +945,18 @@ await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
 ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
 await shot("19-importa");
 
-// 7b. Feedback dei tester: email precompilata con pagina e telefono
-await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
-const fb = page.getByRole("link", { name: "Feedback" });
-ok(await fb.isVisible(), "feedback: voce 'Feedback' nella barra in basso");
+// 7b. Feedback dei tester: email precompilata con pagina e telefono.
+// Dal piano 6.4 sta nel profilo (sezione "Account"), anche da non collegati; non più nella barra.
+await page.goto(`${BASE}/profilo?da=feedback`, { waitUntil: "networkidle" });
+ok((await page.locator("nav").first().getByRole("link", { name: "Feedback" }).count()) === 0, "feedback: non è più una voce della barra in basso");
+const fb = page.getByTestId("profilo-account").getByRole("link", { name: /Dai un feedback/ });
+ok(await fb.isVisible(), "feedback: 'Dai un feedback' nel profilo (anche da non collegati)");
 await fb.evaluate((a) => a.addEventListener("click", (e) => e.preventDefault()));
 await fb.click();
 const fbHref = decodeURIComponent((await fb.getAttribute("href")) ?? "");
-ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /mappa?lista=b"), "feedback: email precompilata con la pagina in cui si trova il tester");
+ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pagina: /profilo?da=feedback"), "feedback: email precompilata con la pagina in cui si trova il tester");
+ok((await page.getByTestId("profilo-account").getByRole("button", { name: "Esci" }).count()) === 0, "profilo da non collegati: niente 'Esci'");
+await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
 
 // 7b'. Barra in basso (voce 11a): "Salvati" al posto di "Importa", apre la mappa sui salvati
 {
@@ -960,7 +964,7 @@ ok(fbHref.startsWith("mailto:founder.mapetite@gmail.com") && fbHref.includes("Pa
   const sv = nav.getByRole("link", { name: "Salvati" });
   ok(await sv.isVisible() && (await sv.getAttribute("href")) === "/mappa?vista=salvati", "barra in basso: voce 'Salvati' che apre la mappa sui salvati");
   ok((await nav.getByRole("link", { name: "Importa" }).count()) === 0, "barra in basso: 'Importa' non c'è più (si trova nel profilo)");
-  ok((await nav.getByRole("link", { name: "Mappa" }).getAttribute("class"))?.includes("text-brand") && !(await sv.getAttribute("class"))?.includes("text-brand"), "barra in basso: su /mappa è accesa 'Mappa', non 'Salvati'");
+  ok((await nav.getByRole("link", { name: "Esplora" }).getAttribute("aria-current")) === "page" && (await sv.getAttribute("aria-current")) === null, "barra in basso: su /mappa è accesa 'Esplora', non 'Salvati'");
 }
 
 // 7c. iPhone: invito ad aggiungere alla Home (solo a chi ha già cercato)
@@ -1257,12 +1261,12 @@ else {
   ok((await p.getByTestId("salvati-filtri").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true" && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
   await p.getByRole("button", { name: "Esplora" }).click();
   await p.waitForTimeout(300);
-  ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
+  ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Esplora" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Esplora' nella barra in basso");
   await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "già sulla mappa: 'Salvati' in basso apre i salvati"), () => ok(false, "già sulla mappa: 'Salvati' in basso apre i salvati"));
-  // In sviluppo il pallino "N" di Next copre "Mappa": si tocca il link direttamente.
-  await p.locator("nav").first().getByRole("link", { name: "Mappa" }).evaluate((a) => a.click());
-  await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Mappa' in basso torna a Esplora"), () => ok(false, "'Mappa' in basso torna a Esplora"));
+  // In sviluppo il pallino "N" di Next copre "Esplora": si tocca il link direttamente.
+  await p.locator("nav").first().getByRole("link", { name: "Esplora" }).evaluate((a) => a.click());
+  await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Esplora' in basso torna a Esplora"), () => ok(false, "'Esplora' in basso torna a Esplora"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 4, "app installata: 4 scorciatoie (Cerca, Salvati, Stasera, Filtri)"); ok((m.shortcuts ?? []).some((x) => x.url === "/stasera" && x.short_name === "Stasera"), "app installata: scorciatoia 'Stasera' → /stasera"); }
 
   // Voce 11c (?beta=pin-salvati, spenta di default): i salvati restano sulla mappa anche in Esplora
@@ -2769,7 +2773,7 @@ else {
   await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
   ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
   ok(await ap.getByTestId("assistente-campo").isVisible(), "assistente: campo per scrivere in basso");
-  { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 56, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
+  { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
   await ashot("50-assistente-benvenuto");
 
   // Prenotazione assistita: una sola ricerca, senza le parole di giorno/ora/persone
@@ -3456,6 +3460,112 @@ else {
   await pp.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 }).catch(() => {});
   ok((await pp.getByTestId("promemoria-tutte").getAttribute("href")) === "/prenotazioni", "home: dal promemoria di oggi si arriva a 'Le mie prenotazioni'");
   await pctx.close();
+}
+
+// 15. Barra in basso ridisegnata (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
+//     Da non collegati l'ultima voce è "Entra". Il cookie "e2e_collegato" (solo sviluppo) dà la barra da collegato.
+{
+  const VOCI = ["Esplora", "Assistente", "Salvati", "Amici", "Profilo"];
+  const profiloFinto = encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] }));
+  for (const [w, h] of [[390, 844], [360, 740]]) {
+    const bctx = await browser.newContext({ viewport: { width: w, height: h } });
+    await bctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    // Telemetria di Mapbox: senza rete fallisce e, se si lascia la mappa mentre è in corso, Mapbox lancia
+    // "this.errorCb is not a function" (difetto della libreria). Qui si risponde subito.
+    await bctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await bctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: profiloFinto, url: BASE }]);
+    const bp = await bctx.newPage();
+    bp.on("pageerror", (e) => errors.push(e.message));
+    await bp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+    await bp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    const nav = bp.getByTestId("barra");
+    const nomi = (await nav.getByRole("link").allTextContents()).map((t) => t.trim());
+    ok(JSON.stringify(nomi) === JSON.stringify(VOCI), `barra ${w}px: 5 voci nell'ordine Esplora, Assistente, Salvati, Amici, Profilo (${nomi.join(", ")})`);
+    // Misure: altezza comoda, voci larghe uguali, etichette dentro la propria voce, niente scorrimento orizzontale.
+    const m = await bp.evaluate(() => {
+      const n = document.querySelector("[data-testid=barra]");
+      const links = [...n.querySelectorAll("a")];
+      const r = n.getBoundingClientRect();
+      return {
+        alta: Math.round(r.height), fondo: Math.round(innerHeight - r.bottom),
+        larghe: links.map((a) => Math.round(a.getBoundingClientRect().width)),
+        etichette: links.every((a) => { const s = a.querySelector("span:last-child").getBoundingClientRect(); const b = a.getBoundingClientRect(); return s.left >= b.left - 0.5 && s.right <= b.right + 0.5 && s.height > 0; }),
+        caratteri: Math.min(...links.map((a) => parseFloat(getComputedStyle(a.querySelector("span:last-child")).fontSize))),
+        sborda: document.documentElement.scrollWidth > innerWidth,
+      };
+    });
+    ok(m.alta >= 64 && m.fondo === 0 && new Set(m.larghe).size === 1 && m.etichette && m.caratteri >= 11 && !m.sborda, `barra ${w}px: alta ${m.alta}px in fondo, voci larghe uguali (${m.larghe[0]}px), etichette intere da ${m.caratteri}px, niente sbordo`);
+    ok(await nav.getByRole("link", { name: "Assistente" }).locator("svg").count() === 1, `barra ${w}px: l'Assistente ha la sua scintilla`);
+    // Ogni voce porta alla pagina giusta ed è l'unica accesa.
+    const attese = [
+      ["Esplora", "/mappa", (u) => u.pathname === "/mappa" && !u.searchParams.get("vista")],
+      ["Assistente", "/assistente", (u) => u.pathname === "/assistente"],
+      ["Salvati", "/mappa?vista=salvati", (u) => u.pathname === "/mappa" && u.searchParams.get("vista") === "salvati"],
+      ["Amici", "/amici", (u) => u.pathname === "/amici"],
+      ["Profilo", "/profilo", (u) => u.pathname === "/profilo"],
+    ];
+    for (const [voce, href, giusta] of attese) {
+      const link = nav.getByRole("link", { name: voce, exact: true });
+      ok((await link.getAttribute("href")) === href, `barra ${w}px: '${voce}' porta a ${href}`);
+      // In sviluppo il pallino "N" di Next può coprire la prima voce: si tocca il link direttamente.
+      await link.evaluate((a) => a.click());
+      await bp.waitForURL((u) => giusta(u), { timeout: 10000 }).catch(() => {});
+      await bp.waitForLoadState("networkidle").catch(() => {});
+      // La mappa sincronizza ?vista= con la vista appena pronta: si lascia il tempo di disegnarsi.
+      await bp.waitForTimeout(voce === "Esplora" || voce === "Salvati" ? 2000 : 600);
+      const u = new URL(bp.url());
+      const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
+      ok(giusta(u) && accese.length === 1 && accese[0] === voce, `barra ${w}px: tocco su '${voce}' → ${u.pathname}${u.search}, accesa solo '${voce}' (${accese.join(",")})`);
+      // Il contenuto della pagina non finisce sotto la barra (pagine a scorrimento: spazio in fondo uguale alla barra).
+      if (voce === "Amici" || voce === "Profilo") {
+        const sotto = await bp.evaluate(async () => {
+          scrollTo(0, document.documentElement.scrollHeight);
+          await new Promise((r) => setTimeout(r, 150));
+          const navTop = document.querySelector("[data-testid=barra]").getBoundingClientRect().top;
+          const els = [...document.querySelectorAll("body > div a, body > div button, body > div p, body > div h1, body > div h2")].filter((e) => e.offsetParent && !e.closest("nav"));
+          return Math.max(...els.map((e) => e.getBoundingClientRect().bottom)) - navTop;
+        });
+        ok(sotto <= 1, `barra ${w}px: su ${voce} l'ultimo contenuto resta sopra la barra (${Math.round(sotto)}px)`);
+      }
+      if (w === 390) await bp.screenshot({ path: `${OUT}/90-barra-${voce.toLowerCase()}.png`, caret: "initial" });
+    }
+    if (w === 390) {
+      // Profilo da collegato: in fondo feedback ed Esci (prima erano nella barra).
+      await bp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+      const acc = bp.getByTestId("profilo-account");
+      ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in fondo 'Dai un feedback' ed 'Esci'");
+      // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Esplora"]]) {
+        await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+        const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
+        ok(accese.length === 1 && accese[0] === voce, `barra: su ${path} è accesa '${voce}' (${accese.join(",")})`);
+      }
+    }
+    await bctx.close();
+  }
+  // Da non collegati: "Entra" al posto di Profilo, con ritorno alla pagina; Amici e Profilo mostrano un invito, non un errore.
+  const gctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
+  await gctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await gctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+  await gctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  const gp = await gctx.newPage();
+  gp.on("pageerror", (e) => errors.push(e.message));
+  await gp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  await gp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const gnav = gp.getByTestId("barra");
+  const accesa = async () => (await gnav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",");
+  const gnomi = (await gnav.getByRole("link").allTextContents()).map((t) => t.trim());
+  ok(JSON.stringify(gnomi) === JSON.stringify(["Esplora", "Assistente", "Salvati", "Amici", "Entra"]), `barra da non collegati: ultima voce 'Entra' (${gnomi.join(", ")})`);
+  ok(await gnav.getByRole("link", { name: "Entra" }).getAttribute("href") === "/login?next=%2Famici", "barra da non collegati: 'Entra' da Amici riporta ad Amici");
+  ok(await gp.getByTestId("amici-accedi").isVisible() && (await accesa()) === "Amici", "Amici da non collegati: invito ad accedere, voce accesa");
+  await gnav.getByRole("link", { name: "Entra" }).click();
+  await gp.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
+  await gp.waitForTimeout(300);
+  ok(new URL(gp.url()).pathname === "/login" && (await accesa()) === "Entra", `barra da non collegati: 'Entra' apre l'accesso ed è accesa (${await accesa()})`);
+  await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await gp.getByRole("link", { name: "Accedi" }).isVisible() && (await accesa()) === "Entra", "Profilo da non collegati: invito ad accedere, accesa 'Entra'");
+  await gp.screenshot({ path: `${OUT}/91-barra-ospite-profilo.png`, caret: "initial" });
+  await gctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
