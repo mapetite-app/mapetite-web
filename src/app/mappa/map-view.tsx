@@ -2081,6 +2081,14 @@ export default function MapView({
         {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
         {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "" && (
           <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem]">
+            {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione. La barra resta la ricerca. */}
+            <Link
+              href="/assistente"
+              data-testid="mappa-assistente"
+              className="flex min-h-10 shrink-0 items-center rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+            >
+              💬 Parla con l&apos;assistente
+            </Link>
             {tasteSuggestion && (
               <button
                 type="button"
