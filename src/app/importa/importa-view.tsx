@@ -6,6 +6,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
 import ManualAddCard from "./manual-add-card";
 import { displayAddress } from "@/lib/city";
+import { trackFeature } from "@/lib/track";
 
 type ImportResult = {
   nome: string | null;
@@ -151,6 +152,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
   const handleRead = () => {
     // Leggere lo screenshot costa (AI + Google): solo per chi può poi salvare il locale.
     if (!file || !userId) return;
+    trackFeature("import_screenshot");
     void readPlace(async () => ({ image: await screenshotForUpload(file) }));
   };
 
@@ -165,6 +167,7 @@ export default function ImportaView({ userId }: { userId: string | null }) {
     setSearchResults([]);
     setExtracted(null);
     setStep(1);
+    trackFeature("import_video");
     void readPlace(async () => ({ link: url }));
   };
 

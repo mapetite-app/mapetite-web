@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { trackFeature } from "@/lib/track";
 
 export type Filters = {
   // "Dove?": zona, quartiere, via o città scritti a mano ("" = intorno alla mappa).
@@ -320,7 +321,7 @@ export default function FiltersSheet({
             type="button"
             // Prima si chiude il pannello, poi si cerca: nei salvati la lista si apre subito
             // e un CLOSE dopo la richiuderebbe.
-            onClick={() => { onClose(); onApply(local); }}
+            onClick={() => { trackFeature("filtri"); onClose(); onApply(local); }}
             className="w-full rounded-pill bg-brand py-3 font-display text-base font-semibold text-white hover:opacity-90 active:scale-95 transition-transform"
           >
             {active > 0 ? `Applica filtri (${active})` : "Applica filtri"}

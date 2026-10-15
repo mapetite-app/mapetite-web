@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Mic } from "lucide-react";
+import { trackFeature } from "@/lib/track";
 
 // Microfono nel campo di ricerca (come Places): usa il riconoscimento vocale del browser,
 // nessun servizio a pagamento. Compare solo dove il telefono lo supporta.
@@ -63,6 +64,7 @@ export default function VoiceButton({ onText, onError }: { onText: (text: string
         r.onend = () => setListening(false);
         rec.current = r;
         setListening(true);
+        trackFeature("voce");
         try { r.start(); } catch { setListening(false); }
       }}
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${listening ? "animate-pulse bg-accent text-white" : "text-brand"}`}

@@ -5,7 +5,8 @@ import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent } from "@/lib/search-intent";
-import { recordEvent } from "@/lib/events";
+import { recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
+import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
@@ -464,10 +465,16 @@ ESEMPI (input → output atteso):
   // Segnale "ricerca" (VISIONE.md: dati sui comportamenti di scoperta, utili anche ai ristoratori).
   // Mai la frase scritta: solo cosa ha capito l'AI o i filtri scelti. Dopo la risposta, senza attese.
   if (source === "world") {
+    // Visitatore e sessione dai cookie del telefono (src/lib/track.ts): la ricerca entra negli imbuti.
+    const jar = await cookies();
+    const anonId = jar.get(ANON_COOKIE)?.value ?? null;
+    const sessionId = jar.get(SESSION_COOKIE)?.value ?? null;
     after(async () => {
       await recordEvent({
         type: "ricerca",
         userId: authUser?.id ?? null,
+        anonId,
+        sessionId,
         lat,
         lng,
         props: {
