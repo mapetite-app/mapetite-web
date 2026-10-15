@@ -1345,7 +1345,7 @@ else {
       ok(await p.getByTestId("guida-voglio").getAttribute("href") === "/mappa?vista=salvati&stato=voglio" && await p.getByTestId("guida-fatto").getAttribute("href") === "/mappa?vista=salvati&stato=fatto" && await p.getByTestId("guida-salvati").getAttribute("href") === "/mappa?vista=salvati", "profilo: ogni numero apre la mappa sui salvati filtrati");
       const raccolte = await p.getByTestId("raccolta").allTextContents();
       ok(raccolte.length === 4 && raccolte[0].includes("Con amici") && raccolte[0].includes("3 locali") && raccolte[1].includes("Romantico") && !raccolte.some((t) => /Da provare|Già visitato/.test(t)), `profilo: raccolte = tag dell'utente con il numero, senza i due stati (${raccolte.join(" | ")})`);
-      ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/mappa?vista=salvati&tag=Con+amici", "profilo: tocco su una raccolta = mappa filtrata su quel tag");
+      ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/raccolte/Con%20amici", "profilo: tocco su una cartella = pagina della raccolta (4.1)");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
       ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
@@ -1375,7 +1375,7 @@ else {
       const emojiAmici = (await amici.getByTestId("raccolta-copertina").locator("span").allTextContents()).length;
       const anteprima = (await amici.getByTestId("raccolta-anteprima").textContent().catch(() => "")) ?? "";
       ok(emojiAmici === 3 && anteprima.startsWith("3 locali · ") && anteprima.includes("Birreria Sei"), `copertine: 'Con amici' mostra 3 emoji e i nomi dei locali (${anteprima})`);
-      const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; return c.getBoundingClientRect().right > m.getBoundingClientRect().left; }));
+      const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom; }));
       ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
       await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
       // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
@@ -1477,7 +1477,7 @@ else {
       await sheet.getByTestId("crea-raccolta").click();
       await waitClosed();
       ok(patches.length === 2 && has(patches, "05", ["Da provare", "Weekend a Milano"]) && has(patches, "06", ["Con amici", "Già visitato", "Weekend a Milano"]), `nuova raccolta: tag aggiunto ai 2 locali scelti (${JSON.stringify(patches)})`);
-      ok(await tile("Weekend a Milano").isVisible() && (await tile("Weekend a Milano").getAttribute("href")) === "/mappa?vista=salvati&tag=Weekend+a+Milano", "nuova raccolta: compare tra le raccolte e apre la mappa filtrata");
+      ok(await tile("Weekend a Milano").isVisible() && (await tile("Weekend a Milano").getAttribute("href")) === "/raccolte/Weekend%20a%20Milano", "nuova raccolta: compare tra le raccolte e apre la sua pagina");
       await p.unroute("**/rest/v1/saved_places**");
 
       // "Le tue ricerche": le recenti salvate su questo telefono
@@ -2536,6 +2536,267 @@ else {
   ok(newPassword === "nuova123", "reimposta password: salva la nuova password su Supabase");
   ok(await rp.getByRole("link", { name: "Vai alla mappa" }).isVisible(), "reimposta password: 'Vai alla mappa' dopo il salvataggio");
   await rctx.close();
+}
+
+// 15. Organizzare e ritrovare (piano 4.1–4.3): raccolte come cartelle, proposte dell'AI, classifica.
+//     Funzioni pure importate direttamente; il resto con Supabase e /api/raccolte/proposte simulati.
+{
+  let cl = null, rai = null;
+  try { cl = await import(new URL("../../src/lib/classifica.ts", import.meta.url).href); } catch (e) { ok(false, `classifica: modulo importabile (${e.message})`); }
+  try { rai = await import(new URL("../../src/lib/raccolte-ai.ts", import.meta.url).href); } catch (e) { ok(false, `raccolte-ai: modulo importabile (${e.message})`); }
+  if (cl) {
+    // Ricerca binaria: per ogni posizione vera (0..n) bastano al massimo 3 domande con 7 locali e la posizione è esatta.
+    let exact = true, maxAsked = 0;
+    for (let truth = 0; truth <= 7; truth++) {
+      let s = cl.startSearch(7), mid;
+      while ((mid = cl.nextCompare(s)) != null) s = cl.answer(s, mid, truth <= mid);
+      maxAsked = Math.max(maxAsked, s.asked);
+      if (cl.finalPosition(s) !== truth) exact = false;
+    }
+    ok(exact && maxAsked <= 3, `classifica: con 7 posti in città bastano ${maxAsked} domande e la posizione è esatta`);
+    { let s = cl.startSearch(1); const m = cl.nextCompare(s); s = cl.answer(s, m, true); ok(m === 0 && cl.nextCompare(s) == null && cl.finalPosition(s) === 0, "classifica: con 1 solo posto in città, 1 domanda"); }
+    { let s = cl.startSearch(30), n = 0, m; while ((m = cl.nextCompare(s)) != null) { s = cl.answer(s, m, false); n++; } ok(n === 3, "classifica: mai più di 3 domande anche con 30 posti"); }
+    const list = [{ score: 10 }, { score: 4 }];
+    ok(cl.scoreAt(list, 0) === 11 && cl.scoreAt(list, 1) === 7 && cl.scoreAt(list, 2) === 3 && cl.scoreAt([], 0) === 0, "classifica: punteggio a metà tra i vicini (o ±1 agli estremi)");
+    const tops = cl.topByCity([{ city: "Roma", score: 1 }, { city: "Roma", score: 5 }, { city: "Milano", score: 2 }, { city: null, score: 9 }]);
+    ok(tops[0][0] === "Roma" && tops[0][1][0].score === 5 && tops.length === 2, "classifica: top per città, la città con più posti prima, i senza città esclusi");
+    ok(cl.isMissingColumn({ code: "42703", message: 'column saved_places.rank_score does not exist' }) && !cl.isMissingColumn({ code: "500", message: "altro" }), "classifica: riconosce la colonna mancante (migrazione non applicata)");
+  }
+  if (rai) {
+    const input = [
+      { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Bar Tramonto", category: "Cocktail bar", city: "Roma", verdict: "Aperitivo lento sui tetti." },
+      { id: "aaaaaaaa-0000-4000-8000-000000000002", name: "Forno Rosso", category: "Panetteria", city: "Roma", verdict: null },
+      { id: "aaaaaaaa-0000-4000-8000-000000000003", name: "Bistrot Lione", category: "Ristorante", city: "Lione", verdict: null },
+    ];
+    const prompt = rai.buildPrompt(input, ["Weekend a Napoli"]);
+    ok(!prompt.includes("aaaaaaaa-") && prompt.includes("- Weekend a Napoli") && prompt.includes("- Romantici") && prompt.includes("diversa da Roma"), "proposte AI: al modello niente UUID, solo raccolte ammesse (tue + standard), città di casa per 'in viaggio'");
+    const parsed = rai.parseProposals('Ecco: {"proposte":[{"n":1,"raccolte":["aperitivo","Inventata"]},{"n":2,"raccolte":["Pranzo veloce","Con amici","Brunch"]},{"n":9,"raccolte":["Speciali"]},{"n":3,"raccolte":[]},{"n":1,"raccolte":["Romantici"]}]}', input, []);
+    ok(parsed.length === 2 && parsed[0].collections.join() === "Aperitivo" && parsed[1].collections.length === 2 && parsed.every((p) => input.some((i) => i.id === p.id)), `proposte AI: scartati nomi inventati, locali inesistenti, doppioni; max 2 raccolte (${JSON.stringify(parsed)})`);
+    ok(rai.parseProposals("non è JSON", input, []).length === 0 && rai.parseProposals('{"proposte":"x"}', input, []).length === 0, "proposte AI: risposta rotta = nessuna proposta, nessun errore");
+    const costo = rai.estimateCostUsd(1800, 600);
+    ok(costo < 0.006, `proposte AI: costo stimato per un gruppo da 30 sotto 0,6 cent ($${costo.toFixed(4)})`);
+  }
+
+  if (!fakeUser) console.log("SKIP  raccolte/classifica: dev server senza E2E_FAKE_USER");
+  else {
+    const ME = "00000000-0000-0000-0000-000000000001";
+    const pid = (n) => `00000000-0000-4000-8000-0000000007${n}`;
+    const pl = (n, name, category, address, lat, lng, extra = {}) => ({ id: pid(n), name, category, address, lat, lng, ...extra });
+    const ROMA = "Via Po, 2/a, 00198 Roma RM, Italy";
+    const MILANO = "Corso Monforte, 26, 20122 Milano MI, Italy";
+    const profilo = {
+      email: "giulia@example.com",
+      saved: [
+        { created_at: "2026-10-12", tags: ["Con amici", "Già visitato"], note: "Il tavolo in fondo", rank_score: 2, places: pl("01", "Osteria Due", "restaurant", ROMA, 41.9, 12.49, { verdict: "Cucina romana di quartiere, senza turisti." }) },
+        { created_at: "2026-10-11", tags: ["Con amici", "Da provare"], note: null, places: pl("02", "Birreria Sei", "bar", ROMA, 41.902, 12.494) },
+        { created_at: "2026-10-10", tags: ["Già visitato"], note: null, rank_score: 1, places: pl("03", "Trattoria Tre", "restaurant", ROMA, 41.895, 12.48) },
+        { created_at: "2026-10-09", tags: ["Già visitato"], note: null, places: pl("04", "Enoteca Quattro", "wine_bar", ROMA, 41.893, 12.47) },
+        { created_at: "2026-10-08", tags: ["Da provare"], note: null, places: pl("05", "Forno Cinque", "bakery", ROMA, 41.88, 12.48) },
+        { created_at: "2026-10-07", tags: [], note: null, places: pl("06", "Caffè Sei", "cafe", MILANO, 45.46, 9.2) },
+        { created_at: "2026-10-06", tags: null, note: null, places: pl("07", "Bar Sette", "cocktail_bar", MILANO, 45.47, 9.19) },
+      ],
+      reviews: [],
+    };
+    // Ordine dei nomi in un elenco (le righe iniziano con numero ed emoji): "OTE" = Osteria, Trattoria, Enoteca…
+    const order = (texts) => texts.map((t) => ["Osteria", "Trattoria", "Enoteca", "Vineria", "Bar Tre"].find((n) => t.includes(n))?.charAt(0) ?? "?").join("");
+    const setProfilo = (c, v) => c.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+    const rc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await rc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await rc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await rc.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+    await rc.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+    let patches = [];
+    let patchFail = false;
+    await rc.route("**/rest/v1/saved_places**", (r) => {
+      const req = r.request();
+      const u = new URL(req.url());
+      if (req.method() === "PATCH") {
+        patches.push({ id: u.searchParams.get("place_id")?.replace(/^eq\./, ""), user: u.searchParams.get("user_id"), body: req.postDataJSON() });
+        return patchFail ? r.fulfill({ status: 500, json: { message: "errore" } }) : r.fulfill({ status: 204, body: "" });
+      }
+      const pidQ = u.searchParams.get("place_id")?.replace(/^eq\./, "");
+      if (pidQ) { const row = profilo.saved.find((x) => x.places.id === pidQ); return r.fulfill({ json: { tags: row?.tags ?? [] } }); }
+      return r.fulfill({ json: [] });
+    });
+    await setProfilo(rc, profilo);
+    const p = await rc.newPage();
+    p.on("pageerror", (e) => errors.push(e.message));
+
+    // 4.1 Cartelle nel profilo
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    const folders = p.getByTestId("raccolta");
+    ok((await folders.count()) === 1 && (await folders.first().getAttribute("href")) === "/raccolte/Con%20amici", "cartelle: una per raccolta, apre /raccolte/<nome>");
+    ok((await folders.first().getByTestId("raccolta-copertina").locator("span").count()) === 2 && (await folders.first().textContent()).includes("2 locali"), "cartelle: copertina con le emoji dei locali e il numero");
+    { const bg = await folders.first().locator("[aria-hidden]").first().evaluate((el) => getComputedStyle(el).backgroundColor); ok(bg !== "rgba(0, 0, 0, 0)" && bg !== "rgb(255, 255, 255)", `cartelle: copertina colorata (${bg})`); }
+    await p.locator("[data-testid=raccolte]").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await p.screenshot({ path: `${OUT}/40-raccolte-cartelle.png`, caret: "initial" });
+
+    // 4.2 Proposte dell'AI per i salvati senza raccolta (route simulata: nessuna chiamata Haiku)
+    const box = p.getByTestId("proposte-raccolte");
+    ok(await box.isVisible() && (await box.textContent()).includes("5 salvati senza raccolta"), "proposte AI: '5 salvati senza raccolta' nel profilo");
+    let proposteReq = null;
+    let proposteMode = "ok";
+    await p.route("**/api/raccolte/proposte", async (r) => {
+      proposteReq = r.request().postDataJSON();
+      if (proposteMode === "limite") return r.fulfill({ status: 429, json: { error: "Hai chiesto tante proposte in poco tempo: riprova tra qualche minuto." } });
+      return r.fulfill({ json: {
+        proposte: [
+          { id: pid("05"), name: "Forno Cinque", raccolte: ["Pranzo veloce"] },
+          { id: pid("06"), name: "Caffè Sei", raccolte: ["Brunch", "Da provare in viaggio"] },
+          { id: pid("07"), name: "Bar Sette", raccolte: ["Aperitivo"] },
+        ],
+        esaminati: [pid("03"), pid("04"), pid("05"), pid("06"), pid("07")],
+        restanti: 0,
+      } });
+    });
+    proposteMode = "limite";
+    await box.getByTestId("proponi-raccolte").click();
+    await box.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(/tante proposte/.test((await box.getByRole("alert").textContent().catch(() => "")) ?? ""), "proposte AI: oltre il tetto, messaggio in italiano e nessuna scrittura");
+    proposteMode = "ok";
+    await box.getByTestId("proponi-raccolte").click();
+    await box.getByTestId("proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok((await box.getByTestId("proposta").count()) === 3 && patches.length === 0 && Array.isArray(proposteReq?.escludi), "proposte AI: 3 proposte, niente scritto prima del tocco");
+    await p.screenshot({ path: `${OUT}/41-proposte-raccolte.png`, caret: "initial" });
+    await box.getByTestId("proposta").filter({ hasText: "Forno Cinque" }).getByTestId("accetta-proposta").click();
+    await box.getByText("✓ Fatto").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok(patches.length === 1 && patches[0].id === pid("05") && JSON.stringify(patches[0].body?.tags) === '["Da provare","Pranzo veloce"]' && patches[0].user === `eq.${ME}`, `proposte AI: 'Accetta' aggiunge la raccolta e tiene lo stato (${JSON.stringify(patches)})`);
+    patches = [];
+    await box.getByTestId("accetta-tutte").click();
+    await p.waitForFunction(() => document.querySelectorAll("[data-testid=proposta]").length > 0 && [...document.querySelectorAll("[data-testid=proposta]")].every((li) => li.textContent.includes("✓ Fatto")), null, { timeout: 5000 }).catch(() => {});
+    ok(patches.length === 2 && patches.some((x) => x.id === pid("06") && JSON.stringify(x.body?.tags) === '["Brunch","Da provare in viaggio"]') && patches.some((x) => x.id === pid("07") && JSON.stringify(x.body?.tags) === '["Aperitivo"]'), `proposte AI: 'Accetta tutte' scrive le altre due (${JSON.stringify(patches)})`);
+    ok((await p.getByTestId("raccolta").count()) === 5, "proposte AI: le nuove raccolte compaiono subito tra le cartelle");
+    patches = [];
+
+    // 4.3 Classifica nel profilo: Roma con 2 in classifica (Osteria Due > Trattoria Tre), Enoteca da mettere
+    const cls = p.getByTestId("profilo-classifica");
+    ok(await cls.isVisible() && order(await cls.getByTestId("classifica-voce").allTextContents()) === "OT", "classifica: nel profilo la top di Roma in ordine");
+    await cls.getByTestId("classifica-ordina").click();
+    await cls.getByTestId("classifica-confronto").waitFor({ timeout: 4000 }).catch(() => {});
+    const rivale1 = await cls.getByTestId("classifica-rivale").textContent().catch(() => "");
+    ok(rivale1 === "Trattoria Tre", `classifica: 'Ti è piaciuto più o meno di…' parte dal centro della classifica (${rivale1})`);
+    await p.screenshot({ path: `${OUT}/42-classifica-confronto.png`, caret: "initial" });
+    await cls.getByTestId("classifica-di-piu").click();
+    const rivale2 = await cls.getByTestId("classifica-rivale").textContent().catch(() => "");
+    ok(rivale2 === "Osteria Due", `classifica: seconda domanda con il primo in classifica (${rivale2})`);
+    await cls.getByTestId("classifica-di-meno").click();
+    await cls.getByRole("status").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(patches.length === 1 && patches[0].id === pid("04") && patches[0].body?.rank_score === 1.5, `classifica: tra Osteria Due (2) e Trattoria Tre (1) → 1.5 (${JSON.stringify(patches)})`);
+    ok(order(await cls.getByTestId("classifica-voce").allTextContents()) === "OET", "classifica: la top si aggiorna subito");
+    await cls.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await p.screenshot({ path: `${OUT}/43-classifica-profilo.png`, caret: "initial" });
+    patches = [];
+    // Senza la colonna rank_score (migrazione non applicata) la classifica non compare
+    await setProfilo(rc, { ...profilo, classifica: false });
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    ok((await p.getByTestId("profilo-classifica").count()) === 0 && await p.getByTestId("raccolte").isVisible(), "classifica: senza migrazione il profilo resta com'era (sezione nascosta)");
+    await setProfilo(rc, profilo);
+
+    // 4.1 Pagina della raccolta
+    await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+    ok((await p.getByTestId("raccolta-titolo").textContent()) === "Con amici" && (await p.getByTestId("raccolta-locale").count()) === 2, "pagina raccolta: titolo e i 2 locali");
+    ok(await p.getByTestId("raccolta-verdetto").getByText("Cucina romana di quartiere, senza turisti.").isVisible() && await p.getByText("“Il tavolo in fondo”").isVisible(), "pagina raccolta: verdetto in cache e la tua nota");
+    ok((await p.getByTestId("raccolta-locale").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && (await p.getByTestId("raccolta-sulla-mappa").getAttribute("href")) === "/mappa?vista=salvati&tag=Con+amici", "pagina raccolta: un locale apre la sua scheda; 'Sulla mappa' apre la mappa filtrata");
+    ok(await p.getByTestId("raccolta-privata").isVisible() && (await p.getByTestId("condividi-raccolta").count()) === 0, "pagina raccolta: profilo non pubblico → spiega come condividerla");
+    await p.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
+    ok(await p.getByTestId("mappa-persona").isVisible(), "pagina raccolta: mini mappa");
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pagina raccolta: niente scorrimento orizzontale a 390px (${w})`); }
+    await p.screenshot({ path: `${OUT}/44-pagina-raccolta.png`, caret: "initial" });
+    // Rinomina dalla pagina: un PATCH per locale, poi l'indirizzo segue il nuovo nome
+    await p.getByTestId("raccolta-pagina-menu").click();
+    const rs = p.getByTestId("raccolta-pagina-sheet");
+    await rs.getByRole("button", { name: /Rinomina/ }).click();
+    await rs.getByLabel("Nuovo nome").fill("amici del giovedì");
+    await rs.getByRole("button", { name: "Salva" }).click();
+    await p.waitForURL(/\/raccolte\/Amici/, { timeout: 6000 }).catch(() => {});
+    ok(patches.length === 2 && patches.every((x) => x.body?.tags?.includes("Amici del giovedì") && !x.body.tags.includes("Con amici")) && decodeURIComponent(p.url()).endsWith("/raccolte/Amici del giovedì"), `pagina raccolta: rinomina scrive su tutti e porta alla nuova pagina (${JSON.stringify(patches)})`);
+    patches = [];
+    await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
+    ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
+    // 360px: titolo e azioni senza uscire dallo schermo
+    await p.setViewportSize({ width: 360, height: 780 });
+    await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `pagina raccolta: niente scorrimento orizzontale a 360px (${w})`); }
+    await p.screenshot({ path: `${OUT}/44b-pagina-raccolta-360.png`, caret: "initial" });
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `profilo: niente scorrimento orizzontale a 360px con cartelle e classifica (${w})`); }
+    await p.setViewportSize({ width: 390, height: 844 });
+
+    // 4.3 Nella scheda: dopo "Ci sono stato", "più o meno di…"
+    const mapRows = profilo.saved.map((x) => ({ tags: x.tags, note: x.note, places: { ...x.places, google_place_id: null } }));
+    const ranked = [
+      { place_id: pid("01"), rank_score: 2, tags: ["Con amici", "Già visitato"], places: { name: "Osteria Due", category: "restaurant", address: ROMA } },
+      { place_id: pid("03"), rank_score: 1, tags: ["Già visitato"], places: { name: "Trattoria Tre", category: "restaurant", address: ROMA } },
+    ];
+    let rankMode = "ok";
+    await p.route("**/rest/v1/saved_places**", (r) => {
+      const req = r.request();
+      const url = decodeURIComponent(req.url());
+      if (req.method() === "PATCH") { patches.push({ id: new URL(req.url()).searchParams.get("place_id")?.replace(/^eq\./, ""), body: req.postDataJSON() }); return r.fulfill({ status: 204, body: "" }); }
+      if (url.includes("rank_score")) return rankMode === "manca" ? r.fulfill({ status: 400, json: { code: "42703", message: "column saved_places.rank_score does not exist" } }) : r.fulfill({ json: ranked });
+      if (url.includes("select=place_id")) return r.fulfill({ json: mapRows.map((x) => ({ place_id: x.places.id })) });
+      return r.fulfill({ json: mapRows });
+    });
+    await p.goto(`${BASE}/mappa?salvato=${pid("04")}`, { waitUntil: "networkidle" });
+    await p.getByTestId("com-era").waitFor({ timeout: 6000 }).catch(() => {});
+    const conf = p.getByTestId("classifica-confronto");
+    await conf.waitFor({ timeout: 5000 }).catch(() => {});
+    ok(await conf.isVisible() && (await conf.textContent()).includes("La tua classifica · Roma"), "scheda: dopo 'Ci sono stato' chiede 'più o meno di…' tra i provati di Roma");
+    await conf.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await p.screenshot({ path: `${OUT}/45-scheda-classifica.png`, caret: "initial" });
+    await conf.getByTestId("classifica-di-piu").click();
+    await conf.getByTestId("classifica-di-piu").click().catch(() => {});
+    await p.getByTestId("classifica-posizione").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(patches.some((x) => x.id === pid("04") && x.body?.rank_score === 3) && (await p.getByTestId("classifica-posizione").textContent().catch(() => "")).includes("Il tuo preferito a Roma"), `scheda: 'Di più' due volte = primo a Roma (${JSON.stringify(patches)})`);
+    patches = [];
+    rankMode = "manca";
+    await p.goto(`${BASE}/mappa?salvato=${pid("04")}`, { waitUntil: "networkidle" });
+    await p.getByTestId("com-era").waitFor({ timeout: 6000 }).catch(() => {});
+    await p.waitForTimeout(800);
+    ok(await p.getByTestId("com-era").isVisible() && (await p.getByTestId("classifica-confronto").count()) === 0 && (await p.getByTestId("classifica-posizione").count()) === 0 && patches.length === 0, "scheda: senza la colonna rank_score niente classifica e nessuna scrittura");
+    await p.unroute("**/rest/v1/saved_places**");
+    await rc.close();
+
+    // Raccolta condivisa e top pubblica (profilo pubblico di Giulia, visitatore senza account)
+    const GIU = "00000000-0000-4000-8000-0000000007a1";
+    const sv = (place_id, name, category, tags, lat, lng, rank_score) => ({ user_id: GIU, handle: "giulia.rm", display_name: "Giulia", place_id, tags, created_at: "2026-10-10T10:00:00Z", name, category, address: ROMA, lat, lng, rank_score });
+    const socialG = {
+      profili: [{ id: GIU, handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 3, da_provare: 1, seguaci: 0, seguiti: 0 }],
+      salvati: [
+        sv("44444444-0000-4000-8000-0000000007b1", "Vineria Uno", "wine_bar", ["Già visitato", "Romantico"], 41.89, 12.47, 1),
+        sv("44444444-0000-4000-8000-0000000007b2", "Trattoria Due", "restaurant", ["Già visitato", "Romantico"], 41.891, 12.471, 5),
+        sv("44444444-0000-4000-8000-0000000007b3", "Bar Tre", "bar", ["Già visitato"], 41.892, 12.472, 3),
+        sv("44444444-0000-4000-8000-0000000007b4", "Forno Quattro", "bakery", ["Da provare"], 41.893, 12.473, null),
+      ],
+      seguo: [],
+      mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    };
+    const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await gc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await gc.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+    await gc.addCookies([
+      { name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialG)), url: BASE },
+      { name: "e2e_anonimo", value: "1", url: BASE },
+    ]);
+    const g = await gc.newPage();
+    g.on("pageerror", (e) => errors.push(e.message));
+    await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
+    const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
+    ok(orderG(await g.getByTestId("top-voce").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-top").textContent()).includes("Top Roma"), "profilo pubblico: 'I preferiti di Giulia' con la top di Roma in ordine");
+    await g.getByTestId("profilo-top").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
+    await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
+    ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
+    ok(await g.getByTestId("condividi-raccolta-pubblica").isVisible() && !(await g.content()).includes("Il tavolo"), "raccolta condivisa: pulsante Condividi, nessuna nota privata");
+    await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
+    await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });
+    ok(await g.getByTestId("raccolta-pubblica-non-trovata").isVisible(), "raccolta condivisa: nome inesistente → 'non disponibile'");
+    await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
+    await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    ok((await g.getByTestId("profilo-top").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica la top non compare");
+    await gc.close();
+  }
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
