@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 export type Filters = {
+  // "Dove?": zona, quartiere, via o città scritti a mano ("" = intorno alla mappa).
+  zona: string;
   radiusKm: number | null;
   minRating: number | null;
   minPriceLevel: number | null;
@@ -13,6 +15,7 @@ export type Filters = {
 };
 
 export const EMPTY_FILTERS: Filters = {
+  zona: "",
   radiusKm: null,
   minRating: null,
   minPriceLevel: null,
@@ -39,7 +42,8 @@ export const CATEGORIES = [
 
 export function countActive(f: Filters): number {
   let n = 0;
-  if (f.radiusKm != null) n++;
+  if (f.zona.trim()) n++;
+  if (f.radiusKm != null && !f.zona.trim()) n++;
   if (f.minRating != null) n++;
   if (f.minPriceLevel != null || f.maxPriceLevel != null) n++;
   if (f.minReviews != null) n++;
@@ -56,6 +60,12 @@ const DISTANCE_OPTIONS: { label: string; value: number | null }[] = [
   { label: "5 km", value: 5 },
   { label: "10 km", value: 10 },
 ];
+
+// Zone suggerite per città (Roma e Milano prima di tutto, VISIONE): un tocco invece di scrivere.
+const ZONE: Record<string, string[]> = {
+  Roma: ["Trastevere", "Monti", "Pigneto", "Testaccio", "Prati", "San Lorenzo", "Ostiense", "Centocelle"],
+  Milano: ["Brera", "Navigli", "Isola", "Porta Venezia", "NoLo", "Città Studi", "Porta Romana", "Sarpi"],
+};
 
 const RATING_OPTIONS: { label: string; value: number | null }[] = [
   { label: "Tutti", value: null },
@@ -88,11 +98,14 @@ export default function FiltersSheet({
   filters,
   onApply,
   onClose,
+  city = null,
 }: {
   isOpen: boolean;
   filters: Filters;
   onApply: (f: Filters) => void;
   onClose: () => void;
+  // Città in cui è la mappa (per le zone suggerite e "Tutta Roma").
+  city?: string | null;
 }) {
   const [local, setLocal] = useState<Filters>(filters);
 
@@ -182,7 +195,45 @@ export default function FiltersSheet({
             </div>
           </section>
 
-          {/* Distanza */}
+          {/* Dove: zona, quartiere, via o città intera */}
+          <section>
+            <label htmlFor="filtro-zona" className="font-display text-sm font-semibold text-text block mb-2">Dove?</label>
+            <div className="relative">
+              <input
+                id="filtro-zona"
+                data-testid="filtro-zona"
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                maxLength={80}
+                value={local.zona}
+                onChange={(e) => setLocal((p) => ({ ...p, zona: e.target.value }))}
+                placeholder={city ? `Zona, quartiere o via (es. Pigneto, via del Corso)` : "Zona, quartiere, via o città"}
+                className="min-h-11 w-full rounded-btn border border-border bg-white px-3.5 pr-10 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
+              />
+              {local.zona && (
+                <button type="button" aria-label="Cancella la zona" onClick={() => setLocal((p) => ({ ...p, zona: "" }))} className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center text-text-muted">✕</button>
+              )}
+            </div>
+            {city && (
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" data-testid="zone-suggerite">
+                <button type="button" aria-pressed={local.zona === city} onClick={() => setLocal((p) => ({ ...p, zona: p.zona === city ? "" : city }))} className={`${chip(local.zona === city)} shrink-0`}>
+                  Tutta {city}
+                </button>
+                {(ZONE[city] ?? []).map((z) => (
+                  <button key={z} type="button" aria-pressed={local.zona === z} onClick={() => setLocal((p) => ({ ...p, zona: p.zona === z ? "" : z }))} className={`${chip(local.zona === z)} shrink-0`}>
+                    {z}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="mt-1.5 text-xs font-sans text-text-muted">
+              {local.zona.trim() ? "Cerco lì, anche se la mappa è altrove." : "Vuoto: cerco intorno alla mappa."}
+            </p>
+          </section>
+
+          {/* Distanza: misurata dalla mappa, quindi solo senza una zona scritta */}
+          {!local.zona.trim() && (
           <section>
             <span className="font-display text-sm font-semibold text-text block mb-2">Quanto lontano?</span>
             <div className="flex flex-wrap gap-2">
@@ -193,6 +244,7 @@ export default function FiltersSheet({
               ))}
             </div>
           </section>
+          )}
 
           {/* Prezzo */}
           <section>

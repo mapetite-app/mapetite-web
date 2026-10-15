@@ -28,6 +28,7 @@ import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
+import { cityNear } from "@/lib/named-city";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
@@ -37,7 +38,8 @@ const TOP_PINS = 5;
 function filtersSummary(f: Filters): string {
   const parts: string[] = [];
   if (f.categories.length > 0) parts.push(f.categories.map((c) => CATEGORIES.find((x) => x.id === c)?.label ?? c).join(", "));
-  if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
+  if (f.zona.trim()) parts.push(`a ${f.zona.trim()}`);
+  else if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
   if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
   if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
   if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
@@ -1431,7 +1433,10 @@ export default function MapView({
         if (f.minRating != null && p.rating != null && p.rating < f.minRating) return false;
         if (f.maxPriceLevel != null && p.priceLevel != null && p.priceLevel > f.maxPriceLevel) return false;
         if (f.minPriceLevel != null && p.priceLevel != null && p.priceLevel < f.minPriceLevel) return false;
-        if (f.radiusKm != null && distanceMeters(center, p) > f.radiusKm * 1000) return false;
+        // "Dove?" nei salvati: la zona scritta deve comparire nell'indirizzo (nessuna chiamata).
+        const zona = f.zona.trim().toLowerCase();
+        if (zona && !(p.address ?? "").toLowerCase().includes(zona) && !p.name.toLowerCase().includes(zona)) return false;
+        if (!zona && f.radiusKm != null && distanceMeters(center, p) > f.radiusKm * 1000) return false;
         return true;
       });
       setAiSearch({ risultati: filtered, filtri: null });
@@ -1457,6 +1462,8 @@ export default function MapView({
           query,
           source: "world",
           searchIntent: "structured",
+          // Lista subito, verdetti dopo (come la ricerca AI): prima si aspettavano ~6 s di Haiku.
+          phase: "fast",
           lat: viewState.latitude,
           lng: viewState.longitude,
           ...(f.minRating != null && { minRating: f.minRating }),
@@ -1464,7 +1471,7 @@ export default function MapView({
           ...(f.minPriceLevel != null && { minPriceLevel: f.minPriceLevel }),
           ...(f.maxPriceLevel != null && { maxPriceLevel: f.maxPriceLevel }),
           ...(f.openNowOnly && { openNowOnly: true }),
-          ...(f.radiusKm != null && { radius: f.radiusKm * 1000 }),
+          ...(f.zona.trim() ? { zona: f.zona.trim() } : f.radiusKm != null ? { radius: f.radiusKm * 1000 } : {}),
           ...(f.categories.length > 0 && { categories: f.categories }),
         }),
       });
@@ -1499,10 +1506,11 @@ export default function MapView({
           editorialSummary: p.editorialSummary ?? null,
         };
       }
-      setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null });
+      setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
       setVenueDetails({ ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati.
       fitToPlaces(places);
+      void loadVerdicts(ticket, query, data.sintesi_pendente ?? null);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
       setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -3194,6 +3202,7 @@ export default function MapView({
         filters={filters}
         onClose={() => dispatch({ type: "CLOSE" })}
         onApply={(f) => { setClusterPlaces(null); setFilterError(null); setFilters(f); void runFilteredSearch(f); }}
+        city={cityNear(viewState.latitude, viewState.longitude)}
       />
     </div>
   );

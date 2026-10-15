@@ -9,7 +9,7 @@ import { recordEvent } from "@/lib/events";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet } from "@/lib/named-city";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -124,22 +124,45 @@ export async function POST(request: Request) {
       queryGoogle = withDistrict(queryGoogle, intent.zona!);
       if (mapCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${mapCity}`;
     }
-    const locationMode = zonaQuartiere ? "bias" : intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    let locationMode: "bias" | "restrict" | "none" = zonaQuartiere ? "bias" : intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    let area: { lat: number; lng: number; radius: number } | null = null;
+    // Filtri con "Dove?" (zona, quartiere o via scritti a mano): come un quartiere nella frase.
+    const zonaFiltro = searchIntent === "structured" && typeof body?.zona === "string" ? body.zona.trim().slice(0, 80) : "";
+    if (zonaFiltro && !wholeCity(zonaFiltro)) {
+      const fCity = typeof lat === "number" && typeof lng === "number" ? cityNear(lat, lng) : null;
+      queryGoogle = `${queryGoogle} ${isStreet(zonaFiltro) ? zonaFiltro : withDistrict(zonaFiltro, zonaFiltro)}`;
+      if (fCity && !namedCity(zonaFiltro)) queryGoogle = `${queryGoogle} ${fCity}`;
+      locationMode = "bias";
+    }
+    // Una città intera ("buon ristorante a Roma", o "Roma" nei filtri): si cerca in tutta l'area
+    // della città, non solo intorno al centro (VISIONE: il posto giusto può essere defilato).
+    const cityWide = !intent?.vicino_a_me
+      ? (intent?.zona ? wholeCity(intent.zona) : !intent && searchIntent === "natural" ? city : zonaFiltro ? wholeCity(zonaFiltro) : null)
+      : null;
+    if (cityWide) area = cityArea(cityWide);
+    if (cityWide && area) {
+      queryGoogle = stripCity(queryGoogle, cityWide);
+      locationMode = "restrict";
+      console.log(`[search-citta] ${cityWide}: tutta l'area della città, query=${JSON.stringify(queryGoogle)}`);
+    }
     try {
       risultati = await searchGooglePlaces(queryGoogle, {
         includedType: intent?.includedType ?? undefined,
         locationMode,
-        lat,
-        lng,
+        lat: area?.lat ?? lat,
+        lng: area?.lng ?? lng,
         minRating: typeof body?.minRating === "number" ? body.minRating : undefined,
         minReviews: typeof body?.minReviews === "number" ? body.minReviews : undefined,
         minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,
         maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
         openNowOnly: body?.openNowOnly === true ? true : undefined,
-        radius: typeof body?.radius === "number" ? body.radius : zonaQuartiere ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
+        // Con una zona scritta la distanza dal centro della mappa non vale (sarebbe da un altro posto).
+        radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
-        maxDistanceMeters: typeof body?.radius === "number" ? body.radius : undefined,
-        sortMode: searchIntent === "natural" ? "relevance" : "quality",
+        maxDistanceMeters: typeof body?.radius === "number" && !zonaFiltro && !area ? body.radius : undefined,
+        // Città intera: l'ordine di Google tra quartieri lontani non dice niente; si ordina per voto
+        // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
+        sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
       });
     } catch (err) {
       // Un errore di Google (quota giornaliera finita, rete, lentezza) non è "nessun risultato":
