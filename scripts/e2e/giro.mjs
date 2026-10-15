@@ -985,6 +985,18 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
+// Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.
+for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_code: 61 }, "al coperto"], [{ temperature_2m: 24, precipitation: 0, weather_code: 1 }, "all'aperto, stasera 24°"]]) {
+  const wctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.route("**/api.open-meteo.com/**", (r) => r.fulfill({ json: { current: meteo } }));
+  const wp = await wctx.newPage();
+  await wp.clock.setFixedTime(new Date("2026-10-15T19:30:00"));
+  await wp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const txt = await wp.getByTestId("suggerimento-momento").textContent({ timeout: 5000 }).catch(() => "");
+  ok(txt.includes(atteso), `suggerimento col meteo: "${txt}" contiene "${atteso}"`);
+  await wctx.close();
+}
 // Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani e la richiesta di verifica per email.
 { const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
   ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href"))?.startsWith("mailto:"), "per i ristoratori: tre piani e 'Rivendica il tuo locale' che prepara un'email"); }

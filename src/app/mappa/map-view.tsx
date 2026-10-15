@@ -24,7 +24,7 @@ import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel } from "@/lib/category-label";
-import { momentSuggestion } from "@/lib/moment";
+import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
@@ -900,11 +900,20 @@ export default function MapView({
     () => "b" as const,
   );
   // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
-  const momentExample = useSyncExternalStore(
+  const momentHour = useSyncExternalStore(
     () => () => {},
-    () => momentSuggestion(new Date()),
+    () => new Date().getHours(),
     () => null,
   );
+  // Meteo per il suggerimento (piano 2.3): una volta, al centro iniziale della mappa.
+  const [weather, setWeather] = useState<Weather | null>(null);
+  const firstView = useRef(viewState);
+  useEffect(() => {
+    let alive = true;
+    void fetchWeather(firstView.current.latitude, firstView.current.longitude).then((w) => { if (alive) setWeather(w); });
+    return () => { alive = false; };
+  }, []);
+  const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [aiSearching, setAiSearching] = useState(false);
