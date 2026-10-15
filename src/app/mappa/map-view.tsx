@@ -1016,7 +1016,14 @@ export default function MapView({
   const focusedIdRef = useRef<string | null>(null);
   useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
   const aiFirstIdRef = useRef<string | null>(null);
-  useEffect(() => { aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null; }, [aiSearch]);
+  const refocusFirst = useRef(false);
+  useEffect(() => {
+    aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null;
+    if (refocusFirst.current) {
+      refocusFirst.current = false;
+      if (aiFirstIdRef.current) setFocusedId(aiFirstIdRef.current);
+    }
+  }, [aiSearch]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1755,7 +1762,8 @@ export default function MapView({
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
         // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
         // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
-        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) setFocusedId(null);
+        // Passa al nuovo primo appena la lista riordinata è sullo schermo (effetto su aiSearch).
+        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) refocusFirst.current = true;
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
           // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
