@@ -16,6 +16,7 @@ Vincoli fissi: Google 20 €/mese e quote invariate; nessun servizio a pagamento
 - **1.3 Prenotazione assistita**: "prenotami domani alle 21 per 2 con terrazza a Roma". L'assistente trova i locali giusti e aperti a quell'ora, poi prepara la prenotazione: link di prenotazione del locale se c'è (sito o piattaforma), altrimenti **messaggio già scritto** per WhatsApp, chiamata o email ("Buonasera, vorrei prenotare per 2 persone domani alle 21, in terrazza se possibile. Lorenzo"). L'utente conferma con un tocco. Promemoria e "Com'è andata?" il giorno dopo.
   - *Limite onesto*: la prenotazione **automatica** senza tocco richiede accordi con TheFork/OpenTable o con i locali (API riservate ai partner). Per il 25/10 il tocco di conferma resta; l'automatico arriva con i primi ristoratori partner (vedi 8).
 - **1.4 Memoria dei gusti**: l'assistente ricorda preferenze dichiarate e comportamenti ("non ami il pesce", "spesso a Monti") e le usa senza chiederle ogni volta.
+- **1.5b Le mie prenotazioni** (dal MVP): sezione con prenotazioni richieste, in corso e passate, con stato (richiesta / confermata da me / fatta), promemoria e "Com'è andata?".
 - **1.5 Voce**: dettatura 🎤 accesa per tutti nell'assistente.
 
 ## 2. Ricerca, filtri e posizione
@@ -44,6 +45,9 @@ Vincoli fissi: Google 20 €/mese e quote invariate; nessun servizio a pagamento
 - 5.3 **Mappa di un amico**: vedi sulla mappa i posti di chi segui; "3 amici ci sono stati".
 - 5.4 **Condividi** un locale, una raccolta o la tua mappa con un link che si apre anche senza app; invito a Mapetite dentro il link.
 - 5.5 **Liste di gruppo**: "Cene del giovedì" con amici, ognuno aggiunge posti, voto per scegliere.
+- 5.6b **Creator e critici** (pitch): profili di food blogger e guide con liste curate da seguire; badge "Creator".
+- 5.6c **Recensioni e foto degli utenti** (MVP): la tua valutazione, il tuo commento, le tue foto sul locale, visibili agli amici e (se pubblico) a tutti. Mai mescolate ai dati Google.
+- 5.6d **Reel e contenuti** (MVP): pagina con i video/reel collegati ai locali (da link Instagram/TikTok/YouTube salvati dagli utenti, con l'anteprima ufficiale oEmbed, niente scraping).
 - 5.6 **Trova amici** dai contatti/link d'invito; classifica di chi scopre più posti nuovi (gioco leggero).
 
 ## 6. Grafica e sensazione da app (non da sito)
@@ -66,8 +70,12 @@ Vincoli fissi: Google 20 €/mese e quote invariate; nessun servizio a pagamento
 - 8.1 **Pagina del locale verificata**: "Sei il titolare? Rivendica" → richiesta di verifica; il titolare aggiorna foto proprie, menu, orari speciali, eventi.
 - 8.2 **Pannello del ristoratore** (versione dimostrativa per gli investitori con dati veri aggregati): quante persone hanno visto, salvato, prenotato il locale; cosa cerca la gente in zona ("terrazza", "brunch", "vegano") e a che ora.
 - 8.3 **Posti in evidenza (sponsorizzati)** dichiarati come tali, mostrati solo se adatti alla ricerca (mai contro la richiesta: VISIONE).
+- 8.3b **Piani per ristoratori** (pitch): Verified (profilo verificato, info, link prenotazione, numeri base), Growth (contenuti premium, cosa cercano e salvano gli utenti, priorità organica migliorata), Pro (numeri avanzati, trend e confronto di zona, strumenti promo). Per il 25/10: pagina "Per i ristoratori" con i piani e il percorso di richiesta (senza pagamenti).
 - 8.4 **Trend di zona** (anonimi e aggregati) come prodotto da vendere.
 Per il 25/10: 8.1 e 8.2 in versione dimostrativa; 8.3 e 8.4 come schermate per la presentazione, attive quando ci saranno ristoratori.
+
+## 8b. Utente premium (dopo il 25/10, da preparare)
+- Funzioni premium per gli utenti (dal business plan): ad esempio assistente senza limiti, mappe e raccolte illimitate, serate organizzate. Per il 25/10 solo l'elenco di cosa sarà premium, nessun pagamento.
 
 ## 9. Pronti per i tester
 - 9.1 **Invito**: link personale, primo accesso in 3 schermate, import dei salvati da Google Maps proposto subito.
