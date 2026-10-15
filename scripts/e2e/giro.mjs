@@ -130,10 +130,13 @@ await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.getByText(/preparo i verdetti/).isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
 ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
+const firstCardH = () => page.locator("li", { hasText: "Terrazza Uno" }).first().evaluate((el) => el.getBoundingClientRect().height);
+const hBefore = await page.getByTestId("segnaposto-verdetto").count() > 0 ? await firstCardH() : null;
 synthDelay = 900;
 await shot("02-lista-caricamento");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 ok(true, "lista: il verdetto compare dopo");
+{ const hAfter = await firstCardH(); ok(hBefore != null && Math.abs(hAfter - hBefore) <= 24, `lista: la card non salta quando arriva il verdetto (${Math.round(hBefore ?? 0)} → ${Math.round(hAfter)} px)`); }
 ok(await page.getByText("Pub Fuori Tema").count() === 0, "lista: il locale escluso sparisce");
 ok(await page.getByText("Aperto ora").first().isVisible(), "card: 'Aperto ora' visibile");
 ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("chiuso-ora").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("chiuso-ora").count()) === 0, "card: 'Chiuso ora' sul locale chiuso (e solo lì)");
