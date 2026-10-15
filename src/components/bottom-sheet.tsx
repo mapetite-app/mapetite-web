@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
@@ -225,6 +225,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     return best?.id ?? null;
   };
   const onCarouselScroll = () => {
+    if (carouselRef.current) atStart.current = carouselRef.current.scrollLeft < 8;
     if (!onFocus) return;
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
@@ -240,6 +241,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
   }, [focusedId]);
   useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
+  // Se l'ordine cambia (riordino per adattezza) mentre il carosello è sulla prima card, resta
+  // sulla prima: il browser altrimenti lo riaggancia alla card di prima, finita in fondo.
+  const atStart = useRef(true);
+  useLayoutEffect(() => {
+    const ul = carouselRef.current;
+    if (ul && atStart.current && ul.scrollLeft !== 0) ul.scrollLeft = 0;
+  }, [orderKey]);
 
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.
