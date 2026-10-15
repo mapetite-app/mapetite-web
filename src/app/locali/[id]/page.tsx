@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, X, Navigation, MapPin } from "lucide-react";
+import { Check, X, Navigation, MapPin, BadgeCheck } from "lucide-react";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
@@ -105,6 +105,13 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         <h1 className="font-title text-3xl font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.4rem]">
           {place.name}
         </h1>
+        {/* Badge "Verificato" (piano 8.1): il titolare ha rivendicato il locale e Mapetite l'ha verificato. */}
+        {place.verified_at && (
+          <p data-testid="locale-verificato" className="mt-2 inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-semibold text-brand">
+            <BadgeCheck size={14} className="shrink-0" aria-hidden />
+            Verificato dal titolare
+          </p>
+        )}
         {city && <p className="mt-2 text-[15px] font-sans text-text-muted">{city}</p>}
         {kind && <p data-testid="locale-tipo" className="mt-0.5 text-[15px] font-sans text-text-muted">{kind}</p>}
       </div>
@@ -178,6 +185,16 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
       </div>
 
       <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} returnPath={returnPath} highlight={highlightSave} />
+
+      {/* Piano 8.1: un invito discreto per chi gestisce il locale (sparisce quando è verificato). */}
+      {!place.verified_at && (
+        <p className="mx-5 mt-6 text-center text-xs font-sans text-text-muted">
+          Sei il titolare?{" "}
+          <Link data-testid="rivendica-locale" href={`/per-i-ristoratori/rivendica?locale=${place.id}`} className="font-display font-semibold text-brand underline underline-offset-2">
+            Rivendica questo locale
+          </Link>
+        </p>
+      )}
     </main>
   );
 }
