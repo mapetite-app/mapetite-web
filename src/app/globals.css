@@ -97,4 +97,28 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-inter), system-ui, sans-serif;
+  /* Sensazione da app, non da sito (piano 6.3): niente rimbalzo né "tira per ricaricare"
+     della pagina intera, niente riquadro grigio al tocco su iPhone/Android. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Pulsanti e link: niente zoom col doppio tocco (risposta immediata) e niente selezione del
+   testo o menu "copia" tenendo premuto per sbaglio. I campi di testo restano selezionabili. */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Feedback al tocco uniforme: ciò che si preme si abbassa appena, come in un'app. */
+@media (hover: none) {
+  button:active:not(:disabled),
+  a:active {
+    transition: transform 80ms ease-out;
+  }
 }
