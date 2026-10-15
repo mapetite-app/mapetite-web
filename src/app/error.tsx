@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { reportError } from "@/lib/track-auto";
 
 // Errore imprevisto: messaggio umano, riprova e via d'uscita (quella di Next è in inglese).
 export default function Error({
@@ -13,6 +14,8 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error("[errore-pagina]", error);
+    // Nel pannello di Lorenzo (/admin/numeri): quale errore e in quale pagina.
+    reportError(error, "schermata");
   }, [error]);
 
   return (

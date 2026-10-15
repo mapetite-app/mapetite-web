@@ -8,6 +8,7 @@ import { extractMapsLinks } from "@/lib/maps-link";
 import { findSocialLink, placeHintFromText, type SocialSource } from "@/lib/social-link";
 import SocialLinkHelp from "./social-link-help";
 import { findVideoLink } from "@/lib/video-caption";
+import { trackFeature } from "@/lib/track";
 
 const HAS_LINK = /https?:\/\/\S+/;
 
@@ -59,6 +60,7 @@ export default function GoogleMapsCard({
     }
     setBusy(true);
     setError(null);
+    trackFeature("import_link");
     try {
       setResults(await saveFromLinks(value, userId));
       clearPendingLink();

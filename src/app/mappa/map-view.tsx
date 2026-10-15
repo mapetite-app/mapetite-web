@@ -27,7 +27,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { momentSuggestion } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
@@ -2255,6 +2255,7 @@ export default function MapView({
                   type="button"
                   data-testid="scegli-tu"
                   onClick={() => {
+                    trackFeature("sorprendimi");
                     const shown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
                     const want = shown.filter((p) => p.tags?.includes(VISIT_WANT));
                     const pool = (want.length > 0 ? want : shown).filter((p) => p.id !== selected?.id);

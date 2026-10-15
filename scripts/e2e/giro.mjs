@@ -2538,6 +2538,147 @@ else {
   await rctx.close();
 }
 
+// Tracciamento (PIANO-25-OTTOBRE.md 7): visite, pagine, funzioni, errori, 👍/👎 e pannello /admin/numeri.
+// Tutto intercettato: nessuna scrittura nel database (e il server non scrive comunque con E2E_FAKE_USER).
+{
+  // Calcoli del pannello (funzioni pure, senza server).
+  let nm = null;
+  try { nm = await import(new URL("../../src/lib/numeri.ts", import.meta.url).href); } catch (e) { ok(false, `numeri: modulo src/lib/numeri.ts importabile (${e.message})`); }
+  if (nm) {
+    const now = Date.parse("2026-10-15T12:00:00Z");
+    const at = (d, h = 10) => new Date(Date.UTC(2026, 9, d, h)).toISOString();
+    const ev = (type, d, who, extra = {}) => ({ created_at: at(d, extra.h ?? 10), type, user_id: who.u ?? null, anon_id: who.a ?? null, session_id: extra.s ?? null, props: extra.p ?? {} });
+    const A = { a: "anon-a" }, B = { u: "00000000-0000-0000-0000-00000000000b" }, Ba = { a: "anon-b", u: "00000000-0000-0000-0000-00000000000b" }, Bonly = { a: "anon-b" };
+    const rows = [
+      ev("sessione_inizio", 5, A, { s: "s1", p: { prima_volta: 1 } }),
+      ev("sessione_inizio", 10, Bonly, { s: "s2", p: { prima_volta: 1 } }),
+      ev("pagina", 10, Bonly, { s: "s2", p: { pagina: "mappa" } }),
+      ev("ricerca", 10, Ba, { s: "s2", p: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 8 } }),
+      ev("apri_scheda", 10, B, { s: "s2", h: 11, p: { fonte: "ricerca" } }),
+      ev("salva", 10, B, { s: "s2", h: 11, p: { fonte: "segnalibro" } }),
+      ev("sessione_inizio", 13, B, { s: "s3", p: { giorni: 3 } }),
+      ev("funzione", 13, B, { s: "s3", p: { nome: "sorprendimi" } }),
+      ev("errore", 14, A, { p: { messaggio: "x is undefined", pagina: "mappa" } }),
+      ev("errore", 14, A, { p: { messaggio: "x is undefined", pagina: "mappa" } }),
+      ev("utile", 14, B, { p: { voto: "si", contesto: "ricerca" } }),
+      ev("ricerca", 15, {}, { p: { modo: "filtri", tipo: "pizzeria", risultati: 0 } }),
+    ];
+    const n = nm.computeNumeri(rows, 7, now);
+    ok(n.attivi.totale === 2 && n.attivi.registrati === 1 && n.attivi.anonimi === 1, `numeri: persone attive in 7 giorni, l'anonimo che poi accede conta una volta (${JSON.stringify(n.attivi)})`);
+    ok(n.nuovi === 1, `numeri: 'nuove' = prima volta nel periodo (${n.nuovi})`);
+    const r3 = n.ritorni.find((r) => r.giorni === 3);
+    ok(r3.base === 1 && r3.tornati === 1, `numeri: ritorno dopo 3 giorni (${JSON.stringify(r3)})`);
+    ok(n.imbuto.map((s) => s.persone).join(",") === "1,1,1" && n.imbuto[0].volte === 2, `numeri: imbuto ricerca → scheda → salva (${n.imbuto.map((s) => `${s.volte}/${s.persone}`).join(" → ")})`);
+    ok(n.ricerche.senzaRisultati === 1 && n.ricerche.ai === 1 && n.ricerche.filtri === 1, "numeri: ricerche con l'AI, con i filtri e senza risultati");
+    ok(n.errori.length === 1 && n.errori[0].volte === 2 && n.errori[0].pagina === "mappa", "numeri: errori raggruppati per messaggio e pagina");
+    ok(n.funzioni[0].volte > 0 && n.funzioni.some((f) => f.chiave === "sorprendimi" && f.volte === 1) && n.funzioni.some((f) => f.chiave === "voce" && f.volte === 0), "numeri: funzioni usate e mai usate");
+    ok(n.utile.si === 1 && n.utile.no === 0 && n.sessioni.totale === 2 && !n.senzaTracciamento, `numeri: 👍/👎 e visite (${n.sessioni.totale})`);
+    ok(nm.computeNumeri(rows.filter((r) => ["ricerca", "salva", "apri_scheda"].includes(r.type)), 30, now).senzaTracciamento, "numeri: avviso se la migrazione del tracciamento non è applicata");
+    ok(nm.computeNumeri([], 1, now).attivi.totale === 0, "numeri: nessun evento, nessun errore");
+  }
+
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tEvents = [];
+  await tctx.route("**/api/events", (r) => { tEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await tctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
+  await tctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await tctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await tctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const tp = await tctx.newPage();
+  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const tErrors = [];
+  tp.on("pageerror", (e) => tErrors.push(e.message));
+  await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await tp.waitForTimeout(300);
+  const ses = tEvents.filter((e) => e.type === "sessione_inizio");
+  ok(ses.length === 1 && ses[0].props?.prima_volta === 1 && typeof ses[0].props?.installata === "number" && typeof ses[0].sessionId === "string", `tracciamento: all'apertura parte 'sessione_inizio' (prima volta, app installata sì/no) (${ses.length})`);
+  ok(tEvents.some((e) => e.type === "pagina" && e.props?.pagina === "mappa"), "tracciamento: vista pagina 'mappa'");
+  ok(tEvents.every((e) => typeof e.sessionId === "string" && e.sessionId === ses[0]?.sessionId && typeof e.anonId === "string"), "tracciamento: ogni segnale porta la stessa sessione e il visitatore anonimo");
+  ok((await tctx.cookies()).some((c) => c.name === "mapetite_anon") && (await tctx.cookies()).some((c) => c.name === "mapetite_sessione"), "tracciamento: cookie di visitatore e sessione per le ricerche fatte dal server");
+
+  // Cambio pagina dentro l'app: "Salvati" dalla barra in basso.
+  await tp.getByRole("link", { name: "Salvati" }).first().click();
+  await tp.waitForURL(/vista=salvati/);
+  await tp.waitForTimeout(400);
+  ok(tEvents.some((e) => e.type === "pagina" && e.props?.pagina === "salvati"), "tracciamento: cambio pagina senza ricaricare ('salvati')");
+
+  // Ricerca: 👍/👎 in fondo ai risultati, senza la frase cercata nel segnale.
+  await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await tp.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await tp.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 });
+  ok(await tp.getByTestId("utile").count() === 1, "utile: 'Ti è stato utile?' in fondo ai risultati");
+  await tp.getByTestId("utile").getByRole("button", { name: "Sì, utile" }).evaluate((b) => b.click());
+  await tp.getByTestId("utile-grazie").waitFor({ timeout: 3000 });
+  await tp.waitForTimeout(200);
+  const ut = tEvents.find((e) => e.type === "utile");
+  ok(!!ut && ut.props?.voto === "si" && ut.props?.contesto === "ricerca" && typeof ut.props?.risultati === "number", "utile: 👍 registra il voto con il numero di risultati");
+  ok(!JSON.stringify(tEvents).includes("Rooftop romantico"), "tracciamento: la frase cercata non finisce mai nei segnali");
+
+  // Filtri: uso della funzione.
+  await tp.getByRole("button", { name: "Filtri", exact: true }).click();
+  await tp.getByRole("button", { name: /^Applica filtri/ }).click();
+  await tp.waitForTimeout(300);
+  ok(tEvents.some((e) => e.type === "funzione" && e.props?.nome === "filtri"), "tracciamento: 'Applica filtri' registra la funzione 'filtri'");
+
+  // Errori del telefono: eccezione e promessa rifiutata, con la pagina; mai due volte lo stesso.
+  // Script della pagina (non evaluate: i suoi errori risultano di un altro file e vengono scartati).
+  await tp.addScriptTag({ content: 'setTimeout(function(){throw new Error("prova-errore-giro")},0);setTimeout(function(){throw new Error("prova-errore-giro")},5);Promise.reject(new Error("prova-promessa-giro"));' });
+  await tp.waitForTimeout(500);
+  const errs = tEvents.filter((e) => e.type === "errore");
+  ok(errs.filter((e) => e.props?.messaggio === "prova-errore-giro").length === 1 && errs.every((e) => e.props?.pagina === "mappa"), `tracciamento: errore JavaScript registrato una volta, con la pagina (${errs.length})`);
+  ok(errs.some((e) => e.props?.messaggio === "prova-promessa-giro" && e.props?.origine === "promessa"), "tracciamento: promessa rifiutata registrata");
+  ok(tErrors.some((m) => /prova-errore-giro/.test(m)) && tErrors.filter((m) => !/prova-(errore|promessa)-giro/.test(m)).length === 0, `tracciamento: nessun altro errore (${tErrors.join(" | ").slice(0, 200)})`);
+
+  // Stessa visita se si ricarica; nuova dopo 30 minuti di pausa, con i giorni dall'ultima.
+  await tp.reload({ waitUntil: "load" });
+  await tp.waitForTimeout(300);
+  ok(tEvents.filter((e) => e.type === "sessione_inizio").length === 1, "tracciamento: ricaricando resta la stessa visita");
+  await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); });
+  await tp.reload({ waitUntil: "load" });
+  await tp.waitForTimeout(300);
+  const ses2 = tEvents.filter((e) => e.type === "sessione_inizio");
+  ok(ses2.length === 2 && ses2[1].props?.giorni === 0 && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
+
+  // Il server accetta i nuovi tipi e rifiuta quelli inventati.
+  { const r1 = await tp.request.post(`${BASE}/api/events`, { data: { type: "pagina", sessionId: "s", props: { pagina: "mappa" } } });
+    const r2 = await tp.request.post(`${BASE}/api/events`, { data: { type: "errore", props: { messaggio: "x".repeat(500), pagina: "mappa" } } });
+    const r3 = await tp.request.post(`${BASE}/api/events`, { data: { type: "admin" } });
+    ok(r1.status() === 204 && r2.status() === 204 && r3.status() === 400, `segnali: /api/events accetta pagina/errore, rifiuta tipi inventati (${r1.status()}/${r2.status()}/${r3.status()})`); }
+
+  // Pannello di Lorenzo: senza accesso non esiste (404).
+  { const r = await tp.request.get(`${BASE}/admin/numeri`);
+    ok(r.status() === 404, `pannello: /admin/numeri senza accesso dà 404 (${r.status()})`); }
+  const pagine = tEvents.filter((e) => e.type === "pagina").length;
+  // Con eventi finti (solo in sviluppo con E2E_FAKE_USER, cookie e2e_eventi): stato vuoto e pannello pieno.
+  const setFake = (rows) => tctx.addCookies([{ name: "e2e_eventi", value: encodeURIComponent(JSON.stringify(rows)), url: BASE }]);
+  await setFake([]);
+  await tp.goto(`${BASE}/admin/numeri`, { waitUntil: "networkidle" });
+  ok(await tp.getByTestId("numeri-vuoto").isVisible(), "pannello: senza dati, stato vuoto chiaro");
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const U = "00000000-0000-0000-0000-00000000000b";
+  await setFake([
+    { created_at: iso(3 * 1440), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
+    { created_at: iso(30), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s1", props: { giorni: 3 } },
+    { created_at: iso(29), type: "pagina", user_id: U, anon_id: null, session_id: "s1", props: { pagina: "mappa" } },
+    { created_at: iso(28), type: "ricerca", user_id: U, anon_id: null, session_id: "s1", props: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 9 } },
+    { created_at: iso(27), type: "apri_scheda", user_id: U, anon_id: null, session_id: "s1", props: { fonte: "ricerca" } },
+    { created_at: iso(25), type: "salva", user_id: U, anon_id: null, session_id: "s1", props: {} },
+    { created_at: iso(20), type: "funzione", user_id: null, anon_id: "anon-x", session_id: "s2", props: { nome: "filtri" } },
+    { created_at: iso(19), type: "errore", user_id: null, anon_id: "anon-x", session_id: "s2", props: { messaggio: "Cannot read properties of undefined", pagina: "salvati" } },
+    { created_at: iso(18), type: "utile", user_id: U, anon_id: null, session_id: "s1", props: { voto: "no", contesto: "ricerca" } },
+  ]);
+  await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
+  ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
+  ok((await tp.getByTestId("numeri-imbuto").textContent())?.includes("Scheda aperta dai risultati"), "pannello: imbuto ricerca → scheda → azione");
+  ok((await tp.getByTestId("numeri-errori").textContent())?.includes("Cannot read properties of undefined"), "pannello: errori con la pagina");
+  ok((await tp.getByTestId("numeri-ritorni").textContent())?.includes("1 su 1"), "pannello: ritorni dopo 1/3/7 giorni");
+  ok((await tp.getByTestId("numeri-tester").locator("li").count()) === 2, "pannello: elenco dei tester");
+  { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello: niente scorrimento orizzontale sul telefono (${w}px)`); }
+  await tp.screenshot({ path: `${OUT}/60-pannello-numeri.png`, fullPage: true });
+  ok(tEvents.filter((e) => e.type === "pagina").length === pagine, "pannello: le visite di Lorenzo al pannello non contano come pagine dei tester");
+  await tctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

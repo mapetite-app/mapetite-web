@@ -10,6 +10,8 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
 import { sortTags, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
+import { trackFeature } from "@/lib/track";
+import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
@@ -447,6 +449,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               onClick={async () => {
                 const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
                 const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
+                trackFeature("condividi_ricerca");
                 try {
                   if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
                   else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
@@ -469,6 +472,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               data-testid="condividi-lista"
               aria-label="Condividi questa lista"
               onClick={async () => {
+                trackFeature("condividi_lista");
                 const r = await onShareList(places);
                 if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
               }}
@@ -602,7 +606,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               </li>
             );
           })}
-          {/* In fondo al carosello: i tester segnalano una ricerca che non va (email già scritta). */}
+          {/* In fondo al carosello: 👍/👎 in un tocco, poi l'email per chi vuole spiegare. */}
+          {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
+            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
+              <div className="flex h-full min-h-[190px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float">
+                <UtileFeedback contesto="ricerca" risultati={places.length} />
+              </div>
+            </li>
+          )}
+          {/* I tester segnalano una ricerca che non va (email già scritta). */}
           {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
             <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
               <a
