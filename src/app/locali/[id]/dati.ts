@@ -17,6 +17,8 @@ export type PublicPlace = {
   rating: number | null;
   price_level: number | null;
   google_place_id: string | null;
+  // Badge "Verificato" (migrazione 20261015_ristoratori.sql): null finché non è applicata.
+  verified_at?: string | null;
 };
 
 export type PublicSynthesis = {
@@ -30,6 +32,8 @@ export type PublicPlaceData = { place: PublicPlace; synthesis: PublicSynthesis |
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLACE_COLUMNS = "id, name, address, lat, lng, category, rating, price_level, google_place_id";
+// Senza la colonna verified_at (migrazione non applicata) si rilegge senza: la pagina non si rompe.
+let noVerifiedColumn = false;
 
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -66,11 +70,13 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
   if (fake) return fake;
 
   const supabase = await createClient();
-  const { data: place, error } = await supabase
-    .from("places")
-    .select(PLACE_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
+  const read = (cols: string) => supabase.from("places").select(cols).eq("id", id).maybeSingle<PublicPlace>();
+  let { data: place, error } = await read(noVerifiedColumn ? PLACE_COLUMNS : `${PLACE_COLUMNS}, verified_at`);
+  // 42703 = colonna inesistente: verified_at arriva con 20261015_ristoratori.sql.
+  if (error?.code === "42703" && !noVerifiedColumn) {
+    noVerifiedColumn = true;
+    ({ data: place, error } = await read(PLACE_COLUMNS));
+  }
   if (error) console.error("[locali] lettura places fallita:", error.message);
   if (!place) return null;
 
@@ -84,7 +90,7 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
     if (sErr) console.error("[locali] lettura place_synthesis fallita:", sErr.message);
     synthesis = (s as PublicSynthesis | null) ?? null;
   }
-  return { place: place as PublicPlace, synthesis };
+  return { place, synthesis };
 });
 
 // Foto: il riferimento Google viaggia nel link condiviso (?foto=places/<id>/photos/<ref>).

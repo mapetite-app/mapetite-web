@@ -1,0 +1,122 @@
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminEmail } from "@/lib/admin";
+import { cityFromAddress } from "@/lib/city";
+import { computeRistoratore, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
+import Pannello, { PERIODI } from "../pannello";
+
+// Pannello del ristoratore (PIANO-25-OTTOBRE.md 8.2), id = UUID del locale in places.
+// Lo vedono solo gli admin (src/lib/admin.ts) e il titolare con una richiesta verificata
+// (tabella claims, migrazione 20261015_ristoratori.sql). Per tutti gli altri la pagina non
+// esiste (404). Legge events e saved_places con la chiave di servizio, solo dal server: al
+// telefono arrivano solo numeri aggregati.
+export const metadata: Metadata = { title: "Pannello del ristoratore · Mapetite", robots: { index: false, follow: false } };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PLACE_COLS = "id, name, address, category, lat, lng, google_place_id";
+const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "chiama", "sito"];
+const PAGE = 1000;
+const MAX_ROWS = 50_000;
+
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; verificato: boolean; avviso: string | null };
+
+// Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
+// scripts/e2e/giro.mjs), perché il giro non può leggere il database. Senza cookie si passa
+// dal controllo vero dell'accesso (e il giro, senza accesso, riceve 404).
+async function e2eDati(id: string): Promise<Dati | null> {
+  if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
+  const raw = (await cookies()).get("e2e_ristoratore")?.value;
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(decodeURIComponent(raw));
+    if (v?.locale?.id !== id) return null;
+    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], verificato: !!v.verificato, avviso: null };
+  } catch {
+    return null;
+  }
+}
+
+// Admin o titolare verificato. Senza tabella claims resta solo l'admin.
+async function puoVedere(placeId: string): Promise<boolean> {
+  const { data } = await getUser();
+  const user = data?.user;
+  if (!user) return false;
+  if (isAdminEmail(user.email)) return true;
+  const { data: claim, error } = await createAdminClient()
+    .from("claims")
+    .select("id")
+    .eq("place_id", placeId)
+    .eq("user_id", user.id)
+    .eq("stato", "verificata")
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[ristoratore] lettura claims:", error.code, error.message);
+  return !!claim;
+}
+
+async function carica(id: string, giorni: number): Promise<Dati | null> {
+  const db = createAdminClient();
+  let verificato = false;
+  let { data: locale, error } = await db.from("places").select(`${PLACE_COLS}, verified_at`).eq("id", id).maybeSingle<RistLocale & { verified_at: string | null }>();
+  if (error?.code === "42703") ({ data: locale, error } = await db.from("places").select(PLACE_COLS).eq("id", id).maybeSingle<RistLocale & { verified_at: string | null }>());
+  if (error) console.error("[ristoratore] lettura places:", error.message);
+  if (!locale) return null;
+  verificato = !!locale.verified_at;
+  const citta = cityFromAddress(locale.address);
+
+  // Locali simili: stessa categoria e stessa città (dall'indirizzo, come nel resto dell'app).
+  let simili: RistLocale[] = [locale];
+  if (locale.category && citta) {
+    const { data } = await db.from("places").select(PLACE_COLS).eq("category", locale.category).ilike("address", `%${citta}%`).limit(500);
+    simili = ((data ?? []) as RistLocale[]).filter((p) => cityFromAddress(p.address) === citta);
+    if (!simili.some((p) => p.id === locale.id)) simili.push(locale);
+  }
+
+  // Eventi del periodo e di quello precedente (per la variazione), a pagine da 1000.
+  const since = new Date(Date.now() - (2 * giorni + 1) * 86_400_000).toISOString();
+  let cols = "created_at,type,user_id,anon_id,session_id,place_id,google_place_id,lat,lng,props";
+  const eventi: RistEvento[] = [];
+  let avviso: string | null = null;
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data, error: e } = await db.from("events").select(cols).in("type", TIPI).gte("created_at", since).order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (e) {
+      if (from === 0 && cols.includes("session_id") && /session_id/.test(e.message)) {
+        cols = cols.replace("session_id,", "");
+        from -= PAGE;
+        continue;
+      }
+      avviso = e.code === "42P01" || e.code === "PGRST205" ? "Il registro delle visite non è ancora attivo: i numeri compariranno appena lo sarà." : `Lettura dei numeri non riuscita (${e.code}).`;
+      break;
+    }
+    eventi.push(...((data ?? []) as unknown as RistEvento[]));
+    if (!data || data.length < PAGE) break;
+  }
+
+  // Salvataggi veri (anche quelli fatti prima che esistesse il segnale "salva").
+  const salvati: RistSalvataggio[] = [];
+  const ids = simili.map((p) => p.id);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await db.from("saved_places").select("place_id,user_id,created_at,tags").in("place_id", ids.slice(i, i + 200)).gte("created_at", since);
+    salvati.push(...((data ?? []) as RistSalvataggio[]));
+  }
+  return { locale, citta, simili, eventi, salvati, verificato, avviso };
+}
+
+export default async function RistoratorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
+  const sp = await searchParams;
+  const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 30;
+
+  let dati = await e2eDati(id);
+  if (!dati) {
+    if (!(await puoVedere(id))) notFound();
+    dati = await carica(id, giorni);
+    if (!dati) notFound();
+  }
+  const p = computeRistoratore(dati, giorni);
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} />;
+}

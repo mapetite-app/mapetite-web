@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { CONTACT } from "./rivendica/mail";
 
 export const metadata: Metadata = {
   title: "Mapetite per i ristoratori",
@@ -7,9 +8,8 @@ export const metadata: Metadata = {
 };
 
 // Pagina per i ristoratori (piano 8.3b, pitch "I piani per i ristoratori"). Per il 25/10 nessun
-// pagamento: "Rivendica il tuo locale" prepara un'email a Mapetite. I prezzi non si mostrano:
-// li decide Lorenzo.
-const CONTACT = "founder.mapetite@gmail.com";
+// pagamento: "Rivendica il tuo locale" porta al modulo di richiesta (/per-i-ristoratori/rivendica,
+// piano 8.1); "Scrivici" prepara un'email a Mapetite. I prezzi non si mostrano: li decide Lorenzo.
 
 const PERCHE = [
   { icon: "🎯", title: "Domanda qualificata", text: "Ti trovano persone già in fase di scelta, che cercano proprio quello che offri: non semplice esposizione." },
@@ -49,9 +49,14 @@ export default function PerIRistoratori() {
           Mapetite è la mappa personale del food &amp; beverage: le persone salvano i locali che scoprono e li ritrovano quando devono scegliere.
           Non paghi per “esserci”: paghi per domanda qualificata, controllo della tua presenza e dati utili.
         </p>
-        <a data-testid="rivendica" href={mail} className="mt-6 inline-flex min-h-12 items-center rounded-pill bg-accent px-6 text-sm font-display font-semibold text-white active:scale-[0.98]">
-          Rivendica il tuo locale
-        </a>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link data-testid="rivendica" href="/per-i-ristoratori/rivendica" className="inline-flex min-h-12 items-center rounded-pill bg-accent px-6 text-sm font-display font-semibold text-white active:scale-[0.98]">
+            Rivendica il tuo locale
+          </Link>
+          <Link data-testid="pannello-demo" href="/ristoratore/demo" className="inline-flex min-h-12 items-center rounded-pill border border-white/40 px-5 text-sm font-display font-semibold text-white active:scale-[0.98]">
+            Guarda un pannello d&apos;esempio
+          </Link>
+        </div>
         <p className="mt-3 text-xs font-sans text-white/70">Partiamo da Roma e Milano. Ti rispondiamo noi, senza impegno.</p>
       </section>
 
@@ -91,7 +96,7 @@ export default function PerIRistoratori() {
       <section className="mt-8 rounded-card border border-border bg-surface p-5">
         <h2 className="font-title text-lg font-semibold text-brand">Come funziona</h2>
         <ol className="mt-3 space-y-2 text-sm font-sans text-text">
-          <li><strong>1.</strong> Ci scrivi con “Rivendica il tuo locale”.</li>
+          <li><strong>1.</strong> Mandi la richiesta con “Rivendica il tuo locale” (o dalla pagina del tuo locale su Mapetite).</li>
           <li><strong>2.</strong> Verifichiamo che il locale sia tuo e attiviamo la pagina verificata.</li>
           <li><strong>3.</strong> Aggiorni foto, menu ed eventi e vedi i tuoi numeri.</li>
         </ol>
