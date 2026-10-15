@@ -144,6 +144,23 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("Rooftop 
 { const href = decodeURIComponent((await page.getByTestId("ricerca-feedback").getAttribute("href")) ?? "");
   ok(href.startsWith("mailto:founder.mapetite@gmail.com") && href.includes('Ho cercato: "Rooftop romantico per due a Roma"') && href.includes("1. Terrazza Uno") && !href.includes("Pub Fuori Tema"), "fine carosello: 'Questi risultati non vanno?' apre un'email con la ricerca e i locali mostrati"); }
 await shot("03-lista-verdetti");
+// Foto: una sola misura per tutte le viste, e una ricerca ripetuta (Google dà riferimenti foto
+// nuovi ogni volta) non le richiede di nuovo per i locali già visti.
+{
+  const seenPhotos = [];
+  const onReq = (r) => { if (r.url().includes("/api/places/photo")) seenPhotos.push(r.url()); };
+  page.on("request", onReq);
+  const remembered = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("mapetite.foto") ?? "{}")));
+  ok(remembered.includes("P1"), `foto: il telefono ricorda la foto vista per il locale (${remembered.join(",")})`);
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.map((x) => ({ ...x, photoRef: x.photoRef ? `${x.photoRef}_nuovo` : x.photoRef })) } }));
+  await page.getByLabel("Cosa cerchi?").fill("Rooftop romantico per due a Roma");
+  await page.keyboard.press("Enter");
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(600);
+  ok(seenPhotos.length > 0 && seenPhotos.every((u) => !u.includes("_nuovo") && u.includes("w=720")), `foto: ricerca ripetuta senza richieste nuove a Google per gli stessi locali (${seenPhotos.length} dalla cache, ${seenPhotos.filter((u) => u.includes("_nuovo")).length} nuove)`);
+  await page.unroute("**/api/search");
+  page.off("request", onReq);
+}
 ok(await page.getByTestId("ho-capito").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1), "lista: 'Ho capito' si legge per intero (non tagliato)");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
