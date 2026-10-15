@@ -2479,8 +2479,8 @@ else {
   await bar.getByTestId("prenota-scheda").click();
   await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   await s.waitForTimeout(300);
-  ok(sEvents.some((e) => e.type === "percorso" && e.props?.da === "barra" && e.googlePlaceId === "S1"), "barra: segnale 'percorso' (da barra)");
-  ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenota" && e.props?.da === "barra"), "barra: apertura di Prenota registrata");
+  ok(sEvents.some((e) => e.type === "percorso" && e.props?.fonte === "barra" && e.googlePlaceId === "S1"), "barra: segnale 'percorso' (da barra)");
+  ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenota" && e.props?.fonte === "barra"), "barra: apertura di Prenota registrata");
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
@@ -2503,7 +2503,7 @@ else {
   sEvents.length = 0;
   await bar.locator("a[href^='tel:']").click();
   await s.waitForTimeout(300);
-  ok(sEvents.some((e) => e.type === "chiama" && e.props?.da === "barra"), "barra: segnale 'chiama' (da barra)");
+  ok(sEvents.some((e) => e.type === "chiama" && e.props?.fonte === "barra"), "barra: segnale 'chiama' (da barra)");
   await s.screenshot({ path: `${OUT}/63-scheda-places-caffe.png`, caret: "initial" });
   // 360 px: stessa barra, niente scorrimento orizzontale.
   await s.setViewportSize({ width: 360, height: 780 });
