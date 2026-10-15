@@ -57,6 +57,8 @@ type VenueSheetProps = {
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
   // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
+  // Classifica personale (piano 4.3) sotto "Com'era?": la passa map-view solo per i salvati visitati.
+  rankSlot?: React.ReactNode;
 };
 
 export default function VenueSheet({
@@ -73,6 +75,7 @@ export default function VenueSheet({
   onOpinion,
   googlePlaceId = null,
   onQuickSave,
+  rankSlot,
 }: VenueSheetProps) {
   const {
     name,
@@ -526,6 +529,7 @@ export default function VenueSheet({
                   );
                 })}
               </div>
+              {rankSlot}
             </div>
           )}
           {hasPersonalTags && (

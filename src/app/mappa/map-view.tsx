@@ -31,6 +31,7 @@ import { track } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
+import ClassificaScheda from "@/components/classifica-scheda";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -2902,6 +2903,9 @@ export default function MapView({
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
+              rankSlot={userId && resolveUuid(selected.id) ? (
+                <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
+              ) : null}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
