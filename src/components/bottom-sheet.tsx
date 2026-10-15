@@ -578,7 +578,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {d?.verdict ? (
                       <span className="mt-2 block">
                         {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
-                        <span className="block text-[10px] font-display font-semibold uppercase tracking-wider text-accent"><span aria-hidden>✦ </span><span data-testid="etichetta-verdetto">Il verdetto Mapetite</span></span>
+                        <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wider text-accent before:mr-1 before:content-['✦']">Il verdetto Mapetite</span>
                         <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
