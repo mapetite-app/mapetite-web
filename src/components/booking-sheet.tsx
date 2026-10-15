@@ -90,8 +90,8 @@ export default function BookingSheet({
     });
     // Segnali esistenti (src/lib/track.ts): sito e chiama, con "da: prenota" per distinguerli.
     const where = place.lat != null && place.lng != null ? { id: place.id, lat: place.lat, lng: place.lng } : { id: place.id };
-    if (via === "sito") track("sito", where, { da: "prenota" });
-    else if (via === "telefono" || via === "whatsapp") track("chiama", where, { da: "prenota", via });
+    if (via === "sito") track("sito", where, { fonte: "prenota" });
+    else if (via === "telefono" || via === "whatsapp") track("chiama", where, { fonte: "prenota", contesto: via });
     setDone(req);
   };
   const copy = async () => {

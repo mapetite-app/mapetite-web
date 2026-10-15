@@ -48,7 +48,7 @@ export default function BookingReminder() {
                 href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => track("percorso", { id: b.placeId, lat: b.lat!, lng: b.lng! }, { da: "promemoria" })}
+                onClick={() => track("percorso", { id: b.placeId, lat: b.lat!, lng: b.lng! }, { fonte: "promemoria" })}
                 className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white"
               >
                 <Navigation size={15} /> Percorso
@@ -71,7 +71,7 @@ export default function BookingReminder() {
                 type="button"
                 onClick={() => {
                   updateBooking(b.id, { outcome });
-                  if (outcome !== "non-andato") track("ci_sono_stato", { id: b.placeId }, { da: "prenota", esito: outcome });
+                  if (outcome !== "non-andato") track("ci_sono_stato", { id: b.placeId }, { fonte: "prenota", stato: outcome });
                 }}
                 className="min-h-10 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
               >

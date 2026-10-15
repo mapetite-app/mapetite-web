@@ -2812,7 +2812,7 @@ else {
   ok((await ap.getByTestId("prenota-fatto").textContent()).includes("La conferma arriva dal locale"), "prenota: 'Prenotazione richiesta' con la conferma che arriva dal locale");
   const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
   ok(saved.length === 1 && saved[0].via === "whatsapp" && saved[0].people === 3 && saved[0].time === "21:00" && saved[0].placeName === "Terrazza Uno", "prenota: richiesta salvata nel telefono");
-  ok(aEvents.some((e) => e.type === "chiama" && e.props?.da === "prenota" && e.props?.via === "whatsapp"), "prenota: segnale registrato (tipo esistente 'chiama', da prenota)");
+  ok(aEvents.some((e) => e.type === "chiama" && e.props?.fonte === "prenota" && e.props?.contesto === "whatsapp"), "prenota: segnale registrato (tipo esistente 'chiama', da prenota)");
   await ashot("53-prenota-richiesta");
   await ap.getByRole("button", { name: "Fatto" }).click();
 
@@ -2875,7 +2875,7 @@ else {
   ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
   await ashot("56-home-promemoria");
   await ap.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
-  ok((await ap.getByTestId("promemoria-com-e-andata").count()) === 0 && aEvents.some((e) => e.type === "ci_sono_stato" && e.props?.da === "prenota"), "home: risposta a 'Com'è andata?' registrata, la domanda sparisce");
+  ok((await ap.getByTestId("promemoria-com-e-andata").count()) === 0 && aEvents.some((e) => e.type === "ci_sono_stato" && e.props?.fonte === "prenota" && e.props?.stato === "bene"), "home: risposta a 'Com'è andata?' registrata, la domanda sparisce");
   await actx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "giulia@example.com", saved: [], reviews: [] })), url: BASE }]);
   await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
