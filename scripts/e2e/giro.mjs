@@ -900,6 +900,8 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
   ok(resp?.status() === 200, `/${r} risponde 200`);
 }
+await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
+ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
