@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck } from "lucide-react";
 import { useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { track } from "@/lib/track";
@@ -12,6 +12,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
+import BookingSheet from "@/components/booking-sheet";
+import type { BookingDetails } from "@/lib/booking";
 
 const TILE =
   "flex min-h-[52px] min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-display font-semibold text-white active:scale-95";
@@ -57,6 +59,8 @@ type VenueSheetProps = {
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
   // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
+  // Prenotazione assistita: giorno, ora e persone già capiti (dall'assistente), da confermare.
+  booking?: Partial<BookingDetails> | null;
 };
 
 export default function VenueSheet({
@@ -73,6 +77,7 @@ export default function VenueSheet({
   onOpinion,
   googlePlaceId = null,
   onQuickSave,
+  booking = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -105,6 +110,7 @@ export default function VenueSheet({
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
@@ -480,6 +486,27 @@ export default function VenueSheet({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Prenota (piano 1.3): messaggio già scritto per WhatsApp, chiamata o sito del locale. */}
+      {(phone != null || websiteUri != null) && (
+        <div className="mx-5 mt-4">
+          <button
+            type="button"
+            data-testid="prenota-scheda"
+            onClick={() => setBookingOpen(true)}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-accent px-4 text-[15px] font-display font-semibold text-white shadow-card active:scale-[0.98]"
+          >
+            <CalendarCheck size={18} /> Prenota un tavolo
+          </button>
+        </div>
+      )}
+      {bookingOpen && (
+        <BookingSheet
+          place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng }}
+          initial={booking}
+          onClose={() => setBookingOpen(false)}
+        />
       )}
 
       {/* 4. LE TUE NOTE */}

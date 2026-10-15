@@ -4,6 +4,7 @@ import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
+import BookingReminder from "@/components/booking-reminder";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
@@ -165,6 +166,9 @@ export default async function ProfiloPage() {
           </Link>
         </div>
       </div>
+
+      {/* Prenotazioni richieste dall'assistente (salvate nel telefono). */}
+      <BookingReminder />
 
       {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
       <Link
