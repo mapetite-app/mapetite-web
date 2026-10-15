@@ -863,10 +863,12 @@ await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 
 ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
 ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
-for (const [label, sel] of [["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"], ["Chiama", "a[href^='tel:']"], ["Sito", "a[aria-label^='Sito di']"]]) {
+// Barra azioni stile Places (piano 6.2): Prenota / Percorso / Salva; Chiama e Sito nella riga dei contatti.
+for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid=prenota-scheda]"], ["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"]]) {
   const box = await page.locator(sel).first().boundingBox();
   ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
 }
+ok((await page.getByTestId("scheda-info").locator("a[href^='tel:']").count()) === 1 && (await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").count()) === 1, "scheda B: Chiama e Sito restano nella riga dei contatti");
 ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
 await shot("15-scheda-b");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -2412,6 +2414,106 @@ else {
   await soctx.close();
 }
 
+// 14-bis. Scheda del locale stile Places (piano 6.2): barra azioni flottante (Prenota / Percorso / Salva
+//         dove si prenota, Chiama / Percorso / Salva altrove), carosello senza foto Google in più,
+//         "chi dei tuoi amici c'è stato" anche nella scheda della mappa.
+{
+  const ristorante = mk("S1", "Trattoria Scheda", 41.889, 12.469, { category: "restaurant", phone: "+39 347 123 4567" });
+  const caffe = mk("S2", "Caffè Scheda", 41.8895, 12.4695, { category: "cafe" });
+  const sSearch = { ...SEARCH_FAST, risultati: [ristorante, caffe], sintesi_pendente: { places: [], token: "x" } };
+  const sSynth = { esclusi: [], dettagli: {
+    S1: { synthesis: "Cucina romana, sala piccola.", tags: [], verdict: "Cucina romana di quartiere, lontana dai giri turistici.", goFor: ["cena tra amici"], dontExpect: [], matchReason: "Clienti del quartiere." },
+    S2: { synthesis: "Caffè al banco.", tags: [], verdict: "Il bar di quartiere vero.", goFor: ["colazione"], dontExpect: [], matchReason: "È un bar di quartiere." },
+  } };
+  const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["geolocation"], geolocation: { latitude: 41.8885, longitude: 12.4685 } });
+  if (fakeUser) await sctx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ profili: [], seguo: ["u-giulia"], salvati: [{ user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia", place_id: "S1", tags: ["Già visitato"], created_at: "2026-10-10T10:00:00Z", name: "Trattoria Scheda", category: "restaurant", address: null, lat: 41.889, lng: 12.469 }] })), url: BASE }]);
+  const sEvents = [];
+  const sPhotos = [];
+  let staticMaps = 0;
+  await sctx.route("**/api/events", (r) => { sEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await sctx.route("**/api/places/photo**", (r) => { sPhotos.push(r.request().url()); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }); });
+  await sctx.route("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/**", (r) => { staticMaps++; return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#e8e8e4"/><circle cx="300" cy="200" r="12" fill="#ff6b4a"/></svg>' }); });
+  await sctx.route("**/rest/v1/**", (r) => r.request().method() === "GET" ? r.fulfill({ json: [] }) : r.fulfill({ status: 201, body: "" }));
+  await sctx.route("**/api/search", (r) => r.fulfill({ json: sSearch }));
+  await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: sSynth }));
+  const s = await sctx.newPage();
+  s.on("pageerror", (e) => errors.push(e.message));
+  await s.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  // I link esterni (Google Maps, tel:) non si aprono davvero: conta solo il segnale registrato.
+  await s.addInitScript(() => document.addEventListener("click", (e) => { const a = e.target instanceof Element ? e.target.closest("a[target=_blank], a[href^='tel:']") : null; if (a) e.preventDefault(); }, true));
+  await s.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  await s.getByRole("button", { name: "La mia posizione", exact: true }).click().catch(() => {});
+  await s.waitForTimeout(800);
+  await s.getByLabel(/cosa cerchi\?/).first().fill("trattoria autentica");
+  await s.getByLabel(/cosa cerchi\?/).first().press("Enter");
+  await s.getByText("Cucina romana di quartiere, lontana dai giri turistici.").first().waitFor({ timeout: 8000 });
+  await s.waitForTimeout(600);
+  const photosBefore = new Set(sPhotos);
+  await s.locator("ul").getByText("Trattoria Scheda").first().click();
+  await s.getByTestId("verdetto-scheda").waitFor({ timeout: 5000 });
+  await s.waitForTimeout(800);
+  const bar = s.getByTestId("barra-azioni");
+  { const labels = await bar.locator("a, button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+    ok(labels.length === 3 && labels[0] === "Prenota" && /^\d+ min$/.test(labels[1]) && labels[2] === "Salva", `scheda: barra Prenota / minuti a piedi / Salva per un ristorante (${labels.join(" / ")})`); }
+  const barCheck = async (pg) => pg.getByTestId("barra-azioni").evaluate((el) => {
+    const tiles = [...el.querySelectorAll("a, button")].map((t) => t.getBoundingClientRect());
+    const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+    const ws = tiles.map((t) => t.width);
+    return { dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.bottom <= nav + 1 && t.height >= 44), uguali: Math.max(...ws) - Math.min(...ws) <= 2, ws: ws.map(Math.round).join("/") };
+  });
+  { const r = await barCheck(s); ok(r.dentro && r.uguali, `scheda: tre riquadri uguali, dentro lo schermo e sopra la barra in basso (${r.ws})`); }
+  ok(await s.getByTestId("amici-qui").isVisible().catch(() => false) || !fakeUser, "scheda della mappa: 'chi dei tuoi amici c'è stato'");
+  if (fakeUser) ok((await s.getByTestId("amici-qui").textContent())?.includes("1 amico ci è stato") && (await s.getByTestId("amici-qui").getByRole("link", { name: "Giulia" }).getAttribute("href")) === "/u/giulia.rm", "scheda della mappa: '1 amico ci è stato' con il link al profilo");
+  // Carosello: la foto è quella della card (nessuna richiesta foto nuova); la mappa "dove si trova" solo se ci si arriva.
+  ok([...sPhotos].every((u) => photosBefore.has(u) || u.includes("S1")) && new Set(sPhotos.filter((u) => u.includes("S1"))).size <= 1, `scheda: nessuna foto Google in più oltre a quella della card (${new Set(sPhotos).size} indirizzi foto)`);
+  ok(staticMaps === 0 && (await s.getByTestId("carosello-puntini").locator("button").count()) === 2, `carosello: foto + 'dove si trova', la mappa non si scarica finché non serve (${staticMaps})`);
+  await s.screenshot({ path: `${OUT}/60-scheda-places-ristorante.png`, caret: "initial" });
+  await s.getByLabel("Mostra dove si trova").click();
+  await s.getByTestId("carosello-mappa").locator("img").waitFor({ timeout: 4000 }).catch(() => {});
+  await s.waitForTimeout(600);
+  ok(staticMaps === 1 && (await s.getByTestId("carosello-mappa").getAttribute("href"))?.startsWith("https://www.google.com/maps/dir/?api=1&destination=41.889,12.469"), `carosello: seconda pagina con la mappa e il percorso (${staticMaps} mappa)`);
+  await s.screenshot({ path: `${OUT}/62-scheda-carosello-mappa.png`, caret: "initial" });
+  // Segnali: percorso dalla barra, apertura di Prenota.
+  sEvents.length = 0;
+  await bar.locator("a[aria-label^='Indicazioni']").click();
+  await bar.getByTestId("prenota-scheda").click();
+  await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await s.waitForTimeout(300);
+  ok(sEvents.some((e) => e.type === "percorso" && e.props?.da === "barra" && e.googlePlaceId === "S1"), "barra: segnale 'percorso' (da barra)");
+  ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenota" && e.props?.da === "barra"), "barra: apertura di Prenota registrata");
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  // In fondo alla scheda la barra non copre l'ultimo contenuto.
+  await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
+  await s.waitForTimeout(300);
+  { const r = await s.evaluate(() => {
+      const barTop = document.querySelector("[data-testid=barra-azioni]").getBoundingClientRect().top;
+      const sections = [...document.querySelectorAll("[data-testid=scheda-trascinabile] h3")];
+      const last = sections[sections.length - 1]?.parentElement?.getBoundingClientRect();
+      return { ok: !!last && last.bottom <= barTop + 1, last: Math.round(last?.bottom ?? 0), barTop: Math.round(barTop) };
+    });
+    ok(r.ok, `scheda: in fondo la barra non copre l'ultimo contenuto (${r.last} ≤ ${r.barTop})`); }
+  await s.screenshot({ path: `${OUT}/61-scheda-places-fondo.png`, caret: "initial" });
+  // Caffè: qui non si prenota → Chiama / Percorso / Salva.
+  await s.getByRole("button", { name: "Locale successivo" }).click();
+  await s.locator("h2", { hasText: "Caffè Scheda" }).waitFor({ timeout: 4000 });
+  await s.waitForTimeout(500);
+  { const labels = await bar.locator("a, button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+    ok(labels[0] === "Chiama" && labels.length === 3 && (await bar.getByTestId("prenota-scheda").count()) === 0, `scheda: per un caffè Chiama / Percorso / Salva, niente Prenota (${labels.join(" / ")})`); }
+  ok((await s.getByTestId("amici-qui").count()) === 0, "scheda: nessun riquadro amici dove nessuno dei tuoi è stato");
+  sEvents.length = 0;
+  await bar.locator("a[href^='tel:']").click();
+  await s.waitForTimeout(300);
+  ok(sEvents.some((e) => e.type === "chiama" && e.props?.da === "barra"), "barra: segnale 'chiama' (da barra)");
+  await s.screenshot({ path: `${OUT}/63-scheda-places-caffe.png`, caret: "initial" });
+  // 360 px: stessa barra, niente scorrimento orizzontale.
+  await s.setViewportSize({ width: 360, height: 780 });
+  await s.waitForTimeout(400);
+  { const r = await barCheck(s); ok(r.dentro && r.uguali, `360px scheda: barra a tre riquadri dentro lo schermo (${r.ws})`); }
+  ok(await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollWidth <= el.clientWidth), "360px scheda: niente scorrimento orizzontale");
+  await s.screenshot({ path: `${OUT}/64-scheda-places-360.png`, caret: "initial" });
+  await sctx.close();
+}
+
 // QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
 {
   const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
@@ -2500,7 +2602,7 @@ else {
         const btns = a ? [...a.parentElement.children].map((e) => e.getBoundingClientRect()) : [];
         return { dentro: !!bar && bar.bottom <= nav + 1 && bar.top >= 0 && btns.every((b) => b.left >= 0 && b.right <= innerWidth && b.height >= 40), toast: t ? t.bottom <= (bar?.top ?? 0) + 1 : null };
       });
-      ok(r.dentro, "360px scheda: barra Salva/Percorso/Chiama/Sito dentro lo schermo, sopra la barra in basso");
+      ok(r.dentro, "360px scheda: barra Prenota/Percorso/Salva dentro lo schermo, sopra la barra in basso");
       ok(r.toast === true, `360px scheda: l'avviso 'Salvato · Aggiungi nota' non copre la barra azioni (${r.toast})`); }
     await qp.screenshot({ path: `${OUT}/qa360-mappa-avviso-scheda.png`, caret: "initial" });
     // ‹ › con la scheda scorsa in basso: il locale successivo si apre dalla foto e dal nome.

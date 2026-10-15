@@ -206,6 +206,24 @@ export async function loadFriendsAtPlace(placeId: string): Promise<FriendsAtPlac
   return visitati.length + daProvare.length > 0 ? { visitati, daProvare } : null;
 }
 
+// Stessa lettura dalla scheda della mappa (/api/places/amici), dove l'id può essere il Place ID
+// Google di un risultato di ricerca: si cerca la riga in places (lettura pubblica) solo dopo aver
+// visto che chi guarda è collegato e segue qualcuno, così chi non ha amici non costa nulla.
+// Nel giro automatico (dati finti dal cookie) l'id si usa così com'è.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function loadFriendsAtAnyPlace(id: string): Promise<FriendsAtPlace | null> {
+  const viewer = await viewerId();
+  if (!viewer) return null;
+  const ids = await followedIds(viewer);
+  if (!Array.isArray(ids) || ids.length === 0) return null;
+  if (UUID_RE.test(id) || (await fake())) return loadFriendsAtPlace(id);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("places").select("id").eq("google_place_id", id).limit(1).maybeSingle<{ id: string }>();
+  if (error) console.error("[social] places per Place ID:", error.message);
+  return data?.id ? loadFriendsAtPlace(data.id) : null;
+}
+
 // ── Impostazioni del proprio profilo pubblico (/profilo) ─────────────────────
 export async function loadMySocial(userId: string): Promise<MySocial | InArrivo> {
   const f = await fake();
