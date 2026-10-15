@@ -1188,6 +1188,10 @@ else {
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
+  // Esc può tornare indietro nella cronologia: si aspetta che finisca, altrimenti il goto sotto
+  // veniva interrotto (ERR_ABORTED / timeout, visto anche sul codice di partenza il 15/10).
+  await p.waitForLoadState("networkidle").catch(() => {});
+  await p.waitForTimeout(500);
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
   await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
