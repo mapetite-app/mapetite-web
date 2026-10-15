@@ -90,8 +90,22 @@ Per il 25/10: 8.1 e 8.2 in versione dimostrativa; 8.3 e 8.4 come schermate per l
 - Ogni sera: PR unita in produzione, elenco di cosa è cambiato, screenshot.
 - Ogni funzione nuova manda i suoi eventi al tracciamento (punto 7) dal primo giorno.
 
-## Ordine di attacco
-1. **Subito (15–16/10)**: 7.1–7.5 tracciamento e pannello; 6.1 card; 1.1 + 1.3 assistente e prenotazione assistita; 5.1–5.4 profili, segui, condividi.
-2. **17–18/10 (weekend, tutto il giorno)**: 2.2 filtri completi, 4.1–4.3 raccolte e classifica, 6.2–6.4 scheda e barra, 8.1–8.2 ristoratori, 3.2 import in blocco.
-3. **19–22/10**: 1.2 serata completa, 1.4 memoria, 2.3–2.5, 5.5–5.6, 4.4–4.5, 6.5, 7.6, 9.1–9.2.
-4. **23–24/10**: controllo qualità, velocità, correzioni. 25/10: tester.
+## Scaletta giorno per giorno
+
+| Giorno | Cosa si costruisce | Si vede in produzione |
+|---|---|---|
+| **Gio 15/10 (giorno, con Lorenzo)** | Card dei risultati stile Places (6.1); pagina Per i ristoratori (8.3b); sensazione da app (6.3); filtri completi: cucina, occasione, caratteristiche, aperto a un'ora (2.2); profili pubblici, segui, amici, condivisione (5.1–5.4); tracciamento completo e pannello dei numeri (7.1–7.5); assistente in chat e prenotazione assistita (1.1, 1.3) | sera del 15 |
+| **Notte 15→16** | Le mie prenotazioni (1.5b); scheda del locale stile Places con barra azioni fissa e "chi dei tuoi amici c'è stato" (6.2); prima card in ~2 s dalla home (2.4); eventi su ogni funzione nuova | mattina del 16 |
+| **Notte 16→17** | Barra in basso ridisegnata: Esplora, Assistente, Salvati, Amici, Profilo (6.4); raccolte come cartelle con copertina e raccolte proposte dall'AI (4.1, 4.2); "Ti è stato utile?" in un tocco (7.6) | mattina del 17 |
+| **Sab 17/10 (tutto il giorno)** | Classifica personale "Ti è piaciuto più di X?" (4.3); diario dei posti visitati con voto e foto tue (4.4); recensioni e foto degli utenti (5.6c); creator e critici con liste curate (5.6b); pagina del locale verificata e pannello del ristoratore dimostrativo (8.1, 8.2); serata completa a tappe (1.2) | ogni ~2 ore |
+| **Dom 18/10 (tutto il giorno)** | "Per te" che impara dai comportamenti e memoria dei gusti nell'assistente (1.4); "Sorprendimi" fuori dai salvati (2.5); suggerimenti per ora, giorno e meteo (2.3); liste di gruppo con voto (5.5); reel e contenuti collegati ai locali (5.6d); import di più link e screenshot insieme (3.2) | ogni ~2 ore |
+| **Notte 18→19** | Versione da computer: mappa a sinistra, lista a destra (6.5); ricerca nei salvati in linguaggio naturale (4.5); trova amici e link d'invito (5.6); invito tester con primo accesso in 3 schermate (9.1) | mattina del 19 |
+| **Notte 19→20** | Posti in evidenza etichettati e trend di zona in versione dimostrativa (8.3, 8.4); elenco delle funzioni premium per gli utenti (8b); "vicino a me adesso" e raggio sulla mappa (2.1) | mattina del 20 |
+| **Notte 20→21** | Controllo qualità completo a 390 e 360 px con screenshot accanto ai riferimenti (6.6); account demo con salvati a Roma e Milano e copione demo (9.2) | mattina del 21 |
+| **Notte 21→22** | Correzioni dalle prove di Lorenzo su iPhone e Android veri (9.3); velocità | mattina del 22 |
+| **Notte 22→23** | Correzioni e rifiniture grafiche; numeri del pannello verificati con dati veri | mattina del 23 |
+| **Notte 23→24** | Stop alle funzioni nuove: solo correzioni | mattina del 24 |
+| **Ven 24/10** | Verifica finale di tutto il percorso del tester; pannello pronto a misurare | — |
+| **Sab 25/10** | Link ai tester | — |
+
+Se una voce si blocca si passa alla successiva e lo si scrive in PR; ciò che avanza slitta alla notte dopo.
