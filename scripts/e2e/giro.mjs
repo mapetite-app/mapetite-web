@@ -946,6 +946,9 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
+// Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani e la richiesta di verifica per email.
+{ const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
+  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href"))?.startsWith("mailto:"), "per i ristoratori: tre piani e 'Rivendica il tuo locale' che prepara un'email"); }
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
