@@ -12,7 +12,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
 import { dateKey, dayLabel, missingDetails, parseBooking, type BookingDetails } from "@/lib/booking";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
@@ -248,6 +248,10 @@ function plannedQuery(raw: string, c: Conv): string | null {
   return searchQueryOf(text, parseBooking(text), c.lastQuery);
 }
 
+// Segnale "funzione" dell'assistente: mai il testo scritto, solo che tipo di messaggio era.
+const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli") =>
+  trackFeature("assistente_messaggio", { contesto });
+
 async function send(raw: string) {
   const text = raw.trim().slice(0, 300);
   if (!text) return;
@@ -267,6 +271,7 @@ async function send(raw: string) {
   const reply = (m: Omit<BotMsg, "id" | "role">) => setConv((c) => ({ ...c, msgs: [...c.msgs, { id: newId(), role: "assistant", status: "done", ...m }] }));
 
   if (SMALL_TALK.test(text)) {
+    trackMsg("saluto");
     reply({ text: "Dimmi cosa cerchi, come lo diresti a un amico: tipo di posto, zona, occasione. Se vuoi prenotare, aggiungi giorno, ora e persone." });
     return;
   }
@@ -286,6 +291,8 @@ async function send(raw: string) {
     }
     const done = applyLocalRefine(refine, prev.places, pos);
     if (done) {
+      trackMsg("seguito");
+      trackFeature("assistente_seguito", { contesto: refine });
       reply({
         text: done.places.length > 0 ? done.note : `${done.note} Vuoi che cerchi altri posti?`,
         places: done.places,
@@ -299,11 +306,15 @@ async function send(raw: string) {
 
   const q = searchQueryOf(text, parsed, before.lastQuery);
   if (q) {
+    trackMsg(parsed.isBooking ? "prenotazione" : "ricerca");
+    // "solo con terrazza" dopo una ricerca: seguito che riformula la richiesta di prima.
+    if (before.lastQuery && q !== searchQueryOf(text, parsed, null)) trackFeature("assistente_seguito", { contesto: "ricerca" });
     await runSearch(q, booking, bookingMode, getConv().pos);
     return;
   }
 
   // Solo dettagli della prenotazione ("per 4", "domani", "alle 21"): nessuna ricerca.
+  trackMsg("dettagli");
   const summary = bookingSummary(booking);
   const ask = askFor(booking);
   if (!prev) {
@@ -586,8 +597,8 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     bookingMode={c.bookingMode}
                     savedIds={savedIds}
                     saving={saving}
-                    onOpen={(p) => { setOpenRef({ msgId: m.id, placeId: p.id }); track("apri_scheda", { id: p.id, lat: p.lat, lng: p.lng }, { da: "assistente" }); }}
-                    onBook={(p) => setBookCard(p)}
+                    onOpen={(p) => { setOpenRef({ msgId: m.id, placeId: p.id }); track("apri_scheda", { id: p.id, lat: p.lat, lng: p.lng }, { fonte: "assistente" }); }}
+                    onBook={(p) => { setBookCard(p); trackFeature("assistente_prenota"); }}
                     onSave={(p) => void save(p)}
                   />
                 )}

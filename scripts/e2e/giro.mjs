@@ -5,7 +5,7 @@
 //   (senza E2E_FAKE_USER il blocco "salvati" viene saltato)
 //   PW_MODULE=$(npm root -g)/playwright node scripts/e2e/giro.mjs [cartella-screenshot]
 import { createRequire } from "module";
-import { mkdirSync } from "fs";
+import { mkdirSync, readFileSync } from "fs";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_MODULE ?? "playwright");
 
@@ -45,6 +45,10 @@ const SYNTH = {
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
+// Chiavi dei segnali che /api/events conserva (le altre le scarta in silenzio): lette dal codice
+// del server, così un segnale con una chiave sbagliata non sembra arrivato quando non lo è.
+const SERVER_PROP_KEYS = [...(readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8").match(/const PROP_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+const droppedKeys = (evs) => evs.flatMap((e) => Object.keys(e.props ?? {}).filter((k) => !SERVER_PROP_KEYS.includes(k)).map((k) => `${e.type}.${k}`));
 
 // 0. Ritorno dopo l'accesso: il parametro `next` accetta solo percorsi interni (niente open redirect).
 //    Node 22.18+ legge il .ts direttamente (tipi rimossi), senza server né rete.
@@ -2296,7 +2300,7 @@ else {
   await sp.waitForFunction(() => window.__shared != null, null, { timeout: 3000 }).catch(() => {});
   ok((await sp.evaluate(() => window.__shared?.url)) === `${new URL(BASE).origin}/u/giulia.rm`, "condividi profilo: menu del telefono con il link /u/<nome>");
   await sp.waitForTimeout(200);
-  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "profilo"), "condividi profilo: segnale 'condividi' (cosa: profilo)");
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.contesto === "profilo"), "condividi profilo: segnale 'condividi' (contesto: profilo)");
   // Mappa della persona a tutta pagina, con condivisione che ripiega sulla copia del link.
   await sp.getByTestId("apri-mappa-persona").click();
   await sp.waitForURL(/\/u\/giulia\.rm\/mappa$/, { timeout: 5000 });
@@ -2310,7 +2314,9 @@ else {
   await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
   ok((await sp.evaluate(() => window.__copied)) === `${new URL(BASE).origin}/u/giulia.rm/mappa` && await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").isVisible(), "condividi mappa: senza menu del telefono copia il link e lo dice");
   await sp.waitForTimeout(200);
-  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "mappa"), "condividi mappa: segnale 'condividi' (cosa: mappa)");
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.contesto === "mappa"), "condividi mappa: segnale 'condividi' (contesto: mappa)");
+  { const lost = droppedKeys(socEvents.filter((e) => e.type === "condividi"));
+    ok(lost.length === 0, `condividi (profilo, mappa, raccolta): chiavi conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
   // Profilo privato o inesistente: messaggio chiaro, niente errore.
   await sp.goto(`${BASE}/u/nessuno.qui`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("profilo-non-trovato").getByText("Profilo non disponibile").isVisible(), "profilo privato o inesistente: 'Profilo non disponibile'");
@@ -2592,6 +2598,32 @@ else {
     ok(n.utile.si === 1 && n.utile.no === 0 && n.sessioni.totale === 2 && !n.senzaTracciamento, `numeri: 👍/👎 e visite (${n.sessioni.totale})`);
     ok(nm.computeNumeri(rows.filter((r) => ["ricerca", "salva", "apri_scheda"].includes(r.type)), 30, now).senzaTracciamento, "numeri: avviso se la migrazione del tracciamento non è applicata");
     ok(nm.computeNumeri([], 1, now).attivi.totale === 0, "numeri: nessun evento, nessun errore");
+    // Eventi dedicati (assistente, prenotazioni, raccolte): tipi esistenti + da/via/cosa nel payload.
+    const rows2 = [
+      ev("pagina", 14, B, { p: { pagina: "assistente" } }),
+      ev("funzione", 14, B, { p: { nome: "assistente_messaggio", contesto: "ricerca" } }),
+      ev("funzione", 14, B, { p: { nome: "assistente_seguito", contesto: "economici" } }),
+      ev("apri_scheda", 14, B, { p: { fonte: "assistente" } }),
+      ev("salva", 14, B, { p: { fonte: "assistente", stato: "Da provare" } }),
+      ev("funzione", 14, B, { p: { nome: "assistente_prenota" } }),
+      ev("chiama", 14, B, { p: { fonte: "prenota", contesto: "whatsapp" } }),
+      ev("sito", 14, A, { p: { fonte: "prenota" } }),
+      ev("ci_sono_stato", 14, B, { p: { fonte: "prenota", stato: "bene" } }),
+      ev("funzione", 14, B, { p: { nome: "raccolta_crea", risultati: 3 } }),
+      ev("pagina", 14, B, { p: { pagina: "raccolta" } }),
+      ev("condividi", 14, B, { p: { contesto: "raccolta" } }),
+    ];
+    const n2 = nm.computeNumeri(rows2, 7, now);
+    const fv = (k) => n2.funzioni.find((x) => x.chiave === k)?.volte ?? -1;
+    ok(fv("assistente_apri") === 1 && fv("assistente_messaggio") === 1 && fv("assistente_seguito") === 1 && fv("assistente_scheda") === 1 && fv("assistente_salva") === 1 && fv("assistente_prenota") === 1,
+      "numeri: assistente distinto (aperto, messaggio, seguito, scheda, salva, prenota)");
+    ok(fv("salva") === 1 && fv("apri_scheda") === 1 && n2.salvataggi.totale === 1, "numeri: il salvataggio dall'assistente conta anche tra i salvataggi");
+    ok(fv("prenota_whatsapp") === 1 && fv("prenota_sito") === 1 && fv("prenota_com_e_andata") === 1 && fv("chiama") === 0 && fv("sito") === 0,
+      "numeri: prenotazioni separate da 'chiama'/'sito' della scheda (WhatsApp, sito, com'è andata)");
+    ok(fv("raccolta_crea") === 1 && fv("raccolta_apri") === 1 && fv("raccolta_condividi") === 1 && fv("condividi") === 1 && fv("raccolta_modifica") === 0,
+      "numeri: raccolte (crea, apri, condividi; mai modificate = 0)");
+    ok(nm.etichettaFunzione("assistente_salva") === "Assistente: salva" && nm.etichettaFunzione("prenota_whatsapp") === "Prenota: WhatsApp" && nm.etichettaFunzione("import_link") === "import link",
+      "numeri: nomi leggibili delle funzioni nel pannello");
   }
 
   const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -2683,6 +2715,10 @@ else {
     { created_at: iso(20), type: "funzione", user_id: null, anon_id: "anon-x", session_id: "s2", props: { nome: "filtri" } },
     { created_at: iso(19), type: "errore", user_id: null, anon_id: "anon-x", session_id: "s2", props: { messaggio: "Cannot read properties of undefined", pagina: "salvati" } },
     { created_at: iso(18), type: "utile", user_id: U, anon_id: null, session_id: "s1", props: { voto: "no", contesto: "ricerca" } },
+    { created_at: iso(17), type: "funzione", user_id: U, anon_id: null, session_id: "s1", props: { nome: "assistente_messaggio", contesto: "ricerca" } },
+    { created_at: iso(16), type: "salva", user_id: U, anon_id: null, session_id: "s1", props: { fonte: "assistente", stato: "Da provare" } },
+    { created_at: iso(15), type: "chiama", user_id: U, anon_id: null, session_id: "s1", props: { fonte: "prenota", contesto: "whatsapp" } },
+    { created_at: iso(14), type: "condividi", user_id: U, anon_id: null, session_id: "s1", props: { contesto: "raccolta" } },
   ]);
   await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
   ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
@@ -2690,6 +2726,10 @@ else {
   ok((await tp.getByTestId("numeri-errori").textContent())?.includes("Cannot read properties of undefined"), "pannello: errori con la pagina");
   ok((await tp.getByTestId("numeri-ritorni").textContent())?.includes("1 su 1"), "pannello: ritorni dopo 1/3/7 giorni");
   ok((await tp.getByTestId("numeri-tester").locator("li").count()) === 2, "pannello: elenco dei tester");
+  { const fn = (await tp.getByTestId("numeri-funzioni").textContent()) ?? "";
+    const ded = (await tp.getByTestId("numeri-dedicate").textContent()) ?? "";
+    ok(fn.includes("Assistente: salva") && fn.includes("Prenota: WhatsApp") && fn.includes("Raccolta: condividi") && !fn.includes("assistente_"), `pannello: funzioni dedicate con nomi leggibili (${fn.slice(0, 120)}…)`);
+    ok(ded.includes("Assistente") && ded.includes("Prenotazioni") && ded.includes("Raccolte") && ded.includes("Assistente: messaggio") && ded.includes("Raccolta: crea"), "pannello: sezione 'Assistente, prenotazioni e raccolte' (anche le funzioni mai usate)"); }
   { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello: niente scorrimento orizzontale sul telefono (${w}px)`); }
   await tp.screenshot({ path: `${OUT}/60-pannello-numeri.png`, fullPage: true });
   ok(tEvents.filter((e) => e.type === "pagina").length === pagine, "pannello: le visite di Lorenzo al pannello non contano come pagine dei tester");
@@ -2800,6 +2840,9 @@ else {
   ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
   ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
   await ashot("51-assistente-prenotazione");
+  ok(aEvents.some((e) => e.type === "pagina" && e.props?.pagina === "assistente"), "tracciamento: vista pagina 'assistente' (non più 'altro')");
+  ok(aEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "prenotazione") && !JSON.stringify(aEvents).includes("terrazza a Roma"),
+    "assistente: messaggio registrato come 'prenotazione', senza il testo scritto");
 
   // Salva in un tocco dalla card (📌 Voglio andarci), stesso salvataggio della mappa
   { const cards = ap.getByTestId("assistente-card");
@@ -2824,6 +2867,7 @@ else {
   // Foglio Prenota
   await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok(aEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_prenota"), "assistente: 'Prenota' dalla card registrato come prenotazione dall'assistente");
   await ap.getByLabel("Il tuo nome").fill("Giulia");
   const msg = await ap.getByTestId("prenota-messaggio").inputValue();
   ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
@@ -2860,6 +2904,13 @@ else {
   await ap.keyboard.press("Enter");
   await ap.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length >= 3, null, { timeout: 8000 });
   ok(searches.length === 2 && searches[1].query === "ristorante con terrazza a roma solo con terrazza", `assistente: 'solo con terrazza' riformula la richiesta di prima (${JSON.stringify(searches[1]?.query)})`);
+  { const seg = aEvents.filter((e) => e.type === "funzione" && e.props?.nome === "assistente_seguito").map((e) => e.props?.contesto);
+    ok(seg.includes("economici") && seg.includes("ricerca"), `assistente: seguiti registrati (${seg.join(", ")})`);
+    ok(aEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "dettagli"), "assistente: 'per 4' registrato come dettaglio della prenotazione"); }
+  // Segnali dell'assistente (esclusi quelli del foglio Prenota, di un'altra voce): ogni chiave arriva al server.
+  { const mine = aEvents.filter((e) => !["chiama", "sito", "ci_sono_stato", "percorso"].includes(e.type));
+    const lost = droppedKeys(mine);
+    ok(SERVER_PROP_KEYS.includes("fonte") && SERVER_PROP_KEYS.includes("contesto") && mine.length > 5 && lost.length === 0, `assistente: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lost.join(", ") || "nessuna scartata"})`); }
   ok(aIntents.length === 0, `assistente: inviando subito (senza pausa) nessuna richiesta all'AI in anticipo (${aIntents.length})`);
 
   // Card → scheda del locale, con Prenota e i dati già scelti
@@ -2867,7 +2918,7 @@ else {
   await ap.getByTestId("assistente-card").last().getByRole("button", { name: "Apri Terrazza Uno" }).click();
   await ap.getByTestId("assistente-scheda").waitFor({ timeout: 3000 });
   ok(await ap.getByTestId("assistente-scheda").getByTestId("verdetto-scheda").isVisible(), "assistente: tocco sulla card = scheda del locale con il verdetto");
-  ok(aEvents.some((e) => e.type === "apri_scheda" && e.props?.da === "assistente"), "assistente: apertura della scheda registrata");
+  ok(aEvents.some((e) => e.type === "apri_scheda" && e.props?.fonte === "assistente"), "assistente: apertura della scheda registrata");
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-persone").textContent()) === "4", "scheda → Prenota: persone già scelte nella conversazione");

@@ -9,6 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
 import { checkCollectionName, collectionPath, summarizeCollections } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
+import { trackFeature } from "@/lib/track";
 import RaccoltaCopertina from "@/components/raccolta-copertina";
 import RaccolteProposte from "@/components/raccolte-proposte";
 
@@ -85,16 +86,19 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if ("error" in res) { setError(res.error); return; }
     if (res.tag === from) { setSheet(null); return; }
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, res.tag));
+    if (failed === 0) trackFeature("raccolta_modifica", { contesto: "rinomina" });
     if (failed === 0) setNotice(allTags.includes(res.tag) ? `“${from}” è confluita in “${res.tag}”.` : `Raccolta rinominata in “${res.tag}”.`);
   }
 
   async function merge(from: string, into: string) {
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, into));
+    if (failed === 0) trackFeature("raccolta_modifica", { contesto: "unisci" });
     if (failed === 0) setNotice(`“${from}” è confluita in “${into}”.`);
   }
 
   async function remove(tag: string) {
     const failed = await apply(withTag(tag), (tags) => tags.filter((t) => t !== tag));
+    if (failed === 0) trackFeature("raccolta_modifica", { contesto: "elimina" });
     if (failed === 0) setNotice(`Raccolta “${tag}” eliminata. I locali restano tra i salvati.`);
   }
 
@@ -104,6 +108,8 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if (picked.size === 0) { setError("Scegli almeno un locale."); return; }
     const targets = rows.filter((r) => picked.has(r.placeId) && !r.tags.includes(res.tag));
     const failed = await apply(targets, (tags) => [...tags, res.tag]);
+    // Solo quanti locali, mai il nome della raccolta (testo dell'utente).
+    if (failed === 0) trackFeature("raccolta_crea", { risultati: picked.size });
     if (failed === 0) setNotice(`Raccolta “${res.tag}” pronta: ${plural(picked.size)}.`);
   }
 
