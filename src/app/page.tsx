@@ -1,10 +1,12 @@
 import Link from "next/link";
 import Form from "next/form";
-import { SlidersHorizontal, Sparkles } from "lucide-react";
+import { MessageCircle, SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
 import { cookies } from "next/headers";
 import HomeIntro, { IntroAgain } from "@/components/home-intro";
 import HomeSaved from "@/components/home-saved";
+import HomeSearchInput from "@/components/home-search-input";
+import BookingReminder from "@/components/booking-reminder";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 // Quanti salvati e quanti "Voglio andarci" (tag "Da provare"). In sviluppo con E2E_FAKE_USER
@@ -57,8 +59,23 @@ export default async function Home() {
 
       <div className="mx-auto w-full max-w-md pb-4">
         {/* Due modi di cercare, chiari subito (Lorenzo 11/10): chiedere all'AI o usare i filtri. */}
+        {/* Prenotazioni richieste dall'assistente: promemoria oggi, "Com'è andata?" dopo. */}
+        <BookingReminder />
         <HomeSaved total={counts.total} want={counts.want} />
         <HomeRecent />
+        {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione assistita. */}
+        <Link
+          href="/assistente"
+          data-testid="home-assistente"
+          className="mb-4 flex min-h-14 items-center gap-3 rounded-card border border-brand/20 bg-brand/5 px-4 py-2.5 active:scale-[0.99]"
+        >
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white"><MessageCircle size={18} /></span>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block font-display text-[15px] font-semibold leading-tight text-brand">Parla con l&apos;assistente</span>
+            <span className="block truncate text-xs font-sans text-text-muted">Chiedi, affina, prenota</span>
+          </span>
+          <span aria-hidden className="text-lg text-brand">→</span>
+        </Link>
         {/* Una sola barra (Lorenzo 12/10): sopra, frasi già pronte che mostrano come si chiede all'AI;
             i filtri sono un pulsante dentro la barra, non un secondo blocco. */}
         <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI come a un amico, per esempio:</p>
@@ -75,16 +92,7 @@ export default async function Home() {
         </div>
         <Form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
           <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
-          <input
-            type="search"
-            name="q"
-            required
-            minLength={3}
-            enterKeyHint="search"
-            placeholder="Chiedi all'AI…"
-            aria-label="Chiedi all'AI: cosa cerchi?"
-            className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
-          />
+          <HomeSearchInput />
           <Link
             href="/mappa?filtri=1"
             data-testid="home-filtri"

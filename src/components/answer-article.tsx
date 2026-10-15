@@ -6,6 +6,8 @@ import { useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
 import { followUpQuery } from "@/lib/follow-up";
 import { searchFeedbackMailto } from "@/lib/feedback";
+import { trackFeature } from "@/lib/track";
+import UtileFeedback from "@/components/utile-feedback";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import PlacePhoto from "@/components/place-photo";
@@ -187,6 +189,11 @@ export default function AnswerArticle({
           </ol>
           {n === 0 && <p className="mt-6 text-sm text-text-muted">Nessun locale con questi filtri: togline qualcuno dalla mappa.</p>}
           {n > 0 && !loadingVerdicts && (
+            <div className="mt-10">
+              <UtileFeedback contesto="articolo" risultati={n} />
+            </div>
+          )}
+          {n > 0 && !loadingVerdicts && (
             <a
               data-testid="articolo-feedback"
               href={searchFeedbackMailto(title, places.map((p) => p.name))}
@@ -206,6 +213,7 @@ export default function AnswerArticle({
             const q = followUp.trim();
             if (q.length < 3) return;
             if (window.history.state?.articolo) window.history.back();
+            trackFeature("domanda_successiva");
             onAsk(followUpQuery(title, q));
           }}
         >

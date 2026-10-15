@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
-import { extractSearchIntent } from "@/lib/search-intent";
-import { recordEvent } from "@/lib/events";
+import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
+import { recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
+import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet } from "@/lib/named-city";
+import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
 const anthropic = new Anthropic({
@@ -49,6 +51,18 @@ export async function POST(request: Request) {
   const fastPhase = body?.phase === "fast";
   const lat = typeof body?.lat === "number" ? body.lat : undefined;
   const lng = typeof body?.lng === "number" ? body.lng : undefined;
+  // Filtri: occasione e caratteristiche (le parole sono già nella query; qui i campi Google).
+  const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : []);
+  const occasione = typeof body?.occasion === "string" ? body.occasion : null;
+  const caratteristiche = strings(body?.features);
+  const attrs = searchIntent === "structured" ? requiredAttributes(occasione, caratteristiche) : [];
+  // "Aperto a un'ora scelta": giorno e ora calcolati dal telefono (ora locale, come gli orari Google).
+  const oa = body?.openAt;
+  const openAt: WeekTime | undefined =
+    searchIntent === "structured" && oa && [oa.day, oa.hour, oa.minute].every((n) => Number.isInteger(n)) &&
+    oa.day >= 0 && oa.day <= 6 && oa.hour >= 0 && oa.hour <= 23 && oa.minute >= 0 && oa.minute <= 59
+      ? { day: oa.day, hour: oa.hour, minute: oa.minute }
+      : undefined;
 
   if (typeof query !== "string" || query.trim() === "") {
     return NextResponse.json(
@@ -96,7 +110,10 @@ export async function POST(request: Request) {
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
     // Se Haiku non risponde si usa la frase originale come prima.
-    const intent = searchIntent === "natural" ? await extractSearchIntent(query.trim()) : null;
+    // Se il telefono ha già fatto capire la frase mentre si scriveva, si risparmiano 1-2 s di Haiku.
+    const preIntent = searchIntent === "natural" && body?.intentQuery === query.trim() ? sanitizeIntent(body?.intent) : null;
+    if (preIntent) console.log(`[search-intent] già capito mentre si scriveva: "${query.trim().slice(0, 60)}"`);
+    const intent = searchIntent === "natural" ? preIntent ?? await extractSearchIntent(query.trim()) : null;
     if (intent) {
       filtri = {
         categoria: intent.tipo,
@@ -159,6 +176,8 @@ export async function POST(request: Request) {
         // Con una zona scritta la distanza dal centro della mappa non vale (sarebbe da un altro posto).
         radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
+        requiredAttributes: attrs.length > 0 ? attrs : undefined,
+        openAt,
         maxDistanceMeters: typeof body?.radius === "number" && !zonaFiltro && !area ? body.radius : undefined,
         // Città intera: l'ordine di Google tra quartieri lontani non dice niente; si ordina per voto
         // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
@@ -433,7 +452,8 @@ ESEMPI (input → output atteso):
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
-    const { reviewTexts, reviewItems, ...rest } = p;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { reviewTexts, reviewItems, attributes, openingPeriods, ...rest } = p;
     return {
       ...rest,
       selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
@@ -464,10 +484,16 @@ ESEMPI (input → output atteso):
   // Segnale "ricerca" (VISIONE.md: dati sui comportamenti di scoperta, utili anche ai ristoratori).
   // Mai la frase scritta: solo cosa ha capito l'AI o i filtri scelti. Dopo la risposta, senza attese.
   if (source === "world") {
+    // Visitatore e sessione dai cookie del telefono (src/lib/track.ts): la ricerca entra negli imbuti.
+    const jar = await cookies();
+    const anonId = jar.get(ANON_COOKIE)?.value ?? null;
+    const sessionId = jar.get(SESSION_COOKIE)?.value ?? null;
     after(async () => {
       await recordEvent({
         type: "ricerca",
         userId: authUser?.id ?? null,
+        anonId,
+        sessionId,
         lat,
         lng,
         props: {
@@ -479,6 +505,10 @@ ESEMPI (input → output atteso):
           categorie: Array.isArray(body?.categories) ? body.categories.slice(0, 6) : null,
           voto_min: typeof body?.minRating === "number" ? body.minRating : null,
           prezzo_max: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : null,
+          cucine: strings(body?.cuisines).slice(0, 6),
+          occasione,
+          caratteristiche: caratteristiche.slice(0, 12),
+          aperto_a: typeof body?.openAtId === "string" ? body.openAtId.slice(0, 20) : null,
           risultati: risultati.length,
         },
       });

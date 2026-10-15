@@ -4,11 +4,17 @@ import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
+import BookingReminder from "@/components/booking-reminder";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
+import ProfiloSocial from "@/components/profilo-social";
+import { loadMySocial } from "@/lib/social";
+import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
+import { isMissingColumn } from "@/lib/classifica";
 
 type SavedPlaceRow = {
   created_at: string;
+  rank_score?: number | null; // solo nei dati finti del giro (la colonna si legge a parte)
   tags: string[] | null;
   note: string | null;
   places: {
@@ -44,13 +50,13 @@ function savedHref(filter?: { stato?: "voglio" | "fatto"; tag?: string }): strin
 // Solo in sviluppo con E2E_FAKE_USER: profilo finto letto dal cookie "e2e_profilo"
 // (scritto da scripts/e2e/giro.mjs), perché il test non può simulare le letture fatte dal server.
 // In produzione NODE_ENV è sempre "production" e questo ramo non si attiva.
-async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[] } | null> {
+async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean } | null> {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = (await cookies()).get("e2e_profilo")?.value;
   if (!raw) return null;
   try {
     const data = JSON.parse(decodeURIComponent(raw));
-    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [] };
+    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false };
   } catch {
     return null;
   }
@@ -91,6 +97,8 @@ export default async function ProfiloPage() {
     );
   }
 
+  // Profilo pubblico (social): "in arrivo" finché la migrazione 20261015_social non è applicata.
+  const socialPromise = loadMySocial(user.id);
   const [{ data: savedRaw }, { data: reviewsRaw }] = fake
     ? [{ data: fake.saved }, { data: fake.reviews }]
     : await Promise.all([
@@ -107,6 +115,18 @@ export default async function ProfiloPage() {
   ]);
 
   const saved = (savedRaw ?? []) as unknown as SavedPlaceRow[];
+  // Classifica personale (piano 4.3): letta a parte, così senza la colonna rank_score (migrazione
+  // 20261015_classifica non applicata) il resto del profilo non cambia e la sezione resta nascosta.
+  let ranks: Map<string, number> | null = null;
+  if (fake) {
+    ranks = fake.classifica ? new Map(fake.saved.flatMap((r) => (r.places && r.rank_score != null ? [[r.places.id, Number(r.rank_score)] as [string, number]] : []))) : null;
+  } else {
+    const { data: rankRaw, error: rankError } = await supabase
+      .from("saved_places").select("place_id, rank_score").eq("user_id", user.id).not("rank_score", "is", null);
+    if (rankError && !isMissingColumn(rankError)) console.error("[profilo] lettura classifica fallita:", rankError.message);
+    if (!rankError) ranks = new Map((rankRaw ?? []).map((r) => [r.place_id as string, Number(r.rank_score)]));
+  }
+  const social = await socialPromise;
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   // Salvati raggruppati per città (ricavata dall'indirizzo, come nella mappa).
@@ -136,6 +156,12 @@ export default async function ProfiloPage() {
     row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
 
+  const classificaRows: ClassificaRow[] = saved.flatMap((r) =>
+    r.places && r.tags?.includes(STATE_DONE)
+      ? [{ placeId: r.places.id, name: r.places.name, category: r.places.category, address: r.places.address, score: ranks?.get(r.places.id) ?? null }]
+      : [],
+  );
+
   // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).
   const visitCandidates: VisitCandidate[] = saved
     .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
@@ -160,6 +186,9 @@ export default async function ProfiloPage() {
           </Link>
         </div>
       </div>
+
+      {/* Prenotazioni richieste dall'assistente (salvate nel telefono). */}
+      <BookingReminder />
 
       {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
       <Link
@@ -194,7 +223,11 @@ export default async function ProfiloPage() {
 
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 
+      {ranks && <ProfiloClassifica userId={user.id} initialRows={classificaRows} />}
+
       <ProfiloRicerche />
+
+      <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
 
       <section className="mb-10">
         <div className="mb-3 flex items-center justify-between gap-2">

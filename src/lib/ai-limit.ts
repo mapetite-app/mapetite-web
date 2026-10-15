@@ -7,10 +7,13 @@
 // Superato il limite l'app non si rompe: la ricerca risponde con un messaggio chiaro,
 // i verdetti si saltano (restano i dati Google).
 // "luoghi" non è AI ma una ricerca Google a pagamento (Importa): stesso freno per persona.
-export type AiAction = "ricerca" | "verdetti" | "screenshot" | "luoghi";
+// "raccolte": proposte di raccolte per i salvati senza raccolta (piano 4.2), 1 chiamata per gruppo di 30.
+export type AiAction = "ricerca" | "verdetti" | "screenshot" | "luoghi" | "intento" | "raccolte";
 
 // verdetti: 4 richieste per ricerca dal 14/10 (gruppi da 2, 3, 3, 4) → 160 = le stesse 40 ricerche di prima.
-const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 160, screenshot: 20, luoghi: 20 };
+// intento: la frase capita mentre si scrive (~0,1 centesimi l'una), al massimo 3 per ricerca.
+// raccolte: 10 gruppi all'ora = 300 salvati, più che sufficiente anche per chi importa tutto in blocco.
+const PER_HOUR: Record<AiAction, number> = { ricerca: 30, verdetti: 160, screenshot: 20, luoghi: 20, intento: 90, raccolte: 10 };
 const PER_DAY = 1500;
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;

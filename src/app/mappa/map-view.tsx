@@ -8,7 +8,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
-import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
+import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
+import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
@@ -23,27 +24,34 @@ import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel } from "@/lib/category-label";
-import { momentSuggestion } from "@/lib/moment";
+import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
+import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
+import ClassificaScheda from "@/components/classifica-scheda";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
 
 // Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
+  f = withDefaults(f);
   const parts: string[] = [];
   if (f.categories.length > 0) parts.push(f.categories.map((c) => CATEGORIES.find((x) => x.id === c)?.label ?? c).join(", "));
+  if (f.cuisines.length > 0) parts.push(`cucina ${f.cuisines.map((c) => (CUISINES.find((x) => x.id === c)?.label ?? c).toLowerCase()).join(", ")}`);
+  if (f.occasion) parts.push((OCCASIONS.find((x) => x.id === f.occasion)?.label ?? f.occasion).toLowerCase());
+  if (f.features.length > 0) parts.push(f.features.map((c) => (FEATURES.find((x) => x.id === c)?.label ?? c).toLowerCase()).join(", "));
   if (f.zona.trim()) parts.push(`a ${f.zona.trim()}`);
   else if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
   if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
   if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
   if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
-  if (f.openNowOnly) parts.push("aperti ora");
+  if (f.openAt) parts.push(OPEN_AT.find((x) => x.id === f.openAt)?.summary ?? "aperti all'ora scelta");
+  else if (f.openNowOnly) parts.push("aperti ora");
   return parts.join(" · ");
 }
 
@@ -893,11 +901,20 @@ export default function MapView({
     () => "b" as const,
   );
   // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
-  const momentExample = useSyncExternalStore(
+  const momentHour = useSyncExternalStore(
     () => () => {},
-    () => momentSuggestion(new Date()),
+    () => new Date().getHours(),
     () => null,
   );
+  // Meteo per il suggerimento (piano 2.3): una volta, al centro iniziale della mappa.
+  const [weather, setWeather] = useState<Weather | null>(null);
+  const firstView = useRef(viewState);
+  useEffect(() => {
+    let alive = true;
+    void fetchWeather(firstView.current.latitude, firstView.current.longitude).then((w) => { if (alive) setWeather(w); });
+    return () => { alive = false; };
+  }, []);
+  const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [aiSearching, setAiSearching] = useState(false);
@@ -1415,7 +1432,8 @@ export default function MapView({
     setAiSearch(null);
   };
 
-  const runFilteredSearch = async (f: Filters) => {
+  const runFilteredSearch = async (filtri: Filters) => {
+    const f = withDefaults(filtri);
     const ticket = ++searchSeq.current;
     setLoadingVerdicts(false);
     setAiSearching(false);
@@ -1423,13 +1441,22 @@ export default function MapView({
     if (view === "saved") {
       // Salvati: si applicano i filtri che i dati salvati permettono (tipo, voto, prezzo, distanza).
       // Prima solo il tipo, e con un confronto di testo: "Gelaterie" non trovava ice_cream_shop.
+      // Cucina: solo se tutte quelle scelte hanno un tipo Google (le regionali no: si ignorano).
+      // Occasione: l'etichetta messa dall'utente ("Romantico", "Con amici"), se l'ha mai usata.
+      // Caratteristiche e orari non sono nei salvati: si ignorano (mai un locale escluso per un dato che manca).
       const allowedTypes = f.categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
+      const cuisineDefs = f.cuisines.map((c) => CUISINES.find((x) => x.id === c));
+      const cuisineTypes = cuisineDefs.every((c) => c?.types) ? cuisineDefs.flatMap((c) => c?.types ?? []) : [];
+      const occasionTag = OCCASIONS.find((o) => o.id === f.occasion)?.tag ?? null;
+      const tagInUse = occasionTag != null && savedPlaces.some((p) => (p.tags ?? []).includes(occasionTag));
       const center = userPos ?? { lat: viewState.latitude, lng: viewState.longitude };
       const filtered = savedPlaces.filter((p) => {
         if (f.categories.length > 0) {
           const cat = (p.category ?? "").toLowerCase();
           if (!allowedTypes.includes(cat) && !f.categories.some((c) => cat.includes(c))) return false;
         }
+        if (cuisineTypes.length > 0 && !cuisineTypes.includes((p.category ?? "").toLowerCase())) return false;
+        if (tagInUse && !(p.tags ?? []).includes(occasionTag)) return false;
         if (f.minRating != null && p.rating != null && p.rating < f.minRating) return false;
         if (f.maxPriceLevel != null && p.priceLevel != null && p.priceLevel > f.maxPriceLevel) return false;
         if (f.minPriceLevel != null && p.priceLevel != null && p.priceLevel < f.minPriceLevel) return false;
@@ -1448,9 +1475,17 @@ export default function MapView({
     let query: string;
     if (f.categories.length > 0) {
       query = f.categories.map((c) => CATEGORY_QUERY[c] ?? c).join(" ");
+    } else if (f.cuisines.length > 0 || f.occasion) {
+      // Una cucina o un'occasione parlano di un posto dove mangiare.
+      query = "ristorante";
     } else {
       query = "ristoranti bar locali";
     }
+    // Cucina, occasione e caratteristiche nel testo: Google trova i posti giusti già alla fonte
+    // ("ristorante cucina romana romantico terrazza"). Una sola chiamata, come prima.
+    const extra = filterQueryWords(f.cuisines, f.occasion, f.features);
+    if (extra) query = `${query} ${extra}`;
+    const openAt = f.openAt ? openAtSlot(f.openAt) : null;
 
     setFilterError(null);
     setFilterLoading(true);
@@ -1473,6 +1508,10 @@ export default function MapView({
           ...(f.openNowOnly && { openNowOnly: true }),
           ...(f.zona.trim() ? { zona: f.zona.trim() } : f.radiusKm != null ? { radius: f.radiusKm * 1000 } : {}),
           ...(f.categories.length > 0 && { categories: f.categories }),
+          ...(f.cuisines.length > 0 && { cuisines: f.cuisines }),
+          ...(f.occasion && { occasion: f.occasion }),
+          ...(f.features.length > 0 && { features: f.features }),
+          ...(openAt && { openAt, openAtId: f.openAt }),
         }),
       });
       const data = await res.json();
@@ -1627,6 +1666,14 @@ export default function MapView({
 
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
+  // Mentre si scrive nella barra: dopo una pausa di 700 ms l'AI capisce già la frase (nessuna
+  // chiamata Google). All'Invio la ricerca parte subito su Google.
+  useEffect(() => {
+    if (view !== "all" || aiQuery.trim().length < 8) return;
+    const t = setTimeout(() => prefetchIntent(aiQuery), 700);
+    return () => clearTimeout(t);
+  }, [aiQuery, view]);
+
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
     // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
@@ -1636,6 +1683,9 @@ export default function MapView({
     setAiSearching(true);
       setAiError(null);
       try {
+        // Frase già capita mentre si scriveva: la ricerca non riaspetta l'AI (~1-2 s in meno).
+        const intent = view === "all" ? await intentFor(q) : null;
+        if (searchSeq.current !== ticket) return;
         const res = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1644,6 +1694,7 @@ export default function MapView({
             source: view === "all" ? "world" : "saved",
             searchIntent: "natural",
             phase: "fast",
+            ...(intent && { intent, intentQuery: q.trim() }),
             lat: at.lat,
             lng: at.lng,
           }),
@@ -2081,6 +2132,14 @@ export default function MapView({
         {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
         {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "" && (
           <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem]">
+            {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione. La barra resta la ricerca. */}
+            <Link
+              href="/assistente"
+              data-testid="mappa-assistente"
+              className="flex min-h-10 shrink-0 items-center rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+            >
+              💬 Parla con l&apos;assistente
+            </Link>
             {tasteSuggestion && (
               <button
                 type="button"
@@ -2214,6 +2273,7 @@ export default function MapView({
                   type="button"
                   data-testid="scegli-tu"
                   onClick={() => {
+                    trackFeature("sorprendimi");
                     const shown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
                     const want = shown.filter((p) => p.tags?.includes(VISIT_WANT));
                     const pool = (want.length > 0 ? want : shown).filter((p) => p.id !== selected?.id);
@@ -2874,6 +2934,9 @@ export default function MapView({
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
+              rankSlot={userId && resolveUuid(selected.id) ? (
+                <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
+              ) : null}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {

@@ -44,3 +44,6 @@ tmp-takeout/
 
 # fixture locali dei test autonomi
 /scripts/fixtures/
+
+# Documenti di business (pitch, business plan): MAI su GitHub, il repository è pubblico
+docs/business/

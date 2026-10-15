@@ -499,7 +499,46 @@ await page.getByRole("button", { name: /^Applica filtri/ }).click();
 await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
 ok(filterBody?.zona === "Pigneto" && filterBody?.radius == null, `filtri: la ricerca parte con la zona e senza distanza (${JSON.stringify({ zona: filterBody?.zona, radius: filterBody?.radius })})`);
 ok((await page.getByTestId("intestazione-lista").textContent())?.includes("a Pigneto"), "filtri: l'intestazione dice la zona");
+// Cucina, occasione, caratteristiche, aperto a un'ora scelta (piano 2.2).
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
+await page.getByRole("button", { name: "Azzera" }).click();
+{
+  const cucina = page.getByTestId("filtri-cucina");
+  ok((await cucina.locator("button[aria-pressed]").count()) === 6 && await page.getByTestId("cucina-tutte").isVisible(), "filtri: cucina mostra le prime 6 e 'Mostra tutte'");
+  await page.getByTestId("cucina-tutte").click();
+  ok((await cucina.getByRole("button", { name: "Peruviana" }).count()) === 1, "filtri: 'Mostra tutte' apre tutte le cucine");
+  await page.getByTestId("cucina-tutte").click();
+  ok((await page.getByTestId("filtri-caratteristiche").getByRole("button", { name: "Cani ammessi" }).count()) === 0, "filtri: caratteristiche, le altre dietro 'Mostra tutte'");
+}
+await page.getByRole("button", { name: "Romana" }).click();
+await page.getByRole("button", { name: "Appuntamento romantico" }).click();
+await shot("24d-filtri-cucina-occasione");
+await page.getByRole("button", { name: "Terrazza / rooftop" }).click();
+await page.getByTestId("caratteristiche-tutte").click();
+await page.getByRole("button", { name: "Cani ammessi" }).click();
+await page.getByRole("button", { name: "Stasera alle 21" }).click();
+ok((await page.getByRole("button", { name: "Applica filtri (5)" }).count()) === 1, "filtri: il conteggio include cucina, occasione, caratteristiche e orario (5)");
+await shot("24d2-filtri-caratteristiche-orario");
+filterBody = null;
+await page.getByRole("button", { name: /^Applica filtri/ }).click();
+await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
+ok(JSON.stringify(filterBody?.cuisines) === '["romana"]' && filterBody?.occasion === "romantico" && JSON.stringify(filterBody?.features) === '["terrazza","cani"]' && filterBody?.openAt?.hour === 21 && filterBody?.openAt?.day === new Date().getDay() && filterBody?.openAtId === "stasera",
+  `filtri: le nuove scelte arrivano al server (${JSON.stringify({ c: filterBody?.cuisines, o: filterBody?.occasion, f: filterBody?.features, a: filterBody?.openAt })})`);
+ok(/cucina romana/.test(filterBody?.query ?? "") && /romantico/.test(filterBody?.query ?? "") && /terrazza/.test(filterBody?.query ?? "") && !/cani/i.test(filterBody?.query ?? ""), `filtri: cucina, occasione e terrazza nel testo per Google, i cani solo come campo (${filterBody?.query})`);
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: cucina romana · appuntamento romantico · terrazza / rooftop, cani ammessi · aperti stasera alle 21", `filtri: il riepilogo mostra le nuove scelte (${await page.getByTestId("intestazione-lista").textContent()})`);
+// A 360 px il pannello resta usabile: niente scorrimento di lato, scelte comode, pulsante raggiungibile.
+await page.setViewportSize({ width: 360, height: 740 });
+await page.getByRole("button", { name: "Filtri", exact: true }).click();
+if (/Mostra tutte/.test(await page.getByTestId("caratteristiche-tutte").textContent() ?? "")) await page.getByTestId("caratteristiche-tutte").click();
+{
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  const romana = await page.getByRole("button", { name: "Romana" }).boundingBox();
+  const lungo = await page.getByRole("button", { name: "All'aperto / dehors" }).boundingBox();
+  const applica = await page.getByRole("button", { name: /^Applica filtri/ }).boundingBox();
+  ok(sw <= 360 && !!romana && romana.height >= 40 && !!lungo && lungo.x + lungo.width <= 360 && !!applica && applica.y + applica.height <= 740, `filtri a 360 px: niente scorrimento di lato, chip ≥ 40 px, 'Applica' visibile (larghezza ${sw})`);
+}
+await shot("24e-filtri-360");
+await page.setViewportSize({ width: 390, height: 844 });
 await page.getByRole("button", { name: "Azzera" }).click();
 await page.getByRole("button", { name: /^Applica filtri/ }).click().catch(() => {});
 await page.keyboard.press("Escape").catch(() => {});
@@ -946,6 +985,21 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
+// Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.
+for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_code: 61 }, "al coperto"], [{ temperature_2m: 24, precipitation: 0, weather_code: 1 }, "all'aperto, stasera 24°"]]) {
+  const wctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.route("**/api.open-meteo.com/**", (r) => r.fulfill({ json: { current: meteo } }));
+  const wp = await wctx.newPage();
+  await wp.clock.setFixedTime(new Date("2026-10-15T19:30:00"));
+  await wp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const txt = await wp.getByTestId("suggerimento-momento").textContent({ timeout: 5000 }).catch(() => "");
+  ok(txt.includes(atteso), `suggerimento col meteo: "${txt}" contiene "${atteso}"`);
+  await wctx.close();
+}
+// Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani, il modulo di richiesta e l'esempio del pannello.
+{ const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
+  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href")) === "/per-i-ristoratori/rivendica" && (await page.getByTestId("pannello-demo").getAttribute("href")) === "/ristoratore/demo", "per i ristoratori: tre piani, 'Rivendica il tuo locale' porta al modulo e c'è il pannello d'esempio"); }
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
@@ -1159,7 +1213,8 @@ else {
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
   await p.route("**/rest/v1/saved_places**", (r) => {
-    if (r.request().method() === "PATCH") { patched = r.request().postDataJSON(); return r.fulfill({ status: 204, body: "" }); }
+    // Solo le scritture dei tag: dopo "Ci sono stato" la classifica (4.3) può scrivere a parte rank_score.
+    if (r.request().method() === "PATCH") { const b = r.request().postDataJSON(); if (b?.tags) patched = b; return r.fulfill({ status: 204, body: "" }); }
     return r.fallback();
   });
   await p.getByLabel("Cerca tra i salvati").fill("");
@@ -1188,6 +1243,10 @@ else {
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
   await p.unroute("**/rest/v1/saved_places**");
+  // Esc può tornare indietro nella cronologia: si aspetta che finisca, altrimenti il goto sotto
+  // veniva interrotto (ERR_ABORTED / timeout, visto anche sul codice di partenza il 15/10).
+  await p.waitForLoadState("networkidle").catch(() => {});
+  await p.waitForTimeout(500);
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
   await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
@@ -1303,7 +1362,7 @@ else {
       ok(await p.getByTestId("guida-voglio").getAttribute("href") === "/mappa?vista=salvati&stato=voglio" && await p.getByTestId("guida-fatto").getAttribute("href") === "/mappa?vista=salvati&stato=fatto" && await p.getByTestId("guida-salvati").getAttribute("href") === "/mappa?vista=salvati", "profilo: ogni numero apre la mappa sui salvati filtrati");
       const raccolte = await p.getByTestId("raccolta").allTextContents();
       ok(raccolte.length === 4 && raccolte[0].includes("Con amici") && raccolte[0].includes("3 locali") && raccolte[1].includes("Romantico") && !raccolte.some((t) => /Da provare|Già visitato/.test(t)), `profilo: raccolte = tag dell'utente con il numero, senza i due stati (${raccolte.join(" | ")})`);
-      ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/mappa?vista=salvati&tag=Con+amici", "profilo: tocco su una raccolta = mappa filtrata su quel tag");
+      ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/raccolte/Con%20amici", "profilo: tocco su una cartella = pagina della raccolta (4.1)");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
       ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
@@ -1333,7 +1392,7 @@ else {
       const emojiAmici = (await amici.getByTestId("raccolta-copertina").locator("span").allTextContents()).length;
       const anteprima = (await amici.getByTestId("raccolta-anteprima").textContent().catch(() => "")) ?? "";
       ok(emojiAmici === 3 && anteprima.startsWith("3 locali · ") && anteprima.includes("Birreria Sei"), `copertine: 'Con amici' mostra 3 emoji e i nomi dei locali (${anteprima})`);
-      const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; return c.getBoundingClientRect().right > m.getBoundingClientRect().left; }));
+      const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom; }));
       ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
       await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
       // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
@@ -1435,7 +1494,7 @@ else {
       await sheet.getByTestId("crea-raccolta").click();
       await waitClosed();
       ok(patches.length === 2 && has(patches, "05", ["Da provare", "Weekend a Milano"]) && has(patches, "06", ["Con amici", "Già visitato", "Weekend a Milano"]), `nuova raccolta: tag aggiunto ai 2 locali scelti (${JSON.stringify(patches)})`);
-      ok(await tile("Weekend a Milano").isVisible() && (await tile("Weekend a Milano").getAttribute("href")) === "/mappa?vista=salvati&tag=Weekend+a+Milano", "nuova raccolta: compare tra le raccolte e apre la mappa filtrata");
+      ok(await tile("Weekend a Milano").isVisible() && (await tile("Weekend a Milano").getAttribute("href")) === "/raccolte/Weekend%20a%20Milano", "nuova raccolta: compare tra le raccolte e apre la sua pagina");
       await p.unroute("**/rest/v1/saved_places**");
 
       // "Le tue ricerche": le recenti salvate su questo telefono
@@ -2167,6 +2226,188 @@ else {
   await pctx.close();
 }
 
+// 14. Social (piano 5.1–5.4): profilo pubblico, mappa di una persona, Amici, "N amici ci sono stati".
+//     Il server legge i dati finti dal cookie "e2e_social"; senza cookie la parte social è "in arrivo"
+//     (come in produzione finché la migrazione 20261015_social non è applicata).
+if (!fakeUser) console.log("SKIP  social: dev server senza E2E_FAKE_USER");
+else {
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const GIULIA = "00000000-0000-4000-8000-0000000005a1";
+  const MARCO = "00000000-0000-4000-8000-0000000005a2";
+  const LOC_SOC = "44444444-0000-4000-8000-000000000005";
+  const prof = (id, handle, display_name, extra = {}) => ({ id, handle, display_name, bio: null, city: "Roma", visitati: 0, da_provare: 0, seguaci: 0, seguiti: 0, ...extra });
+  const sv = (user_id, handle, display_name, place_id, name, category, tags, created_at, lat, lng) => ({ user_id, handle, display_name, place_id, name, category, tags, created_at, address: "Via del Moro 12, 00153 Roma RM, Italy", lat, lng });
+  const giulia = prof(GIULIA, "giulia.rm", "Giulia", { bio: "Trattorie di quartiere e vini naturali", visitati: 1, da_provare: 2, seguaci: 3, seguiti: 2 });
+  const marco = prof(MARCO, "marco", "Marco", { city: "Milano" });
+  const oggi = new Date().toISOString();
+  const social = {
+    profili: [giulia, marco],
+    salvati: [
+      sv(GIULIA, "giulia.rm", "Giulia", LOC_SOC, "Trattoria del Vicolo", "restaurant", ["Già visitato", "Romantico"], oggi, 41.889, 12.469),
+      sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000006", "Bar Nero", "bar", ["Da provare", "Romantico"], "2026-10-10T18:00:00Z", 41.893, 12.473),
+      sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000007", "Forno Sud", "bakery", ["Economico"], "2026-10-09T09:00:00Z", 41.88, 12.48),
+      sv(MARCO, "marco", "Marco", "44444444-0000-4000-8000-000000000008", "Osteria Milano", "restaurant", ["Da provare"], oggi, 45.48, 9.19),
+    ],
+    seguo: [GIULIA],
+    mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+  };
+  const setSocial = (c, v) => c.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const soctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const socEvents = [];
+  await soctx.route("**/api/events", (r) => { socEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await soctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+  const sp = await soctx.newPage();
+  sp.on("pageerror", (e) => errors.push(e.message));
+
+  // In arrivo: senza dati social (migrazione non applicata) nessuna pagina si rompe.
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+  const rIn = await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok(rIn?.status() === 200 && await sp.getByTestId("profilo-pubblico-in-arrivo").getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /u/<nome> dice 'in arrivo' invece di rompersi");
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /amici dice 'in arrivo'");
+  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("profilo-social-in-arrivo").isVisible(), "social in arrivo: nel profilo il riquadro 'Profilo pubblico' è 'in arrivo'");
+  ok(await sp.locator("nav").first().getByRole("link", { name: "Amici" }).getAttribute("href") === "/amici", "barra in basso: voce 'Amici'");
+
+  // Profilo pubblico da chi non ha l'account (link condiviso).
+  await setSocial(soctx, social);
+  await soctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await sp.getByRole("heading", { level: 1 }).textContent()) === "Giulia" && await sp.getByText("@giulia.rm").isVisible() && await sp.getByTestId("profilo-bio").isVisible(), "profilo pubblico: nome, @nome e bio");
+  ok((await sp.title()) === "Giulia (@giulia.rm) · Mapetite", `profilo pubblico: titolo per l'anteprima (${await sp.title()})`);
+  { const n = async (id) => (await sp.getByTestId(`numero-${id}`).textContent())?.replace(/\s+/g, " ").trim();
+    ok((await n("visitati")) === "1Visitati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
+  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
+  ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
+  await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");
+  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok((await sp.getByTestId("pin-persona").count()) === 3, `profilo pubblico: un pin per ogni posto (${await sp.getByTestId("pin-persona").count()})`);
+  ok(await sp.getByTestId("segui").getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: 'Segui' porta a Crea un account e poi torna qui");
+  ok(await sp.getByTestId("invito-crea-mappa").getByText("Crea la tua mappa su Mapetite").isVisible() && await sp.getByTestId("invito-crea-mappa").getByRole("link", { name: "Crea la tua mappa, è gratis" }).getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: invito 'Crea la tua mappa su Mapetite' in fondo");
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/60-profilo-pubblico.png`, caret: "initial" });
+  await sp.screenshot({ path: `${OUT}/60b-profilo-pubblico-intero.png`, caret: "initial", fullPage: true });
+  // Condividi: menu del telefono con il link al profilo, segnale "condividi".
+  await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+  await sp.getByTestId("condividi-profilo").click();
+  await sp.waitForFunction(() => window.__shared != null, null, { timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__shared?.url)) === `${new URL(BASE).origin}/u/giulia.rm`, "condividi profilo: menu del telefono con il link /u/<nome>");
+  await sp.waitForTimeout(200);
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "profilo"), "condividi profilo: segnale 'condividi' (cosa: profilo)");
+  // Mappa della persona a tutta pagina, con condivisione che ripiega sulla copia del link.
+  await sp.getByTestId("apri-mappa-persona").click();
+  await sp.waitForURL(/\/u\/giulia\.rm\/mappa$/, { timeout: 5000 });
+  await sp.getByTestId("mappa-persona-pagina").waitFor({ timeout: 5000 });
+  ok(await sp.getByTestId("mappa-persona-pagina").getByText("La mappa di Giulia").isVisible() && await sp.getByTestId("invito-crea-mappa").isVisible(), "mappa di una persona: si apre senza account, con l'invito in fondo");
+  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/61-mappa-persona.png`, caret: "initial" });
+  await sp.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "share", { configurable: true, value: undefined }); Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); });
+  await sp.getByTestId("condividi-mappa").click();
+  await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__copied)) === `${new URL(BASE).origin}/u/giulia.rm/mappa` && await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").isVisible(), "condividi mappa: senza menu del telefono copia il link e lo dice");
+  await sp.waitForTimeout(200);
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "mappa"), "condividi mappa: segnale 'condividi' (cosa: mappa)");
+  // Profilo privato o inesistente: messaggio chiaro, niente errore.
+  await sp.goto(`${BASE}/u/nessuno.qui`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("profilo-non-trovato").getByText("Profilo non disponibile").isVisible(), "profilo privato o inesistente: 'Profilo non disponibile'");
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("amici-accedi").isVisible(), "amici senza account: invito ad accedere");
+  await soctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Con l'accesso: Segui / Segui già scrivono in follows.
+  const follows = [];
+  await soctx.route("**/rest/v1/follows**", (r) => { follows.push({ method: r.request().method(), url: decodeURIComponent(r.request().url()), body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
+  await sp.getByTestId("segui").click();
+  await sp.getByTestId("segui").getByText("Segui", { exact: true }).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "DELETE" && f.url.includes(`follower_id=eq.${ME}`) && f.url.includes(`followed_id=eq.${GIULIA}`)) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "false", "smetti di seguire: cancella solo il proprio follow");
+  await sp.getByTestId("segui").click();
+  await sp.getByTestId("segui").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "POST" && f.body?.follower_id === ME && f.body?.followed_id === GIULIA) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true", "segui: scrive il follow a proprio nome");
+
+  // Amici: chi segui, attività raggruppata, ricerca persone.
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
+  { const att = sp.getByTestId("attivita");
+    const first = (await att.first().innerText()).replace(/\s+/g, " ");
+    ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
+    ok((await att.first().getByTestId("card-attivita").count()) === 3 && await att.first().getByTestId("card-attivita").first().getAttribute("href") === `/locali/${LOC_SOC}`, "amici: card dei locali che aprono la pagina del locale");
+    ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui"); }
+  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible(), "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
+  await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
+  let searchUrl = null;
+  await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
+  await sp.getByLabel("Cerca persone per nome").fill("@Mar");
+  await sp.getByTestId("persona").first().waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await sp.getByTestId("persona").getByText("Marco", { exact: true }).isVisible() && !!searchUrl && searchUrl.includes("handle.ilike.mar%"), "amici: cerca persone per nome (solo profili pubblici)");
+  follows.length = 0;
+  await sp.getByTestId("persona").getByTestId("segui").click();
+  await sp.getByTestId("persona").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "POST" && f.body?.followed_id === MARCO), "amici: 'Segui' dai risultati della ricerca");
+  await sp.screenshot({ path: `${OUT}/63-amici-cerca.png`, caret: "initial" });
+
+  // Impostazioni del profilo pubblico (in /profilo): spento di default, testo chiaro, nome ripulito.
+  let profPatch = null;
+  let profStatus = 204;
+  await soctx.route("**/rest/v1/profiles**", (r) => {
+    if (r.request().method() === "PATCH") { profPatch = r.request().postDataJSON(); return profStatus === 204 ? r.fulfill({ status: 204, body: "" }) : r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key", details: null, hint: null } }); }
+    return r.fulfill({ json: [] });
+  });
+  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const ps = sp.getByTestId("profilo-social");
+  ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
+  await ps.locator("input[name=handle]").fill("@Lorenzo Mà!");
+  ok((await ps.locator("input[name=handle]").inputValue()) === "lorenzoma", "profilo: il nome pubblico si ripulisce da solo (minuscole, niente spazi né accenti)");
+  await ps.locator("input[name=display_name]").fill("Lorenzo");
+  await ps.locator("input[name=city]").fill("Roma");
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Le note private non si vedono mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
+  profStatus = 409;
+  await ps.getByRole("button", { name: "Salva" }).click();
+  await ps.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await ps.getByRole("alert").textContent())?.includes("è già preso"), "profilo: nome già preso spiegato in italiano");
+  profStatus = 204;
+  profPatch = null;
+  await ps.getByRole("button", { name: "Salva" }).click();
+  await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.handle === "lorenzoma" && profPatch?.is_public === true && profPatch?.display_name === "Lorenzo" && profPatch?.city === "Roma" && !("note" in (profPatch ?? {})), "profilo: salva nome pubblico, nome, città e 'pubblico'");
+  ok(await ps.getByTestId("profilo-condividi").isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Pubblico") && await ps.getByTestId("vedi-profilo-pubblico").getAttribute("href") === "/u/lorenzoma", "profilo: dopo il salvataggio, condividi profilo e mappa");
+  await ps.scrollIntoViewIfNeeded();
+  await ps.screenshot({ path: `${OUT}/64-profilo-impostazioni.png`, caret: "initial" });
+  await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+  await ps.getByTestId("condividi-mia-mappa").click();
+  await sp.waitForFunction(() => window.__shared != null, null, { timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__shared?.url)) === `${new URL(BASE).origin}/u/lorenzoma/mappa`, "profilo: 'Condividi mappa' manda il link alla propria mappa");
+
+  // Pagina pubblica del locale: "1 amico ci è stato".
+  const locSoc = { place: { id: LOC_SOC, name: "Trattoria del Vicolo", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, category: "restaurant", rating: 4.6, price_level: 2, google_place_id: "GVICOLO2" }, synthesis: null };
+  await soctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify(locSoc)), url: BASE }]);
+  await sp.goto(`${BASE}/locali/${LOC_SOC}`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("amici-qui").textContent())?.includes("1 amico ci è stato") && await sp.getByTestId("amici-qui").getByRole("link", { name: "Giulia" }).getAttribute("href") === "/u/giulia.rm", "pagina del locale: '1 amico ci è stato' con il link al profilo");
+  await sp.screenshot({ path: `${OUT}/65-locale-amici.png`, caret: "initial" });
+  await setSocial(soctx, { ...social, seguo: [] });
+  await sp.goto(`${BASE}/locali/${LOC_SOC}`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("amici-qui").count()) === 0, "pagina del locale: senza amici che ci sono stati non compare nulla");
+
+  // Telefono piccolo (360px): niente scorrimento orizzontale sulle pagine nuove.
+  await setSocial(soctx, social);
+  await sp.setViewportSize({ width: 360, height: 780 });
+  for (const path of ["/u/giulia.rm", "/u/giulia.rm/mappa", "/amici", "/profilo"]) {
+    await sp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    ok(await sp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, `360px: ${path} senza scorrimento orizzontale`);
+  }
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/66-profilo-pubblico-360.png`, caret: "initial" });
+  await soctx.close();
+}
+
 // QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
 {
   const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
@@ -2311,6 +2552,783 @@ else {
   await rp.getByTestId("reset-fatto").waitFor({ timeout: 5000 });
   ok(newPassword === "nuova123", "reimposta password: salva la nuova password su Supabase");
   ok(await rp.getByRole("link", { name: "Vai alla mappa" }).isVisible(), "reimposta password: 'Vai alla mappa' dopo il salvataggio");
+  await rctx.close();
+}
+
+// Tracciamento (PIANO-25-OTTOBRE.md 7): visite, pagine, funzioni, errori, 👍/👎 e pannello /admin/numeri.
+// Tutto intercettato: nessuna scrittura nel database (e il server non scrive comunque con E2E_FAKE_USER).
+{
+  // Calcoli del pannello (funzioni pure, senza server).
+  let nm = null;
+  try { nm = await import(new URL("../../src/lib/numeri.ts", import.meta.url).href); } catch (e) { ok(false, `numeri: modulo src/lib/numeri.ts importabile (${e.message})`); }
+  if (nm) {
+    const now = Date.parse("2026-10-15T12:00:00Z");
+    const at = (d, h = 10) => new Date(Date.UTC(2026, 9, d, h)).toISOString();
+    const ev = (type, d, who, extra = {}) => ({ created_at: at(d, extra.h ?? 10), type, user_id: who.u ?? null, anon_id: who.a ?? null, session_id: extra.s ?? null, props: extra.p ?? {} });
+    const A = { a: "anon-a" }, B = { u: "00000000-0000-0000-0000-00000000000b" }, Ba = { a: "anon-b", u: "00000000-0000-0000-0000-00000000000b" }, Bonly = { a: "anon-b" };
+    const rows = [
+      ev("sessione_inizio", 5, A, { s: "s1", p: { prima_volta: 1 } }),
+      ev("sessione_inizio", 10, Bonly, { s: "s2", p: { prima_volta: 1 } }),
+      ev("pagina", 10, Bonly, { s: "s2", p: { pagina: "mappa" } }),
+      ev("ricerca", 10, Ba, { s: "s2", p: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 8 } }),
+      ev("apri_scheda", 10, B, { s: "s2", h: 11, p: { fonte: "ricerca" } }),
+      ev("salva", 10, B, { s: "s2", h: 11, p: { fonte: "segnalibro" } }),
+      ev("sessione_inizio", 13, B, { s: "s3", p: { giorni: 3 } }),
+      ev("funzione", 13, B, { s: "s3", p: { nome: "sorprendimi" } }),
+      ev("errore", 14, A, { p: { messaggio: "x is undefined", pagina: "mappa" } }),
+      ev("errore", 14, A, { p: { messaggio: "x is undefined", pagina: "mappa" } }),
+      ev("utile", 14, B, { p: { voto: "si", contesto: "ricerca" } }),
+      ev("ricerca", 15, {}, { p: { modo: "filtri", tipo: "pizzeria", risultati: 0 } }),
+    ];
+    const n = nm.computeNumeri(rows, 7, now);
+    ok(n.attivi.totale === 2 && n.attivi.registrati === 1 && n.attivi.anonimi === 1, `numeri: persone attive in 7 giorni, l'anonimo che poi accede conta una volta (${JSON.stringify(n.attivi)})`);
+    ok(n.nuovi === 1, `numeri: 'nuove' = prima volta nel periodo (${n.nuovi})`);
+    const r3 = n.ritorni.find((r) => r.giorni === 3);
+    ok(r3.base === 1 && r3.tornati === 1, `numeri: ritorno dopo 3 giorni (${JSON.stringify(r3)})`);
+    ok(n.imbuto.map((s) => s.persone).join(",") === "1,1,1" && n.imbuto[0].volte === 2, `numeri: imbuto ricerca → scheda → salva (${n.imbuto.map((s) => `${s.volte}/${s.persone}`).join(" → ")})`);
+    ok(n.ricerche.senzaRisultati === 1 && n.ricerche.ai === 1 && n.ricerche.filtri === 1, "numeri: ricerche con l'AI, con i filtri e senza risultati");
+    ok(n.errori.length === 1 && n.errori[0].volte === 2 && n.errori[0].pagina === "mappa", "numeri: errori raggruppati per messaggio e pagina");
+    ok(n.funzioni[0].volte > 0 && n.funzioni.some((f) => f.chiave === "sorprendimi" && f.volte === 1) && n.funzioni.some((f) => f.chiave === "voce" && f.volte === 0), "numeri: funzioni usate e mai usate");
+    ok(n.utile.si === 1 && n.utile.no === 0 && n.sessioni.totale === 2 && !n.senzaTracciamento, `numeri: 👍/👎 e visite (${n.sessioni.totale})`);
+    ok(nm.computeNumeri(rows.filter((r) => ["ricerca", "salva", "apri_scheda"].includes(r.type)), 30, now).senzaTracciamento, "numeri: avviso se la migrazione del tracciamento non è applicata");
+    ok(nm.computeNumeri([], 1, now).attivi.totale === 0, "numeri: nessun evento, nessun errore");
+  }
+
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tEvents = [];
+  await tctx.route("**/api/events", (r) => { tEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await tctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
+  await tctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await tctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await tctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const tp = await tctx.newPage();
+  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const tErrors = [];
+  tp.on("pageerror", (e) => tErrors.push(e.message));
+  await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await tp.waitForTimeout(300);
+  const ses = tEvents.filter((e) => e.type === "sessione_inizio");
+  ok(ses.length === 1 && ses[0].props?.prima_volta === 1 && typeof ses[0].props?.installata === "number" && typeof ses[0].sessionId === "string", `tracciamento: all'apertura parte 'sessione_inizio' (prima volta, app installata sì/no) (${ses.length})`);
+  ok(tEvents.some((e) => e.type === "pagina" && e.props?.pagina === "mappa"), "tracciamento: vista pagina 'mappa'");
+  ok(tEvents.every((e) => typeof e.sessionId === "string" && e.sessionId === ses[0]?.sessionId && typeof e.anonId === "string"), "tracciamento: ogni segnale porta la stessa sessione e il visitatore anonimo");
+  ok((await tctx.cookies()).some((c) => c.name === "mapetite_anon") && (await tctx.cookies()).some((c) => c.name === "mapetite_sessione"), "tracciamento: cookie di visitatore e sessione per le ricerche fatte dal server");
+
+  // Cambio pagina dentro l'app: "Salvati" dalla barra in basso.
+  await tp.getByRole("link", { name: "Salvati" }).first().click();
+  await tp.waitForURL(/vista=salvati/);
+  await tp.waitForTimeout(400);
+  ok(tEvents.some((e) => e.type === "pagina" && e.props?.pagina === "salvati"), "tracciamento: cambio pagina senza ricaricare ('salvati')");
+
+  // Ricerca: 👍/👎 in fondo ai risultati, senza la frase cercata nel segnale.
+  await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await tp.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await tp.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 });
+  ok(await tp.getByTestId("utile").count() === 1, "utile: 'Ti è stato utile?' in fondo ai risultati");
+  await tp.getByTestId("utile").getByRole("button", { name: "Sì, utile" }).evaluate((b) => b.click());
+  await tp.getByTestId("utile-grazie").waitFor({ timeout: 3000 });
+  await tp.waitForTimeout(200);
+  const ut = tEvents.find((e) => e.type === "utile");
+  ok(!!ut && ut.props?.voto === "si" && ut.props?.contesto === "ricerca" && typeof ut.props?.risultati === "number", "utile: 👍 registra il voto con il numero di risultati");
+  ok(!JSON.stringify(tEvents).includes("Rooftop romantico"), "tracciamento: la frase cercata non finisce mai nei segnali");
+
+  // Filtri: uso della funzione.
+  await tp.getByRole("button", { name: "Filtri", exact: true }).click();
+  await tp.getByRole("button", { name: /^Applica filtri/ }).click();
+  await tp.waitForTimeout(300);
+  ok(tEvents.some((e) => e.type === "funzione" && e.props?.nome === "filtri"), "tracciamento: 'Applica filtri' registra la funzione 'filtri'");
+
+  // Errori del telefono: eccezione e promessa rifiutata, con la pagina; mai due volte lo stesso.
+  // Script della pagina (non evaluate: i suoi errori risultano di un altro file e vengono scartati).
+  await tp.addScriptTag({ content: 'setTimeout(function(){throw new Error("prova-errore-giro")},0);setTimeout(function(){throw new Error("prova-errore-giro")},5);Promise.reject(new Error("prova-promessa-giro"));' });
+  await tp.waitForTimeout(500);
+  const errs = tEvents.filter((e) => e.type === "errore");
+  ok(errs.filter((e) => e.props?.messaggio === "prova-errore-giro").length === 1 && errs.every((e) => e.props?.pagina === "mappa"), `tracciamento: errore JavaScript registrato una volta, con la pagina (${errs.length})`);
+  ok(errs.some((e) => e.props?.messaggio === "prova-promessa-giro" && e.props?.origine === "promessa"), "tracciamento: promessa rifiutata registrata");
+  ok(tErrors.some((m) => /prova-errore-giro/.test(m)) && tErrors.filter((m) => !/prova-(errore|promessa)-giro/.test(m)).length === 0, `tracciamento: nessun altro errore (${tErrors.join(" | ").slice(0, 200)})`);
+
+  // Stessa visita se si ricarica; nuova dopo 30 minuti di pausa, con i giorni dall'ultima.
+  await tp.reload({ waitUntil: "load" });
+  await tp.waitForTimeout(300);
+  ok(tEvents.filter((e) => e.type === "sessione_inizio").length === 1, "tracciamento: ricaricando resta la stessa visita");
+  await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); });
+  await tp.reload({ waitUntil: "load" });
+  await tp.waitForTimeout(300);
+  const ses2 = tEvents.filter((e) => e.type === "sessione_inizio");
+  ok(ses2.length === 2 && ses2[1].props?.giorni === 0 && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
+
+  // Il server accetta i nuovi tipi e rifiuta quelli inventati.
+  { const r1 = await tp.request.post(`${BASE}/api/events`, { data: { type: "pagina", sessionId: "s", props: { pagina: "mappa" } } });
+    const r2 = await tp.request.post(`${BASE}/api/events`, { data: { type: "errore", props: { messaggio: "x".repeat(500), pagina: "mappa" } } });
+    const r3 = await tp.request.post(`${BASE}/api/events`, { data: { type: "admin" } });
+    ok(r1.status() === 204 && r2.status() === 204 && r3.status() === 400, `segnali: /api/events accetta pagina/errore, rifiuta tipi inventati (${r1.status()}/${r2.status()}/${r3.status()})`); }
+
+  // Pannello di Lorenzo: senza accesso non esiste (404).
+  { const r = await tp.request.get(`${BASE}/admin/numeri`);
+    ok(r.status() === 404, `pannello: /admin/numeri senza accesso dà 404 (${r.status()})`); }
+  const pagine = tEvents.filter((e) => e.type === "pagina").length;
+  // Con eventi finti (solo in sviluppo con E2E_FAKE_USER, cookie e2e_eventi): stato vuoto e pannello pieno.
+  const setFake = (rows) => tctx.addCookies([{ name: "e2e_eventi", value: encodeURIComponent(JSON.stringify(rows)), url: BASE }]);
+  await setFake([]);
+  await tp.goto(`${BASE}/admin/numeri`, { waitUntil: "networkidle" });
+  ok(await tp.getByTestId("numeri-vuoto").isVisible(), "pannello: senza dati, stato vuoto chiaro");
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const U = "00000000-0000-0000-0000-00000000000b";
+  await setFake([
+    { created_at: iso(3 * 1440), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
+    { created_at: iso(30), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s1", props: { giorni: 3 } },
+    { created_at: iso(29), type: "pagina", user_id: U, anon_id: null, session_id: "s1", props: { pagina: "mappa" } },
+    { created_at: iso(28), type: "ricerca", user_id: U, anon_id: null, session_id: "s1", props: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 9 } },
+    { created_at: iso(27), type: "apri_scheda", user_id: U, anon_id: null, session_id: "s1", props: { fonte: "ricerca" } },
+    { created_at: iso(25), type: "salva", user_id: U, anon_id: null, session_id: "s1", props: {} },
+    { created_at: iso(20), type: "funzione", user_id: null, anon_id: "anon-x", session_id: "s2", props: { nome: "filtri" } },
+    { created_at: iso(19), type: "errore", user_id: null, anon_id: "anon-x", session_id: "s2", props: { messaggio: "Cannot read properties of undefined", pagina: "salvati" } },
+    { created_at: iso(18), type: "utile", user_id: U, anon_id: null, session_id: "s1", props: { voto: "no", contesto: "ricerca" } },
+  ]);
+  await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
+  ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
+  ok((await tp.getByTestId("numeri-imbuto").textContent())?.includes("Scheda aperta dai risultati"), "pannello: imbuto ricerca → scheda → azione");
+  ok((await tp.getByTestId("numeri-errori").textContent())?.includes("Cannot read properties of undefined"), "pannello: errori con la pagina");
+  ok((await tp.getByTestId("numeri-ritorni").textContent())?.includes("1 su 1"), "pannello: ritorni dopo 1/3/7 giorni");
+  ok((await tp.getByTestId("numeri-tester").locator("li").count()) === 2, "pannello: elenco dei tester");
+  { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello: niente scorrimento orizzontale sul telefono (${w}px)`); }
+  await tp.screenshot({ path: `${OUT}/60-pannello-numeri.png`, fullPage: true });
+  ok(tEvents.filter((e) => e.type === "pagina").length === pagine, "pannello: le visite di Lorenzo al pannello non contano come pagine dei tester");
+  await tctx.close();
+}
+
+// 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
+//     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
+{
+  let bk = null;
+  try { bk = await import(new URL("../../src/lib/booking.ts", import.meta.url).href); } catch (e) { ok(false, `prenota: modulo src/lib/booking.ts importabile (${e.message})`); }
+  let as = null;
+  try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }
+  if (bk) {
+    const now = new Date(2026, 9, 15, 18, 0); // giovedì 15/10, ore 18
+    const r = bk.parseBooking("prenotami domani alle 21 per 2 con terrazza a Roma", now);
+    ok(r.isBooking && r.date === "2026-10-16" && r.time === "21:00" && r.people === 2 && r.special === "in terrazza" && r.search === "ristorante con terrazza a roma", `prenota: frase capita senza AI (${JSON.stringify(r)})`);
+    const s = bk.parseBooking("Prenota sabato alle 20:30 in 4 una trattoria a Testaccio", now);
+    ok(s.date === "2026-10-17" && s.time === "20:30" && s.people === 4 && s.search === "trattoria a testaccio", `prenota: "sabato", "20:30", "in 4" (${JSON.stringify(s)})`);
+    const t = bk.parseBooking("tavolo per 3 stasera alle 9 e mezza", now);
+    ok(t.date === "2026-10-15" && t.time === "21:30" && t.people === 3 && t.search === null, `prenota: "stasera alle 9 e mezza" = 21:30, solo dettagli (${JSON.stringify(t)})`);
+    const u = bk.parseBooking("prenota per una cena lunedì a Milano", now);
+    ok(u.people === null && u.date === "2026-10-19" && u.search === "cena a milano", `prenota: "per una cena" non sono persone; "lunedì" con l'accento (${JSON.stringify(u)})`);
+    ok(bk.parseBooking("per 4", now).people === 4 && bk.parseBooking("per 4", now).search === null, "prenota: 'per 4' aggiorna solo le persone");
+    const msg = bk.bookingMessage(r, "Lorenzo", now);
+    ok(msg === "Buonasera, vorrei prenotare un tavolo per 2 persone domani 16/10 alle 21:00, in terrazza se possibile. È disponibile? Grazie, Lorenzo", `prenota: messaggio già scritto (${msg})`);
+    ok(bk.whatsappNumber("347 123 4567") === "393471234567" && bk.whatsappNumber("06 1234 5678") === null && bk.whatsappNumber("+39 333 1234567") === "393331234567", "prenota: WhatsApp solo per i cellulari (un fisso non lo propone)");
+    const list = [
+      { id: "a", date: "2026-10-15", time: "21:00", placeName: "Oggi", via: "whatsapp" },
+      { id: "b", date: "2026-10-14", placeName: "Ieri", via: "telefono" },
+      { id: "c", date: "2026-10-14", placeName: "Ieri risposto", via: "telefono", outcome: "bene" },
+      { id: "d", date: "2026-10-01", placeName: "Vecchia", via: "sito" },
+    ];
+    const rem = bk.bookingReminders(list, now);
+    ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
+  }
+  if (as) {
+    ok(as.localRefineOf("più economici") === "economici" && as.localRefineOf("aperti ora") === "aperti" && as.localRefineOf("più vicini") === "vicini" && as.localRefineOf("meno conosciuti") === "meno-noti", "assistente: seguiti riconosciuti");
+    ok(as.localRefineOf("solo con terrazza") === null && as.localRefineOf("più economici ma a Monti") === null && as.localRefineOf("e dopo un cocktail bar economico in centro storico") === null, "assistente: i seguiti con nuovi requisiti o zone sono ricerche nuove");
+    const pl = [{ id: "x", lat: 0, lng: 0, priceLevel: 3, openNow: true, rating: 4.6, userRatingCount: 5000 }, { id: "y", lat: 0, lng: 0, priceLevel: 2, openNow: false, rating: 4.5, userRatingCount: 90 }];
+    ok(as.applyLocalRefine("economici", pl).places.map((p) => p.id).join() === "y" && as.applyLocalRefine("meno-noti", pl).places[0].id === "y" && as.applyLocalRefine("aperti", pl).places.map((p) => p.id).join() === "x", "assistente: filtri sui risultati già avuti");
+    ok(as.applyLocalRefine("vicini", pl, null) === null && as.applyLocalRefine("economici", [pl[0]]) === null, "assistente: senza dati (posizione, prezzi) si dice o si cerca di nuovo, niente di inventato");
+  }
+
+  const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const aEvents = [];
+  const searches = [];
+  await actx.route("**/api/events", (route) => { aEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+  await actx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  await actx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  await actx.route("https://wa.me/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
+  await actx.route("https://example.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>Sito</p>" }));
+  const A_PLACES = [
+    { ...PLACES[0], phone: "347 123 4567", priceLevel: 2 },
+    PLACES[1],
+    { ...PLACES[2], priceLevel: 3 },
+  ];
+  await actx.route("**/api/search", async (route) => {
+    searches.push(route.request().postDataJSON());
+    await new Promise((r) => setTimeout(r, 300));
+    return route.fulfill({ json: { ...SEARCH_FAST, risultati: A_PLACES } });
+  });
+  await actx.route("**/api/search/synthesis", async (route) => { await new Promise((r) => setTimeout(r, 600)); return route.fulfill({ json: { ...SYNTH, livelli: { P3: "alto" } } }); });
+  const ap = await actx.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  ap.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  const ashot = (n) => ap.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
+
+  // Ingresso dalla mappa e dalla home
+  await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("mappa-assistente").isVisible(), "mappa: 'Parla con l'assistente' sotto la barra (la barra resta la ricerca di oggi)");
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("home-assistente").isVisible(), "home: collegamento 'Parla con l'assistente'");
+  await ap.getByTestId("home-assistente").click();
+  await ap.waitForURL(/\/assistente/);
+  await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
+  ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
+  ok(await ap.getByTestId("assistente-campo").isVisible(), "assistente: campo per scrivere in basso");
+  { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 56, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
+  await ashot("50-assistente-benvenuto");
+
+  // Prenotazione assistita: una sola ricerca, senza le parole di giorno/ora/persone
+  await ap.getByTestId("assistente-campo").fill("prenotami domani alle 21 per 2 con terrazza a Roma");
+  await ap.keyboard.press("Enter");
+  await ap.getByTestId("assistente-attesa").waitFor({ timeout: 3000 }).then(() => ok(true, "assistente: 'Cerco i posti giusti…' mentre aspetta"), () => ok(false, "assistente: 'Cerco i posti giusti…' mentre aspetta"));
+  await ap.getByTestId("assistente-card").getByText("Terrazza Uno").waitFor({ timeout: 8000 });
+  ok(searches.length === 1 && searches[0].query === "ristorante con terrazza a roma" && searches[0].phase === "fast" && searches[0].searchIntent === "natural", `assistente: una ricerca, con la richiesta ripulita (${JSON.stringify(searches[0]?.query)})`);
+  const firstReply = await ap.getByTestId("assistente-risposta").first().textContent();
+  ok(firstReply.includes("2 persone") && firstReply.includes("alle 21:00") && firstReply.includes("domani"), `assistente: riepilogo della prenotazione nella risposta (${firstReply.slice(0, 90)}…)`);
+  ok(firstReply.includes("la conferma arriva sempre dal locale"), "assistente: dice con onestà che i tavoli liberi non li vede");
+  ok((await ap.getByTestId("assistente-card").getByText("Aperto ora").count()) === 0, "assistente: niente 'Aperto ora' se si prenota per un altro giorno (non direbbe niente)");
+  ok((await ap.getByTestId("assistente-verdetto-attesa").count()) >= 1, "assistente: segnaposto del verdetto mentre arriva");
+  await ap.getByTestId("assistente-card").getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 6000 });
+  ok(true, "assistente: il verdetto compare sulla card");
+  ok((await ap.getByTestId("assistente-card").getByText("Pub Fuori Tema").count()) === 0, "assistente: il locale escluso dai verdetti sparisce");
+  ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
+  ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
+  await ashot("51-assistente-prenotazione");
+
+  // Foglio Prenota
+  await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await ap.getByLabel("Il tuo nome").fill("Giulia");
+  const msg = await ap.getByTestId("prenota-messaggio").inputValue();
+  ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
+  ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
+  ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
+  await ap.getByTestId("prenota-messaggio").fill("Buonasera, un tavolo per 2 domani alle 21 in terrazza. Giulia");
+  await ap.getByRole("button", { name: "Una persona in più" }).click();
+  ok((await ap.getByTestId("prenota-messaggio").inputValue()).startsWith("Buonasera, un tavolo per 2 domani"), "prenota: il messaggio modificato a mano non viene riscritto");
+  await ap.getByRole("button", { name: "Rigenera" }).click();
+  ok((await ap.getByTestId("prenota-messaggio").inputValue()).includes("per 3 persone"), "prenota: persone modificabili, il messaggio si aggiorna");
+  { const w = await ap.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `prenota: niente scorrimento orizzontale (${w}px)`); }
+  await ashot("52-prenota-foglio");
+  const [popup] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-whatsapp").click()]);
+  ok(decodeURIComponent(popup.url()).includes("per 3 persone"), "prenota: WhatsApp si apre con il messaggio");
+  await popup.close();
+  await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-fatto").textContent()).includes("La conferma arriva dal locale"), "prenota: 'Prenotazione richiesta' con la conferma che arriva dal locale");
+  const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+  ok(saved.length === 1 && saved[0].via === "whatsapp" && saved[0].people === 3 && saved[0].time === "21:00" && saved[0].placeName === "Terrazza Uno", "prenota: richiesta salvata nel telefono");
+  ok(aEvents.some((e) => e.type === "chiama" && e.props?.da === "prenota" && e.props?.via === "whatsapp"), "prenota: segnale registrato (tipo esistente 'chiama', da prenota)");
+  await ashot("53-prenota-richiesta");
+  await ap.getByRole("button", { name: "Fatto" }).click();
+
+  // Seguiti senza nuove ricerche
+  await ap.getByTestId("assistente-seguiti").getByRole("button", { name: "Più economici" }).click();
+  await ap.getByText("Senza una nuova ricerca: ho usato i posti di prima.").waitFor({ timeout: 3000 });
+  const lastCards = ap.getByTestId("assistente-card").last();
+  ok(searches.length === 1 && (await lastCards.getByText("Terrazza Uno").count()) === 1 && (await lastCards.getByText("Rooftop Tre").count()) === 0, "assistente: 'Più economici' filtra i posti di prima, nessuna chiamata Google");
+  await ap.getByTestId("assistente-campo").fill("per 4");
+  await ap.keyboard.press("Enter");
+  await ap.getByText(/Perfetto: 4 persone/).waitFor({ timeout: 3000 });
+  ok(searches.length === 1, "assistente: 'per 4' aggiorna la prenotazione senza cercare di nuovo");
+  await ap.getByTestId("assistente-campo").fill("solo con terrazza");
+  await ap.keyboard.press("Enter");
+  await ap.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length >= 3, null, { timeout: 8000 });
+  ok(searches.length === 2 && searches[1].query === "ristorante con terrazza a roma solo con terrazza", `assistente: 'solo con terrazza' riformula la richiesta di prima (${JSON.stringify(searches[1]?.query)})`);
+
+  // Card → scheda del locale, con Prenota e i dati già scelti
+  await ap.getByTestId("assistente-card").last().getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 6000 });
+  await ap.getByTestId("assistente-card").last().getByRole("button", { name: "Apri Terrazza Uno" }).click();
+  await ap.getByTestId("assistente-scheda").waitFor({ timeout: 3000 });
+  ok(await ap.getByTestId("assistente-scheda").getByTestId("verdetto-scheda").isVisible(), "assistente: tocco sulla card = scheda del locale con il verdetto");
+  ok(aEvents.some((e) => e.type === "apri_scheda" && e.props?.da === "assistente"), "assistente: apertura della scheda registrata");
+  await ap.getByTestId("prenota-scheda").click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-persone").textContent()) === "4", "scheda → Prenota: persone già scelte nella conversazione");
+  await ashot("54-scheda-prenota");
+  await ap.getByRole("dialog", { name: "Prenota da Terrazza Uno" }).getByRole("button", { name: "Chiudi" }).click();
+  await ap.getByTestId("assistente-scheda").click({ position: { x: 20, y: 20 } });
+
+  // La conversazione resta nel telefono
+  const bubbles = await ap.getByTestId("assistente-utente").count();
+  await ap.reload({ waitUntil: "networkidle" });
+  await ap.getByTestId("assistente-utente").first().waitFor({ timeout: 5000 });
+  ok((await ap.getByTestId("assistente-utente").count()) === bubbles && searches.length === 2, `assistente: dopo aver ricaricato la conversazione c'è ancora (${bubbles} messaggi), senza ricerche nuove`);
+  await ap.getByTestId("assistente-nuova").click();
+  ok(await ap.getByTestId("assistente-benvenuto").isVisible(), "assistente: 'Nuova' ricomincia da capo");
+
+  // Domande di chiarimento: solo ciò che manca per prenotare, una alla volta
+  await ap.getByTestId("assistente-campo").fill("prenota stasera una trattoria a Trastevere");
+  await ap.keyboard.press("Enter");
+  await ap.getByTestId("assistente-domanda").waitFor({ timeout: 8000 });
+  ok((await ap.getByTestId("assistente-risposta").last().textContent()).includes("Per quante persone?"), "assistente: chiede quante persone (manca)");
+  await ap.getByTestId("assistente-domanda").getByRole("button", { name: "2 persone" }).click();
+  await ap.getByText(/A che ora\?/).last().waitFor({ timeout: 3000 });
+  ok(searches.length === 3, "assistente: la risposta alla domanda non rifà la ricerca");
+  await ashot("55-assistente-domanda");
+
+  // Promemoria in home: oggi e "Com'è andata?"
+  await ap.evaluate(() => {
+    const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+      { id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d(0), time: "21:00", people: 2, special: null, via: "whatsapp", createdAt: Date.now() },
+      { id: "t2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d(-1), time: "20:30", people: 2, special: null, via: "telefono", createdAt: Date.now() },
+    ]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 });
+  ok((await ap.getByTestId("promemoria-oggi").textContent()).includes("Oggi alle 21:00") && (await ap.getByTestId("promemoria-oggi").textContent()).includes("Terrazza Uno"), "home: promemoria della prenotazione di oggi");
+  ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
+  await ashot("56-home-promemoria");
+  await ap.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
+  ok((await ap.getByTestId("promemoria-com-e-andata").count()) === 0 && aEvents.some((e) => e.type === "ci_sono_stato" && e.props?.da === "prenota"), "home: risposta a 'Com'è andata?' registrata, la domanda sparisce");
+  await actx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "giulia@example.com", saved: [], reviews: [] })), url: BASE }]);
+  await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
+  await actx.clearCookies({ name: "e2e_profilo" });
+
+  // Scheda della mappa: stesso pulsante Prenota
+  await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  await ap.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  const mapCard = ap.locator("li", { hasText: "Terrazza Uno" }).locator("button", { hasText: "Terrazza Uno" }).first();
+  await mapCard.waitFor({ timeout: 8000 });
+  await ap.waitForTimeout(1500); // verdetti e riordino del carosello
+  await mapCard.click();
+  await ap.getByTestId("prenota-scheda").waitFor({ timeout: 4000 });
+  await ap.getByTestId("prenota-scheda").click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
+  await actx.close();
+
+  // 360 px: si legge, niente scorrimento orizzontale
+  const nctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await nctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+  await nctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  await nctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  await nctx.route("**/api/search", (route) => route.fulfill({ json: { ...SEARCH_FAST, risultati: A_PLACES } }));
+  await nctx.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+  const np = await nctx.newPage();
+  np.on("pageerror", (e) => errors.push(e.message));
+  await np.goto(`${BASE}/assistente?q=${encodeURIComponent("Trattoria non turistica a Testaccio")}`, { waitUntil: "networkidle" });
+  await np.getByTestId("assistente-card").getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 8000 });
+  ok(!np.url().includes("q="), "assistente: /assistente?q=… parte da solo e la richiesta sparisce dall'indirizzo");
+  { const w = await np.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `assistente a 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await np.screenshot({ path: `${OUT}/57-assistente-360.png`, caret: "initial" });
+  await np.getByTestId("assistente-prenota").first().click();
+  await np.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  { const w = await np.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `prenota a 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await np.screenshot({ path: `${OUT}/58-prenota-360.png`, caret: "initial" });
+  await nctx.close();
+}
+// 15. Organizzare e ritrovare (piano 4.1–4.3): raccolte come cartelle, proposte dell'AI, classifica.
+//     Funzioni pure importate direttamente; il resto con Supabase e /api/raccolte/proposte simulati.
+{
+  let cl = null, rai = null;
+  try { cl = await import(new URL("../../src/lib/classifica.ts", import.meta.url).href); } catch (e) { ok(false, `classifica: modulo importabile (${e.message})`); }
+  try { rai = await import(new URL("../../src/lib/raccolte-ai.ts", import.meta.url).href); } catch (e) { ok(false, `raccolte-ai: modulo importabile (${e.message})`); }
+  if (cl) {
+    // Ricerca binaria: per ogni posizione vera (0..n) bastano al massimo 3 domande con 7 locali e la posizione è esatta.
+    let exact = true, maxAsked = 0;
+    for (let truth = 0; truth <= 7; truth++) {
+      let s = cl.startSearch(7), mid;
+      while ((mid = cl.nextCompare(s)) != null) s = cl.answer(s, mid, truth <= mid);
+      maxAsked = Math.max(maxAsked, s.asked);
+      if (cl.finalPosition(s) !== truth) exact = false;
+    }
+    ok(exact && maxAsked <= 3, `classifica: con 7 posti in città bastano ${maxAsked} domande e la posizione è esatta`);
+    { let s = cl.startSearch(1); const m = cl.nextCompare(s); s = cl.answer(s, m, true); ok(m === 0 && cl.nextCompare(s) == null && cl.finalPosition(s) === 0, "classifica: con 1 solo posto in città, 1 domanda"); }
+    { let s = cl.startSearch(30), n = 0, m; while ((m = cl.nextCompare(s)) != null) { s = cl.answer(s, m, false); n++; } ok(n === 3, "classifica: mai più di 3 domande anche con 30 posti"); }
+    const list = [{ score: 10 }, { score: 4 }];
+    ok(cl.scoreAt(list, 0) === 11 && cl.scoreAt(list, 1) === 7 && cl.scoreAt(list, 2) === 3 && cl.scoreAt([], 0) === 0, "classifica: punteggio a metà tra i vicini (o ±1 agli estremi)");
+    const tops = cl.topByCity([{ city: "Roma", score: 1 }, { city: "Roma", score: 5 }, { city: "Milano", score: 2 }, { city: null, score: 9 }]);
+    ok(tops[0][0] === "Roma" && tops[0][1][0].score === 5 && tops.length === 2, "classifica: top per città, la città con più posti prima, i senza città esclusi");
+    ok(cl.isMissingColumn({ code: "42703", message: 'column saved_places.rank_score does not exist' }) && !cl.isMissingColumn({ code: "500", message: "altro" }), "classifica: riconosce la colonna mancante (migrazione non applicata)");
+  }
+  if (rai) {
+    const input = [
+      { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Bar Tramonto", category: "Cocktail bar", city: "Roma", verdict: "Aperitivo lento sui tetti." },
+      { id: "aaaaaaaa-0000-4000-8000-000000000002", name: "Forno Rosso", category: "Panetteria", city: "Roma", verdict: null },
+      { id: "aaaaaaaa-0000-4000-8000-000000000003", name: "Bistrot Lione", category: "Ristorante", city: "Lione", verdict: null },
+    ];
+    const prompt = rai.buildPrompt(input, ["Weekend a Napoli"]);
+    ok(!prompt.includes("aaaaaaaa-") && prompt.includes("- Weekend a Napoli") && prompt.includes("- Romantici") && prompt.includes("diversa da Roma"), "proposte AI: al modello niente UUID, solo raccolte ammesse (tue + standard), città di casa per 'in viaggio'");
+    const parsed = rai.parseProposals('Ecco: {"proposte":[{"n":1,"raccolte":["aperitivo","Inventata"]},{"n":2,"raccolte":["Pranzo veloce","Con amici","Brunch"]},{"n":9,"raccolte":["Speciali"]},{"n":3,"raccolte":[]},{"n":1,"raccolte":["Romantici"]}]}', input, []);
+    ok(parsed.length === 2 && parsed[0].collections.join() === "Aperitivo" && parsed[1].collections.length === 2 && parsed.every((p) => input.some((i) => i.id === p.id)), `proposte AI: scartati nomi inventati, locali inesistenti, doppioni; max 2 raccolte (${JSON.stringify(parsed)})`);
+    ok(rai.parseProposals("non è JSON", input, []).length === 0 && rai.parseProposals('{"proposte":"x"}', input, []).length === 0, "proposte AI: risposta rotta = nessuna proposta, nessun errore");
+    const costo = rai.estimateCostUsd(1800, 600);
+    ok(costo < 0.006, `proposte AI: costo stimato per un gruppo da 30 sotto 0,6 cent ($${costo.toFixed(4)})`);
+  }
+
+  if (!fakeUser) console.log("SKIP  raccolte/classifica: dev server senza E2E_FAKE_USER");
+  else {
+    const ME = "00000000-0000-0000-0000-000000000001";
+    const pid = (n) => `00000000-0000-4000-8000-0000000007${n}`;
+    const pl = (n, name, category, address, lat, lng, extra = {}) => ({ id: pid(n), name, category, address, lat, lng, ...extra });
+    const ROMA = "Via Po, 2/a, 00198 Roma RM, Italy";
+    const MILANO = "Corso Monforte, 26, 20122 Milano MI, Italy";
+    const profilo = {
+      email: "giulia@example.com",
+      saved: [
+        { created_at: "2026-10-12", tags: ["Con amici", "Già visitato"], note: "Il tavolo in fondo", rank_score: 2, places: pl("01", "Osteria Due", "restaurant", ROMA, 41.9, 12.49, { verdict: "Cucina romana di quartiere, senza turisti." }) },
+        { created_at: "2026-10-11", tags: ["Con amici", "Da provare"], note: null, places: pl("02", "Birreria Sei", "bar", ROMA, 41.902, 12.494) },
+        { created_at: "2026-10-10", tags: ["Già visitato"], note: null, rank_score: 1, places: pl("03", "Trattoria Tre", "restaurant", ROMA, 41.895, 12.48) },
+        { created_at: "2026-10-09", tags: ["Già visitato"], note: null, places: pl("04", "Enoteca Quattro", "wine_bar", ROMA, 41.893, 12.47) },
+        { created_at: "2026-10-08", tags: ["Da provare"], note: null, places: pl("05", "Forno Cinque", "bakery", ROMA, 41.88, 12.48) },
+        { created_at: "2026-10-07", tags: [], note: null, places: pl("06", "Caffè Sei", "cafe", MILANO, 45.46, 9.2) },
+        { created_at: "2026-10-06", tags: null, note: null, places: pl("07", "Bar Sette", "cocktail_bar", MILANO, 45.47, 9.19) },
+      ],
+      reviews: [],
+    };
+    // Ordine dei nomi in un elenco (le righe iniziano con numero ed emoji): "OTE" = Osteria, Trattoria, Enoteca…
+    const order = (texts) => texts.map((t) => ["Osteria", "Trattoria", "Enoteca", "Vineria", "Bar Tre"].find((n) => t.includes(n))?.charAt(0) ?? "?").join("");
+    const setProfilo = (c, v) => c.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+    const rc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await rc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await rc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await rc.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+    await rc.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+    let patches = [];
+    let patchFail = false;
+    await rc.route("**/rest/v1/saved_places**", (r) => {
+      const req = r.request();
+      const u = new URL(req.url());
+      if (req.method() === "PATCH") {
+        patches.push({ id: u.searchParams.get("place_id")?.replace(/^eq\./, ""), user: u.searchParams.get("user_id"), body: req.postDataJSON() });
+        return patchFail ? r.fulfill({ status: 500, json: { message: "errore" } }) : r.fulfill({ status: 204, body: "" });
+      }
+      const pidQ = u.searchParams.get("place_id")?.replace(/^eq\./, "");
+      if (pidQ) { const row = profilo.saved.find((x) => x.places.id === pidQ); return r.fulfill({ json: { tags: row?.tags ?? [] } }); }
+      return r.fulfill({ json: [] });
+    });
+    await setProfilo(rc, profilo);
+    const p = await rc.newPage();
+    p.on("pageerror", (e) => errors.push(e.message));
+
+    // 4.1 Cartelle nel profilo
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    const folders = p.getByTestId("raccolta");
+    ok((await folders.count()) === 1 && (await folders.first().getAttribute("href")) === "/raccolte/Con%20amici", "cartelle: una per raccolta, apre /raccolte/<nome>");
+    ok((await folders.first().getByTestId("raccolta-copertina").locator("span").count()) === 2 && (await folders.first().textContent()).includes("2 locali"), "cartelle: copertina con le emoji dei locali e il numero");
+    { const bg = await folders.first().locator("[aria-hidden]").first().evaluate((el) => getComputedStyle(el).backgroundColor); ok(bg !== "rgba(0, 0, 0, 0)" && bg !== "rgb(255, 255, 255)", `cartelle: copertina colorata (${bg})`); }
+    await p.locator("[data-testid=raccolte]").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await p.screenshot({ path: `${OUT}/40-raccolte-cartelle.png`, caret: "initial" });
+
+    // 4.2 Proposte dell'AI per i salvati senza raccolta (route simulata: nessuna chiamata Haiku)
+    const box = p.getByTestId("proposte-raccolte");
+    ok(await box.isVisible() && (await box.textContent()).includes("5 salvati senza raccolta"), "proposte AI: '5 salvati senza raccolta' nel profilo");
+    let proposteReq = null;
+    let proposteMode = "ok";
+    await p.route("**/api/raccolte/proposte", async (r) => {
+      proposteReq = r.request().postDataJSON();
+      if (proposteMode === "limite") return r.fulfill({ status: 429, json: { error: "Hai chiesto tante proposte in poco tempo: riprova tra qualche minuto." } });
+      return r.fulfill({ json: {
+        proposte: [
+          { id: pid("05"), name: "Forno Cinque", raccolte: ["Pranzo veloce"] },
+          { id: pid("06"), name: "Caffè Sei", raccolte: ["Brunch", "Da provare in viaggio"] },
+          { id: pid("07"), name: "Bar Sette", raccolte: ["Aperitivo"] },
+        ],
+        esaminati: [pid("03"), pid("04"), pid("05"), pid("06"), pid("07")],
+        restanti: 0,
+      } });
+    });
+    proposteMode = "limite";
+    await box.getByTestId("proponi-raccolte").click();
+    await box.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(/tante proposte/.test((await box.getByRole("alert").textContent().catch(() => "")) ?? ""), "proposte AI: oltre il tetto, messaggio in italiano e nessuna scrittura");
+    proposteMode = "ok";
+    await box.getByTestId("proponi-raccolte").click();
+    await box.getByTestId("proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok((await box.getByTestId("proposta").count()) === 3 && patches.length === 0 && Array.isArray(proposteReq?.escludi), "proposte AI: 3 proposte, niente scritto prima del tocco");
+    await p.screenshot({ path: `${OUT}/41-proposte-raccolte.png`, caret: "initial" });
+    await box.getByTestId("proposta").filter({ hasText: "Forno Cinque" }).getByTestId("accetta-proposta").click();
+    await box.getByText("✓ Fatto").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok(patches.length === 1 && patches[0].id === pid("05") && JSON.stringify(patches[0].body?.tags) === '["Da provare","Pranzo veloce"]' && patches[0].user === `eq.${ME}`, `proposte AI: 'Accetta' aggiunge la raccolta e tiene lo stato (${JSON.stringify(patches)})`);
+    patches = [];
+    await box.getByTestId("accetta-tutte").click();
+    await p.waitForFunction(() => document.querySelectorAll("[data-testid=proposta]").length > 0 && [...document.querySelectorAll("[data-testid=proposta]")].every((li) => li.textContent.includes("✓ Fatto")), null, { timeout: 5000 }).catch(() => {});
+    ok(patches.length === 2 && patches.some((x) => x.id === pid("06") && JSON.stringify(x.body?.tags) === '["Brunch","Da provare in viaggio"]') && patches.some((x) => x.id === pid("07") && JSON.stringify(x.body?.tags) === '["Aperitivo"]'), `proposte AI: 'Accetta tutte' scrive le altre due (${JSON.stringify(patches)})`);
+    ok((await p.getByTestId("raccolta").count()) === 5, "proposte AI: le nuove raccolte compaiono subito tra le cartelle");
+    patches = [];
+
+    // 4.3 Classifica nel profilo: Roma con 2 in classifica (Osteria Due > Trattoria Tre), Enoteca da mettere
+    const cls = p.getByTestId("profilo-classifica");
+    ok(await cls.isVisible() && order(await cls.getByTestId("classifica-voce").allTextContents()) === "OT", "classifica: nel profilo la top di Roma in ordine");
+    await cls.getByTestId("classifica-ordina").click();
+    await cls.getByTestId("classifica-confronto").waitFor({ timeout: 4000 }).catch(() => {});
+    const rivale1 = await cls.getByTestId("classifica-rivale").textContent().catch(() => "");
+    ok(rivale1 === "Trattoria Tre", `classifica: 'Ti è piaciuto più o meno di…' parte dal centro della classifica (${rivale1})`);
+    await p.screenshot({ path: `${OUT}/42-classifica-confronto.png`, caret: "initial" });
+    await cls.getByTestId("classifica-di-piu").click();
+    const rivale2 = await cls.getByTestId("classifica-rivale").textContent().catch(() => "");
+    ok(rivale2 === "Osteria Due", `classifica: seconda domanda con il primo in classifica (${rivale2})`);
+    await cls.getByTestId("classifica-di-meno").click();
+    await cls.getByRole("status").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(patches.length === 1 && patches[0].id === pid("04") && patches[0].body?.rank_score === 1.5, `classifica: tra Osteria Due (2) e Trattoria Tre (1) → 1.5 (${JSON.stringify(patches)})`);
+    ok(order(await cls.getByTestId("classifica-voce").allTextContents()) === "OET", "classifica: la top si aggiorna subito");
+    await cls.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await p.screenshot({ path: `${OUT}/43-classifica-profilo.png`, caret: "initial" });
+    patches = [];
+    // Senza la colonna rank_score (migrazione non applicata) la classifica non compare
+    await setProfilo(rc, { ...profilo, classifica: false });
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    ok((await p.getByTestId("profilo-classifica").count()) === 0 && await p.getByTestId("raccolte").isVisible(), "classifica: senza migrazione il profilo resta com'era (sezione nascosta)");
+    await setProfilo(rc, profilo);
+
+    // 4.1 Pagina della raccolta
+    await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+    ok((await p.getByTestId("raccolta-titolo").textContent()) === "Con amici" && (await p.getByTestId("raccolta-locale").count()) === 2, "pagina raccolta: titolo e i 2 locali");
+    ok(await p.getByTestId("raccolta-verdetto").getByText("Cucina romana di quartiere, senza turisti.").isVisible() && await p.getByText("“Il tavolo in fondo”").isVisible(), "pagina raccolta: verdetto in cache e la tua nota");
+    ok((await p.getByTestId("raccolta-locale").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && (await p.getByTestId("raccolta-sulla-mappa").getAttribute("href")) === "/mappa?vista=salvati&tag=Con+amici", "pagina raccolta: un locale apre la sua scheda; 'Sulla mappa' apre la mappa filtrata");
+    ok(await p.getByTestId("raccolta-privata").isVisible() && (await p.getByTestId("condividi-raccolta").count()) === 0, "pagina raccolta: profilo non pubblico → spiega come condividerla");
+    await p.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
+    ok(await p.getByTestId("mappa-persona").isVisible(), "pagina raccolta: mini mappa");
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pagina raccolta: niente scorrimento orizzontale a 390px (${w})`); }
+    await p.screenshot({ path: `${OUT}/44-pagina-raccolta.png`, caret: "initial" });
+    // Rinomina dalla pagina: un PATCH per locale, poi l'indirizzo segue il nuovo nome
+    await p.getByTestId("raccolta-pagina-menu").click();
+    const rs = p.getByTestId("raccolta-pagina-sheet");
+    await rs.getByRole("button", { name: /Rinomina/ }).click();
+    await rs.getByLabel("Nuovo nome").fill("amici del giovedì");
+    await rs.getByRole("button", { name: "Salva" }).click();
+    await p.waitForURL(/\/raccolte\/Amici/, { timeout: 6000 }).catch(() => {});
+    ok(patches.length === 2 && patches.every((x) => x.body?.tags?.includes("Amici del giovedì") && !x.body.tags.includes("Con amici")) && decodeURIComponent(p.url()).endsWith("/raccolte/Amici del giovedì"), `pagina raccolta: rinomina scrive su tutti e porta alla nuova pagina (${JSON.stringify(patches)})`);
+    patches = [];
+    await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
+    ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
+    // 360px: titolo e azioni senza uscire dallo schermo
+    await p.setViewportSize({ width: 360, height: 780 });
+    await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `pagina raccolta: niente scorrimento orizzontale a 360px (${w})`); }
+    await p.screenshot({ path: `${OUT}/44b-pagina-raccolta-360.png`, caret: "initial" });
+    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `profilo: niente scorrimento orizzontale a 360px con cartelle e classifica (${w})`); }
+    await p.setViewportSize({ width: 390, height: 844 });
+
+    // 4.3 Nella scheda: dopo "Ci sono stato", "più o meno di…"
+    const mapRows = profilo.saved.map((x) => ({ tags: x.tags, note: x.note, places: { ...x.places, google_place_id: null } }));
+    const ranked = [
+      { place_id: pid("01"), rank_score: 2, tags: ["Con amici", "Già visitato"], places: { name: "Osteria Due", category: "restaurant", address: ROMA } },
+      { place_id: pid("03"), rank_score: 1, tags: ["Già visitato"], places: { name: "Trattoria Tre", category: "restaurant", address: ROMA } },
+    ];
+    let rankMode = "ok";
+    await p.route("**/rest/v1/saved_places**", (r) => {
+      const req = r.request();
+      const url = decodeURIComponent(req.url());
+      if (req.method() === "PATCH") { patches.push({ id: new URL(req.url()).searchParams.get("place_id")?.replace(/^eq\./, ""), body: req.postDataJSON() }); return r.fulfill({ status: 204, body: "" }); }
+      if (url.includes("rank_score")) return rankMode === "manca" ? r.fulfill({ status: 400, json: { code: "42703", message: "column saved_places.rank_score does not exist" } }) : r.fulfill({ json: ranked });
+      if (url.includes("select=place_id")) return r.fulfill({ json: mapRows.map((x) => ({ place_id: x.places.id })) });
+      return r.fulfill({ json: mapRows });
+    });
+    await p.goto(`${BASE}/mappa?salvato=${pid("04")}`, { waitUntil: "networkidle" });
+    await p.getByTestId("com-era").waitFor({ timeout: 6000 }).catch(() => {});
+    const conf = p.getByTestId("classifica-confronto");
+    await conf.waitFor({ timeout: 5000 }).catch(() => {});
+    ok(await conf.isVisible() && (await conf.textContent()).includes("La tua classifica · Roma"), "scheda: dopo 'Ci sono stato' chiede 'più o meno di…' tra i provati di Roma");
+    await conf.evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await p.screenshot({ path: `${OUT}/45-scheda-classifica.png`, caret: "initial" });
+    await conf.getByTestId("classifica-di-piu").click();
+    await conf.getByTestId("classifica-di-piu").click().catch(() => {});
+    await p.getByTestId("classifica-posizione").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(patches.some((x) => x.id === pid("04") && x.body?.rank_score === 3) && (await p.getByTestId("classifica-posizione").textContent().catch(() => "")).includes("Il tuo preferito a Roma"), `scheda: 'Di più' due volte = primo a Roma (${JSON.stringify(patches)})`);
+    patches = [];
+    rankMode = "manca";
+    await p.goto(`${BASE}/mappa?salvato=${pid("04")}`, { waitUntil: "networkidle" });
+    await p.getByTestId("com-era").waitFor({ timeout: 6000 }).catch(() => {});
+    await p.waitForTimeout(800);
+    ok(await p.getByTestId("com-era").isVisible() && (await p.getByTestId("classifica-confronto").count()) === 0 && (await p.getByTestId("classifica-posizione").count()) === 0 && patches.length === 0, "scheda: senza la colonna rank_score niente classifica e nessuna scrittura");
+    await p.unroute("**/rest/v1/saved_places**");
+    await rc.close();
+
+    // Raccolta condivisa e top pubblica (profilo pubblico di Giulia, visitatore senza account)
+    const GIU = "00000000-0000-4000-8000-0000000007a1";
+    const sv = (place_id, name, category, tags, lat, lng, rank_score) => ({ user_id: GIU, handle: "giulia.rm", display_name: "Giulia", place_id, tags, created_at: "2026-10-10T10:00:00Z", name, category, address: ROMA, lat, lng, rank_score });
+    const socialG = {
+      profili: [{ id: GIU, handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 3, da_provare: 1, seguaci: 0, seguiti: 0 }],
+      salvati: [
+        sv("44444444-0000-4000-8000-0000000007b1", "Vineria Uno", "wine_bar", ["Già visitato", "Romantico"], 41.89, 12.47, 1),
+        sv("44444444-0000-4000-8000-0000000007b2", "Trattoria Due", "restaurant", ["Già visitato", "Romantico"], 41.891, 12.471, 5),
+        sv("44444444-0000-4000-8000-0000000007b3", "Bar Tre", "bar", ["Già visitato"], 41.892, 12.472, 3),
+        sv("44444444-0000-4000-8000-0000000007b4", "Forno Quattro", "bakery", ["Da provare"], 41.893, 12.473, null),
+      ],
+      seguo: [],
+      mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    };
+    const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await gc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await gc.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+    await gc.addCookies([
+      { name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialG)), url: BASE },
+      { name: "e2e_anonimo", value: "1", url: BASE },
+    ]);
+    const g = await gc.newPage();
+    g.on("pageerror", (e) => errors.push(e.message));
+    await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
+    const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
+    ok(orderG(await g.getByTestId("top-voce").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-top").textContent()).includes("Top Roma"), "profilo pubblico: 'I preferiti di Giulia' con la top di Roma in ordine");
+    await g.getByTestId("profilo-top").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
+    await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
+    ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
+    ok(await g.getByTestId("condividi-raccolta-pubblica").isVisible() && !(await g.content()).includes("Il tavolo"), "raccolta condivisa: pulsante Condividi, nessuna nota privata");
+    await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
+    await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });
+    ok(await g.getByTestId("raccolta-pubblica-non-trovata").isVisible(), "raccolta condivisa: nome inesistente → 'non disponibile'");
+    await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
+    await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    ok((await g.getByTestId("profilo-top").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica la top non compare");
+    await gc.close();
+  }
+}
+
+// Lato ristoratori (PIANO-25-OTTOBRE.md 8.1 e 8.2): rivendica dal locale, badge "Verificato",
+// pannello del ristoratore (vietato a chi non è admin/titolare) ed esempio dimostrativo.
+// Supabase simulato: il browser scrive in claims (intercettato), il server legge dai cookie e2e_*.
+if (!fakeUser) console.log("SKIP  ristoratori: dev server senza E2E_FAKE_USER");
+else {
+  // Calcoli del pannello (funzioni pure, senza server).
+  let rs = null;
+  try { rs = await import(new URL("../../src/lib/ristoratore.ts", import.meta.url).href); } catch (e) { ok(false, `ristoratore: modulo src/lib/ristoratore.ts importabile (${e.message})`); }
+  if (rs) {
+    const now = Date.parse("2026-10-15T12:00:00Z");
+    const at = (d, h = 10, m = 0) => new Date(Date.UTC(2026, 9, d, h, m)).toISOString();
+    const L = { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Trattoria Uno", address: "Via del Pigneto 10, 00176 Roma RM, Italy", category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GUNO" };
+    const peer = (i) => ({ ...L, id: `aaaaaaaa-0000-4000-8000-00000000010${i}`, name: `Simile ${i}`, google_place_id: `GS${i}` });
+    const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
+    const eventi = [
+      // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
+      e("ricerca", 14, "a1", { s: "s1", m: 0, p: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], caratteristiche: ["Tavoli all'aperto"], zona: "Pigneto" } }),
+      e("apri_scheda", 14, "a1", { s: "s1", m: 2, gid: "GUNO", lat: 41.89, lng: 12.53, p: { fonte: "ricerca" } }),
+      e("salva", 14, "a1", { s: "s1", m: 3, pid: L.id }),
+      e("apri_scheda", 13, "a2", { s: "s2", gid: "GUNO", p: { fonte: "mappa" } }),
+      e("apri_scheda", 12, "a3", { s: "s3", gid: "GUNO", p: { fonte: "mappa" } }),
+      e("apri_scheda", 12, "a3", { s: "s3", gid: "GUNO", m: 5, p: { fonte: "mappa" } }),
+      e("percorso", 12, "a3", { s: "s3", pid: L.id }),
+      // Ricerca in zona di un'altra persona (zona = città) e una lontana (Milano): solo la prima conta.
+      e("ricerca", 11, "a4", { s: "s4", h: 11, p: { modo: "ai", tipo: "bar", requisiti: ["terrazza"], zona: "Roma" } }),
+      e("ricerca", 11, "a5", { s: "s5", p: { modo: "ai", tipo: "bar", requisiti: ["terrazza"], zona: "Milano" } }),
+      // Locale simile visto da 2 persone; uno fuori periodo (40 giorni fa) non conta.
+      e("apri_scheda", 14, "a6", { gid: "GS1" }), e("apri_scheda", 14, "a7", { gid: "GS2" }),
+    ];
+    const salvati = [{ place_id: L.id, user_id: "00000000-0000-0000-0000-0000000000c1", created_at: at(13), tags: ["Già visitato"] }];
+    const p = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi, salvati }, 7, now);
+    const az = Object.fromEntries(p.azioni.map((a) => [a.tipo, a.persone]));
+    ok(az.apri_scheda === 3 && az.salva === 2 && az.ci_sono_stato === 1 && az.percorso === 1, `ristoratore: persone per azione, con Place ID Google e salvataggi veri (${JSON.stringify(az)})`);
+    ok(p.daRicerca.ricerche === 1 && p.daRicerca.tipi[0]?.chiave === "trattoria" && p.daRicerca.richieste.some((r) => r.chiave === "tavoli all'aperto") && p.daRicerca.zone[0]?.chiave === "Pigneto", `ristoratore: 'come ti trovano' dalla ricerca della stessa visita (${JSON.stringify(p.daRicerca.richieste)})`);
+    ok(p.zona.ricerche === 2 && !p.zona.richieste.some((r) => r.persone > 1) && p.zona.fasce.find((f) => f.chiave === "pranzo")?.persone === 1, `ristoratore: ricerche in zona (città o quartiere nell'indirizzo), non quelle di Milano (${p.zona.ricerche})`);
+    ok(p.confronto.simili === 2 && p.confronto.mediaViste === null, "ristoratore: con meno di 3 locali simili niente media (non rivelerebbe il singolo)");
+    ok(rs.mostraPersone(0) === "0" && rs.mostraPersone(2) === "meno di 3" && rs.mostraPersone(3) === "3" && p.pochiDati === false, "ristoratore: sotto 3 persone 'meno di 3'");
+    ok(p.perGiorno.length === 7 && p.perGiorno.at(-2).viste === 1, "ristoratore: andamento giorno per giorno");
+  }
+
+  const LOC = "44444444-0000-4000-8000-0000000000a1";
+  const locR = {
+    place: { id: LOC, name: "Osteria Pigneto", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GOSTERIA" },
+    synthesis: null,
+  };
+  const rctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const setCookie = (name, v) => rctx.addCookies([{ name, value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setCookie("e2e_locale", locR);
+  await rctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  let claim = null, claimMode = "ok", claimCalls = 0;
+  await rctx.route("**/rest/v1/claims**", (r) => {
+    claimCalls++;
+    if (r.request().method() !== "POST") return r.fulfill({ json: [] });
+    claim = r.request().postDataJSON();
+    if (claimMode === "manca") return r.fulfill({ status: 404, json: { code: "PGRST205", message: "Could not find the table 'public.claims' in the schema cache", details: null, hint: null } });
+    return r.fulfill({ status: 201, body: "" });
+  });
+  const rp = await rctx.newPage();
+  rp.on("pageerror", (err) => errors.push(err.message));
+
+  // Pagina del locale: invito discreto, niente badge finché non è verificato.
+  await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+  ok((await rp.getByTestId("rivendica-locale").getAttribute("href")) === `/per-i-ristoratori/rivendica?locale=${LOC}` && (await rp.getByTestId("locale-verificato").count()) === 0, "locale: 'Sei il titolare? Rivendica questo locale' porta al modulo, senza badge");
+  await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
+  await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+  ok(await rp.getByTestId("locale-verificato").isVisible() && (await rp.getByTestId("rivendica-locale").count()) === 0, "locale verificato: badge 'Verificato dal titolare' e niente invito a rivendicare");
+  await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
+  await setCookie("e2e_locale", locR);
+
+  // Modulo: con l'accesso la richiesta va in claims con UUID e Place ID del locale.
+  const fill = async () => {
+    await rp.getByLabel("Nome e cognome").fill("Maria Rossi");
+    await rp.getByLabel("Ruolo").selectOption("Titolare");
+    await rp.getByLabel("Telefono").fill("+39 333 1234567");
+    await rp.getByLabel("Email").fill("maria@example.com");
+    await rp.getByLabel(/Messaggio/).fill("Chiamatemi dopo le 15");
+  };
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  ok((await rp.getByTestId("rivendica-scheda").textContent())?.includes("Osteria Pigneto") && (await rp.getByLabel("Nome del locale").count()) === 0, "rivendica: mostra il locale, senza chiedere di nuovo nome e città");
+  await fill();
+  { const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `rivendica: niente scorrimento orizzontale sul telefono (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/71-rivendica-modulo.png`, caret: "initial", fullPage: true });
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-inviata").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await rp.getByTestId("rivendica-inviata").isVisible() && claim?.place_id === LOC && claim?.google_place_id === "GOSTERIA" && claim?.user_id === "00000000-0000-0000-0000-000000000001" && claim?.nome === "Maria Rossi" && claim?.ruolo === "Titolare" && claim?.messaggio === "Chiamatemi dopo le 15" && !("stato" in claim), `rivendica: richiesta salvata in claims e conferma (${JSON.stringify(claim)?.slice(0, 120)})`);
+  await rp.screenshot({ path: `${OUT}/72-rivendica-inviata.png`, caret: "initial" });
+
+  // Senza tabella (migrazione non applicata): email precompilata a Mapetite con gli stessi dati.
+  claimMode = "manca"; claim = null;
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  await fill();
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-ripiego").waitFor({ timeout: 5000 }).catch(() => {});
+  { const href = decodeURIComponent((await rp.getByTestId("rivendica-email").getAttribute("href").catch(() => "")) ?? "");
+    ok(claim !== null && href.startsWith("mailto:founder.mapetite@gmail.com") && href.includes("Osteria Pigneto") && href.includes("Maria Rossi") && href.includes("+39 333 1234567") && href.includes(LOC), "rivendica senza tabella claims: prepara l'email con i dati del modulo"); }
+  await rp.screenshot({ path: `${OUT}/73-rivendica-ripiego-email.png`, caret: "initial" });
+
+  // Senza accesso: nessuna scrittura, email e invito ad accedere. Senza locale: nome e città a mano.
+  await rctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  claimCalls = 0;
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica`, { waitUntil: "networkidle" });
+  ok(await rp.getByTestId("rivendica-accedi").isVisible() && (await rp.getByLabel("Nome del locale").count()) === 1, "rivendica senza accesso e senza locale: chiede nome e città e invita ad accedere");
+  await rp.getByLabel("Nome del locale").fill("Bar Sport");
+  await rp.getByLabel("Città").fill("Milano");
+  await fill();
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-ripiego").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await rp.getByTestId("rivendica-ripiego").isVisible() && claimCalls === 0 && decodeURIComponent((await rp.getByTestId("rivendica-email").getAttribute("href")) ?? "").includes("Città: Milano"), "rivendica senza accesso: nessuna scrittura, email precompilata");
+  await rctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Pannello del ristoratore: senza essere admin o titolare non esiste.
+  { const a = await rp.request.get(`${BASE}/ristoratore/${LOC}`); const b = await rp.request.get(`${BASE}/ristoratore/non-un-id`);
+    ok(a.status() === 404 && b.status() === 404, `pannello ristoratore: vietato a chi non è admin o titolare (404: ${a.status()}/${b.status()})`); }
+  // Con dati finti (cookie e2e_ristoratore, solo in sviluppo): pochi dati → messaggio onesto e soglia.
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const Lr = { id: LOC, name: "Osteria Pigneto", address: locR.place.address, category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GOSTERIA" };
+  await setCookie("e2e_ristoratore", {
+    locale: Lr, simili: [Lr], verificato: true, salvati: [],
+    eventi: [
+      { created_at: iso(60), type: "ricerca", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], zona: "Pigneto" } },
+      { created_at: iso(59), type: "apri_scheda", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: "GOSTERIA", props: { fonte: "ricerca" } },
+      { created_at: iso(30), type: "apri_scheda", user_id: null, anon_id: "x2", session_id: "s2", place_id: LOC, google_place_id: null, props: { fonte: "mappa" } },
+    ],
+  });
+  { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
+    ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
+    ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
+    const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
+
+  // Esempio dimostrativo: etichetta in cima, numeri pieni, periodo 7/30 giorni.
+  { const r = await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+    const lab = rp.getByTestId("pannello-demo-etichetta");
+    const box = await lab.boundingBox();
+    ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
+    ok((await rp.getByTestId("pannello-pochi-dati").count()) === 0 && await rp.getByTestId("pannello-confronto").isVisible() && await rp.getByTestId("pannello-fasce").isVisible() && await rp.getByTestId("pannello-andamento").isVisible(), "pannello demo: confronto con la zona, fasce orarie e andamento");
+    const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });
+  await rp.screenshot({ path: `${OUT}/76-pannello-demo-intero.png`, caret: "initial", fullPage: true });
+  await rp.getByRole("link", { name: "Ultimi 7 giorni" }).click();
+  await rp.waitForURL((u) => u.searchParams.get("giorni") === "7", { timeout: 8000 }).catch(() => {});
+  ok((await rp.getByRole("link", { name: "Ultimi 7 giorni" }).getAttribute("aria-current")) === "page", "pannello demo: si passa agli ultimi 7 giorni");
+
+  // Su computer.
+  await rp.setViewportSize({ width: 1280, height: 800 });
+  await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/77-pannello-demo-computer.png`, caret: "initial", fullPage: true });
+  await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/78-pannello-ristoratore-computer.png`, caret: "initial", fullPage: true });
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/79-rivendica-computer.png`, caret: "initial", fullPage: true });
   await rctx.close();
 }
 

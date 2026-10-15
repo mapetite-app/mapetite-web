@@ -1,0 +1,274 @@
+// Prenotazione assistita (piano 1.3): capire giorno, ora e persone da una frase
+// ("prenotami domani alle 21 per 2 con terrazza a Roma") SENZA AI, e scrivere il messaggio
+// per il locale. Nessun dato inventato: Mapetite non vede i tavoli liberi, la conferma arriva
+// sempre dal locale. Nessun import con alias: il giro automatico importa questo file da Node.
+
+export type BookingDetails = {
+  date: string | null;    // "AAAA-MM-GG" (giorno locale del telefono)
+  time: string | null;    // "HH:MM"
+  people: number | null;
+  special: string | null; // richiesta speciale già in italiano: "in terrazza", "all'aperto"…
+};
+
+export type ParsedBooking = BookingDetails & {
+  isBooking: boolean;     // la frase chiede di prenotare
+  search: string | null;  // cosa cercare, senza giorno/ora/persone (null = solo dettagli)
+};
+
+const WEEKDAYS = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+// Niente \b dopo "ì": in JavaScript \b conosce solo le lettere senza accento.
+const WEEKDAY_STEMS: [string, number][] = [
+  ["domenica", 0], ["luned[iì]", 1], ["marted[iì]", 2], ["mercoled[iì]", 3],
+  ["gioved[iì]", 4], ["venerd[iì]", 5], ["sabato", 6],
+];
+const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const NUMBER_WORDS: Record<string, number> = {
+  uno: 1, una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10,
+  undici: 11, dodici: 12,
+};
+const NUM = `(\\d{1,2}|${Object.keys(NUMBER_WORDS).join("|")})`;
+// Per le persone niente "uno/una" ("prenota per una cena") e niente "sei" ("sei libero?").
+const PEOPLE_NUM = `(\\d{1,2}|${Object.keys(NUMBER_WORDS).filter((w) => !["uno", "una", "sei"].includes(w)).join("|")})`;
+const toNum = (s: string): number => (/^\d+$/.test(s) ? Number(s) : NUMBER_WORDS[s] ?? NaN);
+
+export function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+export function fromKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Le parti riconosciute vengono tolte dal testo: quello che resta è cosa cercare.
+type Cut = { re: RegExp };
+
+export function parseBooking(text: string, now: Date = new Date()): ParsedBooking {
+  const t = ` ${text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim()} `;
+  const cuts: Cut[] = [];
+  const take = (re: RegExp) => { cuts.push({ re }); };
+
+  let isBooking = /\bprenot|\btavolo\b/.test(t);
+
+  // Giorno
+  let date: string | null = null;
+  let evening = /\b(stasera|sera|cena|stanotte)\b/.test(t);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (/\bdopodomani\b/.test(t)) { date = dateKey(addDays(today, 2)); take(/\bdopodomani( sera| a cena| a pranzo)?\b/); }
+  else if (/\bdomani\b/.test(t)) { date = dateKey(addDays(today, 1)); take(/\bdomani( sera| a cena| a pranzo)?\b/); }
+  else if (/\b(stasera|stanotte|oggi)\b/.test(t)) { date = dateKey(today); take(/\b(stasera|stanotte|oggi( a pranzo| a cena)?)\b/); }
+  if (!date) {
+    // "il 18 ottobre", "18/10", "il 18"
+    const dm = t.match(/\b(?:il |per il )?(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b/);
+    const dn = t.match(new RegExp(`\\b(?:il |per il )?(\\d{1,2}) (${MONTHS.join("|")})\\b`));
+    const dd = t.match(/\b(?:il|per il) (\d{1,2})\b(?! ?(?:persone|person|euro|€|km|:|\.\d))/);
+    let day = NaN, month = NaN;
+    if (dm) { day = Number(dm[1]); month = Number(dm[2]) - 1; take(/\b(?:il |per il )?\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/); }
+    else if (dn) { day = Number(dn[1]); month = MONTHS.indexOf(dn[2]); take(new RegExp(`\\b(?:il |per il )?\\d{1,2} (${MONTHS.join("|")})\\b`)); }
+    else if (dd && isBooking) { day = Number(dd[1]); month = today.getMonth(); if (day < today.getDate()) month++; take(/\b(?:il|per il) \d{1,2}\b/); }
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 12) {
+      let d = new Date(today.getFullYear(), month, day);
+      if (d < today) d = new Date(today.getFullYear() + 1, month, day);
+      date = dateKey(d);
+    }
+  }
+  if (!date) {
+    for (const [stem, wd] of WEEKDAY_STEMS) {
+      if (new RegExp(`\\b${stem}(?![a-z])`).test(t)) {
+        const diff = (wd - today.getDay() + 7) % 7;
+        date = dateKey(addDays(today, diff));
+        take(new RegExp(`\\b(?:per |di )?${stem}( prossim[oa])?( sera| a cena| a pranzo)?(?![a-z])`));
+        break;
+      }
+    }
+  }
+
+  // Ora: "alle 21", "alle 21:30", "alle 9 e mezza", "ore 20", "per le 20.30"
+  let time: string | null = null;
+  const tm = t.match(new RegExp(`\\b(?:alle|ore|per le|verso le|h)\\s?${NUM}(?:[:.](\\d{2}))?( e mezza| e un quarto| e trenta)?\\b`))
+    ?? t.match(/\b(\d{1,2})[:.](\d{2})\b/);
+  if (tm) {
+    let h = toNum(tm[1]);
+    let m = tm[2] ? Number(tm[2]) : 0;
+    if (tm[3]?.includes("mezza") || tm[3]?.includes("trenta")) m = 30;
+    if (tm[3]?.includes("quarto")) m = 15;
+    // "alle 9 stasera", "alle 8 a cena": di sera.
+    if (h >= 1 && h <= 11 && (evening || h <= 6)) h += 12;
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      time = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      take(new RegExp(`\\b(?:alle|ore|per le|verso le|h)\\s?${NUM}(?:[:.]\\d{2})?( e mezza| e un quarto| e trenta)?\\b`));
+      take(/\b\d{1,2}[:.]\d{2}\b/);
+    }
+  }
+  if (time) evening = evening || Number(time.slice(0, 2)) >= 18;
+
+  // Persone: "per 2", "in 4", "per due", "2 persone", "siamo in 3", "per noi due"
+  let people: number | null = null;
+  const pm = t.match(new RegExp(`\\b(?:siamo in|tavolo per|per|in|x)\\s(?:noi\\s)?${PEOPLE_NUM}(?: persone| person[ae]| adulti)?\\b(?![:.\\/]\\d)`))
+    ?? t.match(new RegExp(`\\b${PEOPLE_NUM} (?:persone|adulti|coperti)\\b`));
+  if (pm) {
+    const n = toNum(pm[1]);
+    if (n >= 1 && n <= 30) {
+      people = n;
+      take(new RegExp(`\\b(?:siamo in|tavolo per|per|in|x)\\s(?:noi\\s)?${PEOPLE_NUM}(?: persone| person[ae]| adulti)?\\b(?![:.\\/]\\d)`));
+      take(new RegExp(`\\b${PEOPLE_NUM} (?:persone|adulti|coperti)\\b`));
+    }
+  } else if (/\b(in due|per due|in coppia|io e (la mia|il mio)|anniversario)\b/.test(t)) {
+    people = 2;
+  }
+
+  // "siamo in 5 venerdì sera": persone e giorno insieme sono già una prenotazione.
+  if (!isBooking && people && people !== 2 && (date || time)) isBooking = true;
+  if (!isBooking && people && /\b(siamo in|tavolo)\b/.test(t)) isBooking = true;
+
+  // Richiesta speciale per il messaggio (solo ciò che è scritto).
+  const wishes: string[] = [];
+  if (/terrazz/.test(t)) wishes.push("in terrazza");
+  else if (/all'aperto|all aperto|\bfuori\b|dehors|esterno|giardino/.test(t)) wishes.push("all'aperto");
+  if (/\bvista\b/.test(t)) wishes.push("con vista");
+  if (/tranquill|appartat|riservat/.test(t)) wishes.push("in un tavolo tranquillo");
+  if (/seggiolon|passeggino|bambin/.test(t)) wishes.push("con un seggiolone per un bambino");
+  if (/senza glutine|celiac/.test(t)) wishes.push("con attenzione al senza glutine");
+  if (/\bcane\b|\bcani\b/.test(t)) wishes.push("con un cane");
+  const special = wishes.length ? wishes.join(", ") : null;
+
+  // Cosa cercare: la frase senza le parti di prenotazione.
+  let rest = t;
+  for (const c of cuts) rest = rest.replace(c.re, " ");
+  rest = rest
+    .replace(/\b(vorrei |voglio |puoi |mi |ci )?(prenotami|prenotaci|prenota|prenotare|prenotazione|prenoti)\b/g, " ")
+    .replace(/\b(trovami|trovaci|cercami|cerca)\b/g, " ")
+    .replace(/\bun tavolo\b|\btavolo\b/g, " ")
+    .replace(/\b(per favore|grazie)\b/g, " ")
+    .replace(/[,.!?]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:(?:e|per|a|da|un|una|di)\s+)+/, "")
+    .replace(/(?:\s+(?:e|per|a|da|di))+$/, "")
+    .trim();
+  const meaningful = rest.replace(/\b(a|ad|in|per|con|e|un|una|il|la|lo|di|da|noi|sera|a cena|cena|a pranzo|pranzo)\b/g, "").trim();
+  let search: string | null = meaningful.length >= 3 ? rest : null;
+  // "prenotami … con terrazza a Roma": senza il tipo di locale si cerca un ristorante (si prenota lì).
+  const hasType = /\b(ristorant|trattori|osteri|pizzeri|sushi|bar|pub|enotec|bistr|cocktail|aperitiv|brunch|colazion|cena|pranzo|rooftop|locale|posto|steak|braceri|giappones|cines|indian|messican|vegan|vegetarian|pesce|carne|gelat|pasticc|caff|forno|hamburger|burger|ramen|taverna|tapas|wine)/.test(rest);
+  if (search && isBooking && !hasType) search = `ristorante ${search}`;
+  if (!search && isBooking && (date || time || people) && special) search = `ristorante ${special}`;
+  if (search && /\b(a cena|cena)\b/.test(t) && !/\bcena\b/.test(search) && isBooking && !hasType) search = search.replace(/^ristorante/, "ristorante per cena");
+
+  return { isBooking, date, time, people, special, search: search ? search.slice(0, 200) : null };
+}
+
+// "oggi", "domani", "sabato 18/10"
+export function dayLabel(date: string, now: Date = new Date()): string {
+  const d = fromKey(date);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  const dm = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  if (diff === 0) return `oggi ${dm}`;
+  if (diff === 1) return `domani ${dm}`;
+  return `${WEEKDAYS[d.getDay()]} ${dm}`;
+}
+
+// Cosa manca per poter scrivere al locale.
+export function missingDetails(b: BookingDetails): ("persone" | "giorno" | "ora")[] {
+  const out: ("persone" | "giorno" | "ora")[] = [];
+  if (!b.people) out.push("persone");
+  if (!b.date) out.push("giorno");
+  if (!b.time) out.push("ora");
+  return out;
+}
+
+// Il messaggio per il locale: cortese, breve, modificabile. Solo dati scelti dall'utente.
+export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date()): string {
+  const greeting = now.getHours() < 13 ? "Buongiorno" : "Buonasera";
+  const parts = [`${greeting}, vorrei prenotare un tavolo`];
+  if (b.people) parts.push(` per ${b.people} ${b.people === 1 ? "persona" : "persone"}`);
+  if (b.date) parts.push(` ${dayLabel(b.date, now)}`);
+  if (b.time) parts.push(` alle ${b.time}`);
+  if (b.special) parts.push(`, ${b.special} se possibile`);
+  parts.push(". È disponibile?");
+  const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
+  return `${parts.join("")} ${sign}`;
+}
+
+// Numero per WhatsApp: solo i cellulari italiani (3xx) o numeri già internazionali.
+// Un fisso di solito non ha WhatsApp: meglio non proporre una via che non funziona.
+export function whatsappNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const clean = phone.replace(/[^\d+]/g, "");
+  if (clean.startsWith("+39")) return /^\+393\d{8,9}$/.test(clean) ? clean.slice(1) : null;
+  if (clean.startsWith("0039")) return /^00393\d{8,9}$/.test(clean) ? clean.slice(2) : null;
+  if (clean.startsWith("+")) return null; // estero: non sappiamo se è un cellulare
+  return /^3\d{8,9}$/.test(clean) ? `39${clean}` : null;
+}
+
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+// ── Prenotazioni richieste, salvate nel telefono (localStorage) ──
+export type BookingRequest = BookingDetails & {
+  id: string;
+  placeId: string;
+  placeName: string;
+  lat: number | null;
+  lng: number | null;
+  via: "whatsapp" | "telefono" | "sito" | "copiato";
+  createdAt: number;
+  outcome?: "bene" | "male" | "non-andato" | null;
+  dismissed?: boolean;
+};
+
+const KEY = "mapetite.prenotazioni";
+const listeners = new Set<() => void>();
+let cacheRaw: string | null = null;
+let cacheList: BookingRequest[] = [];
+
+export function loadBookings(): BookingRequest[] {
+  try {
+    const raw = window.localStorage.getItem(KEY) ?? "[]";
+    if (raw === cacheRaw) return cacheList;
+    const list = JSON.parse(raw);
+    cacheRaw = raw;
+    cacheList = Array.isArray(list) ? list.filter((b) => b && typeof b.placeName === "string") : [];
+    return cacheList;
+  } catch {
+    return cacheList;
+  }
+}
+function storeBookings(list: BookingRequest[]) {
+  try { window.localStorage.setItem(KEY, JSON.stringify(list.slice(-30))); } catch { /* storage pieno o non disponibile */ }
+  listeners.forEach((l) => l());
+}
+export function subscribeBookings(cb: () => void): () => void {
+  listeners.add(cb);
+  const onStorage = (e: StorageEvent) => { if (e.key === KEY) cb(); };
+  window.addEventListener("storage", onStorage);
+  return () => { listeners.delete(cb); window.removeEventListener("storage", onStorage); };
+}
+export function addBooking(b: Omit<BookingRequest, "id" | "createdAt">): BookingRequest {
+  const full: BookingRequest = { ...b, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: Date.now() };
+  storeBookings([...loadBookings(), full]);
+  return full;
+}
+export function updateBooking(id: string, patch: Partial<BookingRequest>) {
+  storeBookings(loadBookings().map((b) => (b.id === id ? { ...b, ...patch } : b)));
+}
+export function removeBooking(id: string) {
+  storeBookings(loadBookings().filter((b) => b.id !== id));
+}
+
+// Cosa ricordare oggi: la prenotazione di oggi (promemoria) e, dal giorno dopo e per 3 giorni,
+// "Com'è andata?" su quelle passate ancora senza risposta.
+export function bookingReminders(list: BookingRequest[], now: Date = new Date()): { today: BookingRequest[]; howWasIt: BookingRequest[] } {
+  const todayKey = dateKey(now);
+  const oldest = dateKey(addDays(now, -3));
+  const live = list.filter((b) => b.date && !b.dismissed);
+  return {
+    today: live.filter((b) => b.date === todayKey).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+    howWasIt: live.filter((b) => b.date! < todayKey && b.date! >= oldest && !b.outcome),
+  };
+}

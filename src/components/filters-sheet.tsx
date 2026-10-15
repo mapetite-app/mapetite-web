@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CUISINES, OCCASIONS, FEATURES, OPEN_AT } from "@/lib/filter-options";
+import { trackFeature } from "@/lib/track";
 
 export type Filters = {
   // "Dove?": zona, quartiere, via o città scritti a mano ("" = intorno alla mappa).
@@ -12,6 +14,11 @@ export type Filters = {
   minReviews: number | null;
   openNowOnly: boolean;
   categories: string[];
+  cuisines: string[];
+  occasion: string | null;
+  features: string[];
+  // "Aperto a un'ora scelta": id di OPEN_AT ("stasera", "domani-pranzo"…); il giorno si calcola alla ricerca.
+  openAt: string | null;
 };
 
 export const EMPTY_FILTERS: Filters = {
@@ -23,6 +30,10 @@ export const EMPTY_FILTERS: Filters = {
   minReviews: null,
   openNowOnly: false,
   categories: [],
+  cuisines: [],
+  occasion: null,
+  features: [],
+  openAt: null,
 };
 
 export const CATEGORIES = [
@@ -40,15 +51,24 @@ export const CATEGORIES = [
   { id: "wine_bar", label: "Wine Bar", emoji: "🍷" },
 ];
 
+// Filtri salvati prima delle nuove sezioni (stato vecchio, link): i campi mancanti diventano vuoti.
+export function withDefaults(f: Partial<Filters>): Filters {
+  return { ...EMPTY_FILTERS, ...f };
+}
+
 export function countActive(f: Filters): number {
+  f = withDefaults(f);
   let n = 0;
   if (f.zona.trim()) n++;
   if (f.radiusKm != null && !f.zona.trim()) n++;
   if (f.minRating != null) n++;
   if (f.minPriceLevel != null || f.maxPriceLevel != null) n++;
   if (f.minReviews != null) n++;
-  if (f.openNowOnly) n++;
+  if (f.openNowOnly || f.openAt) n++;
   if (f.categories.length > 0) n++;
+  if (f.cuisines.length > 0) n++;
+  if (f.occasion) n++;
+  n += f.features.length;
   return n;
 }
 
@@ -86,6 +106,9 @@ const REVIEW_OPTIONS: { label: string; value: number | null }[] = [
   { label: "500+", value: 500 },
 ];
 
+// Sezioni lunghe (cucina, caratteristiche): le prime 6, poi "Mostra tutte".
+const SHORT_LIST = 6;
+
 const PRICE_LEVELS = [
   { label: "€", value: 1 },
   { label: "€€", value: 2 },
@@ -107,10 +130,12 @@ export default function FiltersSheet({
   // Città in cui è la mappa (per le zone suggerite e "Tutta Roma").
   city?: string | null;
 }) {
-  const [local, setLocal] = useState<Filters>(filters);
+  const [local, setLocal] = useState<Filters>(() => withDefaults(filters));
+  const [allCuisines, setAllCuisines] = useState(false);
+  const [allFeatures, setAllFeatures] = useState(false);
 
   useEffect(() => {
-    if (isOpen) setLocal(filters);
+    if (isOpen) setLocal(withDefaults(filters));
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
@@ -124,6 +149,31 @@ export default function FiltersSheet({
         ? prev.categories.filter((c) => c !== id)
         : [...prev.categories, id],
     }));
+
+  const toggleIn = (key: "cuisines" | "features", id: string) =>
+    setLocal((prev) => ({
+      ...prev,
+      [key]: prev[key].includes(id) ? prev[key].filter((c) => c !== id) : [...prev[key], id],
+    }));
+
+  // Una scelta nascosta dietro "Mostra tutte" resta visibile: si vede sempre cosa è attivo.
+  const visible = <T extends { id: string }>(list: T[], all: boolean, chosen: string[]) =>
+    all ? list : list.filter((x, i) => i < SHORT_LIST || chosen.includes(x.id));
+
+  const optionChips = (list: { id: string; label: string; emoji: string }[], isOn: (id: string) => boolean, onTap: (id: string) => void) =>
+    list.map(({ id, label, emoji }) => (
+      <button key={id} type="button" aria-pressed={isOn(id)} onClick={() => onTap(id)} className={`${chip(isOn(id))} flex items-center gap-1.5 px-3.5`}>
+        <span aria-hidden>{emoji}</span>
+        <span>{label}</span>
+      </button>
+    ));
+
+  const moreButton = (list: unknown[], all: boolean, toggle: () => void, testId: string) =>
+    list.length > SHORT_LIST && (
+      <button type="button" data-testid={testId} onClick={toggle} className="min-h-10 px-2 font-display text-sm font-semibold text-brand underline-offset-2 hover:underline">
+        {all ? "Mostra meno" : `Mostra tutte (${list.length})`}
+      </button>
+    );
 
   const setPriceLevel = (value: number) =>
     setLocal((prev) => {
@@ -158,7 +208,7 @@ export default function FiltersSheet({
         <div className="flex items-start justify-between px-5 pb-3 pt-1">
           <div>
             <span className="font-display text-lg font-semibold text-text">Filtri</span>
-            <p className="text-xs font-sans text-text-muted">Scegli tipo, zona, prezzo e voto: senza scrivere niente.</p>
+            <p className="text-xs font-sans text-text-muted">Tipo, cucina, occasione, zona e orario: senza scrivere niente.</p>
           </div>
           <button
             type="button"
@@ -192,6 +242,23 @@ export default function FiltersSheet({
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Cucina: entra nel testo della ricerca ("ristorante cucina romana") */}
+          <section data-testid="filtri-cucina">
+            <span className="font-display text-sm font-semibold text-text block mb-2">Che cucina?</span>
+            <div className="flex flex-wrap gap-2">
+              {optionChips(visible(CUISINES, allCuisines, local.cuisines), (id) => local.cuisines.includes(id), (id) => toggleIn("cuisines", id))}
+              {moreButton(CUISINES, allCuisines, () => setAllCuisines((v) => !v), "cucina-tutte")}
+            </div>
+          </section>
+
+          {/* Occasione: una sola scelta */}
+          <section data-testid="filtri-occasione">
+            <span className="font-display text-sm font-semibold text-text block mb-2">Per quale occasione?</span>
+            <div className="flex flex-wrap gap-2">
+              {optionChips(OCCASIONS, (id) => local.occasion === id, (id) => setLocal((p) => ({ ...p, occasion: p.occasion === id ? null : id })))}
             </div>
           </section>
 
@@ -246,6 +313,15 @@ export default function FiltersSheet({
           </section>
           )}
 
+          {/* Caratteristiche: più scelte insieme */}
+          <section data-testid="filtri-caratteristiche">
+            <span className="font-display text-sm font-semibold text-text block mb-2">Cosa deve avere?</span>
+            <div className="flex flex-wrap gap-2">
+              {optionChips(visible(FEATURES, allFeatures, local.features), (id) => local.features.includes(id), (id) => toggleIn("features", id))}
+              {moreButton(FEATURES, allFeatures, () => setAllFeatures((v) => !v), "caratteristiche-tutte")}
+            </div>
+          </section>
+
           {/* Prezzo */}
           <section>
             <span className="font-display text-sm font-semibold text-text block mb-2">Prezzo</span>
@@ -288,29 +364,22 @@ export default function FiltersSheet({
             </div>
           </section>
 
-          {/* Solo aperti */}
-          <section className="flex items-center justify-between">
-            <span id="filtro-aperti" className="font-display text-sm font-semibold text-text">
-              Solo aperti adesso
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-labelledby="filtro-aperti"
-              aria-checked={local.openNowOnly}
-              onClick={() => setLocal((p) => ({ ...p, openNowOnly: !p.openNowOnly }))}
-              className={[
-                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 transition-colors before:absolute before:-inset-x-1 before:-inset-y-2",
-                local.openNowOnly ? "bg-brand border-brand" : "bg-surface border-border",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "inline-block h-5 w-5 rounded-full bg-white shadow transition-transform",
-                  local.openNowOnly ? "translate-x-5" : "translate-x-0.5",
-                ].join(" ")}
-              />
-            </button>
+          {/* Quando: aperti adesso o a un'ora scelta (orari di Google) */}
+          <section data-testid="filtri-quando">
+            <span className="font-display text-sm font-semibold text-text block mb-2">Aperto quando?</span>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" aria-pressed={!local.openNowOnly && !local.openAt} onClick={() => setLocal((p) => ({ ...p, openNowOnly: false, openAt: null }))} className={chip(!local.openNowOnly && !local.openAt)}>
+                Qualsiasi
+              </button>
+              <button type="button" aria-pressed={local.openNowOnly && !local.openAt} onClick={() => setLocal((p) => ({ ...p, openNowOnly: !(p.openNowOnly && !p.openAt), openAt: null }))} className={chip(local.openNowOnly && !local.openAt)}>
+                Adesso
+              </button>
+              {OPEN_AT.map(({ id, label }) => (
+                <button key={id} type="button" aria-pressed={local.openAt === id} onClick={() => setLocal((p) => ({ ...p, openNowOnly: false, openAt: p.openAt === id ? null : id }))} className={chip(local.openAt === id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </section>
         </div>
 
@@ -320,7 +389,7 @@ export default function FiltersSheet({
             type="button"
             // Prima si chiude il pannello, poi si cerca: nei salvati la lista si apre subito
             // e un CLOSE dopo la richiuderebbe.
-            onClick={() => { onClose(); onApply(local); }}
+            onClick={() => { trackFeature("filtri"); onClose(); onApply(local); }}
             className="w-full rounded-pill bg-brand py-3 font-display text-base font-semibold text-white hover:opacity-90 active:scale-95 transition-transform"
           >
             {active > 0 ? `Applica filtri (${active})` : "Applica filtri"}

@@ -7,6 +7,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
+import { trackFeature } from "@/lib/track";
 
 function errorText(e: unknown): string {
   if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
@@ -58,6 +59,7 @@ export default function ManualAddCard({
     const q = raw.trim();
     if (!userId || !q) return;
     if (q === searchedFor && results) { setSaved(null); return; } // stessa frase: niente seconda chiamata a Google
+    trackFeature("import_manuale");
     setSearching(true);
     setError(null);
     setSaved(null);

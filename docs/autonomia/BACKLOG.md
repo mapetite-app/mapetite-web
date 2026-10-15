@@ -7,7 +7,8 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-**In corso adesso:** nessuna sessione (giorno 15/10 chiuso).
+**Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
+**In corso adesso:** nessuna sessione (giorno 15/10 chiuso, tutto in produzione con la PR del pomeriggio).
 **Aggiornato 15/10 alle 07:15 (sessione delle 05:00).** Fatto: card che non saltano quando arriva il verdetto; carosello che resta sul locale più adatto dopo il riordino; mappa che torna com'era chiudendo la scheda; tolte le pagine vecchie. **Ancora bloccati dall'ambiente (non da Lorenzo):** modificare `LORENZO.md` e leggere/scrivere il database di produzione (migrazione `events`).
 **Aggiornato 15/10 alle 01:00 (sessione delle 00:05).** Fatto: frasi già capite senza riaspettare l'AI; "trattoria a Monti" con 20 risultati del rione invece di 1; onboarding solo dopo la registrazione; link di Google Maps senza coordinate salvabili; verdetti che si rinnovano dopo 90 giorni; 5 decisioni aperte chiuse. **Bloccato dai permessi dell'ambiente (serve Lorenzo):** modificare `LORENZO.md`, leggere/scrivere il database di produzione (migrazione `events`), cancellare file (pagine vecchie).
 **Aggiornato 14/10 sera (sessione di giorno chiesta da Lorenzo, PR della sera).** Lorenzo ha dato carta bianca (resta suo solo budget e orari) e ha sbloccato chiave Haiku, token Vercel, rete per le foto, anteprime senza login. Fatto: prima prova con Haiku vero (verdetti 2× più veloci, locali più adatti in cima), 6 funzioni accese per tutti, "Salva da TikTok e YouTube". Foto vere viste per la prima volta. Da fare stanotte: migrazione `events` (token Supabase pronto dalla prossima sessione).
@@ -259,6 +260,11 @@ Nessun commento nuovo di Lorenzo e nessuna voce PRONTA. La sessione delle 22:00 
 - **Sbloccato da Lorenzo (permanente)**: migrazione `events` applicata in produzione (tabella creata, verificata con un evento di prova `anon_id = claude-verifica-15-10`); `LORENZO.md` aggiornato con le autorizzazioni.
 - **Ancora da fare a mano (Lorenzo)**: aggiungere al repository il file `.claude/settings.json` con i permessi di lettura di Supabase e Vercel (testo nel messaggio del 15/10): il filtro della sessione non permette a Claude di pubblicare i propri permessi.
 - **Prossimi passi**: "Per te" che impara dagli eventi; lista risultati più vicina a Places; prima card in 2 s dalla home; classifica personale; mappa dei salvati condivisibile.
+
+## Pomeriggio 15/10 (con Lorenzo, 5 sviluppatori in parallelo) — in produzione
+Piano completo in `PIANO-25-OTTOBRE.md` (e PDF). Fatte: 6.1 card stile Places; 8.3b Per i ristoratori; 6.3 sensazione da app; 2.2 filtri completi; 5.1–5.4 profili pubblici, segui, amici, condivisione; 7.1–7.5 tracciamento e pannello `/admin/numeri`; 1.1 e 1.3 assistente e prenotazione assistita (+ promemoria, parte di 1.5b); 2.4 prima card in 1,3 s (frase capita mentre si scrive); 2.3 suggerimento col meteo; 4.1–4.3 raccolte come cartelle, proposte dell'AI, classifica personale; 8.1–8.2 rivendica, badge Verificato, pannello del ristoratore ed esempio.
+Migrazioni applicate in produzione: events, events_tracking, social, classifica, ristoratori. Giro: 752 controlli TUTTO OK.
+Da fare dopo (dai resoconti): eventi dedicati per assistente/prenotazioni/raccolte; salvare dall'assistente; assistente con la frase capita in anticipo come la mappa; "Stasera alle 21" dopo le 23; controllo "password dimenticata" legato alla porta 3000; import in blocco da Takeout senza consumare quota.
 
 ## Cosa serve decidere (in ordine di impatto per il 25/10)
 1. ~~Merge della PR #32~~ (fatto 13/10). Resta: in Supabase → Authentication → URL Configuration aggiungere ai Redirect URLs `…/login*` e `…/reimposta-password`.

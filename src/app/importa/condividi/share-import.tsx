@@ -10,6 +10,7 @@ import { findVideoLink } from "@/lib/video-caption";
 import ManualAddCard from "../manual-add-card";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, rememberPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
+import { trackFeature } from "@/lib/track";
 
 function errorText(e: unknown): string {
   if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
@@ -65,6 +66,7 @@ export default function ShareImport({
     // Google, che costerebbe di nuovo 1 ricerca per link sulle 50 al giorno.
     const done = readDone(fullText);
     if (done) { void Promise.resolve(done).then((r) => { setResults(r); setBusy(false); }); return; }
+    trackFeature("import_condivisione");
     void save(userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

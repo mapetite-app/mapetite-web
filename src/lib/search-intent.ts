@@ -88,6 +88,27 @@ export async function extractSearchIntent(query: string): Promise<SearchIntent |
   return value;
 }
 
+// Intento capito prima, mentre la persona scriveva (/api/search/intent), rimandato dal telefono
+// con la ricerca: si ricontrolla con le stesse regole di Haiku (tipo Google da lista chiusa, testi
+// corti). Non dà più potere di quanto ne abbia già chi scrive la frase.
+export function sanitizeIntent(v: unknown): SearchIntent | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const queryGoogle = str(o.queryGoogle);
+  if (!queryGoogle) return null;
+  const inc = str(o.includedType);
+  return {
+    zona: str(o.zona),
+    vicino_a_me: o.vicino_a_me === true,
+    tipo: str(o.tipo),
+    includedType: inc && (ALLOWED_INCLUDED_TYPES as readonly string[]).includes(inc) ? inc : null,
+    requisiti: Array.isArray(o.requisiti)
+      ? o.requisiti.filter((r): r is string => typeof r === "string" && r.trim() !== "").map((r) => r.trim().slice(0, 60)).slice(0, 8)
+      : [],
+    queryGoogle,
+  };
+}
+
 async function askIntent(query: string): Promise<SearchIntent | null> {
   try {
     const message = await anthropic.messages.create(

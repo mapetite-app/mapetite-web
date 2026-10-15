@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Users } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
 import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
 import { withNext } from "@/lib/next-path";
@@ -120,6 +120,8 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
   const savedActive = onMap && vista === "salvati";
   const mapActive = onMap && !savedActive;
   const profileActive = pathname === "/profilo" || pathname.startsWith("/profilo/");
+  // Amici: il feed e i profili delle persone (/u/<nome>).
+  const friendsActive = pathname === "/amici" || pathname.startsWith("/u/");
   const authActive = pathname === "/login" || pathname === "/signup";
 
   return (
@@ -149,6 +151,17 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
         >
           <Bookmark aria-hidden className="w-6 h-6" strokeWidth={1.5} fill={savedActive ? "currentColor" : "none"} />
           <span className="text-[11px] font-display">Salvati</span>
+        </Link>
+
+        <Link
+          href="/amici"
+          aria-current={friendsActive ? "page" : undefined}
+          className={`flex flex-col items-center justify-center flex-1 min-h-14 gap-0.5 active:scale-95 transition-all duration-150 ${
+            friendsActive ? "text-brand" : "text-text-muted"
+          }`}
+        >
+          <Users aria-hidden className="w-6 h-6" strokeWidth={1.5} />
+          <span className="text-[11px] font-display">Amici</span>
         </Link>
 
         <Link
@@ -225,6 +238,18 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
           >
             <Bookmark aria-hidden className="w-6 h-6" strokeWidth={1.5} />
             Salvati
+          </Link>
+          <Link
+            href="/amici"
+            aria-current={friendsActive ? "page" : undefined}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-sm font-display transition-colors duration-150 ${
+              friendsActive
+                ? "text-white bg-brand"
+                : "text-text-muted hover:text-text hover:bg-brand-light"
+            }`}
+          >
+            <Users aria-hidden className="w-6 h-6" strokeWidth={1.5} />
+            Amici
           </Link>
           <Link
             href="/profilo"
