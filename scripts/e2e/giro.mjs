@@ -2314,6 +2314,227 @@ else {
   await rctx.close();
 }
 
+// 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
+//     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
+{
+  let bk = null;
+  try { bk = await import(new URL("../../src/lib/booking.ts", import.meta.url).href); } catch (e) { ok(false, `prenota: modulo src/lib/booking.ts importabile (${e.message})`); }
+  let as = null;
+  try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }
+  if (bk) {
+    const now = new Date(2026, 9, 15, 18, 0); // giovedì 15/10, ore 18
+    const r = bk.parseBooking("prenotami domani alle 21 per 2 con terrazza a Roma", now);
+    ok(r.isBooking && r.date === "2026-10-16" && r.time === "21:00" && r.people === 2 && r.special === "in terrazza" && r.search === "ristorante con terrazza a roma", `prenota: frase capita senza AI (${JSON.stringify(r)})`);
+    const s = bk.parseBooking("Prenota sabato alle 20:30 in 4 una trattoria a Testaccio", now);
+    ok(s.date === "2026-10-17" && s.time === "20:30" && s.people === 4 && s.search === "trattoria a testaccio", `prenota: "sabato", "20:30", "in 4" (${JSON.stringify(s)})`);
+    const t = bk.parseBooking("tavolo per 3 stasera alle 9 e mezza", now);
+    ok(t.date === "2026-10-15" && t.time === "21:30" && t.people === 3 && t.search === null, `prenota: "stasera alle 9 e mezza" = 21:30, solo dettagli (${JSON.stringify(t)})`);
+    const u = bk.parseBooking("prenota per una cena lunedì a Milano", now);
+    ok(u.people === null && u.date === "2026-10-19" && u.search === "cena a milano", `prenota: "per una cena" non sono persone; "lunedì" con l'accento (${JSON.stringify(u)})`);
+    ok(bk.parseBooking("per 4", now).people === 4 && bk.parseBooking("per 4", now).search === null, "prenota: 'per 4' aggiorna solo le persone");
+    const msg = bk.bookingMessage(r, "Lorenzo", now);
+    ok(msg === "Buonasera, vorrei prenotare un tavolo per 2 persone domani 16/10 alle 21:00, in terrazza se possibile. È disponibile? Grazie, Lorenzo", `prenota: messaggio già scritto (${msg})`);
+    ok(bk.whatsappNumber("347 123 4567") === "393471234567" && bk.whatsappNumber("06 1234 5678") === null && bk.whatsappNumber("+39 333 1234567") === "393331234567", "prenota: WhatsApp solo per i cellulari (un fisso non lo propone)");
+    const list = [
+      { id: "a", date: "2026-10-15", time: "21:00", placeName: "Oggi", via: "whatsapp" },
+      { id: "b", date: "2026-10-14", placeName: "Ieri", via: "telefono" },
+      { id: "c", date: "2026-10-14", placeName: "Ieri risposto", via: "telefono", outcome: "bene" },
+      { id: "d", date: "2026-10-01", placeName: "Vecchia", via: "sito" },
+    ];
+    const rem = bk.bookingReminders(list, now);
+    ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
+  }
+  if (as) {
+    ok(as.localRefineOf("più economici") === "economici" && as.localRefineOf("aperti ora") === "aperti" && as.localRefineOf("più vicini") === "vicini" && as.localRefineOf("meno conosciuti") === "meno-noti", "assistente: seguiti riconosciuti");
+    ok(as.localRefineOf("solo con terrazza") === null && as.localRefineOf("più economici ma a Monti") === null && as.localRefineOf("e dopo un cocktail bar economico in centro storico") === null, "assistente: i seguiti con nuovi requisiti o zone sono ricerche nuove");
+    const pl = [{ id: "x", lat: 0, lng: 0, priceLevel: 3, openNow: true, rating: 4.6, userRatingCount: 5000 }, { id: "y", lat: 0, lng: 0, priceLevel: 2, openNow: false, rating: 4.5, userRatingCount: 90 }];
+    ok(as.applyLocalRefine("economici", pl).places.map((p) => p.id).join() === "y" && as.applyLocalRefine("meno-noti", pl).places[0].id === "y" && as.applyLocalRefine("aperti", pl).places.map((p) => p.id).join() === "x", "assistente: filtri sui risultati già avuti");
+    ok(as.applyLocalRefine("vicini", pl, null) === null && as.applyLocalRefine("economici", [pl[0]]) === null, "assistente: senza dati (posizione, prezzi) si dice o si cerca di nuovo, niente di inventato");
+  }
+
+  const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const aEvents = [];
+  const searches = [];
+  await actx.route("**/api/events", (route) => { aEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+  await actx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  await actx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  await actx.route("https://wa.me/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
+  await actx.route("https://example.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>Sito</p>" }));
+  const A_PLACES = [
+    { ...PLACES[0], phone: "347 123 4567", priceLevel: 2 },
+    PLACES[1],
+    { ...PLACES[2], priceLevel: 3 },
+  ];
+  await actx.route("**/api/search", async (route) => {
+    searches.push(route.request().postDataJSON());
+    await new Promise((r) => setTimeout(r, 300));
+    return route.fulfill({ json: { ...SEARCH_FAST, risultati: A_PLACES } });
+  });
+  await actx.route("**/api/search/synthesis", async (route) => { await new Promise((r) => setTimeout(r, 600)); return route.fulfill({ json: { ...SYNTH, livelli: { P3: "alto" } } }); });
+  const ap = await actx.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  ap.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  const ashot = (n) => ap.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
+
+  // Ingresso dalla mappa e dalla home
+  await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("mappa-assistente").isVisible(), "mappa: 'Parla con l'assistente' sotto la barra (la barra resta la ricerca di oggi)");
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("home-assistente").isVisible(), "home: collegamento 'Parla con l'assistente'");
+  await ap.getByTestId("home-assistente").click();
+  await ap.waitForURL(/\/assistente/);
+  await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
+  ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
+  ok(await ap.getByTestId("assistente-campo").isVisible(), "assistente: campo per scrivere in basso");
+  { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 56, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
+  await ashot("50-assistente-benvenuto");
+
+  // Prenotazione assistita: una sola ricerca, senza le parole di giorno/ora/persone
+  await ap.getByTestId("assistente-campo").fill("prenotami domani alle 21 per 2 con terrazza a Roma");
+  await ap.keyboard.press("Enter");
+  await ap.getByTestId("assistente-attesa").waitFor({ timeout: 3000 }).then(() => ok(true, "assistente: 'Cerco i posti giusti…' mentre aspetta"), () => ok(false, "assistente: 'Cerco i posti giusti…' mentre aspetta"));
+  await ap.getByTestId("assistente-card").getByText("Terrazza Uno").waitFor({ timeout: 8000 });
+  ok(searches.length === 1 && searches[0].query === "ristorante con terrazza a roma" && searches[0].phase === "fast" && searches[0].searchIntent === "natural", `assistente: una ricerca, con la richiesta ripulita (${JSON.stringify(searches[0]?.query)})`);
+  const firstReply = await ap.getByTestId("assistente-risposta").first().textContent();
+  ok(firstReply.includes("2 persone") && firstReply.includes("alle 21:00") && firstReply.includes("domani"), `assistente: riepilogo della prenotazione nella risposta (${firstReply.slice(0, 90)}…)`);
+  ok(firstReply.includes("la conferma arriva sempre dal locale"), "assistente: dice con onestà che i tavoli liberi non li vede");
+  ok((await ap.getByTestId("assistente-card").getByText("Aperto ora").count()) === 0, "assistente: niente 'Aperto ora' se si prenota per un altro giorno (non direbbe niente)");
+  ok((await ap.getByTestId("assistente-verdetto-attesa").count()) >= 1, "assistente: segnaposto del verdetto mentre arriva");
+  await ap.getByTestId("assistente-card").getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 6000 });
+  ok(true, "assistente: il verdetto compare sulla card");
+  ok((await ap.getByTestId("assistente-card").getByText("Pub Fuori Tema").count()) === 0, "assistente: il locale escluso dai verdetti sparisce");
+  ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
+  ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
+  await ashot("51-assistente-prenotazione");
+
+  // Foglio Prenota
+  await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await ap.getByLabel("Il tuo nome").fill("Giulia");
+  const msg = await ap.getByTestId("prenota-messaggio").inputValue();
+  ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
+  ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
+  ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
+  await ap.getByTestId("prenota-messaggio").fill("Buonasera, un tavolo per 2 domani alle 21 in terrazza. Giulia");
+  await ap.getByRole("button", { name: "Una persona in più" }).click();
+  ok((await ap.getByTestId("prenota-messaggio").inputValue()).startsWith("Buonasera, un tavolo per 2 domani"), "prenota: il messaggio modificato a mano non viene riscritto");
+  await ap.getByRole("button", { name: "Rigenera" }).click();
+  ok((await ap.getByTestId("prenota-messaggio").inputValue()).includes("per 3 persone"), "prenota: persone modificabili, il messaggio si aggiorna");
+  { const w = await ap.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `prenota: niente scorrimento orizzontale (${w}px)`); }
+  await ashot("52-prenota-foglio");
+  const [popup] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-whatsapp").click()]);
+  ok(decodeURIComponent(popup.url()).includes("per 3 persone"), "prenota: WhatsApp si apre con il messaggio");
+  await popup.close();
+  await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-fatto").textContent()).includes("La conferma arriva dal locale"), "prenota: 'Prenotazione richiesta' con la conferma che arriva dal locale");
+  const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+  ok(saved.length === 1 && saved[0].via === "whatsapp" && saved[0].people === 3 && saved[0].time === "21:00" && saved[0].placeName === "Terrazza Uno", "prenota: richiesta salvata nel telefono");
+  ok(aEvents.some((e) => e.type === "chiama" && e.props?.da === "prenota" && e.props?.via === "whatsapp"), "prenota: segnale registrato (tipo esistente 'chiama', da prenota)");
+  await ashot("53-prenota-richiesta");
+  await ap.getByRole("button", { name: "Fatto" }).click();
+
+  // Seguiti senza nuove ricerche
+  await ap.getByTestId("assistente-seguiti").getByRole("button", { name: "Più economici" }).click();
+  await ap.getByText("Senza una nuova ricerca: ho usato i posti di prima.").waitFor({ timeout: 3000 });
+  const lastCards = ap.getByTestId("assistente-card").last();
+  ok(searches.length === 1 && (await lastCards.getByText("Terrazza Uno").count()) === 1 && (await lastCards.getByText("Rooftop Tre").count()) === 0, "assistente: 'Più economici' filtra i posti di prima, nessuna chiamata Google");
+  await ap.getByTestId("assistente-campo").fill("per 4");
+  await ap.keyboard.press("Enter");
+  await ap.getByText(/Perfetto: 4 persone/).waitFor({ timeout: 3000 });
+  ok(searches.length === 1, "assistente: 'per 4' aggiorna la prenotazione senza cercare di nuovo");
+  await ap.getByTestId("assistente-campo").fill("solo con terrazza");
+  await ap.keyboard.press("Enter");
+  await ap.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length >= 3, null, { timeout: 8000 });
+  ok(searches.length === 2 && searches[1].query === "ristorante con terrazza a roma solo con terrazza", `assistente: 'solo con terrazza' riformula la richiesta di prima (${JSON.stringify(searches[1]?.query)})`);
+
+  // Card → scheda del locale, con Prenota e i dati già scelti
+  await ap.getByTestId("assistente-card").last().getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 6000 });
+  await ap.getByTestId("assistente-card").last().getByRole("button", { name: "Apri Terrazza Uno" }).click();
+  await ap.getByTestId("assistente-scheda").waitFor({ timeout: 3000 });
+  ok(await ap.getByTestId("assistente-scheda").getByTestId("verdetto-scheda").isVisible(), "assistente: tocco sulla card = scheda del locale con il verdetto");
+  ok(aEvents.some((e) => e.type === "apri_scheda" && e.props?.da === "assistente"), "assistente: apertura della scheda registrata");
+  await ap.getByTestId("prenota-scheda").click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-persone").textContent()) === "4", "scheda → Prenota: persone già scelte nella conversazione");
+  await ashot("54-scheda-prenota");
+  await ap.getByRole("dialog", { name: "Prenota da Terrazza Uno" }).getByRole("button", { name: "Chiudi" }).click();
+  await ap.getByTestId("assistente-scheda").click({ position: { x: 20, y: 20 } });
+
+  // La conversazione resta nel telefono
+  const bubbles = await ap.getByTestId("assistente-utente").count();
+  await ap.reload({ waitUntil: "networkidle" });
+  await ap.getByTestId("assistente-utente").first().waitFor({ timeout: 5000 });
+  ok((await ap.getByTestId("assistente-utente").count()) === bubbles && searches.length === 2, `assistente: dopo aver ricaricato la conversazione c'è ancora (${bubbles} messaggi), senza ricerche nuove`);
+  await ap.getByTestId("assistente-nuova").click();
+  ok(await ap.getByTestId("assistente-benvenuto").isVisible(), "assistente: 'Nuova' ricomincia da capo");
+
+  // Domande di chiarimento: solo ciò che manca per prenotare, una alla volta
+  await ap.getByTestId("assistente-campo").fill("prenota stasera una trattoria a Trastevere");
+  await ap.keyboard.press("Enter");
+  await ap.getByTestId("assistente-domanda").waitFor({ timeout: 8000 });
+  ok((await ap.getByTestId("assistente-risposta").last().textContent()).includes("Per quante persone?"), "assistente: chiede quante persone (manca)");
+  await ap.getByTestId("assistente-domanda").getByRole("button", { name: "2 persone" }).click();
+  await ap.getByText(/A che ora\?/).last().waitFor({ timeout: 3000 });
+  ok(searches.length === 3, "assistente: la risposta alla domanda non rifà la ricerca");
+  await ashot("55-assistente-domanda");
+
+  // Promemoria in home: oggi e "Com'è andata?"
+  await ap.evaluate(() => {
+    const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+      { id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d(0), time: "21:00", people: 2, special: null, via: "whatsapp", createdAt: Date.now() },
+      { id: "t2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d(-1), time: "20:30", people: 2, special: null, via: "telefono", createdAt: Date.now() },
+    ]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 });
+  ok((await ap.getByTestId("promemoria-oggi").textContent()).includes("Oggi alle 21:00") && (await ap.getByTestId("promemoria-oggi").textContent()).includes("Terrazza Uno"), "home: promemoria della prenotazione di oggi");
+  ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
+  await ashot("56-home-promemoria");
+  await ap.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
+  ok((await ap.getByTestId("promemoria-com-e-andata").count()) === 0 && aEvents.some((e) => e.type === "ci_sono_stato" && e.props?.da === "prenota"), "home: risposta a 'Com'è andata?' registrata, la domanda sparisce");
+  await actx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "giulia@example.com", saved: [], reviews: [] })), url: BASE }]);
+  await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
+  await actx.clearCookies({ name: "e2e_profilo" });
+
+  // Scheda della mappa: stesso pulsante Prenota
+  await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  await ap.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  const mapCard = ap.locator("li", { hasText: "Terrazza Uno" }).locator("button", { hasText: "Terrazza Uno" }).first();
+  await mapCard.waitFor({ timeout: 8000 });
+  await ap.waitForTimeout(1500); // verdetti e riordino del carosello
+  await mapCard.click();
+  await ap.getByTestId("prenota-scheda").waitFor({ timeout: 4000 });
+  await ap.getByTestId("prenota-scheda").click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
+  await actx.close();
+
+  // 360 px: si legge, niente scorrimento orizzontale
+  const nctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await nctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+  await nctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  await nctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  await nctx.route("**/api/search", (route) => route.fulfill({ json: { ...SEARCH_FAST, risultati: A_PLACES } }));
+  await nctx.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+  const np = await nctx.newPage();
+  np.on("pageerror", (e) => errors.push(e.message));
+  await np.goto(`${BASE}/assistente?q=${encodeURIComponent("Trattoria non turistica a Testaccio")}`, { waitUntil: "networkidle" });
+  await np.getByTestId("assistente-card").getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 8000 });
+  ok(!np.url().includes("q="), "assistente: /assistente?q=… parte da solo e la richiesta sparisce dall'indirizzo");
+  { const w = await np.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `assistente a 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await np.screenshot({ path: `${OUT}/57-assistente-360.png`, caret: "initial" });
+  await np.getByTestId("assistente-prenota").first().click();
+  await np.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  { const w = await np.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `prenota a 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await np.screenshot({ path: `${OUT}/58-prenota-360.png`, caret: "initial" });
+  await nctx.close();
+}
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
