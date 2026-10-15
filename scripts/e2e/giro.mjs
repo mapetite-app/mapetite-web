@@ -310,11 +310,22 @@ ok((await page.getByLabel(/Condividi Terrazza Uno/).count()) === 1, "beta condiv
 await page.goBack();
 await page.getByTestId("verdetto-scheda").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
 ok(new URL(page.url()).pathname === "/mappa" && (await page.getByTestId("verdetto-scheda").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, `indietro del telefono: chiude la scheda e torna ai risultati, senza uscire dalla mappa (${page.url()})`);
-// Chiusa dall'interfaccia, la voce aggiunta alla cronologia sparisce: un altro "indietro" non riapre niente
-await page.getByText("Terrazza Uno").first().click();
+// Chiusa dall'interfaccia, la voce aggiunta alla cronologia sparisce: un altro "indietro" non riapre niente.
+// E la mappa torna com'era prima di aprire il locale (non resta zoomata su un solo pin).
+await page.waitForTimeout(800);
+const pinGap = () => page.evaluate(() => {
+  const xs = [...document.querySelectorAll("[data-testid=pin]")].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+  if (xs.length < 2) return null;
+  return Math.round(Math.hypot(xs[0].x - xs[1].x, xs[0].y - xs[1].y));
+});
+const gapBefore = await pinGap();
+await page.locator("ul").getByText("Terrazza Uno").first().click();
 await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
+await page.waitForTimeout(1500);
+const gapOpen = await pinGap();
 await page.keyboard.press("Escape");
-await page.waitForTimeout(500);
+await page.waitForTimeout(1500);
+{ const gapAfter = await pinGap(); ok(gapBefore != null && gapOpen > gapBefore * 1.5 && Math.abs(gapAfter - gapBefore) <= Math.max(6, gapBefore * 0.1), `scheda chiusa: la mappa torna com'era prima di aprirla (distanza tra due pin ${gapBefore} → ${gapOpen} → ${gapAfter} px)`); }
 ok((await page.getByTestId("verdetto-scheda").count()) === 0 && (await page.evaluate(() => !window.history.state?.scheda)), "scheda chiusa dall'interfaccia: tolta anche dalla cronologia");
 // ✕ mentre la ricerca è in corso: i risultati non devono ricomparire quando la risposta arriva
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

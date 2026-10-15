@@ -1064,6 +1064,9 @@ export default function MapView({
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Vista della mappa prima di aprire un locale dal carosello (lo zoom passa a 17): chiusa la
+  // scheda si torna lì, invece di restare su un solo pin senza più vedere gli altri risultati.
+  const viewBeforeVenue = useRef<{ latitude: number; longitude: number; zoom: number } | null>(null);
   const selected = useMemo<Place | null>(() => {
     if (overlay.kind !== "venue") return null;
     const id = overlay.placeId;
@@ -1079,6 +1082,18 @@ export default function MapView({
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+  const hadSelected = useRef(false);
+  useEffect(() => {
+    if (selected) { hadSelected.current = true; return; }
+    if (!hadSelected.current) return;
+    hadSelected.current = false;
+    const v = viewBeforeVenue.current;
+    viewBeforeVenue.current = null;
+    // Solo se si torna ai risultati (la ricerca è ancora lì): con ✕ sul pannello la vista resta.
+    if (!v || !carouselOpen) return;
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number; duration?: number }) => void } } | null)?.getMap?.();
+    map?.flyTo({ center: [v.longitude, v.latitude], zoom: v.zoom, duration: 600 });
+  }, [selected, carouselOpen]);
 
   const savedFiltered = activeTag !== null || activeCity !== null || savedQuery.trim() !== "";
 
@@ -3143,6 +3158,7 @@ export default function MapView({
             return next;
           })}
           onSelect={(place) => {
+            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
