@@ -2741,6 +2741,15 @@ else {
   await actx.route("**/api/events", (route) => { aEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
   await actx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
   await actx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  // Salva dall'assistente: Rooftop Tre (P3) è già tra i salvati; il nuovo salvataggio è simulato.
+  const aSaveInserts = [], aAdds = [];
+  await actx.route("**/rest/v1/saved_places**", (route) => {
+    if (route.request().method() === "POST") { aSaveInserts.push(route.request().postDataJSON()); return route.fulfill({ status: 201, body: "" }); }
+    // Solo la lettura dell'assistente (Place ID dei salvati); la mappa riceve i salvati vuoti come prima.
+    if (!decodeURIComponent(route.request().url()).includes("places(google_place_id)")) return route.fulfill({ json: [] });
+    return route.fulfill({ json: [{ place_id: "33333333-0000-4000-8000-0000000000a3", places: { google_place_id: "P3" } }] });
+  });
+  await actx.route("**/api/places/add", (route) => { aAdds.push(route.request().postDataJSON()); return route.fulfill({ json: { place: { id: "33333333-0000-4000-8000-0000000000a1" } } }); });
   await actx.route("https://wa.me/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
   await actx.route("https://example.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>Sito</p>" }));
   const A_PLACES = [
@@ -2789,6 +2798,26 @@ else {
   ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
   ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
   await ashot("51-assistente-prenotazione");
+
+  // Salva in un tocco dalla card (📌 Voglio andarci), stesso salvataggio della mappa
+  { const cards = ap.getByTestId("assistente-card");
+    ok((await cards.locator("li", { hasText: "Rooftop Tre" }).getByTestId("assistente-salvato").count()) === 1, "assistente: il locale già salvato mostra 'Salvato'");
+    ok((await cards.locator("li", { hasText: "Terrazza Uno" }).getByTestId("assistente-salva").count()) === 1, "assistente: 'Salva' sulle card non salvate");
+    await cards.getByRole("button", { name: "Salva Terrazza Uno tra i Voglio andarci" }).click();
+    await cards.locator("li", { hasText: "Terrazza Uno" }).getByTestId("assistente-salvato").waitFor({ timeout: 5000 });
+    ok(true, "assistente: dopo il tocco la card dice 'Salvato'");
+    ok(aAdds.length === 1 && aAdds[0].googlePlaceId === "P1" && aAdds[0].name === "Terrazza Uno", "assistente: il locale entra nel catalogo con /api/places/add (Place ID Google)");
+    ok(aSaveInserts.length === 1 && aSaveInserts[0].place_id === "33333333-0000-4000-8000-0000000000a1" && JSON.stringify(aSaveInserts[0].tags) === '["Da provare"]', `assistente: salvato in saved_places come 'Da provare' con l'UUID (${JSON.stringify(aSaveInserts[0] ?? null)})`);
+    await ap.getByTestId("assistente-salvato-avviso").waitFor({ timeout: 3000 });
+    ok((await ap.getByTestId("assistente-salvato-avviso").textContent()).includes("Voglio andarci") && (await ap.getByTestId("assistente-salvato-avviso").getByRole("link", { name: "Sulla mappa" }).getAttribute("href")) === "/mappa?salvato=33333333-0000-4000-8000-0000000000a1",
+      "assistente: avviso 'Salvato' con il collegamento alla mappa");
+    await ap.waitForTimeout(150);
+    ok(aEvents.some((e) => e.type === "salva" && e.props?.fonte === "assistente" && e.placeId === "33333333-0000-4000-8000-0000000000a1"), "assistente: salvataggio registrato (tipo 'salva', fonte assistente)");
+    { const b = await cards.first().locator("li").first().boundingBox(); const s = await cards.first().locator("li").first().getByTestId(/assistente-(salva|salvato)/).boundingBox();
+      ok(!!b && !!s && s.x >= b.x && s.x + s.width <= b.x + b.width + 1, "assistente: Salva e Prenota stanno dentro la card"); }
+    await ashot("51b-assistente-salva");
+    await ap.getByTestId("assistente-salvato-avviso").waitFor({ state: "hidden", timeout: 8000 });
+  }
 
   // Foglio Prenota
   await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
@@ -2915,6 +2944,18 @@ else {
   await np.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   { const w = await np.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `prenota a 360 px: niente scorrimento orizzontale (${w}px)`); }
   await np.screenshot({ path: `${OUT}/58-prenota-360.png`, caret: "initial" });
+  // Salva senza accesso: il locale si ricorda e si salva da solo dopo il login (come la mappa).
+  await nctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await np.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await np.getByTestId("assistente-card").first().waitFor({ timeout: 5000 });
+  ok((await np.getByTestId("assistente-salvato").count()) === 0 && (await np.getByTestId("assistente-salva").count()) >= 2, "assistente senza accesso: 'Salva' su ogni card, nessun 'Salvato'");
+  { const li = np.getByTestId("assistente-card").locator("li").first();
+    const [b, s, p] = [await li.boundingBox(), await li.getByTestId("assistente-salva").boundingBox(), await li.getByTestId("assistente-prenota").boundingBox()];
+    ok(!!b && !!s && !!p && s.x >= b.x && p.x + p.width <= b.x + b.width + 1 && s.x + s.width <= p.x, `assistente a 360 px: Salva e Prenota affiancati dentro la card (${Math.round(s?.width ?? 0)}+${Math.round(p?.width ?? 0)} px)`); }
+  await np.getByTestId("assistente-salva").first().click();
+  await np.waitForURL(/\/login\?message=/, { timeout: 8000 });
+  { const pend = await np.evaluate(() => JSON.parse(localStorage.getItem("mapetite-salva-dopo-accesso") ?? "null"));
+    ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
 }
 // 15. Organizzare e ritrovare (piano 4.1–4.3): raccolte come cartelle, proposte dell'AI, classifica.
