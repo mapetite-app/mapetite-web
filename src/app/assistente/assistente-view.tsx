@@ -232,7 +232,10 @@ async function send(raw: string) {
     date: parsed.date ?? before.booking.date,
     time: parsed.time ?? before.booking.time,
     people: parsed.people ?? before.booking.people,
-    special: parsed.special ?? before.booking.special,
+    // "…con terrazza" e poi "solo con vista": le richieste si sommano, non si sostituiscono.
+    special: parsed.special && before.booking.special && !before.booking.special.includes(parsed.special)
+      ? `${before.booking.special}, ${parsed.special}`
+      : parsed.special ?? before.booking.special,
   };
   const bookingMode = before.bookingMode || parsed.isBooking;
   setConv((c) => ({ ...c, booking, bookingMode, msgs: [...c.msgs, { id: newId(), role: "user", text }] }));
@@ -312,7 +315,7 @@ function PlaceCards({ msg, booking, bookingMode, onOpen, onBook }: {
             type="button"
             onClick={() => onOpen(p)}
             aria-label={`Apri ${p.name}`}
-            className="relative flex min-h-[220px] w-full flex-col overflow-hidden rounded-card bg-brand p-4 pb-16 text-left text-white shadow-float active:scale-[0.99]"
+            className="relative flex h-full min-h-[220px] w-full flex-col overflow-hidden rounded-card bg-brand p-4 pb-16 text-left text-white shadow-float active:scale-[0.99]"
           >
             {i < 6 && p.photoRef && (
               <>
