@@ -1015,6 +1015,15 @@ export default function MapView({
   // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
   const focusedIdRef = useRef<string | null>(null);
   useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
+  const aiFirstIdRef = useRef<string | null>(null);
+  const refocusFirst = useRef(false);
+  useEffect(() => {
+    aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null;
+    if (refocusFirst.current) {
+      refocusFirst.current = false;
+      if (aiFirstIdRef.current) setFocusedId(aiFirstIdRef.current);
+    }
+  }, [aiSearch]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1055,6 +1064,9 @@ export default function MapView({
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Vista della mappa prima di aprire un locale dal carosello (lo zoom passa a 17): chiusa la
+  // scheda si torna lì, invece di restare su un solo pin senza più vedere gli altri risultati.
+  const viewBeforeVenue = useRef<{ latitude: number; longitude: number; zoom: number } | null>(null);
   const selected = useMemo<Place | null>(() => {
     if (overlay.kind !== "venue") return null;
     const id = overlay.placeId;
@@ -1070,6 +1082,18 @@ export default function MapView({
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+  const hadSelected = useRef(false);
+  useEffect(() => {
+    if (selected) { hadSelected.current = true; return; }
+    if (!hadSelected.current) return;
+    hadSelected.current = false;
+    const v = viewBeforeVenue.current;
+    viewBeforeVenue.current = null;
+    // Solo se si torna ai risultati (la ricerca è ancora lì): con ✕ sul pannello la vista resta.
+    if (!v || !carouselOpen) return;
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number; duration?: number }) => void } } | null)?.getMap?.();
+    map?.flyTo({ center: [v.longitude, v.latitude], zoom: v.zoom, duration: 600 });
+  }, [selected, carouselOpen]);
 
   const savedFiltered = activeTag !== null || activeCity !== null || savedQuery.trim() !== "";
 
@@ -1751,6 +1775,10 @@ export default function MapView({
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
+        // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
+        // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
+        // Passa al nuovo primo appena la lista riordinata è sullo schermo (effetto su aiSearch).
+        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) refocusFirst.current = true;
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
           // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
@@ -3130,6 +3158,7 @@ export default function MapView({
             return next;
           })}
           onSelect={(place) => {
+            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });

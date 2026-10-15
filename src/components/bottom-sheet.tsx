@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
@@ -119,12 +119,20 @@ export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat
   return parts.join(" · ");
 }
 
+// Stessa forma di ciò che arriva (verdetto su 2 righe, "perché" su 1, 2 chip):
+// quando il verdetto sostituisce il segnaposto la lista non salta di ~60 px.
 function SkeletonLines({ dark = false }: { dark?: boolean }) {
   const bar = dark ? "bg-white/20" : "bg-border";
+  const chip = dark ? "bg-white/15" : "bg-accent-light";
   return (
-    <span aria-label="Sto preparando il verdetto" className="mt-2 block space-y-1.5">
-      <span className={`block h-3 w-4/5 animate-pulse rounded-pill ${bar}`} />
-      <span className={`block h-3 w-3/5 animate-pulse rounded-pill ${bar}`} />
+    <span aria-label="Sto preparando il verdetto" data-testid="segnaposto-verdetto" className="mt-2 block">
+      <span className="flex h-5 items-center"><span className={`block h-3 w-4/5 animate-pulse rounded-pill ${bar}`} /></span>
+      <span className="flex h-5 items-center"><span className={`block h-3 w-3/5 animate-pulse rounded-pill ${bar}`} /></span>
+      <span className="mt-1 flex h-4 items-center"><span className={`block h-2.5 w-2/5 animate-pulse rounded-pill ${bar}`} /></span>
+      <span className="mt-2 flex gap-1.5">
+        <span className={`block h-[22px] w-16 animate-pulse rounded-pill ${chip}`} />
+        <span className={`block h-[22px] w-20 animate-pulse rounded-pill ${chip}`} />
+      </span>
     </span>
   );
 }
@@ -217,6 +225,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     return best?.id ?? null;
   };
   const onCarouselScroll = () => {
+    if (carouselRef.current) atStart.current = carouselRef.current.scrollLeft < 8;
     if (!onFocus) return;
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
@@ -232,6 +241,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
   }, [focusedId]);
   useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
+  // Se l'ordine cambia (riordino per adattezza) mentre il carosello è sulla prima card, resta
+  // sulla prima: il browser altrimenti lo riaggancia alla card di prima, finita in fondo.
+  const atStart = useRef(true);
+  useLayoutEffect(() => {
+    const ul = carouselRef.current;
+    if (ul && atStart.current && ul.scrollLeft !== 0) ul.scrollLeft = 0;
+  }, [orderKey]);
 
   const [snap, setSnap] = useState<SnapKey>("medium");
   // Altezza in px imposta solo durante il drag; null = altezza controllata dallo snap.

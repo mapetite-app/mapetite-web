@@ -7,7 +7,8 @@ Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) ·
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
-**In corso adesso:** nessuna sessione (notte 14→15/10 chiusa, branch `claude/brave-mccarthy-6a5pqw`).
+**In corso adesso:** nessuna sessione (mattina 15/10 chiusa, branch `claude/brave-mccarthy-ulhwa9`).
+**Aggiornato 15/10 alle 07:15 (sessione delle 05:00).** Fatto: card che non saltano quando arriva il verdetto; carosello che resta sul locale più adatto dopo il riordino; mappa che torna com'era chiudendo la scheda; tolte le pagine vecchie. **Ancora bloccati dall'ambiente (non da Lorenzo):** modificare `LORENZO.md` e leggere/scrivere il database di produzione (migrazione `events`).
 **Aggiornato 15/10 alle 01:00 (sessione delle 00:05).** Fatto: frasi già capite senza riaspettare l'AI; "trattoria a Monti" con 20 risultati del rione invece di 1; onboarding solo dopo la registrazione; link di Google Maps senza coordinate salvabili; verdetti che si rinnovano dopo 90 giorni; 5 decisioni aperte chiuse. **Bloccato dai permessi dell'ambiente (serve Lorenzo):** modificare `LORENZO.md`, leggere/scrivere il database di produzione (migrazione `events`), cancellare file (pagine vecchie).
 **Aggiornato 14/10 sera (sessione di giorno chiesta da Lorenzo, PR della sera).** Lorenzo ha dato carta bianca (resta suo solo budget e orari) e ha sbloccato chiave Haiku, token Vercel, rete per le foto, anteprime senza login. Fatto: prima prova con Haiku vero (verdetti 2× più veloci, locali più adatti in cima), 6 funzioni accese per tutti, "Salva da TikTok e YouTube". Foto vere viste per la prima volta. Da fare stanotte: migrazione `events` (token Supabase pronto dalla prossima sessione).
 **Aggiornato 14/10 alle 06:15 (sessione delle 22:00, PR #33 unita + PR #34).** Nessuna voce PRONTA: su richiesta di Lorenzo la notte è andata in 7 riletture del codice in produzione (45 difetti corretti, 2 di sicurezza), velocità (ricerca dalla home in 0,7 s invece di 1,4), conferma email che fa entrare, emoji delle cucine, 2 prove nuove spente e l'elenco di cosa sbloccare (`SBLOCCHI.md`). Le 10 ricerche di TEST-RICERCHE sono ora tutte provate con Google vero almeno una volta: tutte passano. Per andare avanti servono le decisioni in fondo ("Cosa serve decidere").
@@ -243,6 +244,14 @@ Nessun commento nuovo di Lorenzo e nessuna voce PRONTA. La sessione delle 22:00 
 - **Verdetti che si rinnovano — FATTA (decisione 24)**: oltre 90 giorni si riscrivono con le recensioni che arrivano già con la ricerca. ~0,3 centesimi Haiku a locale ogni 90 giorni, nessuna chiamata Google in più.
 - **Decise senza codice**: (9) "autentico" resta come "non turistico": chi scrive "autentica" cerca il posto di quartiere, non quello famoso (VISIONE); (14) verdetto resta sui primi 12: su telefono 12 card bastano e raddoppiare il costo non migliora la demo; la distanza dal centro mappa senza posizione resta, "Più vicini" ne ha bisogno.
 - **Bloccati dai permessi dell'ambiente (non da Lorenzo)**: aggiornare `LORENZO.md` con le autorizzazioni del 14/10; leggere o modificare il database di produzione (migrazione `events`); cancellare `/miei-locali` e `site-header`. Serve che Lorenzo li faccia o allarghi i permessi della routine.
+
+## Mattina 15/10 (sessione delle 05:00, branch `claude/brave-mccarthy-ulhwa9`)
+- **Card che non saltano — FATTA**: il segnaposto del verdetto ha la stessa forma di ciò che arriva (2 righe, perché, 2 chip). Prima la card cresceva di ~60 px e la lista si spostava sotto il dito; ora 214 → 210 px (controllo nel giro).
+- **Carosello sul locale più adatto dopo il riordino — FATTA**: da non registrati (il tester alla prima apertura), quando Haiku riordinava le card il browser riagganciava il carosello alla card di prima, finita in fondo: si vedeva il locale meno adatto e la mappa lo evidenziava. Ora resta sulla prima card e il fuoco passa al nuovo primo.
+- **Mappa che torna com'era — FATTA** (visto il 14/10, punto b): aprendo un locale dal carosello lo zoom va a 17; chiudendo la scheda la mappa torna alla vista dei risultati.
+- **Pagine vecchie tolte — FATTA (decisione 8)**: `site-header` cancellato; `/miei-locali` porta a "I miei salvati".
+- **Bloccati dall'ambiente anche stamattina**: il controllo automatico della sessione rifiuta la modifica di `LORENZO.md` e ogni lettura del database di produzione (quindi niente migrazione `events`). Serve che Lorenzo li faccia o allarghi i permessi della routine.
+- **Nota sul giro**: va lanciato con `E2E_FAKE_USER=00000000-0000-0000-0000-000000000001 npm run dev`; senza, il giro si ferma su Importa (non è un difetto dell'app).
 
 ## Cosa serve decidere (in ordine di impatto per il 25/10)
 1. ~~Merge della PR #32~~ (fatto 13/10). Resta: in Supabase → Authentication → URL Configuration aggiungere ai Redirect URLs `…/login*` e `…/reimposta-password`.
