@@ -1,55 +1,89 @@
-# Piano fino al 25 ottobre 2026 — Mapetite pronta per i tester
+# Piano fino al 25 ottobre 2026 — Mapetite completa per i tester
 
-Scritto il 15/10 su richiesta di Lorenzo. Le sessioni notturne lo seguono in quest'ordine (prima di `BACKLOG.md`).
-Obiettivo del 25/10: un gruppo di tester usa Mapetite da solo e alla fine sappiamo **se ha senso**. Quindi servono tre cose:
-1. l'app deve convincere in 10 secondi (grafica e velocità);
-2. il differenziatore deve vedersi (verdetto sempre, locali giusti per te, non i più famosi);
-3. dobbiamo **misurare** se i tester tornano e salvano, non solo chiederglielo.
+Riscritto il 15/10 dopo il feedback di Lorenzo: "deve essere 100 volte di più". Le sessioni notturne lo seguono prima di `BACKLOG.md`.
 
-Vincoli fissi: budget Google 20 €/mese e quote invariate; nessun servizio a pagamento nuovo; nessun contenuto Google salvato sui nostri server.
+## Cosa deve essere Mapetite il 25/10 (parole di Lorenzo, 15/10)
+L'app che **risolve qualunque problema nella scelta del food & beverage**: ti fa scoprire posti nuovi e gente nuova, ti semplifica la vita, ti stuzzica a provare qualcosa di diverso invece dei soliti posti. Il passaparola passa da Mapetite: vedi il profilo di un amico, dove è stato, cosa ha salvato, e condividi.
+Il business è soprattutto **B2B**: i ristoratori pagheranno pagine verificate, pubblicità mirata e trend di chi usa l'app. Senza base utenti non si vende niente, quindi il 25/10 serve un prodotto che i tester usino davvero, e **dati per dimostrarlo**.
 
-## Blocco A — Convincere in 10 secondi (15–18/10)
+Vincoli fissi: Google 20 €/mese e quote invariate; nessun servizio a pagamento nuovo; nessun contenuto Google salvato sui nostri server; niente scraping.
 
-| # | Cosa | Perché | Stato |
-|---|---|---|---|
-| A1 | **Card dei risultati stile Places**: più basse, nome grande, categoria in maiuscoletto, verdetto Mapetite in 2 righe, 2 chip; senza foto una copertina col colore della cucina invece del blocco tutto teal; intestazione dei risultati in una riga sola; mappa più visibile | È la prima cosa che si vede dopo una ricerca: oggi è pesante e copre metà mappa | IN CORSO (15/10) |
-| A2 | **Prima card in ~2 s dalla home** (oggi ~5): la comprensione della frase e Google lavorano in fila; frasi semplici capite senza AI e segnaposto subito | "Una ricerca da venti secondi non esiste" (VISIONE) | — |
-| A3 | **Primo accesso per i tester**: link d'invito, 3 schermate (cosa fa Mapetite, una ricerca di esempio vera, importa i tuoi salvati da Google Maps), poi dritti alla mappa | Il tester deve capire da solo, senza spiegazioni a voce | — |
-| A4 | **Scheda del locale rifinita** sul modello Places: foto grande, verdetto in evidenza, barra azioni fissa (Percorso, Chiama, Salva) | Dove si decide | — |
+---
 
-## Blocco B — Il differenziatore si vede (18–20/10)
+## 1. Assistente Mapetite (la ricerca diventa una conversazione)
+- **1.1 Chat con l'assistente**: dalla barra "Chiedi all'AI" si apre una conversazione. Risposte con card dei locali veri, domande di chiarimento ("Per quante persone? Che zona?"), seguiti ("più economico", "solo con terrazza", "e per dopo cena un cocktail bar vicino?").
+- **1.2 Serata completa**: "organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" → percorso a tappe sulla mappa, con distanze a piedi.
+- **1.3 Prenotazione assistita**: "prenotami domani alle 21 per 2 con terrazza a Roma". L'assistente trova i locali giusti e aperti a quell'ora, poi prepara la prenotazione: link di prenotazione del locale se c'è (sito o piattaforma), altrimenti **messaggio già scritto** per WhatsApp, chiamata o email ("Buonasera, vorrei prenotare per 2 persone domani alle 21, in terrazza se possibile. Lorenzo"). L'utente conferma con un tocco. Promemoria e "Com'è andata?" il giorno dopo.
+  - *Limite onesto*: la prenotazione **automatica** senza tocco richiede accordi con TheFork/OpenTable o con i locali (API riservate ai partner). Per il 25/10 il tocco di conferma resta; l'automatico arriva con i primi ristoratori partner (vedi 8).
+- **1.4 Memoria dei gusti**: l'assistente ricorda preferenze dichiarate e comportamenti ("non ami il pesce", "spesso a Monti") e le usa senza chiederle ogni volta.
+- **1.5 Voce**: dettatura 🎤 accesa per tutti nell'assistente.
 
-| # | Cosa | Perché | Stato |
-|---|---|---|---|
-| B1 | **"Per te" che impara** dagli eventi (salvataggi, aperture, filtri, "Ci sono stato"): i risultati salgono se assomigliano a ciò che salvi, con il motivo scritto ("Come Trattoria X, che hai salvato") | È il vantaggio competitivo di VISIONE; la tabella `events` ora c'è | — |
-| B2 | **Classifica personale** "Ti è piaciuto più di X?" dopo "Ci sono stato" (come Beli): la tua top per città | Fa tornare nell'app e dà un segnale di gusto vero | — |
-| B3 | **Mappa dei salvati condivisibile** con un link (sola lettura, scelta dell'utente) | Effetto rete: ogni tester porta amici | — |
+## 2. Ricerca, filtri e posizione
+- 2.1 **Dove?** nei filtri e città intera (FATTO 15/10). Aggiungere: "vicino a me adesso", raggio sulla mappa trascinando, "lungo il mio percorso".
+- 2.2 **Filtri completi**: tipo, cucina (romana, giapponese, napoletana…), prezzo, voto, aperto ora/aperto a un'ora scelta, occasione (appuntamento, amici, lavoro, famiglia, da solo), caratteristiche (terrazza, all'aperto, vista, dehors, cani ammessi, vegetariano/vegano, senza glutine, prenotabile, gruppi), "poco conosciuto" 💎.
+- 2.3 **Suggerimenti di partenza** legati a ora, meteo e giorno ("Aperitivo all'aperto, oggi 22°"), e ai tuoi gusti.
+- 2.4 **Prima card in ~2 s** dalla home (oggi ~5).
+- 2.5 **"Sorprendimi"** fuori dai salvati: un posto mai provato che probabilmente ti piace, con il perché.
 
-## Blocco C — Misurare se Mapetite ha senso (19–21/10)
+## 3. Raccogliere e importare (Raccogli, VISIONE)
+- 3.1 Salva in un tocco da qualsiasi schermata (c'è); stati "Voglio andarci / Ci sono stato".
+- 3.2 **Import da Instagram, TikTok, YouTube, Google Maps**: link singoli (c'è), più link incollati insieme, screenshot multipli, **file di Google Takeout/KML** con import in blocco senza costi Google quando ci sono le coordinate.
+- 3.3 **Condividi verso Mapetite** da qualsiasi app su Android (c'è), e istruzioni per iPhone (scorciatoia).
+- 3.4 **Dal reel al tavolo**: il locale salvato da un video mostra il video collegato nella scheda.
 
-| # | Cosa | Perché | Stato |
-|---|---|---|---|
-| C1 | **Pannello dei numeri per Lorenzo** (pagina protetta): tester attivi, ricerche, salvataggi per tester, ritorni dopo 1 e 7 giorni, ricerche finite senza salvare, ricerche più frequenti | Senza numeri, il 25/10 non si capisce niente | — |
-| C2 | **"Ti è stato utile?" in un tocco** dopo una ricerca (👍/👎 + campo facoltativo) e feedback dalla barra | Il perché dietro i numeri | — |
-| C3 | **Errori visibili a Lorenzo**: riepilogo giornaliero degli errori di produzione dai log Vercel | Sapere cosa si rompe prima che lo dicano i tester | — |
+## 4. Organizzare e ritrovare (Organizza, Ritrova)
+- 4.1 **Raccolte** come cartelle con copertina, ordinabili, condivisibili; raccolte automatiche ("Romantici", "Per il pranzo veloce", "Viaggio a Milano") proposte dall'AI sui tuoi salvati.
+- 4.2 **Riclassificazione automatica**: l'AI propone tag e raccolte per i salvati senza tag; un tocco per accettare.
+- 4.3 **Classifica personale** "Ti è piaciuto più di X?" (Beli) e top per città.
+- 4.4 **Diario**: posti visitati con data, nota, voto personale, foto tua (le tue, non di Google).
+- 4.5 **Ricerca nei salvati** in linguaggio naturale ("quel giapponese che avevo salvato a Milano").
 
-## Blocco D — Pronti per la consegna (22–24/10)
+## 5. Social (passaparola dentro Mapetite)
+- 5.1 **Profilo pubblico** (scelta dell'utente): foto, nome, città, raccolte pubbliche, posti visitati, top personale.
+- 5.2 **Segui** amici e persone; **feed attività** ("Giulia ha salvato Mariù", "Marco è stato da…").
+- 5.3 **Mappa di un amico**: vedi sulla mappa i posti di chi segui; "3 amici ci sono stati".
+- 5.4 **Condividi** un locale, una raccolta o la tua mappa con un link che si apre anche senza app; invito a Mapetite dentro il link.
+- 5.5 **Liste di gruppo**: "Cene del giovedì" con amici, ognuno aggiunge posti, voto per scegliere.
+- 5.6 **Trova amici** dai contatti/link d'invito; classifica di chi scopre più posti nuovi (gioco leggero).
 
-| # | Cosa | Stato |
-|---|---|---|
-| D1 | Controllo qualità completo a 390 e 360 px, con screenshot affiancati ai riferimenti | — |
-| D2 | Account demo con salvati realistici a Roma e Milano, copione demo aggiornato (`DEMO.md`) | — |
-| D3 | Lorenzo prova su iPhone e Android veri (unica cosa che Claude non può fare) | — |
-| D4 | 24/10: solo correzioni, niente funzioni nuove. 25/10: link ai tester | — |
+## 6. Grafica e sensazione da app (non da sito)
+- 6.1 **Card dei risultati stile Places** (IN CORSO 15/10): più basse, copertina col colore della cucina, verdetto e perché sempre visibili.
+- 6.2 **Scheda locale** stile Places: carosello foto, barra azioni fissa (Prenota, Percorso, Salva), verdetto in evidenza, "chi dei tuoi amici c'è stato".
+- 6.3 **Transizioni e gesti** da app: pannelli che scorrono, tocco con feedback, niente salti, caricamenti con segnaposto, schermo iniziale (splash), icona e nome sull'iPhone.
+- 6.4 **Barra in basso** ridisegnata: Esplora, Assistente, Salvati, Amici, Profilo.
+- 6.5 **Versione web da computer** degna: mappa grande a sinistra, lista a destra.
+- 6.6 Controllo qualità a 390 e 360 px con screenshot affiancati ai riferimenti, ogni sera.
 
-## Calendario
+## 7. Tracciamento (per capire se Mapetite ha senso)
+- 7.1 **Eventi di uso** su ogni funzione (ricerca, assistente, filtri, salva, import, condividi, segui, prenota…) nella tabella `events` (c'è da oggi).
+- 7.2 **Sessioni e ritorni**: chi torna dopo 1, 3, 7 giorni; quante volte a settimana; durata.
+- 7.3 **Imbuti**: ricerca → apertura scheda → salva/prenota; dove si abbandona.
+- 7.4 **Funzioni più e meno usate**, ricerche senza risultati utili, errori e blocchi (errori del telefono registrati automaticamente, con la pagina in cui succedono).
+- 7.5 **Pannello di Lorenzo** (pagina protetta): tutti questi numeri, per giorno e per tester.
+- 7.6 **"Ti è stato utile?"** in un tocco dopo ricerche e prenotazioni, e domanda settimanale breve.
 
-- **15/10 (giorno, con Lorenzo)**: A1.
-- **Notte 15→16**: A1 rifinita, A2.
-- **Notte 16→17**: C1, C2.
-- **Sabato 17 (tutto il giorno)**: A3, A4, B1.
-- **Domenica 18 (tutto il giorno)**: B2, B3, C3.
-- **Notti 19→22**: D1, D2, correzioni dalle prove di Lorenzo.
-- **Notti 22→24**: solo correzioni e velocità.
+## 8. Lato ristoratori (B2B, il modello di business)
+- 8.1 **Pagina del locale verificata**: "Sei il titolare? Rivendica" → richiesta di verifica; il titolare aggiorna foto proprie, menu, orari speciali, eventi.
+- 8.2 **Pannello del ristoratore** (versione dimostrativa per gli investitori con dati veri aggregati): quante persone hanno visto, salvato, prenotato il locale; cosa cerca la gente in zona ("terrazza", "brunch", "vegano") e a che ora.
+- 8.3 **Posti in evidenza (sponsorizzati)** dichiarati come tali, mostrati solo se adatti alla ricerca (mai contro la richiesta: VISIONE).
+- 8.4 **Trend di zona** (anonimi e aggregati) come prodotto da vendere.
+Per il 25/10: 8.1 e 8.2 in versione dimostrativa; 8.3 e 8.4 come schermate per la presentazione, attive quando ci saranno ristoratori.
 
-Se una voce si blocca, si passa alla successiva e lo si scrive in PR.
+## 9. Pronti per i tester
+- 9.1 **Invito**: link personale, primo accesso in 3 schermate, import dei salvati da Google Maps proposto subito.
+- 9.2 **Account demo** con salvati realistici a Roma e Milano; copione demo per gli investitori.
+- 9.3 Prova su iPhone e Android veri (Lorenzo).
+- 9.4 24/10 solo correzioni; 25/10 link ai tester.
+
+---
+
+## Come si lavora (ritmo)
+- Più sviluppatori in parallelo, ognuno su una parte diversa dell'app, uniti in main ogni sera dopo i controlli (giro automatico, build, prove vere).
+- Ogni sera: PR unita in produzione, elenco di cosa è cambiato, screenshot.
+- Ogni funzione nuova manda i suoi eventi al tracciamento (punto 7) dal primo giorno.
+
+## Ordine di attacco
+1. **Subito (15–16/10)**: 7.1–7.5 tracciamento e pannello; 6.1 card; 1.1 + 1.3 assistente e prenotazione assistita; 5.1–5.4 profili, segui, condividi.
+2. **17–18/10 (weekend, tutto il giorno)**: 2.2 filtri completi, 4.1–4.3 raccolte e classifica, 6.2–6.4 scheda e barra, 8.1–8.2 ristoratori, 3.2 import in blocco.
+3. **19–22/10**: 1.2 serata completa, 1.4 memoria, 2.3–2.5, 5.5–5.6, 4.4–4.5, 6.5, 7.6, 9.1–9.2.
+4. **23–24/10**: controllo qualità, velocità, correzioni. 25/10: tester.
