@@ -6,6 +6,8 @@ import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
+import ProfiloSocial from "@/components/profilo-social";
+import { loadMySocial } from "@/lib/social";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -91,6 +93,8 @@ export default async function ProfiloPage() {
     );
   }
 
+  // Profilo pubblico (social): "in arrivo" finché la migrazione 20261015_social non è applicata.
+  const socialPromise = loadMySocial(user.id);
   const [{ data: savedRaw }, { data: reviewsRaw }] = fake
     ? [{ data: fake.saved }, { data: fake.reviews }]
     : await Promise.all([
@@ -107,6 +111,7 @@ export default async function ProfiloPage() {
   ]);
 
   const saved = (savedRaw ?? []) as unknown as SavedPlaceRow[];
+  const social = await socialPromise;
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   // Salvati raggruppati per città (ricavata dall'indirizzo, come nella mappa).
@@ -195,6 +200,8 @@ export default async function ProfiloPage() {
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 
       <ProfiloRicerche />
+
+      <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
 
       <section className="mb-10">
         <div className="mb-3 flex items-center justify-between gap-2">

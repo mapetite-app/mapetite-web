@@ -2170,6 +2170,188 @@ else {
   await pctx.close();
 }
 
+// 14. Social (piano 5.1–5.4): profilo pubblico, mappa di una persona, Amici, "N amici ci sono stati".
+//     Il server legge i dati finti dal cookie "e2e_social"; senza cookie la parte social è "in arrivo"
+//     (come in produzione finché la migrazione 20261015_social non è applicata).
+if (!fakeUser) console.log("SKIP  social: dev server senza E2E_FAKE_USER");
+else {
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const GIULIA = "00000000-0000-4000-8000-0000000005a1";
+  const MARCO = "00000000-0000-4000-8000-0000000005a2";
+  const LOC_SOC = "44444444-0000-4000-8000-000000000005";
+  const prof = (id, handle, display_name, extra = {}) => ({ id, handle, display_name, bio: null, city: "Roma", visitati: 0, da_provare: 0, seguaci: 0, seguiti: 0, ...extra });
+  const sv = (user_id, handle, display_name, place_id, name, category, tags, created_at, lat, lng) => ({ user_id, handle, display_name, place_id, name, category, tags, created_at, address: "Via del Moro 12, 00153 Roma RM, Italy", lat, lng });
+  const giulia = prof(GIULIA, "giulia.rm", "Giulia", { bio: "Trattorie di quartiere e vini naturali", visitati: 1, da_provare: 2, seguaci: 3, seguiti: 2 });
+  const marco = prof(MARCO, "marco", "Marco", { city: "Milano" });
+  const oggi = new Date().toISOString();
+  const social = {
+    profili: [giulia, marco],
+    salvati: [
+      sv(GIULIA, "giulia.rm", "Giulia", LOC_SOC, "Trattoria del Vicolo", "restaurant", ["Già visitato", "Romantico"], oggi, 41.889, 12.469),
+      sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000006", "Bar Nero", "bar", ["Da provare", "Romantico"], "2026-10-10T18:00:00Z", 41.893, 12.473),
+      sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000007", "Forno Sud", "bakery", ["Economico"], "2026-10-09T09:00:00Z", 41.88, 12.48),
+      sv(MARCO, "marco", "Marco", "44444444-0000-4000-8000-000000000008", "Osteria Milano", "restaurant", ["Da provare"], oggi, 45.48, 9.19),
+    ],
+    seguo: [GIULIA],
+    mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+  };
+  const setSocial = (c, v) => c.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const soctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const socEvents = [];
+  await soctx.route("**/api/events", (r) => { socEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await soctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+  const sp = await soctx.newPage();
+  sp.on("pageerror", (e) => errors.push(e.message));
+
+  // In arrivo: senza dati social (migrazione non applicata) nessuna pagina si rompe.
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+  const rIn = await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok(rIn?.status() === 200 && await sp.getByTestId("profilo-pubblico-in-arrivo").getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /u/<nome> dice 'in arrivo' invece di rompersi");
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /amici dice 'in arrivo'");
+  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("profilo-social-in-arrivo").isVisible(), "social in arrivo: nel profilo il riquadro 'Profilo pubblico' è 'in arrivo'");
+  ok(await sp.locator("nav").first().getByRole("link", { name: "Amici" }).getAttribute("href") === "/amici", "barra in basso: voce 'Amici'");
+
+  // Profilo pubblico da chi non ha l'account (link condiviso).
+  await setSocial(soctx, social);
+  await soctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await sp.getByRole("heading", { level: 1 }).textContent()) === "Giulia" && await sp.getByText("@giulia.rm").isVisible() && await sp.getByTestId("profilo-bio").isVisible(), "profilo pubblico: nome, @nome e bio");
+  ok((await sp.title()) === "Giulia (@giulia.rm) · Mapetite", `profilo pubblico: titolo per l'anteprima (${await sp.title()})`);
+  { const n = async (id) => (await sp.getByTestId(`numero-${id}`).textContent())?.replace(/\s+/g, " ").trim();
+    ok((await n("visitati")) === "1Visitati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
+  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
+  ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
+  await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");
+  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok((await sp.getByTestId("pin-persona").count()) === 3, `profilo pubblico: un pin per ogni posto (${await sp.getByTestId("pin-persona").count()})`);
+  ok(await sp.getByTestId("segui").getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: 'Segui' porta a Crea un account e poi torna qui");
+  ok(await sp.getByTestId("invito-crea-mappa").getByText("Crea la tua mappa su Mapetite").isVisible() && await sp.getByTestId("invito-crea-mappa").getByRole("link", { name: "Crea la tua mappa, è gratis" }).getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: invito 'Crea la tua mappa su Mapetite' in fondo");
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/60-profilo-pubblico.png`, caret: "initial" });
+  await sp.screenshot({ path: `${OUT}/60b-profilo-pubblico-intero.png`, caret: "initial", fullPage: true });
+  // Condividi: menu del telefono con il link al profilo, segnale "condividi".
+  await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+  await sp.getByTestId("condividi-profilo").click();
+  await sp.waitForFunction(() => window.__shared != null, null, { timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__shared?.url)) === `${new URL(BASE).origin}/u/giulia.rm`, "condividi profilo: menu del telefono con il link /u/<nome>");
+  await sp.waitForTimeout(200);
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "profilo"), "condividi profilo: segnale 'condividi' (cosa: profilo)");
+  // Mappa della persona a tutta pagina, con condivisione che ripiega sulla copia del link.
+  await sp.getByTestId("apri-mappa-persona").click();
+  await sp.waitForURL(/\/u\/giulia\.rm\/mappa$/, { timeout: 5000 });
+  await sp.getByTestId("mappa-persona-pagina").waitFor({ timeout: 5000 });
+  ok(await sp.getByTestId("mappa-persona-pagina").getByText("La mappa di Giulia").isVisible() && await sp.getByTestId("invito-crea-mappa").isVisible(), "mappa di una persona: si apre senza account, con l'invito in fondo");
+  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/61-mappa-persona.png`, caret: "initial" });
+  await sp.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, "share", { configurable: true, value: undefined }); Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); });
+  await sp.getByTestId("condividi-mappa").click();
+  await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__copied)) === `${new URL(BASE).origin}/u/giulia.rm/mappa` && await sp.getByTestId("condividi-mappa").getByText("✓ Link copiato").isVisible(), "condividi mappa: senza menu del telefono copia il link e lo dice");
+  await sp.waitForTimeout(200);
+  ok(socEvents.some((e) => e.type === "condividi" && e.props?.cosa === "mappa"), "condividi mappa: segnale 'condividi' (cosa: mappa)");
+  // Profilo privato o inesistente: messaggio chiaro, niente errore.
+  await sp.goto(`${BASE}/u/nessuno.qui`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("profilo-non-trovato").getByText("Profilo non disponibile").isVisible(), "profilo privato o inesistente: 'Profilo non disponibile'");
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("amici-accedi").isVisible(), "amici senza account: invito ad accedere");
+  await soctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Con l'accesso: Segui / Segui già scrivono in follows.
+  const follows = [];
+  await soctx.route("**/rest/v1/follows**", (r) => { follows.push({ method: r.request().method(), url: decodeURIComponent(r.request().url()), body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
+  await sp.getByTestId("segui").click();
+  await sp.getByTestId("segui").getByText("Segui", { exact: true }).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "DELETE" && f.url.includes(`follower_id=eq.${ME}`) && f.url.includes(`followed_id=eq.${GIULIA}`)) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "false", "smetti di seguire: cancella solo il proprio follow");
+  await sp.getByTestId("segui").click();
+  await sp.getByTestId("segui").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "POST" && f.body?.follower_id === ME && f.body?.followed_id === GIULIA) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true", "segui: scrive il follow a proprio nome");
+
+  // Amici: chi segui, attività raggruppata, ricerca persone.
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
+  { const att = sp.getByTestId("attivita");
+    const first = (await att.first().innerText()).replace(/\s+/g, " ");
+    ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
+    ok((await att.first().getByTestId("card-attivita").count()) === 3 && await att.first().getByTestId("card-attivita").first().getAttribute("href") === `/locali/${LOC_SOC}`, "amici: card dei locali che aprono la pagina del locale");
+    ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui"); }
+  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible(), "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
+  await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
+  let searchUrl = null;
+  await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
+  await sp.getByLabel("Cerca persone per nome").fill("@Mar");
+  await sp.getByTestId("persona").first().waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await sp.getByTestId("persona").getByText("Marco", { exact: true }).isVisible() && !!searchUrl && searchUrl.includes("handle.ilike.mar%"), "amici: cerca persone per nome (solo profili pubblici)");
+  follows.length = 0;
+  await sp.getByTestId("persona").getByTestId("segui").click();
+  await sp.getByTestId("persona").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(follows.some((f) => f.method === "POST" && f.body?.followed_id === MARCO), "amici: 'Segui' dai risultati della ricerca");
+  await sp.screenshot({ path: `${OUT}/63-amici-cerca.png`, caret: "initial" });
+
+  // Impostazioni del profilo pubblico (in /profilo): spento di default, testo chiaro, nome ripulito.
+  let profPatch = null;
+  let profStatus = 204;
+  await soctx.route("**/rest/v1/profiles**", (r) => {
+    if (r.request().method() === "PATCH") { profPatch = r.request().postDataJSON(); return profStatus === 204 ? r.fulfill({ status: 204, body: "" }) : r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key", details: null, hint: null } }); }
+    return r.fulfill({ json: [] });
+  });
+  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const ps = sp.getByTestId("profilo-social");
+  ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
+  await ps.locator("input[name=handle]").fill("@Lorenzo Mà!");
+  ok((await ps.locator("input[name=handle]").inputValue()) === "lorenzoma", "profilo: il nome pubblico si ripulisce da solo (minuscole, niente spazi né accenti)");
+  await ps.locator("input[name=display_name]").fill("Lorenzo");
+  await ps.locator("input[name=city]").fill("Roma");
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Le note private non si vedono mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
+  profStatus = 409;
+  await ps.getByRole("button", { name: "Salva" }).click();
+  await ps.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await ps.getByRole("alert").textContent())?.includes("è già preso"), "profilo: nome già preso spiegato in italiano");
+  profStatus = 204;
+  profPatch = null;
+  await ps.getByRole("button", { name: "Salva" }).click();
+  await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.handle === "lorenzoma" && profPatch?.is_public === true && profPatch?.display_name === "Lorenzo" && profPatch?.city === "Roma" && !("note" in (profPatch ?? {})), "profilo: salva nome pubblico, nome, città e 'pubblico'");
+  ok(await ps.getByTestId("profilo-condividi").isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Pubblico") && await ps.getByTestId("vedi-profilo-pubblico").getAttribute("href") === "/u/lorenzoma", "profilo: dopo il salvataggio, condividi profilo e mappa");
+  await ps.scrollIntoViewIfNeeded();
+  await ps.screenshot({ path: `${OUT}/64-profilo-impostazioni.png`, caret: "initial" });
+  await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+  await ps.getByTestId("condividi-mia-mappa").click();
+  await sp.waitForFunction(() => window.__shared != null, null, { timeout: 3000 }).catch(() => {});
+  ok((await sp.evaluate(() => window.__shared?.url)) === `${new URL(BASE).origin}/u/lorenzoma/mappa`, "profilo: 'Condividi mappa' manda il link alla propria mappa");
+
+  // Pagina pubblica del locale: "1 amico ci è stato".
+  const locSoc = { place: { id: LOC_SOC, name: "Trattoria del Vicolo", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, category: "restaurant", rating: 4.6, price_level: 2, google_place_id: "GVICOLO2" }, synthesis: null };
+  await soctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify(locSoc)), url: BASE }]);
+  await sp.goto(`${BASE}/locali/${LOC_SOC}`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("amici-qui").textContent())?.includes("1 amico ci è stato") && await sp.getByTestId("amici-qui").getByRole("link", { name: "Giulia" }).getAttribute("href") === "/u/giulia.rm", "pagina del locale: '1 amico ci è stato' con il link al profilo");
+  await sp.screenshot({ path: `${OUT}/65-locale-amici.png`, caret: "initial" });
+  await setSocial(soctx, { ...social, seguo: [] });
+  await sp.goto(`${BASE}/locali/${LOC_SOC}`, { waitUntil: "networkidle" });
+  ok((await sp.getByTestId("amici-qui").count()) === 0, "pagina del locale: senza amici che ci sono stati non compare nulla");
+
+  // Telefono piccolo (360px): niente scorrimento orizzontale sulle pagine nuove.
+  await setSocial(soctx, social);
+  await sp.setViewportSize({ width: 360, height: 780 });
+  for (const path of ["/u/giulia.rm", "/u/giulia.rm/mappa", "/amici", "/profilo"]) {
+    await sp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    ok(await sp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, `360px: ${path} senza scorrimento orizzontale`);
+  }
+  await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  await sp.waitForTimeout(500);
+  await sp.screenshot({ path: `${OUT}/66-profilo-pubblico-360.png`, caret: "initial" });
+  await soctx.close();
+}
+
 // QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
 {
   const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });

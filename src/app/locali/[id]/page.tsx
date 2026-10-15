@@ -7,6 +7,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import SalvaLocale from "./salva-locale";
+import AmiciQui from "./amici-qui";
 import { safeNext } from "@/lib/next-path";
 import {
   cleanList,
@@ -107,6 +108,9 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         {city && <p className="mt-2 text-[15px] font-sans text-text-muted">{city}</p>}
         {kind && <p data-testid="locale-tipo" className="mt-0.5 text-[15px] font-sans text-text-muted">{kind}</p>}
       </div>
+
+      {/* Passaparola: quanti amici (persone che segui) ci sono stati o vogliono provarlo. */}
+      <AmiciQui placeId={place.id} />
 
       {hasVerdict && (
         <section data-testid="verdetto-pubblico" className="mx-5 mt-5 rounded-card bg-brand p-5 shadow-card">
