@@ -64,20 +64,22 @@ function Barre({ voci, vuoto, max = 6, etichetta, testId }: { voci: Voce[]; vuot
   );
 }
 
-// Colonne per fascia oraria: altezza proporzionale, numeri solo sopra la soglia.
+// Fasce orarie nell'ordine della giornata (barre orizzontali: leggibili anche a 390 px),
+// numeri solo sopra la soglia.
 function Fasce({ voci }: { voci: Voce[] }) {
   const top = Math.max(1, ...voci.map((v) => v.persone));
   return (
-    <div data-testid="pannello-fasce" className="grid grid-cols-6 gap-1.5">
+    <ul data-testid="pannello-fasce" className="space-y-1.5">
       {voci.map((v) => (
-        <div key={v.chiave} className="flex flex-col items-center gap-1" title={`${FASCIA_LABEL[v.chiave] ?? v.chiave}: ${mostraPersone(v.persone)} persone`}>
-          <div className="flex h-20 w-full items-end rounded-[6px] bg-surface">
-            <div className="w-full rounded-[6px] bg-accent" style={{ height: `${v.persone > 0 ? Math.max(6, (v.persone / top) * 100) : 0}%` }} />
-          </div>
-          <span className="text-[10px] font-sans text-text-muted sm:text-xs">{FASCIA_LABEL[v.chiave] ?? v.chiave}</span>
-        </div>
+        <li key={v.chiave} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-sm font-sans">
+          <span className="text-text">{FASCIA_LABEL[v.chiave] ?? v.chiave}</span>
+          <span className="h-2.5 overflow-hidden rounded-full bg-surface">
+            <span className="block h-full rounded-full bg-accent" style={{ width: `${v.persone > 0 ? Math.max(4, (v.persone / top) * 100) : 0}%` }} />
+          </span>
+          <span className="w-20 text-right text-xs tabular-nums text-text-muted">{mostraPersone(v.persone)}</span>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -122,9 +124,10 @@ function Andamento({ p }: { p: PannelloRistoratore }) {
 
 function Confronto({ p, categoria, citta }: { p: PannelloRistoratore; categoria: string | null; citta: string | null }) {
   const c = p.confronto;
-  const dove = [categoria ? categoria.toLowerCase() : "locali", citta ? `a ${citta}` : null].filter(Boolean).join(" ");
+  const dove = [categoria ? `categoria “${categoria}”` : null, citta ? `a ${citta}` : null].filter(Boolean).join(", ");
+  const tra = dove ? ` (${dove})` : "";
   if (c.mediaViste === null || c.mediaSalvati === null) {
-    return <p className="text-sm font-sans text-text-muted">Ancora pochi locali simili su Mapetite ({c.simili}) per un confronto che non riveli i numeri di un singolo locale. Servono almeno {SOGLIA} {dove}.</p>;
+    return <p className="text-sm font-sans text-text-muted">Ancora pochi locali simili su Mapetite ({c.simili}) per un confronto che non riveli i numeri di un singolo locale. Servono almeno {SOGLIA} locali simili{tra}.</p>;
   }
   const righe = [
     { label: "Hanno visto la scheda", tuo: c.viste, media: c.mediaViste },
@@ -132,7 +135,7 @@ function Confronto({ p, categoria, citta }: { p: PannelloRistoratore; categoria:
   ];
   return (
     <div data-testid="pannello-confronto" className="space-y-4">
-      <p className="text-xs font-sans text-text-muted">Media di {c.simili} {dove} su Mapetite, stesso periodo.</p>
+      <p className="text-xs font-sans text-text-muted">Media di {c.simili} locali simili su Mapetite{tra}, stesso periodo.</p>
       {righe.map((r) => {
         const top = Math.max(1, r.tuo, r.media);
         const volte = r.media > 0 ? r.tuo / r.media : null;
@@ -248,7 +251,12 @@ export default function Pannello({
       </Sezione>
 
       <Sezione titolo="Giorno per giorno" piano="Verified">
-        <Andamento p={p} />
+        {/* Con meno di 3 persone anche la forma della curva direbbe chi è passato e quando. */}
+        {p.pochiDati ? (
+          <p data-testid="pannello-andamento-nascosto" className="text-sm font-sans text-text-muted">L&apos;andamento compare quando almeno {SOGLIA} persone hanno visto la scheda nel periodo.</p>
+        ) : (
+          <Andamento p={p} />
+        )}
       </Sezione>
 
       <Sezione
