@@ -8,7 +8,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
-import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive } from "@/components/filters-sheet";
+import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
+import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
@@ -36,14 +37,19 @@ const TOP_PINS = 5;
 
 // Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
+  f = withDefaults(f);
   const parts: string[] = [];
   if (f.categories.length > 0) parts.push(f.categories.map((c) => CATEGORIES.find((x) => x.id === c)?.label ?? c).join(", "));
+  if (f.cuisines.length > 0) parts.push(`cucina ${f.cuisines.map((c) => (CUISINES.find((x) => x.id === c)?.label ?? c).toLowerCase()).join(", ")}`);
+  if (f.occasion) parts.push((OCCASIONS.find((x) => x.id === f.occasion)?.label ?? f.occasion).toLowerCase());
+  if (f.features.length > 0) parts.push(f.features.map((c) => (FEATURES.find((x) => x.id === c)?.label ?? c).toLowerCase()).join(", "));
   if (f.zona.trim()) parts.push(`a ${f.zona.trim()}`);
   else if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
   if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
   if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
   if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
-  if (f.openNowOnly) parts.push("aperti ora");
+  if (f.openAt) parts.push(OPEN_AT.find((x) => x.id === f.openAt)?.summary ?? "aperti all'ora scelta");
+  else if (f.openNowOnly) parts.push("aperti ora");
   return parts.join(" · ");
 }
 
@@ -1415,7 +1421,8 @@ export default function MapView({
     setAiSearch(null);
   };
 
-  const runFilteredSearch = async (f: Filters) => {
+  const runFilteredSearch = async (filtri: Filters) => {
+    const f = withDefaults(filtri);
     const ticket = ++searchSeq.current;
     setLoadingVerdicts(false);
     setAiSearching(false);
@@ -1423,13 +1430,22 @@ export default function MapView({
     if (view === "saved") {
       // Salvati: si applicano i filtri che i dati salvati permettono (tipo, voto, prezzo, distanza).
       // Prima solo il tipo, e con un confronto di testo: "Gelaterie" non trovava ice_cream_shop.
+      // Cucina: solo se tutte quelle scelte hanno un tipo Google (le regionali no: si ignorano).
+      // Occasione: l'etichetta messa dall'utente ("Romantico", "Con amici"), se l'ha mai usata.
+      // Caratteristiche e orari non sono nei salvati: si ignorano (mai un locale escluso per un dato che manca).
       const allowedTypes = f.categories.flatMap((c) => CATEGORY_TYPE_MAP[c] ?? []);
+      const cuisineDefs = f.cuisines.map((c) => CUISINES.find((x) => x.id === c));
+      const cuisineTypes = cuisineDefs.every((c) => c?.types) ? cuisineDefs.flatMap((c) => c?.types ?? []) : [];
+      const occasionTag = OCCASIONS.find((o) => o.id === f.occasion)?.tag ?? null;
+      const tagInUse = occasionTag != null && savedPlaces.some((p) => (p.tags ?? []).includes(occasionTag));
       const center = userPos ?? { lat: viewState.latitude, lng: viewState.longitude };
       const filtered = savedPlaces.filter((p) => {
         if (f.categories.length > 0) {
           const cat = (p.category ?? "").toLowerCase();
           if (!allowedTypes.includes(cat) && !f.categories.some((c) => cat.includes(c))) return false;
         }
+        if (cuisineTypes.length > 0 && !cuisineTypes.includes((p.category ?? "").toLowerCase())) return false;
+        if (tagInUse && !(p.tags ?? []).includes(occasionTag)) return false;
         if (f.minRating != null && p.rating != null && p.rating < f.minRating) return false;
         if (f.maxPriceLevel != null && p.priceLevel != null && p.priceLevel > f.maxPriceLevel) return false;
         if (f.minPriceLevel != null && p.priceLevel != null && p.priceLevel < f.minPriceLevel) return false;
@@ -1448,9 +1464,17 @@ export default function MapView({
     let query: string;
     if (f.categories.length > 0) {
       query = f.categories.map((c) => CATEGORY_QUERY[c] ?? c).join(" ");
+    } else if (f.cuisines.length > 0 || f.occasion) {
+      // Una cucina o un'occasione parlano di un posto dove mangiare.
+      query = "ristorante";
     } else {
       query = "ristoranti bar locali";
     }
+    // Cucina, occasione e caratteristiche nel testo: Google trova i posti giusti già alla fonte
+    // ("ristorante cucina romana romantico terrazza"). Una sola chiamata, come prima.
+    const extra = filterQueryWords(f.cuisines, f.occasion, f.features);
+    if (extra) query = `${query} ${extra}`;
+    const openAt = f.openAt ? openAtSlot(f.openAt) : null;
 
     setFilterError(null);
     setFilterLoading(true);
@@ -1473,6 +1497,10 @@ export default function MapView({
           ...(f.openNowOnly && { openNowOnly: true }),
           ...(f.zona.trim() ? { zona: f.zona.trim() } : f.radiusKm != null ? { radius: f.radiusKm * 1000 } : {}),
           ...(f.categories.length > 0 && { categories: f.categories }),
+          ...(f.cuisines.length > 0 && { cuisines: f.cuisines }),
+          ...(f.occasion && { occasion: f.occasion }),
+          ...(f.features.length > 0 && { features: f.features }),
+          ...(openAt && { openAt, openAtId: f.openAt }),
         }),
       });
       const data = await res.json();
