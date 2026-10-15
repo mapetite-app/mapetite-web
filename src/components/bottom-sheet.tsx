@@ -121,6 +121,22 @@ export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat
 
 // Stessa forma di ciò che arriva (verdetto su 2 righe, "perché" su 1, 2 chip):
 // quando il verdetto sostituisce il segnaposto la lista non salta di ~60 px.
+// Copertina senza foto: un colore per famiglia di cucina (sempre scuro, il testo resta bianco).
+const COVERS: [RegExp, string, string][] = [
+  [/pizza/, "#7a2e1f", "#3d1610"],
+  [/sushi|japanese|ramen|seafood|fish|pesce/, "#1d4e6b", "#0f2a3b"],
+  [/cocktail|bar|pub|wine|brewery|night/, "#4a2346", "#241122"],
+  [/cafe|coffee|bakery|pastry|dessert|ice_cream|gelat/, "#6b4423", "#35210f"],
+  [/vegan|vegetarian/, "#2f5a2e", "#172d17"],
+  [/chinese|indian|thai|asian|mexican|korean|vietnam/, "#7a4a12", "#3b2308"],
+];
+export function coverGradient(category: string | null, name = ""): string {
+  const key = `${category ?? ""} ${name}`.toLowerCase();
+  const hit = COVERS.find(([re]) => re.test(key));
+  const [a, b] = hit ? [hit[1], hit[2]] : ["#24545a", "#1a3c40"];
+  return `linear-gradient(160deg, ${a} 0%, ${b} 100%)`;
+}
+
 function SkeletonLines({ dark = false }: { dark?: boolean }) {
   const bar = dark ? "bg-white/20" : "bg-border";
   const chip = dark ? "bg-white/15" : "bg-accent-light";
@@ -518,36 +534,38 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 <button
                   type="button"
                   onClick={() => onSelect(place)}
-                  className="relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-card bg-brand p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  data-testid="card-risultato"
+                  className="relative flex h-full min-h-[172px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  style={{ background: coverGradient(place.category, place.name) }}
                 >
+                  {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
+                      così si vede anche quando la foto non arriva (quota finita). */}
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute -right-3 -top-2 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
-                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-brand/20" />
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/55 to-black/10" />
                     </>
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    <span className="flex items-start justify-between gap-2">
-                      <span className="text-2xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
-                      <span className={`flex flex-wrap justify-end gap-1 ${onSave ? "pr-11" : ""}`}>
-                        {gemsOn && isGem(place.rating, d?.userRatingCount) && (
-                          <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
-                        )}
-                        {onSave && savedLabel?.(place.id) && (
-                          <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{savedLabel(place.id)}</span>
-                        )}
-                        {d?.openNow === true && (
-                          <span className="rounded-pill bg-white/15 px-2 py-0.5 text-[10px] font-display font-medium">Aperto ora</span>
-                        )}
-                        {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
-                        {d?.openNow === false && (
-                          <span data-testid="chiuso-ora" className="rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium text-white/80">Chiuso ora</span>
-                        )}
-                      </span>
+                    <span className={`flex flex-wrap items-center gap-1 ${onSave ? "pr-11" : ""}`}>
+                      {d?.openNow === true && (
+                        <span className="flex items-center gap-1 rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
+                      )}
+                      {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
+                      {d?.openNow === false && (
+                        <span data-testid="chiuso-ora" className="rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium text-white/80">Chiuso ora</span>
+                      )}
+                      {gemsOn && isGem(place.rating, d?.userRatingCount) && (
+                        <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                      )}
+                      {onSave && savedLabel?.(place.id) && (
+                        <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{savedLabel(place.id)}</span>
+                      )}
                     </span>
-                    <span className="mt-3 line-clamp-2 text-lg font-title in-data-[titoli=serif]:text-2xl font-semibold leading-snug">{place.name}</span>
-                    <span className="mt-1 truncate text-[13px] font-sans font-medium text-white/85">
+                    <span className={`mt-auto pt-6 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave ? "pr-2" : ""}`}>{place.name}</span>
+                    <span className="mt-1 truncate text-[11px] font-display font-medium uppercase tracking-wider text-white/75">
                       {metaLine(place, d, origin, showCity)}
                     </span>
                     {similarTo?.(place.id) && (
@@ -556,32 +574,26 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {d?.verdict ? (
                       <span className="mt-2 block">
                         {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
-                        <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</span>
+                        <span className="block text-[10px] font-display font-semibold uppercase tracking-wider text-accent"><span aria-hidden>✦ </span><span data-testid="etichetta-verdetto">Il verdetto Mapetite</span></span>
                         <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
                     ) : googleLine(d) ? (
-                      <span data-testid="riga-google" className="mt-2 line-clamp-3 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
+                      <span data-testid="riga-google" className="mt-2 line-clamp-2 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
+                    {/* Il perché è adatto a QUESTA ricerca: con il verdetto, ciò che nessun concorrente mostra. */}
                     {d?.matchReason && (
-                      <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-white/70">{d.matchReason}</span>
+                      <span className="mt-1 line-clamp-1 text-xs font-sans leading-snug text-white/75">{d.matchReason}</span>
                     )}
-                    {/* Dati personali dei salvati: i tuoi tag e la tua nota. */}
-                    {place.tags && place.tags.length > 0 && (
-                      <span className="mt-2 flex flex-wrap gap-1.5">
-                        {sortTags(place.tags).slice(0, 3).map((t) => (
-                          <span key={t} className="rounded-pill border border-white/40 px-2 py-0.5 text-[11px] font-display font-medium">{tagLabel(t)}</span>
-                        ))}
-                      </span>
-                    )}
+                    {/* Dati personali dei salvati: la tua nota (i tag restano nella scheda e nei filtri). */}
                     {place.note && (
                       <span className="mt-1 line-clamp-1 text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
                     )}
-                    {(d?.goFor ?? []).length > 0 && (
-                      <span className="mt-auto flex flex-wrap gap-1.5 pt-2">
-                        {d!.goFor!.slice(0, 2).map((c) => (
-                          <span key={c} className="rounded-pill bg-white/15 px-2 py-0.5 text-[11px] font-display">{c}</span>
+                    {((d?.goFor ?? []).length > 0 || (place.tags ?? []).length > 0) && (
+                      <span className="mt-2 flex gap-1.5 overflow-hidden">
+                        {(place.tags && place.tags.length > 0 ? sortTags(place.tags).slice(0, 2).map(tagLabel) : d!.goFor!.slice(0, 2)).map((c) => (
+                          <span key={c} className="shrink-0 truncate rounded-pill border border-white/30 px-2 py-0.5 text-[11px] font-display">{c}</span>
                         ))}
                       </span>
                     )}
