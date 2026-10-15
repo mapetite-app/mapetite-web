@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle } from "lucide-react";
 import {
   addBooking,
@@ -148,7 +149,7 @@ export default function BookingSheet({
                 La conferma arriva dal locale: Mapetite non vede i tavoli liberi.
               </p>
               <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                Te la ricordo il giorno stesso in home e nel profilo, e il giorno dopo ti chiedo com&apos;è andata.
+                La trovi in &ldquo;Le mie prenotazioni&rdquo;: te la ricordo il giorno stesso in home e il giorno dopo ti chiedo com&apos;è andata.
               </p>
             </div>
             {done.via === "telefono" && (
@@ -158,6 +159,13 @@ export default function BookingSheet({
               </div>
             )}
             <button type="button" onClick={onClose} className={`${btn} mt-4 bg-accent text-white`}>Fatto</button>
+            <Link
+              href="/prenotazioni"
+              data-testid="prenota-vedi-prenotazioni"
+              className="mt-1 flex min-h-11 items-center justify-center text-sm font-display font-semibold text-brand"
+            >
+              Vedi le mie prenotazioni →
+            </Link>
           </div>
         ) : (
           <>

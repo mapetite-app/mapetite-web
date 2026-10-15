@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import Link from "next/link";
 import { CalendarCheck, Navigation, X } from "lucide-react";
 import { bookingReminders, loadBookings, removeBooking, subscribeBookings, updateBooking, type BookingRequest } from "@/lib/booking";
 import { track } from "@/lib/track";
@@ -37,7 +38,10 @@ export default function BookingReminder() {
               <X size={16} />
             </button>
           </div>
-          <p className="mt-2 text-xs font-sans text-white/70">La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.</p>
+          <p className="mt-2 text-xs font-sans text-white/70">
+            La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.{" "}
+            <Link href="/prenotazioni" data-testid="promemoria-tutte" className="font-semibold text-white underline underline-offset-2">Le mie prenotazioni</Link>
+          </p>
           <div className="mt-3 flex gap-2">
             {b.lat != null && b.lng != null && (
               <a

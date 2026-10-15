@@ -5,6 +5,7 @@ import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import BookingReminder from "@/components/booking-reminder";
+import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
@@ -203,6 +204,8 @@ export default async function ProfiloPage() {
         </span>
         <span aria-hidden className="text-xl text-white/70">→</span>
       </Link>
+
+      <ProfiloPrenotazioni />
 
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
