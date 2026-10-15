@@ -1201,7 +1201,8 @@ else {
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
   await p.route("**/rest/v1/saved_places**", (r) => {
-    if (r.request().method() === "PATCH") { patched = r.request().postDataJSON(); return r.fulfill({ status: 204, body: "" }); }
+    // Solo le scritture dei tag: dopo "Ci sono stato" la classifica (4.3) può scrivere a parte rank_score.
+    if (r.request().method() === "PATCH") { const b = r.request().postDataJSON(); if (b?.tags) patched = b; return r.fulfill({ status: 204, body: "" }); }
     return r.fallback();
   });
   await p.getByLabel("Cerca tra i salvati").fill("");
