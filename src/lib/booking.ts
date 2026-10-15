@@ -220,6 +220,7 @@ export type BookingRequest = BookingDetails & {
   createdAt: number;
   outcome?: "bene" | "male" | "non-andato" | null;
   dismissed?: boolean;
+  confirmed?: boolean;    // l'utente ha segnato "Il locale ha confermato" (assente nelle richieste vecchie)
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -271,4 +272,70 @@ export function bookingReminders(list: BookingRequest[], now: Date = new Date())
     today: live.filter((b) => b.date === todayKey).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     howWasIt: live.filter((b) => b.date! < todayKey && b.date! >= oldest && !b.outcome),
   };
+}
+
+// ── Pagina "Le mie prenotazioni" ──
+// In arrivo: da oggi in poi (oggi compreso), dalla più vicina. Passate: dalla più recente.
+// Senza giorno (non dovrebbe succedere: il foglio lo chiede) restano in arrivo, in fondo.
+export function splitBookings(list: BookingRequest[], now: Date = new Date()): { upcoming: BookingRequest[]; past: BookingRequest[] } {
+  const todayKey = dateKey(now);
+  const when = (b: BookingRequest) => `${b.date ?? "9999-99-99"} ${b.time ?? "99:99"}`;
+  const upcoming = list.filter((b) => !b.date || b.date >= todayKey).sort((a, b) => when(a).localeCompare(when(b)));
+  const past = list.filter((b) => !!b.date && b.date < todayKey).sort((a, b) => when(b).localeCompare(when(a)));
+  return { upcoming, past };
+}
+
+// Richiesta inviata → Confermata (lo segna l'utente) → Fatta / Non andata. "da-dire": passata, senza esito.
+export type BookingStatus = "inviata" | "confermata" | "fatta" | "non-andata" | "da-dire";
+export function bookingStatus(b: BookingRequest, now: Date = new Date()): BookingStatus {
+  if (b.outcome === "non-andato") return "non-andata";
+  if (b.outcome === "bene" || b.outcome === "male") return "fatta";
+  if (b.date && b.date < dateKey(now)) return "da-dire";
+  return b.confirmed ? "confermata" : "inviata";
+}
+
+// File .ics per il calendario del telefono, generato nel browser (nessun servizio esterno).
+// Orario "fluttuante" (senza fuso): il calendario lo legge nell'ora del telefono, come l'ha scelto l'utente.
+function icsText(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
+}
+function icsLocal(d: Date): string {
+  return `${dateKey(d).replace(/-/g, "")}T${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}00`;
+}
+export function bookingIcs(b: BookingRequest, now: Date = new Date()): string | null {
+  if (!b.date) return null;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Mapetite//Prenotazioni//IT",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${b.id}@mapetite`,
+    `DTSTAMP:${now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")}`,
+  ];
+  if (b.time && /^\d{1,2}:\d{2}$/.test(b.time)) {
+    const [h, m] = b.time.split(":").map(Number);
+    const start = fromKey(b.date);
+    start.setHours(h, m, 0, 0);
+    const end = new Date(start.getTime() + 2 * 3_600_000); // durata indicativa: 2 ore
+    lines.push(`DTSTART:${icsLocal(start)}`, `DTEND:${icsLocal(end)}`);
+  } else {
+    const next = fromKey(b.date);
+    next.setDate(next.getDate() + 1);
+    lines.push(`DTSTART;VALUE=DATE:${b.date.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${dateKey(next).replace(/-/g, "")}`);
+  }
+  const details = [
+    b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null,
+    b.special ? `Richiesta: ${b.special}` : null,
+    b.confirmed ? "Confermata dal locale." : "Richiesta inviata: la conferma arriva dal locale.",
+  ].filter(Boolean).join("\n");
+  const title = icsText(`Tavolo da ${b.placeName}`);
+  lines.push(`SUMMARY:${title}`, `DESCRIPTION:${icsText(details)}`);
+  if (b.lat != null && b.lng != null) {
+    lines.push(`GEO:${b.lat};${b.lng}`, `URL:https://www.google.com/maps/dir/?api=1&destination=${b.lat}%2C${b.lng}`);
+  }
+  lines.push("BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", `DESCRIPTION:${title}`, "END:VALARM", "END:VEVENT", "END:VCALENDAR");
+  // Righe lunghe piegate (RFC 5545: massimo 75 byte; 60 caratteri lasciano margine agli accenti).
+  const fold = (l: string) => (l.length <= 60 ? l : (l.match(/[\s\S]{1,60}/gu) ?? [l]).join("\r\n "));
+  return lines.map(fold).join("\r\n") + "\r\n";
 }
