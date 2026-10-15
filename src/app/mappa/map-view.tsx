@@ -1015,6 +1015,8 @@ export default function MapView({
   // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
   const focusedIdRef = useRef<string | null>(null);
   useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
+  const aiFirstIdRef = useRef<string | null>(null);
+  useEffect(() => { aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null; }, [aiSearch]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1751,6 +1753,9 @@ export default function MapView({
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
+        // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
+        // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
+        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) setFocusedId(null);
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
           // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
