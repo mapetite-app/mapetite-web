@@ -27,8 +27,6 @@ export default function RaccoltaCopertina({
         className={`relative flex ${compact ? "h-20" : "h-[104px]"} items-stretch p-2`}
         style={{ backgroundColor: collectionColor(name) }}
       >
-        {/* Linguetta della cartella */}
-        <span className="absolute left-3 top-0 h-1.5 w-10 rounded-b-full bg-white/25" />
         {covers ? (
           <span data-testid="raccolta-copertina" className="grid w-full grid-cols-2 grid-rows-2 gap-1.5 pt-1.5">
             {tiles.map((e, i) => (
@@ -46,9 +44,10 @@ export default function RaccoltaCopertina({
           </span>
         )}
       </span>
-      <span className="block min-w-0 flex-1 px-3 pb-3 pt-2.5">
+      {/* pr-8: a destra c'è il pulsante ⋯ della raccolta (nel profilo), non deve coprire il testo. */}
+      <span className="block min-w-0 flex-1 pb-3 pl-3 pr-8 pt-2.5">
         {/* Parole intere a capo: affiancati a un'icona, a 360-390px i nomi si spezzavano a metà parola. */}
-        <span data-testid="raccolta-nome" className="line-clamp-2 pr-7 font-display text-[15px] font-semibold leading-tight text-text [overflow-wrap:anywhere] [word-break:normal]">
+        <span data-testid="raccolta-nome" className="line-clamp-2 font-display text-[15px] font-semibold leading-tight text-text [overflow-wrap:anywhere] [word-break:normal]">
           {name}
         </span>
         {covers && names.length > 0 ? (

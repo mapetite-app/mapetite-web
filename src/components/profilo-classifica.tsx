@@ -113,7 +113,7 @@ export default function ProfiloClassifica({ userId, initialRows }: { userId: str
           {current && rankedForCurrent.length > 0 ? (
             <>
               <p className="mb-2 text-sm text-text-muted">
-                <strong className="font-display text-text">{current.name}</strong> · ne restano {todo.length}
+                {todo.length === 1 ? "Ultimo da mettere in classifica" : `Ne restano ${todo.length}`}
               </p>
               <ClassificaConfronto
                 key={current.placeId}

@@ -113,7 +113,7 @@ export default function RaccolteProposte({
           <div className="flex items-center justify-between gap-2">
             <p className="flex min-w-0 items-center gap-2 font-display text-[15px] font-semibold text-brand">
               <Sparkles size={18} aria-hidden className="shrink-0 text-accent" />
-              <span className="truncate">{proposte.length === 0 ? "Nessuna proposta sicura" : "Proposte per i tuoi salvati"}</span>
+              <span className="truncate">{proposte.length === 0 ? "Nessuna proposta sicura" : proposte.length === 1 ? "1 proposta" : `${proposte.length} proposte`}</span>
             </p>
             {aperte.length > 1 && (
               <button
@@ -143,7 +143,7 @@ export default function RaccolteProposte({
                     <span className="block truncate font-display text-sm font-semibold text-text">{p.name}</span>
                     <span className="mt-1 flex flex-wrap gap-1">
                       {p.raccolte.map((c) => (
-                        <span key={c} className="rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-semibold text-accent">{c}</span>
+                        <span key={c} className="max-w-full truncate whitespace-nowrap rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-semibold text-accent">{c}</span>
                       ))}
                     </span>
                   </span>

@@ -48,15 +48,10 @@ export default function ClassificaConfronto({
         La tua classifica · {city}
       </p>
       <p className="mt-1.5 text-[15px] font-display font-semibold leading-snug text-text">
-        Ti è piaciuto più o meno di <span data-testid="classifica-rivale">{other.name}</span>?
+        {target.name}: ti è piaciuto più o meno di{" "}
+        <span aria-hidden>{getCategoryEmoji(other.category, other.name)} </span>
+        <span data-testid="classifica-rivale">{other.name}</span>?
       </p>
-      <div className="mt-2 flex items-center gap-2 text-sm text-text-muted" aria-hidden>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn bg-white text-lg">{getCategoryEmoji(target.category, target.name)}</span>
-        <span className="min-w-0 truncate">{target.name}</span>
-        <span className="shrink-0 font-display font-semibold text-accent">vs</span>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn bg-white text-lg">{getCategoryEmoji(other.category, other.name)}</span>
-        <span className="min-w-0 truncate">{other.name}</span>
-      </div>
       {error && <p role="alert" className="mt-2 text-sm text-error">Non sono riuscito a salvare la classifica. Riprova.</p>}
       <div className="mt-3 flex gap-2">
         <button
