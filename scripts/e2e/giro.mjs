@@ -487,6 +487,22 @@ await page.getByRole("button", { name: "Cerca in quest'area" }).click({ timeout:
   await page.waitForTimeout(800);
   ok(filterBody?.searchIntent === "structured" && filterBody?.minRating === 4.5, "filtri: 'Cerca in quest'area' rifà la ricerca con gli stessi filtri");
 }, () => ok(false, "filtri: 'Cerca in quest'area' compare anche dopo i filtri"));
+ok(filterBody?.phase === "fast" && await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 }).then(() => true, () => false), "filtri: lista subito e verdetti dopo (come la ricerca AI)");
+// "Dove?": zona scritta a mano o suggerita; la distanza (misurata dalla mappa) sparisce.
+await page.getByRole("button", { name: "Filtri", exact: true }).click();
+ok(await page.getByTestId("filtro-zona").isVisible() && await page.getByTestId("zone-suggerite").getByRole("button", { name: "Tutta Roma" }).isVisible(), "filtri: campo 'Dove?' con le zone di Roma suggerite");
+await page.getByTestId("filtro-zona").fill("Pigneto");
+ok((await page.getByRole("button", { name: "3 km" }).count()) === 0, "filtri: con una zona scritta la distanza dalla mappa non si chiede");
+await shot("24c-filtri-dove");
+filterBody = null;
+await page.getByRole("button", { name: /^Applica filtri/ }).click();
+await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
+ok(filterBody?.zona === "Pigneto" && filterBody?.radius == null, `filtri: la ricerca parte con la zona e senza distanza (${JSON.stringify({ zona: filterBody?.zona, radius: filterBody?.radius })})`);
+ok((await page.getByTestId("intestazione-lista").textContent())?.includes("a Pigneto"), "filtri: l'intestazione dice la zona");
+await page.getByRole("button", { name: "Filtri", exact: true }).click();
+await page.getByRole("button", { name: "Azzera" }).click();
+await page.getByRole("button", { name: /^Applica filtri/ }).click().catch(() => {});
+await page.keyboard.press("Escape").catch(() => {});
 await page.unroute("**/api/search");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.getByLabel("Cosa cerchi?").fill("aperitivo sul tetto a Monti");
