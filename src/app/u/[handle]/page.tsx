@@ -11,6 +11,11 @@ import { PostoRiga } from "@/components/posto-persona";
 import { loadProfilePage } from "@/lib/social";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
 import { isVisited, mapSpots, plural, publicCollections } from "@/lib/social-view";
+import { collectionColor, publicCollectionPath } from "@/lib/raccolte";
+import { loadPublicRanks } from "@/lib/classifica-server";
+import { topByCity } from "@/lib/classifica";
+import { cityFromAddress } from "@/lib/city";
+import ClassificaLista from "@/components/classifica-lista";
 
 // Profilo pubblico di una persona (piano 5.1): si apre anche senza account (link condiviso).
 // Solo se la persona ha scelto di renderlo pubblico; mai note private, mai gusti dichiarati.
@@ -82,6 +87,11 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const collections = publicCollections(places);
   const visited = places.filter(isVisited);
   const want = places.filter((p) => !isVisited(p)); // salvato e non ancora visitato = da provare
+  // Top per città (piano 4.3): solo i visitati messi in classifica; nascosta senza la migrazione.
+  const ranks = await loadPublicRanks(profile.id);
+  const tops = ranks
+    ? topByCity(visited.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 5).slice(0, 3)
+    : [];
   const stats = [
     { label: "Visitati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },
@@ -141,10 +151,30 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           <h2 id="raccolte-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Raccolte</h2>
           <div data-testid="profilo-raccolte" className="mt-2 flex flex-wrap gap-1.5">
             {collections.map((c) => (
-              <span key={c.name} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-accent-light px-3 py-1 text-[13px] font-display font-medium text-accent">
+              <Link
+                key={c.name}
+                href={publicCollectionPath(profile.handle, c.name)}
+                data-testid="raccolta-pubblica-link"
+                className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-pill bg-accent-light px-3 py-1 text-[13px] font-display font-medium text-accent active:scale-95"
+              >
+                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: collectionColor(c.name) }} />
                 <span className="truncate">{c.name}</span>
                 <span className="text-accent/70">· {c.count}</span>
-              </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {tops.length > 0 && (
+        <section className="mt-6 px-4" aria-labelledby="top-titolo" data-testid="profilo-top">
+          <h2 id="top-titolo" className="mb-2 font-title text-xl font-semibold text-brand">I preferiti di {name}</h2>
+          <div className="space-y-4">
+            {tops.map(([city, list]) => (
+              <div key={city}>
+                <p className="mb-1.5 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">🏆 Top {city}</p>
+                <ClassificaLista testId="top-voce" voci={list.map((p) => ({ id: p.place_id, name: p.name, category: p.category, href: `/locali/${p.place_id}` }))} />
+              </div>
             ))}
           </div>
         </section>

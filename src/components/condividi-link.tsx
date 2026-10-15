@@ -19,7 +19,7 @@ export default function CondividiLink({
   path: string;
   title: string;
   text: string;
-  cosa: "profilo" | "mappa";
+  cosa: "profilo" | "mappa" | "raccolta";
   label?: string;
   variant?: "outline" | "solid";
   testId?: string;

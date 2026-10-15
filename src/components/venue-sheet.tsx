@@ -61,6 +61,8 @@ type VenueSheetProps = {
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
   // Prenotazione assistita: giorno, ora e persone già capiti (dall'assistente), da confermare.
   booking?: Partial<BookingDetails> | null;
+  // Classifica personale (piano 4.3) sotto "Com'era?": la passa map-view solo per i salvati visitati.
+  rankSlot?: React.ReactNode;
 };
 
 export default function VenueSheet({
@@ -78,6 +80,7 @@ export default function VenueSheet({
   googlePlaceId = null,
   onQuickSave,
   booking = null,
+  rankSlot,
 }: VenueSheetProps) {
   const {
     name,
@@ -553,6 +556,7 @@ export default function VenueSheet({
                   );
                 })}
               </div>
+              {rankSlot}
             </div>
           )}
           {hasPersonalTags && (
