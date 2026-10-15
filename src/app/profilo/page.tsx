@@ -11,6 +11,7 @@ import ProfiloSocial from "@/components/profilo-social";
 import { loadMySocial } from "@/lib/social";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
+import ProfiloAccount from "@/components/profilo-account";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -92,6 +93,9 @@ export default async function ProfiloPage() {
           <a href="/signup?next=%2Fprofilo" className="inline-flex min-h-11 items-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand">
             Crea un account
           </a>
+        </div>
+        <div className="w-full max-w-xs">
+          <ProfiloAccount loggedIn={false} />
         </div>
       </div>
     );
@@ -302,6 +306,8 @@ export default async function ProfiloPage() {
           </ul>
         )}
       </section>
+
+      <ProfiloAccount loggedIn />
     </div>
   );
 }
