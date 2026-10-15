@@ -499,7 +499,46 @@ await page.getByRole("button", { name: /^Applica filtri/ }).click();
 await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
 ok(filterBody?.zona === "Pigneto" && filterBody?.radius == null, `filtri: la ricerca parte con la zona e senza distanza (${JSON.stringify({ zona: filterBody?.zona, radius: filterBody?.radius })})`);
 ok((await page.getByTestId("intestazione-lista").textContent())?.includes("a Pigneto"), "filtri: l'intestazione dice la zona");
+// Cucina, occasione, caratteristiche, aperto a un'ora scelta (piano 2.2).
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
+await page.getByRole("button", { name: "Azzera" }).click();
+{
+  const cucina = page.getByTestId("filtri-cucina");
+  ok((await cucina.locator("button[aria-pressed]").count()) === 6 && await page.getByTestId("cucina-tutte").isVisible(), "filtri: cucina mostra le prime 6 e 'Mostra tutte'");
+  await page.getByTestId("cucina-tutte").click();
+  ok((await cucina.getByRole("button", { name: "Peruviana" }).count()) === 1, "filtri: 'Mostra tutte' apre tutte le cucine");
+  await page.getByTestId("cucina-tutte").click();
+  ok((await page.getByTestId("filtri-caratteristiche").getByRole("button", { name: "Cani ammessi" }).count()) === 0, "filtri: caratteristiche, le altre dietro 'Mostra tutte'");
+}
+await page.getByRole("button", { name: "Romana" }).click();
+await page.getByRole("button", { name: "Appuntamento romantico" }).click();
+await shot("24d-filtri-cucina-occasione");
+await page.getByRole("button", { name: "Terrazza / rooftop" }).click();
+await page.getByTestId("caratteristiche-tutte").click();
+await page.getByRole("button", { name: "Cani ammessi" }).click();
+await page.getByRole("button", { name: "Stasera alle 21" }).click();
+ok((await page.getByRole("button", { name: "Applica filtri (5)" }).count()) === 1, "filtri: il conteggio include cucina, occasione, caratteristiche e orario (5)");
+await shot("24d2-filtri-caratteristiche-orario");
+filterBody = null;
+await page.getByRole("button", { name: /^Applica filtri/ }).click();
+await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
+ok(JSON.stringify(filterBody?.cuisines) === '["romana"]' && filterBody?.occasion === "romantico" && JSON.stringify(filterBody?.features) === '["terrazza","cani"]' && filterBody?.openAt?.hour === 21 && filterBody?.openAt?.day === new Date().getDay() && filterBody?.openAtId === "stasera",
+  `filtri: le nuove scelte arrivano al server (${JSON.stringify({ c: filterBody?.cuisines, o: filterBody?.occasion, f: filterBody?.features, a: filterBody?.openAt })})`);
+ok(/cucina romana/.test(filterBody?.query ?? "") && /romantico/.test(filterBody?.query ?? "") && /terrazza/.test(filterBody?.query ?? "") && !/cani/i.test(filterBody?.query ?? ""), `filtri: cucina, occasione e terrazza nel testo per Google, i cani solo come campo (${filterBody?.query})`);
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: cucina romana · appuntamento romantico · terrazza / rooftop, cani ammessi · aperti stasera alle 21", `filtri: il riepilogo mostra le nuove scelte (${await page.getByTestId("intestazione-lista").textContent()})`);
+// A 360 px il pannello resta usabile: niente scorrimento di lato, scelte comode, pulsante raggiungibile.
+await page.setViewportSize({ width: 360, height: 740 });
+await page.getByRole("button", { name: "Filtri", exact: true }).click();
+if (/Mostra tutte/.test(await page.getByTestId("caratteristiche-tutte").textContent() ?? "")) await page.getByTestId("caratteristiche-tutte").click();
+{
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  const romana = await page.getByRole("button", { name: "Romana" }).boundingBox();
+  const lungo = await page.getByRole("button", { name: "All'aperto / dehors" }).boundingBox();
+  const applica = await page.getByRole("button", { name: /^Applica filtri/ }).boundingBox();
+  ok(sw <= 360 && !!romana && romana.height >= 40 && !!lungo && lungo.x + lungo.width <= 360 && !!applica && applica.y + applica.height <= 740, `filtri a 360 px: niente scorrimento di lato, chip ≥ 40 px, 'Applica' visibile (larghezza ${sw})`);
+}
+await shot("24e-filtri-360");
+await page.setViewportSize({ width: 390, height: 844 });
 await page.getByRole("button", { name: "Azzera" }).click();
 await page.getByRole("button", { name: /^Applica filtri/ }).click().catch(() => {});
 await page.keyboard.press("Escape").catch(() => {});
