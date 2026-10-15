@@ -5,6 +5,7 @@ import HomeRecent from "@/components/home-recent";
 import { cookies } from "next/headers";
 import HomeIntro, { IntroAgain } from "@/components/home-intro";
 import HomeSaved from "@/components/home-saved";
+import HomeSearchInput from "@/components/home-search-input";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 // Quanti salvati e quanti "Voglio andarci" (tag "Da provare"). In sviluppo con E2E_FAKE_USER
@@ -75,16 +76,7 @@ export default async function Home() {
         </div>
         <Form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
           <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
-          <input
-            type="search"
-            name="q"
-            required
-            minLength={3}
-            enterKeyHint="search"
-            placeholder="Chiedi all'AI…"
-            aria-label="Chiedi all'AI: cosa cerchi?"
-            className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
-          />
+          <HomeSearchInput />
           <Link
             href="/mappa?filtri=1"
             data-testid="home-filtri"

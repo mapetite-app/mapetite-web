@@ -30,6 +30,7 @@ import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-st
 import { track } from "@/lib/track";
 import { labelsToHide } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
+import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
@@ -1655,6 +1656,14 @@ export default function MapView({
 
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
+  // Mentre si scrive nella barra: dopo una pausa di 700 ms l'AI capisce già la frase (nessuna
+  // chiamata Google). All'Invio la ricerca parte subito su Google.
+  useEffect(() => {
+    if (view !== "all" || aiQuery.trim().length < 8) return;
+    const t = setTimeout(() => prefetchIntent(aiQuery), 700);
+    return () => clearTimeout(t);
+  }, [aiQuery, view]);
+
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
     // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
@@ -1664,6 +1673,9 @@ export default function MapView({
     setAiSearching(true);
       setAiError(null);
       try {
+        // Frase già capita mentre si scriveva: la ricerca non riaspetta l'AI (~1-2 s in meno).
+        const intent = view === "all" ? await intentFor(q) : null;
+        if (searchSeq.current !== ticket) return;
         const res = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1672,6 +1684,7 @@ export default function MapView({
             source: view === "all" ? "world" : "saved",
             searchIntent: "natural",
             phase: "fast",
+            ...(intent && { intent, intentQuery: q.trim() }),
             lat: at.lat,
             lng: at.lng,
           }),

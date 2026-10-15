@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
-import { extractSearchIntent } from "@/lib/search-intent";
+import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
 import { recordEvent } from "@/lib/events";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
@@ -109,7 +109,10 @@ export async function POST(request: Request) {
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
     // Se Haiku non risponde si usa la frase originale come prima.
-    const intent = searchIntent === "natural" ? await extractSearchIntent(query.trim()) : null;
+    // Se il telefono ha già fatto capire la frase mentre si scriveva, si risparmiano 1-2 s di Haiku.
+    const preIntent = searchIntent === "natural" && body?.intentQuery === query.trim() ? sanitizeIntent(body?.intent) : null;
+    if (preIntent) console.log(`[search-intent] già capito mentre si scriveva: "${query.trim().slice(0, 60)}"`);
+    const intent = searchIntent === "natural" ? preIntent ?? await extractSearchIntent(query.trim()) : null;
     if (intent) {
       filtri = {
         categoria: intent.tipo,
