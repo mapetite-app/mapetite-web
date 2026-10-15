@@ -1910,10 +1910,14 @@ export default function MapView({
   }, [vistaParam]);
 
   // L'indirizzo dice se si stanno guardando i salvati (?vista=salvati): la barra in basso accende "Salvati".
-  // Non al primo disegno: lì è l'indirizzo a decidere la vista (vedi sotto).
-  const viewSynced = useRef(false);
+  // Solo quando la vista cambia davvero, non al primo disegno: lì è l'indirizzo a decidere la vista
+  // (vedi sotto). Si confronta con la vista precedente e non con un "già fatto": in sviluppo React
+  // esegue due volte gli effetti al montaggio e la seconda volta toglieva ?vista=salvati appena
+  // arrivati dalla barra in basso, e la mappa rimbalzava tra Esplora e Salvati.
+  const syncedView = useRef(view);
   useEffect(() => {
-    if (!viewSynced.current) { viewSynced.current = true; return; }
+    if (syncedView.current === view) return;
+    syncedView.current = view;
     const params = new URLSearchParams(window.location.search);
     if ((params.get("vista") === "salvati") === (view === "saved")) return;
     if (view === "saved") params.set("vista", "salvati");
