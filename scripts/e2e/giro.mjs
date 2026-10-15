@@ -985,9 +985,9 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
-// Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani e la richiesta di verifica per email.
+// Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani, il modulo di richiesta e l'esempio del pannello.
 { const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
-  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href"))?.startsWith("mailto:"), "per i ristoratori: tre piani e 'Rivendica il tuo locale' che prepara un'email"); }
+  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href")) === "/per-i-ristoratori/rivendica" && (await page.getByTestId("pannello-demo").getAttribute("href")) === "/ristoratore/demo", "per i ristoratori: tre piani, 'Rivendica il tuo locale' porta al modulo e c'è il pannello d'esempio"); }
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
@@ -2677,6 +2677,160 @@ else {
   await tp.screenshot({ path: `${OUT}/60-pannello-numeri.png`, fullPage: true });
   ok(tEvents.filter((e) => e.type === "pagina").length === pagine, "pannello: le visite di Lorenzo al pannello non contano come pagine dei tester");
   await tctx.close();
+}
+
+// Lato ristoratori (PIANO-25-OTTOBRE.md 8.1 e 8.2): rivendica dal locale, badge "Verificato",
+// pannello del ristoratore (vietato a chi non è admin/titolare) ed esempio dimostrativo.
+// Supabase simulato: il browser scrive in claims (intercettato), il server legge dai cookie e2e_*.
+if (!fakeUser) console.log("SKIP  ristoratori: dev server senza E2E_FAKE_USER");
+else {
+  // Calcoli del pannello (funzioni pure, senza server).
+  let rs = null;
+  try { rs = await import(new URL("../../src/lib/ristoratore.ts", import.meta.url).href); } catch (e) { ok(false, `ristoratore: modulo src/lib/ristoratore.ts importabile (${e.message})`); }
+  if (rs) {
+    const now = Date.parse("2026-10-15T12:00:00Z");
+    const at = (d, h = 10, m = 0) => new Date(Date.UTC(2026, 9, d, h, m)).toISOString();
+    const L = { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Trattoria Uno", address: "Via del Pigneto 10, 00176 Roma RM, Italy", category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GUNO" };
+    const peer = (i) => ({ ...L, id: `aaaaaaaa-0000-4000-8000-00000000010${i}`, name: `Simile ${i}`, google_place_id: `GS${i}` });
+    const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
+    const eventi = [
+      // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
+      e("ricerca", 14, "a1", { s: "s1", m: 0, p: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], caratteristiche: ["Tavoli all'aperto"], zona: "Pigneto" } }),
+      e("apri_scheda", 14, "a1", { s: "s1", m: 2, gid: "GUNO", lat: 41.89, lng: 12.53, p: { fonte: "ricerca" } }),
+      e("salva", 14, "a1", { s: "s1", m: 3, pid: L.id }),
+      e("apri_scheda", 13, "a2", { s: "s2", gid: "GUNO", p: { fonte: "mappa" } }),
+      e("apri_scheda", 12, "a3", { s: "s3", gid: "GUNO", p: { fonte: "mappa" } }),
+      e("apri_scheda", 12, "a3", { s: "s3", gid: "GUNO", m: 5, p: { fonte: "mappa" } }),
+      e("percorso", 12, "a3", { s: "s3", pid: L.id }),
+      // Ricerca in zona di un'altra persona (zona = città) e una lontana (Milano): solo la prima conta.
+      e("ricerca", 11, "a4", { s: "s4", h: 11, p: { modo: "ai", tipo: "bar", requisiti: ["terrazza"], zona: "Roma" } }),
+      e("ricerca", 11, "a5", { s: "s5", p: { modo: "ai", tipo: "bar", requisiti: ["terrazza"], zona: "Milano" } }),
+      // Locale simile visto da 2 persone; uno fuori periodo (40 giorni fa) non conta.
+      e("apri_scheda", 14, "a6", { gid: "GS1" }), e("apri_scheda", 14, "a7", { gid: "GS2" }),
+    ];
+    const salvati = [{ place_id: L.id, user_id: "00000000-0000-0000-0000-0000000000c1", created_at: at(13), tags: ["Già visitato"] }];
+    const p = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi, salvati }, 7, now);
+    const az = Object.fromEntries(p.azioni.map((a) => [a.tipo, a.persone]));
+    ok(az.apri_scheda === 3 && az.salva === 2 && az.ci_sono_stato === 1 && az.percorso === 1, `ristoratore: persone per azione, con Place ID Google e salvataggi veri (${JSON.stringify(az)})`);
+    ok(p.daRicerca.ricerche === 1 && p.daRicerca.tipi[0]?.chiave === "trattoria" && p.daRicerca.richieste.some((r) => r.chiave === "tavoli all'aperto") && p.daRicerca.zone[0]?.chiave === "Pigneto", `ristoratore: 'come ti trovano' dalla ricerca della stessa visita (${JSON.stringify(p.daRicerca.richieste)})`);
+    ok(p.zona.ricerche === 2 && !p.zona.richieste.some((r) => r.persone > 1) && p.zona.fasce.find((f) => f.chiave === "pranzo")?.persone === 1, `ristoratore: ricerche in zona (città o quartiere nell'indirizzo), non quelle di Milano (${p.zona.ricerche})`);
+    ok(p.confronto.simili === 2 && p.confronto.mediaViste === null, "ristoratore: con meno di 3 locali simili niente media (non rivelerebbe il singolo)");
+    ok(rs.mostraPersone(0) === "0" && rs.mostraPersone(2) === "meno di 3" && rs.mostraPersone(3) === "3" && p.pochiDati === false, "ristoratore: sotto 3 persone 'meno di 3'");
+    ok(p.perGiorno.length === 7 && p.perGiorno.at(-2).viste === 1, "ristoratore: andamento giorno per giorno");
+  }
+
+  const LOC = "44444444-0000-4000-8000-0000000000a1";
+  const locR = {
+    place: { id: LOC, name: "Osteria Pigneto", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GOSTERIA" },
+    synthesis: null,
+  };
+  const rctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const setCookie = (name, v) => rctx.addCookies([{ name, value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setCookie("e2e_locale", locR);
+  await rctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  let claim = null, claimMode = "ok", claimCalls = 0;
+  await rctx.route("**/rest/v1/claims**", (r) => {
+    claimCalls++;
+    if (r.request().method() !== "POST") return r.fulfill({ json: [] });
+    claim = r.request().postDataJSON();
+    if (claimMode === "manca") return r.fulfill({ status: 404, json: { code: "PGRST205", message: "Could not find the table 'public.claims' in the schema cache", details: null, hint: null } });
+    return r.fulfill({ status: 201, body: "" });
+  });
+  const rp = await rctx.newPage();
+  rp.on("pageerror", (err) => errors.push(err.message));
+
+  // Pagina del locale: invito discreto, niente badge finché non è verificato.
+  await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+  ok((await rp.getByTestId("rivendica-locale").getAttribute("href")) === `/per-i-ristoratori/rivendica?locale=${LOC}` && (await rp.getByTestId("locale-verificato").count()) === 0, "locale: 'Sei il titolare? Rivendica questo locale' porta al modulo, senza badge");
+  await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
+  await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+  ok(await rp.getByTestId("locale-verificato").isVisible() && (await rp.getByTestId("rivendica-locale").count()) === 0, "locale verificato: badge 'Verificato dal titolare' e niente invito a rivendicare");
+  await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
+  await setCookie("e2e_locale", locR);
+
+  // Modulo: con l'accesso la richiesta va in claims con UUID e Place ID del locale.
+  const fill = async () => {
+    await rp.getByLabel("Nome e cognome").fill("Maria Rossi");
+    await rp.getByLabel("Ruolo").selectOption("Titolare");
+    await rp.getByLabel("Telefono").fill("+39 333 1234567");
+    await rp.getByLabel("Email").fill("maria@example.com");
+    await rp.getByLabel(/Messaggio/).fill("Chiamatemi dopo le 15");
+  };
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  ok((await rp.getByTestId("rivendica-scheda").textContent())?.includes("Osteria Pigneto") && (await rp.getByLabel("Nome del locale").count()) === 0, "rivendica: mostra il locale, senza chiedere di nuovo nome e città");
+  await fill();
+  { const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `rivendica: niente scorrimento orizzontale sul telefono (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/71-rivendica-modulo.png`, caret: "initial", fullPage: true });
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-inviata").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await rp.getByTestId("rivendica-inviata").isVisible() && claim?.place_id === LOC && claim?.google_place_id === "GOSTERIA" && claim?.user_id === "00000000-0000-0000-0000-000000000001" && claim?.nome === "Maria Rossi" && claim?.ruolo === "Titolare" && claim?.messaggio === "Chiamatemi dopo le 15" && !("stato" in claim), `rivendica: richiesta salvata in claims e conferma (${JSON.stringify(claim)?.slice(0, 120)})`);
+  await rp.screenshot({ path: `${OUT}/72-rivendica-inviata.png`, caret: "initial" });
+
+  // Senza tabella (migrazione non applicata): email precompilata a Mapetite con gli stessi dati.
+  claimMode = "manca"; claim = null;
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  await fill();
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-ripiego").waitFor({ timeout: 5000 }).catch(() => {});
+  { const href = decodeURIComponent((await rp.getByTestId("rivendica-email").getAttribute("href").catch(() => "")) ?? "");
+    ok(claim !== null && href.startsWith("mailto:founder.mapetite@gmail.com") && href.includes("Osteria Pigneto") && href.includes("Maria Rossi") && href.includes("+39 333 1234567") && href.includes(LOC), "rivendica senza tabella claims: prepara l'email con i dati del modulo"); }
+  await rp.screenshot({ path: `${OUT}/73-rivendica-ripiego-email.png`, caret: "initial" });
+
+  // Senza accesso: nessuna scrittura, email e invito ad accedere. Senza locale: nome e città a mano.
+  await rctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  claimCalls = 0;
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica`, { waitUntil: "networkidle" });
+  ok(await rp.getByTestId("rivendica-accedi").isVisible() && (await rp.getByLabel("Nome del locale").count()) === 1, "rivendica senza accesso e senza locale: chiede nome e città e invita ad accedere");
+  await rp.getByLabel("Nome del locale").fill("Bar Sport");
+  await rp.getByLabel("Città").fill("Milano");
+  await fill();
+  await rp.getByRole("button", { name: "Invia la richiesta" }).click();
+  await rp.getByTestId("rivendica-ripiego").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await rp.getByTestId("rivendica-ripiego").isVisible() && claimCalls === 0 && decodeURIComponent((await rp.getByTestId("rivendica-email").getAttribute("href")) ?? "").includes("Città: Milano"), "rivendica senza accesso: nessuna scrittura, email precompilata");
+  await rctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Pannello del ristoratore: senza essere admin o titolare non esiste.
+  { const a = await rp.request.get(`${BASE}/ristoratore/${LOC}`); const b = await rp.request.get(`${BASE}/ristoratore/non-un-id`);
+    ok(a.status() === 404 && b.status() === 404, `pannello ristoratore: vietato a chi non è admin o titolare (404: ${a.status()}/${b.status()})`); }
+  // Con dati finti (cookie e2e_ristoratore, solo in sviluppo): pochi dati → messaggio onesto e soglia.
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const Lr = { id: LOC, name: "Osteria Pigneto", address: locR.place.address, category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GOSTERIA" };
+  await setCookie("e2e_ristoratore", {
+    locale: Lr, simili: [Lr], verificato: true, salvati: [],
+    eventi: [
+      { created_at: iso(60), type: "ricerca", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], zona: "Pigneto" } },
+      { created_at: iso(59), type: "apri_scheda", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: "GOSTERIA", props: { fonte: "ricerca" } },
+      { created_at: iso(30), type: "apri_scheda", user_id: null, anon_id: "x2", session_id: "s2", place_id: LOC, google_place_id: null, props: { fonte: "mappa" } },
+    ],
+  });
+  { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
+    ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
+    ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
+    const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
+
+  // Esempio dimostrativo: etichetta in cima, numeri pieni, periodo 7/30 giorni.
+  { const r = await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+    const lab = rp.getByTestId("pannello-demo-etichetta");
+    const box = await lab.boundingBox();
+    ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
+    ok((await rp.getByTestId("pannello-pochi-dati").count()) === 0 && await rp.getByTestId("pannello-confronto").isVisible() && await rp.getByTestId("pannello-fasce").isVisible() && await rp.getByTestId("pannello-andamento").isVisible(), "pannello demo: confronto con la zona, fasce orarie e andamento");
+    const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
+  await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });
+  await rp.screenshot({ path: `${OUT}/76-pannello-demo-intero.png`, caret: "initial", fullPage: true });
+  await rp.getByRole("link", { name: "Ultimi 7 giorni" }).click();
+  await rp.waitForURL((u) => u.searchParams.get("giorni") === "7", { timeout: 8000 }).catch(() => {});
+  ok((await rp.getByRole("link", { name: "Ultimi 7 giorni" }).getAttribute("aria-current")) === "page", "pannello demo: si passa agli ultimi 7 giorni");
+
+  // Su computer.
+  await rp.setViewportSize({ width: 1280, height: 800 });
+  await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/77-pannello-demo-computer.png`, caret: "initial", fullPage: true });
+  await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/78-pannello-ristoratore-computer.png`, caret: "initial", fullPage: true });
+  await rp.goto(`${BASE}/per-i-ristoratori/rivendica?locale=${LOC}`, { waitUntil: "networkidle" });
+  await rp.screenshot({ path: `${OUT}/79-rivendica-computer.png`, caret: "initial", fullPage: true });
+  await rctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
