@@ -131,7 +131,7 @@ function RemoveButton({ b, confirmText }: { b: BookingRequest; confirmText: stri
       type="button"
       onClick={() => setAsking(true)}
       aria-label={`Togli la prenotazione da ${b.placeName}`}
-      className="flex min-h-10 items-center justify-center gap-1.5 rounded-pill px-3 text-sm font-display font-semibold text-text-muted"
+      className="flex min-h-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
     >
       <Trash2 size={15} /> Togli
     </button>
@@ -193,7 +193,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
             rel="noopener noreferrer"
             data-testid="prenotazione-percorso"
             onClick={() => track("percorso", placeOf(b), { fonte: "prenotazioni" })}
-            className="flex min-h-10 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand"
+            className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand"
           >
             <Navigation size={15} /> Percorso
           </a>
@@ -203,7 +203,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           data-testid="prenotazione-calendario"
           disabled={!b.date}
           onClick={() => downloadIcs(b)}
-          className="flex min-h-10 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand disabled:opacity-40"
+          className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand disabled:opacity-40"
         >
           <CalendarPlus size={15} /> Calendario
         </button>

@@ -3440,7 +3440,7 @@ else {
   await pp.reload({ waitUntil: "networkidle" });
   await pp.getByTestId("prenotazione-in-arrivo").first().waitFor({ timeout: 5000 });
   { const w = await width(); ok(w <= 360, `prenotazioni a 360 px: niente scorrimento orizzontale (${w}px)`); }
-  { const b = await up.nth(0).getByTestId("prenotazione-calendario").boundingBox(); ok(!!b && b.x + b.width <= 360, "prenotazioni a 360 px: i pulsanti stanno nello schermo"); }
+  { const b = await up.nth(0).getByRole("button", { name: /Togli la prenotazione/ }).boundingBox(); const c = await up.nth(0).boundingBox(); ok(!!b && !!c && b.x + b.width <= c.x + c.width - 8, `prenotazioni a 360 px: i pulsanti stanno dentro la card (${Math.round((b?.x ?? 0) + (b?.width ?? 0))}/${Math.round((c?.x ?? 0) + (c?.width ?? 0))})`); }
   await pshot("84-prenotazioni-360");
   await pp.setViewportSize({ width: 390, height: 844 });
 
