@@ -1,7 +1,20 @@
 import { distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { refineCategory } from "@/lib/refine-category";
-const FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours.openNow,places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos";
+import { GOOGLE_ATTRIBUTES, isOpenAt, type GoogleAttribute, type WeekTime } from "@/lib/filter-options";
+// Costo: la richiesta è già nella fascia più cara ("Text Search Enterprise + Atmosphere", per
+// reviews ed editorialSummary) e Google fattura la fascia più alta tra i campi chiesti, una volta per
+// richiesta. I campi delle caratteristiche (outdoorSeating, allowsDogs…) sono della stessa fascia
+// Atmosphere; gli orari (currentOpeningHours/regularOpeningHours) della fascia Enterprise, più bassa.
+// Aggiungerli non cambia il prezzo di una ricerca (verificato sul listino il 15/10/2026).
+const FIELD_MASK = [
+  "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel",
+  "places.currentOpeningHours.openNow,places.currentOpeningHours.periods,places.regularOpeningHours.periods",
+  "places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos",
+  ...GOOGLE_ATTRIBUTES.map((a) => `places.${a}`),
+].join(",");
+
+type OpeningPeriod = { open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } };
 
 type GooglePlace = {
   id: string;
@@ -12,14 +25,15 @@ type GooglePlace = {
   rating?: number;
   userRatingCount?: number;
   priceLevel?: string;
-  currentOpeningHours?: { openNow?: boolean };
+  currentOpeningHours?: { openNow?: boolean; periods?: OpeningPeriod[] };
+  regularOpeningHours?: { periods?: OpeningPeriod[] };
   types?: string[];
   websiteUri?: string;
   editorialSummary?: { text?: string };
   reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
   nationalPhoneNumber?: string;
   photos?: { name: string; authorAttributions?: { displayName?: string }[] }[];
-};
+} & Partial<Record<GoogleAttribute, boolean>>;
 
 type GoogleSearchTextResponse = {
   places?: GooglePlace[];
@@ -45,6 +59,9 @@ export type PlaceResult = {
   phone: string | null;
   photoRef: string | null;   // il campo "name" della PRIMA foto, o null
   photoAuthor?: string | null; // autore della prima foto: Google chiede di mostrarlo
+  // Caratteristiche dichiarate su Google (solo quelle presenti) e orari: servono ai filtri. Solo server.
+  attributes?: Partial<Record<GoogleAttribute, boolean>>;
+  openingPeriods?: OpeningPeriod[] | null;
 };
 
 export type SearchOptions = {
@@ -58,6 +75,10 @@ export type SearchOptions = {
   maxPriceLevel?: number;
   openNowOnly?: boolean;
   categories?: string[];
+  // Caratteristiche richieste dai Filtri (cani ammessi, all'aperto…): fuori solo chi su Google ha false.
+  requiredAttributes?: GoogleAttribute[];
+  // "Aperto stasera alle 21": fuori solo chi ha orari su Google e in quel momento è chiuso.
+  openAt?: WeekTime;
   // Distanza scelta dall'utente nei filtri ("entro 1 km"): Google la tratta solo come preferenza,
   // quindi i locali più lontani si tolgono dopo. Senza questo, "1 km" mostrava posti a 5-8 km.
   maxDistanceMeters?: number;
@@ -126,6 +147,8 @@ export async function searchGooglePlaces(
     maxPriceLevel,
     openNowOnly,
     categories,
+    requiredAttributes,
+    openAt,
     maxDistanceMeters,
     sortMode = "quality",
     includedType,
@@ -209,8 +232,13 @@ export async function searchGooglePlaces(
     phone: place.nationalPhoneNumber ?? null,
     photoRef: place.photos?.[0]?.name ?? null,
     photoAuthor: place.photos?.[0]?.authorAttributions?.[0]?.displayName ?? null,
+    attributes: Object.fromEntries(
+      GOOGLE_ATTRIBUTES.filter((a) => typeof place[a] === "boolean").map((a) => [a, place[a]]),
+    ) as Partial<Record<GoogleAttribute, boolean>>,
+    openingPeriods: place.currentOpeningHours?.periods ?? place.regularOpeningHours?.periods ?? null,
   }));
 
+  const excludedByChoice: string[] = [];
   const filtered = mapped.filter((p) => {
     // Pavimento di qualita': sempre attivo, prima dei filtri utente.
     if ((p.rating ?? 0) < FLOOR_RATING) return false;
@@ -222,7 +250,11 @@ export async function searchGooglePlaces(
     // recensiti: escluderli lasciava solo i posti più documentati, cioè i più famosi (VISIONE.md).
     if (minPriceLevel != null && p.priceLevel != null && p.priceLevel < minPriceLevel) return false;
     if (maxPriceLevel != null && p.priceLevel != null && p.priceLevel > maxPriceLevel) return false;
-    if (openNowOnly === true && p.openNow !== true) return false;
+    if (openNowOnly === true && openAt == null && p.openNow !== true) return false;
+    // Caratteristiche e orario scelti: nel dubbio (dato assente su Google) il locale resta.
+    const noAttr = requiredAttributes?.find((a) => p.attributes?.[a] === false);
+    if (noAttr) { excludedByChoice.push(`${p.name} (${noAttr}=false)`); return false; }
+    if (openAt != null && isOpenAt(p.openingPeriods, openAt) === false) { excludedByChoice.push(`${p.name} (chiuso all'ora scelta)`); return false; }
     if (categories != null && categories.length > 0) {
       // Tutti i tipi del locale, non solo il principale: una pizzeria segnata "restaurant" con il
       // tipo "pizza_restaurant" tra gli altri spariva da "Pizzerie".
@@ -235,6 +267,10 @@ export async function searchGooglePlaces(
     }
     return true;
   });
+
+  if (excludedByChoice.length > 0) {
+    console.log(`[search-filtri] esclusi per caratteristiche/orario scelti: ${JSON.stringify(excludedByChoice)}`);
+  }
 
   // [search-funnel] conteggi diagnostici — SOLO lettura, nessun effetto sulla pipeline.
   // floorSurvivors ricalcola il solo pavimento (il .filter reale fonde floor + filtri utente).
