@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { browserClient } from "@/lib/supabase/client-lazy";
 import { cityFromAddress, displayAddress } from "@/lib/city";
-import { isStateTag, normalizeTagName, replaceTag } from "@/lib/tags";
+import { replaceTag } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
+import { checkCollectionName, collectionPath, summarizeCollections } from "@/lib/raccolte";
+import { updateTags } from "@/lib/raccolte-write";
+import RaccoltaCopertina from "@/components/raccolta-copertina";
 
 // Un salvato dell'utente: placeId è l'UUID Supabase di places (non il Place ID Google).
 export type RaccoltaRow = { placeId: string; name: string; address: string | null; category?: string | null; tags: string[] };
@@ -19,13 +21,10 @@ type Sheet =
   | { kind: "elimina"; tag: string }
   | { kind: "nuova" };
 
-function savedHref(tag: string): string {
-  return `/mappa?${new URLSearchParams({ vista: "salvati", tag }).toString()}`;
-}
-
 const plural = (n: number) => `${n} ${n === 1 ? "locale" : "locali"}`;
 
-// "Le tue raccolte" nel profilo: le raccolte sono i tag dei salvati (esclusi i due di stato).
+// "Le tue raccolte" nel profilo: le raccolte sono i tag dei salvati (esclusi i due di stato),
+// mostrate come cartelle (piano 4.1) che aprono la pagina della raccolta (/raccolte/<nome>).
 // Qui si possono rinominare, unire, eliminare e crearne di nuove scegliendo tra i salvati.
 // Ogni modifica è un update per riga su saved_places con la sessione dell'utente (come la scheda).
 export default function ProfiloRaccolte({ userId, initialRows }: { userId: string; initialRows: RaccoltaRow[] }) {
@@ -41,29 +40,9 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
   const busy = progress !== null;
 
   const covers = useOptIn("copertine");
-  const collections = useMemo(() => {
-    const byTag = new Map<string, number>();
-    for (const row of rows) {
-      for (const tag of new Set(row.tags)) {
-        if (isStateTag(tag) || !tag.trim()) continue;
-        byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
-      }
-    }
-    return [...byTag.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
-  }, [rows]);
-  // ?beta=copertine: i primi locali di ogni raccolta (nell'ordine dei salvati, i più recenti prima)
-  // per mostrare emoji e nomi al posto dell'iniziale, come le copertine delle liste di Places/Mapstr.
-  const previews = useMemo(() => {
-    const byTag = new Map<string, RaccoltaRow[]>();
-    for (const row of rows) {
-      for (const tag of new Set(row.tags)) {
-        if (isStateTag(tag) || !tag.trim()) continue;
-        const list = byTag.get(tag) ?? [];
-        if (list.length < 3) byTag.set(tag, [...list, row]);
-      }
-    }
-    return byTag;
-  }, [rows]);
+  // Cartelle: nome, numero di locali e i primi locali (i più recenti) per la copertina.
+  const summaries = useMemo(() => summarizeCollections(rows), [rows]);
+  const collections = useMemo(() => summaries.map((c) => [c.name, c.count] as const), [summaries]);
   const allTags = useMemo(() => [...new Set(rows.flatMap((r) => r.tags))], [rows]);
 
   const open = (next: Sheet) => {
@@ -79,32 +58,12 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
   // Applica "change" a ogni salvato toccato, una riga alla volta, e aggiorna subito l'elenco.
   // Ritorna il numero di righe non aggiornate (0 = tutto ok).
   async function apply(targets: RaccoltaRow[], change: (tags: string[]) => string[]): Promise<number> {
-    let failed = 0;
     setError(null);
     setProgress({ done: 0, total: targets.length });
-    const supabase = await browserClient().catch(() => null);
-    if (!supabase) {
-      // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non attesa infinita.
-      setProgress(null);
-      setError("Non sono riuscito ad aggiornare la raccolta: controlla la connessione e riprova.");
-      return targets.length;
-    }
-    for (const [i, row] of targets.entries()) {
-      // Tag attuali dal database, non quelli caricati con la pagina: nel frattempo "Ci sei stato?"
-      // (o un altro telefono) può averli cambiati, e riscrivere la copia vecchia cancellerebbe la visita.
-      const { data: fresh } = await supabase
-        .from("saved_places").select("tags").eq("user_id", userId).eq("place_id", row.placeId).maybeSingle();
-      const current = fresh ? ((fresh.tags as string[] | null) ?? []) : row.tags;
-      const next = change(current);
-      const { error: err } = await supabase
-        .from("saved_places")
-        .update({ tags: next.length > 0 ? next : null })
-        .eq("user_id", userId)
-        .eq("place_id", row.placeId);
-      if (err) failed++;
-      else setRows((prev) => prev.map((r) => (r.placeId === row.placeId ? { ...r, tags: next } : r)));
-      setProgress({ done: i + 1, total: targets.length });
-    }
+    const failed = await updateTags(userId, targets, change, (placeId, tags, done) => {
+      if (tags) setRows((prev) => prev.map((r) => (r.placeId === placeId ? { ...r, tags } : r)));
+      setProgress({ done, total: targets.length });
+    });
     setProgress(null);
     if (failed > 0) {
       setError(`Non sono riuscito ad aggiornare ${plural(failed)}: controlla la connessione e riprova.`);
@@ -118,12 +77,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
   const withTag = (tag: string) => rows.filter((r) => r.tags.includes(tag));
 
   // Nome scritto → nome definitivo, oppure messaggio d'errore.
-  function checkName(raw: string, current?: string): { tag: string } | { error: string } {
-    const tag = normalizeTagName(raw, allTags.filter((t) => t !== current));
-    if (!tag) return { error: "Scrivi un nome per la raccolta." };
-    if (isStateTag(tag)) return { error: "Questo nome è già usato per lo stato del locale (Voglio andarci / Ci sono stato): scegline un altro." };
-    return { tag };
-  }
+  const checkName = (raw: string, current?: string) => checkCollectionName(raw, allTags, current);
 
   async function rename(from: string) {
     const res = checkName(name, from);
@@ -191,46 +145,28 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
           Raggruppa i tuoi salvati per occasione o per viaggio (es. Romantico, Con amici, Weekend a Napoli): ogni raccolta è un tag.
         </p>
       )}
-      <ul className="grid grid-cols-2 gap-2">
-        {collections.map(([tag, count]) => (
-          <li key={tag} className="relative">
+      <ul className="grid grid-cols-2 gap-3">
+        {summaries.map((c) => (
+          <li key={c.name} className="relative">
             <Link
-              href={savedHref(tag)}
+              href={collectionPath(c.name)}
               data-testid="raccolta"
-              className="flex min-h-[72px] flex-col items-start gap-2 rounded-card bg-brand p-3 text-white shadow-card active:scale-[0.98] transition-transform duration-150"
+              className="block h-full active:scale-[0.98] transition-transform duration-150"
             >
-              {/* Iniziale sopra e nome a tutta larghezza: affiancati, a 360-390px il nome restava largo
-                  60-75px e si spezzava a metà parola ("Romantic/o"). Le parole vanno a capo intere. */}
-              {covers ? (
-                <span aria-hidden data-testid="raccolta-copertina" className="flex gap-1">
-                  {(previews.get(tag) ?? []).map((row) => (
-                    <span key={row.placeId} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-base leading-none">
-                      {getCategoryEmoji(row.category ?? null, row.name)}
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-title text-sm font-semibold text-white">
-                  {tag.charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="w-full min-w-0">
-                <span data-testid="raccolta-nome" className="line-clamp-2 font-display text-sm font-semibold leading-tight [overflow-wrap:anywhere] [word-break:normal]">{tag}</span>
-                {covers ? (
-                  <span data-testid="raccolta-anteprima" className="mt-0.5 block truncate text-xs text-white/75">
-                    {plural(count)} · {(previews.get(tag) ?? []).map((row) => row.name).join(", ")}
-                  </span>
-                ) : (
-                  <span className="mt-0.5 block text-xs text-white/75">{plural(count)}</span>
-                )}
-              </span>
+              <RaccoltaCopertina
+                name={c.name}
+                count={c.count}
+                covers={covers}
+                emojis={c.preview.map((row) => getCategoryEmoji(row.category ?? null, row.name))}
+                names={c.preview.slice(0, 3).map((row) => row.name)}
+              />
             </Link>
             <button
               type="button"
               data-testid="raccolta-menu"
-              aria-label={`Gestisci la raccolta ${tag}`}
-              onClick={() => open({ kind: "menu", tag })}
-              className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center rounded-tr-card text-lg leading-none text-white/80 active:text-white"
+              aria-label={`Gestisci la raccolta ${c.name}`}
+              onClick={() => open({ kind: "menu", tag: c.name })}
+              className="absolute bottom-1 right-0 flex h-11 w-10 items-center justify-center text-lg leading-none text-text-muted active:text-brand"
             >
               ⋯
             </button>
@@ -242,9 +178,9 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
               type="button"
               data-testid="nuova-raccolta"
               onClick={() => open({ kind: "nuova" })}
-              className="flex h-full min-h-[72px] w-full flex-col items-start justify-center gap-2 rounded-card border border-dashed border-brand/40 p-3 text-left text-brand active:scale-[0.98] transition-transform duration-150"
+              className="flex h-full min-h-[160px] w-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-brand/40 p-3 text-center text-brand active:scale-[0.98] transition-transform duration-150"
             >
-              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-light font-title text-lg font-semibold text-accent">+</span>
+              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-light font-title text-2xl font-semibold text-accent">+</span>
               <span className="font-display text-sm font-semibold">Nuova raccolta</span>
             </button>
           </li>
