@@ -115,7 +115,7 @@ export default function VenueSheet({
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
   // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
-    track(type, { id: venue.id, lat, lng }, da ? { da } : undefined);
+    track(type, { id: venue.id, lat, lng }, da ? { fonte: da } : undefined);
 
   // "Chi dei tuoi amici c'è stato" (piano 6.2): stessa lettura della pagina pubblica del locale.
   // Per chi non ha l'accesso o non segue nessuno la risposta è vuota e non si mostra nulla.
@@ -207,7 +207,7 @@ export default function VenueSheet({
     : lead !== "chiama" && telHref ? "chiama" : lead !== "sito" && websiteUri ? "sito" : null;
   const inBar = (a: "chiama" | "sito") => lead === a || extra === a;
   const openBooking = (da: string) => {
-    track("funzione", { id: venue.id, lat, lng }, { nome: "prenota", da });
+    track("funzione", { id: venue.id, lat, lng }, { nome: "prenota", fonte: da });
     setBookingOpen(true);
   };
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
