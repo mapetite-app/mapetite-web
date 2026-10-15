@@ -10,7 +10,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
-import VenueSheet from "@/components/venue-sheet";
+import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
@@ -585,6 +585,7 @@ function SaveButton({
   onSaveRequest: (googlePlaceId: string) => void;
   onLoginRequest?: () => void;
 }) {
+  const tile = useVariant("scheda") === "b";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
@@ -622,6 +623,22 @@ function SaveButton({
       onToggle(placeId, false);
     });
   };
+
+  // Scheda B (stile Places): Salva è il terzo riquadro della barra azioni flottante.
+  if (tile) {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        aria-label={error ? "Errore durante il salvataggio. Riprova." : undefined}
+        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-success" : "bg-white/10"} disabled:opacity-60`}
+      >
+        <Bookmark size={18} aria-hidden fill={isSaved ? "currentColor" : "none"} />
+        {isPending ? "..." : error ? "Riprova" : isSaved ? "Salvato" : "Salva"}
+      </button>
+    );
+  }
 
   return (
     <div>
