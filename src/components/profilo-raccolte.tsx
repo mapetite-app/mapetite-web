@@ -10,6 +10,7 @@ import { useOptIn } from "@/lib/beta";
 import { checkCollectionName, collectionPath, summarizeCollections } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
 import RaccoltaCopertina from "@/components/raccolta-copertina";
+import RaccolteProposte from "@/components/raccolte-proposte";
 
 // Un salvato dell'utente: placeId è l'UUID Supabase di places (non il Place ID Google).
 export type RaccoltaRow = { placeId: string; name: string; address: string | null; category?: string | null; tags: string[] };
@@ -140,6 +141,11 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
           {notice}
         </p>
       )}
+      <RaccolteProposte
+        userId={userId}
+        rows={rows}
+        onTags={(placeId, tags) => setRows((prev) => prev.map((r) => (r.placeId === placeId ? { ...r, tags } : r)))}
+      />
       {collections.length === 0 && (
         <p data-testid="raccolte-vuote" className="mb-2 rounded-card border border-dashed border-border p-4 text-sm text-text-muted">
           Raggruppa i tuoi salvati per occasione o per viaggio (es. Romantico, Con amici, Weekend a Napoli): ogni raccolta è un tag.
