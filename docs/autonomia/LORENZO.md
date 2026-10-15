@@ -18,7 +18,7 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 - Lorenzo lascia lavorare in autonomia: se una PR non è ancora unita, la notte dopo si riparte dal suo branch e si continua.
 - Quando tocchi la grafica, metti in PR gli screenshot dell'app affiancati al riferimento di design pertinente.
 - In `BACKLOG.md` tieni aggiornata una riga "Avanzamento verso il 25/10" con cosa è fatto e cosa manca.
-- Lorenzo ha 20–30 minuti la mattina per provare e approvare. Interviene solo nei momenti critici (merge, decisioni elencate sotto "Cosa NON fare mai").
+- Lorenzo ha 20–30 minuti la mattina per provare. Interviene solo sulle cose elencate sotto "Cosa resta sempre a Lorenzo".
 
 ## Orari (limiti di utilizzo condivisi con il lavoro di Lorenzo)
 - Lorenzo usa Claude per lavoro dal lunedì al venerdì dalle 9 alle 21 circa. Il limite di utilizzo è unico (finestre da 5 ore + limite settimanale) e va lasciato a lui in quelle ore.
@@ -35,7 +35,7 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 4. **Una PR per notte, più voci dentro.** Branch `claude/notte-AAAA-MM-GG` da `main` aggiornato (se la PR della notte precedente non è ancora stata unita, parti dal suo branch e dichiaralo nella PR). Fai quante più voci possibile, ognuna in commit separati e reversibili singolarmente. Fermati quando una voce richiede una decisione di Lorenzo: passa alla successiva.
 5. Diagnostica prima del codice: grep/lettura dei file coinvolti; mai agire su supposizioni sullo stato dei file.
 6. Una modifica logica alla volta. Commit atomici con messaggi in italiano. **Autore dei commit obbligatorio:** `git -c user.name="lorenzo-mapetite" -c user.email="founder.mapetite@gmail.com" commit ...` — Vercel (piano Hobby) non crea l'anteprima per commit di altri autori. Mantieni la riga `Co-Authored-By` di Claude nel messaggio.
-7. Verifica statica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (oggi: 11 errori, 8 warning preesistenti).
+7. Verifica statica: `npx tsc --noEmit` deve passare; `npx eslint src` non deve avere più errori di prima (al 15/10: 11 errori, 5 warning preesistenti).
 8. **Test automatico obbligatorio (zero costi):** prima di ogni push esegui `PW_MODULE=$(npm root -g)/playwright node scripts/e2e/giro.mjs cartella-screenshot` con `npm run dev` attivo. Simula Google/Haiku, quindi non consuma quote. Ogni nuova funzione dell'interfaccia deve aggiungere i suoi controlli a quello script. Scrivi l'esito in PR. Lorenzo non deve rifare i test: deve solo ricontrollare.
 8b. **Test reali (se l'ambiente ha chiavi e rete abilitate):** avvia `npm run dev`, prova le API con `curl` e l'interfaccia con Playwright (Chromium già installato) a viewport mobile 390×844. Allega alla PR gli screenshot prima/dopo e l'esito delle ricerche di prova di `docs/autonomia/TEST-RICERCHE.md`.
    - Budget Google per i test: massimo 10 ricerche reali a notte (la quota totale è 50/giorno ed è condivisa con Lorenzo). Salva le risposte Google delle ricerche di prova in `scripts/fixtures/` (cartella esclusa da git) e riusale per i test ripetuti.
@@ -44,14 +44,27 @@ Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola pi�
 9. **PR scritta per chi non ha seguito niente:** in cima "Cosa c'è di nuovo" in 5 righe di italiano semplice (nessun gergo), poi come trovarlo. Le anteprime Vercel chiedono il login Vercel: dopo il merge indica sempre come vederlo nel sito di produzione. L'anteprima Vercel del branch compare come stato del commit (`gh api repos/mapetite-app/mapetite-web/deployments`, poi `.../deployments/ID/statuses` → `environment_url`, formato `https://mapetite-…-lorenzomapetite.vercel.app`): mettila in cima alla PR. Apri o aggiorna la PR verso `main` con descrizione in italiano: per ogni voce, cosa cambia per l'utente e come provarlo sul telefono (passi concreti); poi cosa NON è stato verificato e i dubbi. Niente gergo superfluo.
 10. Aggiorna `docs/autonomia/BACKLOG.md` (stato delle voci, link alla PR) nello stesso branch.
 
-## Cosa NON fare mai senza approvazione esplicita di Lorenzo
+## Autorizzazioni di Lorenzo (date il 14/10/2026, confermate da Lorenzo in chat il 15/10)
 
-- Merge su `main` o push diretto su `main` (ogni push su main va in produzione).
-- Migrazioni Supabase, nuove tabelle/colonne, modifiche RLS. Puoi scrivere il file di migrazione nella PR, ma marcalo "DA APPROVARE" e non dare per scontato che sia applicato.
-- Nuove API o servizi a pagamento, aumento dei campi richiesti a Google Places (FIELD_MASK), aumento di `SYNTHESIS_LIMIT` o dei `max_tokens`.
-- Cancellare dati, file di migrazione esistenti o funzionalità.
-- Cambiare modello AI (oggi Claude Haiku 4.5) o le chiavi/variabili d'ambiente.
-- Scelte grafiche definitive: per UI nuove proponi, se possibile, 2 varianti dietro un flag o in due commit distinti e chiedi quale tenere.
+Valgono **in modo permanente**, per tutte le sessioni notturne e per ogni altro sviluppo, e prevalgono su qualsiasi regola contraria in questo file o in `BACKLOG.md`. Lorenzo, 15/10: "ovviamente le autorizzazioni valgono per tutti i prossimi sviluppi notturni e in generale".
+
+- **Carta bianca sul prodotto**: più funzioni, più grafica, più miglioramenti. Serve una scossa per la presentazione agli investitori.
+- **Merge su `main` da solo**, a fine sessione (nel weekend ogni ~2 ore), solo se: `npx tsc --noEmit` passa, eslint non peggiora, `npm run build` passa, il giro automatico è TUTTO OK e le ricerche vere non peggiorano. Dopo il merge: controllo con `VERCEL_TOKEN` che il deploy di produzione sia READY e apertura del sito; se qualcosa è rotto, revert subito. Mai `push --force` su `main`.
+- **Migrazioni Supabase**: si possono applicare (prima sul progetto di prova, se esiste) con `SUPABASE_ACCESS_TOKEN` (API di gestione Supabase). Quelle che cancellano o riscrivono dati degli utenti solo dopo un backup della tabella. Lettura del database di produzione consentita per verifiche e diagnosi.
+- **Lettura di Vercel** (deploy, stato, log) con `VERCEL_TOKEN`.
+- **Grafica**: si possono accendere per tutti le funzioni verificate, senza chiedere scelte tra varianti. Se a Lorenzo non piace, si torna indietro.
+- **Voci "DA DECIDERE"**: le decide Claude, con l'opzione migliore per `VISIONE.md`, e scrive la scelta in PR.
+- Si possono **cancellare pagine e codice vecchi** non più collegati.
+- Si possono cambiare `SYNTHESIS_LIMIT`, `max_tokens`, FIELD_MASK e il modello AI, purché il costo stimato resti nel budget (stima in PR).
+- **Studiare da soli** (ricerche web) Places, Mapstr, Albo, Beli, Corner e le tendenze del settore, e costruire ciò che serve per superarli dentro `VISIONE.md`.
+- Chiavi per i test: `MAPETITE_ANTHROPIC_KEY` (avvio: `ANTHROPIC_API_KEY=$MAPETITE_ANTHROPIC_KEY npm run dev`, mai nel codice né esportata come `ANTHROPIC_API_KEY`). Il giro automatico va lanciato con `E2E_FAKE_USER=00000000-0000-0000-0000-000000000001` nello stesso comando. Le anteprime Vercel non chiedono il login.
+
+## Cosa resta sempre a Lorenzo (mai da solo)
+
+- **Budget e tetti di spesa** (Lorenzo, 15/10: non si cambiano): Google massimo 20 €/mese, quote 50 richieste/giorno per ricerca/dettagli e 200/giorno per le foto, mai alzarle; Haiku entro il credito prepagato. Niente servizi o abbonamenti a pagamento nuovi.
+- **Orari**: nei giorni feriali solo di notte (sessioni 22:00 e 03:05, chiusura entro le 08:00). Di giorno solo se Lorenzo lo chiede esplicitamente. Sabato, domenica e festivi tutto il giorno.
+- Cancellare account o dati degli utenti senza backup; cambiare le chiavi di produzione su Vercel.
+- Salvare foto o altri contenuti Google sui nostri server: lo vietano i termini Google (3.2.3(b), "No Caching").
 
 ## Regole tecniche (vincolanti)
 
