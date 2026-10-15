@@ -544,7 +544,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
                       così si vede anche quando la foto non arriva (quota finita). */}
-                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute -right-3 -top-2 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[88px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
@@ -597,7 +597,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {((d?.goFor ?? []).length > 0 || (place.tags ?? []).length > 0) && (
                       <span className="mt-2 flex gap-1.5 overflow-hidden">
                         {(place.tags && place.tags.length > 0 ? sortTags(place.tags).slice(0, 2).map(tagLabel) : d!.goFor!.slice(0, 2)).map((c) => (
-                          <span key={c} className="shrink-0 truncate rounded-pill border border-white/30 px-2 py-0.5 text-[11px] font-display">{c}</span>
+                          <span key={c} className="min-w-0 truncate rounded-pill border border-white/30 px-2 py-0.5 text-[11px] font-display">{c}</span>
                         ))}
                       </span>
                     )}
