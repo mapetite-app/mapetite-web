@@ -2750,6 +2750,8 @@ else {
     return route.fulfill({ json: [{ place_id: "33333333-0000-4000-8000-0000000000a3", places: { google_place_id: "P3" } }] });
   });
   await actx.route("**/api/places/add", (route) => { aAdds.push(route.request().postDataJSON()); return route.fulfill({ json: { place: { id: "33333333-0000-4000-8000-0000000000a1" } } }); });
+  const aIntents = [];
+  await actx.route("**/api/search/intent", (route) => { aIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
   await actx.route("https://wa.me/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
   await actx.route("https://example.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>Sito</p>" }));
   const A_PLACES = [
@@ -2858,6 +2860,7 @@ else {
   await ap.keyboard.press("Enter");
   await ap.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length >= 3, null, { timeout: 8000 });
   ok(searches.length === 2 && searches[1].query === "ristorante con terrazza a roma solo con terrazza", `assistente: 'solo con terrazza' riformula la richiesta di prima (${JSON.stringify(searches[1]?.query)})`);
+  ok(aIntents.length === 0, `assistente: inviando subito (senza pausa) nessuna richiesta all'AI in anticipo (${aIntents.length})`);
 
   // Card → scheda del locale, con Prenota e i dati già scelti
   await ap.getByTestId("assistente-card").last().getByText("Vista vera sui tetti di Roma.").waitFor({ timeout: 6000 });
@@ -2957,6 +2960,63 @@ else {
   { const pend = await np.evaluate(() => JSON.parse(localStorage.getItem("mapetite-salva-dopo-accesso") ?? "null"));
     ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
+
+  // Frase capita in anticipo (come la mappa, piano 2.4): tempo alla prima card prima/dopo.
+  // Server simulato: Google 300 ms; l'AI che capisce la frase 1200 ms, sul server se la ricerca
+  // arriva senza intento, oppure in anticipo mentre si scrive (/api/search/intent).
+  const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await pctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+  await pctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
+  await pctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  const pIntents = [], pSearches = [];
+  await pctx.route("**/api/search/intent", async (route) => {
+    pIntents.push(route.request().postDataJSON());
+    await new Promise((r) => setTimeout(r, 1200));
+    return route.fulfill({ json: { intent: { tipo: "trattoria", requisiti: ["non turistica"], zona: "Testaccio", vicino_a_me: false } } });
+  });
+  await pctx.route("**/api/search", async (route) => {
+    const b = route.request().postDataJSON();
+    pSearches.push(b);
+    await new Promise((r) => setTimeout(r, 300 + (b.intent ? 0 : 1200)));
+    return route.fulfill({ json: { ...SEARCH_FAST, risultati: A_PLACES } });
+  });
+  await pctx.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+  const pp = await pctx.newPage();
+  pp.on("pageerror", (e) => errors.push(e.message));
+  const FRASE = "Trattoria non turistica a Testaccio";
+  const firstCard = async () => {
+    const t0 = Date.now();
+    await pp.keyboard.press("Enter");
+    await pp.getByTestId("assistente-card").getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
+    return Date.now() - t0;
+  };
+  await pp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  // Prima: invio subito, la frase la capisce il server durante la ricerca.
+  await pp.getByTestId("assistente-campo").fill(FRASE);
+  const prima = await firstCard();
+  ok(pSearches.length === 1 && !pSearches[0].intent && pIntents.length === 0, "anticipo: inviando subito la ricerca parte senza intento (come prima)");
+  // Seguito sui posti di prima ("più economici"): nessuna richiesta all'AI mentre si scrive.
+  await pp.getByTestId("assistente-campo").pressSequentially("più economici", { delay: 30 });
+  await pp.waitForTimeout(1100);
+  ok(pIntents.length === 0, `anticipo: un seguito sui posti di prima non chiede niente all'AI (${pIntents.length})`);
+  await pp.getByTestId("assistente-campo").fill("");
+  await pp.getByTestId("assistente-nuova").click();
+  // Dopo: si scrive come una persona, una pausa, poi Invio.
+  await pp.getByTestId("assistente-campo").pressSequentially(FRASE, { delay: 40 });
+  await pp.waitForTimeout(2000);
+  ok(pIntents.length === 1 && pIntents[0].query === FRASE, `anticipo: una sola richiesta all'AI per tutta la frase scritta (${pIntents.length})`);
+  const dopo = await firstCard();
+  const last = pSearches[pSearches.length - 1];
+  ok(pSearches.length === 2 && !!last.intent && last.intentQuery === FRASE && last.query === FRASE, "anticipo: la ricerca manda l'intento già pronto");
+  console.log(`      tempo alla prima card (server simulato): prima ${prima} ms, dopo ${dopo} ms`);
+  ok(dopo < prima - 700, `anticipo: prima card più veloce (prima ${prima} ms → dopo ${dopo} ms)`);
+  // Stessa frase di nuovo: memoria, nessuna nuova richiesta all'AI.
+  await pp.getByTestId("assistente-nuova").click();
+  await pp.getByTestId("assistente-campo").pressSequentially(FRASE, { delay: 10 });
+  await pp.waitForTimeout(1000);
+  ok(pIntents.length === 1, `anticipo: la stessa frase non si richiede due volte (${pIntents.length})`);
+  await pctx.close();
 }
 // 15. Organizzare e ritrovare (piano 4.1–4.3): raccolte come cartelle, proposte dell'AI, classifica.
 //     Funzioni pure importate direttamente; il resto con Supabase e /api/raccolte/proposte simulati.

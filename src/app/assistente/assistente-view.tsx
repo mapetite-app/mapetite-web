@@ -13,6 +13,7 @@ import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
 import { dateKey, dayLabel, missingDetails, parseBooking, type BookingDetails } from "@/lib/booking";
 import { track } from "@/lib/track";
+import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
 
@@ -181,10 +182,16 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
   setConv((c) => ({ ...c, lastQuery: q, msgs: [...c.msgs, { id: msgId, role: "assistant", text: "", status: "loading", query: q }] }));
   const at = pos ?? DEFAULT_CENTER;
   try {
+    // Frase già capita mentre si scriveva (come la mappa): la ricerca non riaspetta l'AI.
+    const intent = await intentFor(q);
     const res = await fetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, source: "world", searchIntent: "natural", phase: "fast", lat: at.lat, lng: at.lng }),
+      body: JSON.stringify({
+        query: q, source: "world", searchIntent: "natural", phase: "fast",
+        ...(intent && { intent, intentQuery: q.trim() }),
+        lat: at.lat, lng: at.lng,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -223,6 +230,22 @@ function lastResults(c: Conv): BotMsg | null {
     if (m.role === "assistant" && m.places && m.places.length > 0) return m;
   }
   return null;
+}
+
+// La ricerca Google che partirebbe per questo messaggio; null = nessuna (saluti, seguiti sui
+// posti di prima, solo dettagli della prenotazione). La stessa regola vale mentre si scrive.
+function searchQueryOf(text: string, parsed: ReturnType<typeof parseBooking>, lastQuery: string | null): string | null {
+  const searchText = parsed.isBooking ? parsed.search : (parsed.search ? text : null);
+  if (!searchText) return null;
+  return lastQuery ? followUpQuery(lastQuery, searchText) : searchText;
+}
+
+// Mentre si scrive: la richiesta che partirà all'Invio, per farla capire in anticipo all'AI.
+function plannedQuery(raw: string, c: Conv): string | null {
+  const text = raw.trim().slice(0, 300);
+  if (!text || SMALL_TALK.test(text)) return null;
+  if (localRefineOf(text) && lastResults(c)) return null;
+  return searchQueryOf(text, parseBooking(text), c.lastQuery);
 }
 
 async function send(raw: string) {
@@ -274,9 +297,8 @@ async function send(raw: string) {
     }
   }
 
-  const searchText = parsed.isBooking ? parsed.search : (parsed.search ? text : null);
-  if (searchText) {
-    const q = before.lastQuery ? followUpQuery(before.lastQuery, searchText) : searchText;
+  const q = searchQueryOf(text, parsed, before.lastQuery);
+  if (q) {
     await runSearch(q, booking, bookingMode, getConv().pos);
     return;
   }
@@ -441,6 +463,14 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
     }
   };
 
+  // Mentre si scrive: dopo 700 ms di pausa l'AI capisce già la richiesta (come la mappa e la home:
+  // stessa memoria, una frase già capita non si richiede). Nessuna chiamata Google.
+  useEffect(() => {
+    const q = plannedQuery(input, getConv());
+    if (!q || q.length < 8) return;
+    const t = setTimeout(() => prefetchIntent(q), 700);
+    return () => clearTimeout(t);
+  }, [input]);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   // Scheda aperta: si legge dalla conversazione, così il verdetto arrivato dopo compare anche lì.
   const [openRef, setOpenRef] = useState<{ msgId: string; placeId: string } | null>(null);
