@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isGem } from "@/lib/gem";
 
 // Unico punto in cui si crea (o si ritrova) un locale nella tabella "places",
 // usato da /api/places/add e /api/places/from-link. Chiave: Google Place ID.
@@ -12,6 +13,8 @@ export type NewPlace = {
   category?: string | null;
   rating?: number | null;
   priceLevel?: number | null;
+  // Solo per calcolare "poco conosciuto" (Scopritori, piano 5.6): il numero NON si salva.
+  userRatingCount?: number | null;
 };
 
 const COLUMNS = "id, name, category, address, lat, lng, google_place_id, rating, price_level";
@@ -51,7 +54,10 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
     return { error: "Errore nella verifica del locale.", status: 500 };
   }
 
-  if (existing) return { place: existing as StoredPlace, created: false };
+  if (existing) {
+    await markPocoConosciuto((existing as StoredPlace).id, input);
+    return { place: existing as StoredPlace, created: false };
+  }
 
   const { data: inserted, error: insertError } = await admin
     .from("places")
@@ -78,7 +84,25 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
     return { error: "Errore nel salvataggio del locale.", status: 500 };
   }
 
+  await markPocoConosciuto((inserted as StoredPlace).id, input);
   return { place: inserted as StoredPlace, created: true };
+}
+
+// Scopritori (piano 5.6): si salva solo la NOSTRA classificazione sì/no (regola del badge
+// "💎 Poco conosciuto"), mai il numero di recensioni di Google. Serve la migrazione
+// 20261016_scopritori.sql: senza la colonna l'aggiornamento fallisce in silenzio e il
+// salvataggio resta identico. Vale anche per un locale già in catalogo (dati più freschi).
+async function markPocoConosciuto(id: string, input: NewPlace): Promise<void> {
+  if (typeof input.rating !== "number" || typeof input.userRatingCount !== "number") return;
+  try {
+    const { error } = await createAdminClient()
+      .from("places")
+      .update({ poco_conosciuto: isGem(input.rating, input.userRatingCount) })
+      .eq("id", id);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") console.error("[places-store] poco_conosciuto:", error.message);
+  } catch {
+    // mai bloccare un salvataggio per il gioco degli Scopritori
+  }
 }
 
 // Locale già nel catalogo, senza chiamare Google: per Place ID, oppure (link con nome e coordinate
