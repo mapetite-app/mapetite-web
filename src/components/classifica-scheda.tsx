@@ -6,6 +6,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { cityFromAddress } from "@/lib/city";
 import { isMissingColumn, sortByScore } from "@/lib/classifica";
 import ClassificaConfronto, { type RankedPlace } from "@/components/classifica-confronto";
+import DiarioScheda from "@/components/diario-scheda";
 
 // Nella scheda di un locale salvato e segnato "Ci sono stato": la sua posizione nella classifica
 // personale della città o, se non c'è ancora, il confronto "più o meno di X?". Se la colonna
@@ -17,13 +18,19 @@ type Loaded =
 
 const VISITED = "Già visitato";
 
-export default function ClassificaScheda({
-  userId,
-  place,
-}: {
-  userId: string;
-  place: { id: string; name: string; category: string | null; address: string | null }; // id = UUID Supabase
-}) {
+type SchedaPlace = { id: string; name: string; category: string | null; address: string | null }; // id = UUID Supabase
+
+// Blocco "Ci sono stato" della scheda: il diario (data della visita, 4.4) e la classifica (4.3).
+export default function ClassificaScheda({ userId, place }: { userId: string; place: SchedaPlace }) {
+  return (
+    <>
+      <DiarioScheda userId={userId} place={place} />
+      <Classifica userId={userId} place={place} />
+    </>
+  );
+}
+
+function Classifica({ userId, place }: { userId: string; place: SchedaPlace }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [redo, setRedo] = useState(false);
   const city = cityFromAddress(place.address);

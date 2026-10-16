@@ -5,13 +5,16 @@ import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
+import { dayKey, withVoto } from "@/lib/diario";
+import { saveVisit } from "@/lib/diario-write";
+import DiarioFoglio from "@/components/diario-foglio";
 
 // "Ci sei stato?" (?beta=ci-sei-stato): nel profilo, un locale "📌 Voglio andarci" salvato da
 // più di una settimana. Un tocco lo segna "✓ Ci sono stato". Le visite sono il segnale di gusto
 // più forte (VISIONE.md), ma oggi quasi nessuno le segna da solo. Stessi tag di sempre,
 // nessuna migrazione; "Non ancora" lo nasconde per 30 giorni (solo su questo telefono).
-export type VisitCandidate = { id: string; name: string; category: string | null; tags: string[]; savedAt: string };
+export type VisitCandidate = { id: string; name: string; category: string | null; tags: string[]; savedAt: string; note?: string | null };
 
 const WANT = "Da provare";
 const DONE = "Già visitato";
@@ -34,12 +37,14 @@ function weeksAgo(iso: string): string {
   return `${Math.floor(days / 30)} mesi fa`;
 }
 
-export default function VisitPrompt({ userId, candidates }: { userId: string; candidates: VisitCandidate[] }) {
+export default function VisitPrompt({ userId, candidates, withDate = false }: { userId: string; candidates: VisitCandidate[]; withDate?: boolean }) {
   const on = useOptIn("ci-sei-stato");
   const [queue, setQueue] = useState<VisitCandidate[] | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // Diario (4.4): dopo "Sì" il foglio "Com'è andata?" (data, voto, nota), saltabile.
+  const [diary, setDiary] = useState<VisitCandidate | null>(null);
 
   useEffect(() => {
     const s = snoozed();
@@ -50,7 +55,23 @@ export default function VisitPrompt({ userId, candidates }: { userId: string; ca
 
   if (!on || queue === null) return null;
   const current = queue[0];
-  if (!current && !done) return null;
+  const foglio = diary && (
+    <DiarioFoglio
+      place={diary}
+      initial={{ date: dayKey(new Date()), voto: null, note: diary.note ?? null }}
+      withDate={withDate}
+      mode="nuova"
+      onSave={async (v) => {
+        const res = await saveVisit(userId, diary.id, { tags: withVoto(diary.tags, v.voto), ...(v.note !== (diary.note ?? "") ? { note: v.note || null } : {}), ...(withDate ? { visited_at: v.date } : {}) });
+        if (res === "errore") return false;
+        trackFeature("diario", { fonte: "ci-sei-stato", stato: "nuova", voto: v.voto ?? "nessuno" });
+        setDiary(null);
+        return true;
+      }}
+      onClose={() => { trackFeature("diario", { fonte: "ci-sei-stato", stato: "saltato" }); setDiary(null); }}
+    />
+  );
+  if (!current && !done) return foglio || null;
 
   const next = () => setQueue((q) => (q ?? []).slice(1));
 
@@ -67,6 +88,7 @@ export default function VisitPrompt({ userId, candidates }: { userId: string; ca
     if (err) { setError(true); return; }
     track("ci_sono_stato", { id: current.id }, { fonte: "ci-sei-stato" });
     setDone(current.name);
+    setDiary({ ...current, tags });
     next();
   };
 
@@ -117,6 +139,7 @@ export default function VisitPrompt({ userId, candidates }: { userId: string; ca
       ) : (
         <p className="text-sm text-text-muted">Per ora è tutto: i tuoi salvati sono aggiornati.</p>
       )}
+      {foglio}
     </section>
   );
 }
