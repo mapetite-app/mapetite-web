@@ -18,7 +18,7 @@ function entraHref(pathname: string, search: string | null): string {
   if (pathname === "/login" || pathname === "/signup") {
     return withNext("/login", new URLSearchParams(search ?? "").get("next"));
   }
-  if (pathname === "/" || pathname === "/mappa" || pathname.startsWith("/mappa/") || pathname.startsWith("/onboarding")) return "/login";
+  if (pathname === "/" || pathname === "/mappa" || pathname.startsWith("/mappa/") || pathname.startsWith("/onboarding") || pathname.startsWith("/invito/")) return "/login";
   return withNext("/login", `${pathname}${search ? `?${search}` : ""}`);
 }
 
