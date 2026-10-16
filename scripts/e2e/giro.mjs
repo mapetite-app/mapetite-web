@@ -1421,9 +1421,9 @@ else {
       ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato)");
       // Le mie cose (semplificazione 16/10): una griglia di tessere con il numero, ognuna porta alla sua pagina o sezione.
       const cose = p.getByTestId("profilo-mie-cose");
-      ok(await cose.isVisible() && (await cose.getByRole("link").count()) === 6, `profilo: griglia 'Le mie cose' con 6 tessere (${await cose.getByRole("link").count()})`);
+      ok(await cose.isVisible() && (await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").count()) === 1, `profilo: griglia 'Le mie cose' con 6 tessere e la riga della carta del gusto (${await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()})`);
       ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-gruppi").getAttribute("href")) === "/gruppi" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Liste di gruppo · Importa con i loro ingressi");
-      { const sz = await cose.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      { const sz = await cose.locator("a:not([data-testid=profilo-carta-gusto])").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
       await cose.getByTestId("tessera-raccolte").click();
       await p.waitForFunction(() => { const r = document.getElementById("raccolte")?.getBoundingClientRect(); return !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' porta alle raccolte"));
       // Le cose secondarie stanno chiuse in "Altro": l'ingranaggio in alto ci porta.
@@ -5759,6 +5759,7 @@ if (fakeUser) {
   await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
   ok(tfile.length === 2 && tfile.every((i) => typeof i.lat === "number" && !("url" in i) && i.googlePlaceId === null) && !tfile.some((i) => i.name.includes("Milano")), `file Takeout: al server solo nome e coordinate dei 2 posti di Roma, nessun Place ID inventato dal cid (${tfile.map((i) => i.name).join(", ")})`);
   ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
+  if (process.env.E2E_DEBUG) console.log("DBG takeout", JSON.stringify(tins), JSON.stringify(tprev));
   for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
   ok(tins.length === 3 && tins.every((r) => r.user_id === fakeUser && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
   const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
