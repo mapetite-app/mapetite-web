@@ -2823,7 +2823,7 @@ else {
   await rp.getByLabel("Email").fill("giulia@example.com");
   await rp.getByRole("button", { name: "Mandami il link" }).click();
   await rp.getByTestId("reset-inviato").waitFor({ timeout: 5000 });
-  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes("redirect_to=http://localhost:3000/reimposta-password"), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
+  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes(`redirect_to=${BASE}/reimposta-password`), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
   ok(!recover?.body?.code_challenge, "password dimenticata: link che funziona anche aperto in un altro browser (niente PKCE)");
   await rp.screenshot({ path: `${OUT}/37-password-dimenticata.png`, caret: "initial" });
   await rp.goto(`${BASE}/reimposta-password`, { waitUntil: "networkidle" });
