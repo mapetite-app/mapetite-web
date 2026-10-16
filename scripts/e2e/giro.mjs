@@ -3049,6 +3049,22 @@ else {
   ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
   ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
   await ashot("51-assistente-prenotazione");
+  // Chat essenziale (Lorenzo 16/10, "il dono della sintesi"): risposta breve, card compatte in fila, azioni come chip.
+  { const bubble = ap.getByTestId("assistente-risposta").first().locator("p").first();
+    const t = (await bubble.textContent()) ?? "";
+    ok(t.length <= 140 && (t.match(/[.?!](\s|$)/g) ?? []).length <= 2, `assistente: risposta in 1–2 frasi brevi (${t.length} caratteri)`);
+    const lis = ap.getByTestId("assistente-card").first().locator("li");
+    const [a, b] = [await lis.nth(0).boundingBox(), await lis.nth(1).boundingBox()];
+    ok(!!a && !!b && Math.abs(a.y - b.y) < 2 && b.x > a.x && a.height <= 240, `assistente: card compatte in un carosello orizzontale (${Math.round(a?.height ?? 0)} px)`);
+    const chips = ap.getByTestId("assistente-seguiti");
+    ok(await chips.getByTestId("assistente-prenota-primo").isVisible() && await chips.getByRole("button", { name: "Più economici" }).isVisible(), "assistente: azioni come chip sotto la risposta ('Prenota il primo', 'Più economici'…)");
+    const c = await ap.getByTestId("assistente-card").first().boundingBox(); const k = await chips.boundingBox();
+    ok(!!c && !!k && k.y >= c.y + c.height, "assistente: le chip stanno sotto le card");
+    ok((await ap.getByTestId("assistente-capito").first().textContent()).startsWith("Ho capito:") && (await ap.getByText("Sto scrivendo i verdetti…").count()) === 0, "assistente: 'Ho capito' in una riga piccola, nessun testo doppio sui verdetti");
+    await chips.getByTestId("assistente-prenota-primo").click();
+    await ap.getByRole("dialog", { name: "Prenota da Rooftop Tre" }).waitFor({ timeout: 3000 });
+    ok(true, "assistente: 'Prenota il primo' apre il foglio del primo locale");
+    await ap.getByRole("dialog", { name: "Prenota da Rooftop Tre" }).getByRole("button", { name: "Chiudi" }).click(); }
   ok(aEvents.some((e) => e.type === "pagina" && e.props?.pagina === "assistente"), "tracciamento: vista pagina 'assistente' (non più 'altro')");
   ok(aEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "prenotazione") && !JSON.stringify(aEvents).includes("terrazza a Roma"),
     "assistente: messaggio registrato come 'prenotazione', senza il testo scritto");
@@ -3082,8 +3098,13 @@ else {
   ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
   ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
   ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
+  ok((await ap.getByTestId("prenota-riepilogo").textContent()).includes("2 persone") && (await ap.getByTestId("prenota-avanti").count()) === 0,
+    "prenota in 2 passi: con i dati già detti in chat si parte dal passo 2 (riepilogo in una riga + messaggio)");
   await ap.getByTestId("prenota-messaggio").fill("Buonasera, un tavolo per 2 domani alle 21 in terrazza. Giulia");
+  await ap.getByTestId("prenota-modifica").click();
+  ok((await ap.getByTestId("prenota-messaggio").count()) === 0 && await ap.getByTestId("prenota-avanti").isVisible(), "prenota in 2 passi: 'Modifica' torna al passo 1 (quando e quanti), senza il messaggio");
   await ap.getByRole("button", { name: "Una persona in più" }).click();
+  await ap.getByTestId("prenota-avanti").click();
   ok((await ap.getByTestId("prenota-messaggio").inputValue()).startsWith("Buonasera, un tavolo per 2 domani"), "prenota: il messaggio modificato a mano non viene riscritto");
   await ap.getByRole("button", { name: "Rigenera" }).click();
   ok((await ap.getByTestId("prenota-messaggio").inputValue()).includes("per 3 persone"), "prenota: persone modificabili, il messaggio si aggiorna");
@@ -3185,6 +3206,7 @@ else {
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  ok(await ap.getByTestId("prenota-avanti").isDisabled() && (await ap.getByTestId("prenota-messaggio").count()) === 0, "prenota in 2 passi: senza dati si parte dal passo 1 e 'Avanti' resta spento");
   await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
   await actx.close();
