@@ -94,10 +94,11 @@ const patchMsg = (id: string, patch: Partial<BotMsg> | ((m: BotMsg) => Partial<B
 
 // ── Testi ──
 const EXAMPLES = [
-  { emoji: "🗓️", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
-  { emoji: "🍝", text: "Trattoria non turistica a Testaccio" },
-  { emoji: "🍸", text: "Aperitivo con vista a Milano" },
-  { emoji: "🥞", text: "Brunch domenica per 4 a Roma" },
+  { emoji: "🗓️", short: "Prenota domani", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
+  { emoji: "🍝", short: "Trattoria vera", text: "Trattoria non turistica a Testaccio" },
+  { emoji: "🍸", short: "Aperitivo con vista", text: "Aperitivo con vista a Milano" },
+  { emoji: "🥞", short: "Brunch domenica", text: "Brunch domenica per 4 a Roma" },
+  { emoji: "🌙", short: "Serata a tappe", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
 ];
 const REFINES: Ask[] = [
   { label: "Più economici", send: "più economici" },
@@ -532,6 +533,7 @@ const WANT = "Da provare";
 export default function AssistenteView({ userId }: { userId: string | null }) {
   const c = useSyncExternalStore(subscribe, getConv, () => EMPTY);
   const [input, setInput] = useState("");
+  const [moreIdeas, setMoreIdeas] = useState(false);
   // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
@@ -673,18 +675,46 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
             <p className="mt-2 text-[15px] font-sans leading-relaxed text-text-muted">
               Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi, e se vuoi ti preparo la prenotazione.
             </p>
-            <div className="mt-6 flex flex-col gap-2">
-              {EXAMPLES.map((e) => (
+            {/* Lorenzo 16/10: poche chip brevi; la lista completa dietro "Altre idee". */}
+            <p className="mt-6 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Ti suggeriamo</p>
+            <div data-testid="assistente-esempi" className="mt-2 flex flex-wrap gap-2">
+              {EXAMPLES.slice(0, 3).map((e) => (
                 <button
                   key={e.text}
                   type="button"
+                  aria-label={e.text}
                   onClick={() => submit(e.text)}
-                  className="flex min-h-12 items-center gap-3 rounded-card border border-border bg-surface px-4 py-3 text-left text-[15px] font-sans text-text active:scale-[0.99]"
+                  className="flex min-h-10 items-center gap-1.5 rounded-pill border border-border bg-surface px-3.5 text-sm font-sans text-text active:scale-[0.98]"
                 >
-                  <span aria-hidden className="text-xl">{e.emoji}</span> “{e.text}”
+                  <span aria-hidden>{e.emoji}</span> {e.short}
                 </button>
               ))}
+              <button
+                type="button"
+                data-testid="assistente-altre-idee"
+                aria-expanded={moreIdeas}
+                onClick={() => setMoreIdeas((v) => !v)}
+                className="flex min-h-10 items-center gap-1 rounded-pill border border-brand/30 bg-surface px-3.5 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+              >
+                {moreIdeas ? "Meno idee" : "✨ Altre idee"}
+              </button>
             </div>
+            {moreIdeas && (
+              <ul data-testid="assistente-idee" className="mt-3 flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+                {EXAMPLES.map((e) => (
+                  <li key={e.text}>
+                    <button
+                      type="button"
+                      onClick={() => submit(e.text)}
+                      className="flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] font-sans text-text active:bg-brand-light"
+                    >
+                      <span aria-hidden className="text-lg">{e.emoji}</span>
+                      <span className="min-w-0 flex-1">“{e.text}”</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
