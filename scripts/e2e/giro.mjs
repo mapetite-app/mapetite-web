@@ -4024,6 +4024,95 @@ else {
   }
 }
 
+// 17. Da computer (piano 6.5): a 1280x800 mappa grande a sinistra e pannello a destra con ricerca,
+//     lista delle card e scheda del locale. Ricerca e verdetti simulati (stessi finti del giro): niente Google.
+//     Sul telefono il pannello non esiste: si controlla anche che a 390px resti tutto come prima.
+{
+  const dctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await dctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await dctx.route("**/api/search/intent", (r) => r.fulfill({ status: 204, body: "" }));
+  await dctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  await dctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+  await dctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await dctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+  await dctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await dctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const dp = await dctx.newPage();
+  dp.on("pageerror", (e) => errors.push(e.message));
+  await dp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const scrollX = () => dp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  await dp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const mappa = await dp.locator(".mapboxgl-map").boundingBox();
+  const pannello = await dp.getByTestId("pannello-ricerca").boundingBox();
+  ok(!!mappa && !!pannello && mappa.width >= 760 && Math.round(mappa.x + mappa.width) <= Math.round(pannello.x) && pannello.width >= 380 && pannello.x + pannello.width >= 1279,
+    `computer: mappa a sinistra (larga ${Math.round(mappa?.width ?? 0)}px) e pannello a destra (da x ${Math.round(pannello?.x ?? 0)})`);
+  ok(await dp.getByTestId("pannello-intro").isVisible() && await dp.getByLabel("Cosa cerchi?").isVisible(), "computer: pannello con titolo 'Dove andiamo?' e barra di ricerca in alto");
+  { const b = await dp.getByTestId("barra-ricerca").boundingBox(); ok(!!b && !!pannello && b.x >= pannello.x && b.y < 200, `computer: barra di ricerca dentro il pannello, in alto (x ${Math.round(b?.x ?? 0)}, y ${Math.round(b?.y ?? 0)})`); }
+  ok((await scrollX()) <= 0, `computer: nessuno scroll orizzontale a mappa vuota (${await scrollX()}px)`);
+  await dp.screenshot({ path: `${OUT}/95-computer-mappa.png`, caret: "initial" });
+
+  // Ricerca: le card sono una lista verticale nel pannello, accanto alla mappa (non sopra).
+  await dp.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).click();
+  await dp.getByTestId("card-risultato").first().waitFor({ timeout: 8000 });
+  await dp.getByTestId("etichetta-verdetto").first().waitFor({ timeout: 5000 }).catch(() => {});
+  const cards = dp.getByTestId("card-risultato");
+  const c1 = await cards.nth(0).boundingBox();
+  const c2 = await cards.nth(1).boundingBox();
+  const mappa2 = await dp.locator(".mapboxgl-map").boundingBox();
+  ok((await cards.count()) >= 2 && !!c1 && !!c2 && !!mappa2 && c1.x >= mappa2.x + mappa2.width && c2.y > c1.y + c1.height - 1 && Math.abs(c2.x - c1.x) < 2 && c2.y < 800,
+    `computer: card in lista verticale nel pannello, due visibili (x ${Math.round(c1?.x ?? 0)}, y ${Math.round(c1?.y ?? 0)} e ${Math.round(c2?.y ?? 0)})`);
+  ok(!!c1 && c1.width >= 340, `computer: card larghe quanto il pannello (${Math.round(c1?.width ?? 0)}px), non strette come sul telefono`);
+  ok(await dp.getByTestId("barra-ricerca").isVisible() && (await dp.getByLabel("Cambia altezza pannello").count()) === 0, "computer: barra di ricerca sempre in alto, niente maniglia da trascinare");
+  ok((await scrollX()) <= 0, `computer: nessuno scroll orizzontale con i risultati (${await scrollX()}px)`);
+  // La lista scorre nel pannello, la pagina no.
+  const lista = dp.getByTestId("lista-risultati");
+  const scorre = await lista.evaluate((el) => { const prima = el.scrollTop; el.scrollTop = 400; const dopo = el.scrollTop; el.scrollTop = prima; return dopo > prima || el.scrollHeight <= el.clientHeight; });
+  ok(scorre && await dp.evaluate(() => window.scrollY === 0), "computer: la lista scorre dentro il pannello, la pagina resta ferma");
+  await dp.screenshot({ path: `${OUT}/96-computer-risultati.png`, caret: "initial" });
+
+  // Mouse su una card: si accende il suo pin.
+  await cards.nth(1).hover();
+  await dp.waitForTimeout(300);
+  const secondo = await dp.locator("[data-testid=pin][data-focused=true]").getAttribute("data-place").catch(() => null);
+  const idSecondo = await dp.locator("ul li[data-id]").nth(1).getAttribute("data-id");
+  ok(secondo === idSecondo, `computer: col mouse sulla seconda card si accende il suo pin (${secondo} = ${idSecondo})`);
+
+  // Clic su una card: la scheda si apre nel pannello, la mappa resta visibile, nessun velo scuro.
+  await cards.first().click();
+  const scheda = dp.getByTestId("scheda-pannello");
+  await scheda.waitFor({ timeout: 5000 });
+  await dp.waitForTimeout(500);
+  const sb = await scheda.boundingBox();
+  const mappa3 = await dp.locator(".mapboxgl-map").boundingBox();
+  const velo = await scheda.evaluate((el) => getComputedStyle(el).backgroundColor);
+  ok(!!sb && !!mappa3 && sb.x >= mappa3.x + mappa3.width - 1 && sb.x + sb.width <= 1281 && mappa3.width >= 760 && !/rgba\(0, 0, 0/.test(velo),
+    `computer: la scheda si apre nel pannello a destra, mappa visibile e niente velo (x ${Math.round(sb?.x ?? 0)}, sfondo ${velo})`);
+  ok(await dp.getByRole("heading", { name: "Terrazza Uno" }).isVisible() && await dp.getByTestId("barra-azioni").isVisible(), "computer: scheda con nome del locale e barra azioni visibili");
+  ok((await dp.getByTestId("card-risultato").count()) === 0 && await dp.getByTestId("barra-ricerca").isVisible(), "computer: la scheda prende il posto della lista, la barra di ricerca resta in alto");
+  ok((await scrollX()) <= 0, `computer: nessuno scroll orizzontale con la scheda aperta (${await scrollX()}px)`);
+  await dp.screenshot({ path: `${OUT}/97-computer-scheda.png`, caret: "initial" });
+  // Chiudi: si torna alla lista.
+  await scheda.getByRole("button", { name: "Chiudi" }).first().click();
+  await dp.getByTestId("card-risultato").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok((await dp.getByTestId("card-risultato").count()) >= 2, "computer: chiusa la scheda torna la lista dei risultati");
+  // Clic su un pin: da computer apre subito la scheda (la lista è già a fianco).
+  await dp.locator("[data-testid=pin][data-place=P3]").click();
+  await dp.waitForTimeout(600);
+  ok(await scheda.isVisible().catch(() => false) && await dp.getByRole("heading", { name: "Rooftop Tre" }).isVisible().catch(() => false), "computer: un clic sul pin apre subito la scheda nel pannello");
+  await dctx.close();
+
+  // Telefono: niente pannello (titolo nascosto, barra sopra la mappa come prima).
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await mctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  const mp = await mctx.newPage();
+  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await mp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const pos = await mp.getByTestId("pannello-ricerca").evaluate((el) => getComputedStyle(el).position);
+  const mm = await mp.locator(".mapboxgl-map").boundingBox();
+  ok(pos === "absolute" && !(await mp.getByTestId("pannello-intro").isVisible()) && !!mm && mm.width === 390, `telefono: nessun pannello da computer (barra ${pos}, mappa larga ${Math.round(mm?.width ?? 0)}px)`);
+  await mctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
