@@ -2,9 +2,12 @@
 
 import { tagLabel, isStateTag } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { track } from "@/lib/track";
+import { bookingMakesSense } from "@/lib/bookable";
+import SchedaCarosello from "@/components/scheda-carosello";
+import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
 import { mapetiteShareUrl } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
@@ -14,9 +17,16 @@ import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
 import BookingSheet from "@/components/booking-sheet";
 import type { BookingDetails } from "@/lib/booking";
+import { VisitaContext } from "@/lib/visita-context";
+import { votoOf, votoTag } from "@/lib/diario";
 
-const TILE =
-  "flex min-h-[52px] min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-display font-semibold text-white active:scale-95";
+// Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
+// La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
+export const ACTION_TILE =
+  "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-xs font-display font-semibold text-white transition-transform active:scale-95";
+const TILE = `${ACTION_TILE} bg-white/10`;
+
+type Friends = { visitati: FriendPerson[]; daProvare: FriendPerson[] };
 
 export type Venue = {
   id: string;
@@ -105,7 +115,29 @@ export default function VenueSheet({
     personalNote,
   } = venue;
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
-  const signal = (type: "percorso" | "chiama" | "sito" | "condividi") => track(type, { id: venue.id, lat, lng });
+  // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
+  const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
+    track(type, { id: venue.id, lat, lng }, da ? { fonte: da } : undefined);
+
+  // "Chi dei tuoi amici c'è stato" (piano 6.2): stessa lettura della pagina pubblica del locale.
+  // Per chi non ha l'accesso o non segue nessuno la risposta è vuota e non si mostra nulla.
+  // venue.id: UUID per i salvati, Place ID Google per i risultati (il server trova la riga).
+  const friendsKey = venue.id;
+  // Tocco su "✓ Ci sono stato" in questa scheda (per il foglio del diario): legato al locale, così
+  // passando a un altro con "‹ ›" non si apre lì.
+  const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
+  const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
+  const setVisitAskedAt = (at: number | null) => setVisitAsked(at == null ? null : { id: venue.id, at });
+  const [friends, setFriends] = useState<{ key: string; data: Friends | null } | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/places/amici?id=${encodeURIComponent(friendsKey)}`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { amici?: Friends | null } | null) => setFriends({ key: friendsKey, data: j?.amici ?? null }))
+      .catch(() => { /* rete assente o scheda chiusa: niente riga amici */ });
+    return () => ctrl.abort();
+  }, [friendsKey]);
+  const friendsData = friends?.key === friendsKey ? friends.data : null;
 
   // Scheda completa su Google Maps (orari, foto, tutte le recensioni): con il Place ID se c'è.
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}${googlePlaceId ? `&query_place_id=${encodeURIComponent(googlePlaceId)}` : ""}`;
@@ -169,6 +201,22 @@ export default function VenueSheet({
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
   // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
   const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  const telHref = phone != null ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
+  // Barra azioni della scheda B (piano 6.2, come Places): Prenota / Percorso / Salva dove si
+  // prenota, altrimenti Chiama (o Sito) / Percorso / Salva. Dall'assistente (prenotazione già
+  // avviata) Prenota c'è sempre se il locale ha un telefono o un sito.
+  const canBook = booking != null ? phone != null || websiteUri != null : bookingMakesSense({ category, phone, websiteUri });
+  const lead: "prenota" | "chiama" | "sito" | null = canBook ? "prenota" : telHref ? "chiama" : websiteUri ? "sito" : null;
+  // Senza Salva (scheda aperta dall'assistente) il terzo posto va a Chiama o al sito.
+  const extra: "chiama" | "sito" | null = saveSlot
+    ? null
+    : lead !== "chiama" && telHref ? "chiama" : lead !== "sito" && websiteUri ? "sito" : null;
+  const inBar = (a: "chiama" | "sito") => lead === a || extra === a;
+  const openBooking = (da: string) => {
+    track("funzione", { id: venue.id, lat, lng }, { nome: "prenota", fonte: da });
+    setBookingOpen(true);
+  };
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
   const variant = useVariant("scheda");
   const emoji = getCategoryEmoji(category, name);
@@ -404,21 +452,18 @@ export default function VenueSheet({
       )}
       {variant === "b" && (
         <>
-          {/* B (stile Places): foto grande con chiudi e condividi sopra, poi nome grande e righe di contesto. */}
-          <div className="relative">
-            {venue.photoRef ? (
-              <PlacePhoto
-                photoRef={venue.photoRef}
-                alt={name}
-                width={700}
-                priority
-                className="h-56 w-full rounded-t-card object-cover"
-                fallback={<div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>}
-                credit={venue.photoAuthor}
-              />
-            ) : (
-              <div className="flex h-40 items-center justify-center rounded-t-card bg-brand/10 text-6xl">{emoji}</div>
-            )}
+          {/* B (stile Places): carosello (foto già caricata + "dove si trova") con chiudi e condividi
+              sopra, poi nome grande e righe di contesto. */}
+          <SchedaCarosello
+            photoRefs={venue.photoRef ? [venue.photoRef] : []}
+            name={name}
+            credit={venue.photoAuthor}
+            lat={lat}
+            lng={lng}
+            directionsUrl={directionsUrl}
+            onDirections={() => signal("percorso", "carosello")}
+            fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
+            overlay={<>
             <button
               type="button"
               onClick={onClose}
@@ -437,30 +482,36 @@ export default function VenueSheet({
                 <Share2 size={18} />
               </button>
             )}
-          </div>
+            </>}
+          />
           <div className="px-5 pt-5">
             <h2 className="font-title text-3xl font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.4rem]">
               {name}
             </h2>
             {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
             {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
-              Orari e foto su Google Maps →
-            </a>
             {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
-            {gem && (
-              <span data-testid="gemma" className="mt-3 mr-2 inline-flex rounded-pill bg-accent-light px-3 py-1 text-sm font-display font-semibold text-accent">💎 Poco conosciuto</span>
-            )}
-            {openNow != null && (
-              <span className="mt-3 inline-flex items-center gap-1.5 rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
-                <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
-                {openNow ? "Aperto ora" : "Chiuso ora"}
-              </span>
+            {(gem || openNow != null) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {openNow != null && (
+                  <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
+                    <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
+                    {openNow ? "Aperto ora" : "Chiuso ora"}
+                  </span>
+                )}
+                {gem && (
+                  <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-3 py-1 text-sm font-display font-semibold text-accent">💎 Poco conosciuto</span>
+                )}
+              </div>
             )}
           </div>
+          {/* Il verdetto subito sotto nome e contesto: è la prima cosa che si legge dopo la foto. */}
           {verdictCard}
         </>
       )}
+
+      {/* Chi dei tuoi amici c'è stato (o lo vuole provare): passaparola vero, solo tra chi segui. */}
+      {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
       {/* 3. TAG AI */}
       {hasTags && (
         <div className="mt-4 flex flex-wrap gap-1.5 px-5">
@@ -492,16 +543,50 @@ export default function VenueSheet({
       )}
 
       {/* Prenota (piano 1.3): messaggio già scritto per WhatsApp, chiamata o sito del locale. */}
-      {(phone != null || websiteUri != null) && (
+      {/* Nella scheda B Prenota sta nella barra in basso. */}
+      {variant === "a" && (phone != null || websiteUri != null) && (
         <div className="mx-5 mt-4">
           <button
             type="button"
             data-testid="prenota-scheda"
-            onClick={() => setBookingOpen(true)}
+            onClick={() => openBooking("scheda")}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-accent px-4 text-[15px] font-display font-semibold text-white shadow-card active:scale-[0.98]"
           >
             <CalendarCheck size={18} /> Prenota un tavolo
           </button>
+        </div>
+      )}
+      {/* Scheda B: indirizzo (si copia) e le vie di contatto che non stanno già nella barra. */}
+      {variant === "b" && (
+        <div className="mx-5 mt-4 flex flex-col gap-0.5 border-t border-border pt-3" data-testid="scheda-info">
+          {address && (
+            <button
+              type="button"
+              data-testid="copia-indirizzo"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+              }}
+              className="flex min-h-10 items-center gap-1.5 text-left text-sm font-sans text-text-muted"
+            >
+              <span className="min-w-0">{displayAddress(address)}</span>
+              <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4">
+            {telHref && !inBar("chiama") && (
+              <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="inline-flex min-h-10 items-center gap-1.5 text-sm font-display font-semibold text-brand">
+                <Phone size={15} className="shrink-0" /> Chiama
+              </a>
+            )}
+            {websiteUri != null && !inBar("sito") && (
+              <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className="inline-flex min-h-10 items-center gap-1.5 text-sm font-display font-semibold text-brand">
+                <Globe size={15} className="shrink-0" /> Sito
+              </a>
+            )}
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
+              Orari e foto su Google Maps →
+            </a>
+          </div>
         </div>
       )}
       {bookingOpen && (
@@ -527,7 +612,11 @@ export default function VenueSheet({
                     key={tag}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => onVisitStatus(tag)}
+                    onClick={() => {
+                      // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?" (diario-scheda).
+                      if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
+                      onVisitStatus(tag);
+                    }}
                     className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
                   >
                     {label}
@@ -556,7 +645,21 @@ export default function VenueSheet({
                   );
                 })}
               </div>
-              {rankSlot}
+              <VisitaContext.Provider value={{
+                askedAt: visitAskedAt,
+                consume: () => setVisitAskedAt(null),
+                voto: votoOf(personalTags),
+                // Passa da map-view (onOpinion), che tiene lo stato dei salvati: ritoccare lo stesso voto lo toglie.
+                setVoto: (v) => {
+                  const cur = votoOf(personalTags);
+                  if (v === cur) return;
+                  onOpinion(v ? votoTag(v) : votoTag(cur!));
+                },
+                note: personalNote,
+                onEditNote: onEdit,
+              }}>
+                {rankSlot}
+              </VisitaContext.Provider>
             </div>
           )}
           {hasPersonalTags && (
@@ -661,32 +764,44 @@ export default function VenueSheet({
       </div>
       )}
       {variant === "b" && (
-        /* B: barra scura a riquadri, staccata dal fondo (come Places). */
-        <div className="sticky bottom-[calc(var(--nav-height-mobile)+0.75rem)] z-10 mt-6 flex justify-center px-3">
-          <div className="flex max-w-full items-center gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
-            {saveSlot}
+        /* B: barra scura a tre riquadri, staccata dal fondo (come Places): Prenota / Percorso / Salva,
+           oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
+           dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone); da
+           computer, dove la nav è in alto, resta comunque sopra il bordo sicuro. */
+        <div
+          data-testid="barra-azioni"
+          className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+0.75rem)] z-10 mt-6 flex justify-center px-4"
+        >
+          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
+            {lead === "prenota" && (
+              <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`}>
+                <CalendarCheck size={18} aria-hidden />
+                Prenota
+              </button>
+            )}
+            {(lead === "chiama" || extra === "chiama") && telHref && (
+              <a href={telHref} onClick={() => signal("chiama", "barra")} aria-label={`Chiama ${name}`} className={`${TILE} ${extra === "chiama" ? "order-last" : ""}`}>
+                <Phone size={18} aria-hidden />
+                Chiama
+              </a>
+            )}
+            {(lead === "sito" || extra === "sito") && websiteUri != null && (
+              <a href={websiteUri} onClick={() => signal("sito", "barra")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={`${TILE} ${extra === "sito" ? "order-last" : ""}`}>
+                <Globe size={18} aria-hidden />
+                Sito
+              </a>
+            )}
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`} onClick={() => signal("percorso")}
+              href={directionsUrl} onClick={() => signal("percorso", "barra")}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
               className={TILE}
             >
-              {walk != null ? <Footprints size={18} /> : <Navigation size={18} />}
-              {walk != null ? `${walk} min` : "Percorso"}
+              {walk != null ? <Footprints size={18} aria-hidden /> : <Navigation size={18} aria-hidden />}
+              <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
             </a>
-            {phone != null && (
-              <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className={TILE}>
-                <Phone size={18} />
-                Chiama
-              </a>
-            )}
-            {websiteUri != null && (
-              <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={TILE}>
-                <Globe size={18} />
-                Sito
-              </a>
-            )}
+            {saveSlot}
           </div>
         </div>
       )}

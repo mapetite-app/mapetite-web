@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { updateTags } from "@/lib/raccolte-write";
 import { withoutCollection } from "@/lib/raccolte";
+import { trackFeature } from "@/lib/track";
 
 // "Mettili in ordine" (piano 4.2): per i salvati senza raccolta l'AI propone dove metterli, solo
 // tra le raccolte dell'utente e poche standard, guardando nome, tipo, città e verdetto già salvati.
@@ -65,6 +66,8 @@ export default function RaccolteProposte({
     if (daFare.length === 0 || scrivo) return;
     setScrivo(true);
     setErrore(null);
+    // Solo quante proposte accettate, mai i nomi delle raccolte (testo dell'utente).
+    trackFeature("raccolte_proposte", { risultati: daFare.length });
     const byId = new Map(daFare.map((p) => [p.id, p.raccolte]));
     const targets = daFare.map((p) => ({ placeId: p.id, tags: rows.find((r) => r.placeId === p.id)?.tags ?? [] }));
     // Ogni locale ha le sue raccolte: una scrittura per locale (tag riletti prima, come sempre).

@@ -13,6 +13,10 @@ export function pageName(pathname: string, search = ""): string {
   if (pathname.startsWith("/miei-locali")) return "salvati";
   if (pathname.startsWith("/importa")) return "importa";
   if (pathname.startsWith("/stasera")) return "stasera";
+  if (pathname.startsWith("/prenotazioni")) return "prenotazioni";
+  if (pathname.startsWith("/assistente")) return "assistente";
+  if (pathname.startsWith("/raccolte/")) return "raccolta";
+  if (/^\/u\/[^/]+\/raccolte\//.test(pathname)) return "raccolta_pubblica";
   if (pathname.startsWith("/locali/")) return "scheda_pubblica";
   if (pathname.startsWith("/onboarding")) return "onboarding";
   if (pathname.startsWith("/me/preferenze")) return "preferenze";

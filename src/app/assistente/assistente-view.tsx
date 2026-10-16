@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowUp, Bookmark, BookmarkCheck, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles } from "lucide-react";
 import VenueSheet, { type Venue } from "@/components/venue-sheet";
 import BookingSheet from "@/components/booking-sheet";
 import VoiceButton from "@/components/voice-button";
@@ -12,7 +12,10 @@ import { categoryLabel } from "@/lib/category-label";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
 import { dateKey, dayLabel, missingDetails, parseBooking, type BookingDetails } from "@/lib/booking";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
+import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
+import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
+import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
 type Card = Venue & { editorialSummary?: string | null };
@@ -179,10 +182,16 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
   setConv((c) => ({ ...c, lastQuery: q, msgs: [...c.msgs, { id: msgId, role: "assistant", text: "", status: "loading", query: q }] }));
   const at = pos ?? DEFAULT_CENTER;
   try {
+    // Frase già capita mentre si scriveva (come la mappa): la ricerca non riaspetta l'AI.
+    const intent = await intentFor(q);
     const res = await fetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, source: "world", searchIntent: "natural", phase: "fast", lat: at.lat, lng: at.lng }),
+      body: JSON.stringify({
+        query: q, source: "world", searchIntent: "natural", phase: "fast",
+        ...(intent && { intent, intentQuery: q.trim() }),
+        lat: at.lat, lng: at.lng,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -223,6 +232,26 @@ function lastResults(c: Conv): BotMsg | null {
   return null;
 }
 
+// La ricerca Google che partirebbe per questo messaggio; null = nessuna (saluti, seguiti sui
+// posti di prima, solo dettagli della prenotazione). La stessa regola vale mentre si scrive.
+function searchQueryOf(text: string, parsed: ReturnType<typeof parseBooking>, lastQuery: string | null): string | null {
+  const searchText = parsed.isBooking ? parsed.search : (parsed.search ? text : null);
+  if (!searchText) return null;
+  return lastQuery ? followUpQuery(lastQuery, searchText) : searchText;
+}
+
+// Mentre si scrive: la richiesta che partirà all'Invio, per farla capire in anticipo all'AI.
+function plannedQuery(raw: string, c: Conv): string | null {
+  const text = raw.trim().slice(0, 300);
+  if (!text || SMALL_TALK.test(text)) return null;
+  if (localRefineOf(text) && lastResults(c)) return null;
+  return searchQueryOf(text, parseBooking(text), c.lastQuery);
+}
+
+// Segnale "funzione" dell'assistente: mai il testo scritto, solo che tipo di messaggio era.
+const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli") =>
+  trackFeature("assistente_messaggio", { contesto });
+
 async function send(raw: string) {
   const text = raw.trim().slice(0, 300);
   if (!text) return;
@@ -242,6 +271,7 @@ async function send(raw: string) {
   const reply = (m: Omit<BotMsg, "id" | "role">) => setConv((c) => ({ ...c, msgs: [...c.msgs, { id: newId(), role: "assistant", status: "done", ...m }] }));
 
   if (SMALL_TALK.test(text)) {
+    trackMsg("saluto");
     reply({ text: "Dimmi cosa cerchi, come lo diresti a un amico: tipo di posto, zona, occasione. Se vuoi prenotare, aggiungi giorno, ora e persone." });
     return;
   }
@@ -261,6 +291,8 @@ async function send(raw: string) {
     }
     const done = applyLocalRefine(refine, prev.places, pos);
     if (done) {
+      trackMsg("seguito");
+      trackFeature("assistente_seguito", { contesto: refine });
       reply({
         text: done.places.length > 0 ? done.note : `${done.note} Vuoi che cerchi altri posti?`,
         places: done.places,
@@ -272,14 +304,17 @@ async function send(raw: string) {
     }
   }
 
-  const searchText = parsed.isBooking ? parsed.search : (parsed.search ? text : null);
-  if (searchText) {
-    const q = before.lastQuery ? followUpQuery(before.lastQuery, searchText) : searchText;
+  const q = searchQueryOf(text, parsed, before.lastQuery);
+  if (q) {
+    trackMsg(parsed.isBooking ? "prenotazione" : "ricerca");
+    // "solo con terrazza" dopo una ricerca: seguito che riformula la richiesta di prima.
+    if (before.lastQuery && q !== searchQueryOf(text, parsed, null)) trackFeature("assistente_seguito", { contesto: "ricerca" });
     await runSearch(q, booking, bookingMode, getConv().pos);
     return;
   }
 
   // Solo dettagli della prenotazione ("per 4", "domani", "alle 21"): nessuna ricerca.
+  trackMsg("dettagli");
   const summary = bookingSummary(booking);
   const ask = askFor(booking);
   if (!prev) {
@@ -298,9 +333,12 @@ async function send(raw: string) {
 const priceOf = (n: number | null) => (n != null && n > 0 ? "€".repeat(n) : null);
 const ratingOf = (r: number | null) => (r != null ? `★ ${r.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null);
 
-function PlaceCards({ msg, booking, bookingMode, onOpen, onBook }: {
+type SaveState = "saving" | "error";
+
+function PlaceCards({ msg, booking, bookingMode, savedIds, saving, onOpen, onBook, onSave }: {
   msg: BotMsg; booking: BookingDetails; bookingMode: boolean;
-  onOpen: (c: Card) => void; onBook: (c: Card) => void;
+  savedIds: Set<string>; saving: Record<string, SaveState>;
+  onOpen: (c: Card) => void; onBook: (c: Card) => void; onSave: (c: Card) => void;
 }) {
   const places = msg.places ?? [];
   // "Aperto ora" vale per adesso: se si prenota per un altro giorno non dice niente e si nasconde.
@@ -351,26 +389,99 @@ function PlaceCards({ msg, booking, bookingMode, onOpen, onBook }: {
               ) : null}
             </span>
           </button>
-          {(p.phone || p.websiteUri) && (
-            <button
-              type="button"
-              data-testid="assistente-prenota"
-              onClick={() => onBook(p)}
-              aria-label={`Prenota da ${p.name}`}
-              className={`absolute bottom-3 left-3 right-3 flex min-h-11 items-center justify-center gap-1.5 rounded-pill text-sm font-display font-semibold active:scale-[0.98] ${bookingMode ? "bg-accent text-white" : "bg-white/15 text-white backdrop-blur"}`}
-            >
-              <CalendarCheck size={16} /> Prenota
-            </button>
-          )}
+          {/* Salva in un tocco ("📌 Voglio andarci", come il segnalibro della mappa) e Prenota. */}
+          <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+            {savedIds.has(p.id) ? (
+              <span
+                role="status"
+                data-testid="assistente-salvato"
+                aria-label={`${p.name} è nei tuoi salvati`}
+                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white text-sm font-display font-semibold text-brand"
+              >
+                <BookmarkCheck size={16} aria-hidden /> Salvato
+              </span>
+            ) : (
+              <button
+                type="button"
+                data-testid="assistente-salva"
+                onClick={() => onSave(p)}
+                disabled={saving[p.id] === "saving"}
+                aria-label={`Salva ${p.name} tra i Voglio andarci`}
+                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white/15 text-sm font-display font-semibold text-white backdrop-blur active:scale-[0.98] disabled:opacity-80"
+              >
+                <Bookmark size={16} aria-hidden />
+                {saving[p.id] === "saving" ? "Salvo…" : saving[p.id] === "error" ? "Riprova" : "Salva"}
+              </button>
+            )}
+            {(p.phone || p.websiteUri) && (
+              <button
+                type="button"
+                data-testid="assistente-prenota"
+                onClick={() => onBook(p)}
+                aria-label={`Prenota da ${p.name}`}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-sm font-display font-semibold active:scale-[0.98] ${bookingMode ? "bg-accent text-white" : "bg-white/15 text-white backdrop-blur"}`}
+              >
+                <CalendarCheck size={16} aria-hidden /> Prenota
+              </button>
+            )}
+          </div>
         </li>
       ))}
     </ul>
   );
 }
 
-export default function AssistenteView() {
+const WANT = "Da provare";
+
+export default function AssistenteView({ userId }: { userId: string | null }) {
   const c = useSyncExternalStore(subscribe, getConv, () => EMPTY);
   const [input, setInput] = useState("");
+  // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
+  const [saving, setSaving] = useState<Record<string, SaveState>>({});
+  const [savedToast, setSavedToast] = useState<{ name: string; uuid: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    savedGoogleIds(userId)
+      .then((ids) => { if (alive && ids.size > 0) setSavedIds((prev) => new Set([...prev, ...ids])); })
+      .catch(() => { /* senza rete: nessun "Salvato", il tocco lo dirà comunque */ });
+    return () => { alive = false; };
+  }, [userId]);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // Stesso salvataggio della mappa: senza accesso il locale si ricorda e si salva dopo il login
+  // (src/lib/pending-save.ts, completato da /mappa, dove si arriva dopo l'accesso).
+  const save = async (p: Card, tag: "Da provare" | "Già visitato" = WANT) => {
+    if (!userId) {
+      rememberPendingSave({ id: p.id, name: p.name, category: p.category, address: p.address, lat: p.lat, lng: p.lng, tags: null, note: null, rating: p.rating, priceLevel: p.priceLevel }, [tag]);
+      window.location.href = loginToSaveUrl(p.name);
+      return;
+    }
+    if (savedIds.has(p.id) || saving[p.id] === "saving") return;
+    setSaving((s) => ({ ...s, [p.id]: "saving" }));
+    try {
+      const { uuid, already } = await quickSavePlace(userId, p, [tag]);
+      setSavedIds((prev) => new Set(prev).add(p.id));
+      setSaving((s) => { const next = { ...s }; delete next[p.id]; return next; });
+      if (!already) track("salva", { id: uuid, lat: p.lat, lng: p.lng }, { fonte: "assistente", stato: tag });
+      setSavedToast({ name: p.name, uuid });
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
+    } catch {
+      setSaving((s) => ({ ...s, [p.id]: "error" }));
+    }
+  };
+
+  // Mentre si scrive: dopo 700 ms di pausa l'AI capisce già la richiesta (come la mappa e la home:
+  // stessa memoria, una frase già capita non si richiede). Nessuna chiamata Google.
+  useEffect(() => {
+    const q = plannedQuery(input, getConv());
+    if (!q || q.length < 8) return;
+    const t = setTimeout(() => prefetchIntent(q), 700);
+    return () => clearTimeout(t);
+  }, [input]);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   // Scheda aperta: si legge dalla conversazione, così il verdetto arrivato dopo compare anche lì.
   const [openRef, setOpenRef] = useState<{ msgId: string; placeId: string } | null>(null);
@@ -484,8 +595,11 @@ export default function AssistenteView() {
                     msg={m}
                     booking={c.booking}
                     bookingMode={c.bookingMode}
-                    onOpen={(p) => { setOpenRef({ msgId: m.id, placeId: p.id }); track("apri_scheda", { id: p.id, lat: p.lat, lng: p.lng }, { da: "assistente" }); }}
-                    onBook={(p) => setBookCard(p)}
+                    savedIds={savedIds}
+                    saving={saving}
+                    onOpen={(p) => { setOpenRef({ msgId: m.id, placeId: p.id }); track("apri_scheda", { id: p.id, lat: p.lat, lng: p.lng }, { fonte: "assistente" }); }}
+                    onBook={(p) => { setBookCard(p); trackFeature("assistente_prenota"); }}
+                    onSave={(p) => void save(p)}
                   />
                 )}
                 {m.status === "verdicts" && <p className="mt-1 text-xs font-sans text-text-muted">Sto scrivendo i verdetti…</p>}
@@ -514,6 +628,22 @@ export default function AssistenteView() {
         </div>
         <div ref={endRef} />
       </div>
+
+      {savedToast && (
+        <div
+          role="status"
+          data-testid="assistente-salvato-avviso"
+          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+4.25rem)] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
+        >
+          <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
+          <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
+            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Voglio andarci”
+          </p>
+          <Link href={`/mappa?salvato=${savedToast.uuid}`} className="shrink-0 text-sm font-display font-semibold text-accent">
+            Sulla mappa
+          </Link>
+        </div>
+      )}
 
       {/* Campo in basso, sopra la barra di navigazione: scrivi o detta. */}
       <form
@@ -549,7 +679,8 @@ export default function AssistenteView() {
           <div className="mx-auto mt-14 max-w-lg" onClick={(e) => e.stopPropagation()}>
             <VenueSheet
               venue={openCard}
-              isSaved={false}
+              isSaved={savedIds.has(openCard.id)}
+              onQuickSave={(tag) => void save(openCard, tag)}
               canEdit={false}
               onEdit={() => {}}
               onClose={() => setOpenCard(null)}

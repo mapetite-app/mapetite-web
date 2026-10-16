@@ -10,7 +10,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
-import VenueSheet from "@/components/venue-sheet";
+import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import PlacePhoto from "@/components/place-photo";
@@ -33,6 +33,10 @@ import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 import ClassificaScheda from "@/components/classifica-scheda";
+
+// Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
+// in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
+const isDesktop = () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
@@ -585,6 +589,7 @@ function SaveButton({
   onSaveRequest: (googlePlaceId: string) => void;
   onLoginRequest?: () => void;
 }) {
+  const tile = useVariant("scheda") === "b";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
@@ -622,6 +627,22 @@ function SaveButton({
       onToggle(placeId, false);
     });
   };
+
+  // Scheda B (stile Places): Salva è il terzo riquadro della barra azioni flottante.
+  if (tile) {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        aria-label={error ? "Errore durante il salvataggio. Riprova." : undefined}
+        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-success" : "bg-white/10"} disabled:opacity-60`}
+      >
+        <Bookmark size={18} aria-hidden fill={isSaved ? "currentColor" : "none"} />
+        {isPending ? "..." : error ? "Riprova" : isSaved ? "Salvato" : "Salva"}
+      </button>
+    );
+  }
 
   return (
     <div>
@@ -1633,8 +1654,15 @@ export default function MapView({
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
     if (!map || typeof window === "undefined") return;
-    const { innerWidth: w, innerHeight: h } = window;
     const pt = map.project([place.lng, place.lat]);
+    // Da computer la lista è a fianco, non sopra la mappa: basta che il pin sia nella mappa.
+    if (isDesktop()) {
+      const box = (map as unknown as { getContainer: () => HTMLElement }).getContainer();
+      if (pt.x > 40 && pt.x < box.clientWidth - 40 && pt.y > 60 && pt.y < box.clientHeight - 40) return;
+      map.easeTo({ center: [place.lng, place.lat], duration: 500 });
+      return;
+    }
+    const { innerWidth: w, innerHeight: h } = window;
     if (pt.x > 30 && pt.x < w - 30 && pt.y > 140 && pt.y < h * 0.5) return;
     map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
   };
@@ -1657,7 +1685,8 @@ export default function MapView({
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: { top, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+        // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -1910,10 +1939,14 @@ export default function MapView({
   }, [vistaParam]);
 
   // L'indirizzo dice se si stanno guardando i salvati (?vista=salvati): la barra in basso accende "Salvati".
-  // Non al primo disegno: lì è l'indirizzo a decidere la vista (vedi sotto).
-  const viewSynced = useRef(false);
+  // Solo quando la vista cambia davvero, non al primo disegno: lì è l'indirizzo a decidere la vista
+  // (vedi sotto). Si confronta con la vista precedente e non con un "già fatto": in sviluppo React
+  // esegue due volte gli effetti al montaggio e la seconda volta toglieva ?vista=salvati appena
+  // arrivati dalla barra in basso, e la mappa rimbalzava tra Esplora e Salvati.
+  const syncedView = useRef(view);
   useEffect(() => {
-    if (!viewSynced.current) { viewSynced.current = true; return; }
+    if (syncedView.current === view) return;
+    syncedView.current = view;
     const params = new URLSearchParams(window.location.search);
     if ((params.get("vista") === "salvati") === (view === "saved")) return;
     if (view === "saved") params.set("vista", "salvati");
@@ -1986,19 +2019,30 @@ export default function MapView({
   }, []);
 
   return (
-    <div className="fixed inset-0 md:top-14">
+    // Da computer (lg, piano 6.5) diventa una griglia: mappa a sinistra, pannello a destra largo
+    // --pannello (ricerca in alto, sotto lista o scheda). Sul telefono resta tutto sovrapposto alla mappa.
+    <div className="fixed inset-0 md:top-14 lg:grid lg:grid-cols-[minmax(0,1fr)_var(--pannello)] lg:grid-rows-[auto_minmax(0,1fr)] lg:[--pannello:420px] xl:[--pannello:460px]">
+      {/* Fondo del pannello da computer (sotto ricerca, lista e scheda). */}
+      <div aria-hidden className="hidden lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:border-l lg:border-border lg:bg-bg" />
       {/* Torna alla mia posizione: sempre raggiungibile, anche dopo aver chiuso la card iniziale. */}
       <button
         type="button"
         onClick={goToMyPosition}
         disabled={geoState === "loading"}
         aria-label="La mia posizione"
-        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60"
+        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60 lg:right-[calc(var(--pannello)+1rem)]"
       >
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
-      <div className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+      <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+        {/* Da computer, a mappa vuota: titolo del pannello sopra la barra (sul telefono non c'è). */}
+        {view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
+          <div data-testid="pannello-intro" className="hidden pb-2 lg:block">
+            <h1 className="font-title text-2xl font-semibold leading-tight text-brand in-data-[titoli=serif]:text-3xl">Dove andiamo?</h1>
+            <p className="mt-1 text-sm font-sans text-text-muted">Scrivi cosa cerchi come lo diresti a un amico: trovo i posti giusti per te, non quelli di tutti, e ti dico perché.</p>
+          </div>
+        )}
         {/* Riga icone: Concierge AI + Filtri (con ?beta=barra: campo "Cosa cerchi?" sempre visibile, come Places) */}
         <div className="pointer-events-auto flex gap-2">
           {barOn ? (
@@ -2131,7 +2175,7 @@ export default function MapView({
         )}
         {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
         {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "" && (
-          <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem]">
+          <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem] lg:ml-0 lg:w-auto lg:flex-wrap lg:overflow-visible lg:px-0">
             {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione. La barra resta la ricerca. */}
             <Link
               href="/assistente"
@@ -2145,7 +2189,7 @@ export default function MapView({
                 type="button"
                 data-testid="suggerimento-per-te"
                 onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
-                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill lg:max-w-full bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
               >
                 ✨ Per te: {tasteSuggestion}
               </button>
@@ -2155,7 +2199,7 @@ export default function MapView({
                 type="button"
                 data-testid="suggerimento-salvati"
                 onClick={() => { setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }}
-                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill lg:max-w-full bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
               >
                 ✨ Dai tuoi salvati: {savedSuggestion.label}
               </button>
@@ -2207,7 +2251,7 @@ export default function MapView({
         )}
         {/* Pannello AI espandibile */}
         {overlay.kind === "ai" && (
-          <div className="pointer-events-auto w-80 max-w-[90vw] relative">
+          <div className="pointer-events-auto w-80 max-w-[90vw] relative lg:w-auto lg:max-w-none">
             <AISearchPanel
               key={view}
               query={aiQuery}
@@ -2329,8 +2373,8 @@ export default function MapView({
 
       {/* Messaggio se non loggato e vista "salvati" */}
       {view === "saved" && !userId && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none lg:static lg:col-start-2 lg:row-start-2 lg:items-start lg:px-5 lg:pt-2">
+          <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
             <p className="text-2xl mb-2">🔒</p>
             <p className="font-display font-semibold text-text">Accesso richiesto</p>
             <p className="mt-1 text-sm font-sans text-text-muted">
@@ -2348,7 +2392,7 @@ export default function MapView({
 
       {/* Spinner caricamento salvati */}
       {view === "saved" && userId && loadingSaved && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none lg:static lg:col-start-2 lg:row-start-2 lg:items-start lg:px-5 lg:pt-2">
           <div className="bg-surface rounded-card shadow-card px-4 py-2 text-sm font-sans text-text-muted">
             Caricamento...
           </div>
@@ -2360,8 +2404,8 @@ export default function MapView({
         !(view === "saved" && !userId) &&
         !(view === "saved" && userId && loadingSaved) &&
         !(view === "all" && aiSearch === null) && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-            <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto">
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none lg:static lg:col-start-2 lg:row-start-2 lg:items-start lg:px-5 lg:pt-2">
+            <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
               <p className="text-2xl mb-2">
                 {aiSearch !== null ? "🔍" : view === "saved" && savedFiltered ? "🏷️" : "📍"}
               </p>
@@ -2428,7 +2472,7 @@ export default function MapView({
       {homeVariant === "b" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeDismissed && (
         <div
           data-testid="benvenuto"
-          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
+          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
           style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md">
@@ -2558,7 +2602,7 @@ export default function MapView({
       {homeVariant === "a" && view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden && (
         <div
           data-testid="benvenuto"
-          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none"
+          className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
           style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
@@ -2706,7 +2750,7 @@ export default function MapView({
       {/* Niente "Cerca in quest'area" se la ricerca nomina già una zona ("a Trastevere"): il server
           ignora la posizione della mappa e restituirebbe la stessa lista, pagando un'altra ricerca. */}
       {view === "all" && aiSearch !== null && movedSinceSearch && (aiQuery.trim() !== "" || (aiSearch.query == null && countActive(filters) > 0)) && !(aiSearch.query != null && aiSearch.filtri?.zona && aiQuery.trim() === aiSearch.query.trim()) && (overlay.kind === "list" || overlay.kind === "none") && (
-        <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center lg:right-[var(--pannello)] lg:top-4">
           <button
             type="button"
             disabled={aiSearching || filterLoading}
@@ -2729,7 +2773,8 @@ export default function MapView({
         ref={mapRef}
         // isolation: i livelli dei pin (fino a 100, vedi sotto) restano dentro la mappa e non salgono
         // mai sopra barra, pulsanti e card della pagina.
-        style={{ width: "100%", height: "100%", isolation: "isolate" }}
+        // gridColumn/gridRow contano solo da computer (griglia lg): la mappa occupa la colonna di sinistra.
+        style={{ width: "100%", height: "100%", isolation: "isolate", gridColumn: 1, gridRow: "1 / span 2" }}
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
         // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
         language="it"
@@ -2791,7 +2836,8 @@ export default function MapView({
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
                 // il secondo apre la scheda.
-                if (carouselOpen && focusId !== place.id && carouselOrder.includes(place.id)) {
+                // Da computer la lista è sempre a fianco: un clic apre subito la scheda.
+                if (carouselOpen && focusId !== place.id && carouselOrder.includes(place.id) && !isDesktop()) {
                   setFocusedId(place.id);
                   return;
                 }
@@ -2889,7 +2935,8 @@ export default function MapView({
       </Map>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40" onClick={() => dispatch({ type: "CLOSE" })}>
+        // Da computer la scheda si apre nel pannello a destra, al posto della lista (niente velo scuro).
+        <div data-testid="scheda-pannello" className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40 lg:static lg:z-auto lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:items-stretch lg:justify-start lg:border-l lg:border-border lg:bg-bg" onClick={() => dispatch({ type: "CLOSE" })}>
           {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
           {(() => {
             const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
@@ -2905,7 +2952,7 @@ export default function MapView({
               if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
             };
             return (
-              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float">
+              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
                 <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
                 <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
                 <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
@@ -2913,7 +2960,7 @@ export default function MapView({
             );
           })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float">
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none">
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -3090,7 +3137,7 @@ export default function MapView({
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
       {nearbySaved && !savedToast && !selected && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
@@ -3106,7 +3153,7 @@ export default function MapView({
         </div>
       )}
       {savedToast && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 truncate text-sm font-sans">
               <span className="font-semibold">📌 Salvato</span> · {savedToast.name}
@@ -3124,17 +3171,17 @@ export default function MapView({
 
       {/* Ricerca in corso senza card iniziale (link ?q=, home): card fantasma come Places, la mappa non resta muta. */}
       {aiSearching && aiSearch === null && welcomeHidden && overlay.kind === "none" && (
-        <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: "var(--nav-height-mobile)" }}>
-          <div className="mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface px-4 py-2 shadow-float">
+        <div data-testid="ricerca-in-corso" className="pointer-events-none absolute left-0 right-0 z-10 lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-hidden lg:border-l lg:border-border" style={{ bottom: "var(--nav-height-mobile)" }}>
+          <div className="mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface px-4 py-2 shadow-float lg:mx-5 lg:shadow-none">
             <p className="truncate font-title text-base font-semibold text-brand first-letter:uppercase">{aiQuery}</p>
             <p className="flex items-center gap-2 text-xs font-sans text-text-muted">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-accent" />
               Cerco i posti giusti…
             </p>
           </div>
-          <div className="flex gap-3 overflow-hidden px-3 pb-3">
+          <div className="flex gap-3 overflow-hidden px-3 pb-3 lg:flex-col lg:px-5">
             {[0, 1].map((i) => (
-              <div key={i} className="h-[190px] w-[78vw] max-w-sm shrink-0 animate-pulse rounded-card bg-brand/80 p-4 shadow-float">
+              <div key={i} className="h-[190px] w-[78vw] max-w-sm shrink-0 animate-pulse rounded-card bg-brand/80 p-4 shadow-float lg:w-auto lg:max-w-none">
                 <div className="h-7 w-7 rounded-full bg-white/20" />
                 <div className="mt-4 h-5 w-2/3 rounded bg-white/25" />
                 <div className="mt-2 h-3 w-1/3 rounded bg-white/15" />
@@ -3146,7 +3193,7 @@ export default function MapView({
       )}
 
       {filterLoading && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-24 lg:right-[var(--pannello)] lg:pt-20">
           <div className="pointer-events-auto flex items-center gap-2 rounded-pill bg-surface px-4 py-2 shadow-float">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-accent" />
             <span className="text-sm font-sans text-text">Sto cercando…</span>
@@ -3155,7 +3202,7 @@ export default function MapView({
       )}
 
       {filterError && (
-        <div className="absolute inset-x-0 top-0 z-20 flex justify-center pt-24">
+        <div className="absolute inset-x-0 top-0 z-20 flex justify-center pt-24 lg:right-[var(--pannello)] lg:pt-20">
           <button
             type="button"
             onClick={() => setFilterError(null)}
@@ -3221,6 +3268,8 @@ export default function MapView({
           // Già salvato: la scheda permette di modificarlo o rimuoverlo (vedi quickSave).
           onSave={aiSearch !== null && view === "all" ? (place) => { void quickSave(place); } : undefined}
           onFocus={(place) => { setFocusedId(place.id); panIntoView(place); }}
+          // Da computer: il mouse su una card accende il suo pin, senza spostare la mappa.
+          onHover={(place) => setFocusedId(place.id)}
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);

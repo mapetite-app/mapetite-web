@@ -3,6 +3,7 @@ import { Poppins, Inter, Newsreader } from "next/font/google";
 import OfflineBanner from "@/components/offline-banner";
 import NavBar from "@/components/nav-bar";
 import { getUser } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -76,7 +77,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const { data } = await getUser();
-  const userId = data?.user?.id ?? null;
+  // Solo in sviluppo con E2E_FAKE_USER: il giro automatico vede la barra "da collegato"
+  // (Profilo al posto di Entra) col cookie "e2e_collegato". In produzione non si attiva.
+  const e2eNav = process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && (await cookies()).get("e2e_collegato")
+    ? process.env.E2E_FAKE_USER
+    : null;
+  const userId = data?.user?.id ?? e2eNav;
 
   return (
     <html

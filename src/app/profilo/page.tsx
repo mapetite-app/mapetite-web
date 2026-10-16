@@ -5,12 +5,15 @@ import PlaceCard from "@/components/place-card";
 import { cityFromAddress } from "@/lib/city";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import BookingReminder from "@/components/booking-reminder";
+import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
 import { loadMySocial } from "@/lib/social";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
+import { isMissingVisitedAt } from "@/lib/diario";
+import ProfiloAccount from "@/components/profilo-account";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -50,13 +53,13 @@ function savedHref(filter?: { stato?: "voglio" | "fatto"; tag?: string }): strin
 // Solo in sviluppo con E2E_FAKE_USER: profilo finto letto dal cookie "e2e_profilo"
 // (scritto da scripts/e2e/giro.mjs), perché il test non può simulare le letture fatte dal server.
 // In produzione NODE_ENV è sempre "production" e questo ramo non si attiva.
-async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean } | null> {
+async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean } | null> {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = (await cookies()).get("e2e_profilo")?.value;
   if (!raw) return null;
   try {
     const data = JSON.parse(decodeURIComponent(raw));
-    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false };
+    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false };
   } catch {
     return null;
   }
@@ -93,6 +96,9 @@ export default async function ProfiloPage() {
             Crea un account
           </a>
         </div>
+        <div className="w-full max-w-xs">
+          <ProfiloAccount loggedIn={false} />
+        </div>
       </div>
     );
   }
@@ -125,6 +131,16 @@ export default async function ProfiloPage() {
       .from("saved_places").select("place_id, rank_score").eq("user_id", user.id).not("rank_score", "is", null);
     if (rankError && !isMissingColumn(rankError)) console.error("[profilo] lettura classifica fallita:", rankError.message);
     if (!rankError) ranks = new Map((rankRaw ?? []).map((r) => [r.place_id as string, Number(r.rank_score)]));
+  }
+  // Diario (4.4): la data della visita esiste solo con la migrazione 20261015_diario; senza, il
+  // foglio "Com'è andata?" chiede solo voto e nota. Lettura minima, solo per saperlo.
+  let diaryWithDate = false;
+  if (fake) {
+    diaryWithDate = fake.diario;
+  } else {
+    const { error: dErr } = await supabase.from("saved_places").select("visited_at").eq("user_id", user.id).limit(1);
+    if (dErr && !isMissingVisitedAt(dErr)) console.error("[profilo] lettura diario fallita:", dErr.message);
+    diaryWithDate = !dErr;
   }
   const social = await socialPromise;
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
@@ -167,7 +183,7 @@ export default async function ProfiloPage() {
     .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .slice(0, 20)
-    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at }));
+    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note }));
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -204,6 +220,8 @@ export default async function ProfiloPage() {
         <span aria-hidden className="text-xl text-white/70">→</span>
       </Link>
 
+      <ProfiloPrenotazioni />
+
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
         {counters.map((c) => (
@@ -219,7 +237,23 @@ export default async function ProfiloPage() {
         ))}
       </nav>
 
-      <VisitPrompt userId={user.id} candidates={visitCandidates} />
+      <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
+
+      {/* Diario (4.4): i posti provati con data, voto e nota. */}
+      <Link
+        href="/profilo/diario"
+        data-testid="profilo-diario"
+        className="mb-8 flex min-h-[72px] items-center gap-4 rounded-card border border-border bg-surface px-4 py-3 active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-light text-2xl">📔</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-semibold leading-tight text-text">Il mio diario</span>
+          <span className="mt-0.5 block text-sm text-text-muted">
+            {doneCount === 0 ? "I posti dove sei stato, con voto e note" : `${doneCount} ${doneCount === 1 ? "posto provato" : "posti provati"}, con voto e note`}
+          </span>
+        </span>
+        <span aria-hidden className="text-xl text-text-muted">→</span>
+      </Link>
 
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 
@@ -302,6 +336,8 @@ export default async function ProfiloPage() {
           </ul>
         )}
       </section>
+
+      <ProfiloAccount loggedIn />
     </div>
   );
 }
