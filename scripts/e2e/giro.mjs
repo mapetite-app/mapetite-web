@@ -987,7 +987,17 @@ await shot("18-login");
 await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
 ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
+// Feedback 16/10 ("il dono della sintesi"): un solo pulsante Incolla in cima, poi 4 tessere che aprono il proprio pannello.
+ok(await page.getByTestId("importa-incolla").isVisible() && (await page.getByRole("button", { name: /Incolla/ }).count()) === 1, "importa: un solo pulsante Incolla, in cima");
+{ const tiles = await page.getByTestId("importa-tessere").getByRole("button").allTextContents();
+  ok(tiles.length === 4 && ["Da Google Maps", "Da file di Google", "Da screenshot", "A mano"].every((t, i) => tiles[i]?.includes(t)), `importa: 4 tessere Da Google Maps · Da file di Google · Da screenshot · A mano (${tiles.length})`); }
+{ const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
+  ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 * 1.05, `importa: Incolla grande sopra le tessere, tutto nel primo schermo (${Math.round(inc?.height ?? 0)}px, tessere fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
+await page.getByTestId("importa-tessera-shot").click();
+ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getByTestId("importa-tessera-shot").getAttribute("aria-expanded")) === "true", "importa: la tessera 'Da screenshot' apre il pannello con il pulsante in italiano");
+await page.getByTestId("importa-tessera-mano").click();
+ok(await page.getByTestId("importa-mano").isVisible() && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa: un pannello alla volta ('A mano' chiude lo screenshot)");
 await shot("19-importa");
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono.
@@ -1057,6 +1067,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+await page.getByTestId("importa-tessera-shot").click();
 await page.getByLabel("Scegli uno screenshot").setInputFiles({ name: "post.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
 ok(await page.getByText("Cambia screenshot").isVisible() && await page.getByText("post.png").isVisible(), "importa: area grande per scegliere lo screenshot, in italiano");
 // Screenshot grande (come un PNG di iPhone): parte rimpicciolito in JPEG, sotto il limite delle richieste
@@ -1161,6 +1172,10 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
 } else {
   await page.getByText("La tua mappa è ancora vuota").waitFor({ timeout: 4000 });
   ok((await page.getByTestId("raccogli-vuoto").getByRole("link").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).join(" ") === "/importa /importa#da-screenshot /importa#a-mano", "salvati vuoti: i modi per salvare (Google Maps, screenshot, a mano) a un tocco");
+  await page.goto(`${BASE}/importa#da-screenshot`, { waitUntil: "networkidle" });
+  ok(await page.getByText("Scegli uno screenshot").waitFor({ timeout: 3000 }).then(() => true, () => false), "importa#da-screenshot: si apre già il pannello dello screenshot");
+  await page.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
+  ok(await page.getByTestId("importa-mano").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa#a-mano: si apre già il pannello 'A mano'");
   await page.screenshot({ path: `${OUT}/08b-salvati-vuoti.png`, caret: "initial" });
   await page.getByRole("button", { name: "Cerca un locale" }).click();
   ok(await page.getByTestId("idee-pannello").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca con le idee aperte");
@@ -1888,11 +1903,13 @@ else {
 
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const card = lp.getByTestId("importa-google");
-  ok(await card.getByText("Da Google Maps").isVisible(), "importa: card 'Da Google Maps' in cima");
-  ok((await card.locator("ol li").count()) === 3 && await card.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
+  await lp.getByTestId("importa-tessera-maps").click();
+  const guida = lp.getByTestId("importa-maps-guida");
+  ok(await guida.getByText("Da Google Maps").isVisible(), "importa: la tessera 'Da Google Maps' apre la sua guida");
+  ok((await guida.locator("ol li").count()) === 3 && await guida.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
   const cardTop = (await card.boundingBox())?.y ?? 9999;
-  const shotTop = (await lp.getByText("Scegli uno screenshot").boundingBox())?.y ?? 0;
-  ok(cardTop < shotTop, "importa: la card Google Maps viene prima dello screenshot");
+  const shotTop = (await lp.getByTestId("importa-tessera-shot").boundingBox())?.y ?? 0;
+  ok(cardTop < shotTop, "importa: 'Incolla un link' viene prima dello screenshot");
 
   if (!fakeUser) {
     ok(await card.getByRole("link", { name: "Accedi" }).isVisible(), "importa da disconnessi: invito ad accedere per salvare da Google Maps");
@@ -1901,11 +1918,11 @@ else {
     ok((await lp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa")))?.includes("maps.app.goo.gl/AAA111"), "condividi da disconnessi: il link resta in attesa");
     console.log("SKIP  salva da Google Maps con accesso: dev server senza E2E_FAKE_USER");
   } else {
-    ok(await card.getByRole("button", { name: "📋 Incolla link" }).isVisible(), "importa: pulsante grande '📋 Incolla link'");
+    ok(await card.getByRole("button", { name: "📋 Incolla un link" }).isVisible(), "importa: pulsante grande '📋 Incolla un link'");
     await lp.screenshot({ path: `${OUT}/30-importa-google.png`, caret: "initial" });
     // Più link negli appunti, uno per riga.
     await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/BBB222"));
-    await card.getByRole("button", { name: "📋 Incolla link" }).click();
+    await card.getByRole("button", { name: "📋 Incolla un link" }).click();
     await card.getByTestId("link-salvato").nth(1).waitFor({ timeout: 5000 });
     ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Trattoria Due").isVisible(), "incolla: più link salvati in una volta ('Salvato in Mapetite')");
     const posts = lwrites.filter((w) => w.m === "POST");
@@ -1928,9 +1945,9 @@ else {
     const np = await nctx.newPage();
     np.on("pageerror", (e) => errors.push(e.message));
     await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-    await np.getByRole("button", { name: "📋 Incolla link" }).click();
-    ok(await np.getByLabel("Link di Google Maps").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
-    await np.getByLabel("Link di Google Maps").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
+    await np.getByRole("button", { name: "📋 Incolla un link" }).click();
+    ok(await np.getByLabel("Link da incollare").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
+    await np.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
     await np.getByRole("button", { name: "Salva", exact: true }).click();
     await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
     ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
@@ -2031,6 +2048,7 @@ else {
   }
   await lctx.clearCookies({ name: "e2e_anonimo" });
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await lp.getByTestId("importa-tessera-shot").click();
   ok(await lp.getByTestId("importa-condividi-android").getByText("Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.").isVisible(), "importa: riga sul Condividi dello screenshot da Android");
   await lctx.close();
 }
@@ -2065,8 +2083,10 @@ if (!fakeUser) {
 
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
-  const [yG, yM, yS] = [await yOf("importa-google"), await yOf("importa-mano"), await yOf("importa-screenshot")];
-  ok(yG >= 0 && yG < yM && yM < yS, `importa: ordine Google Maps → Aggiungi a mano → Da uno screenshot (${yG}, ${yM}, ${yS})`);
+  const [yG, yT] = [await yOf("importa-google"), await yOf("importa-tessere")];
+  ok(yG >= 0 && yG < yT && (await yOf("importa-mano")) === -1, `importa: prima 'Incolla un link', poi le tessere; 'A mano' chiuso (${yG}, ${yT})`);
+  await mp.getByTestId("importa-tessera-mano").click();
+  ok((await yOf("importa-mano")) > yT, "importa: la tessera 'A mano' apre il campo sotto le tessere");
   const DOCS_SHOTS = "docs/autonomia/screenshots/2026-10-13-notte";
   mkdirSync(DOCS_SHOTS, { recursive: true });
   await mp.screenshot({ path: `${DOCS_SHOTS}/importa.png`, caret: "initial" });
@@ -2102,7 +2122,7 @@ if (!fakeUser) {
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
+  await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   const soc = gcard.getByTestId("link-social");
   ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
@@ -2123,7 +2143,7 @@ if (!fakeUser) {
   // TikTok e YouTube Shorts incollati.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("https://vm.tiktok.com/ZMabc123/");
+  await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
   // "✨ Trova il locale dal video" (14/10): la didascalia del video (oEmbed) va all'AI, poi si sceglie il locale.
@@ -2137,7 +2157,7 @@ if (!fakeUser) {
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("https://www.youtube.com/shorts/abcDEF");
+  await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByText("Leggo la descrizione del video di YouTube", { exact: false }).isVisible() && await gcard.getByTestId("link-social-video").isVisible() && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps");
 
@@ -2163,7 +2183,10 @@ if (!fakeUser) {
   // Da disconnessi: invito ad accedere, nessuna ricerca.
   await mctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  ok(await mp.getByTestId("importa-google").getByRole("link", { name: "Accedi" }).isVisible() && (await mp.getByTestId("importa-incolla").count()) === 0, "importa da disconnessi: al posto di Incolla l'invito ad accedere");
+  await mp.getByTestId("importa-tessera-mano").click();
   ok(await mano.getByTestId("mano-accedi").isVisible() && await mano.getByRole("link", { name: "Accedi" }).isVisible() && !(await mano.getByLabel("Nome del locale e città").isVisible()), "a mano da disconnessi: invito ad accedere, niente campo");
+  await mp.getByTestId("importa-tessera-shot").click();
   ok(await mp.getByTestId("screenshot-accedi").isVisible() && await mp.getByRole("button", { name: "Leggi locale" }).isDisabled(), "screenshot da disconnessi: 'Leggi locale' spento e invito ad accedere (niente AI e Google senza poter salvare)");
   { const r = await mctx.request.post(`${BASE}/api/places/search`, { data: { query: "x".repeat(201) } }); ok(r.status() === 400, `ricerca locali: testo oltre 200 caratteri rifiutato senza chiamare Google (${r.status()})`); }
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/ABC/")}`, { waitUntil: "networkidle" });
@@ -2643,7 +2666,8 @@ else {
   await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
   { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(Apri la mappa|accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 3 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
-  await qp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
+  await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
   if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
   await qp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
   ok(await qp.getByTestId("condividi-vuoto").getByRole("link", { name: "Incolla il link in Importa" }).isVisible(), "condividi senza link: c'è un'azione per andare avanti");
@@ -4740,9 +4764,8 @@ if (fakeUser) {
   mp.on("pageerror", (e) => errors.push(e.message));
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const mc = mp.getByTestId("importa-multi");
-  ok(await mc.getByText("Incolla più link").isVisible() && await mc.getByLabel("Testo con i link").isVisible(), "incolla più link: card con il campo per la chat o la nota");
+  ok((await mc.count()) === 0, "incolla più link: la lista compare solo dopo aver incollato");
   const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
-  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-mano"), "incolla più link: subito dopo 'Da Google Maps'");
 
   const chat = [
     "[15/10/26, 21:02:11] Lorenzo: Da provare! https://maps.app.goo.gl/AAA111",
@@ -4757,7 +4780,9 @@ if (fakeUser) {
     "di nuovo https://maps.app.goo.gl/AAA111",
   ].join("\n");
   await mp.evaluate((t) => navigator.clipboard.writeText(t), chat);
-  await mc.getByRole("button", { name: "📋 Incolla" }).click();
+  await mp.getByTestId("importa-incolla").click();
+  await mc.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-tessere"), "incolla più link: tanti link misti dall'unico Incolla aprono la lista, subito sotto");
   await mc.getByTestId("multi-avanzamento").waitFor({ timeout: 4000 }).catch(() => {});
   const progress = await mc.getByTestId("multi-avanzamento").textContent().catch(() => "");
   ok(/Leggo i link… \d+ di 19/.test(progress), `incolla più link: avanzamento mentre legge ("${progress.trim()}")`);
@@ -4823,10 +4848,12 @@ if (fakeUser) {
 
   // Testo senza link: spiegato in italiano, nessuna chiamata.
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
+  ok((await mc.count()) === 0, "incolla più link: 'Incolla altri link' torna all'unico Incolla");
   const n0 = previews.length;
-  await mc.getByLabel("Testo con i link").fill("ricordati la pizzeria di Marco");
-  await mc.getByTestId("multi-leggi").click();
-  ok(await mc.getByTestId("multi-errore").isVisible() && (await mc.getByTestId("multi-errore").textContent()).includes("Non vedo link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+  ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
   await mctx.close();
 } else {
   console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
@@ -4932,9 +4959,9 @@ else {
   await ip.getByRole("button", { name: "Continua" }).click();
   await ip.getByTestId("benvenuto-importa-si").click();
   await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Importa da Google Maps' apre l'import"), () => ok(false, `primo accesso: 'Importa da Google Maps' apre l'import (${ip.url()})`));
-  await ip.getByTestId("importa-multi").waitFor({ timeout: 5000 }).catch(() => {});
-  const mb = await ip.getByTestId("importa-multi").boundingBox();
-  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2, `primo accesso: l'import si apre con 'Incolla più link' in cima (${Math.round(mb?.y ?? -1)})`);
+  await ip.getByTestId("importa-incolla").waitFor({ timeout: 5000 }).catch(() => {});
+  const mb = await ip.getByTestId("importa-incolla").boundingBox();
+  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2 && await ip.getByTestId("importa-maps-guida").isVisible(), `primo accesso: l'import si apre con 'Incolla un link' in cima e la guida di Google Maps aperta (${Math.round(mb?.y ?? -1)})`);
   await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
   ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
 
@@ -5728,6 +5755,7 @@ if (fakeUser) {
   const tp = await tctx.newPage();
   tp.on("pageerror", (e) => errors.push(e.message));
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await tp.getByTestId("importa-tessera-file").click();
   const tc = tp.getByTestId("importa-file");
   ok(await tc.getByText("Carica il file di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
   await tp.getByTestId("file-aiuto").click();
@@ -5801,19 +5829,21 @@ else {
   const guide = ip.getByTestId("salva-telefono");
   await guide.waitFor({ timeout: 5000 }).catch(() => {});
   ok(await guide.getAttribute("data-telefono").catch(() => null) === "iphone", "salva da iPhone: su iPhone compare la guida iPhone");
-  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).isVisible(), "salva da iPhone: 2 passi (Copia il link → Incolla qui) e pulsante 'Incolla il link copiato'");
-  const yG = (await guide.boundingBox())?.y ?? 9999;
-  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 0;
-  ok(yG < yMaps, "salva da iPhone: la guida sta in cima, prima di 'Da Google Maps'");
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 0 && await guide.getByTestId("salva-telefono-apri").getByText("Come salvare dal telefono").isVisible(), "salva da iPhone: guida chiusa in una riga discreta 'Come salvare dal telefono'");
+  await guide.getByTestId("salva-telefono-apri").click();
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && (await guide.getByRole("button", { name: /Incolla/ }).count()) === 0 && (await ip.getByRole("button", { name: /Incolla/ }).count()) === 1, "salva da iPhone: 2 passi (Copia il link → Incolla) e un solo pulsante Incolla nella pagina");
+  ok(featureEv("salva_da_telefono_apri").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: l'apertura della guida è registrata (contesto iphone)");
+  const yG = (await guide.boundingBox())?.y ?? 0;
+  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 9999;
+  ok(yMaps < yG, "salva da iPhone: la guida sta sotto il pulsante Incolla");
   await ip.screenshot({ path: `${OUT}/99a-salva-iphone.png`, caret: "initial" });
   await ip.evaluate(() => navigator.clipboard.writeText("Guarda qui https://maps.app.goo.gl/TEL111"));
-  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  await ip.getByTestId("importa-incolla").click();
   ok(await ip.getByTestId("importa-google").getByTestId("link-salvato").first().waitFor({ timeout: 5000 }).then(() => true, () => false) && await ip.getByText("Osteria Nascosta").isVisible(), "salva da iPhone: il link copiato si salva con un tocco");
-  ok(featureEv("salva_da_telefono_incolla").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: il tocco su 'Incolla' è registrato (contesto iphone)");
   await ip.screenshot({ path: `${OUT}/99b-salva-iphone-salvato.png`, caret: "initial" });
   // Reel di Instagram: non si legge, si spiega lo screenshot (stesso percorso della card Maps).
   await ip.evaluate(() => navigator.clipboard.writeText("https://www.instagram.com/reel/C9xYz12AbCd/"));
-  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  await ip.getByTestId("importa-incolla").click();
   ok(await ip.getByTestId("link-social").waitFor({ timeout: 4000 }).then(() => true, () => false), "salva da iPhone: un reel di Instagram incollato spiega cosa fare (screenshot)");
   await ip.setViewportSize({ width: 360, height: 780 });
   ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "salva da iPhone 360px: niente scorrimento orizzontale");
@@ -5826,7 +5856,8 @@ else {
   await ap.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const ag = ap.getByTestId("salva-telefono");
   await ag.waitFor({ timeout: 5000 }).catch(() => {});
-  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ag.getByRole("button", { name: "Oppure 📋 incolla il link copiato" }).isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite' con incolla come alternativa");
+  await ag.getByTestId("salva-telefono-apri").click().catch(() => {});
+  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ap.getByTestId("importa-incolla").isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite', incolla resta l'alternativa in cima");
   await ap.screenshot({ path: `${OUT}/99c-salva-android.png`, caret: "initial" });
   await ag.getByTestId("salva-telefono-cambia").click();
   ok(await ag.getAttribute("data-telefono") === "iphone" && featureEv("salva_da_telefono_cambia").length > 0, "salva da Android: 'Hai un iPhone?' passa alla guida iPhone");
