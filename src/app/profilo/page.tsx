@@ -374,6 +374,14 @@ export default async function ProfiloPage() {
       </section>
 
       <ProfiloAccount loggedIn />
+
+      {/* Lato ristoratori (piano 8): prima la pagina si apriva solo scrivendo l'indirizzo. */}
+      <p className="mt-6 text-center text-sm text-text-muted">
+        Hai un locale?{" "}
+        <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className="font-display font-semibold text-brand underline underline-offset-2">
+          Mapetite per i ristoratori
+        </Link>
+      </p>
     </div>
   );
 }

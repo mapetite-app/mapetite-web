@@ -5192,6 +5192,7 @@ else {
     await pmctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
     await pm.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     ok((await pm.getByTestId("profilo-premium").getAttribute("href")) === "/premium", "premium: collegato dal profilo");
+    ok((await pm.getByTestId("profilo-ristoratori").getAttribute("href")) === "/per-i-ristoratori", "profilo: link 'Mapetite per i ristoratori'");
   } else console.log("SKIP  premium dal profilo: dev server senza E2E_FAKE_USER");
   await pmctx.close();
 }
