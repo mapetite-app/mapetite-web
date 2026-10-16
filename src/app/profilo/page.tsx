@@ -263,6 +263,20 @@ export default async function ProfiloPage() {
         <span aria-hidden className="text-xl text-text-muted">→</span>
       </Link>
 
+      {/* Liste di gruppo (piano 5.5): scegliere insieme agli amici, con i 👍. */}
+      <Link
+        href="/gruppi"
+        data-testid="profilo-gruppi"
+        className="mb-8 flex min-h-[72px] items-center gap-4 rounded-card border border-border bg-surface px-4 py-3 active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-light text-2xl">🍽️</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-semibold leading-tight text-text">Liste di gruppo</span>
+          <span className="mt-0.5 block text-sm text-text-muted">Es. &quot;Cene del giovedì&quot;: ognuno propone, si vota, si sceglie</span>
+        </span>
+        <span aria-hidden className="text-xl text-text-muted">→</span>
+      </Link>
+
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 
       {ranks && <ProfiloClassifica userId={user.id} initialRows={classificaRows} />}
