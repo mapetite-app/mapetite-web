@@ -5078,6 +5078,59 @@ else {
   await wctx.close();
 }
 
+// ── Pitch (sezione separata): creator, posti in evidenza e trend di zona, premium ─────────────
+// 5.6b Creator e critici: badge sul profilo pubblico e "Liste dei creator da seguire" in /amici.
+//      Dati finti dal cookie "e2e_social" (campo `creator`); senza creator la sezione non c'è.
+if (!fakeUser) console.log("SKIP  creator: dev server senza E2E_FAKE_USER");
+else {
+  const CR = "00000000-0000-4000-8000-0000000005c1";
+  const NORMALE = "00000000-0000-4000-8000-0000000005c2";
+  const profC = (id, handle, display_name) => ({ id, handle, display_name, bio: "Trattorie vere, lontano dai giri turistici", city: "Roma", visitati: 2, da_provare: 1, seguaci: 0, seguiti: 0 });
+  const svC = (user_id, handle, place_id, name, tags) => ({ user_id, handle, display_name: handle, place_id, name, category: "restaurant", tags, created_at: "2026-10-12T19:00:00Z", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.889, lng: 12.53 });
+  const socialC = {
+    profili: [profC(CR, "sara.mangia", "Sara Mangia"), profC(NORMALE, "luca.rm", "Luca")],
+    salvati: [
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c1", "Trattoria Pigneto", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c2", "Osteria Nascosta", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c3", "Vino Vivo", ["Da provare", "Vini naturali"]),
+      svC(NORMALE, "luca.rm", "44444444-0000-4000-8000-0000000000c4", "Bar Luca", ["Da provare", "Colazioni"]),
+    ],
+    seguo: [],
+    mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    creator: [{ id: CR, tipo: "Food blogger" }],
+  };
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const cEv = [];
+  await cctx.route("**/api/events", (r) => { cEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(e.message));
+  const setC = (v) => cctx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setC(socialC);
+  await cp.goto(`${BASE}/u/sara.mangia`, { waitUntil: "networkidle" });
+  ok(((await cp.getByTestId("badge-creator").first().textContent().catch(() => "")) ?? "").includes("Creator · Food blogger"), "creator: badge 'Creator · Food blogger' sul profilo pubblico");
+  await cp.screenshot({ path: `${OUT}/80-creator-profilo.png`, caret: "initial" });
+  await cp.goto(`${BASE}/u/luca.rm`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("badge-creator").count()) === 0, "creator: nessun badge su un profilo normale");
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const cl = cp.getByTestId("creator-liste");
+  ok(await cl.isVisible(), "creator: sezione 'Liste dei creator da seguire' in /amici");
+  ok((await cl.getByTestId("creator-card").count()) === 1 && ((await cl.textContent()) ?? "").includes("Sara Mangia") && !((await cl.textContent()) ?? "").includes("Luca"), "creator: solo i creator nella sezione");
+  const prima = cl.getByTestId("creator-raccolta").first();
+  ok(((await prima.textContent()) ?? "").includes("Trattorie di quartiere") && (await prima.getAttribute("href")) === "/u/sara.mangia/raccolte/Trattorie%20di%20quartiere", "creator: la raccolta pubblica si apre dalla card");
+  ok(await cl.getByTestId("segui").isVisible(), "creator: bottone Segui nella card");
+  await cp.waitForTimeout(400);
+  ok(cEv.some((e) => e.type === "funzione" && e.props?.nome === "creator_liste"), "creator: vista della sezione registrata (trackFeature)");
+  { const w = await cp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `creator /amici: niente scorrimento orizzontale (${w}px)`); }
+  await cl.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/81-creator-amici.png`, caret: "initial" });
+  await setC({ ...socialC, creator: [] });
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("creator-liste").count()) === 0 && await cp.getByTestId("amici").isVisible(), "creator: senza creator (o senza migrazione) la sezione è nascosta e la pagina regge");
+  await cctx.close();
+}
+
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

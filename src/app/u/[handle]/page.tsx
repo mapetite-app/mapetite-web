@@ -16,6 +16,7 @@ import { loadPublicRanks } from "@/lib/classifica-server";
 import { topByCity } from "@/lib/classifica";
 import { cityFromAddress } from "@/lib/city";
 import ClassificaLista from "@/components/classifica-lista";
+import CreatorBadge from "@/components/creator-badge";
 
 // Profilo pubblico di una persona (piano 5.1): si apre anche senza account (link condiviso).
 // Solo se la persona ha scelto di renderlo pubblico; mai note private, mai gusti dichiarati.
@@ -80,7 +81,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
     );
   }
 
-  const { profile, places, iFollow, isMe, viewer } = data;
+  const { profile, places, iFollow, isMe, viewer, creator } = data;
   const name = personName(profile);
   const path = profilePath(profile.handle);
   const spots = mapSpots(places);
@@ -109,6 +110,11 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           <div className="min-w-0">
             <h1 className="truncate font-title text-2xl font-semibold leading-tight text-text">{name}</h1>
             <p className="truncate text-sm font-sans text-text-muted">@{profile.handle}</p>
+            {creator && (
+              <p className="mt-1">
+                <CreatorBadge tipo={creator.tipo} />
+              </p>
+            )}
             {profile.city && (
               <p className="mt-0.5 flex items-center gap-1 text-sm font-sans text-text-muted">
                 <MapPin size={14} aria-hidden className="shrink-0 text-brand" />
