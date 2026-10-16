@@ -104,6 +104,27 @@ export async function findStoredPlace(
   return ((data ?? []) as StoredPlace[]).find((p) => sameName(p.name) === want) ?? null;
 }
 
+// Locale importato da un file (Google Takeout, KML) con nome e coordinate ma senza Place ID:
+// si riusa quello già nel catalogo (stesso nome entro ~150 m), altrimenti si crea senza chiamare
+// Google. Il Place ID resta vuoto: lo si aggiunge solo se in futuro arriva da Google, mai inventato.
+export async function findOrCreateImportedPlace(
+  input: { name: string; address: string; lat: number; lng: number },
+  logTag = "import-file",
+): Promise<FindOrCreateResult> {
+  const known = await findStoredPlace({ name: input.name, lat: input.lat, lng: input.lng });
+  if (known) return { place: known, created: false };
+  const { data, error } = await createAdminClient()
+    .from("places")
+    .insert({ google_place_id: null, name: input.name, address: input.address || null, lat: input.lat, lng: input.lng, category: null })
+    .select(COLUMNS)
+    .single();
+  if (error) {
+    console.error(`[${logTag}] insertError:`, { message: error.message, code: error.code });
+    return { error: "Errore nel salvataggio del locale.", status: 500 };
+  }
+  return { place: data as StoredPlace, created: true };
+}
+
 function sameName(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }

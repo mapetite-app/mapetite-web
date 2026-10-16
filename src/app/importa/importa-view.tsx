@@ -6,6 +6,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
 import ManualAddCard from "./manual-add-card";
 import MultiLinkCard from "./multi-link-card";
+import TakeoutCard from "./takeout-card";
 import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
 import { addReel } from "@/lib/community-write";
@@ -287,6 +288,9 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
           <p className="mb-6 text-sm text-text-muted">Copia da Google Maps i link dei posti che hai salvato (o la chat dove te li mandi) e incollali qui: li salvo tutti insieme.</p>
           <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
           <div className="mt-6">
+            <TakeoutCard userId={userId} />
+          </div>
+          <div className="mt-6">
             <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
           </div>
         </>
@@ -299,6 +303,9 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 
           <div className="mt-6">
             <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          </div>
+          <div className="mt-6">
+            <TakeoutCard userId={userId} />
           </div>
         </>
       )}
