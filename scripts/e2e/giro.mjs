@@ -4406,6 +4406,138 @@ else {
   await actxS.close();
 }
 
+// 11. Incolla più link (piano 3.2): chat di WhatsApp con tanti link → lista con lo stato di ciascuno →
+//     "Salva gli N riconosciuti" in una raccolta. API simulata: nessuna chiamata Google.
+if (fakeUser) {
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  const mevents = [];
+  await mctx.route("**/api/events", (r) => { mevents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const SAVED_ID = "00000000-0000-4000-8000-0000000005a1";
+  const minserts = [];
+  await mctx.route("**/rest/v1/saved_places**", (r) => {
+    const req = r.request();
+    if (req.method() === "POST") { minserts.push(req.postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [{ place_id: SAVED_ID, tags: ["Da provare", "Weekend"] }] });
+  });
+  const previews = [];
+  let inflight = 0, maxInflight = 0, spent = 0;
+  await mctx.route("**/api/places/link-preview", async (r) => {
+    const body = r.request().postDataJSON() ?? {};
+    previews.push(body);
+    inflight++; maxInflight = Math.max(maxInflight, inflight);
+    await new Promise((res) => setTimeout(res, 120));
+    inflight--;
+    const id = (s) => `00000000-0000-4000-8000-${s.padStart(12, "0")}`;
+    const link = String(body.link ?? "");
+    const place = (k, name, address = "Via di Prova 1, Roma") => ({ id: id(k), name, address });
+    let out;
+    if (link.includes("AAA111") || link.includes("DUPA11")) out = { stato: "riconosciuto", chiamate: 0, place: place("a1", "Bar Rossi", "Via Roma 1, Roma, Italia") };
+    else if (link.includes("SAVED9")) out = { stato: "riconosciuto", chiamate: 0, place: { id: SAVED_ID, name: "Osteria Già Mia", address: "Via dei Salvati 2, Roma" } };
+    else if (link.includes("BBB222")) out = body.budget >= 1 ? { stato: "riconosciuto", chiamate: 1, place: place("b2", "Trattoria Due", "") } : { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google: toccalo per riconoscerlo.", nome: "Trattoria Due" };
+    else if (link.includes("ERR")) out = { stato: "non_riconosciuto", chiamate: 0, motivo: "Il link non si apre: copialo di nuovo da Google Maps." };
+    else {
+      const n = link.match(/C(\d\d)/)?.[1] ?? "0";
+      out = body.budget >= 1 ? { stato: "riconosciuto", chiamate: 1, place: place(`c${n}`, `Locale ${n}`) } : { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google: toccalo per riconoscerlo.", nome: `Locale ${n}` };
+    }
+    spent += out.chiamate;
+    return r.fulfill({ json: out });
+  });
+  const mp = await mctx.newPage();
+  mp.on("pageerror", (e) => errors.push(e.message));
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const mc = mp.getByTestId("importa-multi");
+  ok(await mc.getByText("Incolla più link").isVisible() && await mc.getByLabel("Testo con i link").isVisible(), "incolla più link: card con il campo per la chat o la nota");
+  const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
+  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-mano"), "incolla più link: subito dopo 'Da Google Maps'");
+
+  const chat = [
+    "[15/10/26, 21:02:11] Lorenzo: Da provare! https://maps.app.goo.gl/AAA111",
+    "[15/10/26, 21:03:40] Lorenzo: https://maps.app.goo.gl/BBB222",
+    "[15/10/26, 21:05:02] Lorenzo: Pizzeria Ai Marmi Roma https://www.instagram.com/reel/XYZ123/",
+    "15/10/26, 21:06 - Lorenzo: guarda https://vm.tiktok.com/ZMabc12/",
+    "https://maps.app.goo.gl/SAVED9 (questo l'avevo già)",
+    "https://maps.app.goo.gl/DUPA11",
+    "https://example.com/articolo-sui-bar",
+    "https://maps.app.goo.gl/ERR999",
+    ...Array.from({ length: 11 }, (_, i) => `https://maps.app.goo.gl/C${String(i + 1).padStart(2, "0")}x`),
+    "di nuovo https://maps.app.goo.gl/AAA111",
+  ].join("\n");
+  await mp.evaluate((t) => navigator.clipboard.writeText(t), chat);
+  await mc.getByRole("button", { name: "📋 Incolla" }).click();
+  await mc.getByTestId("multi-avanzamento").waitFor({ timeout: 4000 }).catch(() => {});
+  const progress = await mc.getByTestId("multi-avanzamento").textContent().catch(() => "");
+  ok(/Leggo i link… \d+ di 19/.test(progress), `incolla più link: avanzamento mentre legge ("${progress.trim()}")`);
+  await mp.screenshot({ path: `${OUT}/multi-link-lettura.png`, caret: "initial" });
+  await mc.getByTestId("multi-riepilogo").waitFor({ timeout: 15000 });
+  const rows = mc.getByTestId("multi-riga");
+  const stati = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-stato")));
+  const by = (s) => stati.filter((x) => x === s).length;
+  ok(stati.length === 19, `incolla più link: 19 link diversi trovati nella chat, il doppione dello stesso link tolto (${stati.length})`);
+  ok(maxInflight <= 2, `incolla più link: al massimo 2 link letti insieme (${maxInflight})`);
+  ok(spent <= 10 && spent >= 9 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: tetto di 10 chiamate Google per import (${spent})`);
+  const R = by("riconosciuto");
+  const label = (n) => `Salva ${String(n).startsWith("8") || n === 11 ? "gli" : "i"} ${n} riconosciuti`;
+  ok(R === 1 + spent && by("da_confermare") === 2 + (12 - spent) && by("gia_salvato") === 1 && by("doppione") === 1 && by("non_riconosciuto") === 2,
+    `incolla più link: stati riconosciuto/da confermare/già salvato/non riconosciuto (${JSON.stringify(Object.fromEntries([...new Set(stati)].map((s) => [s, by(s)])))})`);
+  ok(previews.every((b) => !/instagram|tiktok|example/.test(b.link)), "incolla più link: Instagram, TikTok e altri siti non partono da soli");
+  const first = rows.nth(0);
+  ok((await first.textContent()).includes("Bar Rossi") && (await first.textContent()).includes("Via Roma 1, Roma") && !(await first.textContent()).includes("Italia"), "incolla più link: riconosciuto con nome e indirizzo");
+  ok((await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Osteria Già Mia") && (await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Già salvato"), "incolla più link: chi è già nei salvati è 'Già salvato'");
+  const ig = mc.locator('[data-stato="da_confermare"]').filter({ hasText: "Instagram" });
+  ok(await ig.getByRole("button", { name: "Carica uno screenshot" }).isVisible() && await ig.getByRole("button", { name: "Cerca “Pizzeria Ai Marmi Roma”" }).isVisible(), "incolla più link: Instagram da confermare, con screenshot e 'Cerca' dal testo della chat");
+  ok(await mc.locator('[data-stato="da_confermare"]').filter({ hasText: "TikTok" }).getByRole("button", { name: "✨ Trova dal video" }).isVisible(), "incolla più link: TikTok da confermare con 'Trova dal video'");
+  ok(await mc.getByTestId("multi-salva").textContent() === label(R), `incolla più link: pulsante unico '${await mc.getByTestId("multi-salva").textContent()}'`);
+  const opts = await mp.locator("#multi-raccolta option").allTextContents();
+  ok(opts.includes("📁 Weekend") && opts.some((o) => o.startsWith("＋ Nuova raccolta")), `incolla più link: scelta tra le raccolte esistenti o una nuova (${opts.join(" | ")})`);
+  await mp.screenshot({ path: `${OUT}/multi-link-lista.png`, caret: "initial", fullPage: true });
+
+  // Oltre il tetto: un tocco riconosce un link alla volta.
+  const before = previews.length;
+  await mc.getByTestId("multi-conferma").first().click();
+  await mc.getByTestId("multi-salva").getByText(label(R + 1)).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(previews.length === before + 1 && previews.at(-1).budget === 2 && await mc.getByTestId("multi-salva").textContent() === label(R + 1), "incolla più link: 'Riconosci' su un link da confermare, uno per uno");
+
+  // 360px: niente scroll orizzontale.
+  await mp.setViewportSize({ width: 360, height: 780 });
+  const mx = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(mx <= 0, `incolla più link 360px: nessuno scroll orizzontale (${mx}px)`);
+  await mc.getByTestId("multi-salva").scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/multi-link-360.png`, caret: "initial" });
+  await mp.setViewportSize({ width: 390, height: 844 });
+
+  // Salva tutto in una raccolta nuova.
+  await mp.locator("#multi-raccolta").selectOption("__nuova__");
+  await mc.getByLabel("Nome della nuova raccolta").fill("Viaggio a Milano");
+  await mc.getByTestId("multi-salva").click();
+  await mc.getByTestId("multi-fatto").waitFor({ timeout: 8000 });
+  ok(minserts.length === R + 1 && minserts.every((b) => JSON.stringify(b.tags) === '["Da provare","Viaggio a Milano"]' && b.user_id === "00000000-0000-0000-0000-000000000001") && !minserts.some((b) => b.place_id === SAVED_ID) && new Set(minserts.map((b) => b.place_id)).size === R + 1,
+    `incolla più link: salvati tutti una volta sola, nella raccolta scelta, mai il già salvato (${minserts.length})`);
+  ok((await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 1} locali salvati in “Viaggio a Milano”`) && await mc.getByRole("link", { name: "Apri la raccolta" }).getAttribute("href") === "/raccolte/Viaggio%20a%20Milano", "incolla più link: conferma con link alla raccolta");
+  await mc.getByTestId("multi-fatto").scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/multi-link-salvati.png`, caret: "initial" });
+  const fe = mevents.filter((e) => e?.type === "funzione" && e.props?.nome === "import_multiplo");
+  ok(fe.some((e) => e.props.risultati === 19 && e.props.contesto === "letti") && fe.some((e) => e.props.risultati === R + 1 && e.props.contesto === "salvati_raccolta"), `incolla più link: tracciato 'import_multiplo' con i numeri (${fe.map((e) => `${e.props.contesto}:${e.props.risultati}`).join(", ")})`);
+  ok(droppedKeys(fe).length === 0 && !JSON.stringify(fe).includes("goo.gl") && !JSON.stringify(fe).includes("instagram"), "incolla più link: nei segnali niente link, solo chiavi accettate");
+
+  // Dopo il salvataggio si può ancora riconoscere un link rimasto e salvarlo.
+  const ins0 = minserts.length;
+  await mc.getByTestId("multi-conferma").first().click();
+  await mc.getByTestId("multi-salva").waitFor({ timeout: 4000 }).catch(() => {});
+  await mc.getByTestId("multi-salva").click().catch(() => {});
+  await mc.getByTestId("multi-fatto").getByText(`${R + 2} locali salvati`).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(minserts.length === ins0 + 1 && (await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 2} locali salvati`), "incolla più link: un link riconosciuto dopo si salva con un secondo tocco");
+
+  // Testo senza link: spiegato in italiano, nessuna chiamata.
+  await mc.getByRole("button", { name: "Incolla altri link" }).click();
+  const n0 = previews.length;
+  await mc.getByLabel("Testo con i link").fill("ricordati la pizzeria di Marco");
+  await mc.getByTestId("multi-leggi").click();
+  ok(await mc.getByTestId("multi-errore").isVisible() && (await mc.getByTestId("multi-errore").textContent()).includes("Non vedo link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  await mctx.close();
+} else {
+  console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
