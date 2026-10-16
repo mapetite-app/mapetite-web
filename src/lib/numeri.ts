@@ -74,6 +74,7 @@ const ETICHETTE: Record<string, string> = {
   assistente_scheda: "Assistente: scheda",
   assistente_salva: "Assistente: salva",
   assistente_prenota: "Assistente: prenota",
+  assistente_serata: "Assistente: serata a tappe",
   prenota_whatsapp: "Prenota: WhatsApp",
   prenota_telefono: "Prenota: telefono",
   prenota_sito: "Prenota: sito",
