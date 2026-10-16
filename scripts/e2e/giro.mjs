@@ -5610,6 +5610,53 @@ else {
   await cctx.close();
 }
 
+// QA visivo generico (voce 6.6, 16/10): a 360 e 390 px nessuna pagina scorre di lato e nessun pulsante
+// o campo visibile finisce sotto la barra in basso (il cerchio della Mappa sporge 28px sopra la barra).
+// In cima si controllano solo gli elementi fissi/appiccicati (barre azioni, campi); in fondo alla pagina tutti.
+{
+  const qctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  await qctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await qctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await qctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const qProfilo = { email: "qa@example.com", saved: [{ created_at: "2026-10-10", tags: ["Da provare", "Romantico"], note: null, places: { id: "00000000-0000-4000-8000-0000000009a1", name: "Trattoria QA", category: "restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }], reviews: [] };
+  if (fakeUser) await qctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(qProfilo)), url: BASE }]);
+  const qp = await qctx.newPage();
+  qp.on("pageerror", (e) => errors.push(e.message));
+  const QA_PAGINE = ["/", "/mappa", "/assistente", "/amici", "/profilo", "/profilo/diario", "/raccolte/Romantico", "/stasera", "/sorprendimi", "/importa", "/gruppi", "/onboarding", "/login", "/signup", "/per-i-ristoratori", "/per-i-ristoratori/rivendica", "/premium", "/prenotazioni", "/ristoratore/demo"];
+  for (const [w, h] of [[360, 780], [390, 844]]) {
+    await qp.setViewportSize({ width: w, height: h });
+    for (const path of QA_PAGINE) {
+      await qp.goto(`${BASE}${path}`, { waitUntil: "networkidle" }).catch(() => {});
+      await qp.waitForTimeout(300);
+      const r = await qp.evaluate(() => {
+        const nav = document.querySelector("[data-testid=barra]");
+        const hs = document.scrollingElement.scrollWidth - innerWidth;
+        if (!nav || getComputedStyle(nav).display === "none") return { hs, coperti: [] };
+        const fisso = (el) => { for (let a = el; a; a = a.parentElement) { const p = getComputedStyle(a).position; if (p === "fixed" || p === "sticky") return true; } return false; };
+        const coperti = new Set();
+        const guarda = (soloFissi) => {
+          for (const el of document.querySelectorAll("a[href], button, input, textarea, select, [role=button]")) {
+            if (nav.contains(el) || el.closest(".mapboxgl-map") || (soloFissi && !fisso(el))) continue;
+            const b = el.getBoundingClientRect();
+            if (b.width < 2 || b.height < 2 || b.bottom <= 0 || b.top >= innerHeight || getComputedStyle(el).visibility === "hidden") continue;
+            const y = Math.min(b.bottom - 3, innerHeight - 1);
+            const punti = [[b.left + b.width / 2, b.top + b.height / 2], [b.left + b.width / 2, y], [b.left + 6, y], [b.right - 6, y]];
+            if (punti.some(([x, yy]) => { const hit = document.elementFromPoint(x, yy); return hit && nav.contains(hit); })) coperti.add((el.getAttribute("aria-label") || el.textContent || el.getAttribute("placeholder") || el.tagName).trim().replace(/\s+/g, " ").slice(0, 40));
+          }
+        };
+        guarda(true);
+        scrollTo({ top: document.scrollingElement.scrollHeight, behavior: "instant" });
+        guarda(false);
+        return { hs, coperti: [...coperti] };
+      });
+      ok(r.hs <= 0, `QA ${w}px ${path}: niente scorrimento orizzontale (${r.hs}px in più)`);
+      ok(r.coperti.length === 0, `QA ${w}px ${path}: nessun pulsante sotto la barra in basso${r.coperti.length ? " (" + r.coperti.join(" | ") + ")" : ""}`);
+    }
+  }
+  await qctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
