@@ -48,6 +48,7 @@ export const FUNZIONI_NOTE = [
   "ricerca_ai", "filtri", "voce", "domanda_successiva", "apri_scheda", "salva", "rimuovi",
   "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi",
   "condividi_ricerca", "condividi_lista", "sorprendimi",
+  "sorpresa", "sorpresa_altro", "sorpresa_salva", "sorpresa_apri",
   "import_link", "import_screenshot", "import_video", "import_manuale", "import_condivisione",
   // Eventi dedicati (16/10): assistente, prenotazioni e raccolte, ricavati dai tipi esistenti
   // ("funzione", "salva", "chiama", "condividi"… con da/via/cosa nel payload): nessuna migrazione.
@@ -85,6 +86,10 @@ const ETICHETTE: Record<string, string> = {
   raccolta_modifica: "Raccolta: modifica",
   raccolte_proposte: "Raccolte dall'AI",
   raccolta_pubblica: "raccolta pubblica",
+  sorpresa: "Sorprendimi",
+  sorpresa_altro: "Sorprendimi: un altro",
+  sorpresa_salva: "Sorprendimi: salva",
+  sorpresa_apri: "Sorprendimi: scheda",
 };
 export const etichettaFunzione = (k: string): string => ETICHETTE[k] ?? k.replaceAll("_", " ");
 
