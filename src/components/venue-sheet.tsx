@@ -17,6 +17,8 @@ import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
 import BookingSheet from "@/components/booking-sheet";
 import type { BookingDetails } from "@/lib/booking";
+import { VisitaContext } from "@/lib/visita-context";
+import { votoOf, votoTag } from "@/lib/diario";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -121,6 +123,11 @@ export default function VenueSheet({
   // Per chi non ha l'accesso o non segue nessuno la risposta è vuota e non si mostra nulla.
   // venue.id: UUID per i salvati, Place ID Google per i risultati (il server trova la riga).
   const friendsKey = venue.id;
+  // Tocco su "✓ Ci sono stato" in questa scheda (per il foglio del diario): legato al locale, così
+  // passando a un altro con "‹ ›" non si apre lì.
+  const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
+  const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
+  const setVisitAskedAt = (at: number | null) => setVisitAsked(at == null ? null : { id: venue.id, at });
   const [friends, setFriends] = useState<{ key: string; data: Friends | null } | null>(null);
   useEffect(() => {
     const ctrl = new AbortController();
@@ -605,7 +612,11 @@ export default function VenueSheet({
                     key={tag}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => onVisitStatus(tag)}
+                    onClick={() => {
+                      // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?" (diario-scheda).
+                      if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
+                      onVisitStatus(tag);
+                    }}
                     className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
                   >
                     {label}
@@ -634,7 +645,21 @@ export default function VenueSheet({
                   );
                 })}
               </div>
-              {rankSlot}
+              <VisitaContext.Provider value={{
+                askedAt: visitAskedAt,
+                consume: () => setVisitAskedAt(null),
+                voto: votoOf(personalTags),
+                // Passa da map-view (onOpinion), che tiene lo stato dei salvati: ritoccare lo stesso voto lo toglie.
+                setVoto: (v) => {
+                  const cur = votoOf(personalTags);
+                  if (v === cur) return;
+                  onOpinion(v ? votoTag(v) : votoTag(cur!));
+                },
+                note: personalNote,
+                onEditNote: onEdit,
+              }}>
+                {rankSlot}
+              </VisitaContext.Provider>
             </div>
           )}
           {hasPersonalTags && (

@@ -1231,6 +1231,10 @@ else {
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
+  // Diario (4.4): dopo "Ci sono stato" si apre il foglio "Com'è andata?", saltabile
+  await p.getByTestId("diario-foglio").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await p.getByTestId("diario-foglio").isVisible(), "diario: 'Ci sono stato' nella scheda apre il foglio 'Com'è andata?'");
+  await p.getByTestId("diario-salta").click().catch(() => {});
   await p.waitForTimeout(500);
   ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
   // "Com'era?" compare dopo "Ci sono stato": 👍 / 👎 si escludono, gli altri tag restano
@@ -1248,6 +1252,7 @@ else {
     const t3 = patched?.tags ?? [];
     ok(t3.includes("Da provare") && !t3.includes("Già visitato") && !t3.includes("Non fa per me"), `com'era: tornando a 'Voglio andarci' il 👎 va via (${JSON.stringify(t3)})`);
     await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
+    await p.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await p.waitForTimeout(400);
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
@@ -3820,6 +3825,203 @@ else {
   ok(await gp.getByRole("link", { name: "Accedi" }).isVisible() && (await accesa()) === "Entra", "Profilo da non collegati: invito ad accedere, accesa 'Entra'");
   await gp.screenshot({ path: `${OUT}/91-barra-ospite-profilo.png`, caret: "initial" });
   await gctx.close();
+}
+
+// 16. Diario dei posti provati (piano 4.4): pagina per mese, foglio "Com'è andata?", senza migrazione.
+{
+  let dl = null;
+  try { dl = await import(new URL("../../src/lib/diario.ts", import.meta.url).href); } catch (e) { ok(false, `diario: modulo importabile (${e.message})`); }
+  if (dl) {
+    const g = dl.groupByMonth([{ date: "2026-10-02", savedAt: "a" }, { date: "2026-09-30", savedAt: "b" }, { date: null, savedAt: "c" }, { date: "2026-10-12", savedAt: "d" }]);
+    ok(g.map((x) => x.label).join("|") === "Ottobre 2026|Settembre 2026|Senza data" && g[0].items.map((i) => i.date).join() === "2026-10-12,2026-10-02", `diario: per mese dal più recente, senza data in fondo (${g.map((x) => x.label).join("|")})`);
+    ok(JSON.stringify(dl.withVoto(["Con amici", "Già visitato", "Mi è piaciuto"], "giu")) === '["Con amici","Già visitato","Non fa per me"]' && JSON.stringify(dl.withVoto(["Già visitato", "Non fa per me"], null)) === '["Già visitato"]', "diario: il voto è il 'Com'era?' (👍/👎 si escludono, gli altri tag restano)");
+    ok(dl.cleanDate("2026-02-30") === null && dl.cleanDate("2026-10-12T00:00:00") === "2026-10-12" && dl.cleanDate(42) === null, "diario: solo date vere");
+    const now = new Date(2026, 9, 15, 0, 30);
+    ok(dl.dayKey(now) === "2026-10-15" && dl.dateLabel("2026-10-14", now) === "ieri" && dl.whenLabel("2026-10-03", now) === "il 3 ottobre" && dl.dateLabel("2025-12-31", now) === "31 dicembre 2025", "diario: date in italiano, 'oggi' è il giorno del telefono anche dopo mezzanotte");
+    ok(dl.isMissingVisitedAt({ code: "42703", message: "column saved_places.visited_at does not exist" }) && dl.isMissingVisitedAt({ code: "PGRST204", message: "Could not find the 'visited_at' column" }) && !dl.isMissingVisitedAt({ code: "PGRST116", message: "x" }), "diario: riconosce la colonna mancante (migrazione non applicata)");
+  }
+
+  if (!fakeUser) console.log("SKIP  diario: dev server senza E2E_FAKE_USER");
+  else {
+    const pid = (n) => `00000000-0000-4000-8000-0000000008${n}`;
+    const ROMA = "Via del Pigneto, 10, 00176 Roma RM, Italy";
+    const MILANO = "Alzaia Naviglio Grande, 4, 20144 Milano MI, Italy";
+    const pl = (n, name, category, address, lat, lng) => ({ id: pid(n), name, category, address, lat, lng });
+    const twoWeeksAgo = new Date(Date.now() - 15 * 86_400_000).toISOString();
+    const profilo = {
+      email: "giulia@example.com",
+      saved: [
+        { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", tags: ["Con amici", "Già visitato", "Mi è piaciuto"], note: "Carbonara da rifare, chiedere il tavolo fuori", places: pl("01", "Osteria Due", "restaurant", ROMA, 41.89, 12.53) },
+        { created_at: "2026-10-03T20:00:00Z", visited_at: "2026-10-03", tags: ["Già visitato"], note: null, places: pl("02", "Bar Sette", "cocktail_bar", MILANO, 45.45, 9.17) },
+        { created_at: "2026-09-20T20:00:00Z", visited_at: "2026-09-20", tags: ["Già visitato", "Non fa per me"], note: null, places: pl("03", "Trattoria Tre", "restaurant", ROMA, 41.9, 12.5) },
+        { created_at: "2026-09-10T20:00:00Z", visited_at: null, tags: ["Già visitato"], note: null, places: pl("04", "Enoteca Quattro", "wine_bar", ROMA, 41.893, 12.47) },
+        { created_at: "2026-08-01T20:00:00Z", visited_at: "2026-08-01", tags: ["Già visitato"], note: "Lunghissima nota senza spazi per vedere se esce dallo schermo:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", places: pl("05", "Antica Trattoria del Ponte Vecchio sul Naviglio Grande", "italian_restaurant", MILANO, 45.451, 9.171) },
+        { created_at: twoWeeksAgo, tags: ["Da provare"], note: "Me l'ha detto Marco", places: pl("06", "Forno Sei", "bakery", ROMA, 41.88, 12.48) },
+      ],
+      reviews: [],
+    };
+    const setProfilo = (c, v) => c.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+    const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const dEvents = [];
+    await dctx.route("**/api/events", (r) => { dEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+    await dctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await dctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+    await dctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+    await dctx.route("**/rest/v1/reviews**", (r) => r.fulfill({ json: [] }));
+    let dPatches = [];
+    let visitedMissing = false;
+    // Salvati per la mappa (scheda): la lista con i luoghi, gli id, la data della visita.
+    const mapRows = profilo.saved.map((x) => ({ tags: x.tags, note: x.note, places: { ...x.places, google_place_id: null } }));
+    await dctx.route("**/rest/v1/saved_places**", (r) => {
+      const req = r.request();
+      const u = new URL(req.url());
+      const url = decodeURIComponent(req.url());
+      if (req.method() === "PATCH") {
+        const body = req.postDataJSON();
+        if (visitedMissing && body && "visited_at" in body) return r.fulfill({ status: 400, json: { code: "PGRST204", message: "Could not find the 'visited_at' column of 'saved_places' in the schema cache" } });
+        dPatches.push({ id: u.searchParams.get("place_id")?.replace(/^eq\./, ""), user: u.searchParams.get("user_id"), body });
+        return r.fulfill({ status: 204, body: "" });
+      }
+      if (url.includes("visited_at")) return visitedMissing ? r.fulfill({ status: 400, json: { code: "42703", message: "column saved_places.visited_at does not exist" } }) : r.fulfill({ json: { visited_at: null } });
+      if (url.includes("rank_score")) return r.fulfill({ json: [] });
+      if (url.includes("select=place_id")) return r.fulfill({ json: mapRows.map((x) => ({ place_id: x.places.id })) });
+      if (u.searchParams.get("place_id")) { const row = profilo.saved.find((x) => x.places.id === u.searchParams.get("place_id").replace(/^eq\./, "")); return r.fulfill({ json: { tags: row?.tags ?? [] } }); }
+      return r.fulfill({ json: mapRows });
+    });
+    await setProfilo(dctx, profilo);
+    const d = await dctx.newPage();
+    d.on("pageerror", (e) => errors.push(e.message));
+    await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+
+    // Ingresso dal profilo
+    await d.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
+    const card = d.getByTestId("profilo-diario");
+    ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 posti provati"), "diario: nel profilo 'Il mio diario' con il numero dei posti provati");
+    await card.click();
+    await d.waitForURL(/\/profilo\/diario/, { timeout: 8000 }).catch(() => {});
+    await d.getByTestId("diario-mese").first().waitFor({ timeout: 8000 }).catch(() => {});
+
+    // Pagina: mesi dal più recente, voto, nota, link alla scheda
+    const mesi = (await d.getByTestId("diario-mese").locator("h2 > span:first-child").allTextContents()).join("|");
+    ok(mesi === "Ottobre 2026|Settembre 2026|Agosto 2026|Senza data", `diario: posti raggruppati per mese, dal più recente (${mesi})`);
+    const nomi = (await d.getByTestId("diario-locale").allTextContents()).map((t) => t.split(" ")[0]).join(",");
+    ok(nomi === "Osteria,Bar,Trattoria,Antica,Enoteca", `diario: in ordine di data, i senza data in fondo (${nomi})`);
+    ok((await d.getByTestId("diario-riepilogo").textContent()).includes("5 posti provati · 1 ti è piaciuto"), "diario: riepilogo in cima (posti provati e quanti sono piaciuti)");
+    const prima = d.getByTestId("diario-voce").first();
+    ok((await prima.getByTestId("diario-voto-badge").textContent()).includes("Mi è piaciuto") && (await prima.getByTestId("diario-nota-testo").textContent()).includes("Carbonara da rifare") && (await prima.textContent()).includes("12") && (await prima.textContent()).includes("Roma"), "diario: ogni voce con giorno, emoji, città, voto e nota privata");
+    ok((await prima.getByTestId("diario-locale").getAttribute("href")) === `/mappa?salvato=${pid("01")}`, "diario: il nome apre la scheda del locale");
+    ok(!(await d.locator("body").innerText()).includes("Forno Sei"), `diario: i 'Voglio andarci' non ci sono`);
+    ok(await d.getByRole("button", { name: "+ Aggiungi la data" }).isVisible(), "diario: chi non ha la data ha '+ Aggiungi la data'");
+    { const w = await d.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `diario: niente scorrimento orizzontale a 390px (${w})`); }
+    await d.screenshot({ path: `${OUT}/50-diario.png`, caret: "initial" });
+
+    // Modifica: data, voto e nota in un PATCH solo; la voce cambia mese subito
+    await d.getByTestId("diario-voce").filter({ hasText: "Bar Sette" }).getByTestId("diario-modifica").click();
+    const f = d.getByTestId("diario-foglio");
+    await f.waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await f.isVisible() && (await f.getByRole("button", { name: /3 ottobre/ }).getAttribute("aria-pressed")) === "true", "diario: 'Modifica' apre il foglio con la data della visita già scelta");
+    await f.getByTestId("diario-data").fill("2026-09-28");
+    await f.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
+    await f.getByTestId("diario-nota").fill("Negroni ottimo, bancone");
+    await d.screenshot({ path: `${OUT}/51-diario-foglio.png`, caret: "initial" });
+    await f.getByTestId("diario-salva").click();
+    await f.waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    const pb = dPatches.find((x) => x.id === pid("02"))?.body;
+    ok(dPatches.length === 1 && pb?.visited_at === "2026-09-28" && JSON.stringify(pb?.tags) === '["Già visitato","Mi è piaciuto"]' && pb?.note === "Negroni ottimo, bancone" && dPatches[0].user === "eq.00000000-0000-0000-0000-000000000001", `diario: salva data, voto e nota del locale giusto (${JSON.stringify(dPatches)})`);
+    const settembre = d.getByTestId("diario-mese").filter({ hasText: "Settembre 2026" });
+    ok((await settembre.getByTestId("diario-locale").allTextContents()).join(",") === "Bar Sette,Trattoria Tre" && (await d.getByTestId("diario-riepilogo").textContent()).includes("2 ti sono piaciuti"), "diario: la voce passa subito a settembre, col voto nuovo");
+    ok(dEvents.some((e) => e.type === "funzione" && e.props?.nome === "diario" && e.props?.fonte === "diario" && e.props?.voto === "su"), "diario: modifica registrata (funzione 'diario', solo chiavi ammesse)");
+    dPatches = [];
+    // Annulla non scrive niente
+    await d.getByTestId("diario-voce").filter({ hasText: "Enoteca Quattro" }).getByTestId("diario-modifica").click();
+    await d.getByTestId("diario-salta").click();
+    ok(dPatches.length === 0 && (await d.getByTestId("diario-foglio").count()) === 0, "diario: 'Annulla' chiude senza scrivere");
+
+    // 360px
+    await d.setViewportSize({ width: 360, height: 780 });
+    await d.reload({ waitUntil: "networkidle" });
+    { const w = await d.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `diario: niente scorrimento orizzontale a 360px (${w})`); }
+    await d.screenshot({ path: `${OUT}/52-diario-360.png`, caret: "initial" });
+    await d.getByTestId("diario-voce").first().getByTestId("diario-modifica").click();
+    { const w = await d.evaluate(() => document.documentElement.scrollWidth); const box = await d.getByTestId("diario-foglio").boundingBox(); ok(w <= 360 && box && box.x >= 0 && box.x + box.width <= 360, `diario: il foglio sta nello schermo a 360px (${w})`); }
+    await d.screenshot({ path: `${OUT}/52b-diario-foglio-360.png`, caret: "initial" });
+    await d.keyboard.press("Escape");
+    await d.setViewportSize({ width: 390, height: 844 });
+
+    // Diario vuoto
+    await setProfilo(dctx, { ...profilo, saved: profilo.saved.filter((x) => !x.tags.includes("Già visitato")) });
+    await d.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
+    ok(await d.getByTestId("diario-vuoto").isVisible() && await d.getByRole("link", { name: "Apri i tuoi salvati" }).isVisible(), "diario vuoto: spiega come si riempie e porta ai salvati");
+    await d.screenshot({ path: `${OUT}/53-diario-vuoto.png`, caret: "initial" });
+
+    // Senza migrazione (colonna visited_at assente): niente date, voto e nota si salvano lo stesso
+    await setProfilo(dctx, { ...profilo, diario: false });
+    await d.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
+    ok((await d.getByTestId("diario-mese").count()) === 1 && (await d.getByTestId("diario-mese").textContent()).includes("I tuoi posti provati") && (await d.getByTestId("diario-voce").count()) === 5 && !(await d.locator("body").innerText()).includes("Ottobre 2026"), "diario senza migrazione: un elenco solo, nessuna data inventata");
+    dPatches = [];
+    await d.getByTestId("diario-voce").first().getByTestId("diario-modifica").click();
+    ok((await d.getByTestId("diario-quando").count()) === 0, "diario senza migrazione: il foglio non chiede la data");
+    await d.getByTestId("diario-nota").fill("Solo nota");
+    await d.getByTestId("diario-salva").click();
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    ok(dPatches.length === 1 && dPatches[0].body?.note === "Solo nota" && !("visited_at" in (dPatches[0].body ?? {})), `diario senza migrazione: la nota si salva, senza data (${JSON.stringify(dPatches)})`);
+    await setProfilo(dctx, profilo);
+
+    // "Ci sei stato?" nel profilo: dopo "Sì" il foglio, la nota esistente resta se non la tocchi
+    dPatches = [];
+    await d.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+    const box = d.getByTestId("ci-sei-stato");
+    await box.waitFor({ timeout: 5000 }).catch(() => {});
+    await box.getByRole("button", { name: "✓ Sì, ci sono stato" }).click();
+    await d.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await d.getByTestId("diario-foglio").isVisible() && (await d.getByTestId("diario-foglio").getByRole("button", { name: "Oggi" }).getAttribute("aria-pressed")) === "true" && (await d.getByTestId("diario-nota").inputValue()) === "Me l'ha detto Marco", "ci sei stato → diario: foglio con oggi già scelto e la nota che avevi");
+    await d.getByTestId("diario-foglio").getByRole("button", { name: "Ieri" }).click();
+    await d.getByTestId("diario-foglio").getByRole("button", { name: "👎 Non fa per me" }).click();
+    await d.getByTestId("diario-salva").click();
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    const ieri = (() => { const t = new Date(); const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1); return `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`; })();
+    const last = dPatches[dPatches.length - 1]?.body;
+    ok(dPatches.length === 2 && JSON.stringify(dPatches[0].body?.tags) === '["Già visitato"]' && last?.visited_at === ieri && JSON.stringify(last?.tags) === '["Già visitato","Non fa per me"]' && !("note" in last), `ci sei stato → diario: data di ieri e 👎, la nota non viene toccata (${JSON.stringify(dPatches)})`);
+
+    // Nella scheda della mappa: "Ci sono stato" → foglio → data di oggi e 👍 (passando dalla mappa)
+    dPatches = [];
+    await d.goto(`${BASE}/mappa?salvato=${pid("06")}`, { waitUntil: "networkidle" });
+    await d.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).catch(() => {});
+    await d.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
+    const fs = d.getByTestId("diario-foglio");
+    await fs.waitFor({ timeout: 5000 }).catch(() => {});
+    ok(await fs.isVisible() && (await fs.getByRole("button", { name: "Oggi" }).getAttribute("aria-pressed")) === "true" && await fs.getByTestId("diario-scrivi-nota").isVisible(), "scheda → diario: dopo 'Ci sono stato' il foglio con oggi già scelto (la nota dal foglio 'Modifica' della scheda)");
+    await d.screenshot({ path: `${OUT}/54-scheda-diario-foglio.png`, caret: "initial" });
+    await fs.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
+    await fs.getByTestId("diario-salva").click();
+    await fs.waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(600);
+    const oggi = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; })();
+    const dateP = dPatches.find((x) => x.body && "visited_at" in x.body);
+    const likeP = dPatches.filter((x) => x.body?.tags).pop();
+    ok(dateP?.body.visited_at === oggi && dateP.id === pid("06") && likeP?.body.tags.includes("Mi è piaciuto") && likeP.body.tags.includes("Già visitato"), `scheda → diario: data di oggi e 👍 salvati (${JSON.stringify(dPatches)})`);
+    ok((await d.getByTestId("diario-scheda-data").textContent()).includes("Ci sei stato oggi") && (await d.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).getAttribute("aria-pressed")) === "true", "scheda → diario: la scheda mostra 'Ci sei stato oggi' e il 👍");
+    ok((await d.getByTestId("diario-scheda-link").getAttribute("href")) === "/profilo/diario", "scheda → diario: link 'Il tuo diario'");
+    await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await d.screenshot({ path: `${OUT}/55-scheda-diario.png`, caret: "initial" });
+    ok(dEvents.some((e) => e.type === "funzione" && e.props?.nome === "diario" && e.props?.fonte === "scheda"), "scheda → diario: registrato (fonte 'scheda')");
+    // Salta: chiude senza scrivere la data
+    dPatches = [];
+    await d.goto(`${BASE}/mappa?salvato=${pid("06")}`, { waitUntil: "networkidle" });
+    await d.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).catch(() => {});
+    await d.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
+    await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
+    await d.waitForTimeout(500);
+    ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
+    // Senza migrazione: la scheda non mostra la riga della data e non si rompe
+    visitedMissing = true;
+    await d.goto(`${BASE}/mappa?salvato=${pid("01")}`, { waitUntil: "networkidle" });
+    await d.getByTestId("com-era").waitFor({ timeout: 8000 }).catch(() => {});
+    await d.getByTestId("diario-scheda").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(await d.getByTestId("diario-scheda-link").isVisible() && (await d.getByTestId("diario-scheda-data").count()) === 0, "scheda senza migrazione: solo il link al diario, niente data");
+    visitedMissing = false;
+    await dctx.close();
+  }
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
