@@ -5033,7 +5033,7 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-2-citta.png`, caret: "initial" });
   await ip.getByRole("button", { name: "Roma", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("onboarding-salta").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, saltabile");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("benvenuto-dopo").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, rimandabile");
   await ip.screenshot({ path: `${OUT}/benvenuto-3-importa.png`, caret: "initial" });
   await ip.setViewportSize({ width: 360, height: 740 });
   const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -5062,9 +5062,9 @@ else {
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("onboarding-salta").click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "primo accesso: 'Salta' al passo 2 va al passo 3");
-  await ip.getByTestId("onboarding-salta").click();
+  await ip.getByTestId("benvenuto-dopo").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
-  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Salta' all'ultimo passo → mappa con la ricerca sui gusti, senza città saltata (${new URL(ip.url()).searchParams.get("q")})`);
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Lo faccio dopo' dopo aver saltato la città → mappa con la ricerca sui gusti, senza città (${new URL(ip.url()).searchParams.get("q")})`);
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Pizza", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
@@ -6348,6 +6348,86 @@ else {
   await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {});
   ok((await fp.getByTestId("community-mie-foto").count()) === 0 && (await fp.getByTestId("foto-community").count()) === 0 && await fp.getByTestId("recensione-form").isVisible(), "foto community senza migrazione: niente foto, la recensione funziona come prima");
   await fctx.close();
+}
+
+// Voci piccole del 16/10 sera: primo accesso senza doppioni, risposte che non si perdono, microfono.
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const vp = await vctx.newPage();
+  vp.on("pageerror", (e) => errors.push(e.message));
+  // 1. Passo 3 del primo accesso: un solo modo di rimandare ("Lo faccio dopo"), niente "Salta" in alto.
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok(await vp.getByTestId("onboarding-salta").isVisible(), "primo accesso: 'Salta' resta al passo 2");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: al passo 3 niente 'Salta' (doppione di 'Lo faccio dopo')");
+  ok(await vp.getByTestId("benvenuto-dopo").isVisible() && /Lo faccio dopo/.test((await vp.getByTestId("benvenuto-dopo").textContent()) ?? ""), "primo accesso: al passo 3 un solo 'Lo faccio dopo'");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-3-un-solo-dopo.png`, caret: "initial" });
+
+  // 2. Accesso scaduto mentre si risponde: si passa dal login e, tornati, le risposte ci sono ancora.
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto")); // il passo 1 sopra ha lasciato la sua bozza
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0, "risposte conservate: senza bozza l'onboarding parte da capo, senza avviso");
+  await vp.getByRole("button", { name: "Pizza", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Milano", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).pathname === "/login", `risposte conservate: senza accesso il salvataggio porta al login (${vp.url().replace(BASE, "")})`);
+  const bozza = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.benvenuto") ?? "null"));
+  ok(bozza?.cuisines?.includes("pizza") && bozza?.city === "Milano" && bozza?.step === 2, `risposte conservate: gusti, città e passo restano sul telefono (${JSON.stringify(bozza && { c: bozza.cuisines, city: bozza.city, step: bozza.step })})`);
+  await vctx.clearCookies({ name: "e2e_anonimo" });
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByTestId("benvenuto-ripreso").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await vp.getByTestId("benvenuto-ripreso").isVisible() && (await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "risposte conservate: dopo l'accesso si riparte dal passo 3 con l'avviso");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Milano", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: la città scelta c'è ancora");
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Pizza", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: i gusti scelti ci sono ancora");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);
+  ok((await vp.evaluate(() => localStorage.getItem("mapetite.benvenuto"))) === null, "risposte conservate: salvate le risposte, la bozza sparisce");
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
+  // Una bozza scaduta (più di 2 giorni) o con valori sconosciuti non si riprende.
+  await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now() - 3 * 864e5, step: 2, cuisines: ["pizza"] })));
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
+
+  // 5. Microfono: cerchio di 36px ma area di tocco di 44px; la barra di ricerca non cambia altezza.
+  await vctx.addInitScript(() => {
+    const Fake = class { start() {} stop() { this.onend?.(); } };
+    window.SpeechRecognition = Fake;
+    window.webkitSpeechRecognition = Fake;
+  });
+  const tocco = () => vp.evaluate(() => {
+    const m = document.querySelector("[data-testid=microfono]");
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const hit = (x, y) => document.elementFromPoint(x, y)?.closest("[data-testid=microfono]") === m;
+    // 4px fuori dal cerchio su ogni lato (44px in tutto) il tocco arriva ancora al microfono.
+    return { w: Math.round(r.width), h: Math.round(r.height), bordi: [hit(r.left - 3.5, cy), hit(r.right + 3.5, cy), hit(cx, r.top - 3.5), hit(cx, r.bottom + 3.5)], fuori: hit(r.left - 6, cy) };
+  });
+  await vp.goto(`${BASE}/mappa?beta=voce`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const tm = await tocco();
+  const hBarra = Math.round((await vp.getByTestId("barra-ricerca").boundingBox())?.height ?? 0);
+  ok(tm && tm.w === 36 && tm.h === 36 && tm.bordi.every(Boolean) && !tm.fuori, `microfono sulla mappa: cerchio 36px, area di tocco 44px (${JSON.stringify(tm)})`);
+  ok(hBarra === 44, `microfono sulla mappa: la barra di ricerca resta alta 44px (${hBarra}px)`);
+  await vp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const ta = await tocco();
+  ok(ta && ta.w === 36 && ta.h === 36 && ta.bordi.every(Boolean), `microfono nell'assistente: area di tocco 44px senza cambiare il cerchio (${JSON.stringify(ta)})`);
+  await vp.screenshot({ path: `${OUT}/zz-microfono-assistente.png`, caret: "initial" });
+  await vctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);

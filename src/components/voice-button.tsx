@@ -67,7 +67,9 @@ export default function VoiceButton({ onText, onError }: { onText: (text: string
         trackFeature("voce");
         try { r.start(); } catch { setListening(false); }
       }}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${listening ? "animate-pulse bg-accent text-white" : "text-brand"}`}
+      // Cerchio di 36px (la barra di ricerca non cambia altezza), area di tocco di 44px:
+      // uno pseudo-elemento invisibile sporge di 4px per lato.
+      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full after:absolute after:-inset-1 after:rounded-full after:content-[''] ${listening ? "animate-pulse bg-accent text-white" : "text-brand"}`}
     >
       <Mic size={18} aria-hidden />
     </button>

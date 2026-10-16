@@ -20,6 +20,48 @@ const CITIES: { name: string; re: RegExp; lat: number; lng: number; radius: numb
   { name: "Verona", re: /\bverona\b/i, lat: 45.438, lng: 10.992, radius: 5000 },
 ];
 
+// Altre città (capoluoghi e mete note) che non hanno un'area in CITIES. Servono a distinguere una
+// città da un quartiere: "trattoria a Parma" con la mappa su Roma non deve diventare
+// "trattoria quartiere Parma Roma" (decisione 13a del backlog, 16/10).
+// Tolte apposta Trieste e Lodi: sono anche zone di Roma (quartiere Trieste) e di Milano (zona Lodi),
+// e lì vale la città della mappa.
+const ALTRE_CITTA = [
+  "Agrigento", "Alessandria", "Amalfi", "Ancona", "Andria", "Aosta", "Arezzo", "Ascoli Piceno", "Asti", "Avellino",
+  "Barletta", "Bellagio", "Belluno", "Benevento", "Bergamo", "Biella", "Bolzano", "Brescia", "Brindisi", "Cagliari",
+  "Caltanissetta", "Campobasso", "Capri", "Carrara", "Caserta", "Catania", "Catanzaro", "Cesena", "Chieti", "Como",
+  "Cortina", "Cortina d'Ampezzo", "Cosenza", "Cremona", "Crotone", "Cuneo", "Enna", "Fermo", "Ferrara", "Foggia",
+  "Forlì", "Frosinone", "Gorizia", "Grosseto", "Imperia", "Isernia", "L'Aquila", "La Spezia", "Latina", "Lecce",
+  "Lecco", "Livorno", "Lucca", "Macerata", "Mantova", "Massa", "Matera", "Messina", "Modena", "Monza", "Novara",
+  "Nuoro", "Oristano", "Padova", "Parma", "Pavia", "Perugia", "Pesaro", "Pescara", "Piacenza", "Pisa", "Pistoia",
+  "Pordenone", "Portofino", "Positano", "Potenza", "Prato", "Ragusa", "Ravenna", "Reggio Calabria", "Reggio Emilia",
+  "Rieti", "Rimini", "Rovigo", "Salerno", "Sassari", "Savona", "Siena", "Siracusa", "Sondrio", "Sorrento", "Taormina",
+  "Taranto", "Teramo", "Terni", "Trani", "Trapani", "Trento", "Treviso", "Udine", "Urbino", "Varese", "Verbania",
+  "Vercelli", "Viareggio", "Vibo Valentia", "Vicenza", "Viterbo",
+];
+const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’`]/g, "'").toLowerCase().trim();
+const ALTRE_SET = new Set(ALTRE_CITTA.map(norm));
+const ALTRE_RE = new RegExp(`(?:^|\\s)(?:a|ad|in|di|da)\\s+(${ALTRE_CITTA.map(norm).join("|")})(?=$|[\\s,.;!?])`, "i");
+
+// La zona capita da Haiku è una città fuori da CITIES? ("Parma", "a Parma", "città di Parma")
+export function isOtherCity(zona: string): boolean {
+  const bare = norm(zona).replace(/^(a|ad|in|di|da|zona|citta di)\s+/, "").replace(/\s*\(.*\)$/, "").trim();
+  return ALTRE_SET.has(bare);
+}
+
+// Senza Haiku: "trattoria a Parma" nomina una città fuori da CITIES (serve "a"/"in" davanti:
+// "prato" o "fermo" da soli sono parole comuni).
+export function namedOtherCity(query: string): string | null {
+  const m = norm(query).match(ALTRE_RE);
+  return m ? ALTRE_CITTA.find((c) => norm(c) === m[1]) ?? null : null;
+}
+
+// Zona ambigua = un quartiere senza città: nessuna città nominata nella frase né nella zona.
+// Solo qui la città della mappa fa da contesto (testo per Google e preferenza larga di 25 km).
+export function ambiguousDistrict(query: string, zona: string | null | undefined): boolean {
+  if (!zona || !zona.trim()) return false;
+  return !namedCity(query) && !namedCity(zona) && !isOtherCity(zona) && !namedOtherCity(query);
+}
+
 // Città della mappa: la più vicina entro 25 km dal centro, altrimenti null.
 export function cityNear(lat: number, lng: number): string | null {
   let best: string | null = null;
