@@ -18,20 +18,27 @@ export function wantsOffTheBeatenPath(query: string): boolean {
   return OFF_THE_BEATEN_PATH.test(query);
 }
 
+// Locali "di massa" tra questi risultati (stessa regola di demoteMainstream, senza guardare la frase):
+// serve anche a "Sorprendimi", che per definizione propone solo posti fuori dai giri di massa.
+export function massPredicate<T extends { userRatingCount: number | null; rating?: number | null }>(places: T[]): (p: T) => boolean {
+  const counts = places.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
+  const median = counts[Math.floor(counts.length / 2)] ?? 0;
+  const limit = Math.max(MIN_COUNT, median * RATIO);
+  // Di massa: molte più recensioni degli altri, oppure tante recensioni con un voto mediocre
+  // (il segno tipico del posto da turisti: Spritz Navigli 4,0 con 4.526 recensioni).
+  return (p: T) => {
+    const n = p.userRatingCount ?? 0;
+    return n > limit || (n >= MIN_COUNT && p.rating != null && p.rating < MEDIOCRE_RATING);
+  };
+}
+export const MASS_MIN_COUNT = MIN_COUNT;
+
 export function demoteMainstream<T extends { name: string; userRatingCount: number | null; rating?: number | null }>(
   query: string,
   places: T[],
 ): { places: T[]; demoted: string[] } {
   if (places.length < 4 || !wantsOffTheBeatenPath(query)) return { places, demoted: [] };
-  const counts = places.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
-  const median = counts[Math.floor(counts.length / 2)];
-  const limit = Math.max(MIN_COUNT, median * RATIO);
-  // Di massa: molte più recensioni degli altri, oppure tante recensioni con un voto mediocre
-  // (il segno tipico del posto da turisti: Spritz Navigli 4,0 con 4.526 recensioni).
-  const isMass = (p: T) => {
-    const n = p.userRatingCount ?? 0;
-    return n > limit || (n >= MIN_COUNT && p.rating != null && p.rating < MEDIOCRE_RATING);
-  };
+  const isMass = massPredicate(places);
   const kept = places.filter((p) => !isMass(p));
   // Se sono tutti "di massa" non si tocca nulla.
   if (kept.length === 0 || kept.length === places.length) return { places, demoted: [] };
