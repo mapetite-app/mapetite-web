@@ -1009,7 +1009,7 @@ await page.goto(`${BASE}/mappa?lista=b`, { waitUntil: "networkidle" });
   const sv = nav.getByRole("link", { name: "Salvati" });
   ok(await sv.isVisible() && (await sv.getAttribute("href")) === "/mappa?vista=salvati", "barra in basso: voce 'Salvati' che apre la mappa sui salvati");
   ok((await nav.getByRole("link", { name: "Importa" }).count()) === 0, "barra in basso: 'Importa' non c'è più (si trova nel profilo)");
-  ok((await nav.getByRole("link", { name: "Esplora" }).getAttribute("aria-current")) === "page" && (await sv.getAttribute("aria-current")) === null, "barra in basso: su /mappa è accesa 'Esplora', non 'Salvati'");
+  ok((await nav.getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page" && (await sv.getAttribute("aria-current")) === null, "barra in basso: su /mappa è accesa 'Mappa', non 'Salvati'");
 }
 
 // 7c. iPhone: invito ad aggiungere alla Home (solo a chi ha già cercato)
@@ -1317,11 +1317,11 @@ else {
   ok((await p.getByTestId("salvati-filtri").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true" && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
   await p.getByRole("button", { name: "Esplora" }).click();
   await p.waitForTimeout(300);
-  ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Esplora" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Esplora' nella barra in basso");
+  ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
   await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => ok(true, "già sulla mappa: 'Salvati' in basso apre i salvati"), () => ok(false, "già sulla mappa: 'Salvati' in basso apre i salvati"));
   // In sviluppo il pallino "N" di Next copre "Esplora": si tocca il link direttamente.
-  await p.locator("nav").first().getByRole("link", { name: "Esplora" }).evaluate((a) => a.click());
+  await p.locator("nav").first().getByRole("link", { name: "Mappa" }).evaluate((a) => a.click());
   await p.getByTestId("salvati-filtri").waitFor({ state: "detached", timeout: 5000 }).then(() => ok(true, "'Esplora' in basso torna a Esplora"), () => ok(false, "'Esplora' in basso torna a Esplora"));
   { const m = await (await p.request.get(`${BASE}/manifest.webmanifest`)).json(); ok((m.shortcuts ?? []).length === 4, "app installata: 4 scorciatoie (Cerca, Salvati, Stasera, Filtri)"); ok((m.shortcuts ?? []).some((x) => x.url === "/stasera" && x.short_name === "Stasera"), "app installata: scorciatoia 'Stasera' → /stasera"); }
 
@@ -4144,7 +4144,7 @@ else {
 // 15. Barra in basso ridisegnata (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
 //     Da non collegati l'ultima voce è "Entra". Il cookie "e2e_collegato" (solo sviluppo) dà la barra da collegato.
 {
-  const VOCI = ["Esplora", "Assistente", "Salvati", "Amici", "Profilo"];
+  const VOCI = ["Assistente", "Salvati", "Mappa", "Amici", "Profilo"];
   const profiloFinto = encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] }));
   for (const [w, h] of [[390, 844], [360, 740]]) {
     const bctx = await browser.newContext({ viewport: { width: w, height: h } });
@@ -4159,7 +4159,7 @@ else {
     await bp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
     const nav = bp.getByTestId("barra");
     const nomi = (await nav.getByRole("link").allTextContents()).map((t) => t.trim());
-    ok(JSON.stringify(nomi) === JSON.stringify(VOCI), `barra ${w}px: 5 voci nell'ordine Esplora, Assistente, Salvati, Amici, Profilo (${nomi.join(", ")})`);
+    ok(JSON.stringify(nomi) === JSON.stringify(VOCI), `barra ${w}px: 5 voci nell'ordine Assistente, Salvati, Mappa, Amici, Profilo (${nomi.join(", ")})`);
     // Misure: altezza comoda, voci larghe uguali, etichette dentro la propria voce, niente scorrimento orizzontale.
     const m = await bp.evaluate(() => {
       const n = document.querySelector("[data-testid=barra]");
@@ -4175,9 +4175,11 @@ else {
     });
     ok(m.alta >= 64 && m.fondo === 0 && new Set(m.larghe).size === 1 && m.etichette && m.caratteri >= 11 && !m.sborda, `barra ${w}px: alta ${m.alta}px in fondo, voci larghe uguali (${m.larghe[0]}px), etichette intere da ${m.caratteri}px, niente sbordo`);
     ok(await nav.getByRole("link", { name: "Assistente" }).locator("svg").count() === 1, `barra ${w}px: l'Assistente ha la sua scintilla`);
+    { const g = await bp.evaluate(() => { const l = document.querySelector("[data-testid=barra-esplora]"); const c = l.querySelector("span").getBoundingClientRect(); const n = document.querySelector("[data-testid=barra]").getBoundingClientRect(); const lr = l.getBoundingClientRect(); return { d: Math.round(c.width), tondo: getComputedStyle(l.querySelector("span")).borderRadius, centro: Math.abs((c.left + c.right) / 2 - (n.left + n.right) / 2), sporge: c.top < n.top, dentro: c.left >= lr.left - 0.5 && c.right <= lr.right + 0.5 }; });
+      ok(g.d >= 52 && g.centro < 2 && g.sporge && g.dentro, `barra ${w}px: la Mappa è al centro, tonda e più grande (${g.d}px, sporge sopra la barra)`); }
     // Ogni voce porta alla pagina giusta ed è l'unica accesa.
     const attese = [
-      ["Esplora", "/mappa", (u) => u.pathname === "/mappa" && !u.searchParams.get("vista")],
+      ["Mappa", "/mappa", (u) => u.pathname === "/mappa" && !u.searchParams.get("vista")],
       ["Assistente", "/assistente", (u) => u.pathname === "/assistente"],
       ["Salvati", "/mappa?vista=salvati", (u) => u.pathname === "/mappa" && u.searchParams.get("vista") === "salvati"],
       ["Amici", "/amici", (u) => u.pathname === "/amici"],
@@ -4191,7 +4193,7 @@ else {
       await bp.waitForURL((u) => giusta(u), { timeout: 10000 }).catch(() => {});
       await bp.waitForLoadState("networkidle").catch(() => {});
       // La mappa sincronizza ?vista= con la vista appena pronta: si lascia il tempo di disegnarsi.
-      await bp.waitForTimeout(voce === "Esplora" || voce === "Salvati" ? 2000 : 600);
+      await bp.waitForTimeout(voce === "Mappa" || voce === "Salvati" ? 2000 : 600);
       const u = new URL(bp.url());
       const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
       ok(giusta(u) && accese.length === 1 && accese[0] === voce, `barra ${w}px: tocco su '${voce}' → ${u.pathname}${u.search}, accesa solo '${voce}' (${accese.join(",")})`);
@@ -4205,6 +4207,9 @@ else {
           return Math.max(...els.map((e) => e.getBoundingClientRect().bottom)) - navTop;
         });
         ok(sotto <= 1, `barra ${w}px: su ${voce} l'ultimo contenuto resta sopra la barra (${Math.round(sotto)}px)`);
+        // Lorenzo 16/10: scorrendo, la barra resta attaccata al fondo dello schermo.
+        { const y = await bp.evaluate(async () => { scrollTo(0, 300); await new Promise((r) => setTimeout(r, 150)); const r = document.querySelector("[data-testid=barra]").getBoundingClientRect(); return Math.round(innerHeight - r.bottom); });
+          ok(y === 0, `barra ${w}px: su ${voce}, scorrendo, la barra resta in fondo (${y}px dal fondo)`); }
       }
       if (w === 390) await bp.screenshot({ path: `${OUT}/90-barra-${voce.toLowerCase()}.png`, caret: "initial" });
     }
@@ -4214,7 +4219,7 @@ else {
       const acc = bp.getByTestId("profilo-account");
       ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in fondo 'Dai un feedback' ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
-      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Esplora"]]) {
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Mappa"]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
         ok(accese.length === 1 && accese[0] === voce, `barra: su ${path} è accesa '${voce}' (${accese.join(",")})`);
@@ -4234,7 +4239,7 @@ else {
   const gnav = gp.getByTestId("barra");
   const accesa = async () => (await gnav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",");
   const gnomi = (await gnav.getByRole("link").allTextContents()).map((t) => t.trim());
-  ok(JSON.stringify(gnomi) === JSON.stringify(["Esplora", "Assistente", "Salvati", "Amici", "Entra"]), `barra da non collegati: ultima voce 'Entra' (${gnomi.join(", ")})`);
+  ok(JSON.stringify(gnomi) === JSON.stringify(["Assistente", "Salvati", "Mappa", "Amici", "Entra"]), `barra da non collegati: ultima voce 'Entra' (${gnomi.join(", ")})`);
   ok(await gnav.getByRole("link", { name: "Entra" }).getAttribute("href") === "/login?next=%2Famici", "barra da non collegati: 'Entra' da Amici riporta ad Amici");
   ok(await gp.getByTestId("amici-accedi").isVisible() && (await accesa()) === "Amici", "Amici da non collegati: invito ad accedere, voce accesa");
   await gnav.getByRole("link", { name: "Entra" }).click();

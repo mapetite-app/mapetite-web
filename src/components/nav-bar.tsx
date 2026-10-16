@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bookmark, Compass, LogIn, Sparkles, UserRound, UsersRound, type LucideIcon } from "lucide-react";
+import { Bookmark, Earth, LogIn, Sparkles, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
 import { withNext } from "@/lib/next-path";
 
-// Barra principale (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
+// Barra principale (piano 6.4): Assistente, Salvati, Mappa (al centro, tonda e più grande), Amici, Profilo.
+// Lorenzo 16/10: la mappa al centro, come un mappamondo, così si capisce subito che è la mappa.
 // "Dai un feedback" ed "Esci" stanno nel profilo (sezione "Account"). Da non registrati
 // l'ultima voce è "Entra": porta all'accesso e poi riporta alla pagina dov'eri.
 
@@ -40,10 +41,10 @@ function voci(pathname: string, vista: string | null, search: string | null, log
   // Salvati: la mappa sui salvati e le pagine che nascono dai salvati (raccolte, "Stasera").
   const savedActive = (onMap && vista === "salvati") || under(pathname, "/raccolte") || under(pathname, "/stasera");
   return [
-    // Esplora: la mappa e la home di ricerca.
-    { id: "esplora", label: "Esplora", href: "/mappa", Icon: Compass, active: (onMap && !savedActive) || pathname === "/" },
     { id: "assistente", label: "Assistente", href: "/assistente", Icon: Sparkles, active: under(pathname, "/assistente") },
     { id: "salvati", label: "Salvati", href: SAVED_HREF, Icon: Bookmark, active: savedActive },
+    // Mappa (id "esplora"): la mappa e la home di ricerca. Al centro della barra.
+    { id: "esplora", label: "Mappa", href: "/mappa", Icon: Earth, active: (onMap && !savedActive) || pathname === "/" },
     // Amici: il feed, i profili delle persone (/u/<nome>) e le liste di gruppo (/gruppi).
     { id: "amici", label: "Amici", href: "/amici", Icon: UsersRound, active: under(pathname, "/amici") || under(pathname, "/u") || under(pathname, "/gruppi") },
     loggedIn
@@ -79,11 +80,34 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
       <nav
         aria-label="Navigazione principale"
         data-testid="barra"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 transform-gpu border-t border-border/70 bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <ul className="mx-auto grid h-16 max-w-lg grid-cols-5">
           {items.map(({ id, label, href, Icon, active }) => {
             const ai = id === "assistente";
+            if (id === "esplora") {
+              // Mappa: cerchio più grande che sporge sopra la barra, con il mappamondo.
+              return (
+                <li key={id} className="flex">
+                  <Link
+                    href={href}
+                    data-testid={`barra-${id}`}
+                    aria-current={active ? "page" : undefined}
+                    className={`group flex flex-1 flex-col items-center justify-end gap-1 pb-2 select-none outline-none [-webkit-tap-highlight-color:transparent] ${active ? "text-brand" : "text-text-muted"}`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`-mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-float ring-4 transition-transform duration-200 group-active:scale-90 ${active ? "ring-accent/30" : "ring-white"}`}
+                    >
+                      <Icon className="h-7 w-7" strokeWidth={active ? 2.25 : 1.9} />
+                    </span>
+                    <span className={`text-[11px] leading-none font-display tracking-[0.01em] ${active ? "font-semibold" : "font-medium"}`}>
+                      {label}
+                    </span>
+                  </Link>
+                </li>
+              );
+            }
             return (
               <li key={id} className="flex">
                 <Link
