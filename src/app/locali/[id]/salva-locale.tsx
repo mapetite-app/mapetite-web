@@ -68,7 +68,7 @@ export default function SalvaLocale({
         </Link>
       </section>
 
-      <div className="sticky bottom-[calc(var(--nav-height-mobile)+0.75rem)] z-10 mt-6 px-5">
+      <div className="sticky bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 px-5">
         {done ? (
           <div role="status" data-testid="salvato-pubblico" className="flex flex-col gap-2 rounded-card bg-brand p-3 shadow-float">
             <p className="text-center text-sm font-display font-semibold text-white">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Map, { Marker } from "react-map-gl/mapbox";
+import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
@@ -36,6 +36,7 @@ import ClassificaScheda from "@/components/classifica-scheda";
 import CommunityLocale from "@/components/community-locale";
 import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
+import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
 // in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
@@ -53,7 +54,7 @@ function filtersSummary(f: Filters): string {
   if (f.occasion) parts.push((OCCASIONS.find((x) => x.id === f.occasion)?.label ?? f.occasion).toLowerCase());
   if (f.features.length > 0) parts.push(f.features.map((c) => (FEATURES.find((x) => x.id === c)?.label ?? c).toLowerCase()).join(", "));
   if (f.zona.trim()) parts.push(`a ${f.zona.trim()}`);
-  else if (f.radiusKm != null) parts.push(`entro ${f.radiusKm} km`);
+  else if (f.radiusKm != null) parts.push(`entro ${radiusLabel(f.radiusKm)}${f.radiusFrom === "me" ? " da te" : ""}`);
   if (f.minPriceLevel != null) parts.push("€".repeat(f.minPriceLevel));
   if (f.minRating != null) parts.push(`★ ${String(f.minRating).replace(".", ",")}+`);
   if (f.minReviews != null) parts.push(`${f.minReviews}+ recensioni`);
@@ -76,6 +77,7 @@ function SaveModal({
   onSaved,
   onCancel,
   photoRef = null,
+  reviewCount = null,
   knownTags = [],
 }: {
   place: Place;
@@ -86,6 +88,8 @@ function SaveModal({
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
   photoRef?: string | null;
+  // Numero di recensioni Google già arrivato: solo per "poco conosciuto" (Scopritori), non si salva.
+  reviewCount?: number | null;
   // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
   knownTags?: string[];
 }) {
@@ -191,6 +195,7 @@ function SaveModal({
             category: place.category,
             rating: place.rating,
             priceLevel: place.priceLevel,
+            userRatingCount: reviewCount,
           }),
         });
         if (!addRes.ok) { setError(true); return; }
@@ -926,6 +931,10 @@ export default function MapView({
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
+  // Centro del raggio dei Filtri (piano 2.1): il cerchio sulla mappa parte da qui.
+  const [radiusCenter, setRadiusCenter] = useState<{ lat: number; lng: number } | null>(null);
+  // Frase scelta da "Vicino a me, aperto adesso": la riusa "Cerca in quest'area".
+  const filterQueryRef = useRef<string | undefined>(undefined);
   const [aiError, setAiError] = useState<string | null>(null);
   const [venueDetails, setVenueDetails] = useState<Record<string, VenueDetails>>({});
   // Locali del cluster su cui si è tappato: se valorizzato, la lista mostra
@@ -1125,6 +1134,7 @@ export default function MapView({
         body: JSON.stringify({
           googlePlaceId: place.id, name: place.name, address: place.address ?? "",
           lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
+          userRatingCount: venueDetails[place.id]?.userRatingCount ?? null,
         }),
       });
       if (!addRes.ok) throw new Error("add");
@@ -1339,12 +1349,27 @@ export default function MapView({
     setAiSearch(null);
   };
 
-  const runFilteredSearch = async (filtri: Filters) => {
+  // `query` sostituisce la frase ricavata dai filtri ("Vicino a me, aperto adesso" la sceglie dall'ora).
+  const runFilteredSearch = async (filtri: Filters, opts: { query?: string } = {}) => {
     const f = withDefaults(filtri);
     const ticket = ++searchSeq.current;
     setLoadingVerdicts(false);
     setAiSearching(false);
     setAiError(null);
+    // Raggio "da me": serve la posizione del telefono (chiesta qui se manca). Se è negata si misura
+    // dal centro della mappa e lo si dice, invece di non cercare.
+    const withRadius = f.radiusKm != null && !f.zona.trim();
+    let origin = { lat: viewState.latitude, lng: viewState.longitude };
+    let geoMissing = false;
+    if (withRadius && f.radiusFrom === "me") {
+      const here = userPos ?? (await askPosition());
+      if (searchSeq.current !== ticket) return;
+      if (here) origin = here;
+      else geoMissing = true;
+    }
+    setRadiusCenter(withRadius ? origin : null);
+    filterQueryRef.current = opts.query;
+    if (withRadius) trackFeature("raggio", { contesto: radiusLabel(f.radiusKm as number), origine: f.radiusFrom === "me" ? "me" : "mappa" });
     if (view === "saved") {
       // Salvati: si applicano i filtri che i dati salvati permettono (tipo, voto, prezzo, distanza).
       // Prima solo il tipo, e con un confronto di testo: "Gelaterie" non trovava ice_cream_shop.
@@ -1356,7 +1381,7 @@ export default function MapView({
       const cuisineTypes = cuisineDefs.every((c) => c?.types) ? cuisineDefs.flatMap((c) => c?.types ?? []) : [];
       const occasionTag = OCCASIONS.find((o) => o.id === f.occasion)?.tag ?? null;
       const tagInUse = occasionTag != null && savedPlaces.some((p) => (p.tags ?? []).includes(occasionTag));
-      const center = userPos ?? { lat: viewState.latitude, lng: viewState.longitude };
+      const center = origin;
       const filtered = savedPlaces.filter((p) => {
         if (f.categories.length > 0) {
           const cat = (p.category ?? "").toLowerCase();
@@ -1380,7 +1405,9 @@ export default function MapView({
     }
 
     let query: string;
-    if (f.categories.length > 0) {
+    if (opts.query) {
+      query = opts.query;
+    } else if (f.categories.length > 0) {
       query = f.categories.map((c) => CATEGORY_QUERY[c] ?? c).join(" ");
     } else if (f.cuisines.length > 0 || f.occasion) {
       // Una cucina o un'occasione parlano di un posto dove mangiare.
@@ -1390,11 +1417,12 @@ export default function MapView({
     }
     // Cucina, occasione e caratteristiche nel testo: Google trova i posti giusti già alla fonte
     // ("ristorante cucina romana romantico terrazza"). Una sola chiamata, come prima.
-    const extra = filterQueryWords(f.cuisines, f.occasion, f.features);
+    const extra = opts.query ? "" : filterQueryWords(f.cuisines, f.occasion, f.features);
     if (extra) query = `${query} ${extra}`;
     const openAt = f.openAt ? openAtSlot(f.openAt) : null;
 
-    setFilterError(null);
+    // Il messaggio sulla posizione negata resta in vista sopra i risultati.
+    if (!geoMissing) setFilterError(null);
     setFilterLoading(true);
     try {
       const res = await fetch("/api/search", {
@@ -1406,8 +1434,8 @@ export default function MapView({
           searchIntent: "structured",
           // Lista subito, verdetti dopo (come la ricerca AI): prima si aspettavano ~6 s di Haiku.
           phase: "fast",
-          lat: viewState.latitude,
-          lng: viewState.longitude,
+          lat: origin.lat,
+          lng: origin.lng,
           ...(f.minRating != null && { minRating: f.minRating }),
           ...(f.minReviews != null && { minReviews: f.minReviews }),
           ...(f.minPriceLevel != null && { minPriceLevel: f.minPriceLevel }),
@@ -1454,8 +1482,14 @@ export default function MapView({
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
       setVenueDetails({ ...savedSynthRef.current, ...details });
-      // Come per la ricerca AI: la mappa si sposta sui risultati.
-      fitToPlaces(places);
+      // Come per la ricerca AI: la mappa si sposta sui risultati. Con il raggio si vede tutto il cerchio.
+      if (withRadius && places.length > 0) {
+        const dLat = ((f.radiusKm as number) * 1000) / 111_320;
+        const dLng = dLat / Math.max(Math.cos((origin.lat * Math.PI) / 180), 0.01);
+        fitToPlaces([{ lat: origin.lat - dLat, lng: origin.lng - dLng }, { lat: origin.lat + dLat, lng: origin.lng + dLng }]);
+      } else {
+        fitToPlaces(places);
+      }
       void loadVerdicts(ticket, query, data.sintesi_pendente ?? null);
       // nuova ricerca: i filtri rapidi della precedente non devono restringere questa
       setQuickFilters(new Set());
@@ -1467,6 +1501,12 @@ export default function MapView({
       setFilterLoading(false);
     }
   };
+
+  // Cerchio del raggio: solo mentre si guardano i risultati dei Filtri (una ricerca a parole lo toglie).
+  const radiusF = withDefaults(filters);
+  const radiusCircle = aiSearch !== null && aiSearch.query == null && radiusCenter && radiusF.radiusKm != null && !radiusF.zona.trim()
+    ? { center: radiusCenter, km: radiusF.radiusKm }
+    : null;
 
   // Pin visibili: con una ricerca AI seguono i filtri rapidi della lista.
   const quickOn = useBeta("filtri-lista");
@@ -1557,10 +1597,10 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: Place[]; top: number } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
-  const fitToPlaces = (list: Place[], top = 190) => {
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
@@ -1679,6 +1719,48 @@ export default function MapView({
         if (searchSeq.current === ticket) setAiSearching(false);
       }
 
+  };
+
+  // Posizione per "Vicino a me" e il raggio "da me": chiesta solo a un tocco dell'utente, con una
+  // spiegazione umana se il telefono la nega (null = si continua senza).
+  const askPosition = (): Promise<{ lat: number; lng: number } | null> => new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoState("unavailable");
+      setFilterError("Questo telefono non mi dice dove sei: sposta la mappa sulla zona che ti interessa, oppure scrivila nei Filtri.");
+      resolve(null);
+      return;
+    }
+    setGeoState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserPos(here);
+        setGeoState("idle");
+        resolve(here);
+      },
+      (err) => {
+        const denied = err.code === err.PERMISSION_DENIED;
+        setGeoState(denied ? "denied" : "unavailable");
+        setFilterError(denied
+          ? "Per cercare vicino a te mi serve la posizione: attivala nelle impostazioni del browser. Intanto cerco intorno al centro della mappa."
+          : "Non riesco a trovare la tua posizione: cerco intorno al centro della mappa.");
+        resolve(null);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  });
+
+  // "📍 Vicino a me, aperto adesso" (piano 2.1): i Filtri con aperto ora + 1 km da me e la frase
+  // adatta all'ora. Una sola ricerca Google, come un'applicazione dei Filtri.
+  const searchNearNow = () => {
+    const near = nearNowQuery(new Date());
+    const f: Filters = { ...EMPTY_FILTERS, openNowOnly: true, radiusKm: 1, radiusFrom: "me" };
+    trackFeature("vicino_adesso");
+    setIdeasOpen(false);
+    setClusterPlaces(null);
+    setFilterError(null);
+    setFilters(f);
+    void runFilteredSearch(f, { query: near.query });
   };
 
   // Posizione: chiesta solo quando l'utente tocca il pulsante (mai al caricamento).
@@ -2144,6 +2226,7 @@ export default function MapView({
               {momentExample && (
                 <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
+              <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
               <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo che probabilmente ti piace" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
               {userId && savedPlaces.length > 0 && (
                 <IdeaRow testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
@@ -2379,7 +2462,7 @@ export default function MapView({
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
-          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
+          style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md">
             <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
@@ -2498,7 +2581,7 @@ export default function MapView({
 
       {/* Senza la card in basso, l'invito ad aggiungere alla Home resta per chi torna (ha già cercato). */}
       {chipsOn && view === "all" && aiSearch === null && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-        <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}>
+        <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div className="w-full max-w-md empty:hidden">
             <InstallHint />
           </div>
@@ -2509,7 +2592,7 @@ export default function MapView({
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
-          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
+          style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
@@ -2669,7 +2752,13 @@ export default function MapView({
             type="button"
             disabled={aiSearching || filterLoading}
             onClick={() => {
-              if (aiSearch?.query == null && countActive(filters) > 0) { void runFilteredSearch(filters); return; }
+              if (aiSearch?.query == null && countActive(filters) > 0) {
+                // Spostata la mappa, il raggio si misura da dove si guarda (non più da me).
+                const f = withDefaults(filters).radiusKm != null ? { ...filters, radiusFrom: "map" as const } : filters;
+                setFilters(f);
+                void runFilteredSearch(f, { query: filterQueryRef.current });
+                return;
+              }
               const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q);
             }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
@@ -2838,6 +2927,20 @@ export default function MapView({
             </Marker>
           ));
         })()}
+        {/* Raggio dei Filtri (piano 2.1): cerchio leggero e la sua misura sul bordo, solo con i risultati dei Filtri. */}
+        {radiusCircle && (
+          <>
+            <Source id="raggio" type="geojson" data={circlePolygon(radiusCircle.center, radiusCircle.km * 1000)}>
+              <Layer id="raggio-area" type="fill" paint={{ "fill-color": "#1a3c40", "fill-opacity": 0.06 }} />
+              <Layer id="raggio-bordo" type="line" paint={{ "line-color": "#1a3c40", "line-width": 1.5, "line-opacity": 0.55, "line-dasharray": [2, 1.5] }} />
+            </Source>
+            <Marker longitude={radiusCircle.center.lng} latitude={radiusCircle.center.lat + (radiusCircle.km * 1000) / 111_320} anchor="center" style={{ zIndex: 0 }}>
+              <span data-testid="raggio-etichetta" className="rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
+                {radiusLabel(radiusCircle.km)}
+              </span>
+            </Marker>
+          </>
+        )}
         {userPos && (
           <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
@@ -2941,6 +3044,7 @@ export default function MapView({
             place={pendingPlace}
             initialTags={pendingSaveTags}
             knownTags={availableTags}
+            reviewCount={venueDetails[pendingPlace.id]?.userRatingCount ?? null}
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
@@ -2984,7 +3088,7 @@ export default function MapView({
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
       {nearbySaved && !savedToast && !selected && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
@@ -3000,7 +3104,7 @@ export default function MapView({
         </div>
       )}
       {savedToast && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 truncate text-sm font-sans">
               <span className="font-semibold">📌 Salvato</span> · {savedToast.name}

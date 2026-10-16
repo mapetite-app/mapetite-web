@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const { googlePlaceId, name, address, lat, lng, category, rating, priceLevel } = body ?? {};
+  const { googlePlaceId, name, address, lat, lng, category, rating, priceLevel, userRatingCount } = body ?? {};
 
   if (
     typeof googlePlaceId !== "string" ||
@@ -35,8 +35,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Dati del locale non validi." }, { status: 400 });
   }
 
+  // Numero di recensioni: serve solo a classificare "poco conosciuto" (Scopritori), non si salva.
+  const reviews = typeof userRatingCount === "number" && Number.isFinite(userRatingCount) && userRatingCount >= 0 ? userRatingCount : null;
   const result = await findOrCreatePlace(
-    { googlePlaceId, name, address, lat, lng, category, rating, priceLevel },
+    { googlePlaceId, name, address, lat, lng, category, rating, priceLevel, userRatingCount: reviews },
     "add/route",
   );
   if ("error" in result) {

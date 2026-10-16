@@ -73,7 +73,7 @@ export default function UtileFeedback({
     if (chiave) segnaVotato(chiave);
     track("utile", null, { voto: v, contesto, ...(typeof risultati === "number" ? { risultati } : {}) });
   };
-  const btn = `flex h-10 w-10 items-center justify-center rounded-full border text-lg active:scale-95 ${scuro ? "border-white/30 bg-white/10" : "border-border bg-white"}`;
+  const btn = `flex h-11 w-11 items-center justify-center rounded-full border text-lg active:scale-95 ${scuro ? "border-white/30 bg-white/10" : "border-border bg-white"}`;
   return (
     <div data-testid="utile" data-contesto={contesto} className={`flex items-center gap-2 ${className}`}>
       <span className={`font-display text-sm font-semibold ${scuro ? "text-white" : "text-brand"}`}>Ti è stato utile?</span>

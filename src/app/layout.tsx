@@ -100,7 +100,7 @@ export default async function RootLayout({
           la navbar desktop. La pagina /mappa usa fixed inset-0 ed è fuori
           dal flusso, quindi gestisce da sola il proprio offset.
         */}
-        <div className="pb-[var(--nav-height-mobile)] md:pb-0 md:pt-14">{children}</div>
+        <div className="pb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] md:pb-0 md:pt-14">{children}</div>
       </body>
     </html>
   );

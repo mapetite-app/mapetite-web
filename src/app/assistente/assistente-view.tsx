@@ -644,7 +644,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   };
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile))] max-w-lg flex-col bg-bg md:min-h-[calc(100dvh-3.5rem)]">
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-bg md:min-h-[calc(100dvh-3.5rem)]">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-bg/95 px-4 py-2.5 backdrop-blur md:top-14">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Sparkles size={18} aria-hidden /></span>
@@ -654,7 +654,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-10 w-10 items-center justify-center rounded-full text-brand"><MapIcon size={18} /></Link>
+          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full text-brand"><MapIcon size={18} /></Link>
           {c.msgs.length > 0 && (
             <button
               type="button"
@@ -668,7 +668,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         </div>
       </header>
 
-      <div className="flex-1 px-4 pb-28 pt-4" data-testid="assistente-conversazione">
+      <div className="flex-1 px-4 pb-36 pt-4" data-testid="assistente-conversazione">
         {c.msgs.length === 0 && (
           <div data-testid="assistente-benvenuto" className="pt-6">
             <p className="font-title text-3xl font-semibold leading-tight text-text">Ciao! Dimmi cosa cerchi.</p>
@@ -862,7 +862,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         <div
           role="status"
           data-testid="assistente-salvato-avviso"
-          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+4.25rem)] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
+          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+4.25rem)] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
@@ -877,7 +877,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       {/* Campo in basso, sopra la barra di navigazione: scrivi o detta. */}
       <form
         onSubmit={(e) => { e.preventDefault(); submit(input); }}
-        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-border bg-bg/95 px-3 py-2 backdrop-blur"
+        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-border bg-bg/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
       >
         {voiceError && <p role="status" className="mx-auto mb-1 max-w-lg px-1 text-xs font-sans text-error">{voiceError}</p>}
         <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-border bg-surface py-1 pl-4 pr-1 shadow-card">
@@ -896,7 +896,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
             type="submit"
             aria-label="Invia"
             disabled={busy || input.trim() === ""}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white disabled:bg-border disabled:text-text-muted active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white disabled:bg-border disabled:text-text-muted active:scale-95"
           >
             <ArrowUp size={18} />
           </button>

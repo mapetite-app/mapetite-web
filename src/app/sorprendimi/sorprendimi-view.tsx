@@ -267,7 +267,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
     try {
       const { uuid } = await quickSavePlace(userId, {
         id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng,
-        category: p.category, rating: p.rating, priceLevel: p.priceLevel,
+        category: p.category, rating: p.rating, priceLevel: p.priceLevel, userRatingCount: p.userRatingCount,
       }, [WANT_TAG]);
       setSaveState((s) => ({ ...s, [p.id]: "saved" }));
       trackFeature("sorpresa_salva", { fonte: from });
@@ -281,7 +281,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
   const exhausted = phase === "pronto" && idx >= candidates.length;
 
   return (
-    <main data-testid="sorprendimi" className="-mb-[var(--nav-height-mobile)] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
+    <main data-testid="sorprendimi" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
       <div className="mx-auto max-w-md px-4 pb-32 pt-6">
         <div className="mb-4 flex items-center justify-between">
           <Link href={back} aria-label="Indietro" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl text-white/90 active:bg-white/10">

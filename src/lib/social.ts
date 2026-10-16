@@ -64,6 +64,7 @@ type FakeSocial = {
   seguo?: string[];
   mio?: MySocial;
   creator?: CreatorInfo[];
+  scopritori?: ScopritoreRow[]; // assente = migrazione 20261016_scopritori non applicata
 };
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -295,4 +296,48 @@ export async function loadCreatorLists(viewer: string | null): Promise<CreatorLi
     const profile = profili.find((p) => p.id === c.id);
     return profile ? [{ profile, tipo: c.tipo, places: salvati.filter((s) => s.user_id === c.id) }] : [];
   });
+}
+
+// ── Scopritori (piano 5.6) ───────────────────────────────────────────────────
+// Due numeri per persona dalla vista scopritori_pubblici (solo profili pubblici). Senza la
+// migrazione 20261016_scopritori la lettura fallisce e si restituisce null: classifica e badge
+// semplicemente non compaiono.
+export type ScopritoreRow = { id: string; handle: string; display_name: string | null; gemme: number; gemme_provate: number };
+
+export async function loadScopritori(ids: string[]): Promise<ScopritoreRow[] | null> {
+  const f = await fake();
+  if (f === "in-arrivo") return null;
+  if (f) return f.scopritori ? f.scopritori.filter((r) => ids.includes(r.id)) : null;
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("scopritori_pubblici").select("id, handle, display_name, gemme, gemme_provate").in("id", ids);
+  if (error) {
+    console.error(`[social] scopritori: ${error.code ?? ""} ${error.message} (migrazione 20261016_scopritori non applicata?)`);
+    return null;
+  }
+  return (data as ScopritoreRow[]) ?? [];
+}
+
+// Le proprie gemme, anche con il profilo privato (lettura dei propri salvati, RLS).
+// null = colonna places.poco_conosciuto assente (migrazione non applicata).
+export async function loadMyGems(userId: string): Promise<{ gemme: number; provate: number } | null> {
+  const f = await fake();
+  if (f === "in-arrivo") return null;
+  if (f) {
+    if (!f.scopritori) return null;
+    const me = f.scopritori.find((r) => r.id === userId);
+    return { gemme: me?.gemme ?? 0, provate: me?.gemme_provate ?? 0 };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("saved_places")
+    .select("tags, places!inner(poco_conosciuto)")
+    .eq("user_id", userId)
+    .eq("places.poco_conosciuto", true);
+  if (error) {
+    console.error(`[social] mie gemme: ${error.code ?? ""} ${error.message} (migrazione 20261016_scopritori non applicata?)`);
+    return null;
+  }
+  const rows = (data ?? []) as { tags: string[] | null }[];
+  return { gemme: rows.length, provate: rows.filter((r) => r.tags?.includes("Già visitato")).length };
 }

@@ -144,7 +144,7 @@ ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes
 await shot("01-benvenuto");
 await idee(page);
 { const pan = page.getByTestId("idee-pannello");
-  ok(await pan.getByText("Ti suggeriamo").isVisible() && await pan.getByText("Adesso").isVisible() && await pan.getByText("Per te").isVisible() && await pan.getByText("Prova a chiedere").isVisible(), "Idee: pannello 'Ti suggeriamo' con i gruppi Adesso · Per te · Prova a chiedere");
+  ok(await pan.getByText("Ti suggeriamo").isVisible() && await pan.getByText("Adesso", { exact: true }).isVisible() && await pan.getByText("Per te").isVisible() && await pan.getByText("Prova a chiedere").isVisible(), "Idee: pannello 'Ti suggeriamo' con i gruppi Adesso · Per te · Prova a chiedere");
   ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && await pan.getByTestId("mappa-assistente").isVisible(), "Idee: Sorprendimi e 'Parla con l'assistente' a due tocchi");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
@@ -510,12 +510,12 @@ ok((await page.getByText("Reset").count()) === 0 && await page.getByRole("button
 let filterBody = null;
 await page.route("**/api/search", async (r) => { filterBody = r.request().postDataJSON(); return r.fallback(); });
 await page.getByRole("button", { name: "Pizzerie" }).click();
-await page.getByRole("button", { name: "3 km" }).click();
+await page.getByRole("button", { name: "2 km" }).click();
 await page.getByRole("button", { name: "★ 4,5+" }).click();
 await page.getByRole("button", { name: "Applica filtri (3)" }).click();
 await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
-ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 3000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 3 km e voto 4,5+");
-ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 3 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
+ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 2000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 2 km e voto 4,5+");
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 2 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
 await page.waitForTimeout(1200);
 { const pins = await page.getByTestId("pin").count(); ok(pins >= 2, `filtri: la mappa si sposta sui risultati (${pins} pin separati, non un gruppo unico)`); }
 await shot("24b-filtri-risultati");
@@ -530,7 +530,7 @@ ok(filterBody?.phase === "fast" && await page.getByText("Vista vera sui tetti di
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
 ok(await page.getByTestId("filtro-zona").isVisible() && await page.getByTestId("zone-suggerite").getByRole("button", { name: "Tutta Roma" }).isVisible(), "filtri: campo 'Dove?' con le zone di Roma suggerite");
 await page.getByTestId("filtro-zona").fill("Pigneto");
-ok((await page.getByRole("button", { name: "3 km" }).count()) === 0, "filtri: con una zona scritta la distanza dalla mappa non si chiede");
+ok((await page.getByRole("button", { name: "2 km" }).count()) === 0, "filtri: con una zona scritta la distanza dalla mappa non si chiede");
 await shot("24c-filtri-dove");
 filterBody = null;
 await page.getByRole("button", { name: /^Applica filtri/ }).click();
@@ -1421,9 +1421,9 @@ else {
       ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato)");
       // Le mie cose (semplificazione 16/10): una griglia di tessere con il numero, ognuna porta alla sua pagina o sezione.
       const cose = p.getByTestId("profilo-mie-cose");
-      ok(await cose.isVisible() && (await cose.getByRole("link").count()) === 6, `profilo: griglia 'Le mie cose' con 6 tessere (${await cose.getByRole("link").count()})`);
+      ok(await cose.isVisible() && (await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").count()) === 1, `profilo: griglia 'Le mie cose' con 6 tessere e la riga della carta del gusto (${await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()})`);
       ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-gruppi").getAttribute("href")) === "/gruppi" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Liste di gruppo · Importa con i loro ingressi");
-      { const sz = await cose.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      { const sz = await cose.locator("a:not([data-testid=profilo-carta-gusto])").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
       await cose.getByTestId("tessera-raccolte").click();
       await p.waitForFunction(() => { const r = document.getElementById("raccolte")?.getBoundingClientRect(); return !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' porta alle raccolte"));
       // Le cose secondarie stanno chiuse in "Altro": l'ingranaggio in alto ci porta.
@@ -4176,7 +4176,7 @@ else {
     ok(m.alta >= 64 && m.fondo === 0 && new Set(m.larghe).size === 1 && m.etichette && m.caratteri >= 11 && !m.sborda, `barra ${w}px: alta ${m.alta}px in fondo, voci larghe uguali (${m.larghe[0]}px), etichette intere da ${m.caratteri}px, niente sbordo`);
     ok(await nav.getByRole("link", { name: "Assistente" }).locator("svg").count() === 1, `barra ${w}px: l'Assistente ha la sua scintilla`);
     { const g = await bp.evaluate(() => { const l = document.querySelector("[data-testid=barra-esplora]"); const c = l.querySelector("span").getBoundingClientRect(); const n = document.querySelector("[data-testid=barra]").getBoundingClientRect(); const lr = l.getBoundingClientRect(); return { d: Math.round(c.width), tondo: getComputedStyle(l.querySelector("span")).borderRadius, centro: Math.abs((c.left + c.right) / 2 - (n.left + n.right) / 2), sporge: c.top < n.top, dentro: c.left >= lr.left - 0.5 && c.right <= lr.right + 0.5 }; });
-      ok(g.d >= 52 && g.centro < 2 && g.sporge && g.dentro, `barra ${w}px: la Mappa è al centro, tonda e più grande (${g.d}px, sporge sopra la barra)`); }
+      ok(g.d >= 44 && g.centro < 2 && !g.sporge && g.dentro, `barra ${w}px: la Mappa è al centro, tonda e più grande (${g.d}px), dentro la barra senza coprire le pagine`); }
     // Ogni voce porta alla pagina giusta ed è l'unica accesa.
     const attese = [
       ["Mappa", "/mappa", (u) => u.pathname === "/mappa" && !u.searchParams.get("vista")],
@@ -5608,6 +5608,420 @@ else {
   ok((await cp.getByTestId("recensione-form").count()) === 0 && (await cp.getByTestId("reel-aggiungi").count()) === 0 && decodeURIComponent((await acc.getAttribute("href").catch(() => "")) ?? "") === `/login?next=/locali/${CID}`, "community senza accesso: niente modulo, 'Accedi' riporta al locale");
   ok((await cp.getByTestId("recensione-community").count()) === 2, "community senza accesso: le recensioni si leggono comunque");
   await cctx.close();
+}
+
+// Vicino a me adesso e raggio sulla mappa (piano 2.1): una riga in "Ti suggeriamo" e il raggio nei Filtri.
+// Una sola ricerca (simulata) per tocco; il cerchio ha la sua misura sul bordo.
+{
+  let vn = null;
+  try { vn = await import(new URL("../../src/lib/vicino.ts", import.meta.url).href); } catch (e) { ok(false, `vicino: modulo src/lib/vicino.ts importabile (${e.message})`); }
+  if (vn) {
+    const at = (h, m = 0) => vn.nearNowQuery(new Date(2026, 9, 16, h, m)).query;
+    ok(/colazione/.test(at(8)) && /pranzo/.test(at(13)) && /aperitivo/.test(at(19)) && /cena/.test(at(21)) && /cocktail/.test(at(1)), "vicino: la ricerca cambia con l'ora (colazione, pranzo, aperitivo, cena, notte)");
+    ok(vn.radiusLabel(0.5) === "500 m" && vn.radiusLabel(2) === "2 km", "vicino: misure del raggio in italiano (500 m, 2 km)");
+    const c = vn.circlePolygon({ lat: 41.9, lng: 12.49 }, 1000).geometry.coordinates[0];
+    ok(c.length === 65 && Math.abs(c[16][1] - 41.9 - 1000 / 111320) < 1e-6, "vicino: il cerchio sulla mappa ha il raggio giusto");
+  }
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["geolocation"], geolocation: { latitude: 41.9001, longitude: 12.4901 } });
+  const vEv = [];
+  await vctx.route("**/api/events", (r) => { vEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await vctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await vctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  const vBodies = [];
+  await vctx.route("**/api/search", (r) => { vBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
+  await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const vp = await vctx.newPage();
+  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  vp.on("pageerror", (e) => errors.push(e.message));
+  await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await idee(vp);
+  const riga = vp.getByTestId("vicino-adesso");
+  ok(await riga.isVisible() && (await riga.textContent())?.includes("Vicino a me, aperto adesso"), "vicino: riga '📍 Vicino a me, aperto adesso' nel pannello 'Ti suggeriamo' (gruppo Adesso)");
+  ok((await vp.getByTestId("vicino-adesso").locator("xpath=ancestor::section[1]").textContent())?.startsWith("Adesso"), "vicino: la riga sta nel gruppo 'Adesso'");
+  await vp.screenshot({ path: `${OUT}/99-vicino-idee.png`, caret: "initial" });
+  await riga.click();
+  await vp.getByTestId("intestazione-lista").waitFor({ timeout: 6000 }).catch(() => {});
+  await vp.waitForTimeout(600);
+  const b = vBodies[0] ?? {};
+  const expected = vn ? vn.nearNowQuery(new Date()).query : null;
+  ok(vBodies.length === 1, `vicino: una sola ricerca per tocco (${vBodies.length})`);
+  ok(b.searchIntent === "structured" && b.openNowOnly === true && b.radius === 1000 && Math.abs(b.lat - 41.9001) < 1e-6 && Math.abs(b.lng - 12.4901) < 1e-6, `vicino: aperti ora, entro 1 km dalla mia posizione (${JSON.stringify({ o: b.openNowOnly, r: b.radius, lat: b.lat, lng: b.lng })})`);
+  ok(expected == null || b.query === expected, `vicino: la frase per Google è quella dell'ora (${b.query})`);
+  const head = (await vp.getByTestId("intestazione-lista").textContent().catch(() => "")) ?? "";
+  ok(head.includes("entro 1 km da te") && head.includes("aperti ora"), `vicino: l'intestazione dice 'entro 1 km da te · aperti ora' (${head})`);
+  ok((await vp.getByTestId("raggio-etichetta").textContent().catch(() => "")) === "1 km" && await vp.getByTestId("tu-sei-qui").isVisible(), "vicino: cerchio con la misura '1 km' e il punto 'tu sei qui' sulla mappa");
+  await vp.waitForTimeout(1000);
+  { const lb = await vp.getByTestId("raggio-etichetta").boundingBox(); ok(!!lb && lb.y > 0 && lb.y + lb.height < 844 && lb.x > 0 && lb.x + lb.width < 390, `vicino: la mappa mostra tutto il cerchio (misura in vista, y=${Math.round(lb?.y ?? -1)})`); }
+  ok(vEv.some((e) => e.type === "funzione" && e.props?.nome === "vicino_adesso") && vEv.some((e) => e.props?.nome === "raggio" && e.props?.origine === "me" && e.props?.contesto === "1 km"), "vicino: tocco e raggio registrati (trackFeature)");
+  { const lost = droppedKeys(vEv.filter((e) => ["vicino_adesso", "raggio"].includes(e.props?.nome))); ok(lost.length === 0, `vicino: chiavi degli eventi conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await vp.screenshot({ path: `${OUT}/99b-vicino-risultati.png`, caret: "initial" });
+  // Filtri, "Quanto lontano?": 500 m dal centro della mappa (niente 'da te', cerchio di 500 m).
+  await vp.getByRole("button", { name: "Filtri", exact: true }).click();
+  const rag = vp.getByTestId("filtri-raggio");
+  await rag.waitFor({ timeout: 4000 });
+  ok((await rag.getByRole("button", { name: "500 m" }).count()) === 1 && (await rag.getByRole("button", { name: "5 km" }).count()) === 1, "raggio: scelte 500 m / 1 km / 2 km / 5 km nei Filtri");
+  ok((await vp.getByTestId("raggio-da-me").getAttribute("aria-pressed")) === "true", "raggio: dopo 'Vicino a me' nei Filtri risulta 'Da me'");
+  await rag.getByRole("button", { name: "500 m" }).click();
+  await vp.getByTestId("raggio-da-mappa").click();
+  await rag.scrollIntoViewIfNeeded();
+  await vp.screenshot({ path: `${OUT}/99c-raggio-filtri.png`, caret: "initial" });
+  await vp.getByRole("button", { name: /^Applica filtri/ }).click();
+  await vp.getByTestId("intestazione-lista").waitFor({ timeout: 5000 }).catch(() => {});
+  await vp.waitForTimeout(600);
+  const b2 = vBodies[1] ?? {};
+  const head2 = (await vp.getByTestId("intestazione-lista").textContent().catch(() => "")) ?? "";
+  ok(vBodies.length === 2 && b2.radius === 500, `raggio: 500 m arriva al server con una sola ricerca (${b2.radius}, ${vBodies.length} ricerche)`);
+  ok(head2.includes("entro 500 m") && !head2.includes("da te") && (await vp.getByTestId("raggio-etichetta").textContent().catch(() => "")) === "500 m", `raggio: dal centro della mappa, cerchio di 500 m (${head2})`);
+  await vp.screenshot({ path: `${OUT}/99d-raggio-mappa.png`, caret: "initial" });
+  ok(await vp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "raggio: niente scorrimento orizzontale");
+  await vctx.close();
+  // Posizione negata: spiegazione umana e ricerca comunque intorno alla mappa (sempre una sola).
+  const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const dBodies = [];
+  await dctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await dctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await dctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await dctx.route("**/api/search", (r) => { dBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
+  await dctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const dp = await dctx.newPage();
+  await dp.addInitScript(() => {
+    try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ }
+    navigator.geolocation.getCurrentPosition = (_ok, err) => setTimeout(() => err({ code: 1, PERMISSION_DENIED: 1, message: "negata" }), 50);
+  });
+  dp.on("pageerror", (e) => errors.push(e.message));
+  await dp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await idee(dp);
+  await dp.getByTestId("vicino-adesso").click();
+  const msg = await dp.getByText(/Per cercare vicino a te mi serve la posizione/).waitFor({ timeout: 5000 }).then(() => true, () => false);
+  await dp.getByTestId("intestazione-lista").waitFor({ timeout: 5000 }).catch(() => {});
+  await dp.waitForTimeout(500);
+  ok(msg && await dp.getByText(/Per cercare vicino a te/).isVisible(), "vicino, posizione negata: spiegazione umana che resta in vista");
+  ok(dBodies.length === 1 && dBodies[0]?.radius === 1000 && dBodies[0]?.openNowOnly === true, `vicino, posizione negata: cerca comunque intorno alla mappa, una sola ricerca (${dBodies.length})`);
+  await dp.screenshot({ path: `${OUT}/99e-vicino-negata.png`, caret: "initial" });
+  await dctx.close();
+}
+
+// 12. Carica il file di Google Maps (piano 3.2): file di Takeout letto nel telefono → anteprima per zone →
+//     salvataggio in blocco. Con le coordinate zero chiamate Google; i .csv al massimo 10. Scritture simulate.
+if (fakeUser) {
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tev = [];
+  await tctx.route("**/api/events", (r) => { tev.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const tins = [];
+  await tctx.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "POST") { tins.push(...[].concat(r.request().postDataJSON())); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const tfile = [];
+  await tctx.route("**/api/places/import-file", (r) => {
+    const items = r.request().postDataJSON()?.items ?? [];
+    tfile.push(...items);
+    return r.fulfill({ json: { risultati: items.map((_, i) => ({ id: `00000000-0000-4000-8000-0000000007${String(tfile.length - items.length + i).padStart(2, "0")}` })) } });
+  });
+  const tprev = [];
+  await tctx.route("**/api/places/link-preview", (r) => {
+    const b = r.request().postDataJSON() ?? {};
+    tprev.push(b);
+    if (String(b.link).includes("Osteria")) return r.fulfill({ json: { stato: "riconosciuto", chiamate: 2, place: { id: "00000000-0000-4000-8000-000000000799", name: "Osteria Finta", address: "" } } });
+    return r.fulfill({ json: { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google", nome: "Pizzeria Inventata" } });
+  });
+  const tp = await tctx.newPage();
+  tp.on("pageerror", (e) => errors.push(e.message));
+  await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const tc = tp.getByTestId("importa-file");
+  ok(await tc.getByText("Carica il file di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
+  await tp.getByTestId("file-aiuto").click();
+  const passi = await tp.getByTestId("file-passi").textContent();
+  ok(passi.includes("takeout.google.com") && passi.includes("Saved Places.json") && (await tp.getByTestId("file-passi").locator("li").count()) === 3 && (await tp.getByRole("link", { name: "takeout.google.com" }).getAttribute("href")) === "https://takeout.google.com/", "file Takeout: 3 passi con il link a takeout.google.com");
+  await tc.screenshot({ path: `${OUT}/takeout-1-card.png` });
+  await tp.getByTestId("file-input").setInputFiles([
+    { name: "Saved Places.json", mimeType: "application/json", buffer: readFileSync(new URL("./takeout-esempio.json", import.meta.url)) },
+    { name: "Want to go.csv", mimeType: "text/csv", buffer: readFileSync(new URL("./takeout-want-to-go.csv", import.meta.url)) },
+  ]);
+  await tp.getByTestId("file-anteprima").waitFor({ timeout: 5000 }).catch(() => {});
+  const ries = (await tp.getByTestId("file-riepilogo").textContent().catch(() => "")).replace(/\s+/g, " ");
+  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 senza posizione", `file Takeout: anteprima per città ("${ries}")`);
+  const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
+  ok(scart.includes("Lasciati fuori 3") && scart.includes("albergo") && scart.includes("museo"), `file Takeout: hotel, museo e punto senza nome lasciati fuori e detti ("${scart.slice(0, 80)}")`);
+  const liste = await tp.getByTestId("file-liste").textContent();
+  ok(liste.includes("«Want to go» → 📌 Voglio andarci") && liste.includes("«Luoghi salvati» → 📌 Voglio andarci"), `file Takeout: lista di Google → stato in Mapetite (${liste})`);
+  ok((await tp.getByTestId("file-avviso-csv").textContent()).includes("al massimo 10"), "file Takeout: avviso sui posti dei .csv senza posizione (al massimo 10 ricerche)");
+  ok(tfile.length === 0 && tprev.length === 0, "file Takeout: leggere il file non chiama il server (resta nel telefono)");
+  await tp.screenshot({ path: `${OUT}/takeout-2-anteprima.png`, caret: "initial", fullPage: true });
+  await tc.getByRole("button", { name: "Milano · 1" }).click();
+  ok(await tp.getByTestId("file-salva").textContent() === "Salva 4 posti", "file Takeout: si toglie una città con un tocco");
+  await tc.getByRole("button", { name: "Nessuno" }).click();
+  ok(await tp.getByTestId("file-salva").isDisabled(), "file Takeout: 'Nessuno' disattiva il salvataggio");
+  await tc.getByRole("button", { name: "Tutti" }).click();
+  await tc.getByRole("button", { name: "Milano · 1" }).click();
+  ok(await tp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "file Takeout 390px: niente scorrimento orizzontale");
+  await tp.getByTestId("file-salva").click();
+  await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(tfile.length === 2 && tfile.every((i) => typeof i.lat === "number" && !("url" in i) && i.googlePlaceId === null) && !tfile.some((i) => i.name.includes("Milano")), `file Takeout: al server solo nome e coordinate dei 2 posti di Roma, nessun Place ID inventato dal cid (${tfile.map((i) => i.name).join(", ")})`);
+  ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
+  if (process.env.E2E_DEBUG) console.log("DBG takeout", JSON.stringify(tins), JSON.stringify(tprev));
+  for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
+  ok(tins.length === 3 && tins.every((r) => r.user_id === process.env.E2E_FAKE_USER && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
+  const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
+  ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
+  const coda = await tp.getByTestId("file-coda").textContent().catch(() => "");
+  ok(coda.includes("1 posto aspetta la posizione") && coda.includes("Altri domani"), `file Takeout: il posto senza posizione resta da completare, un gruppo al giorno ("${coda}")`);
+  ok(tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "letti" && e.props.risultati === 5) && tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "salvati" && e.props.risultati === 3), "file Takeout: tracciato 'import_file' (letti e salvati)");
+  ok(droppedKeys(tev.filter((e) => e.props?.nome === "import_file")).length === 0, "file Takeout: le chiavi del segnale arrivano tutte al server");
+  await tc.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/takeout-3-fatto.png`, caret: "initial" });
+  // File sbagliato: messaggio chiaro, niente schermata vuota.
+  await tp.reload({ waitUntil: "networkidle" });
+  await tp.getByTestId("file-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
+  ok((await tp.getByTestId("file-errore").textContent().catch(() => "")).includes("Non trovo posti"), "file Takeout: file senza posti spiegato");
+  await tctx.close();
+}
+
+// 99. Salva da iPhone (piano 3.3) e Scopritori (piano 5.6). Tutto simulato: niente Google, niente Supabase.
+if (!fakeUser) console.log("SKIP  salva da iPhone / scopritori: dev server senza E2E_FAKE_USER");
+else {
+  const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  const ANDROID_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
+  const tEv = [];
+  const telCtx = async (userAgent) => {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, userAgent, permissions: ["clipboard-read", "clipboard-write"] });
+    await c.route("**/api/events", (r) => { tEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await c.route("**/rest/v1/saved_places**", (r) => r.fulfill({ status: r.request().method() === "POST" ? 201 : 200, json: [] }));
+    await c.route("**/api/places/from-link", (r) => r.fulfill({ json: { risultati: [{ link: "https://maps.app.goo.gl/TEL111", place: { id: "00000000-0000-0000-0000-000000000199", name: "Osteria Nascosta" } }] } }));
+    return c;
+  };
+  const featureEv = (nome) => tEv.filter((e) => e.type === "funzione" && e.props?.nome === nome);
+
+  // A) iPhone: guida in 2 passi in cima a /importa; "Incolla il link copiato" legge gli appunti e salva.
+  const ic = await telCtx(IPHONE_UA);
+  const ip = await ic.newPage();
+  ip.on("pageerror", (e) => errors.push(e.message));
+  await ip.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const guide = ip.getByTestId("salva-telefono");
+  await guide.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await guide.getAttribute("data-telefono").catch(() => null) === "iphone", "salva da iPhone: su iPhone compare la guida iPhone");
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).isVisible(), "salva da iPhone: 2 passi (Copia il link → Incolla qui) e pulsante 'Incolla il link copiato'");
+  const yG = (await guide.boundingBox())?.y ?? 9999;
+  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 0;
+  ok(yG < yMaps, "salva da iPhone: la guida sta in cima, prima di 'Da Google Maps'");
+  await ip.screenshot({ path: `${OUT}/99a-salva-iphone.png`, caret: "initial" });
+  await ip.evaluate(() => navigator.clipboard.writeText("Guarda qui https://maps.app.goo.gl/TEL111"));
+  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  ok(await ip.getByTestId("importa-google").getByTestId("link-salvato").first().waitFor({ timeout: 5000 }).then(() => true, () => false) && await ip.getByText("Osteria Nascosta").isVisible(), "salva da iPhone: il link copiato si salva con un tocco");
+  ok(featureEv("salva_da_telefono_incolla").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: il tocco su 'Incolla' è registrato (contesto iphone)");
+  await ip.screenshot({ path: `${OUT}/99b-salva-iphone-salvato.png`, caret: "initial" });
+  // Reel di Instagram: non si legge, si spiega lo screenshot (stesso percorso della card Maps).
+  await ip.evaluate(() => navigator.clipboard.writeText("https://www.instagram.com/reel/C9xYz12AbCd/"));
+  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  ok(await ip.getByTestId("link-social").waitFor({ timeout: 4000 }).then(() => true, () => false), "salva da iPhone: un reel di Instagram incollato spiega cosa fare (screenshot)");
+  await ip.setViewportSize({ width: 360, height: 780 });
+  ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "salva da iPhone 360px: niente scorrimento orizzontale");
+  await ic.close();
+
+  // B) Android: Condividi → Mapetite; incollare resta l'alternativa; si può passare alla guida iPhone.
+  const ac = await telCtx(ANDROID_UA);
+  const ap = await ac.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  await ap.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const ag = ap.getByTestId("salva-telefono");
+  await ag.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ag.getByRole("button", { name: "Oppure 📋 incolla il link copiato" }).isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite' con incolla come alternativa");
+  await ap.screenshot({ path: `${OUT}/99c-salva-android.png`, caret: "initial" });
+  await ag.getByTestId("salva-telefono-cambia").click();
+  ok(await ag.getAttribute("data-telefono") === "iphone" && featureEv("salva_da_telefono_cambia").length > 0, "salva da Android: 'Hai un iPhone?' passa alla guida iPhone");
+  await ac.close();
+
+  // C) Scopritori: riga nel profilo, badge sul profilo pubblico, classifica in Amici.
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const GIU = "00000000-0000-4000-8000-0000000009a1";
+  const MAR = "00000000-0000-4000-8000-0000000009a2";
+  const LIA = "00000000-0000-4000-8000-0000000009a3";
+  const prof = (id, handle, display_name) => ({ id, handle, display_name, bio: null, city: "Roma", visitati: 1, da_provare: 1, seguaci: 1, seguiti: 1 });
+  const base = {
+    profili: [prof(GIU, "giulia.rm", "Giulia"), prof(MAR, "marco", "Marco"), prof(LIA, "lia", "Lia")],
+    salvati: [], seguo: [GIU, MAR, LIA],
+    mio: { handle: "io.test", display_name: "Io", bio: null, city: null, is_public: true },
+  };
+  const scop = [
+    { id: ME, handle: "io.test", display_name: "Io", gemme: 2, gemme_provate: 1 },
+    { id: GIU, handle: "giulia.rm", display_name: "Giulia", gemme: 9, gemme_provate: 3 },
+    { id: MAR, handle: "marco", display_name: "Marco", gemme: 0, gemme_provate: 0 },
+    { id: LIA, handle: "lia", display_name: "Lia", gemme: 1, gemme_provate: 0 },
+  ];
+  const sc = await telCtx(IPHONE_UA);
+  const setS = (v) => sc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await sc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "io@example.com", saved: [], reviews: [] })), url: BASE }]);
+  await setS({ ...base, scopritori: scop });
+  const s = await sc.newPage();
+  s.on("pageerror", (e) => errors.push(e.message));
+  await s.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const riga = s.getByTestId("scopritore-riga");
+  ok(await riga.isVisible() && (await riga.textContent())?.includes("Scopritore · Esploratore") && await riga.getByTestId("scopritore-livello").textContent() === "Liv. 2", "scopritori: nel profilo la riga compatta '💎 Scopritore · Esploratore · Liv. 2'");
+  const yRiga = (await riga.boundingBox())?.y ?? 9999;
+  ok(yRiga < ((await s.getByTestId("profilo-mie-cose").boundingBox())?.y ?? 0), "scopritori: la riga sta sotto i numeri, prima di 'Le mie cose'");
+  await riga.locator("summary").click();
+  ok((await riga.getByTestId("scopritore-mancano").textContent())?.includes("Ancora 5 punti per il livello 3") && (await riga.getByTestId("scopritore-cerca").getAttribute("href")) === "/sorprendimi", "scopritori: aperta dice quanto manca e porta a scoprire un posto poco conosciuto");
+  await s.waitForTimeout(300);
+  ok(featureEv("scopritore_apri").some((e) => e.props?.contesto === "livello-2"), "scopritori: l'apertura della riga è registrata");
+  await s.screenshot({ path: `${OUT}/99d-scopritore-profilo.png`, caret: "initial" });
+
+  await s.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const cl = s.getByTestId("scopritori-amici");
+  const rows = cl.getByTestId("scopritore-amico");
+  const names = await rows.allTextContents();
+  ok(await cl.isVisible() && names.length === 3 && names[0].includes("Giulia") && names[1].includes("Tu") && names[2].includes("Lia"), `scopritori: in Amici classifica Giulia → Tu → Lia, chi non ha gemme non compare (${names.map((n) => n.slice(0, 12)).join(" | ")})`);
+  ok((await rows.first().locator("a").getAttribute("href")) === "/u/giulia.rm" && (await rows.nth(1).locator("a").getAttribute("href")) === "/profilo", "scopritori: dalla classifica si apre il profilo dell'amico (o il proprio)");
+  ok(featureEv("scopritori_amici_vista").length > 0, "scopritori: la vista della classifica è registrata");
+  await cl.scrollIntoViewIfNeeded();
+  await s.screenshot({ path: `${OUT}/99e-scopritori-amici.png`, caret: "initial" });
+
+  await s.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await s.getByTestId("scopritore-badge").textContent().catch(() => ""))?.includes("💎 Scopritore · liv. 3"), "scopritori: sul profilo pubblico il badge '💎 Scopritore · liv. 3'");
+  await s.screenshot({ path: `${OUT}/99f-scopritore-pubblico.png`, caret: "initial" });
+  await s.goto(`${BASE}/u/marco`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("profilo-pubblico").isVisible() && (await s.getByTestId("scopritore-badge").count()) === 0, "scopritori: senza gemme nessun badge");
+
+  // Migrazione 20261016_scopritori non applicata: niente riga, niente classifica, nessun errore.
+  await setS(base);
+  await s.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("guida-contatori").isVisible() && (await s.getByTestId("scopritore-riga").count()) === 0, "scopritori senza migrazione: il profilo resta com'era");
+  await s.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("amici").isVisible() && (await s.getByTestId("scopritori-amici").count()) === 0, "scopritori senza migrazione: Amici resta com'era");
+  await s.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("profilo-pubblico").isVisible() && (await s.getByTestId("scopritore-badge").count()) === 0, "scopritori senza migrazione: profilo pubblico senza badge");
+  { const lost = droppedKeys(tEv); ok(lost.length === 0, `salva da iPhone / scopritori: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await sc.close();
+}
+
+// QA visivo generico (voce 6.6, 16/10): a 360 e 390 px nessuna pagina scorre di lato e nessun pulsante
+// o campo visibile finisce sotto la barra in basso (il cerchio della Mappa sporge 28px sopra la barra).
+// In cima si controllano solo gli elementi fissi/appiccicati (barre azioni, campi); in fondo alla pagina tutti.
+{
+  const qctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  await qctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await qctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await qctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const qProfilo = { email: "qa@example.com", saved: [{ created_at: "2026-10-10", tags: ["Da provare", "Romantico"], note: null, places: { id: "00000000-0000-4000-8000-0000000009a1", name: "Trattoria QA", category: "restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }], reviews: [] };
+  if (fakeUser) await qctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(qProfilo)), url: BASE }]);
+  const qp = await qctx.newPage();
+  qp.on("pageerror", (e) => errors.push(e.message));
+  const QA_PAGINE = ["/", "/mappa", "/assistente", "/amici", "/profilo", "/profilo/diario", "/raccolte/Romantico", "/stasera", "/sorprendimi", "/importa", "/gruppi", "/onboarding", "/login", "/signup", "/per-i-ristoratori", "/per-i-ristoratori/rivendica", "/premium", "/prenotazioni", "/ristoratore/demo"];
+  for (const [w, h] of [[360, 780], [390, 844]]) {
+    await qp.setViewportSize({ width: w, height: h });
+    for (const path of QA_PAGINE) {
+      await qp.goto(`${BASE}${path}`, { waitUntil: "networkidle" }).catch(() => {});
+      await qp.waitForTimeout(300);
+      const r = await qp.evaluate(() => {
+        const nav = document.querySelector("[data-testid=barra]");
+        const hs = document.scrollingElement.scrollWidth - innerWidth;
+        if (!nav || getComputedStyle(nav).display === "none") return { hs, coperti: [] };
+        const fisso = (el) => { for (let a = el; a; a = a.parentElement) { const p = getComputedStyle(a).position; if (p === "fixed" || p === "sticky") return true; } return false; };
+        const coperti = new Set();
+        const guarda = (soloFissi) => {
+          for (const el of document.querySelectorAll("a[href], button, input, textarea, select, [role=button]")) {
+            if (nav.contains(el) || el.closest(".mapboxgl-map") || (soloFissi && !fisso(el))) continue;
+            const b = el.getBoundingClientRect();
+            if (b.width < 2 || b.height < 2 || b.bottom <= 0 || b.top >= innerHeight || getComputedStyle(el).visibility === "hidden") continue;
+            const y = Math.min(b.bottom - 3, innerHeight - 1);
+            const punti = [[b.left + b.width / 2, b.top + b.height / 2], [b.left + b.width / 2, y], [b.left + 6, y], [b.right - 6, y]];
+            if (punti.some(([x, yy]) => { const hit = document.elementFromPoint(x, yy); return hit && nav.contains(hit); })) coperti.add((el.getAttribute("aria-label") || el.textContent || el.getAttribute("placeholder") || el.tagName).trim().replace(/\s+/g, " ").slice(0, 40));
+          }
+        };
+        guarda(true);
+        scrollTo({ top: document.scrollingElement.scrollHeight, behavior: "instant" });
+        guarda(false);
+        return { hs, coperti: [...coperti] };
+      });
+      ok(r.hs <= 0, `QA ${w}px ${path}: niente scorrimento orizzontale (${r.hs}px in più)`);
+      ok(r.coperti.length === 0, `QA ${w}px ${path}: nessun pulsante sotto la barra in basso${r.coperti.length ? " (" + r.coperti.join(" | ") + ")" : ""}`);
+    }
+  }
+  await qctx.close();
+}
+
+// Carta del gusto (/profilo/gusto): card condivisibile fatta SOLO dai salvati (numeri e tipi,
+// titolo da regole fisse), immagine PNG verticale, stato vuoto sotto i 3 salvati.
+if (!process.env.E2E_FAKE_USER) console.log("SKIP  carta del gusto: serve E2E_FAKE_USER");
+else {
+  const gEv = [];
+  const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await gc.route("**/api/events", (r) => { gEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await gc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await gc.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  const cartaEv = (nome) => gEv.filter((e) => e.type === "funzione" && e.props?.nome === nome);
+  const setP = (v) => gc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const pl = (n, category, address, poco) => ({ id: `00000000-0000-4000-8000-0000000007${String(n).padStart(2, "0")}`, name: `Locale Segreto ${n}`, category, address, poco_conosciuto: poco });
+  const R = "Via di Prova 1, 00100 Roma RM, Italy";
+  const M = "Via Tortona 15, 20144 Milano MI, Italy";
+  const saved = [
+    { created_at: "2026-10-10", tags: ["Romantico", "Già visitato"], note: null, places: pl(1, "Trattoria", R, null) },
+    { created_at: "2026-10-09", tags: ["Con amici", "Da provare"], note: null, places: pl(2, "Trattoria", R, null) },
+    { created_at: "2026-10-08", tags: ["Romantico"], note: null, places: pl(3, "italian_restaurant", R, null) },
+    { created_at: "2026-10-07", tags: ["Già visitato"], note: null, places: pl(4, "cocktail_bar", M, null) },
+    { created_at: "2026-10-06", tags: ["Con amici", "Romantico"], note: null, places: pl(5, "wine_bar", R, null) },
+    { created_at: "2026-10-05", tags: ["Da provare"], note: null, places: pl(6, "Trattoria", M, null) },
+  ];
+  await setP({ email: "giulia@example.com", saved, reviews: [] });
+  const g = await gc.newPage();
+  g.on("pageerror", (e) => errors.push(e.message));
+  await g.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const entry = g.getByTestId("profilo-carta-gusto");
+  ok(await entry.isVisible() && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 1, "carta del gusto: ingresso compatto dentro 'Le mie cose'");
+  await entry.click();
+  await g.waitForURL(/\/profilo\/gusto$/, { timeout: 8000 }).catch(() => {});
+  const card = g.getByTestId("carta-gusto");
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await card.isVisible(), "carta del gusto: dal profilo si apre la card");
+  ok(await g.getByTestId("carta-titolo").textContent() === "Cacciatore di trattorie" && (await g.getByTestId("carta-perche").textContent())?.includes("4 dei tuoi 6 salvati"), `carta del gusto: titolo da regole con il suo perché (${await g.getByTestId("carta-titolo").textContent()} · ${await g.getByTestId("carta-perche").textContent()})`);
+  const nums = (await g.getByTestId("carta-numeri").textContent()) ?? "";
+  ok(nums.includes("6salvati") && nums.includes("2provati") && nums.includes("2città"), `carta del gusto: numeri veri (salvati, provati, città) (${nums})`);
+  const tipi = await g.getByTestId("carta-tipi").locator("li").allTextContents();
+  ok(tipi.length === 3 && tipi[0].includes("Trattoria") && tipi[0].includes("3"), `carta del gusto: top 3 tipi di locale (${tipi.join(" | ")})`);
+  ok((await g.getByTestId("carta-raccolte").textContent())?.startsWith("Romantico") && !(await g.getByTestId("carta-raccolte").textContent())?.includes("Da provare"), "carta del gusto: raccolte principali, senza i tag di stato");
+  ok((await card.textContent())?.includes("Roma · Milano") && !(await card.textContent())?.includes("Locale Segreto"), "carta del gusto: città sì, nomi dei locali no");
+  ok(!(await card.textContent())?.includes("poco conosciuti"), "carta del gusto: senza il dato 'poco conosciuto' la percentuale non compare (niente numeri inventati)");
+  await g.waitForTimeout(300);
+  ok(cartaEv("carta_gusto_vista").some((e) => e.props?.contesto === "piena"), "carta del gusto: la vista è registrata");
+  ok(await g.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "carta del gusto 390px: niente scorrimento orizzontale");
+  await g.screenshot({ path: `${OUT}/99g-carta-gusto.png`, caret: "initial", fullPage: true });
+  // Immagine PNG verticale (formato storia).
+  const img = await g.request.get(`${BASE}/profilo/gusto/immagine`);
+  const buf = img.ok() ? await img.body() : Buffer.alloc(0);
+  const pngW = buf.length > 24 ? buf.readUInt32BE(16) : 0;
+  const pngH = buf.length > 24 ? buf.readUInt32BE(20) : 0;
+  ok(img.status() === 200 && (img.headers()["content-type"] ?? "").includes("image/png") && pngW === 1080 && pngH === 1920, `carta del gusto: immagine PNG 1080×1920 (${img.status()} ${pngW}×${pngH})`);
+  if (buf.length) { const { writeFileSync } = await import("fs"); writeFileSync(`${OUT}/99h-carta-gusto-immagine.png`, buf); }
+  // "Condividi" senza condivisione di file (Chromium del test): l'immagine si scarica.
+  const dl = g.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+  await g.getByTestId("carta-condividi").click();
+  const file = await dl;
+  ok(file?.suggestedFilename() === "carta-del-gusto-mapetite.png" && (await g.getByTestId("carta-condividi-esito").textContent())?.includes("Immagine salvata"), "carta del gusto: senza condivisione di file l'immagine si scarica");
+  ok(cartaEv("carta_gusto_condividi").some((e) => e.props?.contesto === "scaricata"), "carta del gusto: il tocco su Condividi è registrato");
+  // Con il telefono che condivide file: parte il foglio di condivisione con il PNG.
+  await g.evaluate(() => {
+    window.__condiviso = null;
+    navigator.canShare = () => true;
+    navigator.share = async (d) => { window.__condiviso = { n: d.files?.length ?? 0, type: d.files?.[0]?.type ?? "" }; };
+  });
+  await g.getByTestId("carta-condividi").click();
+  await g.waitForFunction(() => window.__condiviso, null, { timeout: 15000 }).catch(() => {});
+  const sh = await g.evaluate(() => window.__condiviso);
+  ok(sh?.n === 1 && sh?.type === "image/png", `carta del gusto: sul telefono si condivide l'immagine PNG (${JSON.stringify(sh)})`);
+  // Posti poco conosciuti: con il dato presente compare la percentuale e il titolo dedicato.
+  await setP({ email: "giulia@example.com", saved: saved.map((s, i) => ({ ...s, places: { ...s.places, poco_conosciuto: i < 4 } })), reviews: [] });
+  await g.goto(`${BASE}/profilo/gusto`, { waitUntil: "networkidle" });
+  ok((await g.getByTestId("carta-numeri").textContent())?.includes("67%poco conosciuti") && await g.getByTestId("carta-titolo").textContent() === "Cercatore di posti nascosti", "carta del gusto: con il dato 💎 compare la % di poco conosciuti e il titolo 'Cercatore di posti nascosti'");
+  // Meno di 3 salvati: stato vuoto con invito, niente immagine.
+  await setP({ email: "giulia@example.com", saved: saved.slice(0, 1), reviews: [] });
+  await g.goto(`${BASE}/profilo/gusto`, { waitUntil: "networkidle" });
+  const vuota = g.getByTestId("carta-vuota");
+  ok(await vuota.isVisible() && (await vuota.textContent())?.includes("Ancora 2 posti") && await vuota.getByRole("link", { name: "Importa da Instagram o Maps" }).isVisible(), "carta del gusto: sotto i 3 salvati invito a salvare o importare");
+  ok((await g.request.get(`${BASE}/profilo/gusto/immagine`)).status() === 404, "carta del gusto: sotto i 3 salvati nessuna immagine");
+  await g.screenshot({ path: `${OUT}/99i-carta-gusto-vuota.png`, caret: "initial" });
+  { const lost = droppedKeys(gEv); ok(lost.length === 0, `carta del gusto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await gc.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);

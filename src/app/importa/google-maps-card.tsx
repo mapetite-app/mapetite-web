@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from "react";
 import Link from "next/link";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
@@ -24,12 +24,15 @@ export default function GoogleMapsCard({
   onScreenshot,
   onSearch,
   onReadVideo,
+  ref,
 }: {
   userId: string | null;
   onScreenshot: () => void;
   onSearch: (q: string) => void;
   // Link di TikTok/YouTube: legge la didascalia del video e cerca il locale (vedi ImportaView).
   onReadVideo?: (url: string) => void;
+  // "Incolla il link copiato" della guida in cima (SalvaDaTelefono) usa lo stesso percorso.
+  ref?: Ref<{ paste: () => void }>;
 }) {
   // Link arrivato da Condividi prima dell'accesso (vedi /importa/condividi).
   const pending = useSyncExternalStore(() => () => {}, readPendingLink, () => null);
@@ -89,8 +92,10 @@ export default function GoogleMapsCard({
     }
   };
 
+  useImperativeHandle(ref, () => ({ paste: () => void pasteFromClipboard() }));
+
   return (
-    <section className="rounded-card border border-border bg-surface p-5" data-testid="importa-google">
+    <section id="importa-google-card" className="scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-google">
       <h2 className="font-display text-lg font-semibold text-brand">
         <span aria-hidden>📍 </span>Da Google Maps
       </h2>

@@ -69,6 +69,8 @@ export const FUNZIONI_NOTE = [
   "raccolta_crea", "raccolta_apri", "raccolta_condividi", "raccolta_modifica", "raccolte_proposte",
   // Invito e primo accesso (piano 9.1).
   "invito_arrivo", "invito_registrato", "invito_condividi", "benvenuto_importa",
+  // Vicino a me e raggio sulla mappa (piano 2.1).
+  "vicino_adesso", "raggio",
 ] as const;
 const AZIONI_DIRETTE = ["apri_scheda", "salva", "rimuovi", "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi"];
 
@@ -80,6 +82,8 @@ const ETICHETTE: Record<string, string> = {
   ci_sono_stato: "Ci sono stato",
   voglio_andarci: "Voglio andarci",
   condividi_ricerca: "Condividi ricerca",
+  vicino_adesso: "Vicino a me, aperto adesso",
+  raggio: "Raggio sulla mappa",
   condividi_lista: "Condividi lista",
   condividi_profilo: "Condividi profilo",
   condividi_mappa: "Condividi mappa",

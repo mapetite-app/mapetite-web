@@ -22,7 +22,7 @@ export default function OfflineBanner() {
       data-testid="offline"
       // In basso, sopra la barra di navigazione: in alto coprirebbe il campo di ricerca.
       className="pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-3"
-      style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}
+      style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}
     >
       <p className="rounded-pill bg-brand px-4 py-2 text-sm font-display font-semibold text-white shadow-float">
         📶 Sei senza connessione

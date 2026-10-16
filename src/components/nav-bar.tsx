@@ -86,20 +86,21 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
           {items.map(({ id, label, href, Icon, active }) => {
             const ai = id === "assistente";
             if (id === "esplora") {
-              // Mappa: cerchio più grande che sporge sopra la barra, con il mappamondo.
+              // Mappa: cerchio più grande, con il mappamondo, dentro l'altezza della barra (se sporgesse
+              // coprirebbe il centro delle barre fisse delle pagine: campo dell'assistente, Prenota…).
               return (
                 <li key={id} className="flex">
                   <Link
                     href={href}
                     data-testid={`barra-${id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`group flex flex-1 flex-col items-center justify-end gap-1 pb-2 select-none outline-none [-webkit-tap-highlight-color:transparent] ${active ? "text-brand" : "text-text-muted"}`}
+                    className={`group flex flex-1 flex-col items-center justify-center gap-0.5 select-none outline-none [-webkit-tap-highlight-color:transparent] ${active ? "text-brand" : "text-text-muted"}`}
                   >
                     <span
                       aria-hidden
-                      className={`-mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-float ring-4 transition-transform duration-200 group-active:scale-90 ${active ? "ring-accent/30" : "ring-white"}`}
+                      className={`flex h-[46px] w-[46px] items-center justify-center rounded-full bg-brand text-white shadow-card ring-2 transition-transform duration-200 group-active:scale-90 ${active ? "ring-accent/50" : "ring-transparent"}`}
                     >
-                      <Icon className="h-7 w-7" strokeWidth={active ? 2.25 : 1.9} />
+                      <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 1.9} />
                     </span>
                     <span className={`text-[11px] leading-none font-display tracking-[0.01em] ${active ? "font-semibold" : "font-medium"}`}>
                       {label}
