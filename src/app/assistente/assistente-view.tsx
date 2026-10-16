@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUp, BookmarkCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
 import VenueSheet from "@/components/venue-sheet";
+import CommunityLocale from "@/components/community-locale";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
 import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
@@ -883,7 +884,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               onEdit={() => {}}
               onClose={() => setOpenCard(null)}
               saveSlot={null}
-              communitySlot={null}
+              communitySlot={<CommunityLocale id={openCard.id} userId={userId} contesto="assistente" />}
               origin={c.pos}
               userPos={c.pos}
               googlePlaceId={openCard.id}
