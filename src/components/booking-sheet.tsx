@@ -16,6 +16,7 @@ import {
   type BookingRequest,
 } from "@/lib/booking";
 import { track } from "@/lib/track";
+import UtileFeedback from "@/components/utile-feedback";
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
 // (WhatsApp solo se il numero è un cellulare, chiamata, sito), con il messaggio già scritto.
@@ -166,6 +167,10 @@ export default function BookingSheet({
             >
               Vedi le mie prenotazioni →
             </Link>
+            {/* "Ti è stato utile?" (piano 7.6): una volta per prenotazione inviata. */}
+            <div className="mt-2 flex justify-center border-t border-border pt-3">
+              <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
+            </div>
           </div>
         ) : (
           <>
