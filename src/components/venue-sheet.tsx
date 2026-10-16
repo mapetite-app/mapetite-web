@@ -4,7 +4,9 @@ import { tagLabel, isStateTag } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
-import { track } from "@/lib/track";
+import Link from "next/link";
+import { track, trackFeature } from "@/lib/track";
+import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
@@ -686,6 +688,20 @@ export default function VenueSheet({
               Modifica
             </button>
           )}
+        </div>
+      )}
+
+      {/* Liste di gruppo (piano 5.5): solo per i salvati, che hanno già l'UUID del locale. */}
+      {isSaved && isUuid(venue.id) && (
+        <div className="mx-5 mt-3">
+          <Link
+            href={`/gruppi?proponi=${venue.id}`}
+            data-testid="proponi-gruppo"
+            onClick={() => trackFeature("gruppo_proponi_scheda")}
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+          >
+            <span aria-hidden>🍽️</span> Proponi in una lista di gruppo
+          </Link>
         </div>
       )}
 

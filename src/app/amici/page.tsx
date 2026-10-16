@@ -57,6 +57,19 @@ export default async function AmiciPage() {
             </Link>
           )}
 
+          <Link
+            href="/gruppi"
+            data-testid="amici-gruppi"
+            className="mt-4 flex items-center gap-3 rounded-card border border-border bg-surface p-4 active:scale-[0.99]"
+          >
+            <span aria-hidden className="text-2xl">🍽️</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-sm font-semibold text-brand">Liste di gruppo</span>
+              <span className="block text-xs font-sans text-text-muted">Dove andiamo giovedì? Ognuno propone un posto e si vota.</span>
+            </span>
+            <span aria-hidden className="text-brand">→</span>
+          </Link>
+
           <div className="mt-5">
             <CercaPersone viewerId={viewer} seguo={feed.seguiti.map((p) => p.id)} />
           </div>
