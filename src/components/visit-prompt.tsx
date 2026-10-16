@@ -69,6 +69,7 @@ export default function VisitPrompt({ userId, candidates, withDate = false }: { 
         return true;
       }}
       onClose={() => { trackFeature("diario", { fonte: "ci-sei-stato", stato: "saltato" }); setDiary(null); }}
+      foto={{ userId, placeId: diary.id, contesto: "ci-sei-stato" }}
     />
   );
   if (!current && !done) return foglio || null;

@@ -11,12 +11,18 @@ import { saveVisit, type VisitPatch } from "@/lib/diario-write";
 import { trackFeature } from "@/lib/track";
 import type { DiaryEntry } from "@/lib/diario-server";
 import DiarioFoglio, { type DiarioValori } from "@/components/diario-foglio";
+import { FotoLightbox } from "@/components/foto-utenti";
+import type { FotoUtente } from "@/lib/foto-utenti";
 
 // "Il mio diario" (piano 4.4): i posti provati per mese, dal più recente, con voto e nota.
-// Un tocco sul nome apre la scheda; la matita apre il foglio per cambiare data, voto e nota.
-export default function DiarioView({ userId, initial, withDate }: { userId: string; initial: DiaryEntry[]; withDate: boolean }) {
+// Un tocco sul nome apre la scheda; la matita apre il foglio per cambiare data, voto, nota e foto.
+// Con le foto tue la prima diventa la copertina della voce (un tocco la apre a schermo intero).
+export default function DiarioView({ userId, initial, withDate, fotoPronte = false }: { userId: string; initial: DiaryEntry[]; withDate: boolean; fotoPronte?: boolean }) {
   const [entries, setEntries] = useState(initial);
-  const [editing, setEditing] = useState<DiaryEntry | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = entries.find((x) => x.id === editingId) ?? null;
+  const setEditing = (e: DiaryEntry | null) => setEditingId(e?.id ?? null);
+  const [viewing, setViewing] = useState<DiaryEntry | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const groups = useMemo(() => groupByMonth(entries), [entries]);
   const liked = entries.filter((e) => votoOf(e.tags) === "su").length;
@@ -37,6 +43,9 @@ export default function DiarioView({ userId, initial, withDate }: { userId: stri
     setEditing(null);
     return true;
   };
+
+  const setFoto = (id: string, foto: FotoUtente[]) =>
+    setEntries((list) => list.map((x) => (x.id === id ? { ...x, foto } : x)));
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-4">
@@ -99,9 +108,26 @@ export default function DiarioView({ userId, initial, withDate }: { userId: stri
                         )}
                       </span>
                     )}
-                    <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-2xl">
-                      {getCategoryEmoji(e.category, e.name)}
-                    </span>
+                    {e.foto.length > 0 ? (
+                      <button
+                        type="button"
+                        data-testid="diario-copertina"
+                        onClick={() => setViewing(e)}
+                        aria-label={`Guarda le tue foto di ${e.name}`}
+                        className="relative h-14 w-14 shrink-0 overflow-hidden rounded-btn bg-surface active:scale-95"
+                      >
+                        {/* Foto scattata da te (mai Google), dal nostro server. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={e.foto[0].url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        {e.foto.length > 1 && (
+                          <span className="absolute bottom-0.5 right-0.5 rounded-pill bg-black/60 px-1.5 text-[10px] font-display font-semibold text-white">+{e.foto.length - 1}</span>
+                        )}
+                      </button>
+                    ) : (
+                      <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-2xl">
+                        {getCategoryEmoji(e.category, e.name)}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <Link href={`/mappa?salvato=${e.id}`} data-testid="diario-locale" className="block truncate font-display text-[15px] font-semibold text-text">
                         {e.name}
@@ -113,11 +139,20 @@ export default function DiarioView({ userId, initial, withDate }: { userId: stri
                         </span>
                       )}
                       {e.note && <p data-testid="diario-nota-testo" className="mt-1 text-sm italic text-text [overflow-wrap:anywhere]">“{e.note}”</p>}
-                      {withDate && !e.date && (
-                        <button type="button" onClick={() => setEditing(e)} className="mt-0.5 min-h-9 text-xs font-display font-semibold text-accent">
-                          + Aggiungi la data
-                        </button>
-                      )}
+                      {(withDate && !e.date) || (fotoPronte && e.foto.length === 0) ? (
+                        <span className="mt-0.5 flex flex-wrap gap-x-3">
+                          {withDate && !e.date && (
+                            <button type="button" onClick={() => setEditing(e)} className="min-h-9 text-xs font-display font-semibold text-accent">
+                              + Aggiungi la data
+                            </button>
+                          )}
+                          {fotoPronte && e.foto.length === 0 && (
+                            <button type="button" data-testid="diario-aggiungi-foto" onClick={() => setEditing(e)} className="min-h-9 text-xs font-display font-semibold text-accent">
+                              + Aggiungi una foto
+                            </button>
+                          )}
+                        </span>
+                      ) : null}
                     </div>
                     <button
                       type="button"
@@ -144,7 +179,11 @@ export default function DiarioView({ userId, initial, withDate }: { userId: stri
           mode="modifica"
           onSave={(v) => save(editing, v)}
           onClose={() => setEditing(null)}
+          foto={fotoPronte ? { userId, placeId: editing.id, initial: editing.foto, onChange: (f) => setFoto(editing.id, f), contesto: "diario" } : undefined}
         />
+      )}
+      {viewing && (
+        <FotoLightbox slides={viewing.foto.map((f) => ({ url: f.url, label: `La tua foto · ${viewing.name}` }))} start={0} onClose={() => setViewing(null)} />
       )}
     </div>
   );

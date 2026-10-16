@@ -1,15 +1,29 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { dayKey, daysAgoKey, dateLabel, type Voto } from "@/lib/diario";
+import type { FotoUtente } from "@/lib/foto-utenti";
+import { cambiaVisibilita } from "@/lib/foto-utenti-write";
+import { trackFeature } from "@/lib/track";
+import { FotoMieEditor } from "@/components/foto-utenti";
 
 // Foglio leggero "Com'è andata?" (piano 4.4): dopo "Ci sono stato" (o da "Modifica" nel diario)
 // chiede quando, il voto (👍/👎, lo stesso "Com'era?" della scheda) e una nota privata.
 // Tutto saltabile. Chi lo apre decide dove scrivere (onSave).
+// Foto (piano 4.4): 1–3 foto tue, caricate subito (senza aspettare "Salva"); private come la nota,
+// a meno di scegliere "Mostrale nella scheda del locale" (stesse regole delle recensioni).
 export type DiarioValori = { date: string | null; voto: Voto | null; note: string };
+
+export type DiarioFoto = {
+  userId: string;
+  placeId: string; // UUID Supabase
+  initial?: FotoUtente[]; // assente = si leggono da /api/foto-utenti
+  onChange?: (foto: FotoUtente[]) => void;
+  contesto: string;
+};
 
 const subscribeNothing = () => () => {};
 
@@ -21,6 +35,7 @@ export default function DiarioFoglio({
   onEditNote,
   onSave,
   onClose,
+  foto,
 }: {
   place: { name: string; category: string | null };
   initial: { date: string | null; voto: Voto | null; note: string | null };
@@ -30,6 +45,7 @@ export default function DiarioFoglio({
   onEditNote?: () => void;
   onSave: (v: DiarioValori) => Promise<boolean>;
   onClose: () => void;
+  foto?: DiarioFoto;
 }) {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const today = dayKey(new Date());
@@ -41,6 +57,26 @@ export default function DiarioFoglio({
   const [error, setError] = useState(false);
   const other = date !== null && date !== today && date !== yesterday;
   const [showPicker, setShowPicker] = useState(other);
+  // Foto: null = in lettura; pronte false = migrazione delle foto non applicata (sezione nascosta).
+  const [fotoList, setFotoList] = useState<FotoUtente[] | null>(foto?.initial ?? null);
+  const [fotoPronte, setFotoPronte] = useState(true);
+  const [condividi, setCondividi] = useState(() => (foto?.initial ?? []).some((f) => f.pubblica));
+  const [visErr, setVisErr] = useState(false);
+  const fotoPlace = foto && !foto.initial ? foto.placeId : null;
+
+  useEffect(() => {
+    if (!fotoPlace) return;
+    const ctrl = new AbortController();
+    fetch(`/api/foto-utenti?place=${encodeURIComponent(fotoPlace)}`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { foto: FotoUtente[]; pronte: boolean } | null) => {
+        setFotoList(d?.foto ?? []);
+        setFotoPronte(d?.pronte ?? false);
+        setCondividi((d?.foto ?? []).some((f) => f.pubblica));
+      })
+      .catch(() => { /* rete assente o foglio chiuso: niente sezione foto */ });
+    return () => ctrl.abort();
+  }, [fotoPlace]);
 
   if (!mounted) return null;
 
@@ -52,6 +88,22 @@ export default function DiarioFoglio({
     setBusy(false);
     if (!ok) setError(true);
     return ok;
+  };
+
+  const changeFoto = (list: FotoUtente[]) => {
+    setFotoList(list);
+    foto?.onChange?.(list);
+  };
+
+  const toggleCondividi = async () => {
+    if (!foto || !fotoList) return;
+    const next = !condividi;
+    setVisErr(false);
+    setCondividi(next);
+    const ok = await cambiaVisibilita(foto.userId, foto.placeId, next);
+    if (!ok) { setCondividi(!next); setVisErr(true); return; }
+    changeFoto(fotoList.map((f) => ({ ...f, pubblica: next })));
+    trackFeature("foto_utente", { stato: next ? "pubblicate" : "private", contesto: foto.contesto, risultati: fotoList.length });
   };
 
   const chip = (on: boolean) =>
@@ -132,6 +184,40 @@ export default function DiarioFoglio({
             </button>
           ))}
         </div>
+
+        {foto && fotoPronte && fotoList && (
+          <div data-testid="diario-foto" className="mt-4">
+            <p className="text-sm font-display font-semibold text-text">
+              Le tue foto{" "}
+              <span className="font-sans font-normal text-text-muted">
+                · {condividi && fotoList.length > 0 ? "visibili nella scheda del locale" : "le vedi solo tu"}
+              </span>
+            </p>
+            <div className="mt-2">
+              <FotoMieEditor
+                userId={foto.userId}
+                placeId={foto.placeId}
+                foto={fotoList}
+                onChange={changeFoto}
+                pubblica={condividi}
+                contesto={foto.contesto}
+              />
+            </div>
+            {fotoList.length > 0 && (
+              <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-sans text-text">
+                <input
+                  type="checkbox"
+                  data-testid="diario-foto-condividi"
+                  checked={condividi}
+                  onChange={() => void toggleCondividi()}
+                  className="h-5 w-5 shrink-0 accent-brand"
+                />
+                Mostrale nella scheda del locale (&ldquo;Dalla community&rdquo;)
+              </label>
+            )}
+            {visErr && <p role="alert" className="text-xs text-error">Non sono riuscito a cambiarlo. Riprova.</p>}
+          </div>
+        )}
 
         {onEditNote ? (
           <button

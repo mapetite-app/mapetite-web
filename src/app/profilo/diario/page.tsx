@@ -7,7 +7,7 @@ import DiarioView from "./diario-view";
 
 export const metadata: Metadata = {
   title: "Il mio diario · Mapetite",
-  description: "I locali dove sei stato, con la data, il tuo voto e le tue note.",
+  description: "I locali dove sei stato, con la data, il tuo voto, le tue note e le tue foto.",
 };
 
 // Solo in sviluppo: utente finto per il test automatico (scripts/e2e/giro.mjs), come in /stasera.
@@ -48,6 +48,6 @@ export default async function DiarioPage() {
     );
   }
 
-  const { entries, withDate } = await loadDiary(userId);
-  return <DiarioView userId={userId} initial={entries} withDate={withDate} />;
+  const { entries, withDate, fotoPronte } = await loadDiary(userId);
+  return <DiarioView userId={userId} initial={entries} withDate={withDate} fotoPronte={fotoPronte} />;
 }
