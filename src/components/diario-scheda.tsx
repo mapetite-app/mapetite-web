@@ -84,6 +84,7 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
           onEditNote={ctx?.onEditNote ? () => { setOpen(null); ctx.onEditNote!(); } : undefined}
           onSave={(v) => save(v, open)}
           onClose={close}
+          foto={{ userId, placeId: place.id, contesto: "scheda" }}
         />
       )}
     </>
