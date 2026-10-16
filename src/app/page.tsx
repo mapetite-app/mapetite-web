@@ -63,6 +63,19 @@ export default async function Home() {
         <BookingReminder />
         <HomeSaved total={counts.total} want={counts.want} />
         <HomeRecent />
+        {/* Sorprendimi (piano 2.5): un posto mai provato che probabilmente ti piace, con il perché. */}
+        <Link
+          href="/sorprendimi?da=home"
+          data-testid="home-sorprendimi"
+          className="mb-3 flex min-h-14 items-center gap-3 rounded-card border border-accent/30 bg-accent-light px-4 py-2.5 active:scale-[0.99]"
+        >
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg">🎲</span>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block font-display text-[15px] font-semibold leading-tight text-brand">Sorprendimi</span>
+            <span className="block truncate text-xs font-sans text-text-muted">Un posto nuovo che probabilmente ti piace</span>
+          </span>
+          <span aria-hidden className="text-lg text-accent">→</span>
+        </Link>
         {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione assistita. */}
         <Link
           href="/assistente"

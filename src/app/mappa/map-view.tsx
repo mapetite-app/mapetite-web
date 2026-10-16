@@ -33,6 +33,7 @@ import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 import ClassificaScheda from "@/components/classifica-scheda";
+import { surpriseFromMemory } from "@/lib/sorpresa";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
 // in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
@@ -1994,6 +1995,36 @@ export default function MapView({
       setTimeout(() => { setWelcomeDismissed(true); dispatch({ type: "OPEN_FILTERS" }); }, 0);
       return;
     }
+    // "Apri scheda" da Sorprendimi (/mappa?sorpresa=<Place ID>): il locale arriva dalla memoria della
+    // sorpresa nel telefono (stessa ricerca, nessuna chiamata in più) e si apre la sua scheda.
+    const surpriseId = params.get("sorpresa");
+    if (surpriseId) {
+      params.delete("sorpresa");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      const hit = surpriseFromMemory(surpriseId.slice(0, 300));
+      if (!hit || hit.place.lat == null || hit.place.lng == null) return;
+      const p = hit.place;
+      const place: Place = {
+        id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number,
+        tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null,
+      };
+      const details: VenueDetails = {
+        userRatingCount: p.userRatingCount ?? null, openNow: p.openNow ?? null, websiteUri: p.websiteUri ?? null,
+        phone: p.phone ?? null, selectedReviews: p.selectedReviews ?? null, synthesis: null, tags: null,
+        verdict: hit.verdict, goFor: null, dontExpect: null, matchReason: null,
+        photoRef: p.photoRef ?? null, photoAuthor: p.photoAuthor ?? null, editorialSummary: p.editorialSummary ?? null,
+      };
+      setTimeout(() => {
+        setWelcomeDismissed(true);
+        setViewState((v) => ({ ...v, latitude: place.lat, longitude: place.lng, zoom: 15 }));
+        setAiSearch({ risultati: [place], filtri: null, id: ++searchSeq.current, query: "Sorprendimi" });
+        setVenueDetails((prev) => ({ ...prev, [place.id]: details }));
+        setFocusedId(place.id);
+        dispatch({ type: "OPEN_VENUE", placeId: place.id });
+      }, 0);
+      return;
+    }
     const q = params.get("q")?.trim().slice(0, 200);
     // meno di 3 caratteri: link troncato o sbagliato, niente ricerca a pagamento
     if (!q || q.length < 3) return;
@@ -2183,6 +2214,14 @@ export default function MapView({
               className="flex min-h-10 shrink-0 items-center rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
             >
               💬 Parla con l&apos;assistente
+            </Link>
+            {/* Sorprendimi (piano 2.5): un posto mai provato vicino al centro della mappa. */}
+            <Link
+              href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`}
+              data-testid="mappa-sorprendimi"
+              className="flex min-h-10 shrink-0 items-center rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
+            >
+              🎲 Sorprendimi
             </Link>
             {tasteSuggestion && (
               <button
@@ -2641,6 +2680,14 @@ export default function MapView({
                   Cancella
                 </button>
               )}
+              <Link
+                key="sorprendimi"
+                href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`}
+                data-testid="mappa-sorprendimi"
+                className="flex min-h-11 shrink-0 items-center rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white active:scale-95"
+              >
+                🎲 Sorprendimi
+              </Link>
               {tasteSuggestion && (
                 <button
                   key="per-te"
