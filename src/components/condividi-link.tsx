@@ -15,14 +15,16 @@ export default function CondividiLink({
   label = "Condividi",
   variant = "outline",
   testId,
+  className = "",
 }: {
   path: string;
   title: string;
   text: string;
-  cosa: "profilo" | "mappa" | "raccolta";
+  cosa: "profilo" | "mappa" | "raccolta" | "invito";
   label?: string;
   variant?: "outline" | "solid";
   testId?: string;
+  className?: string;
 }) {
   const [copied, setCopied] = useState<"ok" | "errore" | null>(null);
 
@@ -58,7 +60,7 @@ export default function CondividiLink({
       type="button"
       onClick={share}
       data-testid={testId}
-      className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold active:scale-95 transition-transform duration-150 ${cls}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold active:scale-95 transition-transform duration-150 ${cls} ${className}`}
     >
       <Share2 size={16} aria-hidden className="shrink-0" />
       <span role={copied ? "status" : undefined}>

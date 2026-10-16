@@ -9,6 +9,7 @@ import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
+import InvitaAmico from "@/components/invita-amico";
 import { loadMySocial } from "@/lib/social";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
@@ -240,6 +241,9 @@ export default async function ProfiloPage() {
           </Link>
         ))}
       </nav>
+
+      {/* Invito (piano 9.1): il proprio link personale, in vista. */}
+      <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
 
       <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
 
