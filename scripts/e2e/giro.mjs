@@ -5078,6 +5078,162 @@ else {
   await wctx.close();
 }
 
+// 19. Liste di gruppo (piano 5.5): /gruppi, /gruppi/<id>, /gruppi/entra/<codice>, "Proponi" dalla scheda.
+//     Il server legge i dati finti dal cookie "e2e_gruppi"; senza cookie le liste sono "in arrivo"
+//     (come in produzione finché la migrazione 20261016_liste_gruppo non è applicata).
+//     Le scritture verso Supabase (rpc, gruppi_posti, gruppi_voti) sono simulate e registrate.
+if (!fakeUser) console.log("SKIP  liste di gruppo: dev server senza E2E_FAKE_USER");
+else {
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const G1 = "00000000-0000-4000-8000-0000000006a1";
+  const G2 = "00000000-0000-4000-8000-0000000006a2";
+  const CODICE = "abcd1234ef";
+  const PL = (n) => `00000000-0000-4000-8000-0000000006b${n}`;
+  const posto = (id, place, name, category, voti, votanti, created_at, extra = {}) => ({
+    posto_id: id, place_id: place, google_place_id: null, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy",
+    lat: 41.889, lng: 12.469, aggiunto_da: "u-giulia", aggiunto_da_nome: "Giulia", created_at, voti, votanti, ho_votato: false, ...extra,
+  });
+  const gruppo = { id: G1, nome: "Cene del giovedì", emoji: "🍽️", codice: CODICE, creato_da: ME, created_at: "2026-10-14T10:00:00Z", membri: 3, posti: 2, voti: 3 };
+  const dati = {
+    gruppi: [gruppo],
+    membri: { [G1]: [{ user_id: ME, nome: "Lorenzo" }, { user_id: "u-giulia", nome: "Giulia" }, { user_id: "u-marco", nome: "Marco" }] },
+    posti: { [G1]: [
+      posto("pA", PL(1), "Trattoria Uno", "restaurant", 1, ["Giulia"], "2026-10-14T11:00:00Z"),
+      posto("pB", PL(2), "Osteria Due", "restaurant", 2, ["Giulia", "Marco"], "2026-10-14T12:00:00Z"),
+    ] },
+    inviti: { [CODICE]: { id: G1, nome: "Cene del giovedì", emoji: "🍽️", membri: 3, posti: 2, sono_dentro: false } },
+  };
+  const profiloG = {
+    email: "tester@example.com",
+    saved: [
+      { created_at: "2026-10-10", tags: ["Da provare"], note: null, places: { id: PL(3), name: "Forno Tre", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.87, lng: 12.48 } },
+      { created_at: "2026-10-09", tags: ["Già visitato"], note: null, places: { id: PL(1), name: "Trattoria Uno", category: "restaurant", address: "Via del Moro 12, Roma", lat: 41.889, lng: 12.469 } },
+    ],
+    reviews: [],
+  };
+  const setCookie = (c, name, v) => c.addCookies([{ name, value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const gEv = [];
+  const writes = [];
+  await gctx.route("**/api/events", (r) => { gEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await gctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await gctx.route("**/rest/v1/rpc/crea_gruppo**", (r) => { writes.push({ t: "crea", body: r.request().postDataJSON() }); return r.fulfill({ json: [{ id: G1, codice: CODICE }] }); });
+  await gctx.route("**/rest/v1/rpc/entra_gruppo**", (r) => { writes.push({ t: "entra", body: r.request().postDataJSON() }); return r.fulfill({ json: G1 }); });
+  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: "pNuovo" } }); });
+  await gctx.route("**/rest/v1/gruppi_voti**", (r) => { writes.push({ t: `voti-${r.request().method()}`, body: r.request().method() === "POST" ? r.request().postDataJSON() : null, url: r.request().url() }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
+  const gp = await gctx.newPage();
+  gp.on("pageerror", (e) => errors.push(e.message));
+  const noHScroll = async (label) => { const w = await gp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `${label}: niente scorrimento orizzontale (${w}px)`); };
+
+  // In arrivo: senza dati (migrazione non applicata) nessuna pagina si rompe.
+  await setCookie(gctx, "e2e_profilo", profiloG);
+  for (const path of ["/gruppi", `/gruppi/${G1}`, `/gruppi/entra/${CODICE}`]) {
+    const r = await gp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    ok(r?.status() === 200 && await gp.getByTestId("gruppi-in-arrivo").isVisible(), `gruppi in arrivo: ${path} dice 'in arrivo' invece di rompersi`);
+  }
+  await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("profilo-gruppi").getAttribute("href") === "/gruppi", "profilo: ingresso 'Liste di gruppo'");
+
+  // Senza account: invito alla registrazione, e il link d'invito torna qui dopo.
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("gruppi-accedi").isVisible(), "gruppi senza account: 'Accedi' invece della pagina");
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppo-invito-titolo").textContent()) === "Cene del giovedì" && await gp.getByText("3 persone · 2 posti").isVisible(), "invito di gruppo: nome della lista e numeri (senza nomi né posti)");
+  ok((await gp.getByTestId("gruppo-invito-registrati").getAttribute("href")) === `/signup?next=${encodeURIComponent(`/gruppi/entra/${CODICE}`)}`, "invito di gruppo: 'Crea un account ed entra' torna all'invito");
+  ok((await gp.locator("body").innerText()).includes("Giulia") === false, "invito di gruppo: nessun nome dei membri prima di entrare");
+  await noHScroll("invito di gruppo");
+  await gp.screenshot({ path: `${OUT}/80-gruppi-invito.png`, caret: "initial" });
+  await gctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Con account: entra con il proprio nome.
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  await gp.locator("#entra-nome").fill("Lorenzo");
+  await gp.getByTestId("gruppo-entra").click();
+  await gp.waitForURL(`**/gruppi/${G1}`, { timeout: 8000 }).catch(() => {});
+  { const w = writes.find((x) => x.t === "entra"); ok(w?.body?.p_codice === CODICE && w?.body?.p_mio_nome === "Lorenzo" && new URL(gp.url()).pathname === `/gruppi/${G1}`, `invito di gruppo: 'Entra nella lista' entra con il codice e apre la lista (${gp.url()})`); }
+  await setCookie(gctx, "e2e_gruppi", { ...dati, inviti: { [CODICE]: { ...dati.inviti[CODICE], sono_dentro: true } } });
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppo-invito-apri").getAttribute("href")) === `/gruppi/${G1}`, "invito di gruppo: chi è già dentro ha 'Apri la lista'");
+  await gp.goto(`${BASE}/gruppi/entra/zz`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("gruppo-invito-non-valido").isVisible(), "invito di gruppo: codice sbagliato = 'Invito non valido'");
+
+  // Elenco.
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  { const r = gp.getByTestId("gruppo-riga"); ok((await r.count()) === 1 && (await r.first().innerText()).includes("Cene del giovedì") && (await r.first().innerText()).includes("3 persone · 2 posti"), "gruppi: elenco delle liste con persone e posti"); }
+  ok((await gp.locator("nav a[aria-current=page]").allInnerTexts()).some((t) => t.includes("Amici")), "gruppi: pagina sotto la voce 'Amici' della barra");
+  await noHScroll("gruppi");
+  await gp.screenshot({ path: `${OUT}/81-gruppi-elenco.png`, caret: "initial" });
+
+  // Lista: il più votato in cima, 👍 sposta l'ordine, "Proponi dai tuoi salvati".
+  await gp.goto(`${BASE}/gruppi/${G1}`, { waitUntil: "networkidle" });
+  const names = async () => (await gp.getByTestId("gruppo-posto").allInnerTexts()).map((t) => t.includes("Osteria Due") ? "Osteria Due" : t.includes("Trattoria Uno") ? "Trattoria Uno" : t.includes("Forno Tre") ? "Forno Tre" : "?");
+  ok((await names()).join(",") === "Osteria Due,Trattoria Uno", `lista di gruppo: il più votato in cima (${(await names()).join(", ")})`);
+  ok((await gp.getByTestId("gruppo-posto").first().getByTestId("gruppo-in-testa").count()) === 1, "lista di gruppo: '🏆 In testa' sul più votato");
+  ok((await gp.getByTestId("gruppo-posto").first().innerText()).includes("Piace a Giulia e Marco"), "lista di gruppo: si vede a chi piace");
+  ok((await gp.getByTestId("gruppo-membri").innerText()).includes("Tu") && (await gp.getByTestId("gruppo-membri").innerText()).includes("Marco"), "lista di gruppo: chi c'è nella lista (tu per primo)");
+  ok(await gp.getByTestId("gruppo-condividi").isVisible() && (await gp.getByTestId("gruppo-condividi").textContent())?.includes("Condividi il link d'invito"), "lista di gruppo: 'Condividi il link d'invito'");
+  await noHScroll("lista di gruppo");
+  await gp.screenshot({ path: `${OUT}/82-gruppo-lista.png`, caret: "initial" });
+  const trattoria = gp.getByTestId("gruppo-posto").filter({ hasText: "Trattoria Uno" });
+  await trattoria.getByTestId("gruppo-vota").click();
+  await gp.waitForTimeout(300);
+  { const v = writes.find((x) => x.t === "voti-POST"); ok(v?.body?.posto_id === "pA" && v?.body?.user_id === ME, "lista di gruppo: 👍 registra il voto a tuo nome"); }
+  ok((await trattoria.getByTestId("gruppo-vota").getAttribute("aria-pressed")) === "true" && (await trattoria.getByTestId("gruppo-vota").innerText()).trim() === "2", "lista di gruppo: 👍 acceso e conteggio +1");
+  ok((await names())[0] === "Trattoria Uno" && (await gp.getByTestId("gruppo-in-testa").count()) === 0, "lista di gruppo: a pari voti sale chi è stato proposto prima, nessuno 'in testa'");
+  await gp.getByTestId("gruppo-posto").filter({ hasText: "Trattoria Uno" }).getByTestId("gruppo-vota").click();
+  await gp.waitForTimeout(300);
+  ok(writes.some((x) => x.t === "voti-DELETE" && x.url.includes("posto_id=eq.pA")) && (await names())[0] === "Osteria Due", "lista di gruppo: secondo tocco toglie il voto e l'ordine torna");
+  await gp.getByTestId("gruppo-aggiungi").click();
+  ok((await gp.getByTestId("gruppo-salvato").count()) === 1 && (await gp.getByTestId("gruppo-salvato").innerText()).includes("Forno Tre"), "lista di gruppo: tra i tuoi salvati solo quelli non ancora proposti");
+  await gp.getByTestId("gruppo-salvato").click();
+  await gp.waitForTimeout(300);
+  { const w = writes.find((x) => x.t === "posti-POST"); ok(w?.body?.gruppo_id === G1 && w?.body?.place_id === PL(3) && w?.body?.aggiunto_da === ME, "lista di gruppo: 'Proponi' aggiunge il salvato (UUID del locale, a tuo nome)"); }
+  ok((await gp.getByTestId("gruppo-posto").count()) === 3 && (await names())[2] === "Forno Tre" && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Forno Tre" }).innerText()).includes("proposto da te"), "lista di gruppo: il posto proposto compare in fondo (0 voti), 'proposto da te'");
+  ok((await gp.getByTestId("gruppo-numeri").textContent()) === "3 persone · 3 posti", "lista di gruppo: i numeri si aggiornano");
+  const nonTrovato = await gp.goto(`${BASE}/gruppi/${G2}`, { waitUntil: "networkidle" });
+  ok(nonTrovato?.status() === 200 && await gp.getByTestId("gruppo-non-trovato").isVisible(), "lista di gruppo: chi non è membro vede 'Lista non disponibile'");
+
+  // Nuova lista: dal vuoto, form già aperto, poi la lista con l'invito in evidenza.
+  await setCookie(gctx, "e2e_gruppi", { ...dati, gruppi: [] });
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("nuova-lista-form").isVisible() && await gp.getByTestId("crea-lista").isDisabled(), "nuova lista: senza liste il modulo è già aperto (e serve un nome)");
+  await gp.getByRole("button", { name: "🍽️ Cene del giovedì" }).click();
+  await gp.locator("#gruppo-mio-nome").fill("Lorenzo");
+  await gp.screenshot({ path: `${OUT}/83-gruppi-nuova.png`, caret: "initial" });
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gp.getByTestId("crea-lista").click();
+  await gp.waitForURL(`**/gruppi/${G1}?nuova=1`, { timeout: 8000 }).catch(() => {});
+  { const w = writes.find((x) => x.t === "crea"); ok(w?.body?.p_nome === "Cene del giovedì" && w?.body?.p_emoji === "🍽️" && w?.body?.p_mio_nome === "Lorenzo", "nuova lista: crea con nome, simbolo e il tuo nome"); }
+  ok((await gp.getByTestId("gruppo-invita").innerText().catch(() => "")).includes("Lista creata! Ora invita gli amici"), "nuova lista: si apre la lista con l'invito in evidenza");
+
+  // Dalla scheda di un locale salvato: "Proponi in una lista di gruppo" → scegli la lista.
+  const before = writes.filter((x) => x.t === "posti-POST").length;
+  await gp.goto(`${BASE}/gruppi?proponi=${PL(3)}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppi-proponi").textContent())?.includes("Forno Tre"), "proponi: 'Scegli la lista in cui proporre Forno Tre'");
+  await gp.getByRole("button", { name: "Proponi in Cene del giovedì" }).click();
+  await gp.waitForURL(`**/gruppi/${G1}`, { timeout: 8000 }).catch(() => {});
+  ok(writes.filter((x) => x.t === "posti-POST").length === before + 1 && new URL(gp.url()).pathname === `/gruppi/${G1}`, "proponi: tocco sulla lista = posto proposto e lista aperta");
+  {
+    const saved = [{ tags: ["Da provare"], note: null, places: { id: PL(3), name: "Forno Tre", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.9, lng: 12.49, google_place_id: "GF3" } }];
+    await gctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: saved.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: saved }));
+    await gctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+    await gp.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
+    await gp.locator("ul.snap-x li").first().locator("button").last().click({ timeout: 5000 }).catch(() => {});
+    await gp.getByTestId("proponi-gruppo").waitFor({ timeout: 4000 }).catch(() => {});
+    ok((await gp.getByTestId("proponi-gruppo").getAttribute("href").catch(() => null)) === `/gruppi?proponi=${PL(3)}`, "scheda salvato: 'Proponi in una lista di gruppo' porta alla scelta della lista");
+  }
+
+  // Segnali: ogni azione manda il suo nome, con chiavi che il server conserva.
+  { const nomi = gEv.filter((e) => e.type === "funzione").map((e) => e.props?.nome);
+    ok(["gruppo_entra", "gruppo_voto", "gruppo_aggiungi", "gruppo_crea"].every((n) => nomi.includes(n)), `segnali gruppi: entra, voto, aggiungi, crea (${[...new Set(nomi)].join(", ")})`);
+    const lost = droppedKeys(gEv.filter((e) => String(e.props?.nome ?? "").startsWith("gruppo_")));
+    ok(lost.length === 0, `segnali gruppi: chiavi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await gctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
