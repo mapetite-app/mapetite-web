@@ -3011,7 +3011,7 @@ else {
   await actx.route("**/api/search/synthesis", async (route) => { await new Promise((r) => setTimeout(r, 600)); return route.fulfill({ json: { ...SYNTH, livelli: { P3: "alto" } } }); });
   const ap = await actx.newPage();
   ap.on("pageerror", (e) => errors.push(e.message));
-  ap.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  ap.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
   const ashot = (n) => ap.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" });
 
   // Ingresso dalla mappa e dalla home
@@ -3278,7 +3278,7 @@ else {
     });
     const gp = await gctx.newPage();
     gp.on("pageerror", (e) => errors.push(e.message));
-    gp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    gp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
     await gp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
     // 1. Solo la preferenza: nessuna ricerca, domanda "Me lo ricordo?".
     await gp.getByTestId("assistente-campo").fill("sono vegetariano e non mi piace il pesce");
@@ -3440,7 +3440,7 @@ else {
     });
     const sp = await sctx.newPage();
     sp.on("pageerror", (e) => errors.push(e.message));
-    sp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    sp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
     await sp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
     await sp.getByTestId("assistente-campo").fill("organizzami sabato sera: aperitivo, cena, dopocena a Trastevere");
     await sp.waitForTimeout(900); // pausa nello scrivere: per una serata nessuna richiesta all'AI in anticipo
@@ -4047,7 +4047,7 @@ else {
   await pctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
   const pp = await pctx.newPage();
   pp.on("pageerror", (e) => errors.push(e.message));
-  pp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  pp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
   const pshot = (n, full = false) => pp.screenshot({ path: `${OUT}/${n}.png`, caret: "initial", fullPage: full });
   const width = () => pp.evaluate(() => document.scrollingElement.scrollWidth);
 
@@ -4491,10 +4491,12 @@ else {
   await dp.screenshot({ path: `${OUT}/96-computer-risultati.png`, caret: "initial" });
 
   // Mouse su una card: si accende il suo pin.
-  await cards.nth(1).hover();
+  // Si aspetta che la lista sia ferma (i verdetti la riordinano), poi si passa sulla card per id.
+  await dp.waitForTimeout(1500);
+  const idSecondo = await dp.locator("ul li[data-id]").nth(1).getAttribute("data-id");
+  await dp.locator(`ul li[data-id="${idSecondo}"]`).hover();
   await dp.waitForTimeout(300);
   const secondo = await dp.locator("[data-testid=pin][data-focused=true]").getAttribute("data-place").catch(() => null);
-  const idSecondo = await dp.locator("ul li[data-id]").nth(1).getAttribute("data-id");
   ok(secondo === idSecondo, `computer: col mouse sulla seconda card si accende il suo pin (${secondo} = ${idSecondo})`);
 
   // Clic su una card: la scheda si apre nel pannello, la mappa resta visibile, nessun velo scuro.
@@ -5013,7 +5015,7 @@ else {
   await uctx.route("https://wa.me/**", (r) => r.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
   const up = await uctx.newPage();
   up.on("pageerror", (e) => errors.push(e.message));
-  up.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  up.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
   const utili = () => uEv.filter((e) => e.type === "utile");
 
   // Assistente: dopo la risposta con i posti, una volta sola, sotto le card.
@@ -5122,7 +5124,7 @@ else {
   await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
   const wp = await wctx.newPage();
   wp.on("pageerror", (e) => errors.push(e.message));
-  wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
   await wp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await wp.waitForTimeout(300);
   ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: al primo giorno d'uso la domanda non c'è");
