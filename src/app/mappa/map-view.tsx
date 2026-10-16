@@ -17,7 +17,7 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, LocateFixed, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Bookmark, ArrowUp, ChevronRight, Lightbulb, LocateFixed, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
@@ -727,6 +727,42 @@ const WELCOME_EXAMPLES = [
   { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento" },
 ];
 
+// Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
+function IdeaGroup({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="mt-1 first-of-type:mt-0">
+      <div className="flex min-h-8 items-center justify-between px-2">
+        <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+        {action}
+      </div>
+      <ul className="flex flex-col">{children}</ul>
+    </section>
+  );
+}
+
+function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: string; title: string; sub?: string; label?: string; onClick?: () => void; href?: string; testId?: string }) {
+  const inner = (
+    <>
+      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-base">{emoji}</span>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 block text-[15px] font-sans font-medium leading-tight text-text">{title}</span>
+        {sub && <span className="block truncate text-xs font-sans text-text-muted">{sub}</span>}
+      </span>
+      <ChevronRight size={16} aria-hidden className="shrink-0 text-text-muted" />
+    </>
+  );
+  const cls = "flex min-h-12 w-full items-center gap-3 rounded-btn px-2 py-1.5 text-left active:bg-brand-light";
+  return (
+    <li>
+      {href ? (
+        <Link href={href} data-testid={testId} aria-label={label} className={cls}>{inner}</Link>
+      ) : (
+        <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className={cls}>{inner}</button>
+      )}
+    </li>
+  );
+}
+
 export default function MapView({
   places: initialPlaces,
   userId,
@@ -885,6 +921,8 @@ export default function MapView({
   // ?beta=-suggerimenti riporta la card di prima.
   const chipsOn = useBeta("suggerimenti") && barOn && homeVariant === "a";
   const welcomeHidden = welcomeDismissed || chipsOn;
+  // Pannello "Ti suggeriamo": si apre con "Idee" o toccando la barra vuota.
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [geoState, setGeoState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
@@ -920,6 +958,7 @@ export default function MapView({
       overlayReducer(state, wrapped.action, wrapped.ctx),
     { kind: "none" } as Overlay,
   );
+  const ideasShown = ideasOpen && chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "";
   const dispatch = (action: OverlayAction) =>
     dispatchRaw({ action, ctx: { hasResults: displayedPlaces.length > 0 } });
 
@@ -1911,6 +1950,8 @@ export default function MapView({
       >
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
+      {/* Tocco fuori dal pannello "Ti suggeriamo": si chiude e la mappa torna libera. */}
+      {ideasShown && <div aria-hidden data-testid="idee-fuori" className="absolute inset-0 z-10" onClick={() => setIdeasOpen(false)} />}
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
       <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
         {/* Da computer, a mappa vuota: titolo del pannello sopra la barra (sul telefono non c'è). */}
@@ -1947,6 +1988,7 @@ export default function MapView({
                 enterKeyHint="search"
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
+                onFocus={() => setIdeasOpen(true)}
                 placeholder="Chiedi all'AI…"
                 aria-label="Chiedi all'AI: cosa cerchi?"
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -2050,88 +2092,91 @@ export default function MapView({
             <p className="px-1 pt-1 text-xs font-sans text-text-muted">Premi Invio per cercare nuovi posti con l&apos;AI.</p>
           </div>
         )}
-        {/* Suggerimenti sotto la barra: fanno capire come si parla all'AI (un tocco = ricerca). */}
+        {/* Seconda riga (Lorenzo 16/10: schermo più libero): Esplora/I miei salvati e UN solo accesso
+            a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. */}
+        <div className="flex items-center gap-2">
+          <div className="pointer-events-auto flex shrink-0 rounded-pill overflow-hidden shadow-float bg-surface">
+            <button
+              type="button"
+              onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
+              className={
+                view === "all"
+                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
+                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+              }
+            >
+              Esplora
+            </button>
+            <button
+              type="button"
+              onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+              className={
+                view === "saved"
+                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
+                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
+              }
+            >
+              I miei salvati
+            </button>
+          </div>
+          {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
+            <button
+              type="button"
+              data-testid="apri-idee"
+              aria-expanded={ideasShown}
+              onClick={() => setIdeasOpen((o) => !o)}
+              className={`pointer-events-auto flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${ideasShown ? "bg-brand text-white" : "bg-surface text-brand"}`}
+            >
+              {ideasShown ? <X size={16} aria-hidden /> : <Lightbulb size={16} className="text-accent" aria-hidden />}
+              Idee
+            </button>
+          )}
+        </div>
+        {/* "Ti suggeriamo" (Lorenzo 16/10): tutti i suggerimenti dietro un solo tocco (Idee o tocco sulla barra),
+            in gruppi brevi come lo storico di Places. Resta nel DOM anche chiuso (nascosto). */}
         {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && aiQuery.trim() === "" && (
-          <div data-testid="suggerimenti-barra" className="pointer-events-auto -ml-4 flex w-screen gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:w-[30rem] lg:ml-0 lg:w-auto lg:flex-wrap lg:overflow-visible lg:px-0">
-            {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione. La barra resta la ricerca. */}
-            <Link
-              href="/assistente"
-              data-testid="mappa-assistente"
-              className="flex min-h-10 shrink-0 items-center rounded-pill bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
-            >
-              💬 Parla con l&apos;assistente
-            </Link>
-            {/* Sorprendimi (piano 2.5): un posto mai provato vicino al centro della mappa. */}
-            <Link
-              href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`}
-              data-testid="mappa-sorprendimi"
-              className="flex min-h-10 shrink-0 items-center rounded-pill bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
-            >
-              🎲 Sorprendimi
-            </Link>
-            {tasteSuggestion && (
-              <button
-                type="button"
-                data-testid="suggerimento-per-te"
-                onClick={() => { setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }}
-                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill lg:max-w-full bg-brand px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
-              >
-                ✨ Per te: {tasteSuggestion}
-              </button>
-            )}
-            {savedSuggestion && (
-              <button
-                type="button"
-                data-testid="suggerimento-salvati"
-                onClick={() => { setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }}
-                className="min-h-10 max-w-[80vw] shrink-0 truncate rounded-pill lg:max-w-full bg-accent px-3.5 text-sm font-sans font-semibold text-white shadow-float active:scale-95"
-              >
-                ✨ Dai tuoi salvati: {savedSuggestion.label}
-              </button>
-            )}
-            {momentExample && (
-              <button
-                type="button"
-                data-testid="suggerimento-momento"
-                onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setAiQuery(q); void runAISearch(q); }}
-                className="min-h-10 shrink-0 rounded-pill border border-brand/40 bg-surface px-3.5 text-sm font-sans font-semibold text-brand shadow-float active:scale-95"
-              >
-                {momentExample}
-              </button>
-            )}
-            {recentOn && (JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
-              <button
-                key={`r-${r}`}
-                type="button"
-                data-testid="recenti"
-                onClick={() => { setAiQuery(r); void runAISearch(r); }}
-                className="min-h-10 shrink-0 rounded-pill bg-accent-light px-3.5 text-sm font-sans text-accent shadow-float active:scale-95"
-              >
-                ↻ {r}
-              </button>
-            ))}
+          <div
+            data-testid="idee-pannello"
+            className={`pointer-events-auto max-h-[calc(100dvh-14rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto rounded-card bg-surface p-2 shadow-float lg:w-auto lg:max-w-none ${ideasShown ? "" : "hidden"}`}
+          >
+            <p className="px-2 pb-1 pt-1 font-title text-lg font-semibold text-brand">Ti suggeriamo</p>
+            <IdeaGroup title="Adesso">
+              {momentExample && (
+                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
+              )}
+              <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo che probabilmente ti piace" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
+              {userId && savedPlaces.length > 0 && (
+                <IdeaRow testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
+              )}
+            </IdeaGroup>
+            <IdeaGroup title="Per te">
+              {tasteSuggestion && (
+                <IdeaRow testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+              )}
+              {savedSuggestion && (
+                <IdeaRow testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+              )}
+              <IdeaRow testId="mappa-assistente" emoji="💬" title="Parla con l'assistente" sub="Chiedi, affina, prenota" href="/assistente" />
+            </IdeaGroup>
             {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-              <button
-                type="button"
-                data-testid="cancella-recenti"
-                onClick={clearRecentSearches}
-                aria-label="Cancella le ricerche recenti"
-                className="min-h-10 shrink-0 rounded-pill bg-surface/90 px-3 text-xs font-sans text-text-muted shadow-float active:scale-95"
+              <IdeaGroup
+                title="Recenti"
+                action={
+                  <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
+                    Cancella
+                  </button>
+                }
               >
-                Cancella
-              </button>
+                {(JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
+                  <IdeaRow key={`r-${r}`} testId="recenti" label={`↻ ${r}`} emoji="↻" title={r} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
+                ))}
+              </IdeaGroup>
             )}
-            {WELCOME_EXAMPLES.map(({ query: example }) => (
-              <button
-                key={example}
-                type="button"
-                aria-label={example}
-                onClick={() => { setAiQuery(example); void runAISearch(example); }}
-                className="min-h-10 shrink-0 rounded-pill bg-surface px-3.5 text-sm font-sans text-text shadow-float active:scale-95"
-              >
-                “{example}”
-              </button>
-            ))}
+            <IdeaGroup title="Prova a chiedere">
+              {WELCOME_EXAMPLES.map((ex) => (
+                <IdeaRow key={ex.query} label={ex.query} emoji="🔎" title={ex.title} sub={ex.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+              ))}
+            </IdeaGroup>
           </div>
         )}
         {/* Pannello AI espandibile */}
@@ -2152,30 +2197,6 @@ export default function MapView({
             />
           </div>
         )}
-        <div className="pointer-events-auto self-start flex rounded-card overflow-hidden shadow-card border border-border bg-surface">
-          <button
-            type="button"
-            onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
-            className={
-              view === "all"
-                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-            }
-          >
-            Esplora
-          </button>
-          <button
-            type="button"
-            onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
-            className={
-              view === "saved"
-                ? "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-brand text-white"
-                : "min-h-10 px-4 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-            }
-          >
-            I miei salvati
-          </button>
-        </div>
         {view === "saved" && userId && savedPlaces.length > 0 && (
           <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-2 rounded-card border border-border bg-surface p-2 shadow-float">
             {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
@@ -2315,7 +2336,7 @@ export default function MapView({
               {aiSearch === null && view === "saved" && !savedFiltered && (
                 <button
                   type="button"
-                  onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                  onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setWelcomeDismissed(false); setIdeasOpen(true); dispatch({ type: "RESET" }); }}
                   className="mt-4 min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
                 >
                   Cerca un locale
@@ -2342,7 +2363,7 @@ export default function MapView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { clearAiSearch(); setAiQuery(""); setWelcomeDismissed(false); dispatch({ type: "RESET" }); }}
+                    onClick={() => { clearAiSearch(); setAiQuery(""); setWelcomeDismissed(false); setIdeasOpen(true); dispatch({ type: "RESET" }); }}
                     className="min-h-11 rounded-pill border border-border px-4 text-sm font-display font-semibold text-brand active:scale-95"
                   >
                     Vedi esempi

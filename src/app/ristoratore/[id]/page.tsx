@@ -118,5 +118,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }

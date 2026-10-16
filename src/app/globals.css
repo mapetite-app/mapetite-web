@@ -93,13 +93,18 @@
   --shadow-float: var(--shadow-float);
 }
 
+/* "Niente rimbalzo" sulla radice, non sul body: su iPhone, sul body con html alto 100%,
+   la barra fissa in basso poteva salire a metà schermo scorrendo (Lorenzo, 16/10). */
+html {
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-inter), system-ui, sans-serif;
   /* Sensazione da app, non da sito (piano 6.3): niente rimbalzo né "tira per ricaricare"
      della pagina intera, niente riquadro grigio al tocco su iPhone/Android. */
-  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
