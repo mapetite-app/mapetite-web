@@ -141,9 +141,33 @@ export function coverGradient(category: string | null, name = ""): string {
   return `linear-gradient(160deg, ${a} 0%, ${b} 100%)`;
 }
 
+// Riga di fatti della card (Lorenzo 16/10, "il dono della sintesi"): tipo · ★ voto · prezzo · [città] · distanza.
+// Senza il numero di recensioni: resta nella scheda; sulla card il "poco conosciuto" lo dice il 💎.
+export function cardFacts(place: Place, origin: { lat: number; lng: number } | null = null, withCity = false): string {
+  const parts: string[] = [];
+  const cat = prettyCategory(place.category);
+  if (cat) parts.push(cat);
+  if (place.rating != null) parts.push(`★ ${place.rating.toFixed(1).replace(".", ",")}`);
+  const price = priceLabel(place.priceLevel);
+  if (price) parts.push(price);
+  const city = withCity ? cityFromAddress(place.address) : null;
+  if (city) parts.push(city);
+  if (origin) parts.push(distanceLabel(origin, place));
+  return parts.join(" · ");
+}
+
 function SkeletonLines({ dark = false }: { dark?: boolean }) {
   const bar = dark ? "bg-white/20" : "bg-border";
   const chip = dark ? "bg-white/15" : "bg-accent-light";
+  // Card del carosello: solo il verdetto (2 righe), stessa forma di ciò che arriva.
+  if (dark) {
+    return (
+      <span aria-label="Sto preparando il verdetto" data-testid="segnaposto-verdetto" className="mt-1.5 block">
+        <span className="flex h-5 items-center"><span className={`block h-3 w-4/5 animate-pulse rounded-pill ${bar}`} /></span>
+        <span className="flex h-5 items-center"><span className={`block h-3 w-3/5 animate-pulse rounded-pill ${bar}`} /></span>
+      </span>
+    );
+  }
   return (
     <span aria-label="Sto preparando il verdetto" data-testid="segnaposto-verdetto" className="mt-2 block">
       <span className="flex h-5 items-center"><span className={`block h-3 w-4/5 animate-pulse rounded-pill ${bar}`} /></span>
@@ -392,7 +416,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (allPlaces.length === 0) return null;
 
   const quickChips = (
-    <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" data-testid="filtri-lista">
+    <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" data-testid="filtri-lista">
       {onOpenArticle && (
         <button
           type="button"
@@ -409,7 +433,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={quick.has(k)}
           onClick={() => toggleQuick(k)}
-          className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium shadow-card ${quick.has(k) ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+          className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${quick.has(k) ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
         >
           {label}
         </button>
@@ -419,7 +443,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={nearestFirst}
           onClick={() => setNearestFirst((v) => !v)}
-          className={`min-h-9 rounded-pill border px-3 text-xs font-display font-medium shadow-card ${nearestFirst ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+          className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${nearestFirst ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
         >
           Più vicini
         </button>
@@ -435,92 +459,110 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         className="pointer-events-none absolute left-0 right-0 z-10 lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-border lg:pb-5"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl lg:mx-5 lg:max-w-none lg:shadow-none ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
-          <div className="min-w-0 flex-1">
+        {/* Intestazione in UNA riga (Lorenzo 16/10, "il dono della sintesi"): frase cercata + numero,
+            un solo "⋯" che apre "Ho capito", i locali messi da parte, Affina e Condividi. */}
+        <div className={`pointer-events-auto mx-3 mb-1.5 bg-surface shadow-float md:max-w-xl lg:mx-5 lg:max-w-none lg:shadow-none ${title || heading ? "rounded-card py-1 pl-4 pr-1" : "w-fit rounded-pill px-4 py-1.5"}`}>
+          <div className="flex min-h-9 items-center gap-1">
             {title && (
-              <p data-testid="titolo-risposta" onClick={() => setHeaderOpen((v) => !v)} className={`${headerOpen ? "" : "line-clamp-1"} font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase`}>
+              <p data-testid="titolo-risposta" onClick={() => setHeaderOpen((v) => !v)} className={`min-w-0 flex-1 ${headerOpen ? "" : "truncate"} font-title text-[15px] in-data-[titoli=serif]:text-lg font-semibold leading-snug text-brand first-letter:uppercase`}>
                 {title}
               </p>
             )}
             {!title && heading && (
-              <p data-testid="intestazione-lista" className="truncate font-title text-base font-semibold leading-snug text-brand">{heading}</p>
+              <p data-testid="intestazione-lista" className="min-w-0 flex-1 truncate font-title text-[15px] font-semibold leading-snug text-brand">{heading}</p>
             )}
-            <p className="text-xs font-sans text-text-muted">
-              {title
-                ? `${places.length} ${places.length === 1 ? "posto scelto" : "posti scelti"} per te`
-                : heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
-              {loadingVerdicts && " · preparo i verdetti…"}
-            </p>
-          </div>
-          {title && (
-            <button
-              type="button"
-              aria-label="Condividi questa ricerca"
-              onClick={async () => {
-                const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
-                const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
-                trackFeature("condividi_ricerca");
-                try {
-                  if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
-                  else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
-                } catch {
-                  // foglio di condivisione chiuso: niente da segnalare
-                }
-              }}
-              className="-my-1 ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
-            >
-              {shared ? "✓" : (
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+            <span data-testid="conteggio-risultati" className="shrink-0 text-xs font-sans text-text-muted">
+              {loadingVerdicts
+                ? "preparo i verdetti…"
+                : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+            </span>
+            {title && (
+              <button
+                type="button"
+                data-testid="opzioni-ricerca"
+                aria-label="Opzioni della ricerca"
+                aria-expanded={headerOpen}
+                onClick={() => setHeaderOpen((v) => !v)}
+                className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-brand active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-bg"}`}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+                  <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
                 </svg>
-              )}
+              </button>
+            )}
+            {!title && heading && onShareList && places.length > 0 && (
+              <button
+                type="button"
+                data-testid="condividi-lista"
+                aria-label="Condividi questa lista"
+                onClick={async () => {
+                  trackFeature("condividi_lista");
+                  const r = await onShareList(places);
+                  if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
+                }}
+                className="ml-1 flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+              >
+                {shared ? "✓ Copiata" : (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                    </svg>
+                    Condividi
+                  </>
+                )}
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Chiudi" className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-text-muted">
+              ✕
             </button>
-          )}
-          {!title && heading && onShareList && places.length > 0 && (
-            <button
-              type="button"
-              data-testid="condividi-lista"
-              aria-label="Condividi questa lista"
-              onClick={async () => {
-                trackFeature("condividi_lista");
-                const r = await onShareList(places);
-                if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
-              }}
-              className="-my-1 ml-2 flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
-            >
-              {shared ? "✓ Copiata" : (
-                <>
+          </div>
+          {title && headerOpen && (
+            <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
+              {understood.length > 0 && (
+                <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
+              )}
+              {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
+                <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
+                  {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
+                      Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
+                  🧭 {[
+                    setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
+                    setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
+                  ].filter(Boolean).join(" ")}
+                </p>
+              )}
+              <div className="mt-2 flex gap-2">
+                {onRefine && (
+                  <button type="button" onClick={onRefine} className="flex min-h-9 items-center gap-1.5 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4Z" />
+                    </svg>
+                    Affina
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label="Condividi questa ricerca"
+                  onClick={async () => {
+                    const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
+                    const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
+                    trackFeature("condividi_ricerca");
+                    try {
+                      if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
+                      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
+                    } catch {
+                      // foglio di condivisione chiuso: niente da segnalare
+                    }
+                  }}
+                  className="flex min-h-9 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+                >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
                   </svg>
-                  Condividi
-                </>
-              )}
-            </button>
-          )}
-          {title && onRefine && (
-            <button type="button" onClick={onRefine} className="-my-1 ml-2 min-h-9 shrink-0 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95">
-              Affina
-            </button>
-          )}
-          <button type="button" onClick={onClose} aria-label="Chiudi" className="-my-2 ml-1 flex h-11 w-9 shrink-0 items-center justify-center text-base text-text-muted">
-            ✕
-          </button>
-          {/* A tutta larghezza sotto i pulsanti: prima veniva tagliato ("a Ro…"). */}
-          {title && understood.length > 0 && (
-            <p data-testid="ho-capito" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-accent`}>
-              Ho capito: {understood.join(" · ")}
-            </p>
-          )}
-          {title && setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
-            <p data-testid="messi-da-parte" onClick={() => setHeaderOpen((v) => !v)} className={`mt-0.5 basis-full ${headerOpen ? "" : "line-clamp-1"} text-xs font-sans text-text-muted`}>
-              {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
-                  Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
-              🧭 {[
-                setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
-                setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
-              ].filter(Boolean).join(" ")}
-            </p>
+                  {shared ? "✓ Copiato" : "Condividi"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
         {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
@@ -530,6 +572,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5">
           {places.map((place) => {
             const d = details?.[place.id];
+            // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
+            // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
+            const saved = onSave ? savedLabel?.(place.id) ?? null : null;
+            const gem = !saved && gemsOn && isGem(place.rating, d?.userRatingCount);
             return (
               <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[78vw] max-w-sm shrink-0 snap-center lg:w-auto lg:max-w-none lg:rounded-card lg:transition-shadow ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                 {onSave && (
@@ -549,93 +595,76 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   type="button"
                   onClick={() => onSelect(place)}
                   data-testid="card-risultato"
-                  className="relative flex h-full min-h-[172px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  className="relative flex h-full min-h-[150px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
                   style={{ background: coverGradient(place.category, place.name) }}
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
                       così si vede anche quando la foto non arriva (quota finita). */}
-                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[88px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
-                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/55 to-black/10" />
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/60 to-black/10" />
                     </>
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    <span className={`flex flex-wrap items-center gap-1 ${onSave ? "pr-11" : ""}`}>
+                    {(saved || gem) && (
+                      <span className={`flex ${onSave ? "pr-11" : ""}`}>
+                        {saved ? (
+                          <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : (
+                          <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                        )}
+                      </span>
+                    )}
+                    <span className={`mt-auto pt-3 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave && !(saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
+                      <span className="truncate">{cardFacts(place, origin, showCity)}</span>
                       {d?.openNow === true && (
-                        <span className="flex items-center gap-1 rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
+                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
                       )}
                       {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                       {d?.openNow === false && (
-                        <span data-testid="chiuso-ora" className="rounded-pill bg-black/30 px-2 py-0.5 text-[10px] font-display font-medium text-white/80">Chiuso ora</span>
+                        <span data-testid="chiuso-ora" className="shrink-0 text-white/60">· Chiuso ora</span>
                       )}
-                      {gemsOn && isGem(place.rating, d?.userRatingCount) && (
-                        <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
-                      )}
-                      {onSave && savedLabel?.(place.id) && (
-                        <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{savedLabel(place.id)}</span>
-                      )}
-                    </span>
-                    <span className={`mt-auto pt-6 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave ? "pr-2" : ""}`}>{place.name}</span>
-                    <span className="mt-1 truncate text-[11px] font-display font-medium uppercase tracking-wider text-white/75">
-                      {metaLine(place, d, origin, showCity)}
                     </span>
                     {similarTo?.(place.id) && (
                       <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
                     )}
                     {d?.verdict ? (
-                      <span className="mt-2 block">
-                        {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
-                        <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wider text-accent before:mr-1 before:content-['✦']">Il verdetto Mapetite</span>
-                        <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
+                      <span className="mt-1.5 block">
+                        {/* Il verdetto si riconosce dal ✦ corallo; l'etichetta intera è nella scheda (e per i lettori di schermo). */}
+                        <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
+                        <span className="line-clamp-2 text-sm font-sans font-medium leading-snug text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
                     ) : googleLine(d) ? (
-                      <span data-testid="riga-google" className="mt-2 line-clamp-2 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
+                      <span data-testid="riga-google" className="mt-1.5 line-clamp-2 text-sm font-sans leading-snug text-white/80">{googleLine(d)}</span>
                     ) : null}
-                    {/* Il perché è adatto a QUESTA ricerca: con il verdetto, ciò che nessun concorrente mostra. */}
-                    {d?.matchReason && (
-                      <span className="mt-1 line-clamp-1 text-xs font-sans leading-snug text-white/75">{d.matchReason}</span>
-                    )}
                     {/* Dati personali dei salvati: la tua nota (i tag restano nella scheda e nei filtri). */}
                     {place.note && (
                       <span className="mt-1 line-clamp-1 text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
-                    )}
-                    {((d?.goFor ?? []).length > 0 || (place.tags ?? []).length > 0) && (
-                      <span className="mt-2 flex gap-1.5 overflow-hidden">
-                        {(place.tags && place.tags.length > 0 ? sortTags(place.tags).slice(0, 2).map(tagLabel) : d!.goFor!.slice(0, 2)).map((c) => (
-                          <span key={c} className="min-w-0 truncate rounded-pill border border-white/30 px-2 py-0.5 text-[11px] font-display">{c}</span>
-                        ))}
-                      </span>
                     )}
                   </span>
                 </button>
               </li>
             );
           })}
-          {/* In fondo al carosello: 👍/👎 in un tocco, poi l'email per chi vuole spiegare. */}
+          {/* In fondo al carosello, in una sola card: 👍/👎 in un tocco, poi l'email per chi vuole spiegare. */}
           {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
             <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center lg:w-auto lg:max-w-none">
-              <div className="flex h-full min-h-[190px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float lg:min-h-0 lg:shadow-none">
+              <div className="flex h-full min-h-[150px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float lg:min-h-0 lg:shadow-none">
                 <UtileFeedback contesto="ricerca" risultati={places.length} />
+                <a
+                  data-testid="ricerca-feedback"
+                  href={searchFeedbackMailto(title, places.map((p) => p.name))}
+                  className="text-xs font-sans text-text-muted underline underline-offset-2"
+                >
+                  🤔 Questi risultati non vanno? Scrivimi
+                </a>
               </div>
-            </li>
-          )}
-          {/* I tester segnalano una ricerca che non va (email già scritta). */}
-          {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
-            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center lg:w-auto lg:max-w-none">
-              <a
-                data-testid="ricerca-feedback"
-                href={searchFeedbackMailto(title, places.map((p) => p.name))}
-                className="flex h-full min-h-[190px] flex-col justify-center rounded-card border-2 border-dashed border-white/70 bg-surface/95 p-4 text-left shadow-float active:scale-[0.99] lg:min-h-0 lg:border-border lg:shadow-none"
-              >
-                <span className="text-2xl" aria-hidden>🤔</span>
-                <span className="mt-2 font-title text-base font-semibold leading-snug text-brand">Questi risultati non vanno?</span>
-                <span className="mt-1 text-sm font-sans text-text-muted">Dimmelo: si apre un&apos;email già scritta con la tua ricerca.</span>
-              </a>
             </li>
           )}
         </ul>
