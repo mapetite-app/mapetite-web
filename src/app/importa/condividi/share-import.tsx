@@ -7,6 +7,7 @@ import { extractMapsLinks } from "@/lib/maps-link";
 import { findSocialLink, placeHintFromText } from "@/lib/social-link";
 import SocialLinkHelp from "../social-link-help";
 import { findVideoLink } from "@/lib/video-caption";
+import { findReelLink } from "@/lib/reel";
 import ManualAddCard from "../manual-add-card";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, rememberPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
@@ -85,7 +86,7 @@ export default function ShareImport({
             // Condiviso da TikTok/YouTube: Importa legge la didascalia del video e propone il locale.
             onReadVideo={video ? () => router.push(`/importa?video=${encodeURIComponent(video)}#da-screenshot`) : undefined}
           />
-          {manualQuery && <ManualAddCard userId={userId} initialQuery={manualQuery} autoSearch />}
+          {manualQuery && <ManualAddCard userId={userId} initialQuery={manualQuery} autoSearch reelUrl={findReelLink(fullText)} />}
         </div>
       )}
 
