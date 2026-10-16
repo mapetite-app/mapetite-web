@@ -43,7 +43,12 @@ export async function GET(request: Request) {
     const meta = await fetch(
       `https://places.googleapis.com/v1/${ref}/media?maxWidthPx=${w}&skipHttpRedirect=true&key=${apiKey}`,
     );
-    if (!meta.ok) return NextResponse.json({ error: "Foto non disponibile." }, { status: 404 });
+    if (!meta.ok) {
+      // Prima era un 404 muto: con Sorprendimi (16/10) la foto mancava senza sapere perché.
+      // 429 = quota Google delle foto finita per oggi; il resto (riferimento scaduto, chiave) resta 404.
+      console.warn(`[photo] Google ha risposto ${meta.status} per ${ref.slice(0, 60)}…`);
+      return NextResponse.json({ error: meta.status === 429 ? "Foto sospese per oggi." : "Foto non disponibile." }, { status: meta.status === 429 ? 429 : 404 });
+    }
     const { photoUri } = (await meta.json()) as { photoUri?: string };
     // Si scarica solo da host di immagini Google (mai un indirizzo arbitrario).
     const host = photoUri ? new URL(photoUri).hostname : "";
