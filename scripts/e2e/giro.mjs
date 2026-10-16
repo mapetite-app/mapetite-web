@@ -1172,13 +1172,13 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
 } else {
   await page.getByText("La tua mappa è ancora vuota").waitFor({ timeout: 4000 });
   ok((await page.getByTestId("raccogli-vuoto").getByRole("link").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).join(" ") === "/importa /importa#da-screenshot /importa#a-mano", "salvati vuoti: i modi per salvare (Google Maps, screenshot, a mano) a un tocco");
+  await page.screenshot({ path: `${OUT}/08b-salvati-vuoti.png`, caret: "initial" });
+  await page.getByRole("button", { name: "Cerca un locale" }).click();
+  ok(await page.getByTestId("idee-pannello").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca con le idee aperte");
   await page.goto(`${BASE}/importa#da-screenshot`, { waitUntil: "networkidle" });
   ok(await page.getByText("Scegli uno screenshot").waitFor({ timeout: 3000 }).then(() => true, () => false), "importa#da-screenshot: si apre già il pannello dello screenshot");
   await page.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   ok(await page.getByTestId("importa-mano").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa#a-mano: si apre già il pannello 'A mano'");
-  await page.screenshot({ path: `${OUT}/08b-salvati-vuoti.png`, caret: "initial" });
-  await page.getByRole("button", { name: "Cerca un locale" }).click();
-  ok(await page.getByTestId("idee-pannello").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca con le idee aperte");
 }
 
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
