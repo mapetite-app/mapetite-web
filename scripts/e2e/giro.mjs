@@ -510,12 +510,12 @@ ok((await page.getByText("Reset").count()) === 0 && await page.getByRole("button
 let filterBody = null;
 await page.route("**/api/search", async (r) => { filterBody = r.request().postDataJSON(); return r.fallback(); });
 await page.getByRole("button", { name: "Pizzerie" }).click();
-await page.getByRole("button", { name: "3 km" }).click();
+await page.getByRole("button", { name: "2 km" }).click();
 await page.getByRole("button", { name: "★ 4,5+" }).click();
 await page.getByRole("button", { name: "Applica filtri (3)" }).click();
 await page.getByTestId("intestazione-lista").waitFor({ timeout: 5000 });
-ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 3000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 3 km e voto 4,5+");
-ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 3 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
+ok(filterBody?.searchIntent === "structured" && filterBody?.radius === 2000 && filterBody?.minRating === 4.5 && JSON.stringify(filterBody?.categories) === '["pizza"]', "filtri: la ricerca parte con tipo, 2 km e voto 4,5+");
+ok((await page.getByTestId("intestazione-lista").textContent()) === "Filtri: Pizzerie · entro 2 km · ★ 4,5+", "filtri: i risultati dicono quali filtri sono attivi");
 await page.waitForTimeout(1200);
 { const pins = await page.getByTestId("pin").count(); ok(pins >= 2, `filtri: la mappa si sposta sui risultati (${pins} pin separati, non un gruppo unico)`); }
 await shot("24b-filtri-risultati");
@@ -530,7 +530,7 @@ ok(filterBody?.phase === "fast" && await page.getByText("Vista vera sui tetti di
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
 ok(await page.getByTestId("filtro-zona").isVisible() && await page.getByTestId("zone-suggerite").getByRole("button", { name: "Tutta Roma" }).isVisible(), "filtri: campo 'Dove?' con le zone di Roma suggerite");
 await page.getByTestId("filtro-zona").fill("Pigneto");
-ok((await page.getByRole("button", { name: "3 km" }).count()) === 0, "filtri: con una zona scritta la distanza dalla mappa non si chiede");
+ok((await page.getByRole("button", { name: "2 km" }).count()) === 0, "filtri: con una zona scritta la distanza dalla mappa non si chiede");
 await shot("24c-filtri-dove");
 filterBody = null;
 await page.getByRole("button", { name: /^Applica filtri/ }).click();
@@ -5608,6 +5608,97 @@ else {
   ok((await cp.getByTestId("recensione-form").count()) === 0 && (await cp.getByTestId("reel-aggiungi").count()) === 0 && decodeURIComponent((await acc.getAttribute("href").catch(() => "")) ?? "") === `/login?next=/locali/${CID}`, "community senza accesso: niente modulo, 'Accedi' riporta al locale");
   ok((await cp.getByTestId("recensione-community").count()) === 2, "community senza accesso: le recensioni si leggono comunque");
   await cctx.close();
+}
+
+// Vicino a me adesso e raggio sulla mappa (piano 2.1): una riga in "Ti suggeriamo" e il raggio nei Filtri.
+// Una sola ricerca (simulata) per tocco; il cerchio ha la sua misura sul bordo.
+{
+  let vn = null;
+  try { vn = await import(new URL("../../src/lib/vicino.ts", import.meta.url).href); } catch (e) { ok(false, `vicino: modulo src/lib/vicino.ts importabile (${e.message})`); }
+  if (vn) {
+    const at = (h, m = 0) => vn.nearNowQuery(new Date(2026, 9, 16, h, m)).query;
+    ok(/colazione/.test(at(8)) && /pranzo/.test(at(13)) && /aperitivo/.test(at(19)) && /cena/.test(at(21)) && /cocktail/.test(at(1)), "vicino: la ricerca cambia con l'ora (colazione, pranzo, aperitivo, cena, notte)");
+    ok(vn.radiusLabel(0.5) === "500 m" && vn.radiusLabel(2) === "2 km", "vicino: misure del raggio in italiano (500 m, 2 km)");
+    const c = vn.circlePolygon({ lat: 41.9, lng: 12.49 }, 1000).geometry.coordinates[0];
+    ok(c.length === 65 && Math.abs(c[16][1] - 41.9 - 1000 / 111320) < 1e-6, "vicino: il cerchio sulla mappa ha il raggio giusto");
+  }
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["geolocation"], geolocation: { latitude: 41.9001, longitude: 12.4901 } });
+  const vEv = [];
+  await vctx.route("**/api/events", (r) => { vEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await vctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await vctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  const vBodies = [];
+  await vctx.route("**/api/search", (r) => { vBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
+  await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const vp = await vctx.newPage();
+  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  vp.on("pageerror", (e) => errors.push(e.message));
+  await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await idee(vp);
+  const riga = vp.getByTestId("vicino-adesso");
+  ok(await riga.isVisible() && (await riga.textContent())?.includes("Vicino a me, aperto adesso"), "vicino: riga '📍 Vicino a me, aperto adesso' nel pannello 'Ti suggeriamo' (gruppo Adesso)");
+  ok((await vp.getByTestId("vicino-adesso").locator("xpath=ancestor::section[1]").textContent())?.startsWith("Adesso"), "vicino: la riga sta nel gruppo 'Adesso'");
+  await vp.screenshot({ path: `${OUT}/99-vicino-idee.png`, caret: "initial" });
+  await riga.click();
+  await vp.getByTestId("intestazione-lista").waitFor({ timeout: 6000 }).catch(() => {});
+  await vp.waitForTimeout(600);
+  const b = vBodies[0] ?? {};
+  const expected = vn ? vn.nearNowQuery(new Date()).query : null;
+  ok(vBodies.length === 1, `vicino: una sola ricerca per tocco (${vBodies.length})`);
+  ok(b.searchIntent === "structured" && b.openNowOnly === true && b.radius === 1000 && Math.abs(b.lat - 41.9001) < 1e-6 && Math.abs(b.lng - 12.4901) < 1e-6, `vicino: aperti ora, entro 1 km dalla mia posizione (${JSON.stringify({ o: b.openNowOnly, r: b.radius, lat: b.lat, lng: b.lng })})`);
+  ok(expected == null || b.query === expected, `vicino: la frase per Google è quella dell'ora (${b.query})`);
+  const head = (await vp.getByTestId("intestazione-lista").textContent().catch(() => "")) ?? "";
+  ok(head.includes("entro 1 km da te") && head.includes("aperti ora"), `vicino: l'intestazione dice 'entro 1 km da te · aperti ora' (${head})`);
+  ok((await vp.getByTestId("raggio-etichetta").textContent().catch(() => "")) === "1 km" && await vp.getByTestId("tu-sei-qui").isVisible(), "vicino: cerchio con la misura '1 km' e il punto 'tu sei qui' sulla mappa");
+  await vp.waitForTimeout(1000);
+  { const lb = await vp.getByTestId("raggio-etichetta").boundingBox(); ok(!!lb && lb.y > 0 && lb.y + lb.height < 844 && lb.x > 0 && lb.x + lb.width < 390, `vicino: la mappa mostra tutto il cerchio (misura in vista, y=${Math.round(lb?.y ?? -1)})`); }
+  ok(vEv.some((e) => e.type === "funzione" && e.props?.nome === "vicino_adesso") && vEv.some((e) => e.props?.nome === "raggio" && e.props?.origine === "me" && e.props?.contesto === "1 km"), "vicino: tocco e raggio registrati (trackFeature)");
+  { const lost = droppedKeys(vEv.filter((e) => ["vicino_adesso", "raggio"].includes(e.props?.nome))); ok(lost.length === 0, `vicino: chiavi degli eventi conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await vp.screenshot({ path: `${OUT}/99b-vicino-risultati.png`, caret: "initial" });
+  // Filtri, "Quanto lontano?": 500 m dal centro della mappa (niente 'da te', cerchio di 500 m).
+  await vp.getByRole("button", { name: "Filtri", exact: true }).click();
+  const rag = vp.getByTestId("filtri-raggio");
+  await rag.waitFor({ timeout: 4000 });
+  ok((await rag.getByRole("button", { name: "500 m" }).count()) === 1 && (await rag.getByRole("button", { name: "5 km" }).count()) === 1, "raggio: scelte 500 m / 1 km / 2 km / 5 km nei Filtri");
+  ok((await vp.getByTestId("raggio-da-me").getAttribute("aria-pressed")) === "true", "raggio: dopo 'Vicino a me' nei Filtri risulta 'Da me'");
+  await rag.getByRole("button", { name: "500 m" }).click();
+  await vp.getByTestId("raggio-da-mappa").click();
+  await rag.scrollIntoViewIfNeeded();
+  await vp.screenshot({ path: `${OUT}/99c-raggio-filtri.png`, caret: "initial" });
+  await vp.getByRole("button", { name: /^Applica filtri/ }).click();
+  await vp.getByTestId("intestazione-lista").waitFor({ timeout: 5000 }).catch(() => {});
+  await vp.waitForTimeout(600);
+  const b2 = vBodies[1] ?? {};
+  const head2 = (await vp.getByTestId("intestazione-lista").textContent().catch(() => "")) ?? "";
+  ok(vBodies.length === 2 && b2.radius === 500, `raggio: 500 m arriva al server con una sola ricerca (${b2.radius}, ${vBodies.length} ricerche)`);
+  ok(head2.includes("entro 500 m") && !head2.includes("da te") && (await vp.getByTestId("raggio-etichetta").textContent().catch(() => "")) === "500 m", `raggio: dal centro della mappa, cerchio di 500 m (${head2})`);
+  await vp.screenshot({ path: `${OUT}/99d-raggio-mappa.png`, caret: "initial" });
+  ok(await vp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "raggio: niente scorrimento orizzontale");
+  await vctx.close();
+  // Posizione negata: spiegazione umana e ricerca comunque intorno alla mappa (sempre una sola).
+  const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const dBodies = [];
+  await dctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await dctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await dctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await dctx.route("**/api/search", (r) => { dBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
+  await dctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  const dp = await dctx.newPage();
+  await dp.addInitScript(() => {
+    try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ }
+    navigator.geolocation.getCurrentPosition = (_ok, err) => setTimeout(() => err({ code: 1, PERMISSION_DENIED: 1, message: "negata" }), 50);
+  });
+  dp.on("pageerror", (e) => errors.push(e.message));
+  await dp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await idee(dp);
+  await dp.getByTestId("vicino-adesso").click();
+  const msg = await dp.getByText(/Per cercare vicino a te mi serve la posizione/).waitFor({ timeout: 5000 }).then(() => true, () => false);
+  await dp.getByTestId("intestazione-lista").waitFor({ timeout: 5000 }).catch(() => {});
+  await dp.waitForTimeout(500);
+  ok(msg && await dp.getByText(/Per cercare vicino a te/).isVisible(), "vicino, posizione negata: spiegazione umana che resta in vista");
+  ok(dBodies.length === 1 && dBodies[0]?.radius === 1000 && dBodies[0]?.openNowOnly === true, `vicino, posizione negata: cerca comunque intorno alla mappa, una sola ricerca (${dBodies.length})`);
+  await dp.screenshot({ path: `${OUT}/99e-vicino-negata.png`, caret: "initial" });
+  await dctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
