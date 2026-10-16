@@ -38,7 +38,7 @@ export default function ProfiloSezione({
   }, []);
 
   return (
-    <details ref={ref} id={id} data-testid={testId} className="group scroll-mt-4 border-t border-border first:border-t-0">
+    <details ref={ref} id={id} data-testid={testId} suppressHydrationWarning className="group scroll-mt-4 border-t border-border first:border-t-0">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 active:bg-surface [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-brand">{icon}</span>
         <span className="min-w-0 flex-1">
