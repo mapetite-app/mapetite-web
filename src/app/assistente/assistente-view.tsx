@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, BookmarkCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, BookmarkCheck, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
 import VenueSheet from "@/components/venue-sheet";
 import CommunityLocale from "@/components/community-locale";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
@@ -336,7 +336,7 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
     } else if (bookingMode) {
       const summary = bookingSummary(booking);
       const ask = askFor(booking);
-      text = `${summary ? `Per ${summary}: ` : ""}ecco ${places.length} ${places.length === 1 ? "posto adatto" : "posti adatti"}. Tocca “Prenota” sul tuo preferito: il messaggio per il locale lo preparo io.${ask ? ` ${ask.question}` : ""}`;
+      text = `${summary ? `Per ${summary}: ` : ""}${places.length} ${places.length === 1 ? "posto adatto" : "posti adatti"}, il messaggio per il locale lo preparo io.${ask ? ` ${ask.question}` : ""}`;
       asks = ask?.asks;
       notes.push("I tavoli liberi non li vedo: la conferma arriva sempre dal locale.");
     } else {
@@ -489,7 +489,7 @@ async function send(raw: string) {
     return;
   }
   reply({
-    text: `Perfetto: ${summary}.${ask ? ` ${ask.question}` : " Tocca “Prenota” sul posto che preferisci: il messaggio è già pronto."}`,
+    text: `Perfetto: ${summary}.${ask ? ` ${ask.question}` : " Il messaggio è pronto: tocca “Prenota”."}`,
     asks: ask?.asks,
   });
 }
@@ -509,7 +509,7 @@ function PlaceCards({ msg, booking, bookingMode, savedIds, saving, onOpen, onBoo
     // (altrimenti il browser restava sulla card di prima, a metà).
     <ul key={places.map((p) => p.id).join()} data-testid="assistente-card" className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
       {places.map((p, i) => (
-        <li key={p.id} className="relative w-[78%] max-w-[300px] shrink-0 snap-start">
+        <li key={p.id} className="relative w-[72%] max-w-[270px] shrink-0 snap-start">
           <AssistantPlaceCard
             p={p}
             photo={i < 6}
@@ -737,8 +737,8 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                   </p>
                 ) : (
                   <>
-                    <p className={`text-[15px] font-sans leading-relaxed ${m.status === "error" ? "text-error" : "text-text"}`}>{m.text}</p>
-                    {m.understood && <p className="mt-1 text-xs font-sans text-text-muted">Ho capito: {m.understood}</p>}
+                    {/* Risposta in una bolla breve, come in un'app di messaggistica. */}
+                    <p className={`w-fit max-w-[92%] rounded-2xl rounded-bl-md bg-surface px-4 py-2.5 text-[15px] font-sans leading-snug ${m.status === "error" ? "text-error" : "text-text"}`}>{m.text}</p>
                   </>
                 )}
                 {m.gusti && m.gusti.length > 0 && (
@@ -783,8 +783,6 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     onSave={(p) => void save(p)}
                   />
                 )}
-                {m.status === "verdicts" && <p className="mt-1 text-xs font-sans text-text-muted">Sto scrivendo i verdetti…</p>}
-                {m.note && <p data-testid="assistente-nota" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">{m.note}</p>}
                 {m.memo && (
                   <div data-testid="assistente-ricorda" className="mt-3 rounded-card border border-border bg-surface px-4 py-3">
                     {m.memo.state === "ask" ? (
@@ -833,14 +831,32 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     ))}
                   </div>
                 )}
+                {/* Azioni principali come chip sotto la risposta (scorrono in orizzontale). */}
                 {m.id === lastResultsId && m.id === last?.id && m.status === "done" && !(m.asks && m.asks.length > 0) && (
                   <div data-testid="assistente-seguiti" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+                    {c.bookingMode && m.places?.[0] && (m.places[0].phone || m.places[0].websiteUri) && (
+                      <button
+                        type="button"
+                        data-testid="assistente-prenota-primo"
+                        onClick={() => { const f = m.places![0]; setBookCard(f); trackFeature("assistente_prenota"); }}
+                        className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill bg-accent px-3.5 text-sm font-display font-semibold text-white active:scale-95"
+                      >
+                        <CalendarCheck size={15} aria-hidden /> Prenota il primo
+                      </button>
+                    )}
                     {REFINES.map((a) => (
-                      <button key={a.label} type="button" onClick={() => submit(a.send)} className="min-h-10 shrink-0 rounded-pill bg-surface px-3.5 text-sm font-sans font-semibold text-brand active:scale-95">
+                      <button key={a.label} type="button" onClick={() => submit(a.send)} className="min-h-10 shrink-0 rounded-pill border border-border bg-white px-3.5 text-sm font-sans font-semibold text-brand active:scale-95">
                         {a.label}
                       </button>
                     ))}
                   </div>
+                )}
+                {/* Dettagli onesti in una riga piccola: cosa ho capito e cosa ho fatto. */}
+                {m.status !== "loading" && (m.understood || m.note) && (
+                  <p data-testid="assistente-nota" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
+                    {m.understood && <span data-testid="assistente-capito">Ho capito: {m.understood}. </span>}
+                    {m.note}
+                  </p>
                 )}
                 {/* "Ti è stato utile?" (piano 7.6): una volta per risposta, solo sull'ultima con posti. */}
                 {m.id === last?.id && m.status === "done" && ((m.places?.length ?? 0) > 0 || !!m.serata) && (
