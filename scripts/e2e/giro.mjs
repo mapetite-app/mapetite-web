@@ -5761,7 +5761,7 @@ if (fakeUser) {
   ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
   if (process.env.E2E_DEBUG) console.log("DBG takeout", JSON.stringify(tins), JSON.stringify(tprev));
   for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
-  ok(tins.length === 3 && tins.every((r) => r.user_id === fakeUser && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
+  ok(tins.length === 3 && tins.every((r) => r.user_id === process.env.E2E_FAKE_USER && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
   const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
   ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
   const coda = await tp.getByTestId("file-coda").textContent().catch(() => "");
