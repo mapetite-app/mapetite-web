@@ -5078,6 +5078,124 @@ else {
   await wctx.close();
 }
 
+// ── Pitch (sezione separata): creator, posti in evidenza e trend di zona, premium ─────────────
+// 5.6b Creator e critici: badge sul profilo pubblico e "Liste dei creator da seguire" in /amici.
+//      Dati finti dal cookie "e2e_social" (campo `creator`); senza creator la sezione non c'è.
+if (!fakeUser) console.log("SKIP  creator: dev server senza E2E_FAKE_USER");
+else {
+  const CR = "00000000-0000-4000-8000-0000000005c1";
+  const NORMALE = "00000000-0000-4000-8000-0000000005c2";
+  const profC = (id, handle, display_name) => ({ id, handle, display_name, bio: "Trattorie vere, lontano dai giri turistici", city: "Roma", visitati: 2, da_provare: 1, seguaci: 0, seguiti: 0 });
+  const svC = (user_id, handle, place_id, name, tags) => ({ user_id, handle, display_name: handle, place_id, name, category: "restaurant", tags, created_at: "2026-10-12T19:00:00Z", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.889, lng: 12.53 });
+  const socialC = {
+    profili: [profC(CR, "sara.mangia", "Sara Mangia"), profC(NORMALE, "luca.rm", "Luca")],
+    salvati: [
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c1", "Trattoria Pigneto", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c2", "Osteria Nascosta", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c3", "Vino Vivo", ["Da provare", "Vini naturali"]),
+      svC(NORMALE, "luca.rm", "44444444-0000-4000-8000-0000000000c4", "Bar Luca", ["Da provare", "Colazioni"]),
+    ],
+    seguo: [],
+    mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    creator: [{ id: CR, tipo: "Food blogger" }],
+  };
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const cEv = [];
+  await cctx.route("**/api/events", (r) => { cEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(e.message));
+  const setC = (v) => cctx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setC(socialC);
+  await cp.goto(`${BASE}/u/sara.mangia`, { waitUntil: "networkidle" });
+  ok(((await cp.getByTestId("badge-creator").first().textContent().catch(() => "")) ?? "").includes("Creator · Food blogger"), "creator: badge 'Creator · Food blogger' sul profilo pubblico");
+  await cp.screenshot({ path: `${OUT}/80-creator-profilo.png`, caret: "initial" });
+  await cp.goto(`${BASE}/u/luca.rm`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("badge-creator").count()) === 0, "creator: nessun badge su un profilo normale");
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const cl = cp.getByTestId("creator-liste");
+  ok(await cl.isVisible(), "creator: sezione 'Liste dei creator da seguire' in /amici");
+  ok((await cl.getByTestId("creator-card").count()) === 1 && ((await cl.textContent()) ?? "").includes("Sara Mangia") && !((await cl.textContent()) ?? "").includes("Luca"), "creator: solo i creator nella sezione");
+  const prima = cl.getByTestId("creator-raccolta").first();
+  ok(((await prima.textContent()) ?? "").includes("Trattorie di quartiere") && (await prima.getAttribute("href")) === "/u/sara.mangia/raccolte/Trattorie%20di%20quartiere", "creator: la raccolta pubblica si apre dalla card");
+  ok(await cl.getByTestId("segui").isVisible(), "creator: bottone Segui nella card");
+  await cp.waitForTimeout(400);
+  ok(cEv.some((e) => e.type === "funzione" && e.props?.nome === "creator_liste"), "creator: vista della sezione registrata (trackFeature)");
+  { const w = await cp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `creator /amici: niente scorrimento orizzontale (${w}px)`); }
+  await cl.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/81-creator-amici.png`, caret: "initial" });
+  await setC({ ...socialC, creator: [] });
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("creator-liste").count()) === 0 && await cp.getByTestId("amici").isVisible(), "creator: senza creator (o senza migrazione) la sezione è nascosta e la pagina regge");
+  await cctx.close();
+}
+
+
+// 8.3 Posti in evidenza e 8.4 Trend di zona (dimostrativi, pannello del ristoratore).
+{
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tEv = [];
+  await tctx.route("**/api/events", (r) => { tEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const tp = await tctx.newPage();
+  tp.on("pageerror", (e) => errors.push(e.message));
+  await tp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  const trend = tp.getByTestId("pannello-trend");
+  ok(await trend.isVisible() && (await trend.getByTestId("trend-fascia").count()) === 6 && (await trend.getByTestId("trend-esempio").count()) === 0 && await trend.getByTestId("trend-picco").isVisible(), "trend di zona (demo): sei fasce orarie con le richieste e il momento di picco");
+  const evd = tp.getByTestId("pannello-evidenza");
+  ok(await evd.isVisible() && ((await evd.getByTestId("etichetta-sponsorizzato").textContent()) ?? "").includes("Sponsorizzato"), "in evidenza (demo): card con l'etichetta 'Sponsorizzato'");
+  ok((await evd.getByTestId("evidenza-si").count()) === 1 && (await evd.getByTestId("evidenza-no").count()) === 2, "in evidenza (demo): compare solo nella ricerca adatta, non nelle altre due");
+  ok(((await evd.getByTestId("evidenza-no").last().textContent()) ?? "").includes("terrazza"), "in evidenza (demo): spiega cosa manca (terrazza)");
+  await tp.waitForTimeout(400);
+  ok(tEv.some((e) => e.type === "funzione" && e.props?.nome === "ristoratore_evidenza"), "in evidenza (demo): vista registrata (trackFeature)");
+  { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `trend e in evidenza: niente scorrimento orizzontale (${w}px)`); }
+  await trend.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/90-trend-zona-demo.png`, caret: "initial" });
+  await evd.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/91-in-evidenza-demo.png`, caret: "initial" });
+  // Nei risultati veri non c'è nessuno sponsorizzato: la parola non compare nel codice della ricerca.
+  { const src = ["src/app/api/search/route.ts", "src/components/venue-sheet.tsx", "src/components/place-card.tsx"].map((f) => { try { return readFileSync(new URL(`../../${f}`, import.meta.url), "utf8"); } catch { return ""; } }).join("\n");
+    ok(!/sponsorizzat/i.test(src), "in evidenza: nessuno sponsorizzato nei risultati veri della ricerca"); }
+  // Pannello vero con pochi dati: il trend è un esempio DICHIARATO.
+  if (fakeUser) {
+    const LT = "44444444-0000-4000-8000-0000000000d1";
+    const Lt = { id: LT, name: "Bar Prova Trend", address: "Via del Pigneto 1, 00176 Roma RM, Italy", category: "bar", lat: 41.888, lng: 12.53, google_place_id: "GTREND" };
+    await tctx.addCookies([{ name: "e2e_ristoratore", url: BASE, value: encodeURIComponent(JSON.stringify({ locale: Lt, simili: [Lt], verificato: false, salvati: [], eventi: [
+      { created_at: new Date(Date.now() - 3_600_000).toISOString(), type: "ricerca", user_id: null, anon_id: "t1", session_id: "t1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "bar", requisiti: ["tavoli all'aperto"], zona: "Pigneto" } },
+    ] })) }]);
+    await tp.goto(`${BASE}/ristoratore/${LT}`, { waitUntil: "networkidle" });
+    ok(await tp.getByTestId("trend-esempio").isVisible() && (await tp.getByTestId("pannello-evidenza").count()) === 0, "trend di zona (pannello vero, pochi dati): esempio etichettato 'Esempio', niente sezione sponsorizzati");
+  } else console.log("SKIP  trend pannello vero: dev server senza E2E_FAKE_USER");
+  await tctx.close();
+}
+
+// 8b Utente premium: /premium con l'elenco "in arrivo", nessun pagamento, "Mi interessa" registrato.
+{
+  const pmctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const pmEv = [];
+  await pmctx.route("**/api/events", (r) => { pmEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const pm = await pmctx.newPage();
+  pm.on("pageerror", (e) => errors.push(e.message));
+  const r = await pm.goto(`${BASE}/premium`, { waitUntil: "networkidle" });
+  ok(r?.status() === 200 && (await pm.getByRole("heading", { level: 1 }).textContent()) === "Mapetite Premium" && (await pm.getByTestId("premium-funzione").count()) >= 3, "premium: pagina con l'elenco delle funzioni");
+  const body = (await pm.getByTestId("premium").textContent()) ?? "";
+  ok(body.includes("Assistente senza limiti") && body.includes("Raccolte e mappe illimitate") && body.includes("Serate organizzate") && body.includes("In arrivo"), "premium: assistente senza limiti, raccolte illimitate, serate organizzate, tutto 'in arrivo'");
+  ok(await pm.getByTestId("premium-nessun-pagamento").isVisible() && !/€|\bcarta\b|abbonati ora|paga ora/i.test(body), "premium: nessun prezzo né pagamento");
+  await pm.getByTestId("premium-interesse").first().click();
+  await pm.getByTestId("premium-interesse-fatto").first().waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await pm.getByTestId("premium-interesse-fatto").first().isVisible() && pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium_interesse" && e.props?.contesto === "assistente"), "premium: 'Mi interessa' registrato (trackFeature) e confermato");
+  ok(pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium"), "premium: vista della pagina registrata");
+  await pm.reload({ waitUntil: "networkidle" });
+  ok((await pm.getByTestId("premium-interesse-fatto").count()) === 1, "premium: 'Mi interessa' ricordato ricaricando");
+  { const w = await pm.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `premium: niente scorrimento orizzontale (${w}px)`); }
+  await pm.screenshot({ path: `${OUT}/92-premium.png`, caret: "initial" });
+  if (fakeUser) {
+    await pmctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await pm.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    ok((await pm.getByTestId("profilo-premium").getAttribute("href")) === "/premium", "premium: collegato dal profilo");
+  } else console.log("SKIP  premium dal profilo: dev server senza E2E_FAKE_USER");
+  await pmctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

@@ -46,6 +46,9 @@ export type MySocial = {
 
 export type InArrivo = { stato: "in-arrivo" };
 
+// Creator e critici (piano 5.6b): lo decide solo Mapetite (migrazione 20261016_creator.sql).
+export type CreatorInfo = { id: string; tipo: string | null };
+
 const PROFILE_COLUMNS = "id, handle, display_name, bio, city, visitati, da_provare, seguaci, seguiti";
 const SAVED_COLUMNS = "user_id, handle, display_name, place_id, tags, created_at, name, category, address, lat, lng";
 
@@ -60,6 +63,7 @@ type FakeSocial = {
   salvati?: PublicSaved[];
   seguo?: string[];
   mio?: MySocial;
+  creator?: CreatorInfo[];
 };
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -105,7 +109,7 @@ async function followedIds(userId: string): Promise<string[] | InArrivo> {
 export type ProfilePage =
   | InArrivo
   | { stato: "non-trovato" }
-  | { stato: "ok"; profile: PublicProfile; places: PublicSaved[]; iFollow: boolean; isMe: boolean; viewer: string | null };
+  | { stato: "ok"; profile: PublicProfile; places: PublicSaved[]; iFollow: boolean; isMe: boolean; viewer: string | null; creator: CreatorInfo | null };
 
 export const loadProfilePage = cache(async (rawHandle: string): Promise<ProfilePage> => {
   const handle = decodeURIComponent(rawHandle).toLowerCase();
@@ -146,7 +150,8 @@ export const loadProfilePage = cache(async (rawHandle: string): Promise<ProfileP
     const ids = await followedIds(viewer);
     iFollow = Array.isArray(ids) && ids.includes(profile.id);
   }
-  return { stato: "ok", profile, places, iFollow, isMe: viewer === profile.id, viewer };
+  const creator = (await loadCreators([profile.id]))[0] ?? null;
+  return { stato: "ok", profile, places, iFollow, isMe: viewer === profile.id, viewer, creator };
 });
 
 // ── Feed di /amici ───────────────────────────────────────────────────────────
@@ -237,4 +242,57 @@ export async function loadMySocial(userId: string): Promise<MySocial | InArrivo>
   }
   const d = data as Partial<MySocial> | null;
   return { handle: d?.handle ?? null, display_name: d?.display_name ?? null, bio: d?.bio ?? null, city: d?.city ?? null, is_public: d?.is_public === true };
+}
+
+// ── Creator e critici (piano 5.6b) ───────────────────────────────────────────
+// Senza la migrazione 20261016_creator.sql (vista creator_pubblici mancante) nessuno è creator:
+// niente badge, sezione nascosta. Mai un errore a schermo.
+type CreatorRow = { id: string; handle: string; creator_tipo: string | null };
+
+/** Creator tra gli id dati (o i primi, senza id). Lista vuota se la migrazione manca. */
+export async function loadCreators(ids?: string[], limit = 12): Promise<CreatorInfo[]> {
+  const f = await fake();
+  if (f === "in-arrivo") return [];
+  if (f) return (f.creator ?? []).filter((c) => !ids || ids.includes(c.id)).slice(0, limit);
+  const supabase = await createClient();
+  let q = supabase.from("creator_pubblici").select("id, handle, creator_tipo").limit(limit);
+  if (ids) q = q.in("id", ids);
+  const { data, error } = await q;
+  if (error) {
+    console.error(`[social] creator_pubblici: ${error.code ?? ""} ${error.message} (migrazione 20261016_creator non applicata?)`);
+    return [];
+  }
+  return ((data as CreatorRow[] | null) ?? []).map((r) => ({ id: r.id, tipo: r.creator_tipo }));
+}
+
+export type CreatorList = { profile: PublicProfile; tipo: string | null; places: PublicSaved[] };
+
+/** "Liste dei creator da seguire": profilo pubblico e posti pubblici di ogni creator (escluso chi guarda). */
+export async function loadCreatorLists(viewer: string | null): Promise<CreatorList[]> {
+  const creators = (await loadCreators()).filter((c) => c.id !== viewer);
+  if (creators.length === 0) return [];
+  const ids = creators.map((c) => c.id);
+  let profili: PublicProfile[];
+  let salvati: PublicSaved[];
+  const f = await fake();
+  if (f && f !== "in-arrivo") {
+    profili = (f.profili ?? []).filter((p) => ids.includes(p.id));
+    salvati = (f.salvati ?? []).filter((s) => ids.includes(s.user_id));
+  } else {
+    const supabase = await createClient();
+    const [{ data: p, error: pErr }, { data: s, error: sErr }] = await Promise.all([
+      supabase.from("profili_pubblici").select(PROFILE_COLUMNS).in("id", ids),
+      supabase.from("salvati_pubblici").select(SAVED_COLUMNS).in("user_id", ids).order("created_at", { ascending: false }).limit(600),
+    ]);
+    if (pErr || sErr) {
+      logMissing("creator", (pErr ?? sErr)!);
+      return [];
+    }
+    profili = (p as PublicProfile[]) ?? [];
+    salvati = (s as PublicSaved[]) ?? [];
+  }
+  return creators.flatMap((c) => {
+    const profile = profili.find((p) => p.id === c.id);
+    return profile ? [{ profile, tipo: c.tipo, places: salvati.filter((s) => s.user_id === c.id) }] : [];
+  });
 }
