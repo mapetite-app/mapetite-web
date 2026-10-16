@@ -9,7 +9,7 @@ import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
 
 // Primo accesso dopo la registrazione (piano 9.1): tre schermate al massimo, stile Albo.
 // 1) i gusti in una schermata sola, 2) la città, 3) "porta qui i tuoi salvati di Google Maps".
-// Ogni schermata ha la barra di avanzamento e "Salta".
+// Ogni schermata ha la barra di avanzamento; le prime due "Salta", l'ultima "Lo faccio dopo".
 
 const STEPS = [
   { kicker: "I TUOI GUSTI", title: "Cosa ti piace?", subtitle: "Tocca quello che ti somiglia: bastano due o tre scelte." },
@@ -132,14 +132,11 @@ export default function OnboardingView({ next = null }: { next?: string | null }
     }
   };
 
+  // "Salta" della seconda schermata: si salta solo la città.
   const skipStep = () => {
-    if (step === 1) {
-      setCity(null);
-      setOtherOpen(false);
-      setStep(2);
-    } else if (step === 2) {
-      void finish(null);
-    }
+    setCity(null);
+    setOtherOpen(false);
+    setStep(2);
   };
 
   const saltaCls = "-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline";
@@ -163,8 +160,12 @@ export default function OnboardingView({ next = null }: { next?: string | null }
               {step + 1} di {TOTAL}
             </span>
             {/* Prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
-                Dopo: salta solo quella schermata, così i gusti già scelti non si perdono. */}
-            {step === 0 ? (
+                Seconda: salta solo la città, così i gusti già scelti non si perdono.
+                Terza: niente "Salta" in alto, basta "Lo faccio dopo" sotto (erano due pulsanti per
+                la stessa cosa). Lo spazio resta vuoto, così "3 di 3" non si sposta. */}
+            {step === TOTAL - 1 ? (
+              <span aria-hidden className="-mr-2 min-h-11 w-12" />
+            ) : step === 0 ? (
               <form action={skipOnboarding}>
                 {next && <input type="hidden" name="next" value={next} />}
                 <button type="submit" data-testid="onboarding-salta" className={saltaCls}>

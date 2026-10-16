@@ -5027,7 +5027,7 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-2-citta.png`, caret: "initial" });
   await ip.getByRole("button", { name: "Roma", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("onboarding-salta").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, saltabile");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("benvenuto-dopo").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, rimandabile");
   await ip.screenshot({ path: `${OUT}/benvenuto-3-importa.png`, caret: "initial" });
   await ip.setViewportSize({ width: 360, height: 740 });
   const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -5056,9 +5056,9 @@ else {
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("onboarding-salta").click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "primo accesso: 'Salta' al passo 2 va al passo 3");
-  await ip.getByTestId("onboarding-salta").click();
+  await ip.getByTestId("benvenuto-dopo").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
-  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Salta' all'ultimo passo → mappa con la ricerca sui gusti, senza città saltata (${new URL(ip.url()).searchParams.get("q")})`);
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Lo faccio dopo' dopo aver saltato la città → mappa con la ricerca sui gusti, senza città (${new URL(ip.url()).searchParams.get("q")})`);
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Pizza", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
@@ -6135,6 +6135,22 @@ else {
   await g.screenshot({ path: `${OUT}/99i-carta-gusto-vuota.png`, caret: "initial" });
   { const lost = droppedKeys(gEv); ok(lost.length === 0, `carta del gusto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
   await gc.close();
+}
+
+// Voci piccole del 16/10 sera: primo accesso senza doppioni, risposte che non si perdono, microfono.
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const vp = await vctx.newPage();
+  vp.on("pageerror", (e) => errors.push(e.message));
+  // 1. Passo 3 del primo accesso: un solo modo di rimandare ("Lo faccio dopo"), niente "Salta" in alto.
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok(await vp.getByTestId("onboarding-salta").isVisible(), "primo accesso: 'Salta' resta al passo 2");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: al passo 3 niente 'Salta' (doppione di 'Lo faccio dopo')");
+  ok(await vp.getByTestId("benvenuto-dopo").isVisible() && /Lo faccio dopo/.test((await vp.getByTestId("benvenuto-dopo").textContent()) ?? ""), "primo accesso: al passo 3 un solo 'Lo faccio dopo'");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-3-un-solo-dopo.png`, caret: "initial" });
+  await vctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
