@@ -5,6 +5,7 @@ import Link from "next/link";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 import { extractMapsLinks } from "@/lib/maps-link";
+import { extractAllLinks } from "@/lib/multi-link";
 import { findSocialLink, placeHintFromText, type SocialSource } from "@/lib/social-link";
 import SocialLinkHelp from "./social-link-help";
 import { findVideoLink } from "@/lib/video-caption";
@@ -17,13 +18,16 @@ function errorText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
 }
 
-// "Da Google Maps": su iPhone le app web non compaiono nel Condividi, quindi si copia
-// il link in Google Maps e lo si incolla qui (anche più link, uno per riga).
+// "Incolla un link" in cima a Importa (stile "Aggiungi qualsiasi cosa" di Albo): un solo pulsante
+// che capisce da solo il link. Google Maps (anche più link) si salva subito; Instagram/TikTok/YouTube
+// spiegano cosa fare; una chat o una nota con tanti link misti passa alla lista di "Incolla più link".
+const MAX_DIRECT = 5;
 export default function GoogleMapsCard({
   userId,
   onScreenshot,
   onSearch,
   onReadVideo,
+  onMulti,
   ref,
 }: {
   userId: string | null;
@@ -31,6 +35,8 @@ export default function GoogleMapsCard({
   onSearch: (q: string) => void;
   // Link di TikTok/YouTube: legge la didascalia del video e cerca il locale (vedi ImportaView).
   onReadVideo?: (url: string) => void;
+  // Tanti link misti (chat, nota): li legge la lista di MultiLinkCard.
+  onMulti?: (text: string) => void;
   // "Incolla il link copiato" della guida in cima (SalvaDaTelefono) usa lo stesso percorso.
   ref?: Ref<{ paste: () => void }>;
 }) {
@@ -49,7 +55,16 @@ export default function GoogleMapsCard({
     setSocial(null);
     if (!HAS_LINK.test(value)) {
       setShowField(true);
-      setError("Non vedo un link. In Google Maps tocca Condividi e poi Copia link, poi torna qui.");
+      setError("Non vedo un link. Nell'app tocca Condividi → Copia link, poi torna qui.");
+      return;
+    }
+    const all = extractAllLinks(value).links;
+    if (onMulti && all.length > 1 && (all.some((l) => l.kind !== "maps") || all.length > MAX_DIRECT)) {
+      setError(null);
+      setResults(null);
+      setDraft("");
+      setShowField(false);
+      onMulti(value);
       return;
     }
     // Link di Instagram/TikTok senza link di Maps: niente chiamata, si spiega cosa fare.
@@ -95,31 +110,18 @@ export default function GoogleMapsCard({
   useImperativeHandle(ref, () => ({ paste: () => void pasteFromClipboard() }));
 
   return (
-    <section id="importa-google-card" className="scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-google">
-      <h2 className="font-display text-lg font-semibold text-brand">
-        <span aria-hidden>📍 </span>Da Google Maps
-      </h2>
-      <p className="mt-1 text-sm text-text-muted">Salva in Mapetite un locale che hai trovato su Google Maps.</p>
-
-      <ol className="mt-4 space-y-2">
-        {["In Google Maps apri il locale", "Tocca Condividi → Copia link", "Torna qui e tocca Incolla link"].map((s, i) => (
-          <li key={s} className="flex items-start gap-3 text-sm text-text">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
-              {i + 1}
-            </span>
-            <span className="pt-0.5">{s}</span>
-          </li>
-        ))}
-      </ol>
-
+    <section id="importa-google-card" className="scroll-mt-4 rounded-card bg-brand p-5 text-white shadow-float" data-testid="importa-google">
       {!userId ? (
-        <p className="mt-4 text-sm text-text-muted">
-          <Link href="/login?next=%2Fimporta" className="underline text-text">Accedi</Link> per salvare i locali.
-        </p>
+        <>
+          <p className="font-display text-lg font-semibold">📋 Incolla un link</p>
+          <p className="mt-1 text-sm text-white/80">
+            <Link href="/login?next=%2Fimporta" className="font-semibold text-white underline">Accedi</Link> per salvare i locali.
+          </p>
+        </>
       ) : (
         <>
           {pending && draft === null && (
-            <p className="mt-4 text-sm text-text" data-testid="link-in-attesa">
+            <p className="mb-3 text-sm" data-testid="link-in-attesa">
               Hai un link in attesa da Google Maps: tocca Salva.
             </p>
           )}
@@ -128,10 +130,14 @@ export default function GoogleMapsCard({
             type="button"
             onClick={pasteFromClipboard}
             disabled={busy}
-            className="mt-4 min-h-14 w-full rounded-pill bg-brand px-4 text-base font-display font-semibold text-white disabled:opacity-60"
+            data-testid="importa-incolla"
+            className="min-h-16 w-full rounded-pill bg-accent px-4 text-lg font-display font-semibold text-white shadow-float active:scale-[0.99] disabled:opacity-60"
           >
-            {busy ? "Salvo..." : "📋 Incolla link"}
+            {busy ? "Salvo..." : "📋 Incolla un link"}
           </button>
+          <p className="mt-2 text-center text-xs text-white/80" data-testid="importa-incolla-fonti">
+            Instagram, TikTok, YouTube o Google Maps. Anche tanti link insieme.
+          </p>
 
           {(showField || pending) ? (
             <div className="mt-3 space-y-2">
@@ -139,15 +145,15 @@ export default function GoogleMapsCard({
                 value={text}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={3}
-                placeholder={"https://maps.app.goo.gl/…\nAnche più link, uno per riga"}
-                aria-label="Link di Google Maps"
-                className="w-full rounded-btn border border-border bg-white px-3 py-2 text-base focus:border-brand focus:outline-none"
+                placeholder={"https://maps.app.goo.gl/…\nAnche una chat piena di link"}
+                aria-label="Link da incollare"
+                className="w-full rounded-btn border border-white/30 bg-white px-3 py-2 text-base text-text focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => save(text)}
                 disabled={busy || !text.trim()}
-                className="min-h-11 w-full rounded-pill border border-brand bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
+                className="min-h-11 w-full rounded-pill border border-white/60 px-4 text-sm font-display font-semibold text-white disabled:opacity-60"
               >
                 Salva
               </button>
@@ -156,14 +162,15 @@ export default function GoogleMapsCard({
             <button
               type="button"
               onClick={() => setShowField(true)}
-              className="mt-1 min-h-11 w-full text-center text-sm text-text-muted underline"
+              className="mt-1 min-h-11 w-full text-center text-sm text-white/80 underline"
             >
               Oppure incolla a mano
             </button>
           )}
 
+          {error && <p className="mt-3 rounded-btn bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
           {social && (
-            <div className="mt-4">
+            <div className="mt-4 rounded-card bg-white text-text">
               <SocialLinkHelp
                 source={social.source}
                 hint={social.hint}
@@ -173,13 +180,7 @@ export default function GoogleMapsCard({
               />
             </div>
           )}
-
-          <p className="mt-3 text-xs text-text-muted">
-            Su Android, con Mapetite installata, puoi anche scegliere Mapetite direttamente da Condividi.
-          </p>
-
-          {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error">{error}</p>}
-          {results && <div className="mt-4"><LinkResults results={results} userId={userId} /></div>}
+          {results && <div className="mt-4 rounded-card bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}
         </>
       )}
     </section>

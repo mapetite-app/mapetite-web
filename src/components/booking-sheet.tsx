@@ -68,6 +68,9 @@ export default function BookingSheet({
   const [custom, setCustom] = useState<string | null>(null);
   const [done, setDone] = useState<BookingRequest | null>(null);
   const [copied, setCopied] = useState(false);
+  // Due passi chiari: 1) quando e quanti, 2) messaggio e invio. Con i dati già completi
+  // (dalla conversazione o dalla scheda) si parte dal passo 2: un tocco e si scrive al locale.
+  const [step, setStep] = useState<1 | 2>(() => (missingDetails({ date: initial?.date ?? null, time: initial?.time ?? null, people: initial?.people ?? null, special: null }).length === 0 ? 2 : 1));
 
   const message = custom ?? bookingMessage(details, name);
   const missing = missingDetails(details);
@@ -172,10 +175,11 @@ export default function BookingSheet({
               <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
             </div>
           </div>
-        ) : (
+        ) : step === 1 ? (
           <>
+            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">Passo 1 di 2 · quando e quanti</p>
             {/* Giorno */}
-            <p className="mt-4 text-sm font-display font-semibold text-text">Quando</p>
+            <p className="mt-3 text-sm font-display font-semibold text-text">Quando</p>
             <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {days.map((d) => (
                 <button
@@ -223,16 +227,49 @@ export default function BookingSheet({
                 </button>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="text-xs font-sans text-text-muted">Richiesta (facoltativa)</span>
-                <input
-                  value={details.special ?? ""}
-                  onChange={(e) => setDetails((b) => ({ ...b, special: e.target.value || null }))}
-                  placeholder="es. in terrazza"
-                  className="mt-1 min-h-11 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text"
-                />
-              </label>
+            <label className="mt-3 block">
+              <span className="text-xs font-sans text-text-muted">Richiesta (facoltativa)</span>
+              <input
+                value={details.special ?? ""}
+                onChange={(e) => setDetails((b) => ({ ...b, special: e.target.value || null }))}
+                placeholder="es. in terrazza"
+                className="mt-1 min-h-11 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text"
+              />
+            </label>
+            {disabled && (
+              <p data-testid="prenota-manca" className="mt-3 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-accent">
+                Scegli {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")} per scrivere al locale.
+              </p>
+            )}
+            <button
+              type="button"
+              data-testid="prenota-avanti"
+              disabled={disabled}
+              onClick={() => setStep(2)}
+              className={`${btn} mt-4 bg-accent text-white disabled:bg-border disabled:text-text-muted`}
+            >
+              Avanti: il messaggio
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Passo 2: riepilogo in una riga (tocco per cambiare), nome, messaggio, invio. */}
+            <p className="mt-1 text-xs font-sans text-text-muted">Passo 2 di 2 · scrivi al locale</p>
+            <button
+              type="button"
+              data-testid="prenota-modifica"
+              onClick={() => setStep(1)}
+              aria-label="Modifica giorno, ora e persone"
+              className="mt-3 flex min-h-12 w-full items-center justify-between gap-2 rounded-card bg-surface px-4 text-left"
+            >
+              <span data-testid="prenota-riepilogo" className="min-w-0 py-2 text-[15px] font-display font-semibold leading-snug text-text">
+                <span data-testid="prenota-persone">{details.people ?? "–"}</span> {details.people === 1 ? "persona" : "persone"}
+                {details.date ? ` · ${dayLabel(details.date)}` : ""}{details.time ? ` · ${details.time}` : ""}
+                {details.special ? ` · ${details.special}` : ""}
+              </span>
+              <span className="shrink-0 text-sm font-display font-semibold text-accent">Modifica</span>
+            </button>
+            <div className="mt-3">
               <label className="block">
                 <span className="text-xs font-sans text-text-muted">Il tuo nome</span>
                 <input
@@ -266,12 +303,6 @@ export default function BookingSheet({
               Mapetite non vede i tavoli liberi: la conferma arriva dal locale.
               {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
             </p>
-
-            {disabled && (
-              <p data-testid="prenota-manca" className="mt-3 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-accent">
-                Scegli {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")} per scrivere al locale.
-              </p>
-            )}
 
             <div className={`mt-3 flex flex-col gap-2 ${disabled ? "pointer-events-none opacity-40" : ""}`} aria-disabled={disabled}>
               {wa && (

@@ -376,7 +376,7 @@ function SaveModal({
 
 const OTHER_CITY = "Altre zone";
 const CHIP_ON = "min-h-10 rounded-pill bg-brand px-3 py-1.5 text-xs font-display font-semibold text-white";
-const CHIP_OFF = "min-h-10 rounded-pill bg-accent-light px-3 py-1.5 text-xs font-display font-semibold text-accent hover:opacity-80";
+const CHIP_ACTIVE = "flex min-h-8 items-center gap-1 rounded-pill bg-brand px-2.5 text-xs font-display font-semibold text-white active:scale-95";
 const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag).
@@ -798,6 +798,10 @@ export default function MapView({
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
   const [activeCity, setActiveCity] = useState<string | null>(null);
+  // "I miei salvati" in una riga (Lorenzo 16/10, "il dono della sintesi"): stato, città, raccolte e
+  // ordine stanno nel foglio "Filtri"; sullo schermo restano solo la ricerca e i filtri accesi.
+  const [savedSheetOpen, setSavedSheetOpen] = useState(false);
+  const [savedNearest, setSavedNearest] = useState(false);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -1068,6 +1072,11 @@ export default function MapView({
   }, [selected, carouselOpen]);
 
   const savedFiltered = activeTag !== null || activeCity !== null || savedQuery.trim() !== "";
+  const savedControlsOn = view === "saved" && userId != null && savedPlaces.length > 0;
+  // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
+  const savedNearestOn = savedNearest && userPos != null;
+  const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
+    + (aiSearch?.filtri != null ? countActive(filters) : 0);
 
   // Città dei salvati, la più frequente per prima; null = indirizzo senza città.
   const availableCities = useMemo(() => {
@@ -1088,6 +1097,13 @@ export default function MapView({
     }
     return Array.from(seen);
   }, [savedPlaces]);
+  // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
+  const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
+  const countTag = (t: string) => savedPlaces.filter((p) => p.tags?.includes(t)).length;
+  const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+  const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
+  const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
+  const sheetSection = "mt-4 mb-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted";
 
   // Risolve l'identita' canonica Supabase di un locale, qualunque id abbia il client.
   const resolveUuid = (id: string): string | null => {
@@ -2119,7 +2135,10 @@ export default function MapView({
           <button
             type="button"
             aria-label="Filtri"
+            data-testid={savedControlsOn ? "salvati-apri-filtri" : undefined}
             onClick={() => {
+              // Nei salvati un solo "Filtri": stato, città, raccolte, ordine (e da lì tipo/voto/prezzo).
+              if (savedControlsOn) { setSavedSheetOpen(true); return; }
               clearAiSearch();
               setAiQuery("");
               setAiError(null);
@@ -2129,9 +2148,9 @@ export default function MapView({
           >
             <SlidersHorizontal size={barOn ? 18 : 20} className={barOn ? "text-brand" : "text-text-muted"} />
             {barOn && <span className="text-sm font-display font-semibold text-brand">Filtri</span>}
-            {countActive(filters) > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent font-display text-xs font-bold text-white">
-                {countActive(filters)}
+            {(savedControlsOn ? savedActiveCount : countActive(filters)) > 0 && (
+              <span data-testid={savedControlsOn ? "salvati-filtri-attivi" : undefined} className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent font-display text-xs font-bold text-white">
+                {savedControlsOn ? savedActiveCount : countActive(filters)}
               </span>
             )}
           </button>
@@ -2280,82 +2299,49 @@ export default function MapView({
             />
           </div>
         )}
-        {view === "saved" && userId && savedPlaces.length > 0 && (
-          <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-2 rounded-card border border-border bg-surface p-2 shadow-float">
-            {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
-            <Link
-              href="/stasera"
-              data-testid="vai-stasera"
-              className="flex min-h-10 items-center justify-between gap-2 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-[0.99]"
-            >
-              <span>🍽️ Stasera dove andiamo?</span>
-              <span aria-hidden className="text-accent">→</span>
-            </Link>
-            <input
-              type="search"
-              value={savedQuery}
-              onChange={(e) => { setSavedQuery(e.target.value); setClusterPlaces(null); }}
-              placeholder={`Cerca tra i tuoi ${savedPlaces.length} salvati`}
-              aria-label="Cerca tra i salvati"
-              className="min-h-10 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
-            />
-            <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 [scrollbar-width:none]">
-              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
-              {pickOn && filterSaved(savedPlaces, activeTag, activeCity, savedQuery).length >= 2 && (
-                <button
-                  type="button"
-                  data-testid="scegli-tu"
-                  onClick={() => {
-                    trackFeature("sorprendimi");
-                    const shown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
-                    const want = shown.filter((p) => p.tags?.includes(VISIT_WANT));
-                    const pool = (want.length > 0 ? want : shown).filter((p) => p.id !== selected?.id);
-                    const place = pool[Math.floor(Math.random() * pool.length)] ?? shown[0];
-                    setFocusedId(place.id);
-                    dispatch({ type: "OPEN_VENUE", placeId: place.id });
-                    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-                    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
-                  }}
-                  className={`shrink-0 ${CHIP_OFF}`}
-                >
-                  🎲 Scegli tu
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
-                className={`shrink-0 ${!savedFiltered ? CHIP_ON : CHIP_OFF}`}
+        {savedControlsOn && (
+          <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float">
+            {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
+                ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="search"
+                value={savedQuery}
+                onChange={(e) => { setSavedQuery(e.target.value); setClusterPlaces(null); }}
+                placeholder={`Cerca in ${savedPlaces.length} salvati`}
+                aria-label="Cerca tra i salvati"
+                className="min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
+              />
+              {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
+              <Link
+                href="/stasera"
+                data-testid="vai-stasera"
+                aria-label="Stasera dove andiamo?"
+                className="flex min-h-10 shrink-0 items-center gap-1 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
               >
-                Tutti
-              </button>
-              {availableCities.length > 1 && availableCities.map(({ city, count }) => (
-                <button
-                  key={`c-${city}`}
-                  type="button"
-                  aria-pressed={activeCity === city}
-                  onClick={() => {
-                    const next = activeCity === city ? null : city;
-                    setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
-                    // sotto il riquadro dei filtri salvati (~220px)
-                    fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 230);
-                  }}
-                  className={`shrink-0 ${activeCity === city ? CHIP_ON : CHIP_CITY}`}
-                >
-                  📍 {city} · {count}
-                </button>
-              ))}
-              {sortTags(availableTags).map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  aria-pressed={activeTag === tag}
-                  onClick={() => { setActiveTag(activeTag === tag ? null : tag); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
-                  className={`shrink-0 ${activeTag === tag ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {tagLabel(tag)} · {savedPlaces.filter((p) => p.tags?.includes(tag)).length}
-                </button>
-              ))}
+                <span aria-hidden>🍽️</span> Stasera
+              </Link>
             </div>
+            {/* I filtri accesi restano in vista: un tocco li toglie. */}
+            {(activeTag !== null || activeCity !== null || savedNearestOn) && (
+              <div data-testid="salvati-attivi" className="-mx-1.5 flex gap-1.5 overflow-x-auto px-1.5 [scrollbar-width:none]">
+                {activeTag !== null && (
+                  <button type="button" onClick={() => { setActiveTag(null); clearAiSearch(); setClusterPlaces(null); }} aria-label={`Togli ${tagLabel(activeTag)}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    {tagLabel(activeTag)} <X size={12} aria-hidden />
+                  </button>
+                )}
+                {activeCity !== null && (
+                  <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    📍 {activeCity} <X size={12} aria-hidden />
+                  </button>
+                )}
+                {savedNearestOn && (
+                  <button type="button" onClick={() => setSavedNearest(false)} aria-label="Togli Più vicini" className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    Più vicini <X size={12} aria-hidden />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3175,6 +3161,8 @@ export default function MapView({
           variant={listVariant}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
+          // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
+          nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
@@ -3258,6 +3246,111 @@ export default function MapView({
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
           onClose={() => setArticleOpen(false)}
         />
+      )}
+
+      {/* Foglio "Filtri" dei salvati: tutto ciò che prima erano tre righe di chip sempre in vista. */}
+      {savedSheetOpen && savedControlsOn && (
+          <div data-testid="salvati-foglio" className="fixed inset-x-0 top-0 z-50 flex items-end justify-center bg-black/40" style={{ bottom: "var(--nav-height-mobile)" }} onClick={() => setSavedSheetOpen(false)}>
+            <div role="dialog" aria-label="Filtri dei salvati" onClick={(e) => e.stopPropagation()} className="max-h-full w-full max-w-md overflow-y-auto rounded-t-card bg-surface px-4 pb-4 pt-3 shadow-float">
+              <div className="flex items-center justify-between">
+                <p className="font-title text-lg font-semibold text-brand">Filtra i salvati</p>
+                <button type="button" aria-label="Chiudi i filtri" onClick={() => setSavedSheetOpen(false)} className="flex h-10 w-10 items-center justify-center text-text-muted"><X size={20} aria-hidden /></button>
+              </div>
+              <p className="mb-1.5 mt-1 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Stato</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" aria-pressed={activeTag !== VISIT_WANT && activeTag !== VISIT_DONE} onClick={() => pickTag(null)} className={sheetChip(activeTag !== VISIT_WANT && activeTag !== VISIT_DONE)}>Tutti · {savedPlaces.length}</button>
+                {[VISIT_WANT, VISIT_DONE].map((t) => (
+                  <button key={t} type="button" aria-pressed={activeTag === t} onClick={() => pickTag(activeTag === t ? null : t)} className={sheetChip(activeTag === t)}>
+                    {tagLabel(t)} · {countTag(t)}
+                  </button>
+                ))}
+              </div>
+              {availableCities.length > 1 && (
+                <>
+                  <p className={sheetSection}>Città</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableCities.map(({ city, count }) => (
+                      <button
+                        key={`c-${city}`}
+                        type="button"
+                        aria-pressed={activeCity === city}
+                        onClick={() => {
+                          const next = activeCity === city ? null : city;
+                          setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
+                          fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150);
+                        }}
+                        className={sheetChip(activeCity === city)}
+                      >
+                        📍 {city} · {count}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {sheetCollections.length > 0 && (
+                <>
+                  <p className={sheetSection}>Raccolte</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sheetCollections.map((tag) => (
+                      <button key={tag} type="button" aria-pressed={activeTag === tag} onClick={() => pickTag(activeTag === tag ? null : tag)} className={sheetChip(activeTag === tag)}>
+                        {tagLabel(tag)} · {countTag(tag)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <p className={sheetSection}>Ordine</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button type="button" aria-pressed={!savedNearestOn} onClick={() => setSavedNearest(false)} className={sheetChip(!savedNearestOn)}>Ultimi salvati</button>
+                {userPos ? (
+                  <button type="button" aria-pressed={savedNearestOn} onClick={() => setSavedNearest((v) => !v)} className={sheetChip(savedNearestOn)}>Più vicini</button>
+                ) : (
+                  <span className="text-xs font-sans text-text-muted">Per ordinarli per distanza tocca <LocateFixed size={12} className="inline" aria-hidden /> in alto</span>
+                )}
+              </div>
+              <button
+                type="button"
+                data-testid="salvati-tipo"
+                onClick={() => { setSavedSheetOpen(false); clearAiSearch(); setAiQuery(""); setAiError(null); dispatch({ type: "OPEN_FILTERS" }); }}
+                className="mt-4 flex min-h-11 w-full items-center justify-between rounded-btn border border-border px-3 text-sm font-display font-semibold text-brand active:scale-[0.99]"
+              >
+                Tipo di locale, voto e prezzo <ChevronRight size={16} aria-hidden />
+              </button>
+              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
+              {pickOn && sheetShown.length >= 2 && (
+                <button
+                  type="button"
+                  data-testid="scegli-tu"
+                  onClick={() => {
+                    trackFeature("sorprendimi");
+                    setSavedSheetOpen(false);
+                    const want = sheetShown.filter((p) => p.tags?.includes(VISIT_WANT));
+                    const pool = (want.length > 0 ? want : sheetShown).filter((p) => p.id !== selected?.id);
+                    const place = pool[Math.floor(Math.random() * pool.length)] ?? sheetShown[0];
+                    setFocusedId(place.id);
+                    dispatch({ type: "OPEN_VENUE", placeId: place.id });
+                    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+                    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+                  }}
+                  className="mt-2 flex min-h-11 w-full items-center justify-between rounded-btn border border-border px-3 text-sm font-display font-semibold text-accent active:scale-[0.99]"
+                >
+                  🎲 Non sai scegliere? Scegli tu <ChevronRight size={16} aria-hidden />
+                </button>
+              )}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setSavedNearest(false); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
+                  className="min-h-11 rounded-btn border border-border px-4 text-sm font-display font-semibold text-text"
+                >
+                  Azzera filtri
+                </button>
+                <button type="button" data-testid="salvati-mostra" onClick={() => setSavedSheetOpen(false)} className="min-h-11 flex-1 rounded-btn bg-brand px-4 text-sm font-display font-semibold text-white active:scale-[0.99]">
+                  {sheetShown.length === 0 ? "Nessun posto" : `Mostra ${sheetShown.length} ${sheetShown.length === 1 ? "posto" : "posti"}`}
+                </button>
+              </div>
+            </div>
+          </div>
       )}
 
       <FiltersSheet

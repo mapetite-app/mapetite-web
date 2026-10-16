@@ -15,7 +15,7 @@ export type SaveState = "saving" | "error";
 export const priceOf = (n: number | null) => (n != null && n > 0 ? "€".repeat(n) : null);
 export const ratingOf = (r: number | null) => (r != null ? `★ ${r.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null);
 
-export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict, bookingMode, saved, saving, onOpen, onSave, onBook, badge, minH = "min-h-[220px]" }: {
+export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict, bookingMode, saved, saving, onOpen, onSave, onBook, badge, minH = "min-h-[196px]" }: {
   p: Card; photo: boolean; showOpen: boolean; waitingVerdict: boolean; bookingMode: boolean;
   saved: boolean; saving: SaveState | undefined;
   onOpen: () => void; onSave: () => void; onBook: () => void;
@@ -27,7 +27,7 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
         type="button"
         onClick={onOpen}
         aria-label={`Apri ${p.name}`}
-        className={`relative flex h-full ${minH} w-full flex-col overflow-hidden rounded-card bg-brand p-4 pb-16 text-left text-white shadow-float active:scale-[0.99]`}
+        className={`relative flex h-full ${minH} w-full flex-col overflow-hidden rounded-card bg-brand p-3.5 pb-[3.75rem] text-left text-white shadow-float active:scale-[0.99]`}
       >
         {photo && p.photoRef && (
           <>
@@ -37,14 +37,14 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
         )}
         <span className="relative flex flex-1 flex-col">
           <span className="flex items-start justify-between gap-2">
-            {badge ?? <span className="text-2xl leading-none" aria-hidden>{getCategoryEmoji(p.category, p.name)}</span>}
+            {badge ?? <span className="text-xl leading-none" aria-hidden>{getCategoryEmoji(p.category, p.name)}</span>}
             {showOpen && p.openNow != null && (
               <span className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-medium ${p.openNow ? "bg-white/15" : "bg-black/30 text-white/80"}`}>
                 {p.openNow ? "Aperto ora" : "Chiuso ora"}
               </span>
             )}
           </span>
-          <span className="mt-auto pt-6 line-clamp-2 font-title text-lg font-semibold leading-snug">{p.name}</span>
+          <span className="mt-auto pt-4 line-clamp-1 font-title text-[17px] font-semibold leading-snug">{p.name}</span>
           <span className="mt-0.5 truncate text-[13px] font-sans font-medium text-white/85">
             {[categoryLabel(p.category), priceOf(p.priceLevel), ratingOf(p.rating)].filter(Boolean).join(" · ")}
           </span>
@@ -64,13 +64,13 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
         </span>
       </button>
       {/* Salva in un tocco ("📌 Voglio andarci", come il segnalibro della mappa) e Prenota. */}
-      <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex gap-2">
         {saved ? (
           <span
             role="status"
             data-testid="assistente-salvato"
             aria-label={`${p.name} è nei tuoi salvati`}
-            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white text-sm font-display font-semibold text-brand"
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white text-sm font-display font-semibold text-brand"
           >
             <BookmarkCheck size={16} aria-hidden /> Salvato
           </span>
@@ -81,7 +81,7 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
             onClick={onSave}
             disabled={saving === "saving"}
             aria-label={`Salva ${p.name} tra i Voglio andarci`}
-            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white/15 text-sm font-display font-semibold text-white backdrop-blur active:scale-[0.98] disabled:opacity-80"
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white/15 text-sm font-display font-semibold text-white backdrop-blur active:scale-[0.98] disabled:opacity-80"
           >
             <Bookmark size={16} aria-hidden />
             {saving === "saving" ? "Salvo…" : saving === "error" ? "Riprova" : "Salva"}
@@ -93,7 +93,7 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
             data-testid="assistente-prenota"
             onClick={onBook}
             aria-label={`Prenota da ${p.name}`}
-            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-sm font-display font-semibold active:scale-[0.98] ${bookingMode ? "bg-accent text-white" : "bg-white/15 text-white backdrop-blur"}`}
+            className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill text-sm font-display font-semibold active:scale-[0.98] ${bookingMode ? "bg-accent text-white" : "bg-white/15 text-white backdrop-blur"}`}
           >
             <CalendarCheck size={16} aria-hidden /> Prenota
           </button>

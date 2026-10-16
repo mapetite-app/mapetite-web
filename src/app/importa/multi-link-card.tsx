@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { displayAddress } from "@/lib/city";
@@ -71,13 +71,18 @@ export default function MultiLinkCard({
   onScreenshot,
   onSearch,
   onReadVideo,
+  incoming,
+  onAgain,
 }: {
   userId: string | null;
   onScreenshot: () => void;
   onSearch: (q: string) => void;
   onReadVideo: (url: string) => void;
+  // Testo incollato con "Incolla un link" (n cambia a ogni incolla): qui si legge e si mostra la lista.
+  incoming: { text: string; n: number } | null;
+  // "Incolla altri link": si torna al pulsante unico in cima.
+  onAgain?: () => void;
 }) {
-  const [text, setText] = useState("");
   const [items, setItems] = useState<Item[] | null>(null);
   const [oltre, setOltre] = useState(0);
   const [phase, setPhase] = useState<"idle" | "reading" | "ready" | "saving" | "done">("idle");
@@ -169,20 +174,18 @@ export default function MultiLinkCard({
     settle(it.url, r, seen.current);
   };
 
-  const pasteFromClipboard = async () => {
-    let clip = "";
-    try {
-      clip = (await navigator.clipboard?.readText?.()) ?? "";
-    } catch {
-      // permesso negato: si incolla a mano nel campo
-    }
-    if (clip.trim()) {
-      setText(clip);
-      await read(clip);
-    } else {
-      setError("Non riesco a leggere gli appunti: tieni premuto nel campo qui sotto e scegli Incolla.");
-    }
-  };
+  // Ogni nuovo incolla del pulsante unico avvia la lettura (fuori dal ciclo dell'effetto).
+  const lastN = useRef(0);
+  useEffect(() => {
+    if (!incoming || incoming.n === lastN.current) return;
+    lastN.current = incoming.n;
+    const t = setTimeout(() => {
+      void read(incoming.text);
+      document.getElementById("importa-multi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming]);
 
   const toSave = items?.filter((it) => it.stato === "riconosciuto") ?? [];
 
@@ -222,7 +225,7 @@ export default function MultiLinkCard({
 
   const reset = () => {
     setItems(null);
-    setText("");
+    onAgain?.();
     setPhase("idle");
     setError(null);
     setOltre(0);
@@ -232,53 +235,14 @@ export default function MultiLinkCard({
   const total = items?.length ?? 0;
   const count = (s: Stato[]) => items?.filter((it) => s.includes(it.stato)).length ?? 0;
 
+  if (!userId || (!items && !error)) return null;
+
   return (
-    <section className="rounded-card border border-border bg-surface p-5" data-testid="importa-multi">
+    <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-multi">
       <h2 className="font-display text-lg font-semibold text-brand">
-        <span aria-hidden>🔗 </span>Incolla più link
+        <span aria-hidden>🔗 </span>I link che hai incollato
       </h2>
-      <p className="mt-1 text-sm text-text-muted">
-        Hai una chat con te stesso piena di posti, o una nota? Incollala tutta: trovo io i link e li salvo insieme.
-      </p>
-
-      {!userId ? (
-        <p className="mt-4 text-sm text-text-muted">
-          <Link href="/login?next=%2Fimporta" className="underline text-text">Accedi</Link> per salvare i locali.
-        </p>
-      ) : (
-        <>
-          {phase !== "done" && (
-            <div className="mt-4 space-y-2">
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={4}
-                placeholder={"Incolla qui la chat o la nota\nes. Da provare! https://maps.app.goo.gl/…"}
-                aria-label="Testo con i link"
-                className="w-full rounded-btn border border-border bg-white px-3 py-2 text-base focus:border-brand focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={pasteFromClipboard}
-                  disabled={phase === "reading" || phase === "saving"}
-                  className="min-h-12 flex-1 rounded-pill border border-brand bg-white px-3 text-sm font-display font-semibold text-brand disabled:opacity-60"
-                >
-                  📋 Incolla
-                </button>
-                <button
-                  type="button"
-                  onClick={() => read(text)}
-                  disabled={!text.trim() || phase === "reading" || phase === "saving"}
-                  data-testid="multi-leggi"
-                  className="min-h-12 flex-[1.4] rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white disabled:opacity-60"
-                >
-                  {phase === "reading" ? "Leggo…" : "Trova i locali"}
-                </button>
-              </div>
-            </div>
-          )}
-
+      <>
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="multi-errore">{error}</p>}
 
           {items && (
@@ -376,8 +340,7 @@ export default function MultiLinkCard({
               )}
             </div>
           )}
-        </>
-      )}
+      </>
     </section>
   );
 }

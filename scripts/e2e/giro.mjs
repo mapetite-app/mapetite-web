@@ -63,6 +63,13 @@ async function esempio(pg) {
   }
   return b;
 }
+// Intestazione dei risultati in una riga (Lorenzo 16/10): "Ho capito", 🧭, Affina e Condividi stanno dietro "⋯".
+async function apriOpzioni(pg) {
+  const pan = pg.getByTestId("opzioni-pannello");
+  if (await pan.isVisible().catch(() => false)) return;
+  await pg.getByTestId("opzioni-ricerca").click();
+  await pan.waitFor({ timeout: 3000 });
+}
 // Chiavi dei segnali che /api/events conserva (le altre le scarta in silenzio): lette dal codice
 // del server, così un segnale con una chiave sbagliata non sembra arrivato quando non lo è.
 const SERVER_PROP_KEYS = [...(readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8").match(/const PROP_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
@@ -199,6 +206,7 @@ await shot("03-lista-verdetti");
   await page.unroute("**/api/search");
   page.off("request", onReq);
 }
+await apriOpzioni(page);
 ok(await page.getByTestId("ho-capito").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1), "lista: 'Ho capito' si legge per intero (non tagliato)");
 ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
@@ -268,10 +276,24 @@ await (await esempio(page)).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok(await page.locator("ul.snap-x").count() === 1, "lista B predefinita: carosello presente");
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
-ok(await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").isVisible(), "lista B: mostra perché il locale è adatto alla ricerca");
+// Card in 1 secondo (Lorenzo 16/10): nome, UNA riga di fatti, il verdetto, al massimo un segnale.
+// Il perché e i tag escono dalla card e restano nella scheda (controllato in 7-ter).
+ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) === 0 && (await page.locator("ul.snap-x").getByText("tramonto", { exact: true }).count()) === 0, "card: il perché e i tag non sono più sulla card (stanno nella scheda)");
+{ const m = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((lis) => lis.map((li) => {
+    const card = li.querySelector("[data-testid=card-risultato]");
+    return { id: li.dataset.id, h: Math.round(card.getBoundingClientRect().height), segnali: card.querySelectorAll("[data-testid=gemma], [data-testid=etichetta-salvato]").length,
+      verdetto: card.querySelectorAll("[data-testid=etichetta-verdetto], [data-testid=riga-google], [data-testid=segnaposto-verdetto]").length, fatti: card.querySelectorAll("[data-testid=riga-fatti]").length,
+      righeFatti: (() => { const r = card.querySelector("[data-testid=riga-fatti]"); return r ? Math.round(r.getBoundingClientRect().height / parseFloat(getComputedStyle(r).lineHeight)) : 0; })() };
+  }));
+  ok(m.length >= 2 && m.every((c) => c.h <= 175), `card: più bassa, lettura in un colpo d'occhio (${m.map((c) => c.h + "px").join(", ")}; prima 260px)`);
+  ok(m.every((c) => c.verdetto === 1), `card: il verdetto (o la riga Google) c'è su ogni card (${m.map((c) => c.id + ":" + c.verdetto).join(", ")})`);
+  ok(m.every((c) => c.segnali <= 1 && c.fatti === 1 && c.righeFatti === 1), `card: UNA riga di fatti e al massimo un segnale (${m.map((c) => c.id + ":" + c.segnali).join(", ")})`); }
+{ const hb = await page.getByTestId("titolo-risposta").evaluate((el) => Math.round(el.closest(".rounded-card").getBoundingClientRect().height));
+  ok(hb <= 48 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `intestazione: una sola riga (${hb}px), "Ho capito" e Affina dietro "⋯"`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
 ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
+await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
 { const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
@@ -315,6 +337,7 @@ ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
 await page.waitForTimeout(300);
 ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Rooftop Tre"), "'Più vicini': il pin evidenziato segue la prima card");
 await page.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
+await apriOpzioni(page);
 await page.getByRole("button", { name: "Condividi questa ricerca" }).click();
 const sharedUrl = await page.evaluate(() => window.__shared?.url ?? "");
 ok(/\/mappa\?q=Rooftop romantico per due a Roma&at=-?\d+\.\d+,-?\d+\.\d+$/.test(decodeURIComponent(sharedUrl)), "condividi ricerca: link che riapre la stessa ricerca nello stesso punto");
@@ -587,6 +610,7 @@ await page.getByLabel("Cosa cerchi?").press("Enter");
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitivo sul tetto"), "barra: si scrive e si cerca dalla barra");
 ok((await page.getByTestId("benvenuto").count()) === 0, "barra: dopo la ricerca la card iniziale sparisce");
+await apriOpzioni(page);
 await page.getByRole("button", { name: "Affina" }).click();
 ok(await page.getByLabel("Cosa cerchi?").evaluate((el) => el === document.activeElement), "barra: 'Affina' porta il cursore nella barra");
 await shot("22b-barra-risultati");
@@ -753,6 +777,7 @@ searchMode = "ok";
 await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: ["Tonnarello", "Nannarella", "Da Enzo"], fuori_tema: [] } } }));
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
+await apriOpzioni(page);
 await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async () => {
   ok((await page.getByTestId("messi-da-parte").textContent()) === "🧭 Ho messo da parte 3 locali molto famosi (Tonnarello, Nannarella…)", "risultati: dice quali locali molto famosi ha messo da parte (non 'turistici': non lo sappiamo)");
   await shot("05d-messi-da-parte");
@@ -867,6 +892,7 @@ await ctx3.close();
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await page.evaluate(() => { navigator.share = async (d) => { window.__shared = d; }; });
 await (await esempio(page)).click();
+await apriOpzioni(page);
 await page.getByLabel("Condividi questa ricerca").click();
 const shared = await page.evaluate(() => window.__shared ?? null);
 ok(!!shared && /\/mappa\?q=Rooftop/.test(shared.url) && /&at=-?\d+\.\d+,-?\d+\.\d+/.test(shared.url), `condividi ricerca: link con richiesta e punto (${shared?.url ?? "nessuno"})`);
@@ -900,6 +926,7 @@ await page.getByText("Terrazza Uno").first().click();
 await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
 await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
 ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
+ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.getByText("tramonto", { exact: true }).count()) >= 1, "scheda B: il perché e i tag usciti dalla card sono nella scheda (nessuna informazione persa)");
 { const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
   ok(parts.length === 5 && parts[0] === "Bar" && parts[1] === "★ 4,5" && parts[2] === "€€" && /^[\d,]+ (m|km)$/.test(parts[3]) && parts[4] === "Aperto ora", `scheda B: UNA riga di fatti tipo · voto · prezzo · distanza · aperto (${parts.join(" · ")})`); }
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
@@ -941,7 +968,7 @@ ok(await page.getByTestId("benvenuto").getByText("Chiedi all'AI, per esempio:").
 // 7-quinquies. Pin con foto (?pin=b): stesse foto delle card, nessuna foto in più
 await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
-await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 12000 });
 await page.waitForTimeout(500);
 const pinSrcs = await page.locator("[data-testid=pin] img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
 const cardSrcs = await page.locator("ul.snap-x img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
@@ -987,7 +1014,17 @@ await shot("18-login");
 await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
 ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-ok(await page.getByText("Scegli uno screenshot").isVisible(), "importa: pulsante per scegliere lo screenshot in italiano");
+// Feedback 16/10 ("il dono della sintesi"): un solo pulsante Incolla in cima, poi 4 tessere che aprono il proprio pannello.
+ok(await page.getByTestId("importa-incolla").isVisible() && (await page.getByRole("button", { name: /Incolla/ }).count()) === 1, "importa: un solo pulsante Incolla, in cima");
+{ const tiles = await page.getByTestId("importa-tessere").getByRole("button").allTextContents();
+  ok(tiles.length === 4 && ["Da Google Maps", "Da file di Google", "Da screenshot", "A mano"].every((t, i) => tiles[i]?.includes(t)), `importa: 4 tessere Da Google Maps · Da file di Google · Da screenshot · A mano (${tiles.length})`); }
+{ const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
+  ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 * 1.05, `importa: Incolla grande sopra le tessere, tutto nel primo schermo (${Math.round(inc?.height ?? 0)}px, tessere fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
+await page.getByTestId("importa-tessera-shot").click();
+ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getByTestId("importa-tessera-shot").getAttribute("aria-expanded")) === "true", "importa: la tessera 'Da screenshot' apre il pannello con il pulsante in italiano");
+await page.getByTestId("importa-tessera-mano").click();
+ok(await page.getByTestId("importa-mano").isVisible() && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa: un pannello alla volta ('A mano' chiude lo screenshot)");
 await shot("19-importa");
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono.
@@ -1057,6 +1094,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+await page.getByTestId("importa-tessera-shot").click();
 await page.getByLabel("Scegli uno screenshot").setInputFiles({ name: "post.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
 ok(await page.getByText("Cambia screenshot").isVisible() && await page.getByText("post.png").isVisible(), "importa: area grande per scegliere lo screenshot, in italiano");
 // Screenshot grande (come un PNG di iPhone): parte rimpicciolito in JPEG, sotto il limite delle richieste
@@ -1164,6 +1202,10 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
   await page.screenshot({ path: `${OUT}/08b-salvati-vuoti.png`, caret: "initial" });
   await page.getByRole("button", { name: "Cerca un locale" }).click();
   ok(await page.getByTestId("idee-pannello").isVisible(), "salvati vuoti: 'Cerca un locale' riporta alla ricerca con le idee aperte");
+  await page.goto(`${BASE}/importa#da-screenshot`, { waitUntil: "networkidle" });
+  ok(await page.getByText("Scegli uno screenshot").waitFor({ timeout: 3000 }).then(() => true, () => false), "importa#da-screenshot: si apre già il pannello dello screenshot");
+  await page.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
+  ok(await page.getByTestId("importa-mano").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa#a-mano: si apre già il pannello 'A mano'");
 }
 
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
@@ -1191,27 +1233,47 @@ else {
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
-  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera", "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
-  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci · 1' (con quanti sono), come nella scheda");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  // Lorenzo 16/10 ("il dono della sintesi"): in alto UNA riga (cerca + Stasera), il resto dietro "Filtri".
+  { const box = await p.getByTestId("salvati-filtri").boundingBox();
+    ok(!!box && box.height < 70 && (await p.getByTestId("salvati-filtri").getByRole("button").count()) === 0 && await p.getByLabel("Cerca tra i salvati").isVisible(), `salvati: una sola riga di controlli in alto (alta ${Math.round(box?.height ?? 0)} px, niente chip sempre in vista)`);
+    ok((await p.getByRole("button", { name: "Filtri", exact: true }).count()) === 1 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un solo pulsante 'Filtri', senza numero se nessun filtro è acceso"); }
+  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera" && await p.getByTestId("vai-stasera").isVisible(), "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  { const fs = p.getByTestId("salvati-foglio");
+    ok(await fs.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2 (nel foglio Filtri)");
+    ok(await fs.getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible() && await fs.getByRole("button", { name: "✓ Ci sono stato · 0" }).isVisible(), "salvati: nel foglio Filtri lo stato '📌 Voglio andarci · 1' / '✓ Ci sono stato · 0' (con quanti sono)");
+    ok(await fs.getByRole("button", { name: "romantico · 1" }).isVisible() && await fs.getByText("Raccolte", { exact: true }).isVisible() && await fs.getByText("Ordine", { exact: true }).isVisible(), "salvati: nel foglio Filtri anche raccolte e ordine");
+    await p.screenshot({ path: `${OUT}/11e-salvati-foglio-filtri.png`, caret: "initial" });
+    await fs.getByRole("button", { name: "📌 Voglio andarci · 1" }).click();
+    ok((await fs.getByTestId("salvati-mostra").textContent()) === "Mostra 1 posto", "foglio Filtri: il pulsante dice quanti posti mostrerà");
+    await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 1 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
+    ok((await p.locator("ul.snap-x li").first().getByTestId("stato-card").textContent()) === "📌 Voglio andarci", "card salvato: lo stato in alto ('📌 Voglio andarci')");
+    await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).click();
+    ok((await p.locator("ul.snap-x li").count()) === 3 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un tocco sul filtro acceso lo toglie"); }
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati + filtri: 'Ristoranti' tiene solo i ristoranti salvati");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
   await p.getByRole("button", { name: "Caffè e Bar" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x").getByText("Caffè Milano").count()) === 1 && (await p.locator("ul.snap-x").getByText("Osteria Due").count()) === 0, "salvati + filtri: 'Caffè e Bar' trova il caffè salvato (tipi Google, non testo)");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Azzera" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
@@ -1232,7 +1294,9 @@ else {
     const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
   ok(!(await p.locator("ul.snap-x li").first().textContent()).includes("· Milano"), "filtro Milano: la città non si ripete sulla card (è già nel titolo)");
@@ -1247,7 +1311,7 @@ else {
   }
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, `filtro Milano: la mappa si sposta su Milano (pin visibile${pin ? "" : ", nessun pin"}${pin && !(pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) ? ` ma a ${Math.round(pin.x)},${Math.round(pin.y)}` : ""})`);
   await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
-  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli Milano" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
@@ -1255,16 +1319,22 @@ else {
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
-  await p.getByRole("button", { name: "Tutti", exact: true }).click();
-  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
+  await p.getByRole("button", { name: "Azzera filtri" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Azzera filtri' azzera anche il testo cercato");
   await sctx.grantPermissions(["geolocation"]);
   await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
   await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
-  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
-  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
-  await p.getByRole("button", { name: "Più vicini" }).click();
-  await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  await p.waitForTimeout(500);
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-foglio").getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano") && (await p.getByTestId("salvati-filtri-attivi").textContent()) === "1", "salvati: 'Più vicini' (nel foglio Filtri) mette prima il salvato più vicino a te (Milano)");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByRole("button", { name: "Azzera filtri" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
   await p.route("**/rest/v1/saved_places**", (r) => {
@@ -1314,7 +1384,10 @@ else {
   ok(p.url().includes("vista=salvati") && (await p.locator("nav").first().getByRole("link", { name: "Salvati" }).getAttribute("aria-current")) === "page", "salvati aperti: 'Salvati' resta acceso nella barra in basso");
   await p.goto(`${BASE}/mappa?vista=salvati&stato=voglio`, { waitUntil: "networkidle" });
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok((await p.getByTestId("salvati-filtri").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true" && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
+  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).isVisible() && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Voglio andarci': acceso anche nel foglio Filtri");
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   await p.getByRole("button", { name: "Esplora" }).click();
   await p.waitForTimeout(300);
   ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
@@ -1709,9 +1782,11 @@ else {
   await p.goto(`${BASE}/mappa?beta=-sorprendimi`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.waitForTimeout(800);
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: si spegne con ?beta=-sorprendimi (acceso di default)");
   await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("scegli-tu").click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByText("Osteria Due").last().isVisible() && (await p.getByTestId("stato-salvato").getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "scegli tu: apre il salvato 'Voglio andarci'");
@@ -1888,11 +1963,13 @@ else {
 
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const card = lp.getByTestId("importa-google");
-  ok(await card.getByText("Da Google Maps").isVisible(), "importa: card 'Da Google Maps' in cima");
-  ok((await card.locator("ol li").count()) === 3 && await card.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
+  await lp.getByTestId("importa-tessera-maps").click();
+  const guida = lp.getByTestId("importa-maps-guida");
+  ok(await guida.getByText("Da Google Maps").isVisible(), "importa: la tessera 'Da Google Maps' apre la sua guida");
+  ok((await guida.locator("ol li").count()) === 3 && await guida.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
   const cardTop = (await card.boundingBox())?.y ?? 9999;
-  const shotTop = (await lp.getByText("Scegli uno screenshot").boundingBox())?.y ?? 0;
-  ok(cardTop < shotTop, "importa: la card Google Maps viene prima dello screenshot");
+  const shotTop = (await lp.getByTestId("importa-tessera-shot").boundingBox())?.y ?? 0;
+  ok(cardTop < shotTop, "importa: 'Incolla un link' viene prima dello screenshot");
 
   if (!fakeUser) {
     ok(await card.getByRole("link", { name: "Accedi" }).isVisible(), "importa da disconnessi: invito ad accedere per salvare da Google Maps");
@@ -1901,11 +1978,11 @@ else {
     ok((await lp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa")))?.includes("maps.app.goo.gl/AAA111"), "condividi da disconnessi: il link resta in attesa");
     console.log("SKIP  salva da Google Maps con accesso: dev server senza E2E_FAKE_USER");
   } else {
-    ok(await card.getByRole("button", { name: "📋 Incolla link" }).isVisible(), "importa: pulsante grande '📋 Incolla link'");
+    ok(await card.getByRole("button", { name: "📋 Incolla un link" }).isVisible(), "importa: pulsante grande '📋 Incolla un link'");
     await lp.screenshot({ path: `${OUT}/30-importa-google.png`, caret: "initial" });
     // Più link negli appunti, uno per riga.
     await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/BBB222"));
-    await card.getByRole("button", { name: "📋 Incolla link" }).click();
+    await card.getByRole("button", { name: "📋 Incolla un link" }).click();
     await card.getByTestId("link-salvato").nth(1).waitFor({ timeout: 5000 });
     ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Trattoria Due").isVisible(), "incolla: più link salvati in una volta ('Salvato in Mapetite')");
     const posts = lwrites.filter((w) => w.m === "POST");
@@ -1928,9 +2005,9 @@ else {
     const np = await nctx.newPage();
     np.on("pageerror", (e) => errors.push(e.message));
     await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-    await np.getByRole("button", { name: "📋 Incolla link" }).click();
-    ok(await np.getByLabel("Link di Google Maps").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
-    await np.getByLabel("Link di Google Maps").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
+    await np.getByRole("button", { name: "📋 Incolla un link" }).click();
+    ok(await np.getByLabel("Link da incollare").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
+    await np.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
     await np.getByRole("button", { name: "Salva", exact: true }).click();
     await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
     ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
@@ -2031,6 +2108,7 @@ else {
   }
   await lctx.clearCookies({ name: "e2e_anonimo" });
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await lp.getByTestId("importa-tessera-shot").click();
   ok(await lp.getByTestId("importa-condividi-android").getByText("Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.").isVisible(), "importa: riga sul Condividi dello screenshot da Android");
   await lctx.close();
 }
@@ -2065,8 +2143,10 @@ if (!fakeUser) {
 
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
-  const [yG, yM, yS] = [await yOf("importa-google"), await yOf("importa-mano"), await yOf("importa-screenshot")];
-  ok(yG >= 0 && yG < yM && yM < yS, `importa: ordine Google Maps → Aggiungi a mano → Da uno screenshot (${yG}, ${yM}, ${yS})`);
+  const [yG, yT] = [await yOf("importa-google"), await yOf("importa-tessere")];
+  ok(yG >= 0 && yG < yT && (await yOf("importa-mano")) === -1, `importa: prima 'Incolla un link', poi le tessere; 'A mano' chiuso (${yG}, ${yT})`);
+  await mp.getByTestId("importa-tessera-mano").click();
+  ok((await yOf("importa-mano")) > yT, "importa: la tessera 'A mano' apre il campo sotto le tessere");
   const DOCS_SHOTS = "docs/autonomia/screenshots/2026-10-13-notte";
   mkdirSync(DOCS_SHOTS, { recursive: true });
   await mp.screenshot({ path: `${DOCS_SHOTS}/importa.png`, caret: "initial" });
@@ -2102,7 +2182,7 @@ if (!fakeUser) {
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
+  await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   const soc = gcard.getByTestId("link-social");
   ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
@@ -2123,7 +2203,7 @@ if (!fakeUser) {
   // TikTok e YouTube Shorts incollati.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("https://vm.tiktok.com/ZMabc123/");
+  await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
   // "✨ Trova il locale dal video" (14/10): la didascalia del video (oEmbed) va all'AI, poi si sceglie il locale.
@@ -2137,7 +2217,7 @@ if (!fakeUser) {
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
-  await gcard.getByLabel("Link di Google Maps").fill("https://www.youtube.com/shorts/abcDEF");
+  await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByText("Leggo la descrizione del video di YouTube", { exact: false }).isVisible() && await gcard.getByTestId("link-social-video").isVisible() && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps");
 
@@ -2163,7 +2243,10 @@ if (!fakeUser) {
   // Da disconnessi: invito ad accedere, nessuna ricerca.
   await mctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  ok(await mp.getByTestId("importa-google").getByRole("link", { name: "Accedi" }).isVisible() && (await mp.getByTestId("importa-incolla").count()) === 0, "importa da disconnessi: al posto di Incolla l'invito ad accedere");
+  await mp.getByTestId("importa-tessera-mano").click();
   ok(await mano.getByTestId("mano-accedi").isVisible() && await mano.getByRole("link", { name: "Accedi" }).isVisible() && !(await mano.getByLabel("Nome del locale e città").isVisible()), "a mano da disconnessi: invito ad accedere, niente campo");
+  await mp.getByTestId("importa-tessera-shot").click();
   ok(await mp.getByTestId("screenshot-accedi").isVisible() && await mp.getByRole("button", { name: "Leggi locale" }).isDisabled(), "screenshot da disconnessi: 'Leggi locale' spento e invito ad accedere (niente AI e Google senza poter salvare)");
   { const r = await mctx.request.post(`${BASE}/api/places/search`, { data: { query: "x".repeat(201) } }); ok(r.status() === 400, `ricerca locali: testo oltre 200 caratteri rifiutato senza chiamare Google (${r.status()})`); }
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/ABC/")}`, { waitUntil: "networkidle" });
@@ -2643,7 +2726,8 @@ else {
   await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
   { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(Apri la mappa|accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 3 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
-  await qp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
+  await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
   if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
   await qp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
   ok(await qp.getByTestId("condividi-vuoto").getByRole("link", { name: "Incolla il link in Importa" }).isVisible(), "condividi senza link: c'è un'azione per andare avanti");
@@ -3049,6 +3133,22 @@ else {
   ok((await ap.getByTestId("assistente-card").locator("li").first().textContent()).includes("Rooftop Tre"), "assistente: in cima il locale più adatto secondo i verdetti");
   ok((await ap.getByTestId("assistente-prenota").count()) === 2, "assistente: 'Prenota' su ogni card");
   await ashot("51-assistente-prenotazione");
+  // Chat essenziale (Lorenzo 16/10, "il dono della sintesi"): risposta breve, card compatte in fila, azioni come chip.
+  { const bubble = ap.getByTestId("assistente-risposta").first().locator("p").first();
+    const t = (await bubble.textContent()) ?? "";
+    ok(t.length <= 140 && (t.match(/[.?!](\s|$)/g) ?? []).length <= 2, `assistente: risposta in 1–2 frasi brevi (${t.length} caratteri)`);
+    const lis = ap.getByTestId("assistente-card").first().locator("li");
+    const [a, b] = [await lis.nth(0).boundingBox(), await lis.nth(1).boundingBox()];
+    ok(!!a && !!b && Math.abs(a.y - b.y) < 2 && b.x > a.x && a.height <= 240, `assistente: card compatte in un carosello orizzontale (${Math.round(a?.height ?? 0)} px)`);
+    const chips = ap.getByTestId("assistente-seguiti");
+    ok(await chips.getByTestId("assistente-prenota-primo").isVisible() && await chips.getByRole("button", { name: "Più economici" }).isVisible(), "assistente: azioni come chip sotto la risposta ('Prenota il primo', 'Più economici'…)");
+    const c = await ap.getByTestId("assistente-card").first().boundingBox(); const k = await chips.boundingBox();
+    ok(!!c && !!k && k.y >= c.y + c.height, "assistente: le chip stanno sotto le card");
+    ok((await ap.getByTestId("assistente-capito").first().textContent()).startsWith("Ho capito:") && (await ap.getByText("Sto scrivendo i verdetti…").count()) === 0, "assistente: 'Ho capito' in una riga piccola, nessun testo doppio sui verdetti");
+    await chips.getByTestId("assistente-prenota-primo").click();
+    await ap.getByRole("dialog", { name: "Prenota da Rooftop Tre" }).waitFor({ timeout: 3000 });
+    ok(true, "assistente: 'Prenota il primo' apre il foglio del primo locale");
+    await ap.getByRole("dialog", { name: "Prenota da Rooftop Tre" }).getByRole("button", { name: "Chiudi" }).click(); }
   ok(aEvents.some((e) => e.type === "pagina" && e.props?.pagina === "assistente"), "tracciamento: vista pagina 'assistente' (non più 'altro')");
   ok(aEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "prenotazione") && !JSON.stringify(aEvents).includes("terrazza a Roma"),
     "assistente: messaggio registrato come 'prenotazione', senza il testo scritto");
@@ -3082,8 +3182,13 @@ else {
   ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
   ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
   ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
+  ok((await ap.getByTestId("prenota-riepilogo").textContent()).includes("2 persone") && (await ap.getByTestId("prenota-avanti").count()) === 0,
+    "prenota in 2 passi: con i dati già detti in chat si parte dal passo 2 (riepilogo in una riga + messaggio)");
   await ap.getByTestId("prenota-messaggio").fill("Buonasera, un tavolo per 2 domani alle 21 in terrazza. Giulia");
+  await ap.getByTestId("prenota-modifica").click();
+  ok((await ap.getByTestId("prenota-messaggio").count()) === 0 && await ap.getByTestId("prenota-avanti").isVisible(), "prenota in 2 passi: 'Modifica' torna al passo 1 (quando e quanti), senza il messaggio");
   await ap.getByRole("button", { name: "Una persona in più" }).click();
+  await ap.getByTestId("prenota-avanti").click();
   ok((await ap.getByTestId("prenota-messaggio").inputValue()).startsWith("Buonasera, un tavolo per 2 domani"), "prenota: il messaggio modificato a mano non viene riscritto");
   await ap.getByRole("button", { name: "Rigenera" }).click();
   ok((await ap.getByTestId("prenota-messaggio").inputValue()).includes("per 3 persone"), "prenota: persone modificabili, il messaggio si aggiorna");
@@ -3185,6 +3290,7 @@ else {
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  ok(await ap.getByTestId("prenota-avanti").isDisabled() && (await ap.getByTestId("prenota-messaggio").count()) === 0, "prenota in 2 passi: senza dati si parte dal passo 1 e 'Avanti' resta spento");
   await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
   await actx.close();
@@ -4740,9 +4846,8 @@ if (fakeUser) {
   mp.on("pageerror", (e) => errors.push(e.message));
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const mc = mp.getByTestId("importa-multi");
-  ok(await mc.getByText("Incolla più link").isVisible() && await mc.getByLabel("Testo con i link").isVisible(), "incolla più link: card con il campo per la chat o la nota");
+  ok((await mc.count()) === 0, "incolla più link: la lista compare solo dopo aver incollato");
   const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
-  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-mano"), "incolla più link: subito dopo 'Da Google Maps'");
 
   const chat = [
     "[15/10/26, 21:02:11] Lorenzo: Da provare! https://maps.app.goo.gl/AAA111",
@@ -4757,7 +4862,9 @@ if (fakeUser) {
     "di nuovo https://maps.app.goo.gl/AAA111",
   ].join("\n");
   await mp.evaluate((t) => navigator.clipboard.writeText(t), chat);
-  await mc.getByRole("button", { name: "📋 Incolla" }).click();
+  await mp.getByTestId("importa-incolla").click();
+  await mc.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-tessere"), "incolla più link: tanti link misti dall'unico Incolla aprono la lista, subito sotto");
   await mc.getByTestId("multi-avanzamento").waitFor({ timeout: 4000 }).catch(() => {});
   const progress = await mc.getByTestId("multi-avanzamento").textContent().catch(() => "");
   ok(/Leggo i link… \d+ di 19/.test(progress), `incolla più link: avanzamento mentre legge ("${progress.trim()}")`);
@@ -4823,10 +4930,12 @@ if (fakeUser) {
 
   // Testo senza link: spiegato in italiano, nessuna chiamata.
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
+  ok((await mc.count()) === 0, "incolla più link: 'Incolla altri link' torna all'unico Incolla");
   const n0 = previews.length;
-  await mc.getByLabel("Testo con i link").fill("ricordati la pizzeria di Marco");
-  await mc.getByTestId("multi-leggi").click();
-  ok(await mc.getByTestId("multi-errore").isVisible() && (await mc.getByTestId("multi-errore").textContent()).includes("Non vedo link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+  ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
   await mctx.close();
 } else {
   console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
@@ -4932,9 +5041,9 @@ else {
   await ip.getByRole("button", { name: "Continua" }).click();
   await ip.getByTestId("benvenuto-importa-si").click();
   await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Importa da Google Maps' apre l'import"), () => ok(false, `primo accesso: 'Importa da Google Maps' apre l'import (${ip.url()})`));
-  await ip.getByTestId("importa-multi").waitFor({ timeout: 5000 }).catch(() => {});
-  const mb = await ip.getByTestId("importa-multi").boundingBox();
-  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2, `primo accesso: l'import si apre con 'Incolla più link' in cima (${Math.round(mb?.y ?? -1)})`);
+  await ip.getByTestId("importa-incolla").waitFor({ timeout: 5000 }).catch(() => {});
+  const mb = await ip.getByTestId("importa-incolla").boundingBox();
+  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2 && await ip.getByTestId("importa-maps-guida").isVisible(), `primo accesso: l'import si apre con 'Incolla un link' in cima e la guida di Google Maps aperta (${Math.round(mb?.y ?? -1)})`);
   await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
   ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
 
@@ -5728,6 +5837,7 @@ if (fakeUser) {
   const tp = await tctx.newPage();
   tp.on("pageerror", (e) => errors.push(e.message));
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  await tp.getByTestId("importa-tessera-file").click();
   const tc = tp.getByTestId("importa-file");
   ok(await tc.getByText("Carica il file di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
   await tp.getByTestId("file-aiuto").click();
@@ -5801,19 +5911,21 @@ else {
   const guide = ip.getByTestId("salva-telefono");
   await guide.waitFor({ timeout: 5000 }).catch(() => {});
   ok(await guide.getAttribute("data-telefono").catch(() => null) === "iphone", "salva da iPhone: su iPhone compare la guida iPhone");
-  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).isVisible(), "salva da iPhone: 2 passi (Copia il link → Incolla qui) e pulsante 'Incolla il link copiato'");
-  const yG = (await guide.boundingBox())?.y ?? 9999;
-  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 0;
-  ok(yG < yMaps, "salva da iPhone: la guida sta in cima, prima di 'Da Google Maps'");
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 0 && await guide.getByTestId("salva-telefono-apri").getByText("Come salvare dal telefono").isVisible(), "salva da iPhone: guida chiusa in una riga discreta 'Come salvare dal telefono'");
+  await guide.getByTestId("salva-telefono-apri").click();
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && (await guide.getByRole("button", { name: /Incolla/ }).count()) === 0 && (await ip.getByRole("button", { name: /Incolla/ }).count()) === 1, "salva da iPhone: 2 passi (Copia il link → Incolla) e un solo pulsante Incolla nella pagina");
+  ok(featureEv("salva_da_telefono_apri").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: l'apertura della guida è registrata (contesto iphone)");
+  const yG = (await guide.boundingBox())?.y ?? 0;
+  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 9999;
+  ok(yMaps < yG, "salva da iPhone: la guida sta sotto il pulsante Incolla");
   await ip.screenshot({ path: `${OUT}/99a-salva-iphone.png`, caret: "initial" });
   await ip.evaluate(() => navigator.clipboard.writeText("Guarda qui https://maps.app.goo.gl/TEL111"));
-  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  await ip.getByTestId("importa-incolla").click();
   ok(await ip.getByTestId("importa-google").getByTestId("link-salvato").first().waitFor({ timeout: 5000 }).then(() => true, () => false) && await ip.getByText("Osteria Nascosta").isVisible(), "salva da iPhone: il link copiato si salva con un tocco");
-  ok(featureEv("salva_da_telefono_incolla").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: il tocco su 'Incolla' è registrato (contesto iphone)");
   await ip.screenshot({ path: `${OUT}/99b-salva-iphone-salvato.png`, caret: "initial" });
   // Reel di Instagram: non si legge, si spiega lo screenshot (stesso percorso della card Maps).
   await ip.evaluate(() => navigator.clipboard.writeText("https://www.instagram.com/reel/C9xYz12AbCd/"));
-  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  await ip.getByTestId("importa-incolla").click();
   ok(await ip.getByTestId("link-social").waitFor({ timeout: 4000 }).then(() => true, () => false), "salva da iPhone: un reel di Instagram incollato spiega cosa fare (screenshot)");
   await ip.setViewportSize({ width: 360, height: 780 });
   ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "salva da iPhone 360px: niente scorrimento orizzontale");
@@ -5826,7 +5938,8 @@ else {
   await ap.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const ag = ap.getByTestId("salva-telefono");
   await ag.waitFor({ timeout: 5000 }).catch(() => {});
-  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ag.getByRole("button", { name: "Oppure 📋 incolla il link copiato" }).isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite' con incolla come alternativa");
+  await ag.getByTestId("salva-telefono-apri").click().catch(() => {});
+  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ap.getByTestId("importa-incolla").isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite', incolla resta l'alternativa in cima");
   await ap.screenshot({ path: `${OUT}/99c-salva-android.png`, caret: "initial" });
   await ag.getByTestId("salva-telefono-cambia").click();
   ok(await ag.getAttribute("data-telefono") === "iphone" && featureEv("salva_da_telefono_cambia").length > 0, "salva da Android: 'Hai un iPhone?' passa alla guida iPhone");
