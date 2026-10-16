@@ -8,6 +8,7 @@ import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
 import { dedupeSamePlace } from "../../src/lib/dedupe-places.ts";
+import { coherentLevel } from "../../src/lib/match-coherence.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -86,4 +87,10 @@ const dd = dedupeSamePlace([
 ok(dd.length === 2 && dd[0].name === "drinc. Cocktail & Conversation", "doppioni: lo stesso locale resta una volta, al primo posto, con la scheda più recensita");
 ok(dedupeSamePlace([{ name: "Bar Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Bar Bianchi", lat: 41.9, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: due locali diversi nello stesso palazzo restano entrambi");
 ok(dedupeSamePlace([{ name: "Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Rossi", lat: 41.91, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: stesso nome a 1 km sono due locali");
+// Coerenza tra il perché e il livello (perché veri di Haiku, 17/10).
+ok(coherentLevel("alto", "Ristorante con vista panoramica sulla città e atmosfera elegante e sofisticata, perfetto per un anniversario; le recensioni sottolineano un servizio formale e attento ai dettagli, ideale per l'occasione, ma non viene esplicitamente menzionata una terrazza.") === "medio", "coerenza: terrazza non menzionata → non più 'alto'");
+ok(coherentLevel("alto", "Rooftop panoramico con vista iconografica di Milano; le uniche criticità riguardano il servizio talvolta lento, ma la location eccezionale compensa per un anniversario.") === "alto", "coerenza: una critica minore non abbassa il livello");
+ok(coherentLevel("alto", "Trattoria tipica di Trastevere con buona cucina romana; le recensioni la descrivono come locale del quartiere, pur senza escludere una certa affluenza nei fine settimana.") === "alto", "coerenza: 'pur senza escludere' non abbassa");
+ok(coherentLevel("alto", "Piccolo bar sui Navigli con buoni drink, anche se le recensioni non lo descrivono specificamente come non turistico.") === "medio", "coerenza: 'non lo descrivono' come requisito → medio");
+ok(coherentLevel("basso", "non viene menzionata") === "basso", "coerenza: 'basso' resta basso");
 process.exit(failed === 0 ? 0 : 1);

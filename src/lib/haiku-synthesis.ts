@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
+import { coherentLevel } from "@/lib/match-coherence";
 import type { PlaceResult } from "@/lib/google-places";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
@@ -366,7 +367,7 @@ export async function getSynthesis(
             const o = item as Record<string, unknown>;
             if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
             if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
-            if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, o.match);
+            if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
               fits.set(o.id, {
                 fit: o.fit,
