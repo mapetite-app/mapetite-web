@@ -3124,6 +3124,141 @@ else {
     ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
 
+  // Serata completa a tappe (piano 1.2): una ricerca per tappa (massimo 3), intento costruito
+  // senza AI, scelta vicina alla tappa precedente (non la più popolare), distanze a piedi stimate,
+  // mini mappa con i pin numerati, percorso in Google Maps, Salva/Prenota e alternative per tappa.
+  {
+    let se = null;
+    try { se = await import(new URL("../../src/lib/serata.ts", import.meta.url).href); } catch (e) { ok(false, `serata: modulo src/lib/serata.ts importabile (${e.message})`); }
+    if (se) {
+      const p = se.serataOf("organizzami sabato sera: aperitivo, cena, dopocena a Trastevere");
+      ok(!!p && p.tappe.map((t) => t.kind).join() === "aperitivo,cena,dopocena" && p.zona === "Trastevere" && p.tappe[0].query === "aperitivo a Trastevere" && p.tappe[2].queryGoogle === "cocktail bar Trastevere", `serata: frase capita senza AI (${JSON.stringify(p?.tappe.map((t) => t.query))}, zona ${p?.zona})`);
+      ok(["Aperitivo con vista a Milano", "Trattoria non turistica a Testaccio", "Prenotami domani alle 21 per 2 con terrazza a Roma", "cocktail bar dopo cena a Monti", "ristorante per una serata romantica a Trastevere", "organizzami una cena a Monti"].every((q) => se.serataOf(q) === null), "serata: le richieste di un posto solo restano ricerche normali");
+      const d = se.serataOf("organizzami la serata a Monti");
+      ok(d?.tappe.map((t) => t.kind).join() === "aperitivo,cena,dopocena" && d.zona === "Monti", "serata: 'organizzami la serata' senza tappe = aperitivo, cena, dopocena");
+      const m = se.serataOf("colazione, pranzo, aperitivo e cena a Roma");
+      ok(m?.tappe.length === 3 && m.tagliate.join() === "Cena", "serata: al massimo 3 tappe (3 ricerche Google), la quarta si dice");
+      const pg = se.serataOf("pizza e gelato dalle parti di campo de' fiori");
+      ok(pg?.tappe[0].includedType === "pizza_restaurant" && pg.tappe[1].kind === "gelato" && pg.zona === "Campo de' Fiori", `serata: 'pizza e gelato' (${pg?.zona})`);
+      const w = se.walkOf({ lat: 41.889, lng: 12.469 }, { lat: 41.892, lng: 12.471 });
+      ok(w.meters > 380 && w.meters < 520 && w.minutes === Math.round(w.meters / 80) && se.walkLabel(w).includes("min a piedi"), `serata: distanza a piedi stimata (linea d'aria × 1,3): ${se.walkLabel(w)}`);
+      ok(se.walkLabel({ meters: 4200, minutes: 53 }).includes("taxi"), "serata: tappe lontane → 'meglio un taxi o i mezzi'");
+      const prev = { lat: 41.889, lng: 12.469 };
+      const cand = [{ id: "far", lat: 41.91, lng: 12.5 }, { id: "used", lat: 41.889, lng: 12.469 }, { id: "near2", lat: 41.8895, lng: 12.4695 }, { id: "near1", lat: 41.893, lng: 12.47 }];
+      ok(se.orderCandidates(cand, prev, new Set(["used"])).map((x) => x.id).join() === "near2,near1,far", "serata: prima i posti comodi a piedi nell'ordine di Google, poi i lontani; nessun posto ripetuto");
+      const url = se.googleMapsRoute([{ id: "A", name: "a", lat: 1, lng: 2 }, { id: "B", name: "b", lat: 3, lng: 4 }, { id: "C", name: "c", lat: 5, lng: 6 }]);
+      ok(url.startsWith("https://www.google.com/maps/dir/?api=1") && url.includes("waypoint_place_ids=B") && url.includes("travelmode=walking") && url.includes("destination_place_id=C"), "serata: link Google Maps con le tappe come waypoint (gratuito)");
+    }
+
+    const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const sEvents = [], sSearches = [], sIntents = [], sAdds = [];
+    await sctx.route("**/api/events", (route) => { sEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+    await sctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await sctx.route("**/rest/v1/**", (route) => route.fulfill(route.request().method() === "POST" ? { status: 201, body: "" } : { json: [] }));
+    await sctx.route("**/api/places/add", (route) => { sAdds.push(route.request().postDataJSON()); return route.fulfill({ json: { place: { id: "33333333-0000-4000-8000-0000000000b1" } } }); });
+    await sctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await sctx.route("**/api/search/intent", (route) => { sIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
+    // Trastevere: l'aperitivo in piazza; per la cena Google mette prima un posto famoso lontano
+    // (5.000 recensioni, a 2 km) e poi una trattoria a due passi: si sceglie la trattoria.
+    const T = (id, name, lat, lng, extra = {}) => mk(id, name, lat, lng, { address: "Trastevere, Roma", ...extra });
+    const STAGES = {
+      aperitivo: [T("SA1", "Bar della Piazza", 41.8894, 12.4699, { category: "wine_bar" }), T("SA2", "Enoteca Vicolo", 41.8899, 12.4703), T("SA3", "Spritz Corner", 41.8885, 12.4712)],
+      cena: [T("SC1", "Ristorante Famoso Lontano", 41.9045, 12.4825, { userRatingCount: 5000, category: "restaurant" }), T("SC2", "Trattoria Vicina", 41.8903, 12.4712, { userRatingCount: 140, category: "restaurant", phone: "347 765 4321" }), T("SC3", "Osteria del Cortile", 41.8889, 12.4721, { category: "restaurant" })],
+      dopocena: [T("SA1", "Bar della Piazza", 41.8894, 12.4699), T("SD2", "Cocktail Segreto", 41.8909, 12.4718, { category: "cocktail_bar" }), T("SD3", "Bar Lontano", 41.8954, 12.4801, { category: "cocktail_bar" })],
+    };
+    await sctx.route("**/api/search", async (route) => {
+      const b = route.request().postDataJSON();
+      sSearches.push(b);
+      await new Promise((r) => setTimeout(r, 250));
+      const kind = Object.keys(STAGES).find((k) => b.query.startsWith(k));
+      return route.fulfill({ json: { risultati: STAGES[kind] ?? [], filtri_usati: { categoria: "bar", parole_chiave: [], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: [], token: kind ?? "x" } } });
+    });
+    await sctx.route("**/api/search/synthesis", async (route) => {
+      await new Promise((r) => setTimeout(r, 400));
+      const v = (t) => ({ synthesis: t, tags: [], verdict: t, goFor: [], dontExpect: [], matchReason: t });
+      return route.fulfill({ json: { dettagli: { SA1: v("Calici al tramonto in piazza."), SC2: v("Cucina romana di quartiere, senza fronzoli."), SC3: v("Cortile tranquillo."), SD2: v("Cocktail d'autore, porta senza insegna.") }, esclusi: ["SA3"] } });
+    });
+    const sp = await sctx.newPage();
+    sp.on("pageerror", (e) => errors.push(e.message));
+    sp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    await sp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    await sp.getByTestId("assistente-campo").fill("organizzami sabato sera: aperitivo, cena, dopocena a Trastevere");
+    await sp.waitForTimeout(900); // pausa nello scrivere: per una serata nessuna richiesta all'AI in anticipo
+    await sp.getByTestId("assistente-campo").press("Enter");
+    await sp.getByTestId("serata").waitFor({ timeout: 5000 });
+    ok((await sp.getByTestId("serata-tappa").count()) === 3, "serata: tre tappe in ordine");
+    await sp.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 3, null, { timeout: 8000 });
+    ok(sSearches.length === 3 && sSearches.map((s) => s.query).join("|") === "aperitivo a Trastevere|cena a Trastevere|dopocena a Trastevere", `serata: una ricerca Google per tappa, 3 in tutto (${sSearches.map((s) => s.query).join(" | ")})`);
+    ok(sSearches.every((s) => s.intent && s.intentQuery === s.query && s.phase === "fast" && s.intent.zona === "Trastevere" && s.intent.queryGoogle.includes("Trastevere")), "serata: ogni tappa arriva con l'intento già costruito (il server non chiede all'AI di capire la frase)");
+    ok(sIntents.length === 0, `serata: nessuna richiesta all'AI per capire la frase (${sIntents.length})`);
+    const tappe = sp.getByTestId("serata-tappa");
+    const nomi = await Promise.all([0, 1, 2].map((i) => tappe.nth(i).getByTestId("serata-scelto").getByRole("button", { name: /^Apri / }).getAttribute("aria-label")));
+    ok(nomi.join() === "Apri Bar della Piazza,Apri Trattoria Vicina,Apri Cocktail Segreto", `serata: scelta vicina alla tappa prima, non la più famosa, nessun posto ripetuto (${nomi.join(", ")})`);
+    const dist = await sp.getByTestId("serata-distanza").allTextContents();
+    ok(dist.length === 2 && dist.every((d) => /circa \d+ m · \d+ min a piedi/.test(d)), `serata: distanza e minuti a piedi tra le tappe (${dist.join(" / ")})`);
+    ok((await sp.getByTestId("serata-stima").textContent()).includes("stime in linea d'aria"), "serata: le distanze sono dichiarate come stima");
+    await tappe.nth(1).getByText("Cucina romana di quartiere, senza fronzoli.").waitFor({ timeout: 6000 });
+    ok(true, "serata: il verdetto Mapetite compare sulla tappa scelta");
+    ok((await tappe.nth(0).getByTestId("serata-alternativa").filter({ hasText: "Spritz Corner" }).count()) === 0, "serata: l'alternativa esclusa dai verdetti sparisce");
+    ok((await tappe.nth(1).getByTestId("serata-alternativa").count()) === 2, "serata: due alternative per tappa");
+    const gm = await sp.getByTestId("serata-google-maps").getAttribute("href");
+    ok(gm.includes("origin_place_id=SA1") && gm.includes("waypoint_place_ids=SC2") && gm.includes("destination_place_id=SD2") && gm.includes("travelmode=walking"), "serata: 'Apri il percorso in Google Maps' con le tappe come waypoint");
+    await sp.getByTestId("serata-pin").first().waitFor({ timeout: 8000 }).catch(() => {});
+    ok((await sp.getByTestId("serata-pin").allTextContents()).join() === "1,2,3", "serata: mini mappa con i pin numerati 1, 2, 3");
+    await sp.getByTestId("serata").scrollIntoViewIfNeeded();
+    await sp.screenshot({ path: `${OUT}/59-serata.png`, caret: "initial" });
+    await sp.getByTestId("serata-mappa").scrollIntoViewIfNeeded();
+    await sp.screenshot({ path: `${OUT}/59b-serata-mappa.png`, caret: "initial" });
+    // Alternativa scelta: cambia la tappa, il percorso e le distanze.
+    const distPrima = dist[0];
+    await tappe.nth(1).getByRole("button", { name: "Scegli Osteria del Cortile per cena" }).click();
+    ok((await tappe.nth(1).getByTestId("serata-scelto").getByRole("button", { name: "Apri Osteria del Cortile" }).count()) === 1, "serata: 'Scegli' su un'alternativa la mette come tappa");
+    ok((await sp.getByTestId("serata-google-maps").getAttribute("href")).includes("waypoint_place_ids=SC3") && (await sp.getByTestId("serata-distanza").first().textContent()) !== distPrima, "serata: percorso e distanze seguono la scelta");
+    // Salva e Prenota sulla tappa (stessi pulsanti delle card dell'assistente).
+    await tappe.nth(0).getByTestId("assistente-salva").click();
+    await tappe.nth(0).getByTestId("assistente-salvato").waitFor({ timeout: 5000 });
+    ok(sAdds.length === 1 && sAdds[0].googlePlaceId === "SA1", "serata: 'Salva' sulla tappa salva il locale (Place ID Google)");
+    await sp.getByTestId("assistente-salvato-avviso").waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+    await tappe.nth(2).getByTestId("assistente-prenota").click();
+    await sp.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+    ok(await sp.getByTestId("foglio-prenota").isVisible(), "serata: 'Prenota' sulla tappa apre il foglio della prenotazione");
+    await sp.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+    await tappe.nth(1).getByTestId("serata-scelto").getByRole("button", { name: /^Apri / }).click();
+    await sp.getByTestId("assistente-scheda").waitFor({ timeout: 3000 });
+    ok(await sp.getByTestId("assistente-scheda").getByText("Osteria del Cortile").first().isVisible(), "serata: tocco sulla tappa = scheda del locale");
+    await sp.getByTestId("assistente-scheda").click({ position: { x: 20, y: 20 } });
+    { const ser = sEvents.filter((e) => e.type === "funzione" && e.props?.nome === "assistente_serata").map((e) => e.props?.contesto);
+      ok(ser.includes("percorso") && ser.includes("alternativa") && sEvents.some((e) => e.props?.nome === "assistente_serata" && e.props?.risultati === 3), `serata: segnali registrati (${ser.join(", ")})`);
+      ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "serata") && !JSON.stringify(sEvents).includes("Trastevere"), "serata: messaggio registrato come 'serata', senza il testo scritto");
+      const lost = droppedKeys(sEvents.filter((e) => e.type === "funzione"));
+      ok(lost.length === 0, `serata: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lost.join(", ") || "nessuna scartata"})`); }
+    // Ricaricata la pagina la serata resta, senza ricerche nuove.
+    await sp.reload({ waitUntil: "networkidle" });
+    await sp.getByTestId("serata").waitFor({ timeout: 5000 });
+    ok(sSearches.length === 3 && (await sp.getByTestId("serata-scelto").count()) === 3, "serata: dopo aver ricaricato c'è ancora, senza ricerche nuove");
+    await sctx.close();
+
+    // 360 px: si legge, niente scorrimento orizzontale.
+    const s3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await s3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+    await s3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await s3.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+    await s3.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await s3.route("**/api/search", (route) => { const b = route.request().postDataJSON(); const kind = Object.keys(STAGES).find((k) => b.query.startsWith(k)); return route.fulfill({ json: { risultati: STAGES[kind] ?? [], sintesi_pendente: null } }); });
+    const s3p = await s3.newPage();
+    s3p.on("pageerror", (e) => errors.push(e.message));
+    await s3p.goto(`${BASE}/assistente?q=${encodeURIComponent("aperitivo e cena a Trastevere")}`, { waitUntil: "networkidle" });
+    await s3p.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 2, null, { timeout: 8000 });
+    { const w = await s3p.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `serata a 360 px: niente scorrimento orizzontale (${w}px)`); }
+    { const li = s3p.getByTestId("serata-alternativa").first(); const [b, s] = [await li.boundingBox(), await li.getByTestId("serata-scegli").boundingBox()];
+      ok(!!b && !!s && s.x + s.width <= b.x + b.width + 1 && s.height >= 40, "serata a 360 px: 'Scegli' dentro la riga, grande abbastanza per il dito"); }
+    await s3p.getByTestId("serata-tappa").first().scrollIntoViewIfNeeded();
+    await s3p.screenshot({ path: `${OUT}/59c-serata-360.png`, caret: "initial" });
+    await s3.close();
+  }
+
   // Frase capita in anticipo (come la mappa, piano 2.4): tempo alla prima card prima/dopo.
   // Server simulato: Google 300 ms; l'AI che capisce la frase 1200 ms, sul server se la ricerca
   // arriva senza intento, oppure in anticipo mentre si scrive (/api/search/intent).

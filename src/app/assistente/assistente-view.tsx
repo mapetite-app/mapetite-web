@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, Bookmark, BookmarkCheck, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles } from "lucide-react";
-import VenueSheet, { type Venue } from "@/components/venue-sheet";
+import { ArrowUp, BookmarkCheck, Map as MapIcon, RotateCcw, Sparkles } from "lucide-react";
+import VenueSheet from "@/components/venue-sheet";
+import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
+import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
 import VoiceButton from "@/components/voice-button";
-import PlacePhoto from "@/components/place-photo";
-import { getCategoryEmoji } from "@/lib/emoji";
-import { categoryLabel } from "@/lib/category-label";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
+import { intentOfTappa, orderCandidates, serataOf, type SerataPlan, type TappaPlan } from "@/lib/serata";
 import { dateKey, dayLabel, missingDetails, parseBooking, type BookingDetails } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
@@ -18,7 +18,6 @@ import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
-type Card = Venue & { editorialSummary?: string | null };
 type Ask = { label: string; send: string };
 type UserMsg = { id: string; role: "user"; text: string };
 type BotMsg = {
@@ -31,6 +30,7 @@ type BotMsg = {
   query?: string | null;       // la ricerca da cui vengono le card
   status?: "loading" | "verdicts" | "done" | "error";
   asks?: Ask[];
+  serata?: Serata;             // serata completa a tappe (piano 1.2)
 };
 type Msg = UserMsg | BotMsg;
 type Conv = {
@@ -47,6 +47,12 @@ const EMPTY: Conv = { msgs: [], booking: EMPTY_BOOKING, bookingMode: false, last
 // Senza posizione e senza città scritta si cerca intorno a Roma, come la mappa all'apertura.
 const DEFAULT_CENTER = { lat: 41.9028, lng: 12.4964 };
 
+// Serata rimasta a metà (pagina chiusa): le tappe in attesa diventano "interrotte", il resto resta.
+function reviveSerata(m: BotMsg): BotMsg {
+  const tappe = (m.serata?.tappe ?? []).map((t): SerataTappa => (t.status === "loading" ? { ...t, status: "error", error: "Ricerca interrotta: riprova." } : t.status === "verdicts" ? { ...t, status: "done" } : t));
+  return { ...m, status: "done", serata: m.serata ? { ...m.serata, tappe } : undefined };
+}
+
 let conv: Conv | null = null;
 const listeners = new Set<() => void>();
 function getConv(): Conv {
@@ -56,7 +62,7 @@ function getConv(): Conv {
     const parsed = raw ? (JSON.parse(raw) as Conv) : null;
     // Una ricerca rimasta "in corso" (pagina chiusa a metà) non deve bloccare la conversazione.
     conv = parsed && Array.isArray(parsed.msgs)
-      ? { ...EMPTY, ...parsed, msgs: parsed.msgs.map((m) => (m.role === "assistant" && (m.status === "loading" || m.status === "verdicts") ? { ...m, status: m.status === "loading" ? "error" : "done", text: m.status === "loading" ? "Ricerca interrotta: riprova." : m.text } : m)) }
+      ? { ...EMPTY, ...parsed, msgs: parsed.msgs.map((m) => (m.role === "assistant" && m.serata ? reviveSerata(m) : m.role === "assistant" && (m.status === "loading" || m.status === "verdicts") ? { ...m, status: m.status === "loading" ? "error" : "done", text: m.status === "loading" ? "Ricerca interrotta: riprova." : m.text } : m)) }
       : EMPTY;
   } catch {
     conv = EMPTY;
@@ -142,9 +148,9 @@ function askPosition(): Promise<{ lat: number; lng: number } | null> {
   });
 }
 
-// Secondo tempo: i verdetti (come la mappa), a gruppi in parallelo; esclusi e ordine alla fine.
-async function loadVerdicts(msgId: string, query: string, pending: Pending) {
-  if (!pending) { patchMsg(msgId, { status: "done" }); return; }
+// Secondo tempo: i verdetti (come la mappa), a gruppi in parallelo. onPart riceve ogni gruppo
+// appena arriva; alla fine esclusi e livelli di tutti i gruppi.
+async function fetchVerdicts(query: string, pending: NonNullable<Pending>, onPart: (part: VerdictReply) => void) {
   const groups = pending.gruppi?.length ? pending.gruppi : [{ places: pending.places, token: pending.token }];
   const replies = await Promise.all(groups.map(async (g): Promise<VerdictReply | null> => {
     try {
@@ -155,14 +161,22 @@ async function loadVerdicts(msgId: string, query: string, pending: Pending) {
       });
       if (!res.ok) return null;
       const part: VerdictReply = await res.json();
-      patchMsg(msgId, (m) => ({ places: (m.places ?? []).map((p) => (part.dettagli?.[p.id] ? { ...p, ...part.dettagli[p.id] } : p)) }));
+      onPart(part);
       return part;
     } catch {
       return null; // un gruppo perso non ferma gli altri: quelle card restano con i dati Google
     }
   }));
-  const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
-  const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
+  return {
+    esclusi: new Set(replies.flatMap((r) => r?.esclusi ?? [])),
+    livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})) as Record<string, string>,
+  };
+}
+
+async function loadVerdicts(msgId: string, query: string, pending: Pending) {
+  if (!pending) { patchMsg(msgId, { status: "done" }); return; }
+  const { esclusi, livelli } = await fetchVerdicts(query, pending, (part) =>
+    patchMsg(msgId, (m) => ({ places: (m.places ?? []).map((p) => (part.dettagli?.[p.id] ? { ...p, ...part.dettagli[p.id] } : p)) })));
   patchMsg(msgId, (m) => {
     let places = (m.places ?? []).filter((p) => !esclusi.has(p.id));
     if (places.length === 0) places = m.places ?? []; // nel dubbio il locale resta
@@ -175,6 +189,92 @@ async function loadVerdicts(msgId: string, query: string, pending: Pending) {
       note: [m.note, excluded > 0 ? `Ho tolto ${excluded === 1 ? "un posto che non rispettava" : `${excluded} posti che non rispettavano`} la richiesta.` : null].filter(Boolean).join(" ") || null,
     };
   });
+}
+
+// ── Serata completa a tappe (piano 1.2) ──
+// Ogni tappa è UNA ricerca Google (massimo 3 tappe → 3 ricerche). L'intento della tappa si
+// costruisce senza AI (src/lib/serata.ts): nessuna chiamata Haiku per capire la frase.
+const patchTappa = (msgId: string, i: number, patch: Partial<SerataTappa> | ((t: SerataTappa) => Partial<SerataTappa>)) =>
+  patchMsg(msgId, (m) => (m.serata
+    ? { serata: { ...m.serata, tappe: m.serata.tappe.map((t, j) => (j === i ? { ...t, ...(typeof patch === "function" ? patch(t) : patch) } : t)) } }
+    : {}));
+
+const POOL_MAX = 6;
+
+async function fetchTappa(t: TappaPlan, zona: string | null, at: { lat: number; lng: number }): Promise<{ cards: Card[]; pending: Pending } | { error: string }> {
+  try {
+    const res = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: t.query, source: "world", searchIntent: "natural", phase: "fast",
+        intent: intentOfTappa(t, zona), intentQuery: t.query,
+        lat: at.lat, lng: at.lng,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: data?.error ?? "Qualcosa è andato storto. Riprova." };
+    const cards = ((data.risultati ?? []) as RawPlace[]).filter((p) => p.lat != null && p.lng != null).map(toCard);
+    return { cards, pending: (data.sintesi_pendente ?? null) as Pending };
+  } catch {
+    return { error: "Errore di rete. Controlla la connessione e riprova." };
+  }
+}
+
+async function loadTappaVerdicts(msgId: string, i: number, query: string, pending: Pending) {
+  if (!pending) { patchTappa(msgId, i, { status: "done" }); return; }
+  const { esclusi } = await fetchVerdicts(query, pending, (part) =>
+    patchTappa(msgId, i, (t) => ({ pool: t.pool.map((p) => (part.dettagli?.[p.id] ? { ...p, ...part.dettagli[p.id] } : p)) })));
+  // I locali che chiaramente non rispettano la richiesta escono (nel dubbio restano).
+  patchTappa(msgId, i, (t) => {
+    const pool = t.pool.filter((p) => !esclusi.has(p.id));
+    if (pool.length === 0) return { status: "done" };
+    return { pool, chosenId: pool.some((p) => p.id === t.chosenId) ? t.chosenId : pool[0].id, status: "done" };
+  });
+}
+
+async function runSerata(plan: SerataPlan, q: string, pos: { lat: number; lng: number } | null) {
+  const msgId = newId();
+  const n = plan.tappe.length;
+  const tappe: SerataTappa[] = plan.tappe.map((t) => ({ kind: t.kind, label: t.label, emoji: t.emoji, query: t.query, status: "loading", pool: [], chosenId: null }));
+  setConv((c) => ({
+    ...c,
+    lastQuery: q,
+    msgs: [...c.msgs, {
+      id: msgId, role: "assistant", status: "loading", query: q,
+      text: `Ecco la tua serata${plan.zona ? ` a ${plan.zona}` : ""}: ${n} tappe in ordine, ognuna vicina alla precedente. Per ogni tappa ti propongo un posto e un paio di alternative.`,
+      understood: plan.tappe.map((t) => t.label.toLowerCase()).join(" → ") + (plan.zona ? ` · ${plan.zona}` : ""),
+      serata: { zona: plan.zona, tappe, tagliate: plan.tagliate },
+    }],
+  }));
+  const start = pos ?? DEFAULT_CENTER;
+  // Con la zona scritta le tappe partono insieme (il testo tiene Google nella zona) e la scelta
+  // segue la tappa precedente qui sotto; senza zona una alla volta, con la posizione della
+  // tappa precedente come preferenza per Google (il dopocena vicino alla cena).
+  const together = plan.zona ? plan.tappe.map((t) => fetchTappa(t, plan.zona, start)) : null;
+  let prev: Card | null = null;
+  const used = new Set<string>();
+  let found = 0;
+  let firstError: string | null = null;
+  for (let i = 0; i < n; i++) {
+    const t = plan.tappe[i];
+    const r: Awaited<ReturnType<typeof fetchTappa>> = together ? await together[i] : await fetchTappa(t, plan.zona, prev ?? start);
+    if ("error" in r) {
+      firstError = firstError ?? r.error;
+      patchTappa(msgId, i, { status: "error", error: r.error });
+      continue;
+    }
+    const pool: Card[] = orderCandidates(r.cards, prev, used).slice(0, POOL_MAX);
+    const chosen: Card | null = pool[0] ?? null;
+    if (chosen) { used.add(chosen.id); prev = chosen; found++; }
+    patchTappa(msgId, i, { pool, chosenId: chosen?.id ?? null, status: r.pending && chosen ? "verdicts" : "done" });
+    if (r.pending && chosen) void loadTappaVerdicts(msgId, i, t.query, r.pending);
+  }
+  patchMsg(msgId, (m) => ({
+    status: found === 0 ? "error" : "done",
+    text: found === 0 ? firstError ?? `Non ho trovato posti per “${q}”. Prova con un'altra zona.` : m.text,
+    note: found > 0 && found < n ? "Per una tappa non ho trovato posti: prova a cambiare zona." : m.note ?? null,
+  }));
 }
 
 async function runSearch(q: string, booking: BookingDetails, bookingMode: boolean, pos: { lat: number; lng: number } | null) {
@@ -227,6 +327,7 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
 function lastResults(c: Conv): BotMsg | null {
   for (let i = c.msgs.length - 1; i >= 0; i--) {
     const m = c.msgs[i];
+    if (m.role === "assistant" && m.serata) return null; // dopo una serata i seguiti rifanno la serata
     if (m.role === "assistant" && m.places && m.places.length > 0) return m;
   }
   return null;
@@ -245,11 +346,13 @@ function plannedQuery(raw: string, c: Conv): string | null {
   const text = raw.trim().slice(0, 300);
   if (!text || SMALL_TALK.test(text)) return null;
   if (localRefineOf(text) && lastResults(c)) return null;
-  return searchQueryOf(text, parseBooking(text), c.lastQuery);
+  const q = searchQueryOf(text, parseBooking(text), c.lastQuery);
+  // Serata a tappe: si capisce senza AI, nessuna richiesta in anticipo.
+  return q && serataOf(q) ? null : q;
 }
 
 // Segnale "funzione" dell'assistente: mai il testo scritto, solo che tipo di messaggio era.
-const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli") =>
+const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli" | "serata") =>
   trackFeature("assistente_messaggio", { contesto });
 
 async function send(raw: string) {
@@ -305,6 +408,13 @@ async function send(raw: string) {
   }
 
   const q = searchQueryOf(text, parsed, before.lastQuery);
+  const plan = q ? serataOf(q) : null;
+  if (q && plan) {
+    trackMsg("serata");
+    trackFeature("assistente_serata", { contesto: "percorso", risultati: plan.tappe.length });
+    await runSerata(plan, q, getConv().pos);
+    return;
+  }
   if (q) {
     trackMsg(parsed.isBooking ? "prenotazione" : "ricerca");
     // "solo con terrazza" dopo una ricerca: seguito che riformula la richiesta di prima.
@@ -330,10 +440,6 @@ async function send(raw: string) {
 }
 
 // ── Interfaccia ──
-const priceOf = (n: number | null) => (n != null && n > 0 ? "€".repeat(n) : null);
-const ratingOf = (r: number | null) => (r != null ? `★ ${r.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null);
-
-type SaveState = "saving" | "error";
 
 function PlaceCards({ msg, booking, bookingMode, savedIds, saving, onOpen, onBook, onSave }: {
   msg: BotMsg; booking: BookingDetails; bookingMode: boolean;
@@ -349,82 +455,18 @@ function PlaceCards({ msg, booking, bookingMode, savedIds, saving, onOpen, onBoo
     <ul key={places.map((p) => p.id).join()} data-testid="assistente-card" className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
       {places.map((p, i) => (
         <li key={p.id} className="relative w-[78%] max-w-[300px] shrink-0 snap-start">
-          <button
-            type="button"
-            onClick={() => onOpen(p)}
-            aria-label={`Apri ${p.name}`}
-            className="relative flex h-full min-h-[220px] w-full flex-col overflow-hidden rounded-card bg-brand p-4 pb-16 text-left text-white shadow-float active:scale-[0.99]"
-          >
-            {i < 6 && p.photoRef && (
-              <>
-                <PlacePhoto photoRef={p.photoRef} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-brand via-brand/75 to-brand/20" />
-              </>
-            )}
-            <span className="relative flex flex-1 flex-col">
-              <span className="flex items-start justify-between gap-2">
-                <span className="text-2xl leading-none" aria-hidden>{getCategoryEmoji(p.category, p.name)}</span>
-                {showOpen && p.openNow != null && (
-                  <span className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-medium ${p.openNow ? "bg-white/15" : "bg-black/30 text-white/80"}`}>
-                    {p.openNow ? "Aperto ora" : "Chiuso ora"}
-                  </span>
-                )}
-              </span>
-              <span className="mt-auto pt-6 line-clamp-2 font-title text-lg font-semibold leading-snug">{p.name}</span>
-              <span className="mt-0.5 truncate text-[13px] font-sans font-medium text-white/85">
-                {[categoryLabel(p.category), priceOf(p.priceLevel), ratingOf(p.rating)].filter(Boolean).join(" · ")}
-              </span>
-              {p.verdict ? (
-                <span className="mt-2 block">
-                  <span data-testid="assistente-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</span>
-                  <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{p.verdict}</span>
-                </span>
-              ) : msg.status === "verdicts" ? (
-                <span data-testid="assistente-verdetto-attesa" className="mt-2 block space-y-1.5" aria-label="Preparo il verdetto">
-                  <span className="block h-2.5 w-24 animate-pulse rounded bg-white/25" />
-                  <span className="block h-3 w-full animate-pulse rounded bg-white/20" />
-                </span>
-              ) : p.editorialSummary ? (
-                <span className="mt-2 line-clamp-2 text-sm font-sans leading-snug text-white/80">{p.editorialSummary}</span>
-              ) : null}
-            </span>
-          </button>
-          {/* Salva in un tocco ("📌 Voglio andarci", come il segnalibro della mappa) e Prenota. */}
-          <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-            {savedIds.has(p.id) ? (
-              <span
-                role="status"
-                data-testid="assistente-salvato"
-                aria-label={`${p.name} è nei tuoi salvati`}
-                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white text-sm font-display font-semibold text-brand"
-              >
-                <BookmarkCheck size={16} aria-hidden /> Salvato
-              </span>
-            ) : (
-              <button
-                type="button"
-                data-testid="assistente-salva"
-                onClick={() => onSave(p)}
-                disabled={saving[p.id] === "saving"}
-                aria-label={`Salva ${p.name} tra i Voglio andarci`}
-                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white/15 text-sm font-display font-semibold text-white backdrop-blur active:scale-[0.98] disabled:opacity-80"
-              >
-                <Bookmark size={16} aria-hidden />
-                {saving[p.id] === "saving" ? "Salvo…" : saving[p.id] === "error" ? "Riprova" : "Salva"}
-              </button>
-            )}
-            {(p.phone || p.websiteUri) && (
-              <button
-                type="button"
-                data-testid="assistente-prenota"
-                onClick={() => onBook(p)}
-                aria-label={`Prenota da ${p.name}`}
-                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-sm font-display font-semibold active:scale-[0.98] ${bookingMode ? "bg-accent text-white" : "bg-white/15 text-white backdrop-blur"}`}
-              >
-                <CalendarCheck size={16} aria-hidden /> Prenota
-              </button>
-            )}
-          </div>
+          <AssistantPlaceCard
+            p={p}
+            photo={i < 6}
+            showOpen={showOpen}
+            waitingVerdict={msg.status === "verdicts"}
+            bookingMode={bookingMode}
+            saved={savedIds.has(p.id)}
+            saving={saving[p.id]}
+            onOpen={() => onOpen(p)}
+            onSave={() => onSave(p)}
+            onBook={() => onBook(p)}
+          />
         </li>
       ))}
     </ul>
@@ -486,7 +528,9 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   // Scheda aperta: si legge dalla conversazione, così il verdetto arrivato dopo compare anche lì.
   const [openRef, setOpenRef] = useState<{ msgId: string; placeId: string } | null>(null);
   const openMsg = openRef ? c.msgs.find((m) => m.id === openRef.msgId) : null;
-  const openCard = openMsg?.role === "assistant" ? openMsg.places?.find((p) => p.id === openRef?.placeId) ?? null : null;
+  const openCard = openMsg?.role === "assistant"
+    ? openMsg.places?.find((p) => p.id === openRef?.placeId) ?? openMsg.serata?.tappe.flatMap((t) => t.pool).find((p) => p.id === openRef?.placeId) ?? null
+    : null;
   const setOpenCard = (v: null) => setOpenRef(v);
   const [bookCard, setBookCard] = useState<Card | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -575,7 +619,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               </p>
             ) : (
               <div key={m.id} data-testid="assistente-risposta" className="max-w-full">
-                {m.status === "loading" ? (
+                {m.status === "loading" && !m.serata ? (
                   <p data-testid="assistente-attesa" className="flex items-center gap-2 text-[15px] font-sans text-text-muted">
                     <span className="flex gap-1" aria-hidden>
                       <span className="h-2 w-2 animate-bounce rounded-full bg-accent" />
@@ -589,6 +633,19 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     <p className={`text-[15px] font-sans leading-relaxed ${m.status === "error" ? "text-error" : "text-text"}`}>{m.text}</p>
                     {m.understood && <p className="mt-1 text-xs font-sans text-text-muted">Ho capito: {m.understood}</p>}
                   </>
+                )}
+                {m.serata && (
+                  <SerataView
+                    serata={m.serata}
+                    savedIds={savedIds}
+                    saving={saving}
+                    bookingMode={c.bookingMode}
+                    onOpen={(p) => { setOpenRef({ msgId: m.id, placeId: p.id }); track("apri_scheda", { id: p.id, lat: p.lat, lng: p.lng }, { fonte: "assistente" }); }}
+                    onBook={(p) => { setBookCard(p); trackFeature("assistente_prenota"); }}
+                    onSave={(p) => void save(p)}
+                    onChoose={(i, id) => { patchTappa(m.id, i, { chosenId: id }); trackFeature("assistente_serata", { contesto: "alternativa" }); }}
+                    onRoute={() => trackFeature("assistente_serata", { contesto: "google_maps", risultati: m.serata?.tappe.filter((t) => chosenOf(t)).length ?? 0 })}
+                  />
                 )}
                 {m.places && m.places.length > 0 && (
                   <PlaceCards
