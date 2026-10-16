@@ -8,7 +8,7 @@ import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
-import { sortTags, tagLabel } from "@/lib/tags";
+import { isStateTag, sortTags, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
@@ -67,6 +67,8 @@ export interface BottomSheetProps {
   onOpenArticle?: () => void;
   // Lista dei propri salvati: niente filtri rapidi (mancano orari e conteggi).
   savedMode?: boolean;
+  // "Più vicini" deciso da fuori (foglio Filtri dei salvati): niente chip nella lista.
+  nearest?: boolean;
   // Città sulla riga dei metadati (salvati di più città: "Ristorante · ★ 4,6 · Roma · 600 m").
   showCity?: boolean;
 }
@@ -217,7 +219,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -225,12 +227,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
-  const nearestOn = origin != null && (quickFiltersOn || heading != null);
+  const nearestOn = nearest === undefined && origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
   // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
-  const [nearestFirst, setNearestFirst] = useState(false);
+  const [nearestLocal, setNearestFirst] = useState(false);
+  const nearestFirst = nearest ?? nearestLocal;
   const [shared, setShared] = useState(false);
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
@@ -575,7 +578,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
-            const gem = !saved && gemsOn && isGem(place.rating, d?.userRatingCount);
+            const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
+            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount);
             return (
               <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[78vw] max-w-sm shrink-0 snap-center lg:w-auto lg:max-w-none lg:rounded-card lg:transition-shadow ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                 {onSave && (
@@ -609,16 +613,19 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    {(saved || gem) && (
+                    {(stato || saved || gem) && (
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
-                        {saved ? (
+                        {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
+                        {stato ? (
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                        ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave && !(saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, origin, showCity)}</span>
                       {d?.openNow === true && (
@@ -636,7 +643,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className="mt-1.5 block">
                         {/* Il verdetto si riconosce dal ✦ corallo; l'etichetta intera è nella scheda (e per i lettori di schermo). */}
                         <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
-                        <span className="line-clamp-2 text-sm font-sans font-medium leading-snug text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
+                        <span className={`${savedMode ? "line-clamp-1" : "line-clamp-2"} text-sm font-sans font-medium leading-snug text-white`}><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />

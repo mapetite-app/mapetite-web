@@ -1218,27 +1218,47 @@ else {
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2");
-  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera", "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
-  ok(await p.getByTestId("salvati-filtri").getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible(), "salvati: il tag 'Da provare' si legge '📌 Voglio andarci · 1' (con quanti sono), come nella scheda");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  // Lorenzo 16/10 ("il dono della sintesi"): in alto UNA riga (cerca + Stasera), il resto dietro "Filtri".
+  { const box = await p.getByTestId("salvati-filtri").boundingBox();
+    ok(!!box && box.height < 70 && (await p.getByTestId("salvati-filtri").getByRole("button").count()) === 0 && await p.getByLabel("Cerca tra i salvati").isVisible(), `salvati: una sola riga di controlli in alto (alta ${Math.round(box?.height ?? 0)} px, niente chip sempre in vista)`);
+    ok((await p.getByRole("button", { name: "Filtri", exact: true }).count()) === 1 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un solo pulsante 'Filtri', senza numero se nessun filtro è acceso"); }
+  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera" && await p.getByTestId("vai-stasera").isVisible(), "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  { const fs = p.getByTestId("salvati-foglio");
+    ok(await fs.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2 (nel foglio Filtri)");
+    ok(await fs.getByRole("button", { name: "📌 Voglio andarci · 1" }).isVisible() && await fs.getByRole("button", { name: "✓ Ci sono stato · 0" }).isVisible(), "salvati: nel foglio Filtri lo stato '📌 Voglio andarci · 1' / '✓ Ci sono stato · 0' (con quanti sono)");
+    ok(await fs.getByRole("button", { name: "romantico · 1" }).isVisible() && await fs.getByText("Raccolte", { exact: true }).isVisible() && await fs.getByText("Ordine", { exact: true }).isVisible(), "salvati: nel foglio Filtri anche raccolte e ordine");
+    await p.screenshot({ path: `${OUT}/11e-salvati-foglio-filtri.png`, caret: "initial" });
+    await fs.getByRole("button", { name: "📌 Voglio andarci · 1" }).click();
+    ok((await fs.getByTestId("salvati-mostra").textContent()) === "Mostra 1 posto", "foglio Filtri: il pulsante dice quanti posti mostrerà");
+    await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 1 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
+    ok((await p.locator("ul.snap-x li").first().getByTestId("stato-card").textContent()) === "📌 Voglio andarci", "card salvato: lo stato in alto ('📌 Voglio andarci')");
+    await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).click();
+    ok((await p.locator("ul.snap-x li").count()) === 3 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un tocco sul filtro acceso lo toglie"); }
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati + filtri: 'Ristoranti' tiene solo i ristoranti salvati");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
   await p.getByRole("button", { name: "Caffè e Bar" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x").getByText("Caffè Milano").count()) === 1 && (await p.locator("ul.snap-x").getByText("Osteria Due").count()) === 0, "salvati + filtri: 'Caffè e Bar' trova il caffè salvato (tipi Google, non testo)");
-  await p.getByRole("button", { name: "Filtri", exact: true }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Azzera" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
@@ -1259,7 +1279,9 @@ else {
     const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
   ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
   ok(!(await p.locator("ul.snap-x li").first().textContent()).includes("· Milano"), "filtro Milano: la città non si ripete sulla card (è già nel titolo)");
@@ -1274,7 +1296,7 @@ else {
   }
   ok(!!pin && pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390, `filtro Milano: la mappa si sposta su Milano (pin visibile${pin ? "" : ", nessun pin"}${pin && !(pin.y > 200 && pin.y < 844 * 0.6 && pin.x > 0 && pin.x < 390) ? ` ma a ${Math.round(pin.x)},${Math.round(pin.y)}` : ""})`);
   await p.screenshot({ path: `${OUT}/13-salvati-milano.png`, caret: "initial" });
-  await p.getByRole("button", { name: "📍 Milano · 1" }).click();
+  await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli Milano" }).click();
   await p.getByLabel("Cerca tra i salvati").fill("terrazza");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Terrazza Uno").isVisible(), "ricerca 'terrazza': solo Terrazza Uno");
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
@@ -1282,16 +1304,22 @@ else {
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
-  await p.getByRole("button", { name: "Tutti", exact: true }).click();
-  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Tutti' azzera anche il testo cercato");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
+  await p.getByRole("button", { name: "Azzera filtri" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Azzera filtri' azzera anche il testo cercato");
   await sctx.grantPermissions(["geolocation"]);
   await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
   await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
-  await p.getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
-  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano"), "salvati: 'Più vicini' mette prima il salvato più vicino a te (Milano)");
-  await p.getByRole("button", { name: "Più vicini" }).click();
-  await p.getByRole("button", { name: "Tutti", exact: true }).click();
+  await p.waitForTimeout(500);
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByTestId("salvati-foglio").getByRole("button", { name: "Più vicini" }).click({ timeout: 4000 });
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
+  ok((await p.locator("ul.snap-x li").first().textContent())?.includes("Caffè Milano") && (await p.getByTestId("salvati-filtri-attivi").textContent()) === "1", "salvati: 'Più vicini' (nel foglio Filtri) mette prima il salvato più vicino a te (Milano)");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  await p.getByRole("button", { name: "Azzera filtri" }).click();
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
   await p.route("**/rest/v1/saved_places**", (r) => {
@@ -1341,7 +1369,10 @@ else {
   ok(p.url().includes("vista=salvati") && (await p.locator("nav").first().getByRole("link", { name: "Salvati" }).getAttribute("aria-current")) === "page", "salvati aperti: 'Salvati' resta acceso nella barra in basso");
   await p.goto(`${BASE}/mappa?vista=salvati&stato=voglio`, { waitUntil: "networkidle" });
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok((await p.getByTestId("salvati-filtri").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true" && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
+  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Voglio andarci" }).isVisible() && (await p.locator("ul.snap-x li").count()) === 1 && !p.url().includes("stato="), "profilo → 'Voglio andarci': mappa sui soli salvati da provare");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
+  ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Voglio andarci': acceso anche nel foglio Filtri");
+  await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   await p.getByRole("button", { name: "Esplora" }).click();
   await p.waitForTimeout(300);
   ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
@@ -1736,9 +1767,11 @@ else {
   await p.goto(`${BASE}/mappa?beta=-sorprendimi`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "I miei salvati" }).click();
   await p.waitForTimeout(800);
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: si spegne con ?beta=-sorprendimi (acceso di default)");
   await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
   await p.getByRole("button", { name: "I miei salvati" }).click();
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("scegli-tu").click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByText("Osteria Due").last().isVisible() && (await p.getByTestId("stato-salvato").getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "scegli tu: apre il salvato 'Voglio andarci'");
