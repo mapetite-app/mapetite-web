@@ -150,7 +150,7 @@ await idee(page);
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
 await shot("01b-idee");
-await page.getByTestId("idee-fuori").click({ position: { x: 200, y: 780 } });
+await page.getByTestId("idee-fuori").click({ position: { x: 385, y: 400 } });
 ok(!(await page.getByTestId("idee-pannello").isVisible()), "Idee: un tocco sulla mappa chiude il pannello");
 await page.getByLabel("Cosa cerchi?").click();
 ok(await page.getByTestId("idee-pannello").isVisible(), "Idee: toccando la barra vuota si aprono i suggerimenti");
@@ -807,6 +807,7 @@ await page.unroute("**/api/search");
 // 6. Errore di rete/API
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await idee(page);
 await page.getByRole("button", { name: "Colazione buona qui vicino", exact: true }).click();
 await page.getByText(/Qualcosa è andato storto/).first().waitFor({ timeout: 4000 });
 ok(true, "errore API: messaggio umano mostrato nella card");
@@ -2967,6 +2968,10 @@ else {
   await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
   ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
   ok(await ap.getByTestId("assistente-campo").isVisible(), "assistente: campo per scrivere in basso");
+  ok((await ap.getByTestId("assistente-esempi").getByRole("button").count()) === 4 && (await ap.getByTestId("assistente-idee").count()) === 0, "assistente: tre chip brevi + 'Altre idee' (niente card lunghe, Lorenzo 16/10)");
+  await ap.getByTestId("assistente-altre-idee").click();
+  ok((await ap.getByTestId("assistente-idee").getByRole("button").count()) === 5, "assistente: 'Altre idee' apre la lista completa delle frasi");
+  await ap.getByTestId("assistente-altre-idee").click();
   { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
   await ashot("50-assistente-benvenuto");
 
