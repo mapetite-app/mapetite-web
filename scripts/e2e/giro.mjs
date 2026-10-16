@@ -3124,6 +3124,167 @@ else {
     ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
 
+  // Memoria dei gusti (piano 1.4): preferenze dichiarate capite a regole (nessuna AI), ricordate
+  // solo dopo un "Sì", usate nelle ricerche come parole della richiesta (nessuna chiamata in più),
+  // togliibili con un tocco; zona abituale dai salvati; "Cosa so di te" nel profilo.
+  {
+    let gm = null;
+    try { gm = await import(new URL("../../src/lib/gusti.ts", import.meta.url).href); } catch (e) { ok(false, `gusti: modulo src/lib/gusti.ts importabile (${e.message})`); }
+    if (gm) {
+      const d = (s) => gm.gustiDichiarati(s);
+      ok(d("Sono vegetariano").ids.join() === "vegetariano" && d("Sono vegetariano").soloPreferenza, "gusti: 'sono vegetariano' capito, solo preferenza (nessuna ricerca)");
+      ok(d("ricordati che non mi piace il pesce").ids.join() === "no-pesce" && d("evito i posti rumorosi").ids.join() === "tranquillo" && d("sono allergico ai crostacei").ids.join() === "no-pesce", "gusti: 'non mi piace il pesce', 'evito i posti rumorosi', 'allergico ai crostacei'");
+      ok(d("budget basso").ids.join() === "budget-basso" && d("max 30 euro a testa").ids.join() === "budget-30" && d("sono vegana e odio i posti turistici").ids.join() === "vegano,no-turistici", "gusti: budget, 'max 30 euro', vegana + niente turistici");
+      ok(d("sono celiaco, cerco una pizzeria a Prati").ids.join() === "celiaco" && !d("sono celiaco, cerco una pizzeria a Prati").soloPreferenza, "gusti: preferenza dentro una ricerca → la ricerca parte e si propone di ricordarla");
+      ok(["Trattoria non turistica a Testaccio", "Prenotami domani alle 21 per 2 con terrazza a Roma", "trattoria a Monti, niente pesce", "ristorante di pesce a Ostia", "Aperitivo con vista a Milano"].every((s) => d(s).ids.length === 0), "gusti: le richieste di stasera ('non turistica', 'niente pesce' dentro una ricerca) non diventano gusti da ricordare");
+      ok(gm.gustiPerRicerca("trattoria a Monti", ["vegetariano", "no-pesce"]).query === "trattoria a Monti, con piatti vegetariani, senza pesce", "gusti: entrano nella richiesta come parole");
+      ok(gm.gustiPerRicerca("ristorante di pesce a Ostia", ["vegetariano", "no-pesce"]).usati.length === 0 && gm.gustiPerRicerca("cocktail bar a Monti", ["vegetariano", "budget-20"]).query === "cocktail bar a Monti, economico", "gusti: la richiesta scritta vince; niente 'piatti vegetariani' per un cocktail bar");
+      { const r = gm.inFondoPerGusti([{ name: "Mare", category: "seafood_restaurant" }, { name: "Verde", category: "restaurant" }], gm.gustiPerRicerca("trattoria", ["no-pesce"]).usati);
+        ok(r.places.map((p) => p.name).join() === "Verde,Mare" && r.spostati === 1, "gusti: il posto di pesce va in fondo, non sparisce"); }
+      ok(gm.aggiungiGusti(["vegetariano", "budget-20"], ["vegano", "budget-basso"]).join() === "vegano,budget-basso" && gm.gustiValidi(["vegano", "inventato", 3, "vegano"]).join() === "vegano", "gusti: vegano assorbe vegetariano, un budget sostituisce l'altro, solo gusti conosciuti");
+      const monti = [{ lat: 41.8946, lng: 12.493 }, { lat: 41.895, lng: 12.492 }, { lat: 41.894, lng: 12.494 }, { lat: 41.889, lng: 12.47 }];
+      ok(gm.zonaAbituale(monti)?.nome === "Monti" && gm.zonaAbituale(monti.slice(0, 2)) === null, "gusti: zona abituale dai salvati (almeno 3 nello stesso quartiere)");
+      ok(gm.fraseConZona("trattoria a Monti") && gm.fraseConZona("pizza a Milano") && gm.fraseConZona("bar qui vicino") && !gm.fraseConZona("trattoria romana"), "gusti: si riconosce quando la frase dice già dove");
+    }
+
+    const U = "00000000-0000-0000-0000-000000000001";
+    const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const gEvents = [], gSearches = [], gSynth = [], gIntents = [], gPatches = [];
+    await gctx.route("**/api/events", (route) => { gEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+    await gctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await gctx.route("**/rest/v1/**", (route) => route.fulfill(route.request().method() === "GET" ? { json: [] } : { status: 204, body: "" }));
+    // Salvati: tre a Monti e uno a Trastevere → "Di solito vai a Monti".
+    await gctx.route("**/rest/v1/saved_places**", (route) => {
+      if (!decodeURIComponent(route.request().url()).includes("places(lat")) return route.fulfill({ json: [] });
+      return route.fulfill({ json: [{ places: { lat: 41.8946, lng: 12.493 } }, { places: { lat: 41.895, lng: 12.492 } }, { places: { lat: 41.894, lng: 12.494 } }, { places: { lat: 41.889, lng: 12.47 } }] });
+    });
+    await gctx.route("**/rest/v1/profiles**", (route) => {
+      if (route.request().method() === "PATCH") { gPatches.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); }
+      return route.fulfill({ json: [] }); // colonna non ancora creata o profilo vuoto: si usa il telefono
+    });
+    await gctx.route("**/api/search/intent", (route) => { gIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
+    const G_PLACES = [
+      mk("G1", "Mare Blu", 41.8945, 12.4935, { category: "seafood_restaurant", userRatingCount: 300 }),
+      mk("G2", "Trattoria Verde", 41.8949, 12.4931, { category: "restaurant", userRatingCount: 120 }),
+      mk("G3", "Osteria del Vicolo", 41.8941, 12.4925, { category: "restaurant", userRatingCount: 90 }),
+    ];
+    await gctx.route("**/api/search", async (route) => {
+      gSearches.push(route.request().postDataJSON());
+      await new Promise((r) => setTimeout(r, 200));
+      return route.fulfill({ json: { risultati: G_PLACES, filtri_usati: { categoria: "trattoria", parole_chiave: [], vicino_a_me: false, zona: null }, sintesi_pendente: { places: [], token: "g" } } });
+    });
+    await gctx.route("**/api/search/synthesis", async (route) => {
+      gSynth.push(route.request().postDataJSON());
+      return route.fulfill({ json: { dettagli: { G2: { synthesis: "Cucina di casa.", tags: [], verdict: "Verdure dell'orto e carbonara vegetariana.", goFor: [], dontExpect: [], matchReason: "Piatti vegetariani nelle recensioni." } }, esclusi: [] } });
+    });
+    const gp = await gctx.newPage();
+    gp.on("pageerror", (e) => errors.push(e.message));
+    gp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    await gp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    // 1. Solo la preferenza: nessuna ricerca, domanda "Me lo ricordo?".
+    await gp.getByTestId("assistente-campo").fill("sono vegetariano e non mi piace il pesce");
+    await gp.waitForTimeout(900); // pausa nello scrivere: per una preferenza nessuna richiesta all'AI in anticipo
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByTestId("assistente-ricorda").waitFor({ timeout: 5000 });
+    ok((await gp.getByTestId("assistente-ricorda").textContent()).includes("vegetariano · niente pesce"), "gusti: 'Me lo ricordo? vegetariano · niente pesce'");
+    ok(gSearches.length === 0 && gIntents.length === 0, `gusti: per una preferenza nessuna ricerca Google e nessuna richiesta all'AI (${gSearches.length}, ${gIntents.length})`);
+    ok(gPatches.length === 0 && (await gp.evaluate((u) => localStorage.getItem(`mapetite.gusti.${u}`), U)) === null, "gusti: niente salvato prima del Sì");
+    await gp.screenshot({ path: `${OUT}/60-gusti-proposta.png`, caret: "initial" });
+    await gp.getByTestId("assistente-ricorda-si").click();
+    await gp.getByTestId("assistente-ricorda").getByText("Fatto, me lo ricordo").waitFor({ timeout: 3000 });
+    await gp.waitForTimeout(300);
+    ok(gPatches.length === 1 && JSON.stringify(gPatches[0]) === '{"gusti_ricordati":["vegetariano","no-pesce"]}', `gusti: dopo il Sì salvati nel profilo (${JSON.stringify(gPatches[0] ?? null)})`);
+    ok((await gp.evaluate((u) => localStorage.getItem(`mapetite.gusti.${u}`), U)) === '["vegetariano","no-pesce"]', "gusti: copia nel telefono (funziona anche senza la migrazione)");
+    ok((await gp.getByTestId("assistente-ricorda").getByRole("link", { name: "Cosa so di te" }).getAttribute("href")) === "/profilo#cosa-so-di-te", "gusti: rimanda a 'Cosa so di te' nel profilo");
+    // 2. Ricerca senza zona: i gusti entrano nella richiesta (Google e verdetti), riga "Tengo conto di".
+    await gp.getByTestId("assistente-campo").fill("trattoria romana");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByTestId("assistente-card").getByText("Trattoria Verde").waitFor({ timeout: 8000 });
+    await gp.getByTestId("assistente-card").getByText("Verdure dell'orto e carbonara vegetariana.").waitFor({ timeout: 6000 }).catch(() => {});
+    ok(gSearches.length === 1 && gSearches[0].query === "trattoria romana, con piatti vegetariani, senza pesce", `gusti: una sola ricerca, con i gusti nella richiesta (${gSearches[0]?.query})`);
+    ok(gSynth.length === 1 && gSynth[0].query === gSearches[0].query, "gusti: i verdetti ricevono la stessa richiesta (nessuna chiamata in più)");
+    { const row = gp.getByTestId("assistente-gusti").last();
+      const t = await row.textContent();
+      ok(t.includes("Tengo conto di") && t.includes("vegetariano") && t.includes("niente pesce"), `gusti: riga 'Tengo conto di: vegetariano · niente pesce' (${t})`); }
+    { const first = await gp.getByTestId("assistente-card").last().locator("li").first().textContent();
+      const lastLi = await gp.getByTestId("assistente-card").last().locator("li").last().textContent();
+      ok(!first.includes("Mare Blu") && lastLi.includes("Mare Blu"), "gusti: il ristorante di pesce va in fondo (non sparisce)"); }
+    ok((await gp.getByTestId("assistente-nota").last().textContent()).includes("Ho messo in fondo un posto di pesce"), "gusti: si dice perché un posto è in fondo");
+    await gp.getByTestId("assistente-zona").waitFor({ timeout: 3000 });
+    ok((await gp.getByTestId("assistente-zona").textContent()).includes("Di solito vai a Monti: cerco lì?"), "gusti: 'Di solito vai a Monti: cerco lì?' (dai salvati) quando la frase non dice dove");
+    await gp.screenshot({ path: `${OUT}/61-gusti-ricerca.png`, caret: "initial" });
+    await gp.getByTestId("assistente-zona").scrollIntoViewIfNeeded();
+    await gp.screenshot({ path: `${OUT}/61b-gusti-zona.png`, caret: "initial" });
+    // 3. Un tocco toglie un gusto da questa conversazione: stessa ricerca senza.
+    await gp.getByTestId("assistente-gusti").last().getByRole("button", { name: /vegetariano/ }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 2, null, { timeout: 8000 });
+    ok(gSearches.length === 2 && gSearches[1].query === "trattoria romana, senza pesce", `gusti: tolto 'vegetariano' → stessa ricerca senza (${gSearches[1]?.query})`);
+    await gp.getByTestId("assistente-nota").last().getByText("Senza “vegetariano”").waitFor({ timeout: 3000 }).then(() => ok(true, "gusti: si dice che vale solo per questa conversazione"), () => ok(false, "gusti: si dice che vale solo per questa conversazione"));
+    // 4. "Cerca a Monti": ricerca nella zona abituale, il gusto tolto resta tolto.
+    await gp.getByTestId("assistente-zona").getByRole("button", { name: "Cerca a Monti" }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 3, null, { timeout: 8000 });
+    ok(gSearches.length === 3 && gSearches[2].query === "trattoria romana a Monti, senza pesce", `gusti: 'Cerca a Monti' rifà la ricerca lì (${gSearches[2]?.query})`);
+    ok((await gp.getByTestId("assistente-zona").count()) === 0, "gusti: con la zona scritta non si ripropone");
+    // 5. La richiesta scritta vince: "ristorante di pesce" non riceve "senza pesce".
+    await gp.getByTestId("assistente-nuova").click();
+    await gp.getByTestId("assistente-campo").fill("ristorante di pesce a Ostia");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 1, null, { timeout: 8000 });
+    ok(gSearches[3]?.query === "ristorante di pesce a Ostia" && (await gp.getByTestId("assistente-gusti").count()) === 0, `gusti: la richiesta esplicita vince sui gusti ricordati (${gSearches[3]?.query})`);
+    // 6. Preferenza già ricordata: nessuna nuova domanda.
+    await gp.getByTestId("assistente-campo").fill("sono vegetariano");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByText("Lo so già").waitFor({ timeout: 3000 }).then(() => ok(true, "gusti: preferenza già ricordata → 'Lo so già', nessuna domanda"), () => ok(false, "gusti: preferenza già ricordata → 'Lo so già', nessuna domanda"));
+    ok(gSearches.length === 4, "gusti: nessuna ricerca per 'sono vegetariano'");
+    { const mem = gEvents.filter((e) => e.type === "funzione" && e.props?.nome === "assistente_memoria").map((e) => e.props?.contesto);
+      ok(["proposta", "si", "tolto", "zona"].every((k) => mem.includes(k)), `gusti: segnali registrati (${mem.join(", ")})`);
+      const all = JSON.stringify(gEvents);
+      ok(!all.includes("non mi piace") && !all.includes("trattoria romana") && !all.includes("Ostia"), "gusti: mai il testo scritto nei segnali");
+      const lost = droppedKeys(gEvents.filter((e) => e.type === "funzione"));
+      ok(lost.length === 0, `gusti: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lost.join(", ") || "nessuna scartata"})`); }
+    // 7. "Cosa so di te" nel profilo: vedere e cancellare.
+    await gctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await gp.goto(`${BASE}/profilo#cosa-so-di-te`, { waitUntil: "networkidle" });
+    await gp.getByTestId("gusto-ricordato").first().waitFor({ timeout: 5000 });
+    ok((await gp.getByTestId("gusto-ricordato").allTextContents()).map((t) => t.trim()).join("|") === "vegetariano|niente pesce", "profilo: 'Cosa so di te' mostra i gusti ricordati");
+    await gp.getByTestId("cosa-so-zona").waitFor({ timeout: 3000 }).then(() => ok(true, "profilo: zona abituale 'Salvi spesso a Monti'"), () => ok(false, "profilo: zona abituale 'Salvi spesso a Monti'"));
+    { const w = await gp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `profilo: niente scorrimento orizzontale (${w}px)`); }
+    await gp.getByTestId("cosa-so-di-te").scrollIntoViewIfNeeded();
+    await gp.screenshot({ path: `${OUT}/62-cosa-so-di-te.png`, caret: "initial" });
+    await gp.getByRole("button", { name: "Dimentica “vegetariano”" }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=gusto-ricordato]").length === 1, null, { timeout: 3000 });
+    await gp.waitForTimeout(300);
+    ok(JSON.stringify(gPatches[gPatches.length - 1]) === '{"gusti_ricordati":["no-pesce"]}', `profilo: 'Dimentica' cancella dal profilo (${JSON.stringify(gPatches[gPatches.length - 1])})`);
+    await gctx.close();
+
+    // 360 px e senza accesso: i gusti restano nel telefono.
+    const g3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await g3.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    const g3Patches = [], g3Searches = [];
+    await g3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+    await g3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
+    await g3.route("**/rest/v1/**", (route) => { if (route.request().method() !== "GET") g3Patches.push(route.request().url()); return route.fulfill(route.request().method() === "GET" ? { json: [] } : { status: 204, body: "" }); });
+    await g3.route("**/api/search/intent", (route) => route.fulfill({ json: { intent: null } }));
+    await g3.route("**/api/search", (route) => { g3Searches.push(route.request().postDataJSON()); return route.fulfill({ json: { risultati: G_PLACES, filtri_usati: { categoria: "trattoria", parole_chiave: [], vicino_a_me: false, zona: "Monti" }, sintesi_pendente: null } }); });
+    const g3p = await g3.newPage();
+    g3p.on("pageerror", (e) => errors.push(e.message));
+    await g3p.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    await g3p.getByTestId("assistente-campo").fill("sono celiaco ed evito i posti rumorosi");
+    await g3p.getByTestId("assistente-campo").press("Enter");
+    await g3p.getByTestId("assistente-ricorda-si").click();
+    await g3p.getByTestId("assistente-ricorda").getByText("Fatto, me lo ricordo").waitFor({ timeout: 3000 });
+    ok((await g3p.evaluate(() => localStorage.getItem("mapetite.gusti.ospite"))) === '["celiaco","tranquillo"]' && g3Patches.length === 0, "gusti senza accesso: ricordati nel telefono, nessuna scrittura sul database");
+    await g3p.getByTestId("assistente-campo").fill("trattoria a Monti");
+    await g3p.getByTestId("assistente-campo").press("Enter");
+    await g3p.getByTestId("assistente-gusti").waitFor({ timeout: 6000 });
+    ok(g3Searches[0]?.query === "trattoria a Monti, senza glutine, tranquillo", `gusti senza accesso: usati nella ricerca (${g3Searches[0]?.query})`);
+    { const w = await g3p.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `gusti a 360 px: niente scorrimento orizzontale (${w}px)`); }
+    await g3p.screenshot({ path: `${OUT}/63-gusti-360.png`, caret: "initial" });
+    await g3.close();
+  }
+
   // Serata completa a tappe (piano 1.2): una ricerca per tappa (massimo 3), intento costruito
   // senza AI, scelta vicina alla tappa precedente (non la più popolare), distanze a piedi stimate,
   // mini mappa con i pin numerati, percorso in Google Maps, Salva/Prenota e alternative per tappa.
