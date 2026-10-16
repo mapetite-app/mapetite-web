@@ -5131,6 +5131,43 @@ else {
 }
 
 
+// 8.3 Posti in evidenza e 8.4 Trend di zona (dimostrativi, pannello del ristoratore).
+{
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tEv = [];
+  await tctx.route("**/api/events", (r) => { tEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const tp = await tctx.newPage();
+  tp.on("pageerror", (e) => errors.push(e.message));
+  await tp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  const trend = tp.getByTestId("pannello-trend");
+  ok(await trend.isVisible() && (await trend.getByTestId("trend-fascia").count()) === 6 && (await trend.getByTestId("trend-esempio").count()) === 0 && await trend.getByTestId("trend-picco").isVisible(), "trend di zona (demo): sei fasce orarie con le richieste e il momento di picco");
+  const evd = tp.getByTestId("pannello-evidenza");
+  ok(await evd.isVisible() && ((await evd.getByTestId("etichetta-sponsorizzato").textContent()) ?? "").includes("Sponsorizzato"), "in evidenza (demo): card con l'etichetta 'Sponsorizzato'");
+  ok((await evd.getByTestId("evidenza-si").count()) === 1 && (await evd.getByTestId("evidenza-no").count()) === 2, "in evidenza (demo): compare solo nella ricerca adatta, non nelle altre due");
+  ok(((await evd.getByTestId("evidenza-no").last().textContent()) ?? "").includes("terrazza"), "in evidenza (demo): spiega cosa manca (terrazza)");
+  await tp.waitForTimeout(400);
+  ok(tEv.some((e) => e.type === "funzione" && e.props?.nome === "ristoratore_evidenza"), "in evidenza (demo): vista registrata (trackFeature)");
+  { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `trend e in evidenza: niente scorrimento orizzontale (${w}px)`); }
+  await trend.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/90-trend-zona-demo.png`, caret: "initial" });
+  await evd.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/91-in-evidenza-demo.png`, caret: "initial" });
+  // Nei risultati veri non c'è nessuno sponsorizzato: la parola non compare nel codice della ricerca.
+  { const src = ["src/app/api/search/route.ts", "src/components/venue-sheet.tsx", "src/components/place-card.tsx"].map((f) => { try { return readFileSync(new URL(`../../${f}`, import.meta.url), "utf8"); } catch { return ""; } }).join("\n");
+    ok(!/sponsorizzat/i.test(src), "in evidenza: nessuno sponsorizzato nei risultati veri della ricerca"); }
+  // Pannello vero con pochi dati: il trend è un esempio DICHIARATO.
+  if (fakeUser) {
+    const LT = "44444444-0000-4000-8000-0000000000d1";
+    const Lt = { id: LT, name: "Bar Prova Trend", address: "Via del Pigneto 1, 00176 Roma RM, Italy", category: "bar", lat: 41.888, lng: 12.53, google_place_id: "GTREND" };
+    await tctx.addCookies([{ name: "e2e_ristoratore", url: BASE, value: encodeURIComponent(JSON.stringify({ locale: Lt, simili: [Lt], verificato: false, salvati: [], eventi: [
+      { created_at: new Date(Date.now() - 3_600_000).toISOString(), type: "ricerca", user_id: null, anon_id: "t1", session_id: "t1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "bar", requisiti: ["tavoli all'aperto"], zona: "Pigneto" } },
+    ] })) }]);
+    await tp.goto(`${BASE}/ristoratore/${LT}`, { waitUntil: "networkidle" });
+    ok(await tp.getByTestId("trend-esempio").isVisible() && (await tp.getByTestId("pannello-evidenza").count()) === 0, "trend di zona (pannello vero, pochi dati): esempio etichettato 'Esempio', niente sezione sponsorizzati");
+  } else console.log("SKIP  trend pannello vero: dev server senza E2E_FAKE_USER");
+  await tctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

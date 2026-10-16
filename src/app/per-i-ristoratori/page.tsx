@@ -32,7 +32,7 @@ const PIANI = [
   {
     name: "Pro",
     tone: "border-accent",
-    items: ["Tutto Growth", "Numeri avanzati", "Trend della zona e per fascia di prezzo", "Confronto con la zona", "Strumenti di promozione dedicati"],
+    items: ["Tutto Growth", "Numeri avanzati", "Trend della zona e per fascia di prezzo", "Confronto con la zona", "Posti in evidenza, solo se adatti alla ricerca e sempre etichettati"],
   },
 ];
 
