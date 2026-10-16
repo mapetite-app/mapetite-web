@@ -900,15 +900,19 @@ await page.getByText("Terrazza Uno").first().click();
 await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
 await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
 ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
-ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible(), "scheda B: riga categoria · prezzo · voto");
+{ const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
+  ok(parts.length === 5 && parts[0] === "Bar" && parts[1] === "★ 4,5" && parts[2] === "€€" && /^[\d,]+ (m|km)$/.test(parts[3]) && parts[4] === "Aperto ora", `scheda B: UNA riga di fatti tipo · voto · prezzo · distanza · aperto (${parts.join(" · ")})`); }
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
 // Barra azioni stile Places (piano 6.2): Prenota / Percorso / Salva; Chiama e Sito nella riga dei contatti.
 for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid=prenota-scheda]"], ["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"]]) {
   const box = await page.locator(sel).first().boundingBox();
   ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
 }
-ok((await page.getByTestId("scheda-info").locator("a[href^='tel:']").count()) === 1 && (await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").count()) === 1, "scheda B: Chiama e Sito restano nella riga dei contatti");
-ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
+await page.getByTestId("scheda-tab-info").click();
+ok(await page.getByTestId("scheda-info").locator("a[href^='tel:']").isVisible() && await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").isVisible(), "scheda B: Chiama e Sito nella sezione Info");
+ok(await page.getByText("4,5 su Google · 812 recensioni").isVisible() && (await page.getByTestId("citta-distanza").textContent())?.match(/Roma · \d+ m/) != null, "scheda B, Info: voto con numero di recensioni e 'Roma · distanza'");
+await page.getByTestId("scheda-tab-panoramica").click();
+ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (nella riga delle azioni)");
 await shot("15-scheda-b");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
@@ -1809,6 +1813,7 @@ else {
     "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni']").first().evaluate((a) => [a, ...a.querySelectorAll("span")].every((el) => el.scrollWidth <= el.clientWidth + 1)), "salvato: la scritta 'Percorso' non viene tagliata");
+  await v.getByTestId("scheda-tab-info").click().catch(() => {});
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
   await v.screenshot({ path: `${OUT}/17-salvato.png`, caret: "initial" });
   await v.locator("button:text-is('Salvato')").click();
@@ -2542,6 +2547,31 @@ else {
   ok([...sPhotos].every((u) => photosBefore.has(u) || u.includes("S1")) && new Set(sPhotos.filter((u) => u.includes("S1"))).size <= 1, `scheda: nessuna foto Google in più oltre a quella della card (${new Set(sPhotos).size} indirizzi foto)`);
   ok(staticMaps === 0 && (await s.getByTestId("carosello-puntini").locator("button").count()) === 2, `carosello: foto + 'dove si trova', la mappa non si scarica finché non serve (${staticMaps})`);
   await s.screenshot({ path: `${OUT}/60-scheda-places-ristorante.png`, caret: "initial" });
+  // Scheda pulita (Lorenzo 16/10): verdetto e azioni in vista senza scorrere, il resto in schede e nel menu "Altro".
+  { const r = await s.evaluate(() => {
+      const q = (id) => document.querySelector(`[data-testid=${id}]`)?.getBoundingClientRect();
+      const v = q("verdetto-box"), a = q("azioni-scheda"), bar = q("barra-azioni");
+      const tiles = [...document.querySelectorAll("[data-testid=azioni-scheda] button")].map((b) => b.getBoundingClientRect());
+      const ws = tiles.map((t) => Math.round(t.width));
+      return { verdetto: !!v && !!bar && v.top >= 0 && v.bottom <= bar.top + 1, azioni: !!a && a.top > (v?.bottom ?? 0) - 1, n: tiles.length, uguali: Math.max(...ws) - Math.min(...ws) <= 2, ws: ws.join("/"), dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.height >= 44) };
+    });
+    ok(r.verdetto, "scheda pulita: il verdetto Mapetite è tutto in vista senza scorrere (sopra la barra)");
+    ok(r.azioni && r.n === 4 && r.uguali && r.dentro, `scheda pulita: riga di 4 azioni uguali sotto il verdetto (${r.ws})`); }
+  ok((await s.getByTestId("scheda-tabs").getByRole("tab").allTextContents()).join(" · ") === "Panoramica · Recensioni · Info" && (await s.getByTestId("scheda-tab-panoramica").getAttribute("aria-selected")) === "true", "scheda pulita: sezioni Panoramica · Recensioni · Info, aperta su Panoramica");
+  ok(!(await s.getByText("Cosa dicono").isVisible()) && !(await s.getByTestId("copia-indirizzo").isVisible()), "scheda pulita: recensioni e indirizzo non affollano la prima schermata");
+  await s.getByTestId("altro-apri").click();
+  { const items = (await s.getByTestId("altro-menu").getByRole("menuitem").allTextContents()).map((t) => t.trim());
+    ok(items.includes("Copia indirizzo") && items.includes("Apri su Google Maps") && items.some((t) => t.includes("Rivendicalo")), `menu Altro: copia indirizzo, Google Maps, rivendica (${items.join(" | ")})`); }
+  { const box = await s.getByTestId("altro-menu").boundingBox(); ok(!!box && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390, "menu Altro: tutto dentro lo schermo"); }
+  await s.screenshot({ path: `${OUT}/60b-scheda-menu-altro.png`, caret: "initial" });
+  await s.getByRole("button", { name: "Chiudi il menu" }).click();
+  ok((await s.getByTestId("altro-menu").count()) === 0, "menu Altro: si chiude toccando fuori");
+  await s.getByTestId("scheda-tab-recensioni").click();
+  ok(await s.getByText("Cosa dicono").isVisible() && await s.getByTestId("community-scheda").isVisible(), "scheda: 'Recensioni' mostra Google e la community Mapetite");
+  await s.getByTestId("scheda-tab-info").click();
+  ok(await s.getByTestId("copia-indirizzo").isVisible() && await s.getByRole("link", { name: /Orari e foto su Google Maps/ }).isVisible(), "scheda: 'Info' mostra indirizzo (si copia) e Google Maps");
+  await s.screenshot({ path: `${OUT}/60c-scheda-info.png`, caret: "initial" });
+  await s.getByTestId("scheda-tab-panoramica").click();
   await s.getByLabel("Mostra dove si trova").click();
   await s.getByTestId("carosello-mappa").locator("img").waitFor({ timeout: 4000 }).catch(() => {});
   await s.waitForTimeout(600);
@@ -2561,7 +2591,7 @@ else {
   await s.waitForTimeout(300);
   { const r = await s.evaluate(() => {
       const barTop = document.querySelector("[data-testid=barra-azioni]").getBoundingClientRect().top;
-      const sections = [...document.querySelectorAll("[data-testid=scheda-trascinabile] h3")];
+      const sections = [...document.querySelectorAll("[data-testid=scheda-trascinabile] h3")].filter((h) => h.offsetParent != null);
       const last = sections[sections.length - 1]?.parentElement?.getBoundingClientRect();
       return { ok: !!last && last.bottom <= barTop + 1, last: Math.round(last?.bottom ?? 0), barTop: Math.round(barTop) };
     });
@@ -5438,6 +5468,7 @@ else {
     await gctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
     await gp.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
     await gp.locator("ul.snap-x li").first().locator("button").last().click({ timeout: 5000 }).catch(() => {});
+    await gp.getByTestId("altro-apri").click({ timeout: 5000 }).catch(() => {});
     await gp.getByTestId("proponi-gruppo").waitFor({ timeout: 4000 }).catch(() => {});
     ok((await gp.getByTestId("proponi-gruppo").getAttribute("href").catch(() => null)) === `/gruppi?proponi=${PL(3)}`, "scheda salvato: 'Proponi in una lista di gruppo' porta alla scelta della lista");
   }

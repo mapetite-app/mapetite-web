@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -27,6 +27,8 @@ import { votoOf, votoTag } from "@/lib/diario";
 export const ACTION_TILE =
   "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-xs font-display font-semibold text-white transition-transform active:scale-95";
 const TILE = `${ACTION_TILE} bg-white/10`;
+
+type SchedaTab = "panoramica" | "recensioni" | "info";
 
 type Friends = { visitati: FriendPerson[]; daProvare: FriendPerson[] };
 
@@ -148,6 +150,9 @@ export default function VenueSheet({
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  // Scheda B: sezione aperta e menu "Altro".
+  const [tab, setTab] = useState<SchedaTab>("panoramica");
+  const [menuOpen, setMenuOpen] = useState(false);
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
@@ -222,17 +227,8 @@ export default function VenueSheet({
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
   const variant = useVariant("scheda");
   const emoji = getCategoryEmoji(category, name);
-  // Righe di contesto della variante B: "Roma · 600 m" e "Cocktail bar · €€ · ★ 4,5 (812)".
+  // Riga di contesto della variante B (sezione Info): "Roma · 600 m".
   const placeLine = [cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null]
-    .filter(Boolean)
-    .join(" · ");
-  const kindLine = [
-    categoryLabel(category),
-    priceLabel,
-    rating != null
-      ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${userRatingCount != null ? ` (${userRatingCount})` : ""}`
-      : null,
-  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -321,6 +317,486 @@ export default function VenueSheet({
         )}
       </div>
   ) : null;
+
+  // "Le tue note": stato, Com'era, classifica, tag e nota del salvato. withStatus=false quando
+  // "Voglio andarci / Ci sono stato" stanno già nella riga delle azioni (scheda B).
+  const personalBlock = (withStatus: boolean) => (
+    <div className="mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4">
+        <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+          Le tue note
+        </p>
+        {withStatus && onVisitStatus && (
+          <div className="mt-2 flex gap-2" data-testid="stato-salvato">
+            {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
+              const on = personalTags?.includes(tag) ?? false;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?" (diario-scheda).
+                    if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
+                    onVisitStatus(tag);
+                  }}
+                  className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* "Com'era?" (segnale per i suggerimenti, VISIONE.md): solo dopo "Ci sono stato". */}
+        {onOpinion && personalTags?.includes("Già visitato") && (
+          <div className="mt-3" data-testid="com-era">
+            <p className="text-sm font-display font-semibold text-text">Com&apos;era?</p>
+            <div className="mt-1.5 flex gap-2">
+              {([["Mi è piaciuto", "👍 Mi è piaciuto"], ["Non fa per me", "👎 Non fa per me"]] as const).map(([tag, label]) => {
+                const on = personalTags?.includes(tag) ?? false;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onOpinion(tag)}
+                    className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-accent bg-accent text-white" : "border-border bg-white text-brand"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <VisitaContext.Provider value={{
+              askedAt: visitAskedAt,
+              consume: () => setVisitAskedAt(null),
+              voto: votoOf(personalTags),
+              // Passa da map-view (onOpinion), che tiene lo stato dei salvati: ritoccare lo stesso voto lo toglie.
+              setVoto: (v) => {
+                const cur = votoOf(personalTags);
+                if (v === cur) return;
+                onOpinion(v ? votoTag(v) : votoTag(cur!));
+              },
+              note: personalNote,
+              onEditNote: onEdit,
+            }}>
+              {rankSlot}
+            </VisitaContext.Provider>
+          </div>
+        )}
+        {personalTags?.some((t) => !onVisitStatus || !isStateTag(t)) && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {personalTags!.filter((t) => !onVisitStatus || !isStateTag(t)).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
+              >
+                {tagLabel(tag)}
+              </span>
+            ))}
+          </div>
+        )}
+        {personalNote != null && (
+          <p className="mt-2 font-sans italic text-text">{personalNote}</p>
+        )}
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="mt-3 min-h-10 rounded-btn border border-border px-4 py-1 text-sm font-display font-semibold text-text-muted hover:text-text"
+          >
+            Modifica
+          </button>
+        )}
+      </div>
+  );
+
+  // ── Scheda B (predefinita, stile Places), riordinata il 16/10 su richiesta di Lorenzo:
+  // "stesse cose, schermo più pulito". In vista senza toccare nulla: foto, nome, una riga di
+  // fatti, il verdetto Mapetite e una riga di azioni a icone uguali. Il resto sta in tre schede
+  // (Panoramica · Recensioni · Info) e le azioni secondarie nel menu "Altro".
+  if (variant === "b") {
+    const copyAddress = async () => {
+      if (!address) return;
+      try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
+    };
+    // Il verdetto in vista: la frase editoriale; se manca, la sintesi (mai testo inventato).
+    const headline = verdictText ?? (synthesis?.trim() || null);
+    const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "";
+    const hasOverview =
+      showSynthesisBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
+    const hasReviewsTab = hasReviews || communitySlot != null;
+    const tabs = [
+      ["panoramica", "Panoramica"],
+      ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
+      ["info", "Info"],
+    ] as [SchedaTab, string][];
+    const activeTab: SchedaTab = tab === "recensioni" && !hasReviewsTab ? "panoramica" : tab;
+    const statusTiles: { tag: "Da provare" | "Già visitato"; label: string; emoji: string }[] = [
+      { tag: "Da provare", label: "Voglio andarci", emoji: "📌" },
+      { tag: "Già visitato", label: "Ci sono stato", emoji: "✓" },
+    ];
+    const ROW_TILE =
+      "flex min-h-[3.75rem] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-[12px] font-display font-semibold leading-[1.15] active:scale-95";
+    const tileOff = `${ROW_TILE} border-border bg-white text-brand`;
+    const tileOn = `${ROW_TILE} border-brand bg-brand text-white`;
+    const menuItem =
+      "flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-sans text-text active:bg-bg";
+    const facts = [
+      categoryLabel(category),
+      rating != null ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null,
+      priceLabel,
+      origin ? distanceLabel(origin, { lat, lng }) : null,
+    ].filter(Boolean) as string[];
+
+    return (
+      <div className="relative flex flex-col rounded-card bg-surface shadow-float">
+        <SchedaCarosello
+          photoRefs={venue.photoRef ? [venue.photoRef] : []}
+          name={name}
+          credit={venue.photoAuthor}
+          lat={lat}
+          lng={lng}
+          directionsUrl={directionsUrl}
+          onDirections={() => signal("percorso", "carosello")}
+          fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
+          overlay={
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Chiudi"
+              className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
+            >
+              <X size={20} />
+            </button>
+          }
+        />
+
+        {/* Nome e UNA riga di fatti: tipo · voto · prezzo · distanza · aperto. */}
+        <div className="px-5 pt-4">
+          <h2 className="font-title text-[1.75rem] font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.2rem]">
+            {name}
+          </h2>
+          <p data-testid="scheda-fatti" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] font-sans text-text-muted">
+            {facts.map((f, i) => (
+              <span key={f} className="inline-flex items-center gap-1.5">
+                {i > 0 && <span aria-hidden>·</span>}
+                <span className={i === 0 ? "text-text" : ""}>{f}</span>
+              </span>
+            ))}
+            {openNow != null && (
+              <span className="inline-flex items-center gap-1.5">
+                {facts.length > 0 && <span aria-hidden>·</span>}
+                <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
+                <span className={openNow ? "text-success" : "text-error"}>{openNow ? "Aperto ora" : "Chiuso ora"}</span>
+              </span>
+            )}
+          </p>
+          {gem && (
+            <span data-testid="gemma" className="mt-2 inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
+              💎 Poco conosciuto
+            </span>
+          )}
+        </div>
+
+        {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}
+        {(headline != null || matchReasonText != null) && (
+          <div data-testid="verdetto-box" className="mx-5 mt-4 rounded-card bg-brand p-4 shadow-card">
+            <p data-testid="verdetto-scheda" className="text-[11px] font-display font-semibold uppercase tracking-wide text-accent">
+              Il verdetto Mapetite
+            </p>
+            {headline && (
+              <p className="mt-1.5 font-display text-lg font-semibold leading-snug text-white">{headline}</p>
+            )}
+            {matchReasonText && (
+              <p className={`${headline ? "mt-2.5 border-t border-white/15 pt-2.5" : "mt-1.5"} font-sans text-sm leading-relaxed text-white/85`}>
+                <span className="font-display font-semibold text-accent">✦ Per te: </span>
+                {matchReasonText}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Azioni principali: icone uguali in una riga. Il resto nel menu "Altro". */}
+        <div className="relative mx-5 mt-4">
+          <div className="flex gap-2" data-testid="azioni-scheda">
+            {!isSaved && onQuickSave && (
+              <div className="contents" data-testid="stato-rapido">
+                {statusTiles.map(({ tag, label, emoji: e }) => (
+                  <button key={tag} type="button" onClick={() => onQuickSave(tag)} aria-label={`${e} ${label}`} className={tileOff}>
+                    <span aria-hidden className="text-lg leading-none">{e}</span>
+                    <span className="text-center">{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {isSaved && onVisitStatus && (
+              <div className="contents" data-testid="stato-salvato">
+                {statusTiles.map(({ tag, label, emoji: e }) => {
+                  const on = personalTags?.includes(tag) ?? false;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={`${e} ${label}`}
+                      onClick={() => {
+                        // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?".
+                        if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
+                        onVisitStatus(tag);
+                      }}
+                      className={on ? tileOn : tileOff}
+                    >
+                      <span aria-hidden className="text-lg leading-none">{e}</span>
+                      <span className="text-center">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {shareOn && (
+              <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={tileOff}>
+                <Share2 size={18} aria-hidden />
+                <span>Condividi</span>
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="altro-apri"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={() => setMenuOpen((o) => !o)}
+              className={menuOpen ? tileOn : tileOff}
+            >
+              <Ellipsis size={18} aria-hidden />
+              <span>Altro</span>
+            </button>
+          </div>
+          {shareNote && <p role="status" className="mt-1.5 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {menuOpen && (
+            <>
+              <button type="button" aria-label="Chiudi il menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
+              <div role="menu" data-testid="altro-menu" className="absolute bottom-full right-0 z-30 mb-2 w-64 overflow-hidden rounded-card border border-border bg-surface py-1 shadow-float">
+                {isSaved && isUuid(venue.id) && (
+                  <Link
+                    role="menuitem"
+                    href={`/gruppi?proponi=${venue.id}`}
+                    data-testid="proponi-gruppo"
+                    onClick={() => trackFeature("gruppo_proponi_scheda")}
+                    className={menuItem}
+                  >
+                    <UsersRound size={18} className="shrink-0 text-brand" aria-hidden /> Proponi in una lista di gruppo
+                  </Link>
+                )}
+                {canEdit && (
+                  <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); onEdit(); }} className={menuItem}>
+                    <Pencil size={18} className="shrink-0 text-brand" aria-hidden /> Modifica tag e nota
+                  </button>
+                )}
+                {address && (
+                  <button role="menuitem" type="button" data-testid="altro-copia-indirizzo" onClick={() => { void copyAddress(); setMenuOpen(false); }} className={menuItem}>
+                    <Copy size={18} className="shrink-0 text-brand" aria-hidden /> Copia indirizzo
+                  </button>
+                )}
+                <a role="menuitem" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className={menuItem}>
+                  <ExternalLink size={18} className="shrink-0 text-brand" aria-hidden /> Apri su Google Maps
+                </a>
+                <Link
+                  role="menuitem"
+                  href={isUuid(venue.id) ? `/per-i-ristoratori/rivendica?locale=${venue.id}` : "/per-i-ristoratori/rivendica"}
+                  data-testid="altro-rivendica"
+                  className={`${menuItem} border-t border-border text-text-muted`}
+                >
+                  <Store size={18} className="shrink-0" aria-hidden /> È il tuo locale? Rivendicalo
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Tre schede brevi al posto della lunga colonna di riquadri. */}
+        <div role="tablist" aria-label="Sezioni della scheda" className="mx-5 mt-5 flex border-b border-border" data-testid="scheda-tabs">
+          {tabs.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`scheda-tab-${id}`}
+              data-testid={`scheda-tab-${id}`}
+              aria-selected={activeTab === id}
+              aria-controls={`scheda-pannello-${id}`}
+              onClick={() => setTab(id)}
+              className={`-mb-px min-h-11 flex-1 border-b-2 text-sm font-display font-semibold ${activeTab === id ? "border-brand text-brand" : "border-transparent text-text-muted"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Panoramica: chi ci è stato, le tue note, in breve. */}
+        <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
+          {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
+          {showPersonalBlock && personalBlock(false)}
+          {hasOverview && (
+            <div className="mx-5 mt-4">
+              <h3 className="font-display text-base font-semibold text-brand">In breve</h3>
+              {showSynthesisBelow && (
+                <p className="mt-1.5 font-sans text-[15px] leading-relaxed text-text">{synthesis}</p>
+              )}
+              {(goForChips.length > 0 || hasTags) && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {goForChips.map((chip) => (
+                    <span key={`g-${chip}`} className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
+                      <Check size={12} className="shrink-0" aria-hidden />
+                      {chip}
+                    </span>
+                  ))}
+                  {tags?.filter((t) => !goForChips.some((g) => g.toLowerCase() === t.trim().toLowerCase())).map((tag) => (
+                    <span key={`t-${tag}`} className="rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {dontExpectChips.length > 0 && (
+                <p className="mt-3 text-sm font-sans text-text-muted">
+                  <span className="font-display font-semibold">Meno adatto se: </span>
+                  {dontExpectChips.join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
+          {!friendsData && !showPersonalBlock && !hasOverview && (
+            <p className="mx-5 mt-4 text-sm font-sans text-text-muted">
+              Recensioni, indirizzo e contatti sono nelle altre sezioni qui sopra.
+            </p>
+          )}
+        </div>
+
+        {/* Recensioni: Google e community Mapetite, mai mescolate. */}
+        {hasReviewsTab && (
+          <div role="tabpanel" id="scheda-pannello-recensioni" aria-labelledby="scheda-tab-recensioni" hidden={activeTab !== "recensioni"} data-testid="pannello-recensioni">
+            {hasReviews && (
+              <div className="mx-5 mt-4">
+                <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+                  Cosa dicono
+                  <span className="text-xs font-sans font-normal text-text-muted">Recensioni da Google</span>
+                </h3>
+                <ul className="mt-1 divide-y divide-border">
+                  {selectedReviews!.map((review, i) => (
+                    <li key={i} className="flex gap-2 py-2.5">
+                      <Quote size={14} className="mt-1 shrink-0 text-text-muted" aria-hidden />
+                      <p className="font-sans text-sm leading-relaxed text-text">{review.text}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {communitySlot && (
+              <div className="mx-5 mt-4" data-testid="community-scheda">
+                <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+                  Dalla community Mapetite
+                  <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
+                </h3>
+                <div className="mt-2">{communitySlot}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Info: indirizzo (si copia), contatti che non stanno già nella barra, Google Maps. */}
+        <div role="tabpanel" id="scheda-pannello-info" aria-labelledby="scheda-tab-info" hidden={activeTab !== "info"} data-testid="pannello-info">
+          <div className="mx-5 mt-4" data-testid="scheda-info">
+            <h3 className="font-display text-base font-semibold text-brand">Indirizzo e contatti</h3>
+            <div className="mt-1 flex flex-col divide-y divide-border">
+              {address && (
+                <button type="button" data-testid="copia-indirizzo" onClick={copyAddress} className="flex min-h-12 items-center gap-3 text-left text-sm font-sans text-text">
+                  <MapPin size={18} className="shrink-0 text-brand" aria-hidden />
+                  <span className="min-w-0 flex-1">{displayAddress(address)}</span>
+                  <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
+                </button>
+              )}
+              {placeLine && (
+                <p data-testid="citta-distanza" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
+                  <Navigation size={18} className="shrink-0 text-brand" aria-hidden />
+                  {placeLine}
+                </p>
+              )}
+              {userRatingCount != null && rating != null && (
+                <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
+                  <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
+                  {`${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} su Google · ${userRatingCount.toLocaleString("it-IT")} recensioni`}
+                </p>
+              )}
+              {telHref && !inBar("chiama") && (
+                <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
+                  <Phone size={18} className="shrink-0" aria-hidden /> Chiama
+                </a>
+              )}
+              {websiteUri != null && !inBar("sito") && (
+                <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
+                  <Globe size={18} className="shrink-0" aria-hidden /> Sito
+                </a>
+              )}
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-accent">
+                <Clock size={18} className="shrink-0" aria-hidden /> Orari e foto su Google Maps →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {bookingOpen && (
+          <BookingSheet
+            place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng }}
+            initial={booking}
+            onClose={() => setBookingOpen(false)}
+          />
+        )}
+
+        {/* Barra scura a tre riquadri, staccata dal fondo (come Places): Prenota / Percorso / Salva,
+            oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
+            dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone). */}
+        <div
+          data-testid="barra-azioni"
+          className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+0.75rem)] z-10 mt-6 flex justify-center px-4"
+        >
+          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
+            {lead === "prenota" && (
+              <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`}>
+                <CalendarCheck size={18} aria-hidden />
+                Prenota
+              </button>
+            )}
+            {(lead === "chiama" || extra === "chiama") && telHref && (
+              <a href={telHref} onClick={() => signal("chiama", "barra")} aria-label={`Chiama ${name}`} className={`${TILE} ${extra === "chiama" ? "order-last" : ""}`}>
+                <Phone size={18} aria-hidden />
+                Chiama
+              </a>
+            )}
+            {(lead === "sito" || extra === "sito") && websiteUri != null && (
+              <a href={websiteUri} onClick={() => signal("sito", "barra")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={`${TILE} ${extra === "sito" ? "order-last" : ""}`}>
+                <Globe size={18} aria-hidden />
+                Sito
+              </a>
+            )}
+            <a
+              href={directionsUrl} onClick={() => signal("percorso", "barra")}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
+              className={TILE}
+            >
+              {walk != null ? <Footprints size={18} aria-hidden /> : <Navigation size={18} aria-hidden />}
+              <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
+            </a>
+            {saveSlot}
+          </div>
+        </div>
+        {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
+        <div aria-hidden style={{ height: "var(--nav-height-mobile)" }} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col rounded-card bg-surface shadow-float">
@@ -452,65 +928,6 @@ export default function VenueSheet({
 
         </>
       )}
-      {variant === "b" && (
-        <>
-          {/* B (stile Places): carosello (foto già caricata + "dove si trova") con chiudi e condividi
-              sopra, poi nome grande e righe di contesto. */}
-          <SchedaCarosello
-            photoRefs={venue.photoRef ? [venue.photoRef] : []}
-            name={name}
-            credit={venue.photoAuthor}
-            lat={lat}
-            lng={lng}
-            directionsUrl={directionsUrl}
-            onDirections={() => signal("percorso", "carosello")}
-            fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
-            overlay={<>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Chiudi"
-              className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
-            >
-              <X size={20} />
-            </button>
-            {shareOn && (
-              <button
-                type="button"
-                onClick={share}
-                aria-label={`Condividi ${name}`}
-                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
-              >
-                <Share2 size={18} />
-              </button>
-            )}
-            </>}
-          />
-          <div className="px-5 pt-5">
-            <h2 className="font-title text-3xl font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.4rem]">
-              {name}
-            </h2>
-            {placeLine && <p className="mt-2 text-[15px] font-sans text-text-muted">{placeLine}</p>}
-            {kindLine && <p className="mt-0.5 text-[15px] font-sans text-text-muted">{kindLine}</p>}
-            {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
-            {(gem || openNow != null) && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {openNow != null && (
-                  <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-white px-3 py-1 text-sm font-sans text-text">
-                    <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
-                    {openNow ? "Aperto ora" : "Chiuso ora"}
-                  </span>
-                )}
-                {gem && (
-                  <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-3 py-1 text-sm font-display font-semibold text-accent">💎 Poco conosciuto</span>
-                )}
-              </div>
-            )}
-          </div>
-          {/* Il verdetto subito sotto nome e contesto: è la prima cosa che si legge dopo la foto. */}
-          {verdictCard}
-        </>
-      )}
 
       {/* Chi dei tuoi amici c'è stato (o lo vuole provare): passaparola vero, solo tra chi segui. */}
       {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
@@ -558,39 +975,6 @@ export default function VenueSheet({
           </button>
         </div>
       )}
-      {/* Scheda B: indirizzo (si copia) e le vie di contatto che non stanno già nella barra. */}
-      {variant === "b" && (
-        <div className="mx-5 mt-4 flex flex-col gap-0.5 border-t border-border pt-3" data-testid="scheda-info">
-          {address && (
-            <button
-              type="button"
-              data-testid="copia-indirizzo"
-              onClick={async () => {
-                try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
-              }}
-              className="flex min-h-10 items-center gap-1.5 text-left text-sm font-sans text-text-muted"
-            >
-              <span className="min-w-0">{displayAddress(address)}</span>
-              <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
-            </button>
-          )}
-          <div className="flex flex-wrap items-center gap-x-4">
-            {telHref && !inBar("chiama") && (
-              <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="inline-flex min-h-10 items-center gap-1.5 text-sm font-display font-semibold text-brand">
-                <Phone size={15} className="shrink-0" /> Chiama
-              </a>
-            )}
-            {websiteUri != null && !inBar("sito") && (
-              <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className="inline-flex min-h-10 items-center gap-1.5 text-sm font-display font-semibold text-brand">
-                <Globe size={15} className="shrink-0" /> Sito
-              </a>
-            )}
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
-              Orari e foto su Google Maps →
-            </a>
-          </div>
-        </div>
-      )}
       {bookingOpen && (
         <BookingSheet
           place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng }}
@@ -600,96 +984,7 @@ export default function VenueSheet({
       )}
 
       {/* 4. LE TUE NOTE */}
-      {showPersonalBlock && (
-        <div className="mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4">
-          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-            Le tue note
-          </p>
-          {onVisitStatus && (
-            <div className="mt-2 flex gap-2" data-testid="stato-salvato">
-              {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
-                const on = personalTags?.includes(tag) ?? false;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => {
-                      // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?" (diario-scheda).
-                      if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
-                      onVisitStatus(tag);
-                    }}
-                    className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {/* "Com'era?" (segnale per i suggerimenti, VISIONE.md): solo dopo "Ci sono stato". */}
-          {onOpinion && personalTags?.includes("Già visitato") && (
-            <div className="mt-3" data-testid="com-era">
-              <p className="text-sm font-display font-semibold text-text">Com&apos;era?</p>
-              <div className="mt-1.5 flex gap-2">
-                {([["Mi è piaciuto", "👍 Mi è piaciuto"], ["Non fa per me", "👎 Non fa per me"]] as const).map(([tag, label]) => {
-                  const on = personalTags?.includes(tag) ?? false;
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => onOpinion(tag)}
-                      className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-accent bg-accent text-white" : "border-border bg-white text-brand"}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <VisitaContext.Provider value={{
-                askedAt: visitAskedAt,
-                consume: () => setVisitAskedAt(null),
-                voto: votoOf(personalTags),
-                // Passa da map-view (onOpinion), che tiene lo stato dei salvati: ritoccare lo stesso voto lo toglie.
-                setVoto: (v) => {
-                  const cur = votoOf(personalTags);
-                  if (v === cur) return;
-                  onOpinion(v ? votoTag(v) : votoTag(cur!));
-                },
-                note: personalNote,
-                onEditNote: onEdit,
-              }}>
-                {rankSlot}
-              </VisitaContext.Provider>
-            </div>
-          )}
-          {hasPersonalTags && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {personalTags!.filter((t) => !onVisitStatus || !isStateTag(t)).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-pill border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-display font-medium text-accent"
-                >
-                  {tagLabel(tag)}
-                </span>
-              ))}
-            </div>
-          )}
-          {personalNote != null && (
-            <p className="mt-2 font-sans italic text-text">{personalNote}</p>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="mt-3 min-h-10 rounded-btn border border-border px-4 py-1 text-sm font-display font-semibold text-text-muted hover:text-text"
-            >
-              Modifica
-            </button>
-          )}
-        </div>
-      )}
+      {showPersonalBlock && personalBlock(true)}
 
       {/* Liste di gruppo (piano 5.5): solo per i salvati, che hanno già l'UUID del locale. */}
       {isSaved && isUuid(venue.id) && (
@@ -779,48 +1074,6 @@ export default function VenueSheet({
           </a>
         )}
       </div>
-      )}
-      {variant === "b" && (
-        /* B: barra scura a tre riquadri, staccata dal fondo (come Places): Prenota / Percorso / Salva,
-           oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
-           dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone); da
-           computer, dove la nav è in alto, resta comunque sopra il bordo sicuro. */
-        <div
-          data-testid="barra-azioni"
-          className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+0.75rem)] z-10 mt-6 flex justify-center px-4"
-        >
-          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
-            {lead === "prenota" && (
-              <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`}>
-                <CalendarCheck size={18} aria-hidden />
-                Prenota
-              </button>
-            )}
-            {(lead === "chiama" || extra === "chiama") && telHref && (
-              <a href={telHref} onClick={() => signal("chiama", "barra")} aria-label={`Chiama ${name}`} className={`${TILE} ${extra === "chiama" ? "order-last" : ""}`}>
-                <Phone size={18} aria-hidden />
-                Chiama
-              </a>
-            )}
-            {(lead === "sito" || extra === "sito") && websiteUri != null && (
-              <a href={websiteUri} onClick={() => signal("sito", "barra")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={`${TILE} ${extra === "sito" ? "order-last" : ""}`}>
-                <Globe size={18} aria-hidden />
-                Sito
-              </a>
-            )}
-            <a
-              href={directionsUrl} onClick={() => signal("percorso", "barra")}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
-              className={TILE}
-            >
-              {walk != null ? <Footprints size={18} aria-hidden /> : <Navigation size={18} aria-hidden />}
-              <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
-            </a>
-            {saveSlot}
-          </div>
-        </div>
       )}
       {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
       <div aria-hidden style={{ height: "var(--nav-height-mobile)" }} />
