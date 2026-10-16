@@ -1317,6 +1317,12 @@ else {
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
   ok(await p.locator("ul.snap-x li").first().getByText(/★ 4,6 · €€/).isVisible(), "card salvato: voto e prezzo salvati");
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
+  // Ricerca nei salvati come frase (4.5): parole di contorno ignorate, stato e città capiti.
+  await p.getByLabel("Cerca tra i salvati").fill("quell'osteria che volevo provare a Roma");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati come frase: 'quell'osteria che volevo provare a Roma' → Osteria Due");
+  await p.getByLabel("Cerca tra i salvati").fill("il caffè di Milano per il brunch");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "salvati come frase: 'il caffè di Milano per il brunch' → Caffè Milano (dalla nota)");
+  await p.screenshot({ path: `${OUT}/12b-salvati-frase.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });

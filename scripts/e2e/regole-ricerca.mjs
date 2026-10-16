@@ -9,6 +9,7 @@ import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
 import { dedupeSamePlace } from "../../src/lib/dedupe-places.ts";
 import { coherentLevel } from "../../src/lib/match-coherence.ts";
+import { filtraSalvatiNaturale } from "../../src/lib/cerca-salvati.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -93,4 +94,19 @@ ok(coherentLevel("alto", "Rooftop panoramico con vista iconografica di Milano; l
 ok(coherentLevel("alto", "Trattoria tipica di Trastevere con buona cucina romana; le recensioni la descrivono come locale del quartiere, pur senza escludere una certa affluenza nei fine settimana.") === "alto", "coerenza: 'pur senza escludere' non abbassa");
 ok(coherentLevel("alto", "Piccolo bar sui Navigli con buoni drink, anche se le recensioni non lo descrivono specificamente come non turistico.") === "medio", "coerenza: 'non lo descrivono' come requisito → medio");
 ok(coherentLevel("basso", "non viene menzionata") === "basso", "coerenza: 'basso' resta basso");
+// Ricerca nei salvati in linguaggio naturale (4.5): tutto nel telefono, nessun costo.
+const salvati = [
+  { name: "Wagyu Bar", t: "sushi_restaurant Sushi Via Tortona 3, 20144 Milano MI", tags: ["Da provare"] },
+  { name: "Iyo", t: "japanese_restaurant Giapponese Via Piero della Francesca 74, 20154 Milano MI", tags: ["Già visitato"] },
+  { name: "Zen", t: "japanese_restaurant Giapponese Via Urbana 10, 00184 Roma RM", tags: ["Da provare"] },
+  { name: "Trattoria da Augusto", t: "italian_restaurant Ristorante italiano Piazza de' Renzi 15, 00153 Roma RM nota: carbonara top", tags: ["Già visitato"] },
+  { name: "Er Caffettiere", t: "bar Bar Via Urbana 72, 00184 Roma RM", tags: [] },
+];
+const cerca = (q) => filtraSalvatiNaturale(salvati, q, (p) => `${p.name} ${p.t}`, (p) => p.tags).map((p) => p.name).sort().join(",");
+ok(cerca("quel giapponese che avevo salvato a Milano") === "Iyo,Wagyu Bar", "salvati: 'quel giapponese che avevo salvato a Milano' → i due giapponesi di Milano (sushi compreso)");
+ok(cerca("il giapponese di Milano dove sono già stato") === "Iyo" || cerca("giapponese a Milano provato") === "Iyo", "salvati: giapponese a Milano già provato → solo Iyo");
+ok(cerca("sushi da provare") === "Wagyu Bar,Zen", "salvati: 'sushi da provare' → i giapponesi da provare");
+ok(cerca("trattoria della carbonara") === "Trattoria da Augusto", "salvati: la nota conta ('carbonara')");
+ok(cerca("bar a Roma, zona Monti") === "Er Caffettiere", "salvati: un rione che l'indirizzo non riporta non svuota il risultato");
+ok(cerca("quello che avevo salvato") === "", "salvati: una frase senza niente di concreto non propone niente");
 process.exit(failed === 0 ? 0 : 1);
