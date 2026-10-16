@@ -25,6 +25,7 @@ import {
 } from "@/lib/sorpresa";
 
 const WANT_TAG = "Da provare";
+const VERDICT_TRIES = 2;
 const ROMA = cityArea("Roma")!;
 
 type Center = { lat: number; lng: number; radius: number; label: string; precise: boolean };
@@ -80,14 +81,17 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
   const [idx, setIdx] = useState(0);
   const [center, setCenter] = useState<Center | null>(null);
   const [verdicts, setVerdicts] = useState<Record<string, string>>({});
-  const [verdictLoading, setVerdictLoading] = useState(false);
+  // Locali per cui il verdetto non è arrivato dopo VERDICT_TRIES richieste: si mostrano i dati Google.
+  const [gaveUp, setGaveUp] = useState<Set<string>>(new Set());
+  const [round, setRound] = useState(0);
+  const attempts = useRef<Map<string, number>>(new Map());
+  const inflight = useRef<Set<string>>(new Set());
   // Cache dei verdetti letta: solo dopo si chiedono quelli mancanti (prima si chiedeva anche quello già scritto).
   const [cacheRead, setCacheRead] = useState(false);
   const [saveState, setSaveState] = useState<Record<string, "saving" | "saved" | "error">>({});
   const [geo, setGeo] = useState<"idle" | "cerco" | "negata">("idle");
   const [from, setFrom] = useState<"home" | "mappa">("home");
   const mem = useRef<SurpriseMemory | null>(null);
-  const asked = useRef<Set<string>>(new Set());
   const taste = useRef<Awaited<ReturnType<typeof loadTaste>> | null>(null);
 
   const run = useCallback(async (where?: Center) => {
@@ -147,7 +151,9 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
       m.currentId = list[start]?.place.id ?? null;
       mem.current = m;
       saveMemory(m);
-      asked.current = new Set();
+      attempts.current = new Map();
+      inflight.current = new Set();
+      setGaveUp(new Set());
       setCandidates(list);
       setIdx(start);
       setVerdicts(m.verdicts);
@@ -184,16 +190,23 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
 
   const current = phase === "pronto" ? candidates[idx] ?? null : null;
 
-  // Verdetto mancante: lo chiede per il gruppo di risultati che contiene questo locale, come fa la
-  // ricerca (stessi limiti AI e stessa cache: un verdetto già scritto non si riscrive). Un gruppo una volta sola.
+  // Verdetto mancante: lo chiede per il gruppo di risultati che contiene il locale MOSTRATO, come fa la
+  // ricerca (stessi limiti AI e stessa cache: un verdetto già scritto non si riscrive, si generano solo i
+  // mancanti). Se l'AI salta proprio questo locale (succede: "MISSING" nei log), si richiede una seconda
+  // volta lo stesso gruppo: costa solo il locale mancante. Poi si smette e restano i dati Google.
   useEffect(() => {
     const m = mem.current;
     if (!current || !m || !cacheRead || verdicts[current.place.id]) return;
-    const group = m.gruppi.find((g) => g.places.some((p) => (p as { id?: string }).id === current.place.id));
-    if (!group || asked.current.has(group.token)) return;
-    asked.current.add(group.token);
-    let alive = true;
-    setTimeout(() => { if (alive) setVerdictLoading(true); }, 0);
+    const id = current.place.id;
+    const group = m.gruppi.find((g) => g.places.some((p) => (p as { id?: string }).id === id));
+    const tries = attempts.current.get(group?.token ?? "") ?? 0;
+    if (!group || tries >= VERDICT_TRIES) {
+      if (!gaveUp.has(id)) setTimeout(() => setGaveUp((s) => new Set(s).add(id)), 0);
+      return;
+    }
+    if (inflight.current.has(group.token)) return;
+    inflight.current.add(group.token);
+    attempts.current.set(group.token, tries + 1);
     fetch("/api/search/synthesis", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,9 +215,9 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { dettagli?: Record<string, { verdict?: string | null }> } | null) => {
         const found: Record<string, string> = {};
-        for (const [id, det] of Object.entries(d?.dettagli ?? {})) {
+        for (const [pid, det] of Object.entries(d?.dettagli ?? {})) {
           const v = det?.verdict?.trim();
-          if (v) found[id] = v;
+          if (v) found[pid] = v;
         }
         if (Object.keys(found).length > 0 && mem.current === m) {
           m.verdicts = { ...m.verdicts, ...found };
@@ -212,10 +225,13 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
           setVerdicts(m.verdicts);
         }
       })
-      .catch(() => { /* niente verdetto: restano i dati Google */ })
-      .finally(() => setVerdictLoading(false));
-    return () => { alive = false; };
-  }, [current, verdicts, cacheRead]);
+      .catch(() => { /* rete: si riprova al giro successivo, poi restano i dati Google */ })
+      .finally(() => {
+        inflight.current.delete(group.token);
+        // Ridà il via all'effetto: se il verdetto del locale mostrato manca ancora, secondo tentativo.
+        setRound((n) => n + 1);
+      });
+  }, [current, verdicts, cacheRead, round, gaveUp]);
 
   const another = () => {
     if (candidates.length === 0) return;
@@ -318,7 +334,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
           <SurpriseCard
             c={current}
             verdict={verdicts[current.place.id] ?? null}
-            verdictLoading={verdictLoading}
+            verdictLoading={!verdicts[current.place.id] && !gaveUp.has(current.place.id)}
             center={center?.precise ? center : null}
             pos={`${idx + 1} di ${candidates.length}`}
             saveState={saveState[current.place.id]}
@@ -365,12 +381,17 @@ function SurpriseCard({
   const rating = p.rating != null ? `★ ${p.rating.toFixed(1).replace(".", ",")}${p.userRatingCount != null ? ` · ${p.userRatingCount.toLocaleString("it-IT")} recensioni` : ""}` : null;
   const price = p.priceLevel != null && p.priceLevel > 0 ? "€".repeat(p.priceLevel) : null;
   const summary = p.editorialSummary?.trim() || null;
+  const review = p.selectedReviews?.find((r) => typeof r?.text === "string" && r.text.trim())?.text.trim() ?? null;
+  const googleText = summary ?? review;
   const saved = saveState === "saved";
 
   return (
     <article data-testid="sorpresa-card" data-id={p.id} className="mt-5 overflow-hidden rounded-card bg-white text-text shadow-float">
-      <div className="relative h-44 bg-accent-light">
+      {/* Una sola foto alla volta: solo quella della proposta visibile (le altre non si scaricano),
+          con la memoria foto del telefono di PlacePhoto; se manca o non arriva, l'emoji. */}
+      <div data-testid="sorpresa-foto" className="relative h-44 bg-accent-light">
         <PlacePhoto
+          key={p.id}
           photoRef={p.photoRef}
           alt={p.name}
           className="h-full w-full object-cover"
@@ -398,18 +419,24 @@ function SurpriseCard({
           </p>
         </div>
 
+        {/* Verdetto: stessa altezza minima mentre arriva e quando c'è, così la card non salta. */}
         {verdict ? (
-          <div data-testid="sorpresa-verdetto" className="mt-3 rounded-btn bg-surface px-3 py-2.5">
+          <div data-testid="sorpresa-verdetto" className="mt-3 min-h-[5.75rem] rounded-btn bg-surface px-3 py-2.5">
             <p className="font-display text-[11px] font-semibold uppercase tracking-wider text-brand">Il verdetto Mapetite</p>
-            <p className="mt-0.5 text-sm text-text">{verdict}</p>
+            <p className="mt-0.5 line-clamp-3 text-sm text-text">{verdict}</p>
           </div>
         ) : verdictLoading ? (
-          <div data-testid="sorpresa-verdetto-attesa" className="mt-3 rounded-btn bg-surface px-3 py-2.5">
+          <div data-testid="sorpresa-verdetto-attesa" aria-busy="true" aria-label="Arriva il verdetto Mapetite" className="mt-3 min-h-[5.75rem] rounded-btn bg-surface px-3 py-2.5">
             <p className="font-display text-[11px] font-semibold uppercase tracking-wider text-brand">Il verdetto Mapetite</p>
-            <p className="mt-1 h-4 w-4/5 animate-pulse rounded bg-border" />
+            <p className="mt-1.5 h-3.5 w-11/12 animate-pulse rounded bg-border" />
+            <p className="mt-1.5 h-3.5 w-3/5 animate-pulse rounded bg-border" />
           </div>
-        ) : summary ? (
-          <p data-testid="sorpresa-google" className="mt-3 text-sm text-text-muted">“{summary}” <span className="text-xs">(da Google)</span></p>
+        ) : googleText ? (
+          // Il verdetto non è arrivato: al suo posto solo testo vero di Google, detto da dove viene.
+          <div data-testid="sorpresa-google" className="mt-3 min-h-[5.75rem] rounded-btn bg-surface px-3 py-2.5">
+            <p className="font-display text-[11px] font-semibold uppercase tracking-wider text-text-muted">{summary ? "Da Google" : "Dalle recensioni Google"}</p>
+            <p className="mt-0.5 line-clamp-3 text-sm italic text-text">“{googleText}”</p>
+          </div>
         ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
