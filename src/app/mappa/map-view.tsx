@@ -834,19 +834,19 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
-  // Variante della mappa da far scegliere: ?mappa=chiara (grigia stile Places), resta sul telefono.
+  // Mappa chiara (grigia stile Places) per tutti dal 17/10; ?mappa=standard torna a quella colorata e resta sul telefono.
   const mapVariant = useSyncExternalStore(
     () => () => {},
     () => {
       const v = new URLSearchParams(window.location.search).get("mappa");
       try {
         if (v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
-        return window.localStorage.getItem("mapetite.mappa") ?? "standard";
+        return window.localStorage.getItem("mapetite.mappa") ?? "chiara";
       } catch {
-        return v ?? "standard";
+        return v ?? "chiara";
       }
     },
-    () => "standard",
+    () => "chiara",
   );
   // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
   // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
