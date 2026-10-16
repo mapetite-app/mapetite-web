@@ -875,9 +875,9 @@ for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid
 }
 await page.getByTestId("scheda-tab-info").click();
 ok(await page.getByTestId("scheda-info").locator("a[href^='tel:']").isVisible() && await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").isVisible(), "scheda B: Chiama e Sito nella sezione Info");
-ok(await page.getByText("Bar · €€ · ★ 4,5 (812)").isVisible() && (await page.getByTestId("citta-distanza").textContent())?.match(/Roma · \d+ m/) != null, "scheda B, Info: voto con numero di recensioni e 'Roma · distanza'");
+ok(await page.getByText("4,5 su Google · 812 recensioni").isVisible() && (await page.getByTestId("citta-distanza").textContent())?.match(/Roma · \d+ m/) != null, "scheda B, Info: voto con numero di recensioni e 'Roma · distanza'");
 await page.getByTestId("scheda-tab-panoramica").click();
-ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (sulla foto)");
+ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (nella riga delle azioni)");
 await shot("15-scheda-b");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");

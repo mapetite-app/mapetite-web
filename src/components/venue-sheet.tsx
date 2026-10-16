@@ -227,17 +227,8 @@ export default function VenueSheet({
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
   const variant = useVariant("scheda");
   const emoji = getCategoryEmoji(category, name);
-  // Righe di contesto della variante B: "Roma · 600 m" e "Cocktail bar · €€ · ★ 4,5 (812)".
+  // Riga di contesto della variante B (sezione Info): "Roma · 600 m".
   const placeLine = [cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null]
-    .filter(Boolean)
-    .join(" · ");
-  const kindLine = [
-    categoryLabel(category),
-    priceLabel,
-    rating != null
-      ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${userRatingCount != null ? ` (${userRatingCount})` : ""}`
-      : null,
-  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -660,7 +651,7 @@ export default function VenueSheet({
                       {chip}
                     </span>
                   ))}
-                  {tags?.map((tag) => (
+                  {tags?.filter((t) => !goForChips.some((g) => g.toLowerCase() === t.trim().toLowerCase())).map((tag) => (
                     <span key={`t-${tag}`} className="rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
                       {tag}
                     </span>
@@ -734,7 +725,7 @@ export default function VenueSheet({
               {userRatingCount != null && rating != null && (
                 <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
                   <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
-                  {kindLine}
+                  {`${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} su Google · ${userRatingCount.toLocaleString("it-IT")} recensioni`}
                 </p>
               )}
               {telHref && !inBar("chiama") && (
