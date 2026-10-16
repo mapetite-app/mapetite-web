@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadCommunity } from "@/lib/community";
+import { EMPTY_COMMUNITY as EMPTY, loadCommunity } from "@/lib/community";
 
 // "Dalla community Mapetite" nella scheda del locale (piani 5.6c e 5.6d): recensioni degli utenti
 // e reel collegati al locale. GET ?id=<UUID Supabase o Place ID Google>.
@@ -7,7 +7,6 @@ import { loadCommunity } from "@/lib/community";
 // Nessuna chiamata a Google: solo Supabase, con le regole di privacy di src/lib/community.ts.
 
 const NO_STORE = { headers: { "Cache-Control": "private, no-store" } };
-const EMPTY = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false };
 
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id")?.trim() ?? "";
