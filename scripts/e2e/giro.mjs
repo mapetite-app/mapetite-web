@@ -4499,6 +4499,8 @@ else {
   // Si aspetta che la lista sia ferma (i verdetti la riordinano), poi si passa sulla card per id.
   await dp.waitForTimeout(1500);
   const idSecondo = await dp.locator("ul li[data-id]").nth(1).getAttribute("data-id");
+  // Il tocco su "Idee" lascia il mouse dove ora c'è la lista: lo si porta fuori, poi sulla card.
+  await dp.mouse.move(5, 400);
   await dp.locator(`ul li[data-id="${idSecondo}"]`).hover();
   await dp.waitForTimeout(300);
   const secondo = await dp.locator("[data-testid=pin][data-focused=true]").getAttribute("data-place").catch(() => null);
