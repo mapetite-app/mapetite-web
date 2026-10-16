@@ -3124,6 +3124,141 @@ else {
     ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
 
+  // Serata completa a tappe (piano 1.2): una ricerca per tappa (massimo 3), intento costruito
+  // senza AI, scelta vicina alla tappa precedente (non la più popolare), distanze a piedi stimate,
+  // mini mappa con i pin numerati, percorso in Google Maps, Salva/Prenota e alternative per tappa.
+  {
+    let se = null;
+    try { se = await import(new URL("../../src/lib/serata.ts", import.meta.url).href); } catch (e) { ok(false, `serata: modulo src/lib/serata.ts importabile (${e.message})`); }
+    if (se) {
+      const p = se.serataOf("organizzami sabato sera: aperitivo, cena, dopocena a Trastevere");
+      ok(!!p && p.tappe.map((t) => t.kind).join() === "aperitivo,cena,dopocena" && p.zona === "Trastevere" && p.tappe[0].query === "aperitivo a Trastevere" && p.tappe[2].queryGoogle === "cocktail bar Trastevere", `serata: frase capita senza AI (${JSON.stringify(p?.tappe.map((t) => t.query))}, zona ${p?.zona})`);
+      ok(["Aperitivo con vista a Milano", "Trattoria non turistica a Testaccio", "Prenotami domani alle 21 per 2 con terrazza a Roma", "cocktail bar dopo cena a Monti", "ristorante per una serata romantica a Trastevere", "organizzami una cena a Monti"].every((q) => se.serataOf(q) === null), "serata: le richieste di un posto solo restano ricerche normali");
+      const d = se.serataOf("organizzami la serata a Monti");
+      ok(d?.tappe.map((t) => t.kind).join() === "aperitivo,cena,dopocena" && d.zona === "Monti", "serata: 'organizzami la serata' senza tappe = aperitivo, cena, dopocena");
+      const m = se.serataOf("colazione, pranzo, aperitivo e cena a Roma");
+      ok(m?.tappe.length === 3 && m.tagliate.join() === "Cena", "serata: al massimo 3 tappe (3 ricerche Google), la quarta si dice");
+      const pg = se.serataOf("pizza e gelato dalle parti di campo de' fiori");
+      ok(pg?.tappe[0].includedType === "pizza_restaurant" && pg.tappe[1].kind === "gelato" && pg.zona === "Campo de' Fiori", `serata: 'pizza e gelato' (${pg?.zona})`);
+      const w = se.walkOf({ lat: 41.889, lng: 12.469 }, { lat: 41.892, lng: 12.471 });
+      ok(w.meters > 380 && w.meters < 520 && w.minutes === Math.round(w.meters / 80) && se.walkLabel(w).includes("min a piedi"), `serata: distanza a piedi stimata (linea d'aria × 1,3): ${se.walkLabel(w)}`);
+      ok(se.walkLabel({ meters: 4200, minutes: 53 }).includes("taxi"), "serata: tappe lontane → 'meglio un taxi o i mezzi'");
+      const prev = { lat: 41.889, lng: 12.469 };
+      const cand = [{ id: "far", lat: 41.91, lng: 12.5 }, { id: "used", lat: 41.889, lng: 12.469 }, { id: "near2", lat: 41.8895, lng: 12.4695 }, { id: "near1", lat: 41.893, lng: 12.47 }];
+      ok(se.orderCandidates(cand, prev, new Set(["used"])).map((x) => x.id).join() === "near2,near1,far", "serata: prima i posti comodi a piedi nell'ordine di Google, poi i lontani; nessun posto ripetuto");
+      const url = se.googleMapsRoute([{ id: "A", name: "a", lat: 1, lng: 2 }, { id: "B", name: "b", lat: 3, lng: 4 }, { id: "C", name: "c", lat: 5, lng: 6 }]);
+      ok(url.startsWith("https://www.google.com/maps/dir/?api=1") && url.includes("waypoint_place_ids=B") && url.includes("travelmode=walking") && url.includes("destination_place_id=C"), "serata: link Google Maps con le tappe come waypoint (gratuito)");
+    }
+
+    const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const sEvents = [], sSearches = [], sIntents = [], sAdds = [];
+    await sctx.route("**/api/events", (route) => { sEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+    await sctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await sctx.route("**/rest/v1/**", (route) => route.fulfill(route.request().method() === "POST" ? { status: 201, body: "" } : { json: [] }));
+    await sctx.route("**/api/places/add", (route) => { sAdds.push(route.request().postDataJSON()); return route.fulfill({ json: { place: { id: "33333333-0000-4000-8000-0000000000b1" } } }); });
+    await sctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await sctx.route("**/api/search/intent", (route) => { sIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
+    // Trastevere: l'aperitivo in piazza; per la cena Google mette prima un posto famoso lontano
+    // (5.000 recensioni, a 2 km) e poi una trattoria a due passi: si sceglie la trattoria.
+    const T = (id, name, lat, lng, extra = {}) => mk(id, name, lat, lng, { address: "Trastevere, Roma", ...extra });
+    const STAGES = {
+      aperitivo: [T("SA1", "Bar della Piazza", 41.8894, 12.4699, { category: "wine_bar" }), T("SA2", "Enoteca Vicolo", 41.8899, 12.4703), T("SA3", "Spritz Corner", 41.8885, 12.4712)],
+      cena: [T("SC1", "Ristorante Famoso Lontano", 41.9045, 12.4825, { userRatingCount: 5000, category: "restaurant" }), T("SC2", "Trattoria Vicina", 41.8903, 12.4712, { userRatingCount: 140, category: "restaurant", phone: "347 765 4321" }), T("SC3", "Osteria del Cortile", 41.8889, 12.4721, { category: "restaurant" })],
+      dopocena: [T("SA1", "Bar della Piazza", 41.8894, 12.4699), T("SD2", "Cocktail Segreto", 41.8909, 12.4718, { category: "cocktail_bar" }), T("SD3", "Bar Lontano", 41.8954, 12.4801, { category: "cocktail_bar" })],
+    };
+    await sctx.route("**/api/search", async (route) => {
+      const b = route.request().postDataJSON();
+      sSearches.push(b);
+      await new Promise((r) => setTimeout(r, 250));
+      const kind = Object.keys(STAGES).find((k) => b.query.startsWith(k));
+      return route.fulfill({ json: { risultati: STAGES[kind] ?? [], filtri_usati: { categoria: "bar", parole_chiave: [], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: [], token: kind ?? "x" } } });
+    });
+    await sctx.route("**/api/search/synthesis", async (route) => {
+      await new Promise((r) => setTimeout(r, 400));
+      const v = (t) => ({ synthesis: t, tags: [], verdict: t, goFor: [], dontExpect: [], matchReason: t });
+      return route.fulfill({ json: { dettagli: { SA1: v("Calici al tramonto in piazza."), SC2: v("Cucina romana di quartiere, senza fronzoli."), SC3: v("Cortile tranquillo."), SD2: v("Cocktail d'autore, porta senza insegna.") }, esclusi: ["SA3"] } });
+    });
+    const sp = await sctx.newPage();
+    sp.on("pageerror", (e) => errors.push(e.message));
+    sp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    await sp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    await sp.getByTestId("assistente-campo").fill("organizzami sabato sera: aperitivo, cena, dopocena a Trastevere");
+    await sp.waitForTimeout(900); // pausa nello scrivere: per una serata nessuna richiesta all'AI in anticipo
+    await sp.getByTestId("assistente-campo").press("Enter");
+    await sp.getByTestId("serata").waitFor({ timeout: 5000 });
+    ok((await sp.getByTestId("serata-tappa").count()) === 3, "serata: tre tappe in ordine");
+    await sp.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 3, null, { timeout: 8000 });
+    ok(sSearches.length === 3 && sSearches.map((s) => s.query).join("|") === "aperitivo a Trastevere|cena a Trastevere|dopocena a Trastevere", `serata: una ricerca Google per tappa, 3 in tutto (${sSearches.map((s) => s.query).join(" | ")})`);
+    ok(sSearches.every((s) => s.intent && s.intentQuery === s.query && s.phase === "fast" && s.intent.zona === "Trastevere" && s.intent.queryGoogle.includes("Trastevere")), "serata: ogni tappa arriva con l'intento già costruito (il server non chiede all'AI di capire la frase)");
+    ok(sIntents.length === 0, `serata: nessuna richiesta all'AI per capire la frase (${sIntents.length})`);
+    const tappe = sp.getByTestId("serata-tappa");
+    const nomi = await Promise.all([0, 1, 2].map((i) => tappe.nth(i).getByTestId("serata-scelto").getByRole("button", { name: /^Apri / }).getAttribute("aria-label")));
+    ok(nomi.join() === "Apri Bar della Piazza,Apri Trattoria Vicina,Apri Cocktail Segreto", `serata: scelta vicina alla tappa prima, non la più famosa, nessun posto ripetuto (${nomi.join(", ")})`);
+    const dist = await sp.getByTestId("serata-distanza").allTextContents();
+    ok(dist.length === 2 && dist.every((d) => /circa \d+ m · \d+ min a piedi/.test(d)), `serata: distanza e minuti a piedi tra le tappe (${dist.join(" / ")})`);
+    ok((await sp.getByTestId("serata-stima").textContent()).includes("stime in linea d'aria"), "serata: le distanze sono dichiarate come stima");
+    await tappe.nth(1).getByText("Cucina romana di quartiere, senza fronzoli.").waitFor({ timeout: 6000 });
+    ok(true, "serata: il verdetto Mapetite compare sulla tappa scelta");
+    ok((await tappe.nth(0).getByTestId("serata-alternativa").filter({ hasText: "Spritz Corner" }).count()) === 0, "serata: l'alternativa esclusa dai verdetti sparisce");
+    ok((await tappe.nth(1).getByTestId("serata-alternativa").count()) === 2, "serata: due alternative per tappa");
+    const gm = await sp.getByTestId("serata-google-maps").getAttribute("href");
+    ok(gm.includes("origin_place_id=SA1") && gm.includes("waypoint_place_ids=SC2") && gm.includes("destination_place_id=SD2") && gm.includes("travelmode=walking"), "serata: 'Apri il percorso in Google Maps' con le tappe come waypoint");
+    await sp.getByTestId("serata-pin").first().waitFor({ timeout: 8000 }).catch(() => {});
+    ok((await sp.getByTestId("serata-pin").allTextContents()).join() === "1,2,3", "serata: mini mappa con i pin numerati 1, 2, 3");
+    await sp.getByTestId("serata").scrollIntoViewIfNeeded();
+    await sp.screenshot({ path: `${OUT}/59-serata.png`, caret: "initial" });
+    await sp.getByTestId("serata-mappa").scrollIntoViewIfNeeded();
+    await sp.screenshot({ path: `${OUT}/59b-serata-mappa.png`, caret: "initial" });
+    // Alternativa scelta: cambia la tappa, il percorso e le distanze.
+    const distPrima = dist[0];
+    await tappe.nth(1).getByRole("button", { name: "Scegli Osteria del Cortile per cena" }).click();
+    ok((await tappe.nth(1).getByTestId("serata-scelto").getByRole("button", { name: "Apri Osteria del Cortile" }).count()) === 1, "serata: 'Scegli' su un'alternativa la mette come tappa");
+    ok((await sp.getByTestId("serata-google-maps").getAttribute("href")).includes("waypoint_place_ids=SC3") && (await sp.getByTestId("serata-distanza").first().textContent()) !== distPrima, "serata: percorso e distanze seguono la scelta");
+    // Salva e Prenota sulla tappa (stessi pulsanti delle card dell'assistente).
+    await tappe.nth(0).getByTestId("assistente-salva").click();
+    await tappe.nth(0).getByTestId("assistente-salvato").waitFor({ timeout: 5000 });
+    ok(sAdds.length === 1 && sAdds[0].googlePlaceId === "SA1", "serata: 'Salva' sulla tappa salva il locale (Place ID Google)");
+    await sp.getByTestId("assistente-salvato-avviso").waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+    await tappe.nth(2).getByTestId("assistente-prenota").click();
+    await sp.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+    ok(await sp.getByTestId("foglio-prenota").isVisible(), "serata: 'Prenota' sulla tappa apre il foglio della prenotazione");
+    await sp.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+    await tappe.nth(1).getByTestId("serata-scelto").getByRole("button", { name: /^Apri / }).click();
+    await sp.getByTestId("assistente-scheda").waitFor({ timeout: 3000 });
+    ok(await sp.getByTestId("assistente-scheda").getByText("Osteria del Cortile").first().isVisible(), "serata: tocco sulla tappa = scheda del locale");
+    await sp.getByTestId("assistente-scheda").click({ position: { x: 20, y: 20 } });
+    { const ser = sEvents.filter((e) => e.type === "funzione" && e.props?.nome === "assistente_serata").map((e) => e.props?.contesto);
+      ok(ser.includes("percorso") && ser.includes("alternativa") && sEvents.some((e) => e.props?.nome === "assistente_serata" && e.props?.risultati === 3), `serata: segnali registrati (${ser.join(", ")})`);
+      ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "assistente_messaggio" && e.props?.contesto === "serata") && !JSON.stringify(sEvents).includes("Trastevere"), "serata: messaggio registrato come 'serata', senza il testo scritto");
+      const lost = droppedKeys(sEvents.filter((e) => e.type === "funzione"));
+      ok(lost.length === 0, `serata: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lost.join(", ") || "nessuna scartata"})`); }
+    // Ricaricata la pagina la serata resta, senza ricerche nuove.
+    await sp.reload({ waitUntil: "networkidle" });
+    await sp.getByTestId("serata").waitFor({ timeout: 5000 });
+    ok(sSearches.length === 3 && (await sp.getByTestId("serata-scelto").count()) === 3, "serata: dopo aver ricaricato c'è ancora, senza ricerche nuove");
+    await sctx.close();
+
+    // 360 px: si legge, niente scorrimento orizzontale.
+    const s3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await s3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+    await s3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await s3.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+    await s3.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await s3.route("**/api/search", (route) => { const b = route.request().postDataJSON(); const kind = Object.keys(STAGES).find((k) => b.query.startsWith(k)); return route.fulfill({ json: { risultati: STAGES[kind] ?? [], sintesi_pendente: null } }); });
+    const s3p = await s3.newPage();
+    s3p.on("pageerror", (e) => errors.push(e.message));
+    await s3p.goto(`${BASE}/assistente?q=${encodeURIComponent("aperitivo e cena a Trastevere")}`, { waitUntil: "networkidle" });
+    await s3p.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 2, null, { timeout: 8000 });
+    { const w = await s3p.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `serata a 360 px: niente scorrimento orizzontale (${w}px)`); }
+    { const li = s3p.getByTestId("serata-alternativa").first(); const [b, s] = [await li.boundingBox(), await li.getByTestId("serata-scegli").boundingBox()];
+      ok(!!b && !!s && s.x + s.width <= b.x + b.width + 1 && s.height >= 40, "serata a 360 px: 'Scegli' dentro la riga, grande abbastanza per il dito"); }
+    await s3p.getByTestId("serata-tappa").first().scrollIntoViewIfNeeded();
+    await s3p.screenshot({ path: `${OUT}/59c-serata-360.png`, caret: "initial" });
+    await s3.close();
+  }
+
   // Frase capita in anticipo (come la mappa, piano 2.4): tempo alla prima card prima/dopo.
   // Server simulato: Google 300 ms; l'AI che capisce la frase 1200 ms, sul server se la ricerca
   // arriva senza intento, oppure in anticipo mentre si scrive (/api/search/intent).
@@ -4111,6 +4246,164 @@ else {
   const mm = await mp.locator(".mapboxgl-map").boundingBox();
   ok(pos === "absolute" && !(await mp.getByTestId("pannello-intro").isVisible()) && !!mm && mm.width === 390, `telefono: nessun pannello da computer (barra ${pos}, mappa larga ${Math.round(mm?.width ?? 0)}px)`);
   await mctx.close();
+}
+
+// Sorprendimi (piano 2.5): UN posto mai provato che probabilmente ti piace, con il perché.
+// Una sola ricerca (simulata), "Un altro" senza nuove chiamate, mai salvati né locali di massa.
+if (!fakeUser) console.log("SKIP  sorprendimi: dev server senza E2E_FAKE_USER");
+else {
+  const sm = (id, name, rating, n, extra = {}) => mk(id, name, 41.9 + Number(id.slice(1)) * 0.001, 12.49, { category: "Trattoria", rating, userRatingCount: n, types: ["restaurant"], ...extra });
+  const SURP = [
+    sm("S1", "Trattoria Di Massa", 4.3, 9000),
+    sm("S2", "Osteria Già Salvata", 4.6, 300),
+    sm("S3", "Trattoria Gemma", 4.7, 180),
+    sm("S4", "Trattoria Buona", 4.4, 600, { editorialSummary: "Cucina romana di quartiere." }),
+    sm("S5", "Trattoria Chiusa", 4.6, 120, { openNow: false }),
+    sm("S6", "Trattoria Sei", 4.2, 900),
+  ];
+  const surpRows = [
+    { tags: ["Mi è piaciuto", "Già visitato"], places: { category: "Trattoria", lat: 41.9, lng: 12.49, google_place_id: "GT1" } },
+    { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.91, lng: 12.48, google_place_id: "GT2" } },
+    { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.89, lng: 12.47, google_place_id: "S2" } },
+    { tags: ["Non fa per me"], places: { category: "pizza_restaurant", lat: 41.9, lng: 12.5, google_place_id: "GT3" } },
+  ];
+  let surpSearches = 0, surpBody = null, surpSynth = [], surpAdd = null, surpInsert = null;
+  const surpEvents = [];
+  const sctxS = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await sctxS.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "POST") { surpInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, json: {} }); }
+    return r.fulfill({ json: surpRows });
+  });
+  await sctxS.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["pizza"], price_range: "€€" }] }));
+  await sctxS.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "S3", verdict: "Carbonara seria e oste che consiglia bene." }] }));
+  const surpPhotos = [];
+  await sctxS.route("**/api/places/photo**", (r) => { surpPhotos.push(decodeURIComponent(new URL(r.request().url()).searchParams.get("ref") ?? "")); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }); });
+  await sctxS.route("**/api/events", (r) => { surpEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await sctxS.route("**/api/search", (r) => {
+    surpSearches++; surpBody = r.request().postDataJSON();
+    return r.fulfill({ json: { risultati: SURP, filtri_usati: { categoria: null, parole_chiave: [], vicino_a_me: false }, sintesi_pendente: { places: [], token: "x", gruppi: [{ places: SURP.slice(0, 3).map((x) => ({ id: x.id })), token: "g1" }, { places: SURP.slice(3).map((x) => ({ id: x.id })), token: "g2" }] } } });
+  });
+  await sctxS.route("**/api/search/synthesis", async (r) => {
+    const b = r.request().postDataJSON(); surpSynth.push(b);
+    await new Promise((res) => setTimeout(res, 700));
+    const first = surpSynth.filter((x) => x.token === b.token).length === 1;
+    return r.fulfill({ json: { dettagli: first ? { S5: { verdict: "Altro locale del gruppo." } } : { S4: { verdict: "Porzioni generose, servizio alla mano." } }, esclusi: [] } });
+  });
+  await sctxS.route("**/api/places/add", (r) => { surpAdd = r.request().postDataJSON(); return r.fulfill({ json: { place: { id: "00000000-0000-4000-8000-0000000005a4" } } }); });
+  const sp = await sctxS.newPage();
+  sp.on("pageerror", (e) => errors.push(e.message));
+  // Ore 20:30: momento "cena" (la sorpresa dipende dall'ora: il controllo deve valere a qualsiasi ora del giro).
+  await sp.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+
+  // Ingressi: home e mappa.
+  await sp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("home-sorprendimi").isVisible() && (await sp.getByTestId("home-sorprendimi").getAttribute("href")) === "/sorprendimi?da=home", "sorprendimi: in home la card '🎲 Sorprendimi' porta a /sorprendimi");
+  await sp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const mapHref = await sp.getByTestId("mappa-sorprendimi").first().getAttribute("href").catch(() => null);
+  ok(!!mapHref && /^\/sorprendimi\?da=mappa&lat=-?\d+\.\d{4}&lng=-?\d+\.\d{4}$/.test(mapHref), `sorprendimi: sulla mappa il pulsante porta la zona della mappa (${mapHref})`);
+  ok(surpSearches === 0, "sorprendimi: aprire home e mappa non fa ricerche");
+
+  await sp.goto(`${BASE}/sorprendimi?da=mappa&lat=41.9&lng=12.49`, { waitUntil: "networkidle" });
+  const card = sp.getByTestId("sorpresa-card");
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(surpSearches === 1 && surpBody?.searchIntent === "structured" && surpBody?.phase === "fast" && surpBody?.source === "world" && surpBody?.query === "Trattoria" && surpBody?.lat === 41.9 && surpBody?.radius === 3000,
+    `sorprendimi: UNA ricerca, con i filtri (senza AI), dal tipo che salvi di più e dalla zona della mappa (${JSON.stringify(surpBody)})`);
+  ok(await sp.getByRole("heading", { name: "Trattoria Gemma" }).isVisible(), "sorprendimi: prima proposta il 💎 poco conosciuto aperto ora, non il più famoso");
+  const why1 = await sp.getByTestId("sorpresa-perche").textContent().catch(() => "");
+  ok(why1.includes("Ti è piaciuto un posto così (trattoria)") && why1.includes("💎 Poco conosciuto") && why1.includes("Aperto ora"), `sorprendimi: il perché è fatto di dati veri (${why1})`);
+  ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Carbonara seria"), "sorprendimi: verdetto Mapetite già scritto (cache) mostrato senza chiamate AI");
+  ok(surpSynth.length === 0, "sorprendimi: con il verdetto già in cache nessuna richiesta di verdetti");
+  ok((await sp.getByTestId("sorpresa-zona").textContent()).includes("Zona della mappa · Roma"), "sorprendimi: dice in che zona cerca");
+  await sp.getByTestId("sorpresa-foto").locator("img").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await sp.getByTestId("sorpresa-foto").locator("img").isVisible().catch(() => false) && surpPhotos.length === 1 && surpPhotos[0] === "places/S3/photos/AbC_S3",
+    `sorprendimi: la foto della proposta visibile, una sola (${JSON.stringify(surpPhotos)})`);
+  await sp.screenshot({ path: `${OUT}/sorprendimi-1.png`, caret: "initial" });
+
+  // "Un altro": dagli stessi risultati, mai i salvati né i locali di massa; i chiusi in fondo.
+  const seenNames = [await sp.getByTestId("sorpresa-card").getByRole("heading").textContent()];
+  const hVerdict = (await sp.getByTestId("sorpresa-verdetto").boundingBox())?.height ?? 0;
+  await sp.getByTestId("sorpresa-altro").click();
+  await sp.getByRole("heading", { name: "Trattoria Buona" }).waitFor({ timeout: 3000 }).catch(() => {});
+  const attesa = sp.getByTestId("sorpresa-verdetto-attesa");
+  const hWait = (await attesa.boundingBox().catch(() => null))?.height ?? 0;
+  ok(await attesa.isVisible().catch(() => false) && Math.abs(hWait - hVerdict) <= 2, `sorprendimi: mentre arriva il verdetto c'è il suo segnaposto, alto uguale (${Math.round(hWait)} vs ${Math.round(hVerdict)} px)`);
+  await sp.getByTestId("sorpresa-verdetto").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(surpSynth.length === 2 && surpSynth.every((x) => x.token === "g2" && x.query === "Trattoria"), `sorprendimi: verdetto chiesto per il gruppo del locale MOSTRATO; saltato dall'AI, richiesto una seconda volta (${JSON.stringify(surpSynth.map((x) => x.token))})`);
+  ok(surpPhotos.length === 2 && surpPhotos[1] === "places/S4/photos/AbC_S4", `sorprendimi: 'Un altro' scarica solo la foto della nuova proposta, nessun precaricamento (${surpPhotos.length} foto)`);
+  ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Porzioni generose"), "sorprendimi: il verdetto arriva anche per 'Un altro'");
+  await sp.screenshot({ path: `${OUT}/sorprendimi-2-altro.png`, caret: "initial" });
+  const headingNow = () => sp.getByTestId("sorpresa-card").getByRole("heading").textContent();
+  seenNames.push(await headingNow());
+  for (let i = 0; i < 6; i++) {
+    await sp.getByTestId("sorpresa-altro").click();
+    await sp.waitForTimeout(150);
+    if (!(await sp.getByTestId("sorpresa-card").isVisible().catch(() => false))) break;
+    seenNames.push(await headingNow());
+  }
+  ok(surpSearches === 1, `sorprendimi: 'Un altro' non fa nuove ricerche (${surpSearches})`);
+  ok(!seenNames.includes("Trattoria Di Massa") && !seenNames.includes("Osteria Già Salvata"), `sorprendimi: mai un tuo salvato né un locale di massa (${seenNames.join(", ")})`);
+  ok(seenNames[seenNames.length - 1] === "Trattoria Chiusa" && seenNames.length === 4, `sorprendimi: 4 proposte, il locale chiuso per ultimo (${seenNames.join(", ")})`);
+  ok(await sp.getByTestId("sorpresa-finiti").isVisible(), "sorprendimi: finite le proposte lo dice, con 'Ricomincia'");
+  await sp.getByRole("button", { name: "Ricomincia" }).click();
+  ok(await sp.getByRole("heading", { name: "Trattoria Gemma" }).isVisible(), "sorprendimi: 'Ricomincia' riparte dalla prima, senza ricerche");
+
+  // Freno alla quota: stessa zona e stesso momento entro 30 minuti = nessuna nuova ricerca.
+  await sp.reload({ waitUntil: "networkidle" });
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(surpSearches === 1 && await card.isVisible(), `sorprendimi: riaperto entro 30 minuti nella stessa zona riusa la ricerca (${surpSearches} ricerche)`);
+
+  // Salva: entra nei salvati come "Voglio andarci".
+  await sp.getByTestId("sorpresa-salva").click();
+  await sp.getByText("✓ Salvato").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(surpAdd?.googlePlaceId === "S3" && JSON.stringify(surpInsert?.tags) === '["Da provare"]' && await sp.getByText("✓ Salvato").isVisible(), "sorprendimi: 'Salva' lo mette tra i salvati come 'Voglio andarci'");
+
+  // 360px: niente scroll orizzontale, azioni visibili.
+  await sp.setViewportSize({ width: 360, height: 780 });
+  const sx = await sp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(sx <= 0 && await sp.getByTestId("sorpresa-apri").isVisible(), `sorprendimi 360px: nessuno scroll orizzontale (${sx}px)`);
+  await sp.screenshot({ path: `${OUT}/sorprendimi-360.png`, caret: "initial" });
+  await sp.setViewportSize({ width: 390, height: 844 });
+
+  // Apri scheda: la scheda della mappa, dalla memoria (nessuna ricerca in più), con il verdetto.
+  await sp.getByTestId("sorpresa-apri").click();
+  await sp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  await sp.getByRole("heading", { name: "Trattoria Gemma" }).first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok((await sp.getByText("Trattoria Gemma").filter({ visible: true }).count()) > 0 && surpSearches === 1, `sorprendimi: 'Apri scheda' apre la scheda del locale sulla mappa senza nuove ricerche (${sp.url().replace(BASE, "")})`);
+  ok(await sp.getByText("Carbonara seria e oste che consiglia bene.").first().isVisible().catch(() => false), "sorprendimi: nella scheda c'è lo stesso verdetto");
+  ok(!sp.url().includes("sorpresa="), "sorprendimi: tolto il parametro dall'indirizzo (ricaricare non riapre)");
+  await sp.screenshot({ path: `${OUT}/sorprendimi-scheda.png`, caret: "initial" });
+
+  const fe = surpEvents.filter((e) => e?.type === "funzione" && String(e.props?.nome ?? "").startsWith("sorpresa"));
+  ok(fe.some((e) => e.props.nome === "sorpresa" && e.props.contesto === "google") && fe.some((e) => e.props.nome === "sorpresa" && e.props.contesto === "memoria") && fe.some((e) => e.props.nome === "sorpresa_altro") && fe.some((e) => e.props.nome === "sorpresa_salva") && fe.some((e) => e.props.nome === "sorpresa_apri"),
+    `sorprendimi: tracciati apertura (google/memoria), 'Un altro', 'Salva', 'Apri scheda' (${fe.map((e) => e.props.nome + (e.props.contesto ? ":" + e.props.contesto : "")).join(", ")})`);
+  ok(droppedKeys(surpEvents).length === 0, `sorprendimi: tutte le chiavi dei segnali sono accettate dal server (${droppedKeys(surpEvents).join(", ")})`);
+  await sctxS.close();
+
+  // Senza accesso: valgono il momento e la zona; per salvare si accede.
+  const actxS = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await actxS.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await actxS.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await actxS.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await actxS.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  let anonBody = null, anonSynth = 0;
+  await actxS.route("**/api/search", (r) => { anonBody = r.request().postDataJSON(); return r.fulfill({ json: { risultati: SURP, filtri_usati: {}, sintesi_pendente: { places: [], token: "x", gruppi: [{ places: SURP.slice(0, 3).map((x) => ({ id: x.id })), token: "g1" }] } } }); });
+  await actxS.route("**/api/search/synthesis", (r) => { anonSynth++; return r.fulfill({ json: { dettagli: {}, esclusi: [] } }); });
+  const ap = await actxS.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  await ap.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await ap.goto(`${BASE}/sorprendimi?da=home`, { waitUntil: "networkidle" });
+  await ap.getByTestId("sorpresa-card").waitFor({ timeout: 8000 }).catch(() => {});
+  const whyA = await ap.getByTestId("sorpresa-perche").textContent().catch(() => "");
+  ok(anonBody?.query === "ristorante cena" && anonBody?.radius === 11000 && whyA.includes("Adatto all'ora: cena"), `sorprendimi senza accesso: momento della giornata e tutta Roma (${anonBody?.query}, ${anonBody?.radius} m, "${whyA}")`);
+  ok(await ap.getByTestId("sorpresa-accedi").isVisible() && (await ap.getByTestId("sorpresa-accedi").getAttribute("href")) === "/login?next=%2Fsorprendimi", "sorprendimi senza accesso: 'Accedi per salvarlo' e poi si torna qui");
+  await ap.getByTestId("sorpresa-google").waitFor({ timeout: 5000 }).catch(() => {});
+  const anonH = await ap.getByTestId("sorpresa-card").getByRole("heading").textContent().catch(() => null);
+  const anonG = await ap.getByTestId("sorpresa-google").textContent().catch(() => "");
+  ok(anonH === "Osteria Già Salvata" && anonSynth === 2 && (await ap.getByTestId("sorpresa-verdetto").count()) === 0 && anonG.includes("Dalle recensioni Google") && anonG.includes("Bella vista sulla città."),
+    `sorprendimi senza accesso: nessun salvato da escludere; verdetto mai arrivato (2 richieste) → al suo posto una recensione Google vera, detta da dove viene (${anonH}, ${anonSynth} richieste, "${anonG}")`);
+  await ap.screenshot({ path: `${OUT}/sorprendimi-anonimo.png`, caret: "initial" });
+  await actxS.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
