@@ -1,4 +1,5 @@
 import { distanceMeters } from "@/lib/distance";
+import { dedupeSamePlace } from "@/lib/dedupe-places";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { refineCategory } from "@/lib/refine-category";
 import { GOOGLE_ATTRIBUTES, isOpenAt, type GoogleAttribute, type WeekTime } from "@/lib/filter-options";
@@ -252,7 +253,7 @@ export async function searchGooglePlaces(
   }));
 
   const excludedByChoice: string[] = [];
-  const filtered = mapped.filter((p) => {
+  const filtered = dedupeSamePlace(mapped).filter((p) => {
     // Pavimento di qualita': sempre attivo, prima dei filtri utente.
     if ((p.rating ?? 0) < FLOOR_RATING) return false;
     if ((p.userRatingCount ?? 0) < FLOOR_REVIEWS) return false;

@@ -7,6 +7,7 @@ import { namedCity, demoteOtherCity, withDistrict, cityNear } from "../../src/li
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
+import { dedupeSamePlace } from "../../src/lib/dedupe-places.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -76,4 +77,13 @@ ok(withDistrict("trattoria Monti", "Monti") === "trattoria quartiere Monti" && w
 ok(cityNear(41.8986, 12.4769) === "Roma" && cityNear(45.45, 9.18) === "Milano" && cityNear(43.0, 12.0) === null, "città della mappa: Roma, Milano, nessuna lontano dalle città note");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
+// Doppioni (visto dal vivo il 17/10 a Milano): stesso civico, due schede Google.
+const dd = dedupeSamePlace([
+  { name: "drinc.different", lat: 45.4753732, lng: 9.2160213, userRatingCount: 534 },
+  { name: "White Rabbit", lat: 45.49, lng: 9.18, userRatingCount: 1746 },
+  { name: "drinc. Cocktail & Conversation", lat: 45.4753707, lng: 9.2160187, userRatingCount: 665 },
+]);
+ok(dd.length === 2 && dd[0].name === "drinc. Cocktail & Conversation", "doppioni: lo stesso locale resta una volta, al primo posto, con la scheda più recensita");
+ok(dedupeSamePlace([{ name: "Bar Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Bar Bianchi", lat: 41.9, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: due locali diversi nello stesso palazzo restano entrambi");
+ok(dedupeSamePlace([{ name: "Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Rossi", lat: 41.91, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: stesso nome a 1 km sono due locali");
 process.exit(failed === 0 ? 0 : 1);
