@@ -38,6 +38,8 @@ export interface BottomSheetProps {
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
   focusedId?: string | null;
   onFocus?: (place: Place) => void;
+  // Da computer (lista a fianco della mappa): passando col mouse su una card si evidenzia il suo pin.
+  onHover?: (place: Place) => void;
   // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
   onOrder?: (ids: string[]) => void;
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
@@ -191,7 +193,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -229,6 +231,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // quella "a fuoco"; se il fuoco arriva da fuori (tocco su un pin) il carosello
   // scorre fino alla card.
   const carouselRef = useRef<HTMLUListElement>(null);
+  const hoveredId = useRef<string | null>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const centeredId = () => {
     const ul = carouselRef.current;
@@ -254,8 +257,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   };
   useEffect(() => {
     const ul = carouselRef.current;
-    if (!ul || !focusedId || centeredId() === focusedId) return;
+    if (!ul || !focusedId) return;
     const li = Array.from(ul.children).find((el) => (el as HTMLElement).dataset.id === focusedId) as HTMLElement | undefined;
+    // Da computer la lista è verticale nel pannello: si porta la card in vista (se non lo è già),
+    // ma non quando il fuoco arriva dal mouse sulla card stessa (la lista non deve scappare).
+    if (li && window.matchMedia("(min-width: 1024px)").matches) { if (hoveredId.current !== focusedId) li.scrollIntoView({ block: "nearest", behavior: "smooth" }); return; }
+    if (centeredId() === focusedId) return;
     if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
   }, [focusedId]);
   useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
@@ -278,6 +285,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     setSnap((s) => ORDER[(ORDER.indexOf(s) + 1) % ORDER.length]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Da computer la lista è un pannello fisso a fianco della mappa: niente trascinamento.
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
     // Tap su un elemento interattivo (✕, voci lista): lascia passare il click,
     // non avviare il drag. L'handle è l'unica eccezione.
     const el = e.target as HTMLElement;
@@ -383,7 +392,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (allPlaces.length === 0) return null;
 
   const quickChips = (
-    <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0" data-testid="filtri-lista">
+    <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" data-testid="filtri-lista">
       {onOpenArticle && (
         <button
           type="button"
@@ -422,10 +431,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (variant === "b") {
     return (
       <div
-        className="pointer-events-none absolute left-0 right-0 z-10"
+        data-testid="lista-risultati"
+        className="pointer-events-none absolute left-0 right-0 z-10 lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-border lg:pb-5"
         style={{ bottom: "var(--nav-height-mobile)" }}
       >
-        <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        <div className={`pointer-events-auto mx-3 mb-2 flex flex-wrap items-center justify-between bg-surface shadow-float md:max-w-xl lg:mx-5 lg:max-w-none lg:shadow-none ${title || heading ? "rounded-card px-4 py-2" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="min-w-0 flex-1">
             {title && (
               <p data-testid="titolo-risposta" onClick={() => setHeaderOpen((v) => !v)} className={`${headerOpen ? "" : "line-clamp-1"} font-title text-base in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand first-letter:uppercase`}>
@@ -513,15 +523,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             </p>
           )}
         </div>
-        {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2">{quickChips}</div>}
+        {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {places.length === 0 && (
-          <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float">{NO_MATCH}</p>
+          <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5">
           {places.map((place) => {
             const d = details?.[place.id];
             return (
-              <li key={place.id} data-id={place.id} className="relative w-[78vw] max-w-sm shrink-0 snap-center">
+              <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[78vw] max-w-sm shrink-0 snap-center lg:w-auto lg:max-w-none lg:rounded-card lg:transition-shadow ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                 {onSave && (
                   <button
                     type="button"
@@ -608,19 +618,19 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           })}
           {/* In fondo al carosello: 👍/👎 in un tocco, poi l'email per chi vuole spiegare. */}
           {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
-            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
-              <div className="flex h-full min-h-[190px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float">
+            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center lg:w-auto lg:max-w-none">
+              <div className="flex h-full min-h-[190px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float lg:min-h-0 lg:shadow-none">
                 <UtileFeedback contesto="ricerca" risultati={places.length} />
               </div>
             </li>
           )}
           {/* I tester segnalano una ricerca che non va (email già scritta). */}
           {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
-            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center">
+            <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center lg:w-auto lg:max-w-none">
               <a
                 data-testid="ricerca-feedback"
                 href={searchFeedbackMailto(title, places.map((p) => p.name))}
-                className="flex h-full min-h-[190px] flex-col justify-center rounded-card border-2 border-dashed border-white/70 bg-surface/95 p-4 text-left shadow-float active:scale-[0.99]"
+                className="flex h-full min-h-[190px] flex-col justify-center rounded-card border-2 border-dashed border-white/70 bg-surface/95 p-4 text-left shadow-float active:scale-[0.99] lg:min-h-0 lg:border-border lg:shadow-none"
               >
                 <span className="text-2xl" aria-hidden>🤔</span>
                 <span className="mt-2 font-title text-base font-semibold leading-snug text-brand">Questi risultati non vanno?</span>
@@ -640,7 +650,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className="pointer-events-auto absolute left-0 right-0 mx-auto max-w-2xl z-10 flex flex-col overflow-hidden rounded-t-card bg-surface shadow-float"
+      data-testid="lista-risultati"
+      className="pointer-events-auto absolute left-0 right-0 mx-auto max-w-2xl z-10 flex flex-col overflow-hidden rounded-t-card bg-surface shadow-float lg:static lg:col-start-2 lg:row-start-2 lg:mx-0 lg:h-auto! lg:min-h-0 lg:max-w-none lg:rounded-none lg:border-l lg:border-border lg:bg-bg lg:pt-1 lg:shadow-none"
       style={{
         bottom: "var(--nav-height-mobile)",
         height: dragHeight !== null ? `${dragHeight}px` : `${SNAPS[snap]}dvh`,
@@ -653,14 +664,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         onClick={cycleSnap}
         aria-label="Cambia altezza pannello"
         data-drag-handle="true"
-        className="flex w-full cursor-pointer items-center justify-center bg-surface py-2"
+        className="flex w-full cursor-pointer items-center justify-center bg-surface py-2 lg:hidden"
         style={{ touchAction: "none" }}
       >
         <div className="h-1 w-10 rounded-pill bg-border" />
       </button>
       <div
         ref={contentRef}
-        className="flex-1 overflow-y-auto px-3 pb-4"
+        className="flex-1 overflow-y-auto px-3 pb-4 lg:px-5"
         style={{ touchAction: "pan-y" }}
       >
         <div className="flex items-start justify-between px-1 pb-2">
