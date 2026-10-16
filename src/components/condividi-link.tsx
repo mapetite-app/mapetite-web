@@ -28,7 +28,8 @@ export default function CondividiLink({
 
   const share = async () => {
     const url = `${window.location.origin}${path}`;
-    track("condividi", null, { cosa });
+    // "contesto": chiave accettata da /api/events ("cosa" veniva scartata dal server).
+    track("condividi", null, { contesto: cosa });
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title, text, url });

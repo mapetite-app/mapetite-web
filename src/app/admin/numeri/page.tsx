@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
-import { computeNumeri, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
+import { computeNumeri, etichettaFunzione, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
 
 // Pannello di Lorenzo (PIANO-25-OTTOBRE.md 7.5): i tester usano Mapetite? Tornano? Cosa usano?
 // Solo per gli indirizzi in src/lib/admin.ts, per tutti gli altri 404. Legge `events` con la
@@ -69,7 +69,13 @@ const fmt = (n: number | null, suffix = "") => (n === null ? "—" : `${n.toLoca
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
 const quando = (iso: string) => new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const giornoBreve = (key: string) => new Date(`${key}T12:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "UTC" });
-const etichetta = (k: string) => k.replaceAll("_", " ");
+const etichetta = etichettaFunzione;
+// Funzioni con eventi dedicati, raggruppate (anche quelle mai usate, a 0).
+const GRUPPI = [
+  { titolo: "Assistente", prefissi: ["assistente_"] },
+  { titolo: "Prenotazioni", prefissi: ["prenota_"] },
+  { titolo: "Raccolte", prefissi: ["raccolta_", "raccolte_"] },
+];
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -200,6 +206,21 @@ function Pannello({ n, troncato }: { n: Numeri; troncato: boolean }) {
             <span className="font-semibold">Mai usate:</span> {maiUsate.map((f) => etichetta(f.chiave)).join(", ")}
           </p>
         )}
+      </Section>
+
+      <Section title="Assistente, prenotazioni e raccolte" note="Le stesse funzioni, raggruppate. Volte · persone diverse.">
+        <div data-testid="numeri-dedicate" className="space-y-4">
+          {GRUPPI.map((g) => {
+            const voci = n.funzioni.filter((f) => g.prefissi.some((x) => f.chiave.startsWith(x)));
+            const max = Math.max(1, ...voci.map((v) => v.volte));
+            return (
+              <div key={g.titolo}>
+                <h3 className="mb-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{g.titolo}</h3>
+                <Bars items={voci} max={max} empty="Nessun dato." />
+              </div>
+            );
+          })}
+        </div>
       </Section>
 
       <Section title="Ti è stato utile?">

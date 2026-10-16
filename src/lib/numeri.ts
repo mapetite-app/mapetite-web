@@ -49,8 +49,72 @@ export const FUNZIONI_NOTE = [
   "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi",
   "condividi_ricerca", "condividi_lista", "sorprendimi",
   "import_link", "import_screenshot", "import_video", "import_manuale", "import_condivisione",
+  // Eventi dedicati (16/10): assistente, prenotazioni e raccolte, ricavati dai tipi esistenti
+  // ("funzione", "salva", "chiama", "condividi"… con da/via/cosa nel payload): nessuna migrazione.
+  "assistente_apri", "assistente_messaggio", "assistente_seguito", "assistente_scheda", "assistente_salva", "assistente_prenota",
+  "prenota_whatsapp", "prenota_telefono", "prenota_sito", "prenota_promemoria", "prenota_com_e_andata",
+  "raccolta_crea", "raccolta_apri", "raccolta_condividi", "raccolta_modifica", "raccolte_proposte",
 ] as const;
 const AZIONI_DIRETTE = ["apri_scheda", "salva", "rimuovi", "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi"];
+
+// Nomi leggibili nel pannello (Lorenzo li legge dal telefono): il resto con gli spazi al posto di "_".
+const ETICHETTE: Record<string, string> = {
+  ricerca_ai: "Ricerca con l'AI",
+  domanda_successiva: "Domanda successiva",
+  apri_scheda: "Scheda aperta",
+  ci_sono_stato: "Ci sono stato",
+  voglio_andarci: "Voglio andarci",
+  condividi_ricerca: "Condividi ricerca",
+  condividi_lista: "Condividi lista",
+  condividi_profilo: "Condividi profilo",
+  condividi_mappa: "Condividi mappa",
+  assistente_apri: "Assistente aperto",
+  assistente_messaggio: "Assistente: messaggio",
+  assistente_seguito: "Assistente: seguito",
+  assistente_scheda: "Assistente: scheda",
+  assistente_salva: "Assistente: salva",
+  assistente_prenota: "Assistente: prenota",
+  prenota_whatsapp: "Prenota: WhatsApp",
+  prenota_telefono: "Prenota: telefono",
+  prenota_sito: "Prenota: sito",
+  prenota_promemoria: "Prenota: percorso",
+  prenota_com_e_andata: "Prenota: com'è andata",
+  raccolta_crea: "Raccolta: crea",
+  raccolta_apri: "Raccolta: apri",
+  raccolta_condividi: "Raccolta: condividi",
+  raccolta_modifica: "Raccolta: modifica",
+  raccolte_proposte: "Raccolte dall'AI",
+  raccolta_pubblica: "raccolta pubblica",
+};
+export const etichettaFunzione = (k: string): string => ETICHETTE[k] ?? k.replaceAll("_", " ");
+
+// Funzione dedicata ricavata da un evento di un tipo esistente (null = nessuna).
+// Solo chiavi che /api/events conserva: "fonte" dice da dove arriva (assistente, prenota,
+// promemoria), "contesto"/"stato" come si prenota o cosa si condivide. ("da", "via" e "cosa"
+// si leggono ancora per sicurezza, ma il server li scarta.)
+export function funzioneDedicata(type: string, p: Record<string, unknown>): string | null {
+  const from = str(p.fonte) ?? str(p.da);
+  if (from === "assistente") {
+    if (type === "apri_scheda") return "assistente_scheda";
+    if (type === "salva") return "assistente_salva";
+    return null;
+  }
+  if (from === "prenota") {
+    if (type === "sito") return "prenota_sito";
+    if (type === "chiama") return [p.contesto, p.stato, p.via].includes("whatsapp") ? "prenota_whatsapp" : "prenota_telefono";
+    if (type === "ci_sono_stato") return "prenota_com_e_andata";
+    return null;
+  }
+  if (from === "promemoria" && type === "percorso") return "prenota_promemoria";
+  if (type === "condividi") {
+    const cosa = str(p.contesto) ?? str(p.cosa);
+    if (cosa === "raccolta") return "raccolta_condividi";
+    if (cosa === "profilo" || cosa === "mappa") return `condividi_${cosa}`;
+  }
+  return null;
+}
+// Pagine che sono anche funzioni: aprire l'assistente o una propria raccolta.
+const PAGINE_FUNZIONE: Record<string, string> = { assistente: "assistente_apri", raccolta: "raccolta_apri" };
 const NUOVI_TIPI = ["sessione_inizio", "pagina", "funzione", "errore", "utile"];
 
 const DAY = 86_400_000;
@@ -163,7 +227,12 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
         if (Array.isArray(p.requisiti)) for (const q of p.requisiti) if (str(q)) req.add(str(q)!.toLowerCase(), e.actor);
         break;
       }
-      case "pagina": { const n = str(p.pagina); if (n) pagine.add(n, e.actor); break; }
+      case "pagina": {
+        const n = str(p.pagina);
+        if (n) pagine.add(n, e.actor);
+        if (n && PAGINE_FUNZIONE[n]) funzioni.add(PAGINE_FUNZIONE[n], e.actor);
+        break;
+      }
       case "utile": if (p.voto === "si") utile.si++; else if (p.voto === "no") utile.no++; break;
       case "errore": {
         const messaggio = str(p.messaggio) ?? "(senza messaggio)";
@@ -176,8 +245,13 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
         errori.set(k, x);
         break;
       }
-      default:
-        if (AZIONI_DIRETTE.includes(e.r.type)) funzioni.add(e.r.type, e.actor);
+      default: {
+        if (!AZIONI_DIRETTE.includes(e.r.type)) break;
+        const dedicata = funzioneDedicata(e.r.type, p);
+        if (dedicata) funzioni.add(dedicata, e.actor);
+        // Chiamata o sito per prenotare: contano come prenotazione, non come "chiama"/"sito" dalla scheda.
+        if (!dedicata?.startsWith("prenota_")) funzioni.add(e.r.type, e.actor);
+      }
     }
   }
   const funzioniList = funzioni.list();
