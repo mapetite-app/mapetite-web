@@ -8,7 +8,8 @@ import InvitoMapetite from "@/components/invito-mapetite";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import { PostoRiga } from "@/components/posto-persona";
-import { loadProfilePage } from "@/lib/social";
+import { loadProfilePage, loadScopritori } from "@/lib/social";
+import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
 import { isVisited, mapSpots, plural, publicCollections } from "@/lib/social-view";
 import { collectionColor, publicCollectionPath } from "@/lib/raccolte";
@@ -89,7 +90,9 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const visited = places.filter(isVisited);
   const want = places.filter((p) => !isVisited(p)); // salvato e non ancora visitato = da provare
   // Top per città (piano 4.3): solo i visitati messi in classifica; nascosta senza la migrazione.
-  const ranks = await loadPublicRanks(profile.id);
+  // Scopritori (5.6): badge "💎 Scopritore" solo se ha gemme e la migrazione è applicata.
+  const [ranks, scopritori] = await Promise.all([loadPublicRanks(profile.id), loadScopritori([profile.id])]);
+  const scopritore = scopritori?.find((s) => s.id === profile.id && s.gemme > 0) ?? null;
   const tops = ranks
     ? topByCity(visited.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 5).slice(0, 3)
     : [];
@@ -110,9 +113,10 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           <div className="min-w-0">
             <h1 className="truncate font-title text-2xl font-semibold leading-tight text-text">{name}</h1>
             <p className="truncate text-sm font-sans text-text-muted">@{profile.handle}</p>
-            {creator && (
-              <p className="mt-1">
-                <CreatorBadge tipo={creator.tipo} />
+            {(creator || scopritore) && (
+              <p className="mt-1 flex flex-wrap gap-1.5">
+                {creator && <CreatorBadge tipo={creator.tipo} />}
+                {scopritore && <ScopritoreBadge gemme={scopritore.gemme} provate={scopritore.gemme_provate} />}
               </p>
             )}
             {profile.city && (

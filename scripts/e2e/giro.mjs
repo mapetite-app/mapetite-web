@@ -5775,6 +5775,123 @@ if (fakeUser) {
   await tctx.close();
 }
 
+// 99. Salva da iPhone (piano 3.3) e Scopritori (piano 5.6). Tutto simulato: niente Google, niente Supabase.
+if (!fakeUser) console.log("SKIP  salva da iPhone / scopritori: dev server senza E2E_FAKE_USER");
+else {
+  const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  const ANDROID_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
+  const tEv = [];
+  const telCtx = async (userAgent) => {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, userAgent, permissions: ["clipboard-read", "clipboard-write"] });
+    await c.route("**/api/events", (r) => { tEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await c.route("**/rest/v1/saved_places**", (r) => r.fulfill({ status: r.request().method() === "POST" ? 201 : 200, json: [] }));
+    await c.route("**/api/places/from-link", (r) => r.fulfill({ json: { risultati: [{ link: "https://maps.app.goo.gl/TEL111", place: { id: "00000000-0000-0000-0000-000000000199", name: "Osteria Nascosta" } }] } }));
+    return c;
+  };
+  const featureEv = (nome) => tEv.filter((e) => e.type === "funzione" && e.props?.nome === nome);
+
+  // A) iPhone: guida in 2 passi in cima a /importa; "Incolla il link copiato" legge gli appunti e salva.
+  const ic = await telCtx(IPHONE_UA);
+  const ip = await ic.newPage();
+  ip.on("pageerror", (e) => errors.push(e.message));
+  await ip.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const guide = ip.getByTestId("salva-telefono");
+  await guide.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await guide.getAttribute("data-telefono").catch(() => null) === "iphone", "salva da iPhone: su iPhone compare la guida iPhone");
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).isVisible(), "salva da iPhone: 2 passi (Copia il link → Incolla qui) e pulsante 'Incolla il link copiato'");
+  const yG = (await guide.boundingBox())?.y ?? 9999;
+  const yMaps = (await ip.getByTestId("importa-google").boundingBox())?.y ?? 0;
+  ok(yG < yMaps, "salva da iPhone: la guida sta in cima, prima di 'Da Google Maps'");
+  await ip.screenshot({ path: `${OUT}/99a-salva-iphone.png`, caret: "initial" });
+  await ip.evaluate(() => navigator.clipboard.writeText("Guarda qui https://maps.app.goo.gl/TEL111"));
+  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  ok(await ip.getByTestId("importa-google").getByTestId("link-salvato").first().waitFor({ timeout: 5000 }).then(() => true, () => false) && await ip.getByText("Osteria Nascosta").isVisible(), "salva da iPhone: il link copiato si salva con un tocco");
+  ok(featureEv("salva_da_telefono_incolla").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: il tocco su 'Incolla' è registrato (contesto iphone)");
+  await ip.screenshot({ path: `${OUT}/99b-salva-iphone-salvato.png`, caret: "initial" });
+  // Reel di Instagram: non si legge, si spiega lo screenshot (stesso percorso della card Maps).
+  await ip.evaluate(() => navigator.clipboard.writeText("https://www.instagram.com/reel/C9xYz12AbCd/"));
+  await guide.getByRole("button", { name: "📋 Incolla il link copiato" }).click();
+  ok(await ip.getByTestId("link-social").waitFor({ timeout: 4000 }).then(() => true, () => false), "salva da iPhone: un reel di Instagram incollato spiega cosa fare (screenshot)");
+  await ip.setViewportSize({ width: 360, height: 780 });
+  ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "salva da iPhone 360px: niente scorrimento orizzontale");
+  await ic.close();
+
+  // B) Android: Condividi → Mapetite; incollare resta l'alternativa; si può passare alla guida iPhone.
+  const ac = await telCtx(ANDROID_UA);
+  const ap = await ac.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  await ap.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const ag = ap.getByTestId("salva-telefono");
+  await ag.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await ag.getAttribute("data-telefono").catch(() => null) === "android" && await ag.getByText("Scegli Mapetite").isVisible() && await ag.getByRole("button", { name: "Oppure 📋 incolla il link copiato" }).isVisible(), "salva da Android: guida 'Condividi → Scegli Mapetite' con incolla come alternativa");
+  await ap.screenshot({ path: `${OUT}/99c-salva-android.png`, caret: "initial" });
+  await ag.getByTestId("salva-telefono-cambia").click();
+  ok(await ag.getAttribute("data-telefono") === "iphone" && featureEv("salva_da_telefono_cambia").length > 0, "salva da Android: 'Hai un iPhone?' passa alla guida iPhone");
+  await ac.close();
+
+  // C) Scopritori: riga nel profilo, badge sul profilo pubblico, classifica in Amici.
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const GIU = "00000000-0000-4000-8000-0000000009a1";
+  const MAR = "00000000-0000-4000-8000-0000000009a2";
+  const LIA = "00000000-0000-4000-8000-0000000009a3";
+  const prof = (id, handle, display_name) => ({ id, handle, display_name, bio: null, city: "Roma", visitati: 1, da_provare: 1, seguaci: 1, seguiti: 1 });
+  const base = {
+    profili: [prof(GIU, "giulia.rm", "Giulia"), prof(MAR, "marco", "Marco"), prof(LIA, "lia", "Lia")],
+    salvati: [], seguo: [GIU, MAR, LIA],
+    mio: { handle: "io.test", display_name: "Io", bio: null, city: null, is_public: true },
+  };
+  const scop = [
+    { id: ME, handle: "io.test", display_name: "Io", gemme: 2, gemme_provate: 1 },
+    { id: GIU, handle: "giulia.rm", display_name: "Giulia", gemme: 9, gemme_provate: 3 },
+    { id: MAR, handle: "marco", display_name: "Marco", gemme: 0, gemme_provate: 0 },
+    { id: LIA, handle: "lia", display_name: "Lia", gemme: 1, gemme_provate: 0 },
+  ];
+  const sc = await telCtx(IPHONE_UA);
+  const setS = (v) => sc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await sc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "io@example.com", saved: [], reviews: [] })), url: BASE }]);
+  await setS({ ...base, scopritori: scop });
+  const s = await sc.newPage();
+  s.on("pageerror", (e) => errors.push(e.message));
+  await s.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const riga = s.getByTestId("scopritore-riga");
+  ok(await riga.isVisible() && (await riga.textContent())?.includes("Scopritore · Esploratore") && await riga.getByTestId("scopritore-livello").textContent() === "Liv. 2", "scopritori: nel profilo la riga compatta '💎 Scopritore · Esploratore · Liv. 2'");
+  const yRiga = (await riga.boundingBox())?.y ?? 9999;
+  ok(yRiga < ((await s.getByTestId("profilo-mie-cose").boundingBox())?.y ?? 0), "scopritori: la riga sta sotto i numeri, prima di 'Le mie cose'");
+  await riga.locator("summary").click();
+  ok((await riga.getByTestId("scopritore-mancano").textContent())?.includes("Ancora 5 punti per il livello 3") && (await riga.getByTestId("scopritore-cerca").getAttribute("href")) === "/sorprendimi", "scopritori: aperta dice quanto manca e porta a scoprire un posto poco conosciuto");
+  await s.waitForTimeout(300);
+  ok(featureEv("scopritore_apri").some((e) => e.props?.contesto === "livello-2"), "scopritori: l'apertura della riga è registrata");
+  await s.screenshot({ path: `${OUT}/99d-scopritore-profilo.png`, caret: "initial" });
+
+  await s.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const cl = s.getByTestId("scopritori-amici");
+  const rows = cl.getByTestId("scopritore-amico");
+  const names = await rows.allTextContents();
+  ok(await cl.isVisible() && names.length === 3 && names[0].includes("Giulia") && names[1].includes("Tu") && names[2].includes("Lia"), `scopritori: in Amici classifica Giulia → Tu → Lia, chi non ha gemme non compare (${names.map((n) => n.slice(0, 12)).join(" | ")})`);
+  ok((await rows.first().locator("a").getAttribute("href")) === "/u/giulia.rm" && (await rows.nth(1).locator("a").getAttribute("href")) === "/profilo", "scopritori: dalla classifica si apre il profilo dell'amico (o il proprio)");
+  ok(featureEv("scopritori_amici_vista").length > 0, "scopritori: la vista della classifica è registrata");
+  await cl.scrollIntoViewIfNeeded();
+  await s.screenshot({ path: `${OUT}/99e-scopritori-amici.png`, caret: "initial" });
+
+  await s.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await s.getByTestId("scopritore-badge").textContent().catch(() => ""))?.includes("💎 Scopritore · liv. 3"), "scopritori: sul profilo pubblico il badge '💎 Scopritore · liv. 3'");
+  await s.screenshot({ path: `${OUT}/99f-scopritore-pubblico.png`, caret: "initial" });
+  await s.goto(`${BASE}/u/marco`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("profilo-pubblico").isVisible() && (await s.getByTestId("scopritore-badge").count()) === 0, "scopritori: senza gemme nessun badge");
+
+  // Migrazione 20261016_scopritori non applicata: niente riga, niente classifica, nessun errore.
+  await setS(base);
+  await s.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("guida-contatori").isVisible() && (await s.getByTestId("scopritore-riga").count()) === 0, "scopritori senza migrazione: il profilo resta com'era");
+  await s.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("amici").isVisible() && (await s.getByTestId("scopritori-amici").count()) === 0, "scopritori senza migrazione: Amici resta com'era");
+  await s.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+  ok(await s.getByTestId("profilo-pubblico").isVisible() && (await s.getByTestId("scopritore-badge").count()) === 0, "scopritori senza migrazione: profilo pubblico senza badge");
+  { const lost = droppedKeys(tEv); ok(lost.length === 0, `salva da iPhone / scopritori: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await sc.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

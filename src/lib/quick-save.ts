@@ -14,6 +14,7 @@ export type QuickSavePlace = {
   category: string | null;
   rating: number | null;
   priceLevel: number | null;
+  userRatingCount?: number | null; // solo per "poco conosciuto" (Scopritori), non si salva
 };
 
 export async function quickSavePlace(
@@ -27,6 +28,7 @@ export async function quickSavePlace(
     body: JSON.stringify({
       googlePlaceId: place.id, name: place.name, address: place.address ?? "",
       lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
+      userRatingCount: place.userRatingCount ?? null,
     }),
   });
   if (!addRes.ok) throw new Error("add");

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
+import SalvaDaTelefono from "./salva-da-telefono";
 import ManualAddCard from "./manual-add-card";
 import MultiLinkCard from "./multi-link-card";
 import TakeoutCard from "./takeout-card";
@@ -86,6 +87,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
   // così la scheda lo mostra in "Visto su TikTok". Si memorizza solo il link, mai il video.
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [reelLinked, setReelLinked] = useState(false);
+  // "Incolla il link copiato" della guida in cima: stesso percorso della card "Da Google Maps".
+  const googleCard = useRef<{ paste: () => void }>(null);
 
   const goToScreenshot = () => {
     document.getElementById("da-screenshot")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -299,7 +302,9 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
           <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
           <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
 
-          <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          {userId && <SalvaDaTelefono onPaste={() => googleCard.current?.paste()} />}
+
+          <GoogleMapsCard ref={googleCard} userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
 
           <div className="mt-6">
             <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />

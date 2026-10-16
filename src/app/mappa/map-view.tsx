@@ -77,6 +77,7 @@ function SaveModal({
   onSaved,
   onCancel,
   photoRef = null,
+  reviewCount = null,
   knownTags = [],
 }: {
   place: Place;
@@ -87,6 +88,8 @@ function SaveModal({
   onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
   onCancel: () => void;
   photoRef?: string | null;
+  // Numero di recensioni Google già arrivato: solo per "poco conosciuto" (Scopritori), non si salva.
+  reviewCount?: number | null;
   // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
   knownTags?: string[];
 }) {
@@ -192,6 +195,7 @@ function SaveModal({
             category: place.category,
             rating: place.rating,
             priceLevel: place.priceLevel,
+            userRatingCount: reviewCount,
           }),
         });
         if (!addRes.ok) { setError(true); return; }
@@ -1130,6 +1134,7 @@ export default function MapView({
         body: JSON.stringify({
           googlePlaceId: place.id, name: place.name, address: place.address ?? "",
           lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
+          userRatingCount: venueDetails[place.id]?.userRatingCount ?? null,
         }),
       });
       if (!addRes.ok) throw new Error("add");
@@ -3039,6 +3044,7 @@ export default function MapView({
             place={pendingPlace}
             initialTags={pendingSaveTags}
             knownTags={availableTags}
+            reviewCount={venueDetails[pendingPlace.id]?.userRatingCount ?? null}
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}

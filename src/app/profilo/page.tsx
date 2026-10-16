@@ -14,7 +14,8 @@ import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
 import InvitaAmico from "@/components/invita-amico";
-import { loadMySocial } from "@/lib/social";
+import { loadMyGems, loadMySocial } from "@/lib/social";
+import { ScopritoreRiga } from "@/components/scopritore";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt } from "@/lib/diario";
@@ -111,6 +112,8 @@ export default async function ProfiloPage() {
 
   // Profilo pubblico (social): "in arrivo" finché la migrazione 20261015_social non è applicata.
   const socialPromise = loadMySocial(user.id);
+  // Scopritori (5.6): null senza la migrazione 20261016_scopritori → la riga non compare.
+  const gemsPromise = loadMyGems(user.id);
   const [{ data: savedRaw }, { data: reviewsRaw }] = fake
     ? [{ data: fake.saved }, { data: fake.reviews }]
     : await Promise.all([
@@ -148,7 +151,7 @@ export default async function ProfiloPage() {
     if (dErr && !isMissingVisitedAt(dErr)) console.error("[profilo] lettura diario fallita:", dErr.message);
     diaryWithDate = !dErr;
   }
-  const social = await socialPromise;
+  const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   // Salvati raggruppati per città (ricavata dall'indirizzo, come nella mappa).
@@ -236,6 +239,7 @@ export default async function ProfiloPage() {
             </Link>
           ))}
         </nav>
+        {gems && <ScopritoreRiga gemme={gems.gemme} provate={gems.provate} />}
       </header>
 
       {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
@@ -282,7 +286,7 @@ export default async function ProfiloPage() {
           </Link>
           {/* "Importa" non è più nella barra in basso: si raggiunge da qui. */}
           <Link href="/importa" data-testid="profilo-importa" className={TILE_CLASS}>
-            <TileBody icon={<Download {...icon} />} label="Importa" sub="Da altre app" />
+            <TileBody icon={<Download {...icon} />} label="Importa" sub="Da Instagram e Maps" />
           </Link>
         </div>
       </section>

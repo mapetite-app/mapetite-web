@@ -267,7 +267,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
     try {
       const { uuid } = await quickSavePlace(userId, {
         id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng,
-        category: p.category, rating: p.rating, priceLevel: p.priceLevel,
+        category: p.category, rating: p.rating, priceLevel: p.priceLevel, userRatingCount: p.userRatingCount,
       }, [WANT_TAG]);
       setSaveState((s) => ({ ...s, [p.id]: "saved" }));
       trackFeature("sorpresa_salva", { fonte: from });
