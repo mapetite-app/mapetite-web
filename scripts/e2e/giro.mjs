@@ -5078,6 +5078,401 @@ else {
   await wctx.close();
 }
 
+// ── Pitch (sezione separata): creator, posti in evidenza e trend di zona, premium ─────────────
+// 5.6b Creator e critici: badge sul profilo pubblico e "Liste dei creator da seguire" in /amici.
+//      Dati finti dal cookie "e2e_social" (campo `creator`); senza creator la sezione non c'è.
+if (!fakeUser) console.log("SKIP  creator: dev server senza E2E_FAKE_USER");
+else {
+  const CR = "00000000-0000-4000-8000-0000000005c1";
+  const NORMALE = "00000000-0000-4000-8000-0000000005c2";
+  const profC = (id, handle, display_name) => ({ id, handle, display_name, bio: "Trattorie vere, lontano dai giri turistici", city: "Roma", visitati: 2, da_provare: 1, seguaci: 0, seguiti: 0 });
+  const svC = (user_id, handle, place_id, name, tags) => ({ user_id, handle, display_name: handle, place_id, name, category: "restaurant", tags, created_at: "2026-10-12T19:00:00Z", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.889, lng: 12.53 });
+  const socialC = {
+    profili: [profC(CR, "sara.mangia", "Sara Mangia"), profC(NORMALE, "luca.rm", "Luca")],
+    salvati: [
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c1", "Trattoria Pigneto", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c2", "Osteria Nascosta", ["Già visitato", "Trattorie di quartiere"]),
+      svC(CR, "sara.mangia", "44444444-0000-4000-8000-0000000000c3", "Vino Vivo", ["Da provare", "Vini naturali"]),
+      svC(NORMALE, "luca.rm", "44444444-0000-4000-8000-0000000000c4", "Bar Luca", ["Da provare", "Colazioni"]),
+    ],
+    seguo: [],
+    mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    creator: [{ id: CR, tipo: "Food blogger" }],
+  };
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const cEv = [];
+  await cctx.route("**/api/events", (r) => { cEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(e.message));
+  const setC = (v) => cctx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setC(socialC);
+  await cp.goto(`${BASE}/u/sara.mangia`, { waitUntil: "networkidle" });
+  ok(((await cp.getByTestId("badge-creator").first().textContent().catch(() => "")) ?? "").includes("Creator · Food blogger"), "creator: badge 'Creator · Food blogger' sul profilo pubblico");
+  await cp.screenshot({ path: `${OUT}/80-creator-profilo.png`, caret: "initial" });
+  await cp.goto(`${BASE}/u/luca.rm`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("badge-creator").count()) === 0, "creator: nessun badge su un profilo normale");
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  const cl = cp.getByTestId("creator-liste");
+  ok(await cl.isVisible(), "creator: sezione 'Liste dei creator da seguire' in /amici");
+  ok((await cl.getByTestId("creator-card").count()) === 1 && ((await cl.textContent()) ?? "").includes("Sara Mangia") && !((await cl.textContent()) ?? "").includes("Luca"), "creator: solo i creator nella sezione");
+  const prima = cl.getByTestId("creator-raccolta").first();
+  ok(((await prima.textContent()) ?? "").includes("Trattorie di quartiere") && (await prima.getAttribute("href")) === "/u/sara.mangia/raccolte/Trattorie%20di%20quartiere", "creator: la raccolta pubblica si apre dalla card");
+  ok(await cl.getByTestId("segui").isVisible(), "creator: bottone Segui nella card");
+  await cp.waitForTimeout(400);
+  ok(cEv.some((e) => e.type === "funzione" && e.props?.nome === "creator_liste"), "creator: vista della sezione registrata (trackFeature)");
+  { const w = await cp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `creator /amici: niente scorrimento orizzontale (${w}px)`); }
+  await cl.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/81-creator-amici.png`, caret: "initial" });
+  await setC({ ...socialC, creator: [] });
+  await cp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok((await cp.getByTestId("creator-liste").count()) === 0 && await cp.getByTestId("amici").isVisible(), "creator: senza creator (o senza migrazione) la sezione è nascosta e la pagina regge");
+  await cctx.close();
+}
+
+
+// 8.3 Posti in evidenza e 8.4 Trend di zona (dimostrativi, pannello del ristoratore).
+{
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tEv = [];
+  await tctx.route("**/api/events", (r) => { tEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const tp = await tctx.newPage();
+  tp.on("pageerror", (e) => errors.push(e.message));
+  await tp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  const trend = tp.getByTestId("pannello-trend");
+  ok(await trend.isVisible() && (await trend.getByTestId("trend-fascia").count()) === 6 && (await trend.getByTestId("trend-esempio").count()) === 0 && await trend.getByTestId("trend-picco").isVisible(), "trend di zona (demo): sei fasce orarie con le richieste e il momento di picco");
+  const evd = tp.getByTestId("pannello-evidenza");
+  ok(await evd.isVisible() && ((await evd.getByTestId("etichetta-sponsorizzato").textContent()) ?? "").includes("Sponsorizzato"), "in evidenza (demo): card con l'etichetta 'Sponsorizzato'");
+  ok((await evd.getByTestId("evidenza-si").count()) === 1 && (await evd.getByTestId("evidenza-no").count()) === 2, "in evidenza (demo): compare solo nella ricerca adatta, non nelle altre due");
+  ok(((await evd.getByTestId("evidenza-no").last().textContent()) ?? "").includes("terrazza"), "in evidenza (demo): spiega cosa manca (terrazza)");
+  await tp.waitForTimeout(400);
+  ok(tEv.some((e) => e.type === "funzione" && e.props?.nome === "ristoratore_evidenza"), "in evidenza (demo): vista registrata (trackFeature)");
+  { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `trend e in evidenza: niente scorrimento orizzontale (${w}px)`); }
+  await trend.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/90-trend-zona-demo.png`, caret: "initial" });
+  await evd.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/91-in-evidenza-demo.png`, caret: "initial" });
+  // Nei risultati veri non c'è nessuno sponsorizzato: la parola non compare nel codice della ricerca.
+  { const src = ["src/app/api/search/route.ts", "src/components/venue-sheet.tsx", "src/components/place-card.tsx"].map((f) => { try { return readFileSync(new URL(`../../${f}`, import.meta.url), "utf8"); } catch { return ""; } }).join("\n");
+    ok(!/sponsorizzat/i.test(src), "in evidenza: nessuno sponsorizzato nei risultati veri della ricerca"); }
+  // Pannello vero con pochi dati: il trend è un esempio DICHIARATO.
+  if (fakeUser) {
+    const LT = "44444444-0000-4000-8000-0000000000d1";
+    const Lt = { id: LT, name: "Bar Prova Trend", address: "Via del Pigneto 1, 00176 Roma RM, Italy", category: "bar", lat: 41.888, lng: 12.53, google_place_id: "GTREND" };
+    await tctx.addCookies([{ name: "e2e_ristoratore", url: BASE, value: encodeURIComponent(JSON.stringify({ locale: Lt, simili: [Lt], verificato: false, salvati: [], eventi: [
+      { created_at: new Date(Date.now() - 3_600_000).toISOString(), type: "ricerca", user_id: null, anon_id: "t1", session_id: "t1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "bar", requisiti: ["tavoli all'aperto"], zona: "Pigneto" } },
+    ] })) }]);
+    await tp.goto(`${BASE}/ristoratore/${LT}`, { waitUntil: "networkidle" });
+    ok(await tp.getByTestId("trend-esempio").isVisible() && (await tp.getByTestId("pannello-evidenza").count()) === 0, "trend di zona (pannello vero, pochi dati): esempio etichettato 'Esempio', niente sezione sponsorizzati");
+  } else console.log("SKIP  trend pannello vero: dev server senza E2E_FAKE_USER");
+  await tctx.close();
+}
+
+// 8b Utente premium: /premium con l'elenco "in arrivo", nessun pagamento, "Mi interessa" registrato.
+{
+  const pmctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const pmEv = [];
+  await pmctx.route("**/api/events", (r) => { pmEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const pm = await pmctx.newPage();
+  pm.on("pageerror", (e) => errors.push(e.message));
+  const r = await pm.goto(`${BASE}/premium`, { waitUntil: "networkidle" });
+  ok(r?.status() === 200 && (await pm.getByRole("heading", { level: 1 }).textContent()) === "Mapetite Premium" && (await pm.getByTestId("premium-funzione").count()) >= 3, "premium: pagina con l'elenco delle funzioni");
+  const body = (await pm.getByTestId("premium").textContent()) ?? "";
+  ok(body.includes("Assistente senza limiti") && body.includes("Raccolte e mappe illimitate") && body.includes("Serate organizzate") && body.includes("In arrivo"), "premium: assistente senza limiti, raccolte illimitate, serate organizzate, tutto 'in arrivo'");
+  ok(await pm.getByTestId("premium-nessun-pagamento").isVisible() && !/€|\bcarta\b|abbonati ora|paga ora/i.test(body), "premium: nessun prezzo né pagamento");
+  await pm.getByTestId("premium-interesse").first().click();
+  await pm.getByTestId("premium-interesse-fatto").first().waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await pm.getByTestId("premium-interesse-fatto").first().isVisible() && pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium_interesse" && e.props?.contesto === "assistente"), "premium: 'Mi interessa' registrato (trackFeature) e confermato");
+  ok(pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium"), "premium: vista della pagina registrata");
+  await pm.reload({ waitUntil: "networkidle" });
+  ok((await pm.getByTestId("premium-interesse-fatto").count()) === 1, "premium: 'Mi interessa' ricordato ricaricando");
+  { const w = await pm.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `premium: niente scorrimento orizzontale (${w}px)`); }
+  await pm.screenshot({ path: `${OUT}/92-premium.png`, caret: "initial" });
+  if (fakeUser) {
+    await pmctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await pm.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    ok((await pm.getByTestId("profilo-premium").getAttribute("href")) === "/premium", "premium: collegato dal profilo");
+    ok((await pm.getByTestId("profilo-ristoratori").getAttribute("href")) === "/per-i-ristoratori", "profilo: link 'Mapetite per i ristoratori'");
+  } else console.log("SKIP  premium dal profilo: dev server senza E2E_FAKE_USER");
+  await pmctx.close();
+}
+
+// 19. Liste di gruppo (piano 5.5): /gruppi, /gruppi/<id>, /gruppi/entra/<codice>, "Proponi" dalla scheda.
+//     Il server legge i dati finti dal cookie "e2e_gruppi"; senza cookie le liste sono "in arrivo"
+//     (come in produzione finché la migrazione 20261016_liste_gruppo non è applicata).
+//     Le scritture verso Supabase (rpc, gruppi_posti, gruppi_voti) sono simulate e registrate.
+if (!fakeUser) console.log("SKIP  liste di gruppo: dev server senza E2E_FAKE_USER");
+else {
+  const ME = "00000000-0000-0000-0000-000000000001";
+  const G1 = "00000000-0000-4000-8000-0000000006a1";
+  const G2 = "00000000-0000-4000-8000-0000000006a2";
+  const CODICE = "abcd1234ef";
+  const PL = (n) => `00000000-0000-4000-8000-0000000006b${n}`;
+  const posto = (id, place, name, category, voti, votanti, created_at, extra = {}) => ({
+    posto_id: id, place_id: place, google_place_id: null, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy",
+    lat: 41.889, lng: 12.469, aggiunto_da: "u-giulia", aggiunto_da_nome: "Giulia", created_at, voti, votanti, ho_votato: false, ...extra,
+  });
+  const gruppo = { id: G1, nome: "Cene del giovedì", emoji: "🍽️", codice: CODICE, creato_da: ME, created_at: "2026-10-14T10:00:00Z", membri: 3, posti: 2, voti: 3 };
+  const dati = {
+    gruppi: [gruppo],
+    membri: { [G1]: [{ user_id: ME, nome: "Lorenzo" }, { user_id: "u-giulia", nome: "Giulia" }, { user_id: "u-marco", nome: "Marco" }] },
+    posti: { [G1]: [
+      posto("pA", PL(1), "Trattoria Uno", "restaurant", 1, ["Giulia"], "2026-10-14T11:00:00Z"),
+      posto("pB", PL(2), "Osteria Due", "restaurant", 2, ["Giulia", "Marco"], "2026-10-14T12:00:00Z"),
+    ] },
+    inviti: { [CODICE]: { id: G1, nome: "Cene del giovedì", emoji: "🍽️", membri: 3, posti: 2, sono_dentro: false } },
+  };
+  const profiloG = {
+    email: "tester@example.com",
+    saved: [
+      { created_at: "2026-10-10", tags: ["Da provare"], note: null, places: { id: PL(3), name: "Forno Tre", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.87, lng: 12.48 } },
+      { created_at: "2026-10-09", tags: ["Già visitato"], note: null, places: { id: PL(1), name: "Trattoria Uno", category: "restaurant", address: "Via del Moro 12, Roma", lat: 41.889, lng: 12.469 } },
+    ],
+    reviews: [],
+  };
+  const setCookie = (c, name, v) => c.addCookies([{ name, value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const gEv = [];
+  const writes = [];
+  await gctx.route("**/api/events", (r) => { gEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await gctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await gctx.route("**/rest/v1/rpc/crea_gruppo**", (r) => { writes.push({ t: "crea", body: r.request().postDataJSON() }); return r.fulfill({ json: [{ id: G1, codice: CODICE }] }); });
+  await gctx.route("**/rest/v1/rpc/entra_gruppo**", (r) => { writes.push({ t: "entra", body: r.request().postDataJSON() }); return r.fulfill({ json: G1 }); });
+  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: "pNuovo" } }); });
+  await gctx.route("**/rest/v1/gruppi_voti**", (r) => { writes.push({ t: `voti-${r.request().method()}`, body: r.request().method() === "POST" ? r.request().postDataJSON() : null, url: r.request().url() }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
+  const gp = await gctx.newPage();
+  gp.on("pageerror", (e) => errors.push(e.message));
+  const noHScroll = async (label) => { const w = await gp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `${label}: niente scorrimento orizzontale (${w}px)`); };
+
+  // In arrivo: senza dati (migrazione non applicata) nessuna pagina si rompe.
+  await setCookie(gctx, "e2e_profilo", profiloG);
+  for (const path of ["/gruppi", `/gruppi/${G1}`, `/gruppi/entra/${CODICE}`]) {
+    const r = await gp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    ok(r?.status() === 200 && await gp.getByTestId("gruppi-in-arrivo").isVisible(), `gruppi in arrivo: ${path} dice 'in arrivo' invece di rompersi`);
+  }
+  await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("profilo-gruppi").getAttribute("href") === "/gruppi", "profilo: ingresso 'Liste di gruppo'");
+
+  // Senza account: invito alla registrazione, e il link d'invito torna qui dopo.
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("gruppi-accedi").isVisible(), "gruppi senza account: 'Accedi' invece della pagina");
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppo-invito-titolo").textContent()) === "Cene del giovedì" && await gp.getByText("3 persone · 2 posti").isVisible(), "invito di gruppo: nome della lista e numeri (senza nomi né posti)");
+  ok((await gp.getByTestId("gruppo-invito-registrati").getAttribute("href")) === `/signup?next=${encodeURIComponent(`/gruppi/entra/${CODICE}`)}`, "invito di gruppo: 'Crea un account ed entra' torna all'invito");
+  ok((await gp.locator("body").innerText()).includes("Giulia") === false, "invito di gruppo: nessun nome dei membri prima di entrare");
+  await noHScroll("invito di gruppo");
+  await gp.screenshot({ path: `${OUT}/93-gruppi-invito.png`, caret: "initial" });
+  await gctx.clearCookies({ name: "e2e_anonimo" });
+
+  // Con account: entra con il proprio nome.
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  await gp.locator("#entra-nome").fill("Lorenzo");
+  await gp.getByTestId("gruppo-entra").click();
+  await gp.waitForURL(`**/gruppi/${G1}`, { timeout: 8000 }).catch(() => {});
+  { const w = writes.find((x) => x.t === "entra"); ok(w?.body?.p_codice === CODICE && w?.body?.p_mio_nome === "Lorenzo" && new URL(gp.url()).pathname === `/gruppi/${G1}`, `invito di gruppo: 'Entra nella lista' entra con il codice e apre la lista (${gp.url()})`); }
+  await setCookie(gctx, "e2e_gruppi", { ...dati, inviti: { [CODICE]: { ...dati.inviti[CODICE], sono_dentro: true } } });
+  await gp.goto(`${BASE}/gruppi/entra/${CODICE}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppo-invito-apri").getAttribute("href")) === `/gruppi/${G1}`, "invito di gruppo: chi è già dentro ha 'Apri la lista'");
+  await gp.goto(`${BASE}/gruppi/entra/zz`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("gruppo-invito-non-valido").isVisible(), "invito di gruppo: codice sbagliato = 'Invito non valido'");
+
+  // Elenco.
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  { const r = gp.getByTestId("gruppo-riga"); ok((await r.count()) === 1 && (await r.first().innerText()).includes("Cene del giovedì") && (await r.first().innerText()).includes("3 persone · 2 posti"), "gruppi: elenco delle liste con persone e posti"); }
+  ok((await gp.locator("nav a[aria-current=page]").allInnerTexts()).some((t) => t.includes("Amici")), "gruppi: pagina sotto la voce 'Amici' della barra");
+  await noHScroll("gruppi");
+  await gp.screenshot({ path: `${OUT}/94-gruppi-elenco.png`, caret: "initial" });
+
+  // Lista: il più votato in cima, 👍 sposta l'ordine, "Proponi dai tuoi salvati".
+  await gp.goto(`${BASE}/gruppi/${G1}`, { waitUntil: "networkidle" });
+  const names = async () => (await gp.getByTestId("gruppo-posto").allInnerTexts()).map((t) => t.includes("Osteria Due") ? "Osteria Due" : t.includes("Trattoria Uno") ? "Trattoria Uno" : t.includes("Forno Tre") ? "Forno Tre" : "?");
+  ok((await names()).join(",") === "Osteria Due,Trattoria Uno", `lista di gruppo: il più votato in cima (${(await names()).join(", ")})`);
+  ok((await gp.getByTestId("gruppo-posto").first().getByTestId("gruppo-in-testa").count()) === 1, "lista di gruppo: '🏆 In testa' sul più votato");
+  ok((await gp.getByTestId("gruppo-posto").first().innerText()).includes("Piace a Giulia e Marco"), "lista di gruppo: si vede a chi piace");
+  ok((await gp.getByTestId("gruppo-membri").innerText()).includes("Tu") && (await gp.getByTestId("gruppo-membri").innerText()).includes("Marco"), "lista di gruppo: chi c'è nella lista (tu per primo)");
+  ok(await gp.getByTestId("gruppo-condividi").isVisible() && (await gp.getByTestId("gruppo-condividi").textContent())?.includes("Condividi il link d'invito"), "lista di gruppo: 'Condividi il link d'invito'");
+  await noHScroll("lista di gruppo");
+  await gp.screenshot({ path: `${OUT}/95-gruppo-lista.png`, caret: "initial" });
+  const trattoria = gp.getByTestId("gruppo-posto").filter({ hasText: "Trattoria Uno" });
+  await trattoria.getByTestId("gruppo-vota").click();
+  await gp.waitForTimeout(300);
+  { const v = writes.find((x) => x.t === "voti-POST"); ok(v?.body?.posto_id === "pA" && v?.body?.user_id === ME, "lista di gruppo: 👍 registra il voto a tuo nome"); }
+  ok((await trattoria.getByTestId("gruppo-vota").getAttribute("aria-pressed")) === "true" && (await trattoria.getByTestId("gruppo-vota").innerText()).trim() === "2", "lista di gruppo: 👍 acceso e conteggio +1");
+  ok((await names())[0] === "Trattoria Uno" && (await gp.getByTestId("gruppo-in-testa").count()) === 0, "lista di gruppo: a pari voti sale chi è stato proposto prima, nessuno 'in testa'");
+  await gp.getByTestId("gruppo-posto").filter({ hasText: "Trattoria Uno" }).getByTestId("gruppo-vota").click();
+  await gp.waitForTimeout(300);
+  ok(writes.some((x) => x.t === "voti-DELETE" && x.url.includes("posto_id=eq.pA")) && (await names())[0] === "Osteria Due", "lista di gruppo: secondo tocco toglie il voto e l'ordine torna");
+  await gp.getByTestId("gruppo-aggiungi").click();
+  ok((await gp.getByTestId("gruppo-salvato").count()) === 1 && (await gp.getByTestId("gruppo-salvato").innerText()).includes("Forno Tre"), "lista di gruppo: tra i tuoi salvati solo quelli non ancora proposti");
+  await gp.getByTestId("gruppo-salvato").click();
+  await gp.waitForTimeout(300);
+  { const w = writes.find((x) => x.t === "posti-POST"); ok(w?.body?.gruppo_id === G1 && w?.body?.place_id === PL(3) && w?.body?.aggiunto_da === ME, "lista di gruppo: 'Proponi' aggiunge il salvato (UUID del locale, a tuo nome)"); }
+  ok((await gp.getByTestId("gruppo-posto").count()) === 3 && (await names())[2] === "Forno Tre" && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Forno Tre" }).innerText()).includes("proposto da te"), "lista di gruppo: il posto proposto compare in fondo (0 voti), 'proposto da te'");
+  ok((await gp.getByTestId("gruppo-numeri").textContent()) === "3 persone · 3 posti", "lista di gruppo: i numeri si aggiornano");
+  const nonTrovato = await gp.goto(`${BASE}/gruppi/${G2}`, { waitUntil: "networkidle" });
+  ok(nonTrovato?.status() === 200 && await gp.getByTestId("gruppo-non-trovato").isVisible(), "lista di gruppo: chi non è membro vede 'Lista non disponibile'");
+
+  // Nuova lista: dal vuoto, form già aperto, poi la lista con l'invito in evidenza.
+  await setCookie(gctx, "e2e_gruppi", { ...dati, gruppi: [] });
+  await gp.goto(`${BASE}/gruppi`, { waitUntil: "networkidle" });
+  ok(await gp.getByTestId("nuova-lista-form").isVisible() && await gp.getByTestId("crea-lista").isDisabled(), "nuova lista: senza liste il modulo è già aperto (e serve un nome)");
+  await gp.getByRole("button", { name: "🍽️ Cene del giovedì" }).click();
+  await gp.locator("#gruppo-mio-nome").fill("Lorenzo");
+  await gp.screenshot({ path: `${OUT}/96-gruppi-nuova.png`, caret: "initial" });
+  await setCookie(gctx, "e2e_gruppi", dati);
+  await gp.getByTestId("crea-lista").click();
+  await gp.waitForURL(`**/gruppi/${G1}?nuova=1`, { timeout: 8000 }).catch(() => {});
+  { const w = writes.find((x) => x.t === "crea"); ok(w?.body?.p_nome === "Cene del giovedì" && w?.body?.p_emoji === "🍽️" && w?.body?.p_mio_nome === "Lorenzo", "nuova lista: crea con nome, simbolo e il tuo nome"); }
+  ok((await gp.getByTestId("gruppo-invita").innerText().catch(() => "")).includes("Lista creata! Ora invita gli amici"), "nuova lista: si apre la lista con l'invito in evidenza");
+
+  // Dalla scheda di un locale salvato: "Proponi in una lista di gruppo" → scegli la lista.
+  const before = writes.filter((x) => x.t === "posti-POST").length;
+  await gp.goto(`${BASE}/gruppi?proponi=${PL(3)}`, { waitUntil: "networkidle" });
+  ok((await gp.getByTestId("gruppi-proponi").textContent())?.includes("Forno Tre"), "proponi: 'Scegli la lista in cui proporre Forno Tre'");
+  await gp.getByRole("button", { name: "Proponi in Cene del giovedì" }).click();
+  await gp.waitForURL(`**/gruppi/${G1}`, { timeout: 8000 }).catch(() => {});
+  ok(writes.filter((x) => x.t === "posti-POST").length === before + 1 && new URL(gp.url()).pathname === `/gruppi/${G1}`, "proponi: tocco sulla lista = posto proposto e lista aperta");
+  {
+    const saved = [{ tags: ["Da provare"], note: null, places: { id: PL(3), name: "Forno Tre", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.9, lng: 12.49, google_place_id: "GF3" } }];
+    await gctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: saved.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: saved }));
+    await gctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+    await gp.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });
+    await gp.locator("ul.snap-x li").first().locator("button").last().click({ timeout: 5000 }).catch(() => {});
+    await gp.getByTestId("proponi-gruppo").waitFor({ timeout: 4000 }).catch(() => {});
+    ok((await gp.getByTestId("proponi-gruppo").getAttribute("href").catch(() => null)) === `/gruppi?proponi=${PL(3)}`, "scheda salvato: 'Proponi in una lista di gruppo' porta alla scelta della lista");
+  }
+
+  // Segnali: ogni azione manda il suo nome, con chiavi che il server conserva.
+  { const nomi = gEv.filter((e) => e.type === "funzione").map((e) => e.props?.nome);
+    ok(["gruppo_entra", "gruppo_voto", "gruppo_aggiungi", "gruppo_crea"].every((n) => nomi.includes(n)), `segnali gruppi: entra, voto, aggiungi, crea (${[...new Set(nomi)].join(", ")})`);
+    const lost = droppedKeys(gEv.filter((e) => String(e.props?.nome ?? "").startsWith("gruppo_")));
+    ok(lost.length === 0, `segnali gruppi: chiavi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await gctx.close();
+}
+
+// ─── Community nella scheda del locale: recensioni degli utenti e reel (PIANO-25-OTTOBRE.md 5.6c, 5.6d) ───
+// Dati finti dal cookie "e2e_community" (letto da src/lib/community.ts solo in sviluppo), scritture
+// verso Supabase e anteprime oEmbed intercettate qui: nessuna chiamata vera a Google, TikTok o Supabase.
+if (!fakeUser) console.log("SKIP  community del locale: dev server senza E2E_FAKE_USER");
+else {
+  const CID = "55555555-0000-4000-8000-000000000005";
+  const locC = { place: { id: CID, name: "Osteria del Pigneto", address: "Via del Pigneto 41, 00176 Roma RM, Italy", lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GPIGNETO" }, synthesis: null };
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const setC = (name, value) => cctx.addCookies([{ name, value: encodeURIComponent(JSON.stringify(value)), url: BASE }]);
+  await setC("e2e_locale", locC);
+  const cEv = [];
+  await cctx.route("**/api/events", (r) => { cEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+  let reviewPost = null;
+  await cctx.route("**/rest/v1/reviews**", (r) => {
+    if (r.request().method() === "POST") { reviewPost = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  let reelPost = null;
+  await cctx.route("**/rest/v1/contenuti_locali**", (r) => {
+    if (r.request().method() === "POST") { reelPost = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const oembedAsked = [];
+  await cctx.route("**/api/places/oembed**", (r) => {
+    oembedAsked.push(new URL(r.request().url()).searchParams.get("url"));
+    return r.fulfill({ json: { titolo: "La carbonara più sincera del Pigneto", autore: "mangiaroma", miniatura: "https://miniature.test/tt.jpg" } });
+  });
+  await cctx.route("https://miniature.test/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="320"><rect width="180" height="320" fill="#a0522d"/></svg>' }));
+  await cctx.route("https://www.tiktok.com/**", (r) => r.fulfill({ contentType: "text/html", body: "<html><body>TikTok</body></html>" }));
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(e.message));
+  const section = cp.getByTestId("community-pubblica");
+  const txt = async (loc) => (await loc.textContent().catch(() => "")) ?? "";
+
+  // 1. Nessuna recensione: la sezione c'è e invita a scrivere la prima; senza migrazione niente reel.
+  await cp.goto(`${BASE}/locali/${CID}`, { waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await section.isVisible() && (await txt(section)).includes("Dalla community Mapetite"), "community: la pagina del locale ha la sezione 'Dalla community Mapetite'");
+  ok(await cp.getByTestId("community-vuota").isVisible() && await cp.getByTestId("recensione-form").isVisible(), "community: senza recensioni invita a scrivere la prima (modulo visibile)");
+  ok((await cp.getByTestId("reel-sezione").count()) === 0, "community: migrazione non applicata (reelPronti false) → nessuna sezione reel, nessun errore");
+
+  // 2. Recensioni degli altri (prima chi segui) e un reel TikTok con l'anteprima ufficiale.
+  await setC("e2e_community", {
+    recensioni: [
+      { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-10-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true },
+      { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false },
+    ],
+    mia: null,
+    reel: [{ id: "v1", url: "https://www.tiktok.com/@mangiaroma/video/7420000000000000001", fonte: "TikTok", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, mio: false }],
+    reelPronti: true,
+  });
+  await cp.goto(`${BASE}/locali/${CID}`, { waitUntil: "networkidle" });
+  await cp.getByTestId("community-media").waitFor({ timeout: 5000 }).catch(() => {});
+  const media = cp.getByTestId("community-media");
+  ok((await txt(media)).includes("4,5") && (await txt(media)).includes("2 recensioni Mapetite"), `community: media e numero delle recensioni Mapetite (${await txt(media)})`);
+  const rows = cp.getByTestId("recensione-community");
+  ok((await rows.count()) === 2 && (await txt(rows.nth(0))).includes("Giulia") && (await txt(rows.nth(0))).includes("Amico") && await rows.nth(0).getByRole("link", { name: "Giulia" }).getAttribute("href") === "/u/giulia.rm", "community: prima la recensione di chi segui, con il link al profilo");
+  ok((await txt(rows.nth(1))).includes("Un membro di Mapetite"), "community: chi ha il profilo privato resta anonimo");
+  const reelSec = cp.getByTestId("reel-sezione");
+  await cp.getByTestId("reel-locale").first().getByText("La carbonara più sincera").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await txt(reelSec)).includes("Visto su TikTok") && (await cp.getByTestId("reel-locale").count()) === 1 && (await txt(cp.getByTestId("reel-locale").first())).includes("@mangiaroma"), "community: 'Visto su TikTok' con titolo e autore dall'oEmbed");
+  ok(oembedAsked.length >= 1 && oembedAsked.every((u) => u?.startsWith("https://www.tiktok.com/")), "community: l'anteprima si chiede solo all'oEmbed, con il link del video");
+  ok(await cp.getByTestId("reel-locale").first().getAttribute("href") === "https://www.tiktok.com/@mangiaroma/video/7420000000000000001" && await cp.getByTestId("reel-locale").first().getAttribute("target") === "_blank", "community: il reel si apre sulla piattaforma (nuova scheda)");
+  ok(cEv.some((e) => e.props?.nome === "community_scheda" && e.props?.risultati === 2 && e.props?.stato === "con_reel"), "community: registrata la vista della sezione con recensioni e reel");
+  await section.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/97-community-locale.png`, caret: "initial" });
+  { const [pop] = await Promise.all([cctx.waitForEvent("page", { timeout: 3000 }).catch(() => null), cp.getByTestId("reel-locale").first().click()]);
+    await pop?.close().catch(() => {});
+    await cp.waitForTimeout(200);
+    ok(cEv.some((e) => e.props?.nome === "reel" && e.props?.stato === "aperto" && e.props?.fonte === "TikTok"), "community: aprire un reel è registrato (fonte TikTok)"); }
+
+  // 3. La tua recensione: senza stelle non parte, con 4 stelle e due righe si pubblica.
+  const form = cp.getByTestId("recensione-form");
+  await form.getByRole("button", { name: "Pubblica" }).click();
+  ok((await txt(form)).includes("Scegli da 1 a 5 stelle") && reviewPost == null, "community: senza stelle la recensione non parte");
+  await form.getByRole("radio", { name: "4 stelle" }).click();
+  await form.getByLabel("Il tuo commento").fill("Amatriciana vera, sala piccola: prenotate.");
+  await form.getByRole("button", { name: "Pubblica" }).click();
+  await cp.getByTestId("mia-recensione").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(reviewPost?.rating === 4 && reviewPost?.comment === "Amatriciana vera, sala piccola: prenotate." && reviewPost?.place_id === CID && reviewPost?.user_id === process.env.E2E_FAKE_USER, `community: recensione scritta a proprio nome sul locale (${JSON.stringify(reviewPost)})`);
+  ok(await cp.getByTestId("mia-recensione").isVisible() && (await txt(cp.getByTestId("mia-recensione"))).includes("Pubblicata") && (await txt(media)).includes("3 recensioni"), "community: dopo la pubblicazione 'La tua recensione' e la media aggiornata");
+  { const r = cEv.filter((e) => e.props?.nome === "recensione_community");
+    ok(r.length === 1 && r[0].props.voto === 4 && r[0].props.stato === "nuova" && r[0].props.contesto === "locale", `community: recensione registrata come evento (${JSON.stringify(r[0]?.props ?? null)})`);
+    const lost = droppedKeys([...r, ...cEv.filter((e) => e.props?.nome === "reel" || e.props?.nome === "community_scheda")]);
+    ok(lost.length === 0, `community: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+
+  // 4. Collegare un reel: link non valido → messaggio; reel Instagram → link pulito, fonte giusta.
+  await cp.getByTestId("reel-aggiungi").click();
+  const rf = cp.getByTestId("reel-form");
+  await rf.getByLabel("Link del video").fill("https://example.com/video");
+  await rf.getByRole("button", { name: "Collega" }).click();
+  ok(await cp.getByTestId("reel-errore").isVisible() && reelPost == null, "community: un link che non è un reel non si salva");
+  await rf.getByLabel("Link del video").fill("https://www.instagram.com/reel/C9xYz12AbCd/?igsh=MTRhbmVzZ3B4");
+  await rf.getByRole("button", { name: "Collega" }).click();
+  await cp.waitForTimeout(400);
+  ok(reelPost?.url === "https://www.instagram.com/reel/C9xYz12AbCd" && reelPost?.fonte === "Instagram" && reelPost?.place_id === CID && Object.keys(reelPost ?? {}).sort().join() === "fonte,place_id,url,user_id", `community: reel salvato con il solo link pulito (${JSON.stringify(reelPost)})`);
+  ok((await cp.getByTestId("reel-locale").count()) === 2 && (await txt(reelSec)).includes("Visto sui social") && (await txt(reelSec)).includes("Salvato da te"), "community: il reel nuovo compare subito ('Visto sui social')");
+  ok(cEv.some((e) => e.props?.nome === "reel" && e.props?.stato === "aggiunto" && e.props?.fonte === "Instagram"), "community: collegare un reel è registrato");
+  ok(oembedAsked.every((u) => !u?.includes("instagram.com")), "community: per Instagram nessuna richiesta oEmbed (serve un token Meta): solo il link");
+  await reelSec.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/98-community-reel.png`, caret: "initial" });
+
+  // 5. Telefono piccolo (360 px): niente scorrimento orizzontale della pagina (i reel scorrono nella loro fila).
+  await cp.setViewportSize({ width: 360, height: 780 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await cp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "community 360px: niente scorrimento orizzontale");
+
+  // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
+  await setC("e2e_anonimo", 1);
+  await cp.setViewportSize({ width: 390, height: 844 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  const acc = section.getByRole("link", { name: "Accedi" });
+  ok((await cp.getByTestId("recensione-form").count()) === 0 && (await cp.getByTestId("reel-aggiungi").count()) === 0 && decodeURIComponent((await acc.getAttribute("href").catch(() => "")) ?? "") === `/login?next=/locali/${CID}`, "community senza accesso: niente modulo, 'Accedi' riporta al locale");
+  ok((await cp.getByTestId("recensione-community").count()) === 2, "community senza accesso: le recensioni si leggono comunque");
+  await cctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

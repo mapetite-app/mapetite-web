@@ -33,6 +33,8 @@ export type RistSalvataggio = { place_id: string; user_id: string; created_at: s
 export type Voce = { chiave: string; volte: number; persone: number };
 export type Azione = { tipo: AzioneTipo; etichetta: string; persone: number; volte: number; prima: number };
 export type GiornoRist = { giorno: string; viste: number; salvati: number };
+// Trend di zona (piano 8.4): per ogni fascia oraria, quante persone hanno cercato e le richieste più frequenti.
+export type TrendFascia = { fascia: (typeof FASCE)[number]; persone: number; richieste: Voce[] };
 
 export type PannelloRistoratore = {
   giorni: number;
@@ -41,7 +43,7 @@ export type PannelloRistoratore = {
   // Ricerche da cui le persone hanno aperto la scheda del locale (stessa visita, poco prima).
   daRicerca: { ricerche: number; persone: number; tipi: Voce[]; richieste: Voce[]; zone: Voce[] };
   // Ricerche fatte nella zona del locale (città nella richiesta, "vicino a me" o locali aperti a meno di 2 km).
-  zona: { nome: string | null; ricerche: number; persone: number; tipi: Voce[]; richieste: Voce[]; fasce: Voce[] };
+  zona: { nome: string | null; ricerche: number; persone: number; tipi: Voce[]; richieste: Voce[]; fasce: Voce[]; trend: TrendFascia[] };
   confronto: { simili: number; mediaViste: number | null; mediaSalvati: number | null; viste: number; salvati: number };
   pochiDati: boolean;
 };
@@ -223,6 +225,7 @@ export function computeRistoratore(
     if (Number.isFinite(lat) && Number.isFinite(lng) && e.r.lat != null && km(lat, lng, locale.lat, locale.lng) <= 2) vicini.add(e.r.session_id);
   }
   const zn = { tipi: tally(), richieste: tally(), fasce: tally(), persone: new Set<string>(), n: 0 };
+  const perFascia = new Map<string, ReturnType<typeof tally>>();
   for (const q of ricerche) {
     if (q.day < start || q.day > today) continue;
     const p = q.r.props ?? {};
@@ -238,11 +241,15 @@ export function computeRistoratore(
     zn.n++;
     zn.tipi.add(str(p.tipo) ?? "qualsiasi locale", q.actor);
     for (const k of richiesteDi(p)) zn.richieste.add(k, q.actor);
-    zn.fasce.add(fascia(q.r.created_at), q.actor);
+    const fq = fascia(q.r.created_at);
+    zn.fasce.add(fq, q.actor);
+    const tf = perFascia.get(fq) ?? perFascia.set(fq, tally()).get(fq)!;
+    for (const k of richiesteDi(p)) tf.add(k, q.actor);
     if (q.actor) zn.persone.add(q.actor);
   }
   const fasce = zn.fasce.list();
   const fasceOrdinate: Voce[] = FASCE.map((f) => fasce.find((x) => x.chiave === f) ?? { chiave: f, volte: 0, persone: 0 });
+  const trend: TrendFascia[] = fasceOrdinate.map((f) => ({ fascia: f.chiave as (typeof FASCE)[number], persone: f.persone, richieste: (perFascia.get(f.chiave)?.list() ?? []).slice(0, 3) }));
 
   // Confronto con i locali della stessa categoria nella stessa città (media, mai il singolo:
   // sotto i 3 locali simili non si mostra).
@@ -257,8 +264,19 @@ export function computeRistoratore(
     azioni,
     perGiorno,
     daRicerca: { ricerche: linked.size, persone: dr.persone.size, tipi: dr.tipi.list(), richieste: dr.richieste.list(), zone: dr.zone.list() },
-    zona: { nome: citta, ricerche: zn.n, persone: zn.persone.size, tipi: zn.tipi.list(), richieste: zn.richieste.list(), fasce: fasceOrdinate },
+    zona: { nome: citta, ricerche: zn.n, persone: zn.persone.size, tipi: zn.tipi.list(), richieste: zn.richieste.list(), fasce: fasceOrdinate, trend },
     confronto: { simili: altri.length, mediaViste: media("apri_scheda"), mediaSalvati: media("salva"), viste, salvati: salvatiN },
     pochiDati: viste < SOGLIA,
   };
 }
+
+// Esempio DICHIARATO del trend di zona, quando i dati veri della zona sono ancora pochi: la
+// pagina lo etichetta sempre "Esempio". Mai mescolato con i numeri veri.
+export const TREND_ESEMPIO: TrendFascia[] = [
+  { fascia: "mattina", persone: 14, richieste: [{ chiave: "colazione", volte: 9, persone: 8 }, { chiave: "cornetti artigianali", volte: 5, persone: 4 }] },
+  { fascia: "pranzo", persone: 38, richieste: [{ chiave: "pranzo veloce", volte: 16, persone: 14 }, { chiave: "prezzi giusti", volte: 11, persone: 10 }, { chiave: "vegetariano", volte: 6, persone: 5 }] },
+  { fascia: "pomeriggio", persone: 9, richieste: [{ chiave: "dolci", volte: 4, persone: 4 }] },
+  { fascia: "aperitivo", persone: 52, richieste: [{ chiave: "tavoli all'aperto", volte: 21, persone: 18 }, { chiave: "vino naturale", volte: 12, persone: 11 }, { chiave: "cena tra amici", volte: 9, persone: 8 }] },
+  { fascia: "cena", persone: 71, richieste: [{ chiave: "cucina romana", volte: 27, persone: 24 }, { chiave: "non turistico", volte: 22, persone: 19 }, { chiave: "romantico", volte: 10, persone: 9 }] },
+  { fascia: "notte", persone: 6, richieste: [{ chiave: "aperto tardi", volte: 4, persone: 4 }] },
+];

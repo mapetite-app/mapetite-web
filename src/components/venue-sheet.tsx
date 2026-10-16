@@ -4,7 +4,9 @@ import { tagLabel, isStateTag } from "@/lib/tags";
 import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
-import { track } from "@/lib/track";
+import Link from "next/link";
+import { track, trackFeature } from "@/lib/track";
+import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
@@ -61,7 +63,7 @@ type VenueSheetProps = {
   onEdit: () => void;
   onClose: () => void;
   saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
-  communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
+  communitySlot: React.ReactNode; // "Dalla community Mapetite" (CommunityLocale), da map-view
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
@@ -689,6 +691,20 @@ export default function VenueSheet({
         </div>
       )}
 
+      {/* Liste di gruppo (piano 5.5): solo per i salvati, che hanno già l'UUID del locale. */}
+      {isSaved && isUuid(venue.id) && (
+        <div className="mx-5 mt-3">
+          <Link
+            href={`/gruppi?proponi=${venue.id}`}
+            data-testid="proponi-gruppo"
+            onClick={() => trackFeature("gruppo_proponi_scheda")}
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+          >
+            <span aria-hidden>🍽️</span> Proponi in una lista di gruppo
+          </Link>
+        </div>
+      )}
+
       {/* 5. COSA DICONO — recensioni Google (prima: è quasi sempre piena) */}
       {hasReviews && (
         <div className="mt-5 border-t border-border px-5 pt-4">
@@ -712,11 +728,12 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 6. COMMUNITY — recensioni Mapetite + ReviewForm */}
+      {/* 6. COMMUNITY (piani 5.6c, 5.6d): recensioni degli utenti e reel, mai mescolati ai dati Google. */}
       {communitySlot && (
-        <div className="mt-5 border-t border-border px-5 pt-4">
-          <h3 className="font-display text-base font-semibold text-brand">
-            Recensioni Mapetite
+        <div className="mt-5 border-t border-border px-5 pt-4" data-testid="community-scheda">
+          <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+            Dalla community Mapetite
+            <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
           </h3>
           <div className="mt-2">{communitySlot}</div>
         </div>

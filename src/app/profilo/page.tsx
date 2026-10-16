@@ -263,6 +263,34 @@ export default async function ProfiloPage() {
         <span aria-hidden className="text-xl text-text-muted">→</span>
       </Link>
 
+      {/* Liste di gruppo (piano 5.5): scegliere insieme agli amici, con i 👍. */}
+      <Link
+        href="/gruppi"
+        data-testid="profilo-gruppi"
+        className="mb-8 flex min-h-[72px] items-center gap-4 rounded-card border border-border bg-surface px-4 py-3 active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-light text-2xl">🍽️</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-semibold leading-tight text-text">Liste di gruppo</span>
+          <span className="mt-0.5 block text-sm text-text-muted">Es. &quot;Cene del giovedì&quot;: ognuno propone, si vota, si sceglie</span>
+          </span>
+          <span aria-hidden className="text-xl text-text-muted">→</span>
+        </Link>
+
+      {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
+      <Link
+        href="/premium"
+        data-testid="profilo-premium"
+        className="mb-8 flex min-h-[64px] items-center gap-4 rounded-card border border-accent/40 bg-accent-light px-4 py-3 active:scale-[0.99] transition-transform duration-150"
+      >
+        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-xl text-white">✨</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-semibold leading-tight text-text">Mapetite Premium <span className="text-xs font-semibold text-accent">· in arrivo</span></span>
+          <span className="mt-0.5 block text-sm text-text-muted">Assistente senza limiti, raccolte illimitate, serate organizzate</span>
+        </span>
+        <span aria-hidden className="text-xl text-text-muted">→</span>
+      </Link>
+
       <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
 
       {ranks && <ProfiloClassifica userId={user.id} initialRows={classificaRows} />}
@@ -346,6 +374,14 @@ export default async function ProfiloPage() {
       </section>
 
       <ProfiloAccount loggedIn />
+
+      {/* Lato ristoratori (piano 8): prima la pagina si apriva solo scrivendo l'indirizzo. */}
+      <p className="mt-6 text-center text-sm text-text-muted">
+        Hai un locale?{" "}
+        <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className="font-display font-semibold text-brand underline underline-offset-2">
+          Mapetite per i ristoratori
+        </Link>
+      </p>
     </div>
   );
 }

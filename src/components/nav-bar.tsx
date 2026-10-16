@@ -44,8 +44,8 @@ function voci(pathname: string, vista: string | null, search: string | null, log
     { id: "esplora", label: "Esplora", href: "/mappa", Icon: Compass, active: (onMap && !savedActive) || pathname === "/" },
     { id: "assistente", label: "Assistente", href: "/assistente", Icon: Sparkles, active: under(pathname, "/assistente") },
     { id: "salvati", label: "Salvati", href: SAVED_HREF, Icon: Bookmark, active: savedActive },
-    // Amici: il feed e i profili delle persone (/u/<nome>).
-    { id: "amici", label: "Amici", href: "/amici", Icon: UsersRound, active: under(pathname, "/amici") || under(pathname, "/u") },
+    // Amici: il feed, i profili delle persone (/u/<nome>) e le liste di gruppo (/gruppi).
+    { id: "amici", label: "Amici", href: "/amici", Icon: UsersRound, active: under(pathname, "/amici") || under(pathname, "/u") || under(pathname, "/gruppi") },
     loggedIn
       ? { id: "profilo", label: "Profilo", href: "/profilo", Icon: UserRound, active: under(pathname, "/profilo") || under(pathname, "/me") }
       : { id: "entra", label: "Entra", href: entraHref(pathname, search), Icon: LogIn, active: under(pathname, "/login") || under(pathname, "/signup") || under(pathname, "/profilo") },

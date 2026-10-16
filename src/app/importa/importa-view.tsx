@@ -8,6 +8,8 @@ import ManualAddCard from "./manual-add-card";
 import MultiLinkCard from "./multi-link-card";
 import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
+import { addReel } from "@/lib/community-write";
+import { reelSourceOf } from "@/lib/reel";
 
 type ImportResult = {
   nome: string | null;
@@ -79,6 +81,10 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
   // Ricerca "a mano" chiesta da un altro punto della pagina (es. "Cerca …" sotto un link di Instagram).
   const [manualReq, setManualReq] = useState<{ q: string; n: number } | null>(null);
   const [flashShot, setFlashShot] = useState(false);
+  // Link del video da cui si sta salvando (piano 5.6d): dopo il salvataggio si collega al locale,
+  // così la scheda lo mostra in "Visto su TikTok". Si memorizza solo il link, mai il video.
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [reelLinked, setReelLinked] = useState(false);
 
   const goToScreenshot = () => {
     document.getElementById("da-screenshot")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -98,6 +104,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
+    setVideoUrl(null);
     setPreviewUrl(URL.createObjectURL(f));
     setError(null);
     setStep(1);
@@ -169,6 +176,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     setExtracted(null);
     setStep(1);
     trackFeature("import_video");
+    setVideoUrl(url);
+    setReelLinked(false);
     void readPlace(async () => ({ link: url }));
   };
 
@@ -240,6 +249,13 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         throw new Error("Errore nel salvataggio nella tua lista.");
       }
 
+      // Il video da cui è arrivato il locale resta collegato (senza migrazione: si salta in silenzio).
+      if (videoUrl) {
+        const reel = await addReel(userId, placeUuid, videoUrl);
+        setReelLinked(reel.esito === "ok" || reel.esito === "doppio");
+        if (reel.esito === "ok") trackFeature("reel", { stato: "salvato_import", fonte: reelSourceOf(videoUrl) ?? "", contesto: "importa" });
+      }
+
       setSavedName(result.name);
       setStep(3);
     } catch (e) {
@@ -251,6 +267,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 
   const handleReset = () => {
     setFile(null);
+    setVideoUrl(null);
+    setReelLinked(false);
     setPreviewUrl(null);
     setExtracted(null);
     setSearchResults([]);
@@ -443,6 +461,11 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
           <p className="text-sm text-text">
             <span className="font-medium">{savedName}</span> è stato aggiunto alla tua mappa.
           </p>
+          {reelLinked && videoUrl && (
+            <p data-testid="import-reel-collegato" className="text-sm text-text-muted">
+              Il video resta collegato: lo ritrovi nella scheda, in &ldquo;Visto su {reelSourceOf(videoUrl) ?? "social"}&rdquo;.
+            </p>
+          )}
           <div className="flex justify-center gap-3 pt-3">
             <Link
               href="/mappa"

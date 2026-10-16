@@ -3,10 +3,11 @@ import Link from "next/link";
 import Avatar from "@/components/avatar";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import { PostoCard } from "@/components/posto-persona";
-import { loadFeed, viewerId } from "@/lib/social";
+import { loadCreatorLists, loadFeed, viewerId } from "@/lib/social";
 import { personName, profilePath } from "@/lib/handle";
 import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
 import CercaPersone from "./cerca-persone";
+import CreatorListe from "./creator-liste";
 
 // Amici (piano 5.2): chi segui, cosa ha salvato o dove è stato, e la ricerca delle persone.
 // Stile Places "People": riga di avatar in alto, poi attività con le card dei locali.
@@ -30,7 +31,7 @@ export default async function AmiciPage() {
     );
   }
 
-  const feed = await loadFeed(viewer);
+  const [feed, creators] = await Promise.all([loadFeed(viewer), loadCreatorLists(viewer)]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
@@ -56,9 +57,24 @@ export default async function AmiciPage() {
             </Link>
           )}
 
+          <Link
+            href="/gruppi"
+            data-testid="amici-gruppi"
+            className="mt-4 flex items-center gap-3 rounded-card border border-border bg-surface p-4 active:scale-[0.99]"
+          >
+            <span aria-hidden className="text-2xl">🍽️</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-sm font-semibold text-brand">Liste di gruppo</span>
+              <span className="block text-xs font-sans text-text-muted">Dove andiamo giovedì? Ognuno propone un posto e si vota.</span>
+            </span>
+            <span aria-hidden className="text-brand">→</span>
+          </Link>
+
           <div className="mt-5">
             <CercaPersone viewerId={viewer} seguo={feed.seguiti.map((p) => p.id)} />
           </div>
+
+          <CreatorListe creators={creators} viewer={viewer} seguo={feed.seguiti.map((p) => p.id)} />
 
           {feed.seguiti.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { BadgeCheck, Check, MapPin, Megaphone, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
-import { mostraPersone, SOGLIA, type PannelloRistoratore, type RistLocale, type Voce } from "@/lib/ristoratore";
+import { mostraPersone, SOGLIA, TREND_ESEMPIO, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
+import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
+import TracciaFunzione from "@/components/traccia-funzione";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -168,6 +170,104 @@ function Confronto({ p, categoria, citta }: { p: PannelloRistoratore; categoria:
   );
 }
 
+
+// Trend di zona (piano 8.4): per fascia oraria, le richieste più frequenti di chi cerca nella
+// zona. Anonimi e aggregati. Con pochi dati veri si mostra un esempio DICHIARATO come tale.
+const TREND_MIN = 20;
+function TrendZona({ trend, esempio }: { trend: TrendFascia[]; esempio: boolean }) {
+  const top = Math.max(1, ...trend.map((t) => t.persone));
+  const picco = trend.reduce((a, b) => (b.persone > a.persone ? b : a), trend[0]);
+  return (
+    <div data-testid="trend-zona">
+      {esempio && (
+        <p data-testid="trend-esempio" className="mb-3 rounded-card border border-dashed border-accent bg-accent-light px-3 py-2 text-xs font-sans text-text">
+          <strong className="font-display">Esempio.</strong> Le ricerche nella tua zona sono ancora poche: questi numeri sono inventati e mostrano come apparirà il trend.
+        </p>
+      )}
+      {picco && picco.persone >= SOGLIA && (
+        <p data-testid="trend-picco" className="mb-3 text-sm font-sans text-text">
+          Il momento in cui si cerca di più: <strong className="font-display text-brand">{(FASCIA_LABEL[picco.fascia] ?? picco.fascia).toLowerCase()}</strong>
+          {picco.richieste[0] && <>, soprattutto “{picco.richieste[0].chiave}”</>}.
+        </p>
+      )}
+      <ul className="space-y-3">
+        {trend.map((t) => (
+          <li key={t.fascia} data-testid="trend-fascia">
+            <div className="flex items-baseline justify-between gap-2 text-sm font-sans">
+              <span className="font-display font-semibold text-text">{FASCIA_LABEL[t.fascia] ?? t.fascia}</span>
+              <span className="shrink-0 text-xs tabular-nums text-text-muted">{mostraPersone(t.persone)} persone</span>
+            </div>
+            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface">
+              <span className="block h-full rounded-full bg-accent" style={{ width: `${t.persone > 0 ? Math.max(4, (t.persone / top) * 100) : 0}%` }} />
+            </span>
+            {t.richieste.length > 0 ? (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {t.richieste.map((r) => (
+                  <span key={r.chiave} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface px-2.5 py-0.5 text-xs font-sans text-text">
+                    <span className="truncate first-letter:uppercase">{r.chiave}</span>
+                    <span className="shrink-0 text-text-muted">· {mostraPersone(r.persone)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs font-sans text-text-muted">Nessuna richiesta particolare.</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Posti in evidenza (piano 8.3), SOLO dimostrativo: come appare un locale sponsorizzato e la
+// regola che lo fa comparire. Nei risultati veri della ricerca non c'è nessuno sponsorizzato.
+function InEvidenzaDemo() {
+  const verifiche = RICERCHE_DEMO.map((r) => ({ r, v: adattoAllaRicerca(SPONSOR_DEMO, r) }));
+  return (
+    <div data-testid="evidenza-demo">
+      <TracciaFunzione nome="ristoratore_evidenza" contesto="demo" />
+      <p className="text-sm font-sans text-text">Come lo vede chi cerca “{RICERCHE_DEMO[0].frase}”:</p>
+      <div data-testid="evidenza-card" className="mt-2 rounded-card border-2 border-accent/60 bg-white p-3 shadow-card">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-accent-light text-2xl">🍝</span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate font-display text-base font-semibold text-text">{SPONSOR_DEMO.nome}</span>
+            <span data-testid="etichetta-sponsorizzato" className="mt-0.5 inline-flex items-center gap-1 rounded-pill bg-text px-2 py-0.5 text-[10px] font-display font-semibold uppercase tracking-wider text-white">
+              <Megaphone size={11} aria-hidden />In evidenza · Sponsorizzato
+            </span>
+            <p className="mt-1 text-xs font-sans text-text-muted">Osteria · Pigneto, Roma</p>
+            <p className="mt-1.5 text-sm font-sans leading-snug text-text">{verifiche[0].v.motivo}</p>
+          </div>
+        </div>
+      </div>
+      <p className="mt-1.5 text-[11px] font-sans text-text-muted">Si aggiunge dopo i primi risultati, non prende il posto di nessuno.</p>
+
+      <h3 className="mb-2 mt-5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Quando compare (e quando no)</h3>
+      <ul className="space-y-2">
+        {verifiche.map(({ r, v }) => (
+          <li key={r.frase} data-testid={v.mostra ? "evidenza-si" : "evidenza-no"} className="flex gap-2.5 rounded-card bg-surface p-3">
+            <span aria-hidden className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${v.mostra ? "bg-success text-white" : "bg-white text-text-muted"}`}>
+              {v.mostra ? <Check size={14} /> : <X size={14} />}
+            </span>
+            <span className="min-w-0 text-sm font-sans">
+              <span className="block font-display font-semibold text-text">“{r.frase}”</span>
+              <span className="block text-text-muted">{v.mostra ? "Compare. " : "Non compare. "}{v.motivo}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="mb-2 mt-5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">La regola</h3>
+      <ul data-testid="evidenza-regole" className="space-y-1.5 text-sm font-sans leading-snug text-text">
+        <li>• Compare solo se rispetta <strong>tutto</strong> quello che la persona ha chiesto: tipo di locale, zona, caratteristiche. Nel dubbio non compare.</li>
+        <li>• Sempre con l&apos;etichetta “Sponsorizzato”, ben visibile.</li>
+        <li>• Al massimo uno per ricerca, e non cambia l&apos;ordine degli altri risultati.</li>
+        <li>• Il verdetto resta quello delle recensioni: pagare non lo cambia.</li>
+      </ul>
+    </div>
+  );
+}
+
 export default function Pannello({
   p,
   locale,
@@ -307,9 +407,24 @@ export default function Pannello({
         )}
       </Sezione>
 
+      <Sezione
+        titolo={`Trend di zona${p.zona.nome ? ` a ${p.zona.nome}` : ""}`}
+        nota="Cosa chiede chi cerca nella tua zona, fascia per fascia. Anonimo e aggregato."
+        piano="Pro"
+        testId="pannello-trend"
+      >
+        <TrendZona trend={!demo && p.zona.ricerche < TREND_MIN ? TREND_ESEMPIO : p.zona.trend} esempio={!demo && p.zona.ricerche < TREND_MIN} />
+      </Sezione>
+
       <Sezione titolo="Confronto con la zona" piano="Pro" testId="pannello-confronto-sezione">
         <Confronto p={p} categoria={categoria} citta={citta} />
       </Sezione>
+
+      {demo && (
+        <Sezione titolo="Posti in evidenza" nota="Esempio: attivo quando ci saranno ristoratori. Oggi nei risultati veri non c'è nessuno sponsorizzato." piano="Pro" testId="pannello-evidenza">
+          <InEvidenzaDemo />
+        </Sezione>
+      )}
 
       <p className="mt-6 text-xs font-sans leading-relaxed text-text-muted">
         Solo numeri aggregati: non vedi mai chi è una persona. Sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”. Le ricerche sono quello che l&apos;AI ha capito (tipo di locale, richieste, zona), mai la frase scritta.

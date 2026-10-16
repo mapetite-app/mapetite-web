@@ -33,6 +33,8 @@ import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
 import ClassificaScheda from "@/components/classifica-scheda";
+import CommunityLocale from "@/components/community-locale";
+import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
@@ -364,120 +366,6 @@ function SaveModal({
         </div>
       </div>
     </div>
-  );
-}
-
-type ReviewItem = {
-  user_id: string;
-  rating: number;
-  comment: string | null;
-  created_at: string;
-};
-
-function StarPicker({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  const [hovered, setHovered] = useState(0);
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          onMouseEnter={() => setHovered(star)}
-          onMouseLeave={() => setHovered(0)}
-          aria-label={`${star} stelle`}
-          className="flex h-10 w-9 items-center justify-center text-2xl leading-none focus:outline-none"
-        >
-          <span className={(hovered || value) >= star ? "text-star" : "text-border"}>
-            ★
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ReviewForm({
-  placeId,
-  userId,
-  existing,
-  onSaved,
-}: {
-  placeId: string;
-  userId: string;
-  existing: ReviewItem | null;
-  onSaved: (items: ReviewItem[]) => void;
-}) {
-  const [rating, setRating] = useState(existing?.rating ?? 0);
-  const [comment, setComment] = useState(existing?.comment ?? "");
-  const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (rating === 0) {
-      setStatus("error");
-      setErrorMsg("Seleziona almeno una stella.");
-      return;
-    }
-    setStatus("saving");
-    setErrorMsg("");
-
-    const supabase = await browserClient();
-    const { error } = await supabase.from("reviews").upsert(
-      { place_id: placeId, user_id: userId, rating, comment: comment.trim() || null },
-      { onConflict: "user_id,place_id" }
-    );
-
-    if (error) {
-      setStatus("error");
-      setErrorMsg("Salvataggio non riuscito. Riprova.");
-      return;
-    }
-
-    const { data } = await supabase
-      .from("reviews")
-      .select("user_id, rating, comment, created_at")
-      .eq("place_id", placeId)
-      .order("created_at", { ascending: false });
-
-    setStatus("done");
-    onSaved((data ?? []) as ReviewItem[]);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-3 space-y-2 border-t border-border pt-3">
-      <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
-        {existing ? "Modifica la tua recensione" : "Lascia una recensione"}
-      </p>
-      <StarPicker value={rating} onChange={(v) => { setRating(v); setStatus("idle"); }} />
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Commento (opzionale)"
-        rows={2}
-        className="w-full resize-none rounded-btn border border-border px-2 py-1.5 text-base font-sans focus:outline-none focus:ring-1 focus:ring-brand"
-      />
-      {status === "error" && (
-        <p className="text-xs text-error">{errorMsg}</p>
-      )}
-      {status === "done" && (
-        <p className="text-xs text-success">Recensione pubblicata ✓</p>
-      )}
-      <button
-        type="submit"
-        disabled={status === "saving"}
-        className="min-h-10 rounded-btn bg-brand px-4 py-1.5 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {status === "saving" ? "..." : existing ? "Aggiorna" : "Pubblica recensione"}
-      </button>
-    </form>
   );
 }
 
@@ -1012,11 +900,6 @@ export default function MapView({
   // Supabase li conosce per UUID. Questa mappa e' il ponte.
   const [placeUuids, setPlaceUuids] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [selectedReviews, setSelectedReviews] = useState<{
-    avg: number;
-    count: number;
-    items: ReviewItem[];
-  } | null>(null);
 
   // Lista attiva: risultati AI, oppure i salvati (eventualmente per tag).
   // È un dato, non una visibilità — ma è anche la risposta a "c'è qualcosa
@@ -1254,43 +1137,6 @@ export default function MapView({
         setSavedIdsLoaded(true);
       });
   }, [userId]);
-
-  // UUID del locale aperto: le recensioni si ricaricano solo se cambia davvero locale
-  // (non a ogni aggiornamento di placeUuids, es. dopo un salvataggio dalla scheda).
-  const selectedUuid = selected ? resolveUuid(selected.id) : null;
-  useEffect(() => {
-    const uuid = selectedUuid;
-    if (!uuid) {
-      setSelectedReviews(null);
-      return;
-    }
-    // Con "‹ ›" si cambia locale in fretta: le recensioni del locale precedente non devono restare
-    // né arrivare in ritardo sul successivo.
-    let cancelled = false;
-    setSelectedReviews(null);
-    browserClient()
-      .then((supabase) => supabase
-        .from("reviews")
-        .select("user_id, rating, comment, created_at")
-        .eq("place_id", uuid)
-        .order("created_at", { ascending: false }))
-      .then(({ data }) => {
-        if (cancelled) return;
-        if (!data || data.length === 0) {
-          setSelectedReviews(null);
-          return;
-        }
-        const avg =
-          data.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
-          data.length;
-        setSelectedReviews({
-          avg,
-          count: data.length,
-          items: data as ReviewItem[],
-        });
-      });
-    return () => { cancelled = true; };
-  }, [selectedUuid]);
 
   useEffect(() => {
     if (!userId) return;
@@ -3053,79 +2899,12 @@ export default function MapView({
                 />
               }
               communitySlot={
-                <>
-                  {selectedReviews ? (
-                    <>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-base font-display font-semibold text-text">
-                          {selectedReviews.avg.toLocaleString("it-IT", {
-                            minimumFractionDigits: 1,
-                            maximumFractionDigits: 1,
-                          })}
-                        </span>
-                        <span className="text-star text-sm">
-                          {"★".repeat(Math.round(selectedReviews.avg))}
-                          <span className="text-border">
-                            {"★".repeat(5 - Math.round(selectedReviews.avg))}
-                          </span>
-                        </span>
-                        <span className="text-xs font-sans text-text-muted">
-                          su {selectedReviews.count}{" "}
-                          {selectedReviews.count === 1 ? "recensione" : "recensioni"}
-                        </span>
-                      </div>
-                      <ul className="mt-1.5 max-h-32 space-y-2 overflow-y-auto">
-                        {selectedReviews.items.map((r, i) => (
-                          <li key={i} className="text-xs">
-                            <span className="text-star">{"★".repeat(r.rating)}</span>
-                            <span className="text-border">{"★".repeat(5 - r.rating)}</span>
-                            {r.comment && (
-                              <p className="mt-0.5 font-sans text-text-muted">{r.comment}</p>
-                            )}
-                            <p className="font-sans text-text-muted">
-                              {new Date(r.created_at).toLocaleDateString("it-IT", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="text-xs font-sans text-text-muted">Ancora nessuna recensione.</p>
-                  )}
-                  {!userId ? (
-                    <p className="mt-2 text-xs font-sans text-text-muted">
-                      <a href="/login" className="underline hover:text-text">
-                        Accedi
-                      </a>{" "}
-                      per lasciare una recensione.
-                    </p>
-                  ) : resolveUuid(selected.id) === null ? (
-                    <p className="mt-2 text-xs font-sans text-text-muted">
-                      Salva questo locale per poter lasciare una recensione.
-                    </p>
-                  ) : (
-                    <ReviewForm
-                      placeId={resolveUuid(selected.id)!}
-                      userId={userId}
-                      existing={
-                        selectedReviews?.items.find((r) => r.user_id === userId) ?? null
-                      }
-                      onSaved={(items) => {
-                        if (items.length === 0) {
-                          setSelectedReviews(null);
-                          return;
-                        }
-                        const avg =
-                          items.reduce((sum, r) => sum + r.rating, 0) / items.length;
-                        setSelectedReviews({ avg, count: items.length, items });
-                      }}
-                    />
-                  )}
-                </>
+                <CommunityLocale
+                  id={resolveUuid(selected.id) ?? selected.id}
+                  userId={userId}
+                  contesto="mappa"
+                  voto={votoOf(selected.tags)}
+                />
               }
             />
           </DragToClose>
