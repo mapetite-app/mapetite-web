@@ -4834,7 +4834,7 @@ else {
   pp.on("pageerror", (e) => errors.push(e.message));
   await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
-  await pp.getByTestId("invita-amico").scrollIntoViewIfNeeded();
+  await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
   await pp.getByTestId("invita-amico-condividi").click();
   await pp.getByTestId("invita-amico-condividi").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
@@ -4844,7 +4844,7 @@ else {
   await pp.setViewportSize({ width: 360, height: 740 });
   const px = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   ok(px <= 0, `profilo 360px: 'Invita un amico' senza scroll orizzontale (${px}px)`);
-  await pp.getByTestId("invita-amico").scrollIntoViewIfNeeded();
+  await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico-360.png`, caret: "initial" });
   // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
   await ictx.clearCookies({ name: "e2e_social" });
