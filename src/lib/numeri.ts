@@ -18,6 +18,15 @@ export type Tester = {
   chi: string; registrato: boolean; prima: string; ultima: string;
   giorniAttivi: number; sessioni: number; ricerche: number; salvati: number; errori: number;
 };
+// "Ti è stato utile?" e domanda settimanale (piano 7.6): il valore che i tester trovano.
+export type UtileContesto = { contesto: string; si: number; no: number };
+export type ValoreGiorno = { giorno: string; si: number; no: number; voti: number; media: number | null };
+export type Valore = {
+  perContesto: UtileContesto[];
+  motivi: Conteggio[];
+  settimanale: { risposte: number; media: number | null; si: number; forse: number; no: number; chiuse: number };
+  perGiorno: ValoreGiorno[];
+};
 export type ErroreRiga = { messaggio: string; pagina: string; volte: number; persone: number; ultima: string };
 
 export type Numeri = {
@@ -37,6 +46,7 @@ export type Numeri = {
   requisiti: Conteggio[];
   pagine: Conteggio[];
   utile: { si: number; no: number };
+  valore: Valore;
   perGiorno: Giorno[];
   tester: Tester[];
   // Nessun evento dei tipi nuovi: probabilmente la migrazione 20261015 non è ancora applicata.
@@ -93,6 +103,18 @@ const ETICHETTE: Record<string, string> = {
   sorpresa_salva: "Sorprendimi: salva",
   sorpresa_apri: "Sorprendimi: scheda",
 };
+// Dove si chiede "Ti è stato utile?" (anche quelli ancora senza voti compaiono, a 0).
+export const UTILE_CONTESTI = ["ricerca", "articolo", "assistente", "serata", "sorpresa", "prenota"] as const;
+const UTILE_ETICHETTE: Record<string, string> = {
+  ricerca: "Ricerca", articolo: "Risposta della ricerca", assistente: "Assistente", serata: "Serata a tappe",
+  sorpresa: "Sorprendimi", prenota: "Prenotazione",
+};
+export const etichettaUtile = (k: string): string => UTILE_ETICHETTE[k] ?? k.replaceAll("_", " ");
+const MOTIVI_ETICHETTE: Record<string, string> = { sbagliati: "Risultati sbagliati", lento: "Troppo lento", gia_noti: "Posti già noti", altro: "Altro" };
+export const etichettaMotivo = (k: string): string => MOTIVI_ETICHETTE[k] ?? k.replaceAll("_", " ");
+// Voto "Ti è stato utile?": "si"/"no" (anche 1/0 per sicurezza).
+const votoUtile = (v: unknown): "si" | "no" | null => (v === "si" || v === 1 ? "si" : v === "no" || v === 0 ? "no" : null);
+
 export const etichettaFunzione = (k: string): string => ETICHETTE[k] ?? k.replaceAll("_", " ");
 
 // Funzione dedicata ricavata da un evento di un tipo esistente (null = nessuna).
@@ -220,12 +242,28 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
   const tipi = tally(), zone = tally(), req = tally(), pagine = tally();
   const errori = new Map<string, { messaggio: string; pagina: string; volte: number; persone: Set<string>; ultima: number }>();
   const utile = { si: 0, no: 0 };
+  const perContesto = new Map<string, UtileContesto>(UTILE_CONTESTI.map((c) => [c, { contesto: c, si: 0, no: 0 }]));
+  const motivi = tally();
+  const sett = { risposte: 0, somma: 0, si: 0, forse: 0, no: 0, chiuse: 0 };
+  const valoreGiorno = new Map<number, { si: number; no: number; voti: number; somma: number }>();
+  const vg = (d: number) => valoreGiorno.get(d) ?? valoreGiorno.set(d, { si: 0, no: 0, voti: 0, somma: 0 }).get(d)!;
   let senzaRisultati = 0, ai = 0, filtri = 0;
 
   for (const e of inP) {
     const p = e.r.props ?? {};
     switch (e.r.type) {
-      case "funzione": { const n = str(p.nome); if (n) funzioni.add(n, e.actor); break; }
+      case "funzione": {
+        const n = str(p.nome);
+        // La domanda settimanale non è una funzione: va in "Valore per i tester".
+        if (n === "domanda_settimanale") {
+          const v = typeof p.voto === "number" ? Math.round(p.voto) : NaN;
+          if (v >= 1 && v <= 5) { sett.risposte++; sett.somma += v; const g = vg(e.day); g.voti++; g.somma += v; }
+          if (p.stato === "si" || p.stato === "forse" || p.stato === "no" || p.stato === "chiusa") sett[p.stato === "chiusa" ? "chiuse" : p.stato]++;
+          break;
+        }
+        if (n) funzioni.add(n, e.actor);
+        break;
+      }
       case "ricerca": {
         if (p.modo === "ai") { ai++; funzioni.add("ricerca_ai", e.actor); } else filtri++;
         if (p.risultati === 0) senzaRisultati++;
@@ -240,7 +278,17 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
         if (n && PAGINE_FUNZIONE[n]) funzioni.add(PAGINE_FUNZIONE[n], e.actor);
         break;
       }
-      case "utile": if (p.voto === "si") utile.si++; else if (p.voto === "no") utile.no++; break;
+      case "utile": {
+        const v = votoUtile(p.voto);
+        const c = str(p.contesto) ?? "ricerca";
+        if (v) {
+          utile[v]++;
+          const x = perContesto.get(c) ?? perContesto.set(c, { contesto: c, si: 0, no: 0 }).get(c)!;
+          x[v]++;
+          vg(e.day)[v]++;
+        } else if (str(p.stato)) motivi.add(str(p.stato)!, e.actor); // "Cosa mancava?" dopo un 👎
+        break;
+      }
       case "errore": {
         const messaggio = str(p.messaggio) ?? "(senza messaggio)";
         const pagina = str(p.pagina) ?? "?";
@@ -277,6 +325,18 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
     });
   }
 
+  const valore: Valore = {
+    perContesto: [...perContesto.values()].sort((a, b) => (b.si + b.no) - (a.si + a.no)),
+    motivi: motivi.list(),
+    settimanale: {
+      risposte: sett.risposte, media: sett.risposte > 0 ? Math.round((sett.somma / sett.risposte) * 10) / 10 : null,
+      si: sett.si, forse: sett.forse, no: sett.no, chiuse: sett.chiuse,
+    },
+    perGiorno: [...valoreGiorno].sort((a, b) => b[0] - a[0]).map(([d, g]) => ({
+      giorno: keyOfIndex(d), si: g.si, no: g.no, voti: g.voti, media: g.voti > 0 ? Math.round((g.somma / g.voti) * 10) / 10 : null,
+    })),
+  };
+
   const tester: Tester[] = [...actors].map((a) => {
     const mine = inP.filter((e) => e.actor === a);
     const sid = new Set(mine.map((e) => e.r.session_id).filter(Boolean));
@@ -311,6 +371,7 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
     requisiti: req.list(),
     pagine: pagine.list(),
     utile,
+    valore,
     perGiorno,
     tester,
     senzaTracciamento: !rows.some((r) => NUOVI_TIPI.includes(r.type)),
