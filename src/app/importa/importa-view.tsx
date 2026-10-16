@@ -5,6 +5,7 @@ import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import GoogleMapsCard from "./google-maps-card";
 import ManualAddCard from "./manual-add-card";
+import MultiLinkCard from "./multi-link-card";
 import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
 
@@ -265,6 +266,10 @@ export default function ImportaView({ userId }: { userId: string | null }) {
       <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
 
       <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+
+      <div className="mt-6">
+        <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+      </div>
 
       <div className="mt-6">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
