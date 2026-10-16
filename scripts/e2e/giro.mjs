@@ -202,7 +202,9 @@ await shot("03-lista-verdetti");
   await page.keyboard.press("Enter");
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
   await page.waitForTimeout(600);
-  ok(seenPhotos.length > 0 && seenPhotos.every((u) => !u.includes("_nuovo") && u.includes("w=720")), `foto: ricerca ripetuta senza richieste nuove a Google per gli stessi locali (${seenPhotos.length} dalla cache, ${seenPhotos.filter((u) => u.includes("_nuovo")).length} nuove)`);
+  // 0 richieste è giusto anche quello: le immagini già sullo schermo restano (il telefono non le richiede).
+  const fotoVisibile = await page.locator('img[src*="/api/places/photo"]').first().isVisible().catch(() => false);
+  ok(fotoVisibile && seenPhotos.every((u) => !u.includes("_nuovo") && u.includes("w=720")), `foto: ricerca ripetuta senza richieste nuove a Google per gli stessi locali (${seenPhotos.length} dalla cache, ${seenPhotos.filter((u) => u.includes("_nuovo")).length} nuove)`);
   await page.unroute("**/api/search");
   page.off("request", onReq);
 }
