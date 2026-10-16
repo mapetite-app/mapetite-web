@@ -27,6 +27,9 @@
   /* Layout — altezza della nav bar mobile: 64px (h-16 in nav-bar.tsx) + safe area.
      Unica fonte di verità: i consumer la usano come offset dal fondo. */
   --nav-height-mobile: calc(4rem + env(safe-area-inset-bottom, 0px));
+  /* Il cerchio della Mappa (al centro della barra) sporge 28px sopra la barra: chi sta
+     appoggiato alla barra (barre azioni, campi, avvisi) aggiunge questo spazio per non finirci sotto. */
+  --nav-sporgenza: 1.75rem;
 
   /* Altezza massima dei bottom-sheet. Base in vh come fallback per browser
      senza dvh; l'@supports sotto la promuove a dvh (esclude la barra URL iOS). */
@@ -59,6 +62,7 @@
 @media (min-width: 768px) {
   :root {
     --nav-height-mobile: 0px;
+    --nav-sporgenza: 0px;
   }
 }
 

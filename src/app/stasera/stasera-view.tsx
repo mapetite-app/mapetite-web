@@ -244,7 +244,7 @@ export default function StaseraView({ userId }: { userId: string }) {
   const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
 
   return (
-    <main data-testid="stasera" className="-mb-[var(--nav-height-mobile)] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
+    <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
       <div className="mx-auto max-w-md px-4 pb-32 pt-6">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/profilo" aria-label="Torna al profilo" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl text-white/90 active:bg-white/10">
@@ -296,7 +296,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} />
               ))}
             </ul>
-            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-brand from-60% to-transparent px-4 pb-3 pt-6">
+            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-brand from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
               <button
                 type="button"
                 onClick={() => setProposals(null)}
@@ -378,7 +378,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 </div>
               </div>
             ) : (
-              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-brand from-70% to-transparent px-4 pb-3 pt-4">
+              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-brand from-70% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-4">
                 <button
                   type="button"
                   onClick={propose}

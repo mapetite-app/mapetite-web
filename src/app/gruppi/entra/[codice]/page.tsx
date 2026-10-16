@@ -46,7 +46,7 @@ export default async function EntraGruppoPage({ params }: Props) {
   const social = userId && !invito.sono_dentro ? await loadMySocial(userId) : null;
 
   return (
-    <main data-testid="gruppo-invito" className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile))] max-w-md flex-col bg-bg">
+    <main data-testid="gruppo-invito" className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-md flex-col bg-bg">
       <section className="relative overflow-hidden rounded-b-[2rem] bg-brand px-6 pb-8 pt-6 text-white">
         <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent/25" />
         <span aria-hidden className="pointer-events-none absolute -bottom-16 -left-8 h-36 w-36 rounded-full bg-white/5" />

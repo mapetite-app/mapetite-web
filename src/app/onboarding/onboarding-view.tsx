@@ -319,7 +319,7 @@ export default function OnboardingView({ next = null }: { next?: string | null }
       </div>
 
       {/* Pulsanti in basso */}
-      <div className="fixed left-0 right-0 z-40 bg-bg px-6 pb-4 pt-4 shadow-float" style={{ bottom: "var(--nav-height-mobile)" }}>
+      <div className="fixed left-0 right-0 z-40 bg-bg px-6 pb-[calc(1rem+var(--nav-sporgenza))] pt-4 shadow-float" style={{ bottom: "var(--nav-height-mobile)" }}>
         <div className="mx-auto max-w-lg">
           {step < TOTAL - 1 ? (
             <button

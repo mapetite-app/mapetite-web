@@ -398,7 +398,7 @@ export default function FiltersSheet({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border bg-surface px-5 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        <div className="border-t border-border bg-surface px-5 pt-4 pb-[calc(1rem+var(--nav-sporgenza))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           <button
             type="button"
             // Prima si chiude il pannello, poi si cerca: nei salvati la lista si apre subito
