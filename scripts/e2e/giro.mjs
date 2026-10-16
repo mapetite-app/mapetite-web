@@ -5701,6 +5701,80 @@ else {
   await dctx.close();
 }
 
+// 12. Carica il file di Google Maps (piano 3.2): file di Takeout letto nel telefono → anteprima per zone →
+//     salvataggio in blocco. Con le coordinate zero chiamate Google; i .csv al massimo 10. Scritture simulate.
+if (fakeUser) {
+  const tctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const tev = [];
+  await tctx.route("**/api/events", (r) => { tev.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const tins = [];
+  await tctx.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "POST") { tins.push(...[].concat(r.request().postDataJSON())); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const tfile = [];
+  await tctx.route("**/api/places/import-file", (r) => {
+    const items = r.request().postDataJSON()?.items ?? [];
+    tfile.push(...items);
+    return r.fulfill({ json: { risultati: items.map((_, i) => ({ id: `00000000-0000-4000-8000-0000000007${String(tfile.length - items.length + i).padStart(2, "0")}` })) } });
+  });
+  const tprev = [];
+  await tctx.route("**/api/places/link-preview", (r) => {
+    const b = r.request().postDataJSON() ?? {};
+    tprev.push(b);
+    if (String(b.link).includes("Osteria")) return r.fulfill({ json: { stato: "riconosciuto", chiamate: 2, place: { id: "00000000-0000-4000-8000-000000000799", name: "Osteria Finta", address: "" } } });
+    return r.fulfill({ json: { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google", nome: "Pizzeria Inventata" } });
+  });
+  const tp = await tctx.newPage();
+  tp.on("pageerror", (e) => errors.push(e.message));
+  await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const tc = tp.getByTestId("importa-file");
+  ok(await tc.getByText("Carica il file di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
+  await tp.getByTestId("file-aiuto").click();
+  const passi = await tp.getByTestId("file-passi").textContent();
+  ok(passi.includes("takeout.google.com") && passi.includes("Saved Places.json") && (await tp.getByTestId("file-passi").locator("li").count()) === 3 && (await tp.getByRole("link", { name: "takeout.google.com" }).getAttribute("href")) === "https://takeout.google.com/", "file Takeout: 3 passi con il link a takeout.google.com");
+  await tc.screenshot({ path: `${OUT}/takeout-1-card.png` });
+  await tp.getByTestId("file-input").setInputFiles([
+    { name: "Saved Places.json", mimeType: "application/json", buffer: readFileSync(new URL("./takeout-esempio.json", import.meta.url)) },
+    { name: "Want to go.csv", mimeType: "text/csv", buffer: readFileSync(new URL("./takeout-want-to-go.csv", import.meta.url)) },
+  ]);
+  await tp.getByTestId("file-anteprima").waitFor({ timeout: 5000 }).catch(() => {});
+  const ries = (await tp.getByTestId("file-riepilogo").textContent().catch(() => "")).replace(/\s+/g, " ");
+  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 senza posizione", `file Takeout: anteprima per città ("${ries}")`);
+  const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
+  ok(scart.includes("Lasciati fuori 3") && scart.includes("albergo") && scart.includes("museo"), `file Takeout: hotel, museo e punto senza nome lasciati fuori e detti ("${scart.slice(0, 80)}")`);
+  const liste = await tp.getByTestId("file-liste").textContent();
+  ok(liste.includes("«Want to go» → 📌 Voglio andarci") && liste.includes("«Luoghi salvati» → 📌 Voglio andarci"), `file Takeout: lista di Google → stato in Mapetite (${liste})`);
+  ok((await tp.getByTestId("file-avviso-csv").textContent()).includes("al massimo 10"), "file Takeout: avviso sui posti dei .csv senza posizione (al massimo 10 ricerche)");
+  ok(tfile.length === 0 && tprev.length === 0, "file Takeout: leggere il file non chiama il server (resta nel telefono)");
+  await tp.screenshot({ path: `${OUT}/takeout-2-anteprima.png`, caret: "initial", fullPage: true });
+  await tc.getByRole("button", { name: "Milano · 1" }).click();
+  ok(await tp.getByTestId("file-salva").textContent() === "Salva 4 posti", "file Takeout: si toglie una città con un tocco");
+  await tc.getByRole("button", { name: "Nessuno" }).click();
+  ok(await tp.getByTestId("file-salva").isDisabled(), "file Takeout: 'Nessuno' disattiva il salvataggio");
+  await tc.getByRole("button", { name: "Tutti" }).click();
+  await tc.getByRole("button", { name: "Milano · 1" }).click();
+  ok(await tp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "file Takeout 390px: niente scorrimento orizzontale");
+  await tp.getByTestId("file-salva").click();
+  await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(tfile.length === 2 && tfile.every((i) => typeof i.lat === "number" && !("url" in i) && i.googlePlaceId === null) && !tfile.some((i) => i.name.includes("Milano")), `file Takeout: al server solo nome e coordinate dei 2 posti di Roma, nessun Place ID inventato dal cid (${tfile.map((i) => i.name).join(", ")})`);
+  ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
+  ok(tins.length === 3 && tins.every((r) => r.user_id === fakeUser && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
+  const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
+  ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
+  const coda = await tp.getByTestId("file-coda").textContent().catch(() => "");
+  ok(coda.includes("1 posto aspetta la posizione") && coda.includes("Altri domani"), `file Takeout: il posto senza posizione resta da completare, un gruppo al giorno ("${coda}")`);
+  ok(tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "letti" && e.props.risultati === 5) && tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "salvati" && e.props.risultati === 3), "file Takeout: tracciato 'import_file' (letti e salvati)");
+  ok(droppedKeys(tev.filter((e) => e.props?.nome === "import_file")).length === 0, "file Takeout: le chiavi del segnale arrivano tutte al server");
+  await tc.scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/takeout-3-fatto.png`, caret: "initial" });
+  // File sbagliato: messaggio chiaro, niente schermata vuota.
+  await tp.reload({ waitUntil: "networkidle" });
+  await tp.getByTestId("file-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
+  ok((await tp.getByTestId("file-errore").textContent().catch(() => "")).includes("Non trovo posti"), "file Takeout: file senza posti spiegato");
+  await tctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
