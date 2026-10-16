@@ -5168,6 +5168,34 @@ else {
   await tctx.close();
 }
 
+// 8b Utente premium: /premium con l'elenco "in arrivo", nessun pagamento, "Mi interessa" registrato.
+{
+  const pmctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const pmEv = [];
+  await pmctx.route("**/api/events", (r) => { pmEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const pm = await pmctx.newPage();
+  pm.on("pageerror", (e) => errors.push(e.message));
+  const r = await pm.goto(`${BASE}/premium`, { waitUntil: "networkidle" });
+  ok(r?.status() === 200 && (await pm.getByRole("heading", { level: 1 }).textContent()) === "Mapetite Premium" && (await pm.getByTestId("premium-funzione").count()) >= 3, "premium: pagina con l'elenco delle funzioni");
+  const body = (await pm.getByTestId("premium").textContent()) ?? "";
+  ok(body.includes("Assistente senza limiti") && body.includes("Raccolte e mappe illimitate") && body.includes("Serate organizzate") && body.includes("In arrivo"), "premium: assistente senza limiti, raccolte illimitate, serate organizzate, tutto 'in arrivo'");
+  ok(await pm.getByTestId("premium-nessun-pagamento").isVisible() && !/€|\bcarta\b|abbonati ora|paga ora/i.test(body), "premium: nessun prezzo né pagamento");
+  await pm.getByTestId("premium-interesse").first().click();
+  await pm.getByTestId("premium-interesse-fatto").first().waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await pm.getByTestId("premium-interesse-fatto").first().isVisible() && pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium_interesse" && e.props?.contesto === "assistente"), "premium: 'Mi interessa' registrato (trackFeature) e confermato");
+  ok(pmEv.some((e) => e.type === "funzione" && e.props?.nome === "premium"), "premium: vista della pagina registrata");
+  await pm.reload({ waitUntil: "networkidle" });
+  ok((await pm.getByTestId("premium-interesse-fatto").count()) === 1, "premium: 'Mi interessa' ricordato ricaricando");
+  { const w = await pm.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `premium: niente scorrimento orizzontale (${w}px)`); }
+  await pm.screenshot({ path: `${OUT}/92-premium.png`, caret: "initial" });
+  if (fakeUser) {
+    await pmctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await pm.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    ok((await pm.getByTestId("profilo-premium").getAttribute("href")) === "/premium", "premium: collegato dal profilo");
+  } else console.log("SKIP  premium dal profilo: dev server senza E2E_FAKE_USER");
+  await pmctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
