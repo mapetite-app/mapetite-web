@@ -1375,17 +1375,32 @@ else {
     await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
     await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     const guida = p.getByTestId("guida-contatori");
-    if (!(await guida.isVisible())) ok(false, "profilo: numeri della guida in cima (Salvati · Voglio andarci · Ci sono stato · Città)");
+    if (!(await guida.isVisible())) ok(false, "profilo: numeri della guida in cima (Salvati · Voglio andarci · Ci sono stato)");
     else {
       const num = async (id) => (await p.getByTestId(`guida-${id}`).textContent())?.replace(/\D.*$/s, "");
-      ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && await num("citta") === "2", "profilo: numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato, 2 città)");
+      ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato)");
+      // Le mie cose (semplificazione 16/10): una griglia di tessere con il numero, ognuna porta alla sua pagina o sezione.
+      const cose = p.getByTestId("profilo-mie-cose");
+      ok(await cose.isVisible() && (await cose.getByRole("link").count()) === 6, `profilo: griglia 'Le mie cose' con 6 tessere (${await cose.getByRole("link").count()})`);
+      ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-gruppi").getAttribute("href")) === "/gruppi" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Liste di gruppo · Importa con i loro ingressi");
+      { const sz = await cose.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      await cose.getByTestId("tessera-raccolte").click();
+      await p.waitForFunction(() => { const r = document.getElementById("raccolte")?.getBoundingClientRect(); return !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' porta alle raccolte"));
+      // Le cose secondarie stanno chiuse in "Altro": l'ingranaggio in alto ci porta.
+      ok((await p.getByTestId("profilo-impostazioni").getAttribute("href")) === "#altro" && !(await p.getByTestId("invita-amico").isVisible()) && !(await p.getByTestId("cosa-so-di-te").isVisible()) && await p.getByTestId("profilo-premium").isVisible() && await p.getByTestId("profilo-ristoratori").isVisible(), "profilo: 'Altro' in fondo, chiuso (invito, profilo pubblico, gusti, ricerche) con Premium e ristoratori in elenco");
+      await p.locator("#gusti > summary").click();
+      ok(await p.getByTestId("cosa-so-di-te").isVisible(), "profilo: una riga di 'Altro' si apre al tocco (Cosa so di te)");
       ok(await p.getByTestId("guida-voglio").getAttribute("href") === "/mappa?vista=salvati&stato=voglio" && await p.getByTestId("guida-fatto").getAttribute("href") === "/mappa?vista=salvati&stato=fatto" && await p.getByTestId("guida-salvati").getAttribute("href") === "/mappa?vista=salvati", "profilo: ogni numero apre la mappa sui salvati filtrati");
       const raccolte = await p.getByTestId("raccolta").allTextContents();
       ok(raccolte.length === 4 && raccolte[0].includes("Con amici") && raccolte[0].includes("3 locali") && raccolte[1].includes("Romantico") && !raccolte.some((t) => /Da provare|Già visitato/.test(t)), `profilo: raccolte = tag dell'utente con il numero, senza i due stati (${raccolte.join(" | ")})`);
       ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/raccolte/Con%20amici", "profilo: tocco su una cartella = pagina della raccolta (4.1)");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
-      ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: sotto restano la lista dei salvati e le recensioni");
+      ok((await p.getByTestId("profilo-salvato-recente").count()) === 3 && (await p.getByTestId("profilo-salvato-recente").first().textContent()).includes("Terrazza Uno") && !(await p.getByTestId("profilo-salvato").first().isVisible()), "profilo: anteprima degli ultimi 3 salvati, elenco completo chiuso");
+      const tutti = p.getByTestId("profilo-salvati-tutti");
+      ok((await tutti.locator("summary").textContent()).includes("Vedi tutti i 6, divisi per 2 città"), `profilo: 'Vedi tutti i 6, divisi per 2 città' (${await tutti.locator("summary").textContent()})`);
+      await tutti.locator("summary").click();
+      ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByTestId("profilo-salvato").last().isVisible() && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: 'Vedi tutti' apre la lista dei salvati per città; le recensioni restano");
       ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
@@ -1519,6 +1534,7 @@ else {
 
       // "Le tue ricerche": le recenti salvate su questo telefono
       const ric = p.getByTestId("profilo-ricerche");
+      await p.locator("#ricerche > summary").click();
       // (le ricerche fatte prima in questo giro restano sul "telefono": si parte da vuoto)
       await p.evaluate(() => { localStorage.removeItem("mapetite.recenti"); window.dispatchEvent(new Event("mapetite-recenti")); });
       ok(await ric.getByTestId("ricerche-vuote").isVisible(), "le tue ricerche: senza ricerche un invito spiega cosa compare qui");
@@ -2286,7 +2302,7 @@ else {
   ok(rIn?.status() === 200 && await sp.getByTestId("profilo-pubblico-in-arrivo").getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /u/<nome> dice 'in arrivo' invece di rompersi");
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /amici dice 'in arrivo'");
-  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("profilo-social-in-arrivo").isVisible(), "social in arrivo: nel profilo il riquadro 'Profilo pubblico' è 'in arrivo'");
   ok(await sp.locator("nav").first().getByRole("link", { name: "Amici" }).getAttribute("href") === "/amici", "barra in basso: voce 'Amici'");
 
@@ -2360,7 +2376,12 @@ else {
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
     ok((await att.first().getByTestId("card-attivita").count()) === 3 && await att.first().getByTestId("card-attivita").first().getAttribute("href") === `/locali/${LOC_SOC}`, "amici: card dei locali che aprono la pagina del locale");
     ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui"); }
-  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible(), "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
+  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible() && (await sp.getByTestId("amici-rendi-pubblico").getAttribute("href")) === "/profilo#profilo-pubblico", "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
+  // Gerarchia (semplificazione 16/10): ricerca in alto, ingressi compatti, poi chi segui e l'attività.
+  { const top = async (id) => (await sp.getByTestId(id).first().boundingBox())?.y ?? -1;
+    const [cerca, ingressi, seguiti, attivita] = [await sp.getByLabel("Cerca persone per nome").boundingBox().then((b) => b?.y ?? -1), await top("amici-ingressi"), await top("seguiti"), await top("attivita")];
+    ok(cerca > 0 && cerca < ingressi && ingressi < seguiti && seguiti < attivita && attivita < 844, `amici: ricerca → ingressi → chi segui → attività, l'attività già nel primo schermo (${[cerca, ingressi, seguiti, attivita].map(Math.round).join(" < ")})`);
+    ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-gruppi").getAttribute("href")) === "/gruppi", "amici: ingresso compatto 'Liste di gruppo'"); }
   await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
   let searchUrl = null;
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
@@ -2380,7 +2401,8 @@ else {
     if (r.request().method() === "PATCH") { profPatch = r.request().postDataJSON(); return profStatus === 204 ? r.fulfill({ status: 204, body: "" }) : r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key", details: null, hint: null } }); }
     return r.fulfill({ json: [] });
   });
-  await sp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  // Da Amici "Fatti trovare" porta qui: la riga "Profilo pubblico" di "Altro" si apre da sola.
+  await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
   const ps = sp.getByTestId("profilo-social");
   ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
   ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
@@ -4223,7 +4245,7 @@ else {
     // Ingresso dal profilo
     await d.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
     const card = d.getByTestId("profilo-diario");
-    ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 posti provati"), "diario: nel profilo 'Il mio diario' con il numero dei posti provati");
+    ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 provati"), "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
     await card.click();
     await d.waitForURL(/\/profilo\/diario/, { timeout: 8000 }).catch(() => {});
     await d.getByTestId("diario-mese").first().waitFor({ timeout: 8000 }).catch(() => {});
@@ -4863,7 +4885,7 @@ else {
   await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
   const pp = await ictx.newPage();
   pp.on("pageerror", (e) => errors.push(e.message));
-  await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  await pp.goto(`${BASE}/profilo#invita`, { waitUntil: "networkidle" });
   ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
   await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
