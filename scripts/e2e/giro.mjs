@@ -4113,6 +4113,152 @@ else {
   await mctx.close();
 }
 
+// Sorprendimi (piano 2.5): UN posto mai provato che probabilmente ti piace, con il perché.
+// Una sola ricerca (simulata), "Un altro" senza nuove chiamate, mai salvati né locali di massa.
+if (!fakeUser) console.log("SKIP  sorprendimi: dev server senza E2E_FAKE_USER");
+else {
+  const sm = (id, name, rating, n, extra = {}) => mk(id, name, 41.9 + Number(id.slice(1)) * 0.001, 12.49, { category: "Trattoria", rating, userRatingCount: n, types: ["restaurant"], photoRef: null, ...extra });
+  const SURP = [
+    sm("S1", "Trattoria Di Massa", 4.3, 9000),
+    sm("S2", "Osteria Già Salvata", 4.6, 300),
+    sm("S3", "Trattoria Gemma", 4.7, 180),
+    sm("S4", "Trattoria Buona", 4.4, 600, { editorialSummary: "Cucina romana di quartiere." }),
+    sm("S5", "Trattoria Chiusa", 4.6, 120, { openNow: false }),
+    sm("S6", "Trattoria Sei", 4.2, 900),
+  ];
+  const surpRows = [
+    { tags: ["Mi è piaciuto", "Già visitato"], places: { category: "Trattoria", lat: 41.9, lng: 12.49, google_place_id: "GT1" } },
+    { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.91, lng: 12.48, google_place_id: "GT2" } },
+    { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.89, lng: 12.47, google_place_id: "S2" } },
+    { tags: ["Non fa per me"], places: { category: "pizza_restaurant", lat: 41.9, lng: 12.5, google_place_id: "GT3" } },
+  ];
+  let surpSearches = 0, surpBody = null, surpSynth = [], surpAdd = null, surpInsert = null;
+  const surpEvents = [];
+  const sctxS = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await sctxS.route("**/rest/v1/saved_places**", (r) => {
+    if (r.request().method() === "POST") { surpInsert = r.request().postDataJSON(); return r.fulfill({ status: 201, json: {} }); }
+    return r.fulfill({ json: surpRows });
+  });
+  await sctxS.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["pizza"], price_range: "€€" }] }));
+  await sctxS.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "S3", verdict: "Carbonara seria e oste che consiglia bene." }] }));
+  await sctxS.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await sctxS.route("**/api/events", (r) => { surpEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await sctxS.route("**/api/search", (r) => {
+    surpSearches++; surpBody = r.request().postDataJSON();
+    return r.fulfill({ json: { risultati: SURP, filtri_usati: { categoria: null, parole_chiave: [], vicino_a_me: false }, sintesi_pendente: { places: [], token: "x", gruppi: [{ places: SURP.slice(0, 3).map((x) => ({ id: x.id })), token: "g1" }, { places: SURP.slice(3).map((x) => ({ id: x.id })), token: "g2" }] } } });
+  });
+  await sctxS.route("**/api/search/synthesis", (r) => {
+    const b = r.request().postDataJSON(); surpSynth.push(b);
+    return r.fulfill({ json: { dettagli: { S4: { verdict: "Porzioni generose, servizio alla mano." } }, esclusi: [] } });
+  });
+  await sctxS.route("**/api/places/add", (r) => { surpAdd = r.request().postDataJSON(); return r.fulfill({ json: { place: { id: "00000000-0000-4000-8000-0000000005a4" } } }); });
+  const sp = await sctxS.newPage();
+  sp.on("pageerror", (e) => errors.push(e.message));
+  // Ore 20:30: momento "cena" (la sorpresa dipende dall'ora: il controllo deve valere a qualsiasi ora del giro).
+  await sp.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+
+  // Ingressi: home e mappa.
+  await sp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("home-sorprendimi").isVisible() && (await sp.getByTestId("home-sorprendimi").getAttribute("href")) === "/sorprendimi?da=home", "sorprendimi: in home la card '🎲 Sorprendimi' porta a /sorprendimi");
+  await sp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  const mapHref = await sp.getByTestId("mappa-sorprendimi").first().getAttribute("href").catch(() => null);
+  ok(!!mapHref && /^\/sorprendimi\?da=mappa&lat=-?\d+\.\d{4}&lng=-?\d+\.\d{4}$/.test(mapHref), `sorprendimi: sulla mappa il pulsante porta la zona della mappa (${mapHref})`);
+  ok(surpSearches === 0, "sorprendimi: aprire home e mappa non fa ricerche");
+
+  await sp.goto(`${BASE}/sorprendimi?da=mappa&lat=41.9&lng=12.49`, { waitUntil: "networkidle" });
+  const card = sp.getByTestId("sorpresa-card");
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(surpSearches === 1 && surpBody?.searchIntent === "structured" && surpBody?.phase === "fast" && surpBody?.source === "world" && surpBody?.query === "Trattoria" && surpBody?.lat === 41.9 && surpBody?.radius === 3000,
+    `sorprendimi: UNA ricerca, con i filtri (senza AI), dal tipo che salvi di più e dalla zona della mappa (${JSON.stringify(surpBody)})`);
+  ok(await sp.getByRole("heading", { name: "Trattoria Gemma" }).isVisible(), "sorprendimi: prima proposta il 💎 poco conosciuto aperto ora, non il più famoso");
+  const why1 = await sp.getByTestId("sorpresa-perche").textContent().catch(() => "");
+  ok(why1.includes("Ti è piaciuto un posto così (trattoria)") && why1.includes("💎 Poco conosciuto") && why1.includes("Aperto ora"), `sorprendimi: il perché è fatto di dati veri (${why1})`);
+  ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Carbonara seria"), "sorprendimi: verdetto Mapetite già scritto (cache) mostrato senza chiamate AI");
+  ok(surpSynth.length === 0, "sorprendimi: con il verdetto già in cache nessuna richiesta di verdetti");
+  ok((await sp.getByTestId("sorpresa-zona").textContent()).includes("Zona della mappa · Roma"), "sorprendimi: dice in che zona cerca");
+  await sp.screenshot({ path: `${OUT}/sorprendimi-1.png`, caret: "initial" });
+
+  // "Un altro": dagli stessi risultati, mai i salvati né i locali di massa; i chiusi in fondo.
+  const seenNames = [await sp.getByTestId("sorpresa-card").getByRole("heading").textContent()];
+  await sp.getByTestId("sorpresa-altro").click();
+  await sp.getByRole("heading", { name: "Trattoria Buona" }).waitFor({ timeout: 3000 }).catch(() => {});
+  await sp.getByTestId("sorpresa-verdetto").waitFor({ timeout: 3000 }).catch(() => {});
+  ok(surpSynth.length === 1 && surpSynth[0]?.token === "g2" && surpSynth[0]?.query === "Trattoria", `sorprendimi: verdetto mancante chiesto una volta per il suo gruppo (${JSON.stringify(surpSynth.map((x) => x.token))})`);
+  ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Porzioni generose"), "sorprendimi: il verdetto arriva anche per 'Un altro'");
+  await sp.screenshot({ path: `${OUT}/sorprendimi-2-altro.png`, caret: "initial" });
+  const headingNow = () => sp.getByTestId("sorpresa-card").getByRole("heading").textContent();
+  seenNames.push(await headingNow());
+  for (let i = 0; i < 6; i++) {
+    await sp.getByTestId("sorpresa-altro").click();
+    await sp.waitForTimeout(150);
+    if (!(await sp.getByTestId("sorpresa-card").isVisible().catch(() => false))) break;
+    seenNames.push(await headingNow());
+  }
+  ok(surpSearches === 1, `sorprendimi: 'Un altro' non fa nuove ricerche (${surpSearches})`);
+  ok(!seenNames.includes("Trattoria Di Massa") && !seenNames.includes("Osteria Già Salvata"), `sorprendimi: mai un tuo salvato né un locale di massa (${seenNames.join(", ")})`);
+  ok(seenNames[seenNames.length - 1] === "Trattoria Chiusa" && seenNames.length === 4, `sorprendimi: 4 proposte, il locale chiuso per ultimo (${seenNames.join(", ")})`);
+  ok(await sp.getByTestId("sorpresa-finiti").isVisible(), "sorprendimi: finite le proposte lo dice, con 'Ricomincia'");
+  await sp.getByRole("button", { name: "Ricomincia" }).click();
+  ok(await sp.getByRole("heading", { name: "Trattoria Gemma" }).isVisible(), "sorprendimi: 'Ricomincia' riparte dalla prima, senza ricerche");
+
+  // Freno alla quota: stessa zona e stesso momento entro 30 minuti = nessuna nuova ricerca.
+  await sp.reload({ waitUntil: "networkidle" });
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(surpSearches === 1 && await card.isVisible(), `sorprendimi: riaperto entro 30 minuti nella stessa zona riusa la ricerca (${surpSearches} ricerche)`);
+
+  // Salva: entra nei salvati come "Voglio andarci".
+  await sp.getByTestId("sorpresa-salva").click();
+  await sp.getByText("✓ Salvato").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(surpAdd?.googlePlaceId === "S3" && JSON.stringify(surpInsert?.tags) === '["Da provare"]' && await sp.getByText("✓ Salvato").isVisible(), "sorprendimi: 'Salva' lo mette tra i salvati come 'Voglio andarci'");
+
+  // 360px: niente scroll orizzontale, azioni visibili.
+  await sp.setViewportSize({ width: 360, height: 780 });
+  const sx = await sp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(sx <= 0 && await sp.getByTestId("sorpresa-apri").isVisible(), `sorprendimi 360px: nessuno scroll orizzontale (${sx}px)`);
+  await sp.screenshot({ path: `${OUT}/sorprendimi-360.png`, caret: "initial" });
+  await sp.setViewportSize({ width: 390, height: 844 });
+
+  // Apri scheda: la scheda della mappa, dalla memoria (nessuna ricerca in più), con il verdetto.
+  await sp.getByTestId("sorpresa-apri").click();
+  await sp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  await sp.getByRole("heading", { name: "Trattoria Gemma" }).first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok((await sp.getByText("Trattoria Gemma").filter({ visible: true }).count()) > 0 && surpSearches === 1, `sorprendimi: 'Apri scheda' apre la scheda del locale sulla mappa senza nuove ricerche (${sp.url().replace(BASE, "")})`);
+  ok(await sp.getByText("Carbonara seria e oste che consiglia bene.").first().isVisible().catch(() => false), "sorprendimi: nella scheda c'è lo stesso verdetto");
+  ok(!sp.url().includes("sorpresa="), "sorprendimi: tolto il parametro dall'indirizzo (ricaricare non riapre)");
+  await sp.screenshot({ path: `${OUT}/sorprendimi-scheda.png`, caret: "initial" });
+
+  const fe = surpEvents.filter((e) => e?.type === "funzione" && String(e.props?.nome ?? "").startsWith("sorpresa"));
+  ok(fe.some((e) => e.props.nome === "sorpresa" && e.props.contesto === "google") && fe.some((e) => e.props.nome === "sorpresa" && e.props.contesto === "memoria") && fe.some((e) => e.props.nome === "sorpresa_altro") && fe.some((e) => e.props.nome === "sorpresa_salva") && fe.some((e) => e.props.nome === "sorpresa_apri"),
+    `sorprendimi: tracciati apertura (google/memoria), 'Un altro', 'Salva', 'Apri scheda' (${fe.map((e) => e.props.nome + (e.props.contesto ? ":" + e.props.contesto : "")).join(", ")})`);
+  ok(droppedKeys(surpEvents).length === 0, `sorprendimi: tutte le chiavi dei segnali sono accettate dal server (${droppedKeys(surpEvents).join(", ")})`);
+  await sctxS.close();
+
+  // Senza accesso: valgono il momento e la zona; per salvare si accede.
+  const actxS = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await actxS.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await actxS.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await actxS.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await actxS.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  let anonBody = null, anonSynth = 0;
+  await actxS.route("**/api/search", (r) => { anonBody = r.request().postDataJSON(); return r.fulfill({ json: { risultati: SURP, filtri_usati: {}, sintesi_pendente: { places: [], token: "x", gruppi: [{ places: SURP.slice(0, 3).map((x) => ({ id: x.id })), token: "g1" }] } } }); });
+  await actxS.route("**/api/search/synthesis", (r) => { anonSynth++; return r.fulfill({ json: { dettagli: {}, esclusi: [] } }); });
+  const ap = await actxS.newPage();
+  ap.on("pageerror", (e) => errors.push(e.message));
+  await ap.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await ap.goto(`${BASE}/sorprendimi?da=home`, { waitUntil: "networkidle" });
+  await ap.getByTestId("sorpresa-card").waitFor({ timeout: 8000 }).catch(() => {});
+  const whyA = await ap.getByTestId("sorpresa-perche").textContent().catch(() => "");
+  ok(anonBody?.query === "ristorante cena" && anonBody?.radius === 11000 && whyA.includes("Adatto all'ora: cena"), `sorprendimi senza accesso: momento della giornata e tutta Roma (${anonBody?.query}, ${anonBody?.radius} m, "${whyA}")`);
+  ok(await ap.getByTestId("sorpresa-accedi").isVisible() && (await ap.getByTestId("sorpresa-accedi").getAttribute("href")) === "/login?next=%2Fsorprendimi", "sorprendimi senza accesso: 'Accedi per salvarlo' e poi si torna qui");
+  await ap.waitForTimeout(400);
+  const anonH = await ap.getByTestId("sorpresa-card").getByRole("heading").textContent().catch(() => null);
+  ok(anonH === "Osteria Già Salvata" && anonSynth === 1 && (await ap.getByTestId("sorpresa-verdetto").count()) === 0 && (await ap.getByTestId("sorpresa-google").count()) === 0,
+    `sorprendimi senza accesso: nessun salvato da escludere, sempre un 💎 non di massa; senza verdetto disponibile nessun testo inventato (${anonH}, ${anonSynth} richiesta di verdetti, verdetto ${await ap.getByTestId("sorpresa-verdetto").count()}, google ${await ap.getByTestId("sorpresa-google").count()})`);
+  await ap.screenshot({ path: `${OUT}/sorprendimi-anonimo.png`, caret: "initial" });
+  await actxS.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
