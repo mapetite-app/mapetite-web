@@ -1,11 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { trackFeature } from "@/lib/track";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
+
+// Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
+// l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
+// posto. Valgono 2 giorni; si cancellano quando il salvataggio parte o con "Salta".
+const DRAFT_KEY = "mapetite.benvenuto";
+const DRAFT_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+
+interface Draft {
+  step: number;
+  cuisines: string[];
+  occasions: string[];
+  atmospheres: string[];
+  priceRange: string | null;
+  city: string | null;
+  otherCity: string;
+  otherOpen: boolean;
+}
+
+function readDraftRaw(): string | null {
+  try {
+    return localStorage.getItem(DRAFT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(d: Draft) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, ts: Date.now() }));
+  } catch { /* archiviazione non disponibile: si va avanti senza */ }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch { /* niente da fare */ }
+}
+
+// Solo valori che l'onboarding conosce: il contenuto del telefono si ricontrolla come un input.
+function parseDraft(raw: string | null): Draft | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== "object" || typeof o.ts !== "number" || Date.now() - o.ts > DRAFT_TTL_MS) return null;
+    const pick = (v: unknown, allowed: readonly { value: string }[]) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && allowed.some((a) => a.value === x)) : [];
+    const d: Draft = {
+      step: Number.isInteger(o.step) ? Math.min(Math.max(o.step, 0), TOTAL - 1) : 0,
+      cuisines: pick(o.cuisines, CUISINES),
+      occasions: pick(o.occasions, OCCASIONS),
+      atmospheres: pick(o.atmospheres, ATMOSPHERES),
+      priceRange: PRICE_RANGES.some((p) => p.value === o.priceRange) ? o.priceRange : null,
+      city: CITIES.some((c) => c.value === o.city) ? o.city : null,
+      otherCity: typeof o.otherCity === "string" ? o.otherCity.slice(0, 40) : "",
+      otherOpen: o.otherOpen === true,
+    };
+    const empty = d.step === 0 && !d.cuisines.length && !d.occasions.length && !d.atmospheres.length && !d.priceRange;
+    return empty ? null : d;
+  } catch {
+    return null;
+  }
+}
 
 // Primo accesso dopo la registrazione (piano 9.1): tre schermate al massimo, stile Albo.
 // 1) i gusti in una schermata sola, 2) la città, 3) "porta qui i tuoi salvati di Google Maps".
@@ -97,17 +160,38 @@ function IlluImporta() {
   );
 }
 
+// Le risposte salvate sul telefono si leggono dopo l'idratazione (sul server non ci sono):
+// con una bozza il modulo riparte da lì, senza effetti che rimettono a posto lo stato.
+const noSubscribe = () => () => {};
 export default function OnboardingView({ next = null }: { next?: string | null }) {
-  const [step, setStep] = useState(0);
-  const [cuisines, setCuisines] = useState<string[]>([]);
-  const [occasions, setOccasions] = useState<string[]>([]);
-  const [atmospheres, setAtmospheres] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<string | null>(null);
-  const [city, setCity] = useState<string | null>(null);
-  const [otherCity, setOtherCity] = useState("");
-  const [otherOpen, setOtherOpen] = useState(false);
+  const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
+  const draft = parseDraft(raw);
+  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft} />;
+}
+
+function Benvenuto({ next, initial }: { next: string | null; initial: Draft | null }) {
+  const router = useRouter();
+  const [step, setStep] = useState(initial?.step ?? 0);
+  const [cuisines, setCuisines] = useState<string[]>(initial?.cuisines ?? []);
+  const [occasions, setOccasions] = useState<string[]>(initial?.occasions ?? []);
+  const [atmospheres, setAtmospheres] = useState<string[]>(initial?.atmospheres ?? []);
+  const [priceRange, setPriceRange] = useState<string | null>(initial?.priceRange ?? null);
+  const [city, setCity] = useState<string | null>(initial?.city ?? null);
+  const [otherCity, setOtherCity] = useState(initial?.otherCity ?? "");
+  const [otherOpen, setOtherOpen] = useState(initial?.otherOpen ?? false);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const ripreso = initial != null;
+
+  // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
+  // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
+  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen };
+  const draftJson = JSON.stringify(draftNow);
+  useEffect(() => {
+    const d = JSON.parse(draftJson) as Draft;
+    if (d.step === 0 && !d.cuisines.length && !d.occasions.length && !d.atmospheres.length && !d.priceRange) return;
+    saveDraft(d);
+  }, [draftJson]);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
   useEffect(() => {
@@ -125,8 +209,17 @@ export default function OnboardingView({ next = null }: { next?: string | null }
     setSubmitting(dest ?? "mappa");
     setError(null);
     trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}` });
+    // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
+    // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
+    clearDraft();
     const result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next });
+    if (result && "login" in result) {
+      saveDraft(draftNow);
+      router.push(result.login);
+      return;
+    }
     if (result?.error) {
+      saveDraft(draftNow);
       setError(result.error);
       setSubmitting(null);
     }
@@ -168,7 +261,7 @@ export default function OnboardingView({ next = null }: { next?: string | null }
             ) : step === 0 ? (
               <form action={skipOnboarding}>
                 {next && <input type="hidden" name="next" value={next} />}
-                <button type="submit" data-testid="onboarding-salta" className={saltaCls}>
+                <button type="submit" data-testid="onboarding-salta" onClick={clearDraft} className={saltaCls}>
                   Salta
                 </button>
               </form>
@@ -196,6 +289,11 @@ export default function OnboardingView({ next = null }: { next?: string | null }
         <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
         <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
         <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
+        {ripreso && (
+          <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
+            Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
+          </p>
+        )}
 
         {step === 0 && (
           <div data-testid="benvenuto-gusti">

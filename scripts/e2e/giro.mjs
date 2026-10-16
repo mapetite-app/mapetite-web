@@ -6150,6 +6150,43 @@ else {
   ok((await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: al passo 3 niente 'Salta' (doppione di 'Lo faccio dopo')");
   ok(await vp.getByTestId("benvenuto-dopo").isVisible() && /Lo faccio dopo/.test((await vp.getByTestId("benvenuto-dopo").textContent()) ?? ""), "primo accesso: al passo 3 un solo 'Lo faccio dopo'");
   await vp.screenshot({ path: `${OUT}/zz-benvenuto-3-un-solo-dopo.png`, caret: "initial" });
+
+  // 2. Accesso scaduto mentre si risponde: si passa dal login e, tornati, le risposte ci sono ancora.
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto")); // il passo 1 sopra ha lasciato la sua bozza
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0, "risposte conservate: senza bozza l'onboarding parte da capo, senza avviso");
+  await vp.getByRole("button", { name: "Pizza", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Milano", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).pathname === "/login", `risposte conservate: senza accesso il salvataggio porta al login (${vp.url().replace(BASE, "")})`);
+  const bozza = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.benvenuto") ?? "null"));
+  ok(bozza?.cuisines?.includes("pizza") && bozza?.city === "Milano" && bozza?.step === 2, `risposte conservate: gusti, città e passo restano sul telefono (${JSON.stringify(bozza && { c: bozza.cuisines, city: bozza.city, step: bozza.step })})`);
+  await vctx.clearCookies({ name: "e2e_anonimo" });
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByTestId("benvenuto-ripreso").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await vp.getByTestId("benvenuto-ripreso").isVisible() && (await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "risposte conservate: dopo l'accesso si riparte dal passo 3 con l'avviso");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Milano", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: la città scelta c'è ancora");
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Pizza", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: i gusti scelti ci sono ancora");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);
+  ok((await vp.evaluate(() => localStorage.getItem("mapetite.benvenuto"))) === null, "risposte conservate: salvate le risposte, la bozza sparisce");
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
+  // Una bozza scaduta (più di 2 giorni) o con valori sconosciuti non si riprende.
+  await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now() - 3 * 864e5, step: 2, cuisines: ["pizza"] })));
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
   await vctx.close();
 }
 
