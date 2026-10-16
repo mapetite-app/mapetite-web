@@ -244,6 +244,23 @@ function Pannello({ n, troncato }: { n: Numeri; troncato: boolean }) {
         )}
       </Section>
 
+      <Section title="Arrivi da invito" note="Chi apre /invito/<codice> e chi poi si registra (una volta per persona)">
+        {n.inviti.length === 0 ? (
+          <p className="text-sm font-sans text-text-muted">Nessun arrivo da un link d&apos;invito.</p>
+        ) : (
+          <ul data-testid="numeri-inviti" className="divide-y divide-border rounded-card border border-border bg-white">
+            {n.inviti.map((i) => (
+              <li key={i.codice} className="flex items-center justify-between gap-3 px-3 py-2 text-sm font-sans">
+                <span className="min-w-0 truncate font-display font-semibold text-brand">{i.codice}</span>
+                <span className="shrink-0 tabular-nums text-text-muted">
+                  {i.arrivi} {i.arrivi === 1 ? "arrivo" : "arrivi"} · {i.registrati} {i.registrati === 1 ? "registrato" : "registrati"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
       <Section title="Pagine viste">
         <Bars items={n.pagine} empty="Nessuna pagina registrata." />
       </Section>
