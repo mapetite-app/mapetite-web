@@ -4699,6 +4699,178 @@ if (fakeUser) {
   console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
 }
 
+// ─── Invito e primo accesso (PIANO-25-OTTOBRE.md 9.1) ────────────────────────
+// /invito/<codice>: nome di chi invita se ha il profilo pubblico (dati finti dal cookie "e2e_social"),
+// codice ricordato nel telefono fino alla registrazione e contato una volta (arrivo, registrato).
+// Primo accesso in 3 schermate con "Salta" e import da Google Maps proposto subito.
+// "Invita un amico" nel profilo. Ricerche simulate: nessuna chiamata Google.
+if (!fakeUser) console.log("SKIP  invito: dev server senza E2E_FAKE_USER");
+else {
+  const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true } };
+  const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const ievents = [];
+  await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await ictx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await ictx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await ictx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await ictx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await ictx.addCookies([
+    { name: "e2e_anonimo", value: "1", url: BASE },
+    { name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialInv)), url: BASE },
+  ]);
+  const ip = await ictx.newPage();
+  ip.on("pageerror", (e) => errors.push(e.message));
+  const arrivi = () => ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_arrivo");
+
+  // Arrivo con il nome di chi invita.
+  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato su Mapetite", `invito: nome di chi invita (${await ip.getByTestId("invito-titolo").textContent()})`);
+  ok((await ip.getByTestId("invito-posti").textContent()) === "11 posti sulla sua mappa", "invito: quanti posti ha sulla sua mappa");
+  ok(await ip.getByTestId("invito-inizia").isVisible() && (await ip.getByTestId("invito-inizia").getAttribute("href")) === "/signup", "invito: un solo pulsante 'Inizia' verso la registrazione");
+  ok((await ip.getByRole("link", { name: "Inizia" }).count()) === 1, "invito: 'Inizia' è unico");
+  const ib = await ip.getByTestId("invito-inizia").boundingBox();
+  ok(ib && ib.y + ib.height <= 844 - 64, `invito 390px: 'Inizia' visibile senza scorrere, sopra la barra (${Math.round(ib?.y ?? -1)})`);
+  await ip.waitForTimeout(400);
+  ok(arrivi().length === 1 && arrivi()[0].props.contesto === "giulia.rm", `invito: arrivo tracciato con il codice (${JSON.stringify(arrivi().map((e) => e.props))})`);
+  ok(droppedKeys(arrivi()).length === 0, "invito: segnale con sole chiavi accettate dal server");
+  const stored = await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null"));
+  ok(stored?.codice === "giulia.rm", `invito: codice ricordato nel telefono fino alla registrazione (${JSON.stringify(stored)})`);
+  const og = await ip.locator('meta[property="og:title"]').getAttribute("content");
+  ok(og === "Giulia ti invita su Mapetite", `invito: anteprima del link su WhatsApp con il nome (${og})`);
+  await ip.screenshot({ path: `${OUT}/invito-arrivo.png`, caret: "initial" });
+  await ip.reload({ waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  ok(arrivi().length === 1, "invito: riaprire il link non conta un secondo arrivo");
+
+  // 360px: niente scroll orizzontale, pulsante visibile.
+  await ip.setViewportSize({ width: 360, height: 740 });
+  const ix = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(ix <= 0, `invito 360px: nessuno scroll orizzontale (${ix}px)`);
+  await ip.screenshot({ path: `${OUT}/invito-arrivo-360.png`, caret: "initial", fullPage: true });
+  await ip.setViewportSize({ width: 390, height: 844 });
+
+  // Codici generici e sconosciuti: testo neutro, mai un nome inventato.
+  await ip.goto(`${BASE}/invito/tester`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Sei tra i primi a provare Mapetite" && !(await ip.getByTestId("invito-posti").count()), "invito: codice 'tester' per il gruppo di prova");
+  await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
+  await ip.goto(`${BASE}/invito/sconosciuto`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice senza profilo pubblico → testo neutro");
+  const nArr = arrivi().length;
+  await ip.goto(`${BASE}/invito/%3Cscript%3E`, { waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite" && arrivi().length === nArr, "invito: codice non valido → pagina neutra, nessun conteggio");
+  ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === "sconosciuto", "invito: si ricorda l'ultimo codice valido");
+  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  await ip.getByTestId("invito-inizia").click();
+  await ip.waitForURL(/\/signup/, { timeout: 5000 }).then(() => ok(true, "invito: 'Inizia' apre la registrazione"), () => ok(false, "invito: 'Inizia' apre la registrazione"));
+
+  // Primo accesso (dopo la registrazione): 3 schermate, codice contato come "registrato".
+  await ictx.clearCookies({ name: "e2e_anonimo" });
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
+  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
+  ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 3" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 3 con barra di avanzamento");
+  ok(await ip.getByTestId("benvenuto-gusti").getByRole("heading", { name: "Cucina" }).isVisible() && await ip.getByRole("heading", { name: "Spesa tipica" }).count() === 1, "primo accesso: tutti i gusti in una schermata (cucina, occasione, atmosfera, spesa)");
+  await ip.getByRole("button", { name: "Romana", exact: true }).click();
+  await ip.getByRole("button", { name: "Cena romantica", exact: true }).click();
+  ok((await ip.getByRole("button", { name: "Romana", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: gusto selezionato");
+  await ip.screenshot({ path: `${OUT}/benvenuto-1-gusti.png`, caret: "initial" });
+  await ip.getByRole("button", { name: "Continua" }).click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 3" && await ip.getByTestId("benvenuto-citta").isVisible(), "primo accesso: passo 2, la città");
+  await ip.getByRole("button", { name: "Un'altra città" }).click();
+  await ip.getByTestId("benvenuto-altra-citta").fill("Torino");
+  await ip.screenshot({ path: `${OUT}/benvenuto-2-citta.png`, caret: "initial" });
+  await ip.getByRole("button", { name: "Roma", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("onboarding-salta").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, saltabile");
+  await ip.screenshot({ path: `${OUT}/benvenuto-3-importa.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 360, height: 740 });
+  const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const ob = await ip.getByTestId("benvenuto-dopo").boundingBox();
+  ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`);
+  await ip.screenshot({ path: `${OUT}/benvenuto-3-importa-360.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 390, height: 844 });
+  // Indietro conserva le scelte.
+  await ip.getByRole("button", { name: "Indietro" }).click();
+  ok((await ip.getByRole("button", { name: "Roma", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: 'Indietro' conserva la città scelta");
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByTestId("benvenuto-importa-si").click();
+  await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Importa da Google Maps' apre l'import"), () => ok(false, `primo accesso: 'Importa da Google Maps' apre l'import (${ip.url()})`));
+  await ip.getByTestId("importa-multi").waitFor({ timeout: 5000 }).catch(() => {});
+  const mb = await ip.getByTestId("importa-multi").boundingBox();
+  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2, `primo accesso: l'import si apre con 'Incolla più link' in cima (${Math.round(mb?.y ?? -1)})`);
+  await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
+  ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
+
+  // "Salta" sulle schermate 2 e 3: si salta solo quella; alla fine la mappa cerca sui gusti, nella città.
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.getByRole("button", { name: "Pizza", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Milano", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Indietro" }).click();
+  await ip.getByTestId("onboarding-salta").click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "primo accesso: 'Salta' al passo 2 va al passo 3");
+  await ip.getByTestId("onboarding-salta").click();
+  await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Salta' all'ultimo passo → mappa con la ricerca sui gusti, senza città saltata (${new URL(ip.url()).searchParams.get("q")})`);
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.getByRole("button", { name: "Pizza", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Milano", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByTestId("benvenuto-dopo").click();
+  await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(ip.url()).searchParams.get("q") === "Pizzeria a Milano", `primo accesso: 'Lo faccio dopo' → mappa con la ricerca nella città scelta (${new URL(ip.url()).searchParams.get("q")})`);
+
+  // "Invita un amico" nel profilo: link personale con il nome pubblico, condiviso o copiato.
+  await ictx.addInitScript(() => { Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); });
+  await ictx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
+  const pp = await ictx.newPage();
+  pp.on("pageerror", (e) => errors.push(e.message));
+  await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  await pp.getByTestId("invita-amico").scrollIntoViewIfNeeded();
+  await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
+  await pp.getByTestId("invita-amico-condividi").click();
+  await pp.getByTestId("invita-amico-condividi").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
+  const clip = await pp.evaluate(() => navigator.clipboard.readText()).catch(() => "");
+  ok(clip === `${BASE}/invito/lorenzo`, `profilo: senza menu di condivisione il link si copia (${clip})`);
+  ok(ievents.some((e) => e?.type === "condividi" && e.props?.contesto === "invito"), "profilo: invito condiviso tracciato");
+  await pp.setViewportSize({ width: 360, height: 740 });
+  const px = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(px <= 0, `profilo 360px: 'Invita un amico' senza scroll orizzontale (${px}px)`);
+  await pp.getByTestId("invita-amico").scrollIntoViewIfNeeded();
+  await pp.screenshot({ path: `${OUT}/invita-amico-360.png`, caret: "initial" });
+  // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
+  await ictx.clearCookies({ name: "e2e_social" });
+  await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  await ictx.close();
+
+  // Pannello: arrivi e registrazioni per codice; chi arriva anonimo e poi si registra conta una volta.
+  let nmI = null;
+  try { nmI = await import(new URL("../../src/lib/numeri.ts", import.meta.url).href); } catch { /* già segnalato sopra */ }
+  if (nmI) {
+    const t = new Date().toISOString();
+    const rowsI = [
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a1", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: "u1", anon_id: "a1", props: { nome: "invito_registrato", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a2", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a2", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a3", props: { nome: "invito_arrivo", contesto: "tester" } },
+      { created_at: t, type: "condividi", user_id: "u9", anon_id: null, props: { contesto: "invito" } },
+    ];
+    const ni = nmI.computeNumeri(rowsI, 7);
+    ok(JSON.stringify(ni.inviti) === JSON.stringify([{ codice: "giulia.rm", arrivi: 2, registrati: 1 }, { codice: "tester", arrivi: 1, registrati: 0 }]), `numeri: arrivi e registrati per codice d'invito (${JSON.stringify(ni.inviti)})`);
+    ok(ni.funzioni.some((f) => f.chiave === "invito_condividi" && f.volte === 1), "numeri: 'Invito: link mandato' tra le funzioni");
+  }
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
