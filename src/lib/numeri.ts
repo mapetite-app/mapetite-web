@@ -18,6 +18,15 @@ export type Tester = {
   chi: string; registrato: boolean; prima: string; ultima: string;
   giorniAttivi: number; sessioni: number; ricerche: number; salvati: number; errori: number;
 };
+// "Ti è stato utile?" e domanda settimanale (piano 7.6): il valore che i tester trovano.
+export type UtileContesto = { contesto: string; si: number; no: number };
+export type ValoreGiorno = { giorno: string; si: number; no: number; voti: number; media: number | null };
+export type Valore = {
+  perContesto: UtileContesto[];
+  motivi: Conteggio[];
+  settimanale: { risposte: number; media: number | null; si: number; forse: number; no: number; chiuse: number };
+  perGiorno: ValoreGiorno[];
+};
 export type ErroreRiga = { messaggio: string; pagina: string; volte: number; persone: number; ultima: string };
 
 export type Numeri = {
@@ -31,12 +40,15 @@ export type Numeri = {
   salvataggi: { totale: number; perUtente: number | null };
   imbuto: { passo: string; volte: number; persone: number }[];
   funzioni: Conteggio[];
+  // Link d'invito (piano 9.1): per codice, quante persone sono arrivate e quante si sono registrate.
+  inviti: { codice: string; arrivi: number; registrati: number }[];
   errori: ErroreRiga[];
   ricerchePerTipo: Conteggio[];
   ricerchePerZona: Conteggio[];
   requisiti: Conteggio[];
   pagine: Conteggio[];
   utile: { si: number; no: number };
+  valore: Valore;
   perGiorno: Giorno[];
   tester: Tester[];
   // Nessun evento dei tipi nuovi: probabilmente la migrazione 20261015 non è ancora applicata.
@@ -55,6 +67,8 @@ export const FUNZIONI_NOTE = [
   "assistente_apri", "assistente_messaggio", "assistente_seguito", "assistente_scheda", "assistente_salva", "assistente_prenota",
   "prenota_whatsapp", "prenota_telefono", "prenota_sito", "prenota_promemoria", "prenota_com_e_andata",
   "raccolta_crea", "raccolta_apri", "raccolta_condividi", "raccolta_modifica", "raccolte_proposte",
+  // Invito e primo accesso (piano 9.1).
+  "invito_arrivo", "invito_registrato", "invito_condividi", "benvenuto_importa",
 ] as const;
 const AZIONI_DIRETTE = ["apri_scheda", "salva", "rimuovi", "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi"];
 
@@ -76,6 +90,7 @@ const ETICHETTE: Record<string, string> = {
   assistente_salva: "Assistente: salva",
   assistente_prenota: "Assistente: prenota",
   assistente_serata: "Assistente: serata a tappe",
+  assistente_memoria: "Assistente: memoria dei gusti",
   prenota_whatsapp: "Prenota: WhatsApp",
   prenota_telefono: "Prenota: telefono",
   prenota_sito: "Prenota: sito",
@@ -91,7 +106,24 @@ const ETICHETTE: Record<string, string> = {
   sorpresa_altro: "Sorprendimi: un altro",
   sorpresa_salva: "Sorprendimi: salva",
   sorpresa_apri: "Sorprendimi: scheda",
+  invito_arrivo: "Invito: arrivo",
+  invito_registrato: "Invito: registrato",
+  invito_condividi: "Invito: link mandato",
+  benvenuto_importa: "Primo accesso: importa",
+  benvenuto_fine: "Primo accesso: finito",
 };
+// Dove si chiede "Ti è stato utile?" (anche quelli ancora senza voti compaiono, a 0).
+export const UTILE_CONTESTI = ["ricerca", "articolo", "assistente", "serata", "sorpresa", "prenota"] as const;
+const UTILE_ETICHETTE: Record<string, string> = {
+  ricerca: "Ricerca", articolo: "Risposta della ricerca", assistente: "Assistente", serata: "Serata a tappe",
+  sorpresa: "Sorprendimi", prenota: "Prenotazione",
+};
+export const etichettaUtile = (k: string): string => UTILE_ETICHETTE[k] ?? k.replaceAll("_", " ");
+const MOTIVI_ETICHETTE: Record<string, string> = { sbagliati: "Risultati sbagliati", lento: "Troppo lento", gia_noti: "Posti già noti", altro: "Altro" };
+export const etichettaMotivo = (k: string): string => MOTIVI_ETICHETTE[k] ?? k.replaceAll("_", " ");
+// Voto "Ti è stato utile?": "si"/"no" (anche 1/0 per sicurezza).
+const votoUtile = (v: unknown): "si" | "no" | null => (v === "si" || v === 1 ? "si" : v === "no" || v === 0 ? "no" : null);
+
 export const etichettaFunzione = (k: string): string => ETICHETTE[k] ?? k.replaceAll("_", " ");
 
 // Funzione dedicata ricavata da un evento di un tipo esistente (null = nessuna).
@@ -115,6 +147,7 @@ export function funzioneDedicata(type: string, p: Record<string, unknown>): stri
   if (type === "condividi") {
     const cosa = str(p.contesto) ?? str(p.cosa);
     if (cosa === "raccolta") return "raccolta_condividi";
+    if (cosa === "invito") return "invito_condividi";
     if (cosa === "profilo" || cosa === "mappa") return `condividi_${cosa}`;
   }
   return null;
@@ -216,15 +249,37 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
   ];
 
   const funzioni = tally();
+  const invArrivi = new Map<string, Set<string>>(), invRegistrati = new Map<string, Set<string>>();
   const tipi = tally(), zone = tally(), req = tally(), pagine = tally();
   const errori = new Map<string, { messaggio: string; pagina: string; volte: number; persone: Set<string>; ultima: number }>();
   const utile = { si: 0, no: 0 };
+  const perContesto = new Map<string, UtileContesto>(UTILE_CONTESTI.map((c) => [c, { contesto: c, si: 0, no: 0 }]));
+  const motivi = tally();
+  const sett = { risposte: 0, somma: 0, si: 0, forse: 0, no: 0, chiuse: 0 };
+  const valoreGiorno = new Map<number, { si: number; no: number; voti: number; somma: number }>();
+  const vg = (d: number) => valoreGiorno.get(d) ?? valoreGiorno.set(d, { si: 0, no: 0, voti: 0, somma: 0 }).get(d)!;
   let senzaRisultati = 0, ai = 0, filtri = 0;
 
   for (const e of inP) {
     const p = e.r.props ?? {};
     switch (e.r.type) {
-      case "funzione": { const n = str(p.nome); if (n) funzioni.add(n, e.actor); break; }
+      case "funzione": {
+        const n = str(p.nome);
+        // La domanda settimanale non è una funzione: va in "Valore per i tester".
+        if (n === "domanda_settimanale") {
+          const v = typeof p.voto === "number" ? Math.round(p.voto) : NaN;
+          if (v >= 1 && v <= 5) { sett.risposte++; sett.somma += v; const g = vg(e.day); g.voti++; g.somma += v; }
+          if (p.stato === "si" || p.stato === "forse" || p.stato === "no" || p.stato === "chiusa") sett[p.stato === "chiusa" ? "chiuse" : p.stato]++;
+          break;
+        }
+        if (n) funzioni.add(n, e.actor);
+        const codice = str(p.contesto);
+        if (codice && e.actor && (n === "invito_arrivo" || n === "invito_registrato")) {
+          const m = n === "invito_arrivo" ? invArrivi : invRegistrati;
+          (m.get(codice) ?? m.set(codice, new Set()).get(codice)!).add(e.actor);
+        }
+        break;
+      }
       case "ricerca": {
         if (p.modo === "ai") { ai++; funzioni.add("ricerca_ai", e.actor); } else filtri++;
         if (p.risultati === 0) senzaRisultati++;
@@ -239,7 +294,17 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
         if (n && PAGINE_FUNZIONE[n]) funzioni.add(PAGINE_FUNZIONE[n], e.actor);
         break;
       }
-      case "utile": if (p.voto === "si") utile.si++; else if (p.voto === "no") utile.no++; break;
+      case "utile": {
+        const v = votoUtile(p.voto);
+        const c = str(p.contesto) ?? "ricerca";
+        if (v) {
+          utile[v]++;
+          const x = perContesto.get(c) ?? perContesto.set(c, { contesto: c, si: 0, no: 0 }).get(c)!;
+          x[v]++;
+          vg(e.day)[v]++;
+        } else if (str(p.stato)) motivi.add(str(p.stato)!, e.actor); // "Cosa mancava?" dopo un 👎
+        break;
+      }
       case "errore": {
         const messaggio = str(p.messaggio) ?? "(senza messaggio)";
         const pagina = str(p.pagina) ?? "?";
@@ -276,6 +341,18 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
     });
   }
 
+  const valore: Valore = {
+    perContesto: [...perContesto.values()].sort((a, b) => (b.si + b.no) - (a.si + a.no)),
+    motivi: motivi.list(),
+    settimanale: {
+      risposte: sett.risposte, media: sett.risposte > 0 ? Math.round((sett.somma / sett.risposte) * 10) / 10 : null,
+      si: sett.si, forse: sett.forse, no: sett.no, chiuse: sett.chiuse,
+    },
+    perGiorno: [...valoreGiorno].sort((a, b) => b[0] - a[0]).map(([d, g]) => ({
+      giorno: keyOfIndex(d), si: g.si, no: g.no, voti: g.voti, media: g.voti > 0 ? Math.round((g.somma / g.voti) * 10) / 10 : null,
+    })),
+  };
+
   const tester: Tester[] = [...actors].map((a) => {
     const mine = inP.filter((e) => e.actor === a);
     const sid = new Set(mine.map((e) => e.r.session_id).filter(Boolean));
@@ -304,12 +381,16 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
     salvataggi: { totale: salvataggi.length, perUtente: ratio(salvataggi.length, nAttivi) },
     imbuto,
     funzioni: funzioniList,
+    inviti: [...new Set([...invArrivi.keys(), ...invRegistrati.keys()])]
+      .map((codice) => ({ codice, arrivi: invArrivi.get(codice)?.size ?? 0, registrati: invRegistrati.get(codice)?.size ?? 0 }))
+      .sort((a, b) => b.arrivi - a.arrivi || b.registrati - a.registrati || a.codice.localeCompare(b.codice)),
     errori: [...errori.values()].map((x) => ({ messaggio: x.messaggio, pagina: x.pagina, volte: x.volte, persone: x.persone.size, ultima: new Date(x.ultima).toISOString() })).sort((a, b) => b.volte - a.volte),
     ricerchePerTipo: tipi.list(),
     ricerchePerZona: zone.list(),
     requisiti: req.list(),
     pagine: pagine.list(),
     utile,
+    valore,
     perGiorno,
     tester,
     senzaTracciamento: !rows.some((r) => NUOVI_TIPI.includes(r.type)),

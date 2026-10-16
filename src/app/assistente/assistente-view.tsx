@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, BookmarkCheck, Map as MapIcon, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowUp, BookmarkCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
 import VenueSheet from "@/components/venue-sheet";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
 import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
+import UtileFeedback from "@/components/utile-feedback";
 import VoiceButton from "@/components/voice-button";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
@@ -16,6 +17,8 @@ import { track, trackFeature } from "@/lib/track";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
+import { aggiungiGusti, fraseConZona, gustiDichiarati, gustiPerRicerca, gustoDa, inFondoPerGusti, metri, type Zona } from "@/lib/gusti";
+import { caricaGusti, caricaZonaAbituale, gustiRicordati, ricordaGusti } from "@/lib/gusti-store";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
 type Ask = { label: string; send: string };
@@ -31,6 +34,9 @@ type BotMsg = {
   status?: "loading" | "verdicts" | "done" | "error";
   asks?: Ask[];
   serata?: Serata;             // serata completa a tappe (piano 1.2)
+  gusti?: { id: string; label: string }[];      // gusti ricordati usati in questa ricerca (piano 1.4)
+  memo?: { ids: string[]; state: "ask" | "si" | "no" }; // "Me lo ricordo?" (mai senza un Sì)
+  zona?: { nome: string; send: string };        // "Di solito vai a Monti: cerco lì?"
 };
 type Msg = UserMsg | BotMsg;
 type Conv = {
@@ -39,6 +45,7 @@ type Conv = {
   bookingMode: boolean;
   lastQuery: string | null;
   pos: { lat: number; lng: number } | null;
+  skipGusti?: string[];        // gusti tolti con un tocco: valgono fino a "Nuova"
 };
 
 const KEY = "mapetite.assistente";
@@ -46,6 +53,8 @@ const EMPTY_BOOKING: BookingDetails = { date: null, time: null, people: null, sp
 const EMPTY: Conv = { msgs: [], booking: EMPTY_BOOKING, bookingMode: false, lastQuery: null, pos: null };
 // Senza posizione e senza città scritta si cerca intorno a Roma, come la mappa all'apertura.
 const DEFAULT_CENTER = { lat: 41.9028, lng: 12.4964 };
+// Zona dove la persona salva più spesso (letta all'apertura, nessuna chiamata Google).
+let zonaAbitualeCache: Zona | null = null;
 
 // Serata rimasta a metà (pagina chiusa): le tappe in attesa diventano "interrotte", il resto resta.
 function reviveSerata(m: BotMsg): BotMsg {
@@ -233,7 +242,7 @@ async function loadTappaVerdicts(msgId: string, i: number, query: string, pendin
   });
 }
 
-async function runSerata(plan: SerataPlan, q: string, pos: { lat: number; lng: number } | null) {
+async function runSerata(plan: SerataPlan, q: string, pos: { lat: number; lng: number } | null): Promise<string> {
   const msgId = newId();
   const n = plan.tappe.length;
   const tappe: SerataTappa[] = plan.tappe.map((t) => ({ kind: t.kind, label: t.label, emoji: t.emoji, query: t.query, status: "loading", pool: [], chosenId: null }));
@@ -275,35 +284,49 @@ async function runSerata(plan: SerataPlan, q: string, pos: { lat: number; lng: n
     text: found === 0 ? firstError ?? `Non ho trovato posti per “${q}”. Prova con un'altra zona.` : m.text,
     note: found > 0 && found < n ? "Per una tappa non ho trovato posti: prova a cambiare zona." : m.note ?? null,
   }));
+  return msgId;
 }
 
-async function runSearch(q: string, booking: BookingDetails, bookingMode: boolean, pos: { lat: number; lng: number } | null) {
+async function runSearch(q: string, booking: BookingDetails, bookingMode: boolean, pos: { lat: number; lng: number } | null, extraNote?: string): Promise<string> {
   const msgId = newId();
-  setConv((c) => ({ ...c, lastQuery: q, msgs: [...c.msgs, { id: msgId, role: "assistant", text: "", status: "loading", query: q }] }));
+  // Gusti ricordati (piano 1.4): entrano nella richiesta come parole, così Google e i verdetti ne
+  // tengono conto senza chiamate in più. La richiesta scritta vince ("ristorante di pesce").
+  const { query: full, usati } = gustiPerRicerca(q, gustiRicordati(), getConv().skipGusti ?? []);
+  const gusti = usati.length > 0 ? usati.map((g) => ({ id: g.id, label: g.label })) : undefined;
+  setConv((c) => ({ ...c, lastQuery: q, msgs: [...c.msgs, { id: msgId, role: "assistant", text: "", status: "loading", query: q, gusti }] }));
   const at = pos ?? DEFAULT_CENTER;
   try {
     // Frase già capita mentre si scriveva (come la mappa): la ricerca non riaspetta l'AI.
-    const intent = await intentFor(q);
+    const intent = await intentFor(full);
     const res = await fetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: q, source: "world", searchIntent: "natural", phase: "fast",
-        ...(intent && { intent, intentQuery: q.trim() }),
+        query: full, source: "world", searchIntent: "natural", phase: "fast",
+        ...(intent && { intent, intentQuery: full.trim() }),
         lat: at.lat, lng: at.lng,
       }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       patchMsg(msgId, { status: "error", text: data?.error ?? "Qualcosa è andato storto. Riprova." });
-      return;
+      return msgId;
     }
-    const places = ((data.risultati ?? []) as RawPlace[]).filter((p) => p.lat != null && p.lng != null).map(toCard);
+    // Contro un gusto dichiarato (categoria o nome chiari, es. "seafood_restaurant"): in fondo, mai esclusi.
+    const ordered = inFondoPerGusti(((data.risultati ?? []) as RawPlace[]).filter((p) => p.lat != null && p.lng != null).map(toCard), usati);
+    const places = ordered.places;
     const f = data.filtri_usati as { categoria?: string | null; parole_chiave?: string[]; zona?: string | null; vicino_a_me?: boolean } | undefined;
     const understood = [f?.categoria, ...(f?.parole_chiave ?? []).slice(0, 3), f?.zona].filter(Boolean).join(" · ");
     const notes: string[] = [];
     if ((data.da_parte?.turistici ?? []).length > 0) notes.push("Ho messo in fondo i posti più turistici.");
-    if (!f?.zona && !pos && !f?.vicino_a_me) notes.push("Ho cercato intorno a Roma: scrivi la città se sei altrove.");
+    if (ordered.spostati > 0) notes.push(`Ho messo in fondo ${ordered.spostati === 1 ? "un posto" : `${ordered.spostati} posti`} ${ordered.motivo}: mi hai detto che non fa per te.`);
+    if (extraNote) notes.push(extraNote);
+    // Comportamento: la zona dove salvi più spesso, proposta solo se la frase non dice già dove.
+    const z = zonaAbitualeCache;
+    const zona = z && !f?.zona && !f?.vicino_a_me && !fraseConZona(q) && (!pos || metri(pos, z) < 20_000)
+      ? { nome: z.nome, send: z.citta === "Roma" ? `a ${z.nome}` : `a ${z.nome}, ${z.citta}` }
+      : undefined;
+    if (!f?.zona && !pos && !f?.vicino_a_me && !zona) notes.push("Ho cercato intorno a Roma: scrivi la città se sei altrove.");
     let text: string;
     let asks: Ask[] | undefined;
     if (places.length === 0) {
@@ -317,12 +340,23 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
     } else {
       text = `Ecco ${places.length} ${places.length === 1 ? "posto" : "posti"} per “${q}”.`;
     }
-    patchMsg(msgId, { places, text, understood: understood || null, note: notes.join(" ") || null, asks, status: data.sintesi_pendente ? "verdicts" : "done" });
-    if (data.sintesi_pendente) void loadVerdicts(msgId, q, data.sintesi_pendente as Pending);
+    patchMsg(msgId, { places, text, understood: understood || null, note: notes.join(" ") || null, asks, zona, status: data.sintesi_pendente ? "verdicts" : "done" });
+    // I verdetti con la stessa richiesta della ricerca (firmata dal server): gusti compresi.
+    if (data.sintesi_pendente) void loadVerdicts(msgId, full, data.sintesi_pendente as Pending);
   } catch {
     patchMsg(msgId, { status: "error", text: "Errore di rete. Controlla la connessione e riprova." });
   }
+  return msgId;
 }
+
+// Gusti nuovi in questo messaggio: quelli che cambierebbero ciò che è già ricordato.
+function gustiNuovi(text: string): { ids: string[]; dichiarati: string[]; soloPreferenza: boolean } {
+  const d = gustiDichiarati(text);
+  const cur = gustiRicordati();
+  const ids = d.ids.filter((id) => aggiungiGusti(cur, [id]).join() !== cur.join());
+  return { ids, dichiarati: d.ids, soloPreferenza: d.soloPreferenza };
+}
+const labelsOf = (ids: string[]) => ids.map((id) => gustoDa(id)?.label).filter(Boolean).join(" · ");
 
 function lastResults(c: Conv): BotMsg | null {
   for (let i = c.msgs.length - 1; i >= 0; i--) {
@@ -346,13 +380,15 @@ function plannedQuery(raw: string, c: Conv): string | null {
   const text = raw.trim().slice(0, 300);
   if (!text || SMALL_TALK.test(text)) return null;
   if (localRefineOf(text) && lastResults(c)) return null;
+  if (gustiDichiarati(text).soloPreferenza) return null; // "sono vegetariano": nessuna ricerca
   const q = searchQueryOf(text, parseBooking(text), c.lastQuery);
-  // Serata a tappe: si capisce senza AI, nessuna richiesta in anticipo.
-  return q && serataOf(q) ? null : q;
+  // Serata a tappe: si capisce senza AI, nessuna richiesta in anticipo. Per le altre la stessa
+  // richiesta che partirà all'Invio, gusti ricordati compresi.
+  return q && serataOf(q) ? null : q ? gustiPerRicerca(q, gustiRicordati(), c.skipGusti ?? []).query : null;
 }
 
 // Segnale "funzione" dell'assistente: mai il testo scritto, solo che tipo di messaggio era.
-const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli" | "serata") =>
+const trackMsg = (contesto: "saluto" | "seguito" | "ricerca" | "prenotazione" | "dettagli" | "serata" | "gusti") =>
   trackFeature("assistente_messaggio", { contesto });
 
 async function send(raw: string) {
@@ -378,6 +414,21 @@ async function send(raw: string) {
     reply({ text: "Dimmi cosa cerchi, come lo diresti a un amico: tipo di posto, zona, occasione. Se vuoi prenotare, aggiungi giorno, ora e persone." });
     return;
   }
+
+  // Preferenze dichiarate ("sono vegetariano", "evito i posti rumorosi"): si chiede se ricordarle,
+  // mai salvate senza un "Sì". Se il messaggio è SOLO la preferenza non parte nessuna ricerca.
+  const nuovi = gustiNuovi(text);
+  if (nuovi.ids.length > 0) trackFeature("assistente_memoria", { contesto: "proposta", risultati: nuovi.ids.length });
+  if (nuovi.soloPreferenza) {
+    trackMsg("gusti");
+    if (nuovi.ids.length === 0) {
+      reply({ text: `Lo so già: ne tengo conto in ogni ricerca (${labelsOf(nuovi.dichiarati)}).` });
+      return;
+    }
+    reply({ text: "Capito. Così non devi ripeterlo a ogni ricerca:", memo: { ids: nuovi.ids, state: "ask" } });
+    return;
+  }
+  const memo = nuovi.ids.length > 0 ? { memo: { ids: nuovi.ids, state: "ask" as const } } : null;
 
   // Seguiti che si fanno sui risultati già avuti: nessuna ricerca Google.
   const prev = lastResults(before);
@@ -412,14 +463,16 @@ async function send(raw: string) {
   if (q && plan) {
     trackMsg("serata");
     trackFeature("assistente_serata", { contesto: "percorso", risultati: plan.tappe.length });
-    await runSerata(plan, q, getConv().pos);
+    const id = await runSerata(plan, q, getConv().pos);
+    if (memo) patchMsg(id, memo);
     return;
   }
   if (q) {
     trackMsg(parsed.isBooking ? "prenotazione" : "ricerca");
     // "solo con terrazza" dopo una ricerca: seguito che riformula la richiesta di prima.
     if (before.lastQuery && q !== searchQueryOf(text, parsed, null)) trackFeature("assistente_seguito", { contesto: "ricerca" });
-    await runSearch(q, booking, bookingMode, getConv().pos);
+    const id = await runSearch(q, booking, bookingMode, getConv().pos);
+    if (memo) patchMsg(id, memo);
     return;
   }
 
@@ -492,6 +545,13 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
     return () => { alive = false; };
   }, [userId]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  // Memoria dei gusti (piano 1.4): gusti ricordati e zona abituale, letti una volta all'apertura.
+  useEffect(() => {
+    let alive = true;
+    void caricaGusti(userId);
+    caricaZonaAbituale(userId).then((z) => { if (alive) zonaAbitualeCache = z; }, () => {});
+    return () => { alive = false; };
+  }, [userId]);
 
   // Stesso salvataggio della mappa: senza accesso il locale si ricorda e si salva dopo il login
   // (src/lib/pending-save.ts, completato da /mappa, dove si arriva dopo l'accesso).
@@ -564,6 +624,22 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   };
   const lastResultsId = lastResults(c)?.id ?? null;
 
+  // "Me lo ricordo?": solo con un Sì esplicito il gusto si salva (profilo o telefono).
+  const answerMemo = (m: BotMsg, yes: boolean) => {
+    if (!m.memo || m.memo.state !== "ask") return;
+    patchMsg(m.id, { memo: { ...m.memo, state: yes ? "si" : "no" } });
+    trackFeature("assistente_memoria", { contesto: yes ? "si" : "no", risultati: m.memo.ids.length });
+    if (yes) void ricordaGusti(userId, m.memo.ids);
+  };
+  // Un tocco su "vegetariano ✕": la stessa ricerca senza quel gusto, fino a "Nuova".
+  const dropGusto = (m: BotMsg, id: string) => {
+    if (busy || !m.query) return;
+    const label = m.gusti?.find((g) => g.id === id)?.label ?? "";
+    setConv((x) => ({ ...x, skipGusti: [...new Set([...(x.skipGusti ?? []), id])] }));
+    trackFeature("assistente_memoria", { contesto: "tolto" });
+    void runSearch(m.query, c.booking, c.bookingMode, c.pos, `Senza “${label}”, solo in questa conversazione.`);
+  };
+
   return (
     <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile))] max-w-lg flex-col bg-bg md:min-h-[calc(100dvh-3.5rem)]">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-bg/95 px-4 py-2.5 backdrop-blur md:top-14">
@@ -634,6 +710,23 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     {m.understood && <p className="mt-1 text-xs font-sans text-text-muted">Ho capito: {m.understood}</p>}
                   </>
                 )}
+                {m.gusti && m.gusti.length > 0 && (
+                  <div data-testid="assistente-gusti" className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-sans text-text-muted">
+                    <span>Tengo conto di:</span>
+                    {m.gusti.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => dropGusto(m, g.id)}
+                        disabled={busy}
+                        aria-label={`Togli “${g.label}” da questa conversazione`}
+                        className="inline-flex min-h-8 items-center gap-1 rounded-pill bg-surface px-2.5 font-semibold text-brand disabled:opacity-60 active:scale-95"
+                      >
+                        {g.label} <X size={12} aria-hidden />
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {m.serata && (
                   <SerataView
                     serata={m.serata}
@@ -661,6 +754,45 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                 )}
                 {m.status === "verdicts" && <p className="mt-1 text-xs font-sans text-text-muted">Sto scrivendo i verdetti…</p>}
                 {m.note && <p data-testid="assistente-nota" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">{m.note}</p>}
+                {m.memo && (
+                  <div data-testid="assistente-ricorda" className="mt-3 rounded-card border border-border bg-surface px-4 py-3">
+                    {m.memo.state === "ask" ? (
+                      <>
+                        <p className="text-[15px] font-sans leading-snug text-text">
+                          <span className="font-display font-semibold">Me lo ricordo?</span> {labelsOf(m.memo.ids)}
+                        </p>
+                        <p className="mt-0.5 text-xs font-sans text-text-muted">Ne terrò conto nelle prossime ricerche. Lo cancelli quando vuoi dal profilo.</p>
+                        <div className="mt-2.5 flex gap-2">
+                          <button type="button" data-testid="assistente-ricorda-si" onClick={() => answerMemo(m, true)} className="min-h-10 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95">
+                            ✓ Sì, ricordalo
+                          </button>
+                          <button type="button" data-testid="assistente-ricorda-no" onClick={() => answerMemo(m, false)} className="min-h-10 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-95">
+                            No
+                          </button>
+                        </div>
+                      </>
+                    ) : m.memo.state === "si" ? (
+                      <p className="text-sm font-sans leading-snug text-text">
+                        Fatto, me lo ricordo: {labelsOf(m.memo.ids)}. Lo trovi nel profilo, in{" "}
+                        <Link href="/profilo#cosa-so-di-te" className="font-semibold text-accent">Cosa so di te</Link>.
+                      </p>
+                    ) : (
+                      <p className="text-sm font-sans text-text-muted">Va bene, non lo ricordo.</p>
+                    )}
+                  </div>
+                )}
+                {m.zona && m.id === last?.id && m.status !== "loading" && (
+                  <div data-testid="assistente-zona" className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <p className="text-sm font-sans text-text">📍 Di solito vai a {m.zona.nome}: cerco lì?</p>
+                    <button
+                      type="button"
+                      onClick={() => { trackFeature("assistente_memoria", { contesto: "zona" }); submit(m.zona!.send); }}
+                      className="min-h-10 rounded-pill border border-brand/40 bg-white px-3.5 text-sm font-display font-semibold text-brand active:scale-95"
+                    >
+                      Cerca a {m.zona.nome}
+                    </button>
+                  </div>
+                )}
                 {m.asks && m.asks.length > 0 && m.id === last?.id && (
                   <div data-testid="assistente-domanda" className="mt-3 flex flex-wrap gap-2">
                     {m.asks.map((a) => (
@@ -678,6 +810,15 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                       </button>
                     ))}
                   </div>
+                )}
+                {/* "Ti è stato utile?" (piano 7.6): una volta per risposta, solo sull'ultima con posti. */}
+                {m.id === last?.id && m.status === "done" && ((m.places?.length ?? 0) > 0 || !!m.serata) && (
+                  <UtileFeedback
+                    contesto={m.serata ? "serata" : "assistente"}
+                    risultati={m.serata ? m.serata.tappe.filter((t) => chosenOf(t)).length : m.places?.length ?? 0}
+                    chiave={`assistente:${m.id}`}
+                    className="mt-4"
+                  />
                 )}
               </div>
             ),

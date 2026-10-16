@@ -9,11 +9,13 @@ import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
+import InvitaAmico from "@/components/invita-amico";
 import { loadMySocial } from "@/lib/social";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
+import ProfiloGusti from "@/components/profilo-gusti";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -222,6 +224,9 @@ export default async function ProfiloPage() {
 
       <ProfiloPrenotazioni />
 
+      {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
+      <ProfiloGusti userId={user.id} />
+
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
         {counters.map((c) => (
@@ -236,6 +241,9 @@ export default async function ProfiloPage() {
           </Link>
         ))}
       </nav>
+
+      {/* Invito (piano 9.1): il proprio link personale, in vista. */}
+      <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
 
       <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
 

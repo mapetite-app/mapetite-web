@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { findOrCreatePlace, type StoredPlace } from "@/lib/places-store";
-import {
-  extractMapsLinks,
-  isGoogleMapsLink,
-  isShortMapsLink,
-  parseMapsUrl,
-  unwrapConsent,
-} from "@/lib/maps-link";
+import { extractMapsLinks, isShortMapsLink, parseMapsUrl, unwrapConsent } from "@/lib/maps-link";
+import { findPlaceId, placeEssentials, resolveShortLink } from "@/lib/maps-resolve";
 
 // "Salva da Google Maps": l'utente condivide (o incolla) uno o più link di Google Maps.
 // Dal link si leggono nome e coordinate; il Place ID arriva da UNA Text Search che chiede
@@ -16,95 +11,9 @@ import {
 // caricano come oggi quando si apre il locale.
 
 const MAX_LINKS = 10;
-const MAX_HOPS = 3;
 const NO_COORDS = "Non riesco a leggere il link: apri il locale in Google Maps e condividi di nuovo.";
 
 type LinkResult = { link: string; place?: StoredPlace; error?: string };
-
-// Segue i link corti (maps.app.goo.gl) leggendo SOLO l'intestazione Location del redirect:
-// la pagina non viene mai letta. Si contattano solo maps.app.goo.gl e goo.gl/maps (niente SSRF).
-async function resolveShortLink(start: URL): Promise<URL | null> {
-  let current = start;
-  for (let hop = 0; hop < MAX_HOPS; hop++) {
-    if (!isShortMapsLink(current)) return current;
-    let res: Response;
-    try {
-      res = await fetch(current, {
-        redirect: "manual",
-        cache: "no-store",
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch (e) {
-      console.warn("[from-link] redirect non raggiungibile:", current.toString(), e);
-      return null;
-    }
-    res.body?.cancel().catch(() => {});
-    const location = res.headers.get("location");
-    if (res.status < 300 || res.status >= 400 || !location) return null;
-    let next: URL;
-    try { next = new URL(location, current); } catch { return null; }
-    if (!isGoogleMapsLink(next)) {
-      console.warn("[from-link] redirect verso host non Google, fermo:", next.hostname);
-      return null;
-    }
-    current = unwrapConsent(next);
-  }
-  return isShortMapsLink(current) ? null : current;
-}
-
-// Link senza coordinate ("?q=Nome,+Indirizzo&ftid=…", decisione 10 del backlog, 15/10): dopo l'ID
-// (gratuito) si chiedono a Place Details SOLO posizione, nome e indirizzo, fascia "Essentials"
-// (10.000 gratuite al mese, poi ~5 $ ogni 1.000). Conta 1 nella quota Place Details (50/giorno).
-async function placeEssentials(apiKey: string, placeId: string): Promise<{ name: string | null; address: string; lat: number; lng: number } | null> {
-  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=it`, {
-    headers: {
-      "X-Goog-Api-Key": apiKey,
-      // Solo campi Essentials. Non aggiungere campi qui.
-      "X-Goog-FieldMask": "id,displayName,formattedAddress,location",
-    },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) {
-    console.error("[from-link] Place Details (Essentials) errore", res.status, (await res.text()).slice(0, 300));
-    throw new Error("google");
-  }
-  const d: { displayName?: { text?: string }; formattedAddress?: string; location?: { latitude?: number; longitude?: number } } = await res.json();
-  const lat = d.location?.latitude;
-  const lng = d.location?.longitude;
-  if (typeof lat !== "number" || typeof lng !== "number") return null;
-  return {
-    name: d.displayName?.text?.trim() || null,
-    address: (d.formattedAddress ?? "").replace(/,\s*Ital(ia|y)$/i, ""),
-    lat,
-    lng,
-  };
-}
-
-async function findPlaceId(apiKey: string, textQuery: string, lat?: number, lng?: number): Promise<string | null> {
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      // SOLO l'ID: è la fascia gratuita ("IDs Only"). Non aggiungere campi qui.
-      "X-Goog-FieldMask": "places.id",
-    },
-    body: JSON.stringify({
-      textQuery,
-      pageSize: 1,
-      languageCode: "it",
-      ...(lat != null && lng != null
-        ? { locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 100 } } }
-        : {}),
-    }),
-  });
-  if (!res.ok) {
-    console.error("[from-link] Text Search (solo ID) errore", res.status, (await res.text()).slice(0, 300));
-    throw new Error("google");
-  }
-  const data: { places?: { id?: string }[] } = await res.json();
-  return data.places?.[0]?.id ?? null;
-}
 
 // Prima riga del testo condiviso che non è un link: su Android di solito è il nome del locale.
 function nameFromSharedText(text: string): string | null {

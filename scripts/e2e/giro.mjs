@@ -3124,6 +3124,167 @@ else {
     ok(!!pend && ["P1", "P3"].includes(pend.place?.id) && JSON.stringify(pend.tags) === '["Da provare"]' && decodeURIComponent(np.url()).includes("per salvare"), `assistente senza accesso: Salva porta all'accesso e il locale si salva dopo (${pend?.place?.name})`); }
   await nctx.close();
 
+  // Memoria dei gusti (piano 1.4): preferenze dichiarate capite a regole (nessuna AI), ricordate
+  // solo dopo un "Sì", usate nelle ricerche come parole della richiesta (nessuna chiamata in più),
+  // togliibili con un tocco; zona abituale dai salvati; "Cosa so di te" nel profilo.
+  {
+    let gm = null;
+    try { gm = await import(new URL("../../src/lib/gusti.ts", import.meta.url).href); } catch (e) { ok(false, `gusti: modulo src/lib/gusti.ts importabile (${e.message})`); }
+    if (gm) {
+      const d = (s) => gm.gustiDichiarati(s);
+      ok(d("Sono vegetariano").ids.join() === "vegetariano" && d("Sono vegetariano").soloPreferenza, "gusti: 'sono vegetariano' capito, solo preferenza (nessuna ricerca)");
+      ok(d("ricordati che non mi piace il pesce").ids.join() === "no-pesce" && d("evito i posti rumorosi").ids.join() === "tranquillo" && d("sono allergico ai crostacei").ids.join() === "no-pesce", "gusti: 'non mi piace il pesce', 'evito i posti rumorosi', 'allergico ai crostacei'");
+      ok(d("budget basso").ids.join() === "budget-basso" && d("max 30 euro a testa").ids.join() === "budget-30" && d("sono vegana e odio i posti turistici").ids.join() === "vegano,no-turistici", "gusti: budget, 'max 30 euro', vegana + niente turistici");
+      ok(d("sono celiaco, cerco una pizzeria a Prati").ids.join() === "celiaco" && !d("sono celiaco, cerco una pizzeria a Prati").soloPreferenza, "gusti: preferenza dentro una ricerca → la ricerca parte e si propone di ricordarla");
+      ok(["Trattoria non turistica a Testaccio", "Prenotami domani alle 21 per 2 con terrazza a Roma", "trattoria a Monti, niente pesce", "ristorante di pesce a Ostia", "Aperitivo con vista a Milano"].every((s) => d(s).ids.length === 0), "gusti: le richieste di stasera ('non turistica', 'niente pesce' dentro una ricerca) non diventano gusti da ricordare");
+      ok(gm.gustiPerRicerca("trattoria a Monti", ["vegetariano", "no-pesce"]).query === "trattoria a Monti, con piatti vegetariani, senza pesce", "gusti: entrano nella richiesta come parole");
+      ok(gm.gustiPerRicerca("ristorante di pesce a Ostia", ["vegetariano", "no-pesce"]).usati.length === 0 && gm.gustiPerRicerca("cocktail bar a Monti", ["vegetariano", "budget-20"]).query === "cocktail bar a Monti, economico", "gusti: la richiesta scritta vince; niente 'piatti vegetariani' per un cocktail bar");
+      { const r = gm.inFondoPerGusti([{ name: "Mare", category: "seafood_restaurant" }, { name: "Verde", category: "restaurant" }], gm.gustiPerRicerca("trattoria", ["no-pesce"]).usati);
+        ok(r.places.map((p) => p.name).join() === "Verde,Mare" && r.spostati === 1, "gusti: il posto di pesce va in fondo, non sparisce"); }
+      ok(gm.aggiungiGusti(["vegetariano", "budget-20"], ["vegano", "budget-basso"]).join() === "vegano,budget-basso" && gm.gustiValidi(["vegano", "inventato", 3, "vegano"]).join() === "vegano", "gusti: vegano assorbe vegetariano, un budget sostituisce l'altro, solo gusti conosciuti");
+      const monti = [{ lat: 41.8946, lng: 12.493 }, { lat: 41.895, lng: 12.492 }, { lat: 41.894, lng: 12.494 }, { lat: 41.889, lng: 12.47 }];
+      ok(gm.zonaAbituale(monti)?.nome === "Monti" && gm.zonaAbituale(monti.slice(0, 2)) === null, "gusti: zona abituale dai salvati (almeno 3 nello stesso quartiere)");
+      ok(gm.fraseConZona("trattoria a Monti") && gm.fraseConZona("pizza a Milano") && gm.fraseConZona("bar qui vicino") && !gm.fraseConZona("trattoria romana"), "gusti: si riconosce quando la frase dice già dove");
+    }
+
+    const U = "00000000-0000-0000-0000-000000000001";
+    const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const gEvents = [], gSearches = [], gSynth = [], gIntents = [], gPatches = [];
+    await gctx.route("**/api/events", (route) => { gEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
+    await gctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await gctx.route("**/rest/v1/**", (route) => route.fulfill(route.request().method() === "GET" ? { json: [] } : { status: 204, body: "" }));
+    // Salvati: tre a Monti e uno a Trastevere → "Di solito vai a Monti".
+    await gctx.route("**/rest/v1/saved_places**", (route) => {
+      if (!decodeURIComponent(route.request().url()).includes("places(lat")) return route.fulfill({ json: [] });
+      return route.fulfill({ json: [{ places: { lat: 41.8946, lng: 12.493 } }, { places: { lat: 41.895, lng: 12.492 } }, { places: { lat: 41.894, lng: 12.494 } }, { places: { lat: 41.889, lng: 12.47 } }] });
+    });
+    await gctx.route("**/rest/v1/profiles**", (route) => {
+      if (route.request().method() === "PATCH") { gPatches.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); }
+      return route.fulfill({ json: [] }); // colonna non ancora creata o profilo vuoto: si usa il telefono
+    });
+    await gctx.route("**/api/search/intent", (route) => { gIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
+    const G_PLACES = [
+      mk("G1", "Mare Blu", 41.8945, 12.4935, { category: "seafood_restaurant", userRatingCount: 300 }),
+      mk("G2", "Trattoria Verde", 41.8949, 12.4931, { category: "restaurant", userRatingCount: 120 }),
+      mk("G3", "Osteria del Vicolo", 41.8941, 12.4925, { category: "restaurant", userRatingCount: 90 }),
+    ];
+    await gctx.route("**/api/search", async (route) => {
+      gSearches.push(route.request().postDataJSON());
+      await new Promise((r) => setTimeout(r, 200));
+      return route.fulfill({ json: { risultati: G_PLACES, filtri_usati: { categoria: "trattoria", parole_chiave: [], vicino_a_me: false, zona: null }, sintesi_pendente: { places: [], token: "g" } } });
+    });
+    await gctx.route("**/api/search/synthesis", async (route) => {
+      gSynth.push(route.request().postDataJSON());
+      return route.fulfill({ json: { dettagli: { G2: { synthesis: "Cucina di casa.", tags: [], verdict: "Verdure dell'orto e carbonara vegetariana.", goFor: [], dontExpect: [], matchReason: "Piatti vegetariani nelle recensioni." } }, esclusi: [] } });
+    });
+    const gp = await gctx.newPage();
+    gp.on("pageerror", (e) => errors.push(e.message));
+    gp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+    await gp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    // 1. Solo la preferenza: nessuna ricerca, domanda "Me lo ricordo?".
+    await gp.getByTestId("assistente-campo").fill("sono vegetariano e non mi piace il pesce");
+    await gp.waitForTimeout(900); // pausa nello scrivere: per una preferenza nessuna richiesta all'AI in anticipo
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByTestId("assistente-ricorda").waitFor({ timeout: 5000 });
+    ok((await gp.getByTestId("assistente-ricorda").textContent()).includes("vegetariano · niente pesce"), "gusti: 'Me lo ricordo? vegetariano · niente pesce'");
+    ok(gSearches.length === 0 && gIntents.length === 0, `gusti: per una preferenza nessuna ricerca Google e nessuna richiesta all'AI (${gSearches.length}, ${gIntents.length})`);
+    ok(gPatches.length === 0 && (await gp.evaluate((u) => localStorage.getItem(`mapetite.gusti.${u}`), U)) === null, "gusti: niente salvato prima del Sì");
+    await gp.screenshot({ path: `${OUT}/60-gusti-proposta.png`, caret: "initial" });
+    await gp.getByTestId("assistente-ricorda-si").click();
+    await gp.getByTestId("assistente-ricorda").getByText("Fatto, me lo ricordo").waitFor({ timeout: 3000 });
+    await gp.waitForTimeout(300);
+    ok(gPatches.length === 1 && JSON.stringify(gPatches[0]) === '{"gusti_ricordati":["vegetariano","no-pesce"]}', `gusti: dopo il Sì salvati nel profilo (${JSON.stringify(gPatches[0] ?? null)})`);
+    ok((await gp.evaluate((u) => localStorage.getItem(`mapetite.gusti.${u}`), U)) === '["vegetariano","no-pesce"]', "gusti: copia nel telefono (funziona anche senza la migrazione)");
+    ok((await gp.getByTestId("assistente-ricorda").getByRole("link", { name: "Cosa so di te" }).getAttribute("href")) === "/profilo#cosa-so-di-te", "gusti: rimanda a 'Cosa so di te' nel profilo");
+    // 2. Ricerca senza zona: i gusti entrano nella richiesta (Google e verdetti), riga "Tengo conto di".
+    await gp.getByTestId("assistente-campo").fill("trattoria romana");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByTestId("assistente-card").getByText("Trattoria Verde").waitFor({ timeout: 8000 });
+    await gp.getByTestId("assistente-card").getByText("Verdure dell'orto e carbonara vegetariana.").waitFor({ timeout: 6000 }).catch(() => {});
+    ok(gSearches.length === 1 && gSearches[0].query === "trattoria romana, con piatti vegetariani, senza pesce", `gusti: una sola ricerca, con i gusti nella richiesta (${gSearches[0]?.query})`);
+    ok(gSynth.length === 1 && gSynth[0].query === gSearches[0].query, "gusti: i verdetti ricevono la stessa richiesta (nessuna chiamata in più)");
+    { const row = gp.getByTestId("assistente-gusti").last();
+      const t = await row.textContent();
+      ok(t.includes("Tengo conto di") && t.includes("vegetariano") && t.includes("niente pesce"), `gusti: riga 'Tengo conto di: vegetariano · niente pesce' (${t})`); }
+    { const first = await gp.getByTestId("assistente-card").last().locator("li").first().textContent();
+      const lastLi = await gp.getByTestId("assistente-card").last().locator("li").last().textContent();
+      ok(!first.includes("Mare Blu") && lastLi.includes("Mare Blu"), "gusti: il ristorante di pesce va in fondo (non sparisce)"); }
+    ok((await gp.getByTestId("assistente-nota").last().textContent()).includes("Ho messo in fondo un posto di pesce"), "gusti: si dice perché un posto è in fondo");
+    await gp.getByTestId("assistente-zona").waitFor({ timeout: 3000 });
+    ok((await gp.getByTestId("assistente-zona").textContent()).includes("Di solito vai a Monti: cerco lì?"), "gusti: 'Di solito vai a Monti: cerco lì?' (dai salvati) quando la frase non dice dove");
+    await gp.screenshot({ path: `${OUT}/61-gusti-ricerca.png`, caret: "initial" });
+    await gp.getByTestId("assistente-zona").scrollIntoViewIfNeeded();
+    await gp.screenshot({ path: `${OUT}/61b-gusti-zona.png`, caret: "initial" });
+    // 3. Un tocco toglie un gusto da questa conversazione: stessa ricerca senza.
+    await gp.getByTestId("assistente-gusti").last().getByRole("button", { name: /vegetariano/ }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 2, null, { timeout: 8000 });
+    ok(gSearches.length === 2 && gSearches[1].query === "trattoria romana, senza pesce", `gusti: tolto 'vegetariano' → stessa ricerca senza (${gSearches[1]?.query})`);
+    await gp.getByTestId("assistente-nota").last().getByText("Senza “vegetariano”").waitFor({ timeout: 3000 }).then(() => ok(true, "gusti: si dice che vale solo per questa conversazione"), () => ok(false, "gusti: si dice che vale solo per questa conversazione"));
+    // 4. "Cerca a Monti": ricerca nella zona abituale, il gusto tolto resta tolto.
+    await gp.getByTestId("assistente-zona").getByRole("button", { name: "Cerca a Monti" }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 3, null, { timeout: 8000 });
+    ok(gSearches.length === 3 && gSearches[2].query === "trattoria romana a Monti, senza pesce", `gusti: 'Cerca a Monti' rifà la ricerca lì (${gSearches[2]?.query})`);
+    ok((await gp.getByTestId("assistente-zona").count()) === 0, "gusti: con la zona scritta non si ripropone");
+    // 5. La richiesta scritta vince: "ristorante di pesce" non riceve "senza pesce".
+    await gp.getByTestId("assistente-nuova").click();
+    await gp.getByTestId("assistente-campo").fill("ristorante di pesce a Ostia");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=assistente-card]").length === 1, null, { timeout: 8000 });
+    ok(gSearches[3]?.query === "ristorante di pesce a Ostia" && (await gp.getByTestId("assistente-gusti").count()) === 0, `gusti: la richiesta esplicita vince sui gusti ricordati (${gSearches[3]?.query})`);
+    // 6. Preferenza già ricordata: nessuna nuova domanda.
+    await gp.getByTestId("assistente-campo").fill("sono vegetariano");
+    await gp.getByTestId("assistente-campo").press("Enter");
+    await gp.getByText("Lo so già").waitFor({ timeout: 3000 }).then(() => ok(true, "gusti: preferenza già ricordata → 'Lo so già', nessuna domanda"), () => ok(false, "gusti: preferenza già ricordata → 'Lo so già', nessuna domanda"));
+    ok(gSearches.length === 4, "gusti: nessuna ricerca per 'sono vegetariano'");
+    { const mem = gEvents.filter((e) => e.type === "funzione" && e.props?.nome === "assistente_memoria").map((e) => e.props?.contesto);
+      ok(["proposta", "si", "tolto", "zona"].every((k) => mem.includes(k)), `gusti: segnali registrati (${mem.join(", ")})`);
+      const all = JSON.stringify(gEvents);
+      ok(!all.includes("non mi piace") && !all.includes("trattoria romana") && !all.includes("Ostia"), "gusti: mai il testo scritto nei segnali");
+      const lost = droppedKeys(gEvents.filter((e) => e.type === "funzione"));
+      ok(lost.length === 0, `gusti: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lost.join(", ") || "nessuna scartata"})`); }
+    // 7. "Cosa so di te" nel profilo: vedere e cancellare.
+    await gctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await gp.goto(`${BASE}/profilo#cosa-so-di-te`, { waitUntil: "networkidle" });
+    await gp.getByTestId("gusto-ricordato").first().waitFor({ timeout: 5000 });
+    ok((await gp.getByTestId("gusto-ricordato").allTextContents()).map((t) => t.trim()).join("|") === "vegetariano|niente pesce", "profilo: 'Cosa so di te' mostra i gusti ricordati");
+    await gp.getByTestId("cosa-so-zona").waitFor({ timeout: 3000 }).then(() => ok(true, "profilo: zona abituale 'Salvi spesso a Monti'"), () => ok(false, "profilo: zona abituale 'Salvi spesso a Monti'"));
+    { const w = await gp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `profilo: niente scorrimento orizzontale (${w}px)`); }
+    await gp.getByTestId("cosa-so-di-te").scrollIntoViewIfNeeded();
+    await gp.screenshot({ path: `${OUT}/62-cosa-so-di-te.png`, caret: "initial" });
+    await gp.getByRole("button", { name: "Dimentica “vegetariano”" }).click();
+    await gp.waitForFunction(() => document.querySelectorAll("[data-testid=gusto-ricordato]").length === 1, null, { timeout: 3000 });
+    await gp.waitForTimeout(300);
+    ok(JSON.stringify(gPatches[gPatches.length - 1]) === '{"gusti_ricordati":["no-pesce"]}', `profilo: 'Dimentica' cancella dal profilo (${JSON.stringify(gPatches[gPatches.length - 1])})`);
+    await gctx.close();
+
+    // 360 px e senza accesso: i gusti restano nel telefono.
+    const g3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
+    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await g3.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    const g3Patches = [], g3Searches = [];
+    await g3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+    await g3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
+    await g3.route("**/rest/v1/**", (route) => { if (route.request().method() !== "GET") g3Patches.push(route.request().url()); return route.fulfill(route.request().method() === "GET" ? { json: [] } : { status: 204, body: "" }); });
+    await g3.route("**/api/search/intent", (route) => route.fulfill({ json: { intent: null } }));
+    await g3.route("**/api/search", (route) => { g3Searches.push(route.request().postDataJSON()); return route.fulfill({ json: { risultati: G_PLACES, filtri_usati: { categoria: "trattoria", parole_chiave: [], vicino_a_me: false, zona: "Monti" }, sintesi_pendente: null } }); });
+    const g3p = await g3.newPage();
+    g3p.on("pageerror", (e) => errors.push(e.message));
+    await g3p.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    await g3p.getByTestId("assistente-campo").fill("sono celiaco ed evito i posti rumorosi");
+    await g3p.getByTestId("assistente-campo").press("Enter");
+    await g3p.getByTestId("assistente-ricorda-si").click();
+    await g3p.getByTestId("assistente-ricorda").getByText("Fatto, me lo ricordo").waitFor({ timeout: 3000 });
+    ok((await g3p.evaluate(() => localStorage.getItem("mapetite.gusti.ospite"))) === '["celiaco","tranquillo"]' && g3Patches.length === 0, "gusti senza accesso: ricordati nel telefono, nessuna scrittura sul database");
+    await g3p.getByTestId("assistente-campo").fill("trattoria a Monti");
+    await g3p.getByTestId("assistente-campo").press("Enter");
+    await g3p.getByTestId("assistente-gusti").waitFor({ timeout: 6000 });
+    ok(g3Searches[0]?.query === "trattoria a Monti, senza glutine, tranquillo", `gusti senza accesso: usati nella ricerca (${g3Searches[0]?.query})`);
+    { const w = await g3p.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `gusti a 360 px: niente scorrimento orizzontale (${w}px)`); }
+    await g3p.screenshot({ path: `${OUT}/63-gusti-360.png`, caret: "initial" });
+    await g3.close();
+  }
+
   // Serata completa a tappe (piano 1.2): una ricerca per tappa (massimo 3), intento costruito
   // senza AI, scelta vicina alla tappa precedente (non la più popolare), distanze a piedi stimate,
   // mini mappa con i pin numerati, percorso in Google Maps, Salva/Prenota e alternative per tappa.
@@ -4404,6 +4565,517 @@ else {
     `sorprendimi senza accesso: nessun salvato da escludere; verdetto mai arrivato (2 richieste) → al suo posto una recensione Google vera, detta da dove viene (${anonH}, ${anonSynth} richieste, "${anonG}")`);
   await ap.screenshot({ path: `${OUT}/sorprendimi-anonimo.png`, caret: "initial" });
   await actxS.close();
+}
+
+// 11. Incolla più link (piano 3.2): chat di WhatsApp con tanti link → lista con lo stato di ciascuno →
+//     "Salva gli N riconosciuti" in una raccolta. API simulata: nessuna chiamata Google.
+if (fakeUser) {
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  const mevents = [];
+  await mctx.route("**/api/events", (r) => { mevents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  const SAVED_ID = "00000000-0000-4000-8000-0000000005a1";
+  const minserts = [];
+  await mctx.route("**/rest/v1/saved_places**", (r) => {
+    const req = r.request();
+    if (req.method() === "POST") { minserts.push(req.postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [{ place_id: SAVED_ID, tags: ["Da provare", "Weekend"] }] });
+  });
+  const previews = [];
+  let inflight = 0, maxInflight = 0, spent = 0;
+  await mctx.route("**/api/places/link-preview", async (r) => {
+    const body = r.request().postDataJSON() ?? {};
+    previews.push(body);
+    inflight++; maxInflight = Math.max(maxInflight, inflight);
+    await new Promise((res) => setTimeout(res, 120));
+    inflight--;
+    const id = (s) => `00000000-0000-4000-8000-${s.padStart(12, "0")}`;
+    const link = String(body.link ?? "");
+    const place = (k, name, address = "Via di Prova 1, Roma") => ({ id: id(k), name, address });
+    let out;
+    if (link.includes("AAA111") || link.includes("DUPA11")) out = { stato: "riconosciuto", chiamate: 0, place: place("a1", "Bar Rossi", "Via Roma 1, Roma, Italia") };
+    else if (link.includes("SAVED9")) out = { stato: "riconosciuto", chiamate: 0, place: { id: SAVED_ID, name: "Osteria Già Mia", address: "Via dei Salvati 2, Roma" } };
+    else if (link.includes("BBB222")) out = body.budget >= 1 ? { stato: "riconosciuto", chiamate: 1, place: place("b2", "Trattoria Due", "") } : { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google: toccalo per riconoscerlo.", nome: "Trattoria Due" };
+    else if (link.includes("ERR")) out = { stato: "non_riconosciuto", chiamate: 0, motivo: "Il link non si apre: copialo di nuovo da Google Maps." };
+    else {
+      const n = link.match(/C(\d\d)/)?.[1] ?? "0";
+      out = body.budget >= 1 ? { stato: "riconosciuto", chiamate: 1, place: place(`c${n}`, `Locale ${n}`) } : { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google: toccalo per riconoscerlo.", nome: `Locale ${n}` };
+    }
+    spent += out.chiamate;
+    return r.fulfill({ json: out });
+  });
+  const mp = await mctx.newPage();
+  mp.on("pageerror", (e) => errors.push(e.message));
+  await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+  const mc = mp.getByTestId("importa-multi");
+  ok(await mc.getByText("Incolla più link").isVisible() && await mc.getByLabel("Testo con i link").isVisible(), "incolla più link: card con il campo per la chat o la nota");
+  const yOf = async (id) => (await mp.getByTestId(id).boundingBox())?.y ?? -1;
+  ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-mano"), "incolla più link: subito dopo 'Da Google Maps'");
+
+  const chat = [
+    "[15/10/26, 21:02:11] Lorenzo: Da provare! https://maps.app.goo.gl/AAA111",
+    "[15/10/26, 21:03:40] Lorenzo: https://maps.app.goo.gl/BBB222",
+    "[15/10/26, 21:05:02] Lorenzo: Pizzeria Ai Marmi Roma https://www.instagram.com/reel/XYZ123/",
+    "15/10/26, 21:06 - Lorenzo: guarda https://vm.tiktok.com/ZMabc12/",
+    "https://maps.app.goo.gl/SAVED9 (questo l'avevo già)",
+    "https://maps.app.goo.gl/DUPA11",
+    "https://example.com/articolo-sui-bar",
+    "https://maps.app.goo.gl/ERR999",
+    ...Array.from({ length: 11 }, (_, i) => `https://maps.app.goo.gl/C${String(i + 1).padStart(2, "0")}x`),
+    "di nuovo https://maps.app.goo.gl/AAA111",
+  ].join("\n");
+  await mp.evaluate((t) => navigator.clipboard.writeText(t), chat);
+  await mc.getByRole("button", { name: "📋 Incolla" }).click();
+  await mc.getByTestId("multi-avanzamento").waitFor({ timeout: 4000 }).catch(() => {});
+  const progress = await mc.getByTestId("multi-avanzamento").textContent().catch(() => "");
+  ok(/Leggo i link… \d+ di 19/.test(progress), `incolla più link: avanzamento mentre legge ("${progress.trim()}")`);
+  await mp.screenshot({ path: `${OUT}/multi-link-lettura.png`, caret: "initial" });
+  await mc.getByTestId("multi-riepilogo").waitFor({ timeout: 15000 });
+  const rows = mc.getByTestId("multi-riga");
+  const stati = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-stato")));
+  const by = (s) => stati.filter((x) => x === s).length;
+  ok(stati.length === 19, `incolla più link: 19 link diversi trovati nella chat, il doppione dello stesso link tolto (${stati.length})`);
+  ok(maxInflight <= 2, `incolla più link: al massimo 2 link letti insieme (${maxInflight})`);
+  ok(spent <= 6 && spent >= 5 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: tetto di 6 chiamate Google per import (${spent})`);
+  const R = by("riconosciuto");
+  const label = (n) => `Salva ${String(n).startsWith("8") || n === 11 ? "gli" : "i"} ${n} riconosciuti`;
+  ok(R === 1 + spent && by("da_confermare") === 2 + (12 - spent) && by("gia_salvato") === 1 && by("doppione") === 1 && by("non_riconosciuto") === 2,
+    `incolla più link: stati riconosciuto/da confermare/già salvato/non riconosciuto (${JSON.stringify(Object.fromEntries([...new Set(stati)].map((s) => [s, by(s)])))})`);
+  ok(previews.every((b) => !/instagram|tiktok|example/.test(b.link)), "incolla più link: Instagram, TikTok e altri siti non partono da soli");
+  const first = rows.nth(0);
+  ok((await first.textContent()).includes("Bar Rossi") && (await first.textContent()).includes("Via Roma 1, Roma") && !(await first.textContent()).includes("Italia"), "incolla più link: riconosciuto con nome e indirizzo");
+  ok((await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Osteria Già Mia") && (await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Già salvato"), "incolla più link: chi è già nei salvati è 'Già salvato'");
+  const ig = mc.locator('[data-stato="da_confermare"]').filter({ hasText: "Instagram" });
+  ok(await ig.getByRole("button", { name: "Carica uno screenshot" }).isVisible() && await ig.getByRole("button", { name: "Cerca “Pizzeria Ai Marmi Roma”" }).isVisible(), "incolla più link: Instagram da confermare, con screenshot e 'Cerca' dal testo della chat");
+  ok(await mc.locator('[data-stato="da_confermare"]').filter({ hasText: "TikTok" }).getByRole("button", { name: "✨ Trova dal video" }).isVisible(), "incolla più link: TikTok da confermare con 'Trova dal video'");
+  ok(await mc.getByTestId("multi-salva").textContent() === label(R), `incolla più link: pulsante unico '${await mc.getByTestId("multi-salva").textContent()}'`);
+  const opts = await mp.locator("#multi-raccolta option").allTextContents();
+  ok(opts.includes("📁 Weekend") && opts.some((o) => o.startsWith("＋ Nuova raccolta")), `incolla più link: scelta tra le raccolte esistenti o una nuova (${opts.join(" | ")})`);
+  await mp.screenshot({ path: `${OUT}/multi-link-lista.png`, caret: "initial", fullPage: true });
+
+  // Oltre il tetto: un tocco riconosce un link alla volta.
+  const before = previews.length;
+  await mc.getByTestId("multi-conferma").first().click();
+  await mc.getByTestId("multi-salva").getByText(label(R + 1)).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(previews.length === before + 1 && previews.at(-1).budget === 2 && await mc.getByTestId("multi-salva").textContent() === label(R + 1), "incolla più link: 'Riconosci' su un link da confermare, uno per uno");
+
+  // 360px: niente scroll orizzontale.
+  await mp.setViewportSize({ width: 360, height: 780 });
+  const mx = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(mx <= 0, `incolla più link 360px: nessuno scroll orizzontale (${mx}px)`);
+  await mc.getByTestId("multi-salva").scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/multi-link-360.png`, caret: "initial" });
+  await mp.setViewportSize({ width: 390, height: 844 });
+
+  // Salva tutto in una raccolta nuova.
+  await mp.locator("#multi-raccolta").selectOption("__nuova__");
+  await mc.getByLabel("Nome della nuova raccolta").fill("Viaggio a Milano");
+  await mc.getByTestId("multi-salva").click();
+  await mc.getByTestId("multi-fatto").waitFor({ timeout: 8000 });
+  ok(minserts.length === R + 1 && minserts.every((b) => JSON.stringify(b.tags) === '["Da provare","Viaggio a Milano"]' && b.user_id === "00000000-0000-0000-0000-000000000001") && !minserts.some((b) => b.place_id === SAVED_ID) && new Set(minserts.map((b) => b.place_id)).size === R + 1,
+    `incolla più link: salvati tutti una volta sola, nella raccolta scelta, mai il già salvato (${minserts.length})`);
+  ok((await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 1} locali salvati in “Viaggio a Milano”`) && await mc.getByRole("link", { name: "Apri la raccolta" }).getAttribute("href") === "/raccolte/Viaggio%20a%20Milano", "incolla più link: conferma con link alla raccolta");
+  await mc.getByTestId("multi-fatto").scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/multi-link-salvati.png`, caret: "initial" });
+  const fe = mevents.filter((e) => e?.type === "funzione" && e.props?.nome === "import_multiplo");
+  ok(fe.some((e) => e.props.risultati === 19 && e.props.contesto === "letti") && fe.some((e) => e.props.risultati === R + 1 && e.props.contesto === "salvati_raccolta"), `incolla più link: tracciato 'import_multiplo' con i numeri (${fe.map((e) => `${e.props.contesto}:${e.props.risultati}`).join(", ")})`);
+  ok(droppedKeys(fe).length === 0 && !JSON.stringify(fe).includes("goo.gl") && !JSON.stringify(fe).includes("instagram"), "incolla più link: nei segnali niente link, solo chiavi accettate");
+
+  // Dopo il salvataggio si può ancora riconoscere un link rimasto e salvarlo.
+  const ins0 = minserts.length;
+  await mc.getByTestId("multi-conferma").first().click();
+  await mc.getByTestId("multi-salva").waitFor({ timeout: 4000 }).catch(() => {});
+  await mc.getByTestId("multi-salva").click().catch(() => {});
+  await mc.getByTestId("multi-fatto").getByText(`${R + 2} locali salvati`).waitFor({ timeout: 4000 }).catch(() => {});
+  ok(minserts.length === ins0 + 1 && (await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 2} locali salvati`), "incolla più link: un link riconosciuto dopo si salva con un secondo tocco");
+
+  // Testo senza link: spiegato in italiano, nessuna chiamata.
+  await mc.getByRole("button", { name: "Incolla altri link" }).click();
+  const n0 = previews.length;
+  await mc.getByLabel("Testo con i link").fill("ricordati la pizzeria di Marco");
+  await mc.getByTestId("multi-leggi").click();
+  ok(await mc.getByTestId("multi-errore").isVisible() && (await mc.getByTestId("multi-errore").textContent()).includes("Non vedo link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  await mctx.close();
+} else {
+  console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
+}
+
+// ─── Invito e primo accesso (PIANO-25-OTTOBRE.md 9.1) ────────────────────────
+// /invito/<codice>: nome di chi invita se ha il profilo pubblico (dati finti dal cookie "e2e_social"),
+// codice ricordato nel telefono fino alla registrazione e contato una volta (arrivo, registrato).
+// Primo accesso in 3 schermate con "Salta" e import da Google Maps proposto subito.
+// "Invita un amico" nel profilo. Ricerche simulate: nessuna chiamata Google.
+if (!fakeUser) console.log("SKIP  invito: dev server senza E2E_FAKE_USER");
+else {
+  const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true } };
+  const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const ievents = [];
+  await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await ictx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await ictx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
+  await ictx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await ictx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await ictx.addCookies([
+    { name: "e2e_anonimo", value: "1", url: BASE },
+    { name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialInv)), url: BASE },
+  ]);
+  const ip = await ictx.newPage();
+  ip.on("pageerror", (e) => errors.push(e.message));
+  const arrivi = () => ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_arrivo");
+
+  // Arrivo con il nome di chi invita.
+  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato su Mapetite", `invito: nome di chi invita (${await ip.getByTestId("invito-titolo").textContent()})`);
+  ok((await ip.getByTestId("invito-posti").textContent()) === "11 posti sulla sua mappa", "invito: quanti posti ha sulla sua mappa");
+  ok(await ip.getByTestId("invito-inizia").isVisible() && (await ip.getByTestId("invito-inizia").getAttribute("href")) === "/signup", "invito: un solo pulsante 'Inizia' verso la registrazione");
+  ok((await ip.getByRole("link", { name: "Inizia" }).count()) === 1, "invito: 'Inizia' è unico");
+  const ib = await ip.getByTestId("invito-inizia").boundingBox();
+  ok(ib && ib.y + ib.height <= 844 - 64, `invito 390px: 'Inizia' visibile senza scorrere, sopra la barra (${Math.round(ib?.y ?? -1)})`);
+  await ip.waitForTimeout(400);
+  ok(arrivi().length === 1 && arrivi()[0].props.contesto === "giulia.rm", `invito: arrivo tracciato con il codice (${JSON.stringify(arrivi().map((e) => e.props))})`);
+  ok(droppedKeys(arrivi()).length === 0, "invito: segnale con sole chiavi accettate dal server");
+  const stored = await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null"));
+  ok(stored?.codice === "giulia.rm", `invito: codice ricordato nel telefono fino alla registrazione (${JSON.stringify(stored)})`);
+  const og = await ip.locator('meta[property="og:title"]').getAttribute("content");
+  ok(og === "Giulia ti invita su Mapetite", `invito: anteprima del link su WhatsApp con il nome (${og})`);
+  await ip.screenshot({ path: `${OUT}/invito-arrivo.png`, caret: "initial" });
+  await ip.reload({ waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  ok(arrivi().length === 1, "invito: riaprire il link non conta un secondo arrivo");
+
+  // 360px: niente scroll orizzontale, pulsante visibile.
+  await ip.setViewportSize({ width: 360, height: 740 });
+  const ix = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(ix <= 0, `invito 360px: nessuno scroll orizzontale (${ix}px)`);
+  await ip.screenshot({ path: `${OUT}/invito-arrivo-360.png`, caret: "initial", fullPage: true });
+  await ip.setViewportSize({ width: 390, height: 844 });
+
+  // Codici generici e sconosciuti: testo neutro, mai un nome inventato.
+  await ip.goto(`${BASE}/invito/tester`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Sei tra i primi a provare Mapetite" && !(await ip.getByTestId("invito-posti").count()), "invito: codice 'tester' per il gruppo di prova");
+  await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
+  await ip.goto(`${BASE}/invito/sconosciuto`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice senza profilo pubblico → testo neutro");
+  const nArr = arrivi().length;
+  await ip.goto(`${BASE}/invito/%3Cscript%3E`, { waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite" && arrivi().length === nArr, "invito: codice non valido → pagina neutra, nessun conteggio");
+  ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === "sconosciuto", "invito: si ricorda l'ultimo codice valido");
+  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  await ip.getByTestId("invito-inizia").click();
+  await ip.waitForURL(/\/signup/, { timeout: 5000 }).then(() => ok(true, "invito: 'Inizia' apre la registrazione"), () => ok(false, "invito: 'Inizia' apre la registrazione"));
+
+  // Primo accesso (dopo la registrazione): 3 schermate, codice contato come "registrato".
+  await ictx.clearCookies({ name: "e2e_anonimo" });
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.waitForTimeout(300);
+  const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
+  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
+  ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 3" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 3 con barra di avanzamento");
+  ok(await ip.getByTestId("benvenuto-gusti").getByRole("heading", { name: "Cucina" }).isVisible() && await ip.getByRole("heading", { name: "Spesa tipica" }).count() === 1, "primo accesso: tutti i gusti in una schermata (cucina, occasione, atmosfera, spesa)");
+  await ip.getByRole("button", { name: "Romana", exact: true }).click();
+  await ip.getByRole("button", { name: "Cena romantica", exact: true }).click();
+  ok((await ip.getByRole("button", { name: "Romana", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: gusto selezionato");
+  await ip.screenshot({ path: `${OUT}/benvenuto-1-gusti.png`, caret: "initial" });
+  await ip.getByRole("button", { name: "Continua" }).click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 3" && await ip.getByTestId("benvenuto-citta").isVisible(), "primo accesso: passo 2, la città");
+  await ip.getByRole("button", { name: "Un'altra città" }).click();
+  await ip.getByTestId("benvenuto-altra-citta").fill("Torino");
+  await ip.screenshot({ path: `${OUT}/benvenuto-2-citta.png`, caret: "initial" });
+  await ip.getByRole("button", { name: "Roma", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("onboarding-salta").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, saltabile");
+  await ip.screenshot({ path: `${OUT}/benvenuto-3-importa.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 360, height: 740 });
+  const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const ob = await ip.getByTestId("benvenuto-dopo").boundingBox();
+  ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`);
+  await ip.screenshot({ path: `${OUT}/benvenuto-3-importa-360.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 390, height: 844 });
+  // Indietro conserva le scelte.
+  await ip.getByRole("button", { name: "Indietro" }).click();
+  ok((await ip.getByRole("button", { name: "Roma", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: 'Indietro' conserva la città scelta");
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByTestId("benvenuto-importa-si").click();
+  await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Importa da Google Maps' apre l'import"), () => ok(false, `primo accesso: 'Importa da Google Maps' apre l'import (${ip.url()})`));
+  await ip.getByTestId("importa-multi").waitFor({ timeout: 5000 }).catch(() => {});
+  const mb = await ip.getByTestId("importa-multi").boundingBox();
+  ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2, `primo accesso: l'import si apre con 'Incolla più link' in cima (${Math.round(mb?.y ?? -1)})`);
+  await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
+  ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
+
+  // "Salta" sulle schermate 2 e 3: si salta solo quella; alla fine la mappa cerca sui gusti, nella città.
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.getByRole("button", { name: "Pizza", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Milano", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Indietro" }).click();
+  await ip.getByTestId("onboarding-salta").click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "primo accesso: 'Salta' al passo 2 va al passo 3");
+  await ip.getByTestId("onboarding-salta").click();
+  await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Salta' all'ultimo passo → mappa con la ricerca sui gusti, senza città saltata (${new URL(ip.url()).searchParams.get("q")})`);
+  await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await ip.getByRole("button", { name: "Pizza", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByRole("button", { name: "Milano", exact: true }).click();
+  await ip.getByRole("button", { name: "Continua" }).click();
+  await ip.getByTestId("benvenuto-dopo").click();
+  await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(ip.url()).searchParams.get("q") === "Pizzeria a Milano", `primo accesso: 'Lo faccio dopo' → mappa con la ricerca nella città scelta (${new URL(ip.url()).searchParams.get("q")})`);
+
+  // "Invita un amico" nel profilo: link personale con il nome pubblico, condiviso o copiato.
+  await ictx.addInitScript(() => { Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); });
+  await ictx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
+  const pp = await ictx.newPage();
+  pp.on("pageerror", (e) => errors.push(e.message));
+  await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
+  await pp.getByTestId("invita-amico-condividi").click();
+  await pp.getByTestId("invita-amico-condividi").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
+  const clip = await pp.evaluate(() => navigator.clipboard.readText()).catch(() => "");
+  ok(clip === `${BASE}/invito/lorenzo`, `profilo: senza menu di condivisione il link si copia (${clip})`);
+  ok(ievents.some((e) => e?.type === "condividi" && e.props?.contesto === "invito"), "profilo: invito condiviso tracciato");
+  await pp.setViewportSize({ width: 360, height: 740 });
+  const px = await pp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(px <= 0, `profilo 360px: 'Invita un amico' senza scroll orizzontale (${px}px)`);
+  await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await pp.screenshot({ path: `${OUT}/invita-amico-360.png`, caret: "initial" });
+  // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
+  await ictx.clearCookies({ name: "e2e_social" });
+  await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  await ictx.close();
+
+  // Pannello: arrivi e registrazioni per codice; chi arriva anonimo e poi si registra conta una volta.
+  let nmI = null;
+  try { nmI = await import(new URL("../../src/lib/numeri.ts", import.meta.url).href); } catch { /* già segnalato sopra */ }
+  if (nmI) {
+    const t = new Date().toISOString();
+    const rowsI = [
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a1", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: "u1", anon_id: "a1", props: { nome: "invito_registrato", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a2", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a2", props: { nome: "invito_arrivo", contesto: "giulia.rm" } },
+      { created_at: t, type: "funzione", user_id: null, anon_id: "a3", props: { nome: "invito_arrivo", contesto: "tester" } },
+      { created_at: t, type: "condividi", user_id: "u9", anon_id: null, props: { contesto: "invito" } },
+    ];
+    const ni = nmI.computeNumeri(rowsI, 7);
+    ok(JSON.stringify(ni.inviti) === JSON.stringify([{ codice: "giulia.rm", arrivi: 2, registrati: 1 }, { codice: "tester", arrivi: 1, registrati: 0 }]), `numeri: arrivi e registrati per codice d'invito (${JSON.stringify(ni.inviti)})`);
+    ok(ni.funzioni.some((f) => f.chiave === "invito_condividi" && f.volte === 1), "numeri: 'Invito: link mandato' tra le funzioni");
+  }
+}
+
+// 18. "Ti è stato utile?" in un tocco (piano 7.6) dopo assistente, serata a tappe, Sorprendimi e
+//     prenotazione; domanda settimanale in home; "Valore per i tester" nel pannello. Tutto simulato.
+if (!fakeUser) console.log("SKIP  ti è stato utile: dev server senza E2E_FAKE_USER");
+else {
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>';
+  const uctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const uEv = [];
+  await uctx.route("**/api/events", (r) => { uEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await uctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: SVG }));
+  await uctx.route("**/rest/v1/**", (r) => r.fulfill(r.request().method() === "POST" ? { status: 201, body: "" } : { json: [] }));
+  await uctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+  await uctx.route("**/api/search/intent", (r) => r.fulfill({ json: { intent: null } }));
+  await uctx.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: [{ ...PLACES[0], phone: "347 123 4567" }, PLACES[1], PLACES[2]] } }));
+  await uctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await uctx.route("https://wa.me/**", (r) => r.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
+  const up = await uctx.newPage();
+  up.on("pageerror", (e) => errors.push(e.message));
+  up.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  const utili = () => uEv.filter((e) => e.type === "utile");
+
+  // Assistente: dopo la risposta con i posti, una volta sola, sotto le card.
+  await up.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await up.getByTestId("assistente-campo").fill("rooftop romantico a Roma");
+  await up.keyboard.press("Enter");
+  const ua = up.getByTestId("assistente-risposta").last().getByTestId("utile");
+  await ua.waitFor({ timeout: 10000 }).catch(() => {});
+  ok(await ua.getAttribute("data-contesto").catch(() => null) === "assistente" && (await up.getByTestId("utile").count()) === 1, "utile: 'Ti è stato utile?' dopo la risposta dell'assistente, una sola volta");
+  { const c = await up.getByTestId("assistente-card").last().boundingBox(); const u = await ua.boundingBox().catch(() => null);
+    ok(!!c && !!u && u.y >= c.y + c.height, "utile: sotto le card dei posti, non in mezzo"); }
+  await ua.getByRole("button", { name: "No, non utile" }).click();
+  const um = up.getByTestId("utile-motivi");
+  await um.waitFor({ timeout: 3000 }).catch(() => {});
+  const motivi = await um.getByRole("button").allTextContents();
+  ok(motivi.join("|") === "Risultati sbagliati|Troppo lento|Posti già noti|Altro" && (await um.locator("input, textarea").count()) === 0, `utile: con 👎 'Cosa mancava?' con 4 scelte rapide, niente testo libero (${motivi.join(", ")})`);
+  await um.scrollIntoViewIfNeeded();
+  await up.screenshot({ path: `${OUT}/70-utile-assistente-motivi.png`, caret: "initial" });
+  await um.getByRole("button", { name: "Troppo lento" }).click();
+  await up.getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await up.waitForTimeout(200);
+  { const v = utili();
+    ok(v.length === 2 && v[0].props.voto === "no" && v[0].props.contesto === "assistente" && typeof v[0].props.risultati === "number"
+      && v[1].props.stato === "lento" && v[1].props.contesto === "assistente" && v[1].props.voto === undefined,
+      `utile: 👎 e 'Troppo lento' registrati come due segnali, il motivo solo come scelta (${JSON.stringify(v.map((e) => e.props))})`); }
+  await up.reload({ waitUntil: "networkidle" });
+  await up.getByTestId("assistente-card").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok((await up.getByTestId("utile").count()) === 0 && (await up.getByTestId("utile-motivi").count()) === 0, "utile: ricaricando, la risposta già votata non chiede di nuovo");
+
+  // Prenotazione: dopo l'invio, nel foglio Prenota.
+  await up.getByTestId("assistente-nuova").click().catch(() => {});
+  await up.getByTestId("assistente-campo").fill("prenotami domani alle 21 per 2 con terrazza a Roma");
+  await up.keyboard.press("Enter");
+  await up.getByRole("button", { name: "Prenota da Terrazza Uno" }).click({ timeout: 10000 });
+  await up.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await up.getByTestId("foglio-prenota").getByTestId("utile").count()) === 0, "utile: nel foglio Prenota non compare prima dell'invio");
+  await up.getByLabel("Il tuo nome").fill("Giulia");
+  const [wa] = await Promise.all([up.waitForEvent("popup"), up.getByTestId("prenota-whatsapp").click()]);
+  await wa.close();
+  await up.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
+  const fu = up.getByTestId("foglio-prenota").getByTestId("utile");
+  ok(await fu.isVisible() && await fu.getAttribute("data-contesto") === "prenota", "utile: dopo l'invio della prenotazione, 'Ti è stato utile?' nel foglio");
+  { const f = await up.getByRole("button", { name: "Fatto" }).boundingBox(); const u = await fu.boundingBox();
+    ok(!!f && !!u && u.y > f.y + f.height, "utile: nel foglio sta sotto 'Fatto', non prima del pulsante principale"); }
+  { const w = await up.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `utile: foglio Prenota senza scorrimento orizzontale (${w}px)`); }
+  await fu.scrollIntoViewIfNeeded();
+  await up.screenshot({ path: `${OUT}/71-utile-prenota.png`, caret: "initial" });
+  await fu.getByRole("button", { name: "Sì, utile" }).click();
+  await up.getByTestId("foglio-prenota").getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await up.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "si" && e.props.contesto === "prenota"), "utile: 👍 dopo la prenotazione registrato con contesto 'prenota'");
+  await up.getByRole("button", { name: "Fatto" }).click();
+
+  // Serata a tappe: contesto "serata".
+  await up.getByTestId("assistente-nuova").click().catch(() => {});
+  await up.goto(`${BASE}/assistente?q=${encodeURIComponent("aperitivo e cena a Trastevere")}`, { waitUntil: "networkidle" });
+  await up.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 2, null, { timeout: 8000 }).catch(() => {});
+  const us = up.getByTestId("assistente-risposta").last().getByTestId("utile");
+  await us.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await us.getAttribute("data-contesto").catch(() => null) === "serata", "utile: dopo la serata a tappe, con contesto 'serata'");
+  { const s = await up.getByTestId("serata").boundingBox(); const u = await us.boundingBox().catch(() => null);
+    ok(!!s && !!u && u.y >= s.y + s.height, "utile: sotto la serata, in fondo alla risposta"); }
+  await us.getByRole("button", { name: "Sì, utile" }).click().catch(() => {});
+  await up.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "si" && e.props.contesto === "serata" && e.props.risultati === 2), "utile: 👍 sulla serata registrato con le tappe trovate");
+
+  // Sorprendimi: sotto la carta, resta uno solo anche con "Un altro".
+  await uctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [{ tags: ["Mi è piaciuto"], places: { category: "Trattoria", lat: 41.9, lng: 12.49, google_place_id: "GT1" } }] }));
+  const sm = (id, name) => mk(id, name, 41.9 + Number(id.slice(2)) * 0.001, 12.49, { category: "Trattoria", rating: 4.6, userRatingCount: 200, types: ["restaurant"] });
+  await uctx.route("**/api/search", (r) => r.fulfill({ json: { risultati: [sm("SU1", "Trattoria Uno"), sm("SU2", "Trattoria Due")], filtri_usati: { categoria: null, parole_chiave: [], vicino_a_me: false }, sintesi_pendente: null } }));
+  const sp2 = await uctx.newPage();
+  sp2.on("pageerror", (e) => errors.push(e.message));
+  await sp2.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await sp2.goto(`${BASE}/sorprendimi?da=mappa&lat=41.9&lng=12.49`, { waitUntil: "networkidle" });
+  await sp2.getByTestId("sorpresa-card").waitFor({ timeout: 8000 }).catch(() => {});
+  const usp = sp2.getByTestId("utile");
+  ok(await usp.isVisible().catch(() => false) && await usp.getAttribute("data-contesto") === "sorpresa", "utile: 'Ti è stato utile?' sotto la proposta di Sorprendimi");
+  { const c = await sp2.getByTestId("sorpresa-card").boundingBox(); const u = await usp.boundingBox().catch(() => null);
+    ok(!!c && !!u && u.y >= c.y + c.height, "utile: sotto la carta, non sopra i pulsanti"); }
+  await sp2.getByTestId("sorpresa-altro").click();
+  await sp2.waitForTimeout(300);
+  ok((await sp2.getByTestId("utile").count()) === 1, "utile: con 'Un altro' resta una sola domanda");
+  await sp2.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
+  await sp2.waitForTimeout(200);
+  await sp2.screenshot({ path: `${OUT}/72-utile-sorprendimi.png`, caret: "initial" });
+  await usp.getByRole("button", { name: "No, non utile" }).click().catch(() => {});
+  await sp2.getByTestId("utile-motivi").getByRole("button", { name: "Posti già noti" }).click().catch(() => {});
+  await sp2.getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await sp2.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "no" && e.props.contesto === "sorpresa") && utili().some((e) => e.props.stato === "gia_noti" && e.props.contesto === "sorpresa"), "utile: 👎 e 'Posti già noti' su Sorprendimi registrati");
+  { const w = await sp2.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `utile: Sorprendimi senza scorrimento orizzontale (${w}px)`); }
+  await sp2.close();
+  const lostU = droppedKeys(utili());
+  ok(lostU.length === 0, `utile: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lostU.join(", ") || "nessuna scartata"})`);
+  ok(!JSON.stringify(uEv).includes("rooftop romantico") && !JSON.stringify(uEv).includes("Giulia"), "utile: nei segnali niente frasi scritte né nomi");
+  { const r = await up.request.post(`${BASE}/api/events`, { data: { type: "utile", props: { contesto: "assistente", stato: "lento" } } });
+    ok(r.status() === 204, `utile: /api/events accetta il motivo del 👎 (${r.status()})`); }
+  await uctx.close();
+
+  // Domanda settimanale in home: solo dopo 2 giorni diversi d'uso, una volta ogni 7 giorni.
+  const day = (n) => { const d = new Date(Date.now() - n * 86_400_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const wctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const wEv = [];
+  await wctx.route("**/api/events", (r) => { wEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await wctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const wp = await wctx.newPage();
+  wp.on("pageerror", (e) => errors.push(e.message));
+  wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  await wp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: al primo giorno d'uso la domanda non c'è");
+  ok((await wp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.giorni_uso") ?? "[]"))).length === 1, "settimanale: il giorno d'uso è segnato nel telefono");
+  await wp.evaluate((d) => localStorage.setItem("mapetite.giorni_uso", JSON.stringify([d])), day(2));
+  await wp.reload({ waitUntil: "networkidle" });
+  const dq = wp.getByTestId("domanda-settimanale");
+  await dq.waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await dq.isVisible() && (await dq.textContent()).includes("Quanto ti ha aiutato Mapetite questa settimana a scegliere dove andare?"), "settimanale: dal secondo giorno diverso compare in home");
+  ok((await dq.getByTestId("domanda-voto").getByRole("button").count()) === 5, "settimanale: voto da 1 a 5");
+  { const b = await dq.getByRole("button", { name: "1 su 5" }).boundingBox(); ok(!!b && b.height >= 44 && b.width >= 44, `settimanale: pulsanti grandi abbastanza per il dito (${Math.round(b?.width ?? 0)}×${Math.round(b?.height ?? 0)})`); }
+  { const s = await wp.getByPlaceholder("Chiedi all'AI…").boundingBox().catch(() => null);
+    ok(!!s && s.y + s.height <= 844, `settimanale: il campo di ricerca in home resta sullo schermo (${Math.round((s?.y ?? 0) + (s?.height ?? 0))} px)`); }
+  await dq.scrollIntoViewIfNeeded();
+  await wp.screenshot({ path: `${OUT}/73-settimanale-voto.png`, caret: "initial" });
+  await dq.getByRole("button", { name: "4 su 5" }).click();
+  await dq.getByTestId("domanda-consiglio").waitFor({ timeout: 3000 }).catch(() => {});
+  ok((await dq.textContent()).includes("Lo consiglieresti a un amico?") && (await dq.getByTestId("domanda-consiglio").getByRole("button").allTextContents()).join() === "Sì,Forse,No", "settimanale: poi 'Lo consiglieresti a un amico?' Sì/Forse/No");
+  await wp.screenshot({ path: `${OUT}/74-settimanale-consiglio.png`, caret: "initial" });
+  await dq.getByTestId("domanda-consiglio").getByRole("button", { name: "Forse" }).click();
+  await dq.getByTestId("domanda-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await wp.waitForTimeout(200);
+  { const s = wEv.filter((e) => e.type === "funzione" && e.props?.nome === "domanda_settimanale");
+    ok(s.length === 2 && s[0].props.voto === 4 && s[1].props.stato === "forse", `settimanale: voto e consiglio registrati (${JSON.stringify(s.map((e) => e.props))})`);
+    const lost = droppedKeys(s);
+    ok(lost.length === 0, `settimanale: chiavi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await wp.reload({ waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: risposta data, non torna prima di 7 giorni");
+  // Dopo 8 giorni torna; chiusa con la X, si ricorda e lo registra.
+  await wp.evaluate(() => localStorage.setItem("mapetite.domanda_settimanale", String(Date.now() - 8 * 86_400_000)));
+  await wp.setViewportSize({ width: 360, height: 780 });
+  await wp.reload({ waitUntil: "networkidle" });
+  await dq.waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await dq.isVisible(), "settimanale: dopo 7 giorni la domanda torna");
+  { const w = await wp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `settimanale 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await dq.scrollIntoViewIfNeeded();
+  await wp.screenshot({ path: `${OUT}/75-settimanale-360.png`, caret: "initial" });
+  await dq.getByRole("button", { name: "Chiudi la domanda" }).click();
+  await wp.waitForTimeout(200);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0 && wEv.some((e) => e.props?.nome === "domanda_settimanale" && e.props?.stato === "chiusa"), "settimanale: si chiude con la X (registrato come 'chiusa')");
+  await wp.reload({ waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: chiusa, non riappare ricaricando");
+
+  // Pannello: "Valore per i tester".
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const V = "00000000-0000-0000-0000-00000000000c";
+  const ev = (type, min, props, user = V) => ({ created_at: iso(min), type, user_id: user, anon_id: null, session_id: "sv", props });
+  await wctx.addCookies([{ name: "e2e_eventi", url: BASE, value: encodeURIComponent(JSON.stringify([
+    ev("sessione_inizio", 60, { prima_volta: 1 }),
+    ev("utile", 50, { voto: "si", contesto: "assistente", risultati: 3 }),
+    ev("utile", 49, { voto: "si", contesto: "assistente", risultati: 3 }),
+    ev("utile", 48, { voto: "no", contesto: "assistente", risultati: 3 }),
+    ev("utile", 47, { contesto: "assistente", stato: "lento" }),
+    ev("utile", 46, { voto: "si", contesto: "sorpresa" }),
+    ev("utile", 45, { voto: "si", contesto: "prenota" }),
+    ev("funzione", 40, { nome: "domanda_settimanale", voto: 4 }),
+    ev("funzione", 39, { nome: "domanda_settimanale", stato: "si" }),
+    ev("funzione", 38, { nome: "domanda_settimanale", voto: 5 }, "00000000-0000-0000-0000-00000000000d"),
+    ev("funzione", 37, { nome: "domanda_settimanale", stato: "si" }, "00000000-0000-0000-0000-00000000000d"),
+    ev("funzione", 36, { nome: "domanda_settimanale", stato: "no" }, "00000000-0000-0000-0000-00000000000e"),
+  ])) }]);
+  await wp.setViewportSize({ width: 390, height: 844 });
+  await wp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
+  const uf = (await wp.getByTestId("numeri-utile-funzioni").textContent().catch(() => "")) ?? "";
+  ok(uf.includes("Assistente") && uf.includes("67%") && uf.includes("Sorprendimi") && uf.includes("Prenotazione") && uf.includes("Serata a tappe"), `pannello: % utile per funzione (${uf.slice(0, 160)})`);
+  ok(((await wp.getByTestId("numeri-utile-motivi").textContent().catch(() => "")) ?? "").includes("Troppo lento"), "pannello: cosa mancava dopo un 👎");
+  const st = (await wp.getByTestId("numeri-settimanale").textContent().catch(() => "")) ?? "";
+  ok(st.includes("4,5/5") && st.includes("67%") && st.includes("netto +33"), `pannello: voto medio settimanale e 'lo consiglierebbe' (${st})`);
+  ok(!((await wp.getByTestId("numeri-funzioni").textContent().catch(() => "")) ?? "").includes("domanda settimanale"), "pannello: la domanda settimanale non finisce tra le funzioni");
+  ok(((await wp.getByTestId("numeri-utile").textContent().catch(() => "")) ?? "").includes("su 5 voti"), "pannello: 👍/👎 totali (il motivo non conta come voto)");
+  { const w = await wp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `pannello valore: niente scorrimento orizzontale (${w}px)`); }
+  await wp.getByTestId("numeri-utile").scrollIntoViewIfNeeded();
+  await wp.evaluate(() => window.scrollBy(0, -60));
+  await wp.screenshot({ path: `${OUT}/76-pannello-valore.png`, caret: "initial" });
+  await wctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
