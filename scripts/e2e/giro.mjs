@@ -4635,7 +4635,7 @@ if (fakeUser) {
   const by = (s) => stati.filter((x) => x === s).length;
   ok(stati.length === 19, `incolla più link: 19 link diversi trovati nella chat, il doppione dello stesso link tolto (${stati.length})`);
   ok(maxInflight <= 2, `incolla più link: al massimo 2 link letti insieme (${maxInflight})`);
-  ok(spent <= 10 && spent >= 9 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: tetto di 10 chiamate Google per import (${spent})`);
+  ok(spent <= 6 && spent >= 5 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: tetto di 6 chiamate Google per import (${spent})`);
   const R = by("riconosciuto");
   const label = (n) => `Salva ${String(n).startsWith("8") || n === 11 ? "gli" : "i"} ${n} riconosciuti`;
   ok(R === 1 + spent && by("da_confermare") === 2 + (12 - spent) && by("gia_salvato") === 1 && by("doppione") === 1 && by("non_riconosciuto") === 2,

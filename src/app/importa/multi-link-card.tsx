@@ -18,7 +18,7 @@ import { trackFeature } from "@/lib/track";
 // e si riconoscono con un tocco, uno per uno. Instagram, TikTok e YouTube non partono da soli:
 // costano AI e una ricerca, quindi si aprono uno alla volta con il flusso già esistente.
 
-const MAX_CALLS = 10;
+const MAX_CALLS = 6;
 const CONCURRENCY = 2;
 const WANT_TAG = "Da provare";
 
