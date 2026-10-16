@@ -1,5 +1,7 @@
 "use client";
 
+import { segnaGiornoUso } from "@/lib/valore-tester";
+
 // Invia un segnale di comportamento a /api/events senza mai disturbare l'utente:
 // nessuna attesa, nessun errore mostrato. Vedi src/lib/events.ts.
 // Sessione, pagine ed errori partono da soli (src/instrumentation-client.ts, src/lib/track-auto.ts).
@@ -60,6 +62,7 @@ function daysSince(ts: number, now: number): number {
 function currentSession(): string | null {
   try {
     const now = Date.now();
+    segnaGiornoUso(now); // giorni diversi d'uso, per la domanda settimanale (src/lib/valore-tester.ts)
     const prev = readSession();
     if (prev && now - prev.last < SESSION_GAP) {
       window.localStorage.setItem(SESSION_KEY, JSON.stringify({ id: prev.id, last: now }));

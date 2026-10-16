@@ -7,6 +7,7 @@ import VenueSheet from "@/components/venue-sheet";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
 import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
+import UtileFeedback from "@/components/utile-feedback";
 import VoiceButton from "@/components/voice-button";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
@@ -809,6 +810,15 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                       </button>
                     ))}
                   </div>
+                )}
+                {/* "Ti è stato utile?" (piano 7.6): una volta per risposta, solo sull'ultima con posti. */}
+                {m.id === last?.id && m.status === "done" && ((m.places?.length ?? 0) > 0 || !!m.serata) && (
+                  <UtileFeedback
+                    contesto={m.serata ? "serata" : "assistente"}
+                    risultati={m.serata ? m.serata.tappe.filter((t) => chosenOf(t)).length : m.places?.length ?? 0}
+                    chiave={`assistente:${m.id}`}
+                    className="mt-4"
+                  />
                 )}
               </div>
             ),

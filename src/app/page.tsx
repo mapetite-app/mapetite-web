@@ -7,6 +7,7 @@ import HomeIntro, { IntroAgain } from "@/components/home-intro";
 import HomeSaved from "@/components/home-saved";
 import HomeSearchInput from "@/components/home-search-input";
 import BookingReminder from "@/components/booking-reminder";
+import DomandaSettimanale from "@/components/domanda-settimanale";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 // Quanti salvati e quanti "Voglio andarci" (tag "Da provare"). In sviluppo con E2E_FAKE_USER
@@ -61,6 +62,8 @@ export default async function Home() {
         {/* Due modi di cercare, chiari subito (Lorenzo 11/10): chiedere all'AI o usare i filtri. */}
         {/* Prenotazioni richieste dall'assistente: promemoria oggi, "Com'è andata?" dopo. */}
         <BookingReminder />
+        {/* Domanda settimanale (piano 7.6): una volta ogni 7 giorni, a chi è tornato almeno una volta. */}
+        <DomandaSettimanale />
         <HomeSaved total={counts.total} want={counts.want} />
         <HomeRecent />
         {/* Sorprendimi (piano 2.5): un posto mai provato che probabilmente ti piace, con il perché. */}

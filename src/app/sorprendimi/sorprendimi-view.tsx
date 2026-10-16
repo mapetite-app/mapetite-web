@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlacePhoto from "@/components/place-photo";
+import UtileFeedback from "@/components/utile-feedback";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
@@ -343,6 +344,12 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
             onAnother={another}
             onOpen={() => trackFeature("sorpresa_apri", { fonte: from })}
           />
+        )}
+        {/* "Ti è stato utile?" (piano 7.6): una volta per visita, sotto la carta (resta anche con "Un altro"). */}
+        {(current || exhausted) && (
+          <div className="mt-4 flex justify-center">
+            <UtileFeedback contesto="sorpresa" risultati={candidates.length} tono="scuro" />
+          </div>
         )}
 
         {exhausted && (

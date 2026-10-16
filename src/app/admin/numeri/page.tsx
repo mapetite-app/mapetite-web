@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
-import { computeNumeri, etichettaFunzione, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
+import { computeNumeri, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
 
 // Pannello di Lorenzo (PIANO-25-OTTOBRE.md 7.5): i tester usano Mapetite? Tornano? Cosa usano?
 // Solo per gli indirizzi in src/lib/admin.ts, per tutti gli altri 404. Legge `events` con la
@@ -123,6 +123,9 @@ function Pannello({ n, troncato }: { n: Numeri; troncato: boolean }) {
   const usate = n.funzioni.filter((f) => f.volte > 0);
   const maiUsate = n.funzioni.filter((f) => f.volte === 0);
   const votiUtile = n.utile.si + n.utile.no;
+  const { si: cSi, forse: cForse, no: cNo } = n.valore.settimanale;
+  const consigli = cSi + cForse + cNo;
+  const nps = consigli > 0 ? Math.round(((cSi - cNo) / consigli) * 100) : 0;
   return (
     <>
       {n.senzaTracciamento && (
@@ -223,12 +226,66 @@ function Pannello({ n, troncato }: { n: Numeri; troncato: boolean }) {
         </div>
       </Section>
 
-      <Section title="Ti è stato utile?">
+      <Section title="Valore per i tester" note="“Ti è stato utile?” dopo ricerche, assistente, Sorprendimi e prenotazioni, e la domanda della settimana in home.">
         <div data-testid="numeri-utile" className="grid grid-cols-3 gap-2">
           <Tile label="👍 Sì" value={fmt(n.utile.si)} />
           <Tile label="👎 No" value={fmt(n.utile.no)} />
           <Tile label="Soddisfatti" value={pct(n.utile.si, votiUtile)} hint={votiUtile > 0 ? `su ${votiUtile} voti` : "nessun voto"} />
         </div>
+        <h3 className="mb-1.5 mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Utile per funzione</h3>
+        <ul data-testid="numeri-utile-funzioni" className="space-y-1.5">
+          {n.valore.perContesto.map((c) => {
+            const tot = c.si + c.no;
+            return (
+              <li key={c.contesto} title={`${c.si} sì, ${c.no} no`} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-2 text-sm font-sans">
+                <span className={`truncate ${tot === 0 ? "text-text-muted" : "text-text"}`}>{etichettaUtile(c.contesto)}</span>
+                <span className="flex h-2.5 overflow-hidden rounded-full bg-surface">
+                  <span className="block h-full bg-success" style={{ width: `${tot > 0 ? (c.si / tot) * 100 : 0}%` }} />
+                  <span className="block h-full bg-accent" style={{ width: `${tot > 0 ? (c.no / tot) * 100 : 0}%` }} />
+                </span>
+                <span className="w-20 text-right tabular-nums text-text-muted">
+                  <span className="font-semibold text-text">{pct(c.si, tot)}</span>{tot > 0 && <> · {tot}</>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-1 text-[11px] font-sans text-text-muted">Verde: utile · corallo: non utile. Percentuale di 👍 · voti.</p>
+        {n.valore.motivi.length > 0 && (
+          <>
+            <h3 className="mb-1.5 mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa mancava (dopo un 👎)</h3>
+            <ul data-testid="numeri-utile-motivi" className="space-y-1 text-sm font-sans">
+              {n.valore.motivi.map((m) => (
+                <li key={m.chiave} className="flex justify-between gap-2"><span>{etichettaMotivo(m.chiave)}</span><span className="tabular-nums text-text-muted"><span className="font-semibold text-text">{m.volte}</span> · {m.persone}👤</span></li>
+              ))}
+            </ul>
+          </>
+        )}
+        <h3 className="mb-1.5 mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Domanda della settimana</h3>
+        <div data-testid="numeri-settimanale" className="grid grid-cols-2 gap-2">
+          <Tile label="Quanto ha aiutato" value={n.valore.settimanale.media === null ? "—" : `${n.valore.settimanale.media.toLocaleString("it-IT")}/5`} hint={n.valore.settimanale.risposte > 0 ? `media di ${n.valore.settimanale.risposte} risposte` : "nessuna risposta"} />
+          <Tile
+            label="Lo consiglierebbe"
+            value={pct(n.valore.settimanale.si, consigli)}
+            hint={consigli > 0 ? `${n.valore.settimanale.si} sì · ${n.valore.settimanale.forse} forse · ${n.valore.settimanale.no} no · netto ${nps > 0 ? "+" : ""}${nps}` : "nessuna risposta"}
+          />
+        </div>
+        <p className="mt-1 text-[11px] font-sans text-text-muted">
+          “Netto” = % sì meno % no (come un NPS semplice).{n.valore.settimanale.chiuse > 0 && ` Chiusa senza rispondere ${n.valore.settimanale.chiuse} ${n.valore.settimanale.chiuse === 1 ? "volta" : "volte"}.`}
+        </p>
+        {n.valore.perGiorno.length > 0 && (
+          <details className="mt-2 text-sm font-sans">
+            <summary className="cursor-pointer text-xs text-text-muted">Giorno per giorno</summary>
+            <table data-testid="numeri-valore-giorni" className="mt-2 w-full text-left text-xs tabular-nums">
+              <thead className="text-text-muted"><tr><th className="py-1 font-normal">Giorno</th><th className="font-normal">👍</th><th className="font-normal">👎</th><th className="font-normal">Utile</th><th className="font-normal">Voto sett.</th></tr></thead>
+              <tbody>
+                {n.valore.perGiorno.map((g) => (
+                  <tr key={g.giorno} className="border-t border-border"><td className="py-1">{giornoBreve(g.giorno)}</td><td>{g.si}</td><td>{g.no}</td><td>{pct(g.si, g.si + g.no)}</td><td>{g.media === null ? "—" : `${g.media.toLocaleString("it-IT")} (${g.voti})`}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
       </Section>
 
       <Section title="Cosa cercano" note={`${n.ricerche.ai} con l'AI · ${n.ricerche.filtri} con i filtri`}>
@@ -287,8 +344,8 @@ function Pannello({ n, troncato }: { n: Numeri; troncato: boolean }) {
           <p className="text-sm font-sans text-text-muted">Nessuno.</p>
         ) : (
           <ul data-testid="numeri-tester" className="divide-y divide-border rounded-card border border-border bg-white">
-            {n.tester.slice(0, 50).map((t) => (
-              <li key={`${t.chi}|${t.prima}`} className="p-3 text-sm font-sans">
+            {n.tester.slice(0, 50).map((t, i) => (
+              <li key={`${t.chi}|${t.prima}|${i}`} className="p-3 text-sm font-sans">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className={`truncate ${t.registrato ? "font-semibold text-text" : "text-text-muted"}`}>{t.chi}</span>
                   <span className="shrink-0 text-xs text-text-muted">{quando(t.ultima)}</span>
