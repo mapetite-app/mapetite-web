@@ -32,6 +32,14 @@ export default async function AmiciPage() {
   }
 
   const [feed, creators] = await Promise.all([loadFeed(viewer), loadCreatorLists(viewer)]);
+  const seguo = feed.stato === "in-arrivo" ? [] : feed.seguiti.map((p) => p.id);
+  const hasCreators = creators.some((c) => c.places.length > 0);
+  const creatorSection = (
+    <div id="creator" className="scroll-mt-4">
+      <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
+    </div>
+  );
+  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-surface px-4 text-sm font-display font-semibold text-brand active:scale-95";
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
@@ -42,39 +50,30 @@ export default async function AmiciPage() {
         <div className="mt-6"><SocialInArrivo /></div>
       ) : (
         <>
-          {!feed.mio?.is_public && (
-            <Link
-              href="/profilo#profilo-pubblico"
-              data-testid="amici-rendi-pubblico"
-              className="mt-4 flex items-center gap-3 rounded-card border border-dashed border-brand/40 bg-surface p-4 active:scale-[0.99]"
-            >
-              <span aria-hidden className="text-2xl">🙋</span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-semibold text-brand">Fatti trovare dagli amici</span>
-                <span className="block text-xs font-sans text-text-muted">Il tuo profilo è privato. Scegli un nome e rendilo pubblico quando vuoi.</span>
-              </span>
-              <span aria-hidden className="text-brand">→</span>
-            </Link>
-          )}
-
-          <Link
-            href="/gruppi"
-            data-testid="amici-gruppi"
-            className="mt-4 flex items-center gap-3 rounded-card border border-border bg-surface p-4 active:scale-[0.99]"
-          >
-            <span aria-hidden className="text-2xl">🍽️</span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-sm font-semibold text-brand">Liste di gruppo</span>
-              <span className="block text-xs font-sans text-text-muted">Dove andiamo giovedì? Ognuno propone un posto e si vota.</span>
-            </span>
-            <span aria-hidden className="text-brand">→</span>
-          </Link>
-
-          <div className="mt-5">
-            <CercaPersone viewerId={viewer} seguo={feed.seguiti.map((p) => p.id)} />
+          {/* Trova persone: la ricerca per nome, come "Search by name" di Places. */}
+          <div className="mt-4" id="trova">
+            <CercaPersone viewerId={viewer} seguo={seguo} />
           </div>
 
-          <CreatorListe creators={creators} viewer={viewer} seguo={feed.seguiti.map((p) => p.id)} />
+          {/* Ingressi compatti: le altre cose della pagina, a un tocco. */}
+          <nav aria-label="Scorciatoie" data-testid="amici-ingressi" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+            <Link href="/gruppi" data-testid="amici-gruppi" className={chip}>
+              <span aria-hidden>🍽️</span> Liste di gruppo
+            </Link>
+            {hasCreators && (
+              <a href="#creator" data-testid="amici-vai-creator" className={chip}>
+                <span aria-hidden>⭐</span> Creator da seguire
+              </a>
+            )}
+            {!feed.mio?.is_public && (
+              <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className={chip}>
+                <span aria-hidden>🙋</span> Fatti trovare
+              </Link>
+            )}
+          </nav>
+
+          {/* Senza nessuno da seguire, i creator sono il primo passo: vengono subito. */}
+          {feed.seguiti.length === 0 && creatorSection}
 
           {feed.seguiti.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">
@@ -98,7 +97,7 @@ export default async function AmiciPage() {
               <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-border bg-surface p-5 text-center">
                 <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
                 <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
-                  Cerca un amico per nome qui sopra, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
+                  Cerca un amico per nome in alto, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
                 </p>
               </div>
             ) : feed.attivita.length === 0 ? (
@@ -136,6 +135,8 @@ export default async function AmiciPage() {
               </ul>
             )}
           </section>
+
+          {feed.seguiti.length > 0 && creatorSection}
         </>
       )}
     </div>
