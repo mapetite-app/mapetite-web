@@ -4,7 +4,7 @@ import Link from "next/link";
 import PlaceCard from "@/components/place-card";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { getCategoryEmoji } from "@/lib/emoji";
-import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, Send, Settings, Sparkles, Store, Trophy, Users } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, Send, Settings, Sparkles, Store, Trophy, Users } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -289,6 +289,19 @@ export default async function ProfiloPage() {
             <TileBody icon={<Download {...icon} />} label="Importa" sub="Da Instagram e Maps" />
           </Link>
         </div>
+        {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
+        <Link
+          href="/profilo/gusto"
+          data-testid="profilo-carta-gusto"
+          className="mt-2 flex min-h-14 items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 active:scale-[0.99] transition-transform duration-150"
+        >
+          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><IdCard {...icon} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-[13px] font-semibold leading-tight text-text">La tua carta del gusto</span>
+            <span className="mt-0.5 block truncate text-[11px] leading-tight text-text-muted">Il tuo gusto in una card da condividere</span>
+          </span>
+          <ChevronRight aria-hidden size={16} className="text-text-muted" />
+        </Link>
       </section>
 
       <div id="raccolte" className="scroll-mt-4">
