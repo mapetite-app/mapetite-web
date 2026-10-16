@@ -280,3 +280,41 @@ export const TREND_ESEMPIO: TrendFascia[] = [
   { fascia: "cena", persone: 71, richieste: [{ chiave: "cucina romana", volte: 27, persone: 24 }, { chiave: "non turistico", volte: 22, persone: 19 }, { chiave: "romantico", volte: 10, persone: 9 }] },
   { fascia: "notte", persone: 6, richieste: [{ chiave: "aperto tardi", volte: 4, persone: 4 }] },
 ];
+
+// "Cosa ti dicono i numeri": al massimo due frasi semplici in cima al pannello, costruite SOLO
+// dai numeri del pannello e solo con voci sopra la soglia (niente frasi su 1 o 2 persone).
+// Nessuna frase se i dati non bastano: meglio niente che una conclusione inventata.
+const FASCIA_FRASE: Record<string, string> = { mattina: "la mattina", pranzo: "a pranzo", pomeriggio: "il pomeriggio", aperitivo: "all'aperitivo", cena: "a cena", notte: "a tarda sera" };
+const virgolette = (v: Voce[]) => v.map((x) => `“${x.chiave}”`).join(" e ");
+const num1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1 });
+
+export function cosaDiconoINumeri(p: PannelloRistoratore): string[] {
+  const out: string[] = [];
+  const sopra = (v: Voce[]) => v.filter((x) => x.persone >= SOGLIA);
+  const daTe = sopra(p.daRicerca.richieste).slice(0, 2);
+  const inZona = sopra(p.zona.richieste).slice(0, 2);
+  const picco = sopra(p.zona.fasce).reduce<Voce | null>((a, b) => (!a || b.persone > a.persone ? b : a), null);
+  const quando = picco ? FASCIA_FRASE[picco.chiave] : null;
+  if (daTe.length) out.push(`Chi ti cerca vuole soprattutto ${virgolette(daTe)}${quando ? `, e nella tua zona si cerca di più ${quando}` : ""}.`);
+  else if (inZona.length) out.push(`Nella tua zona si chiede soprattutto ${virgolette(inZona)}${quando ? `, e si cerca di più ${quando}` : ""}.`);
+  else if (quando) out.push(`Nella tua zona si cerca di più ${quando}.`);
+
+  const c = p.confronto;
+  if (c.mediaSalvati && c.salvati >= SOGLIA) {
+    const r = c.salvati / c.mediaSalvati;
+    out.push(
+      r >= 1.1
+        ? `Ti salvano ${num1(r)} volte più dei locali simili in zona: chi ti scopre ti vuole ricordare.`
+        : r <= 0.9
+          ? `Ti salvano meno dei locali simili (${Math.round(r * 100)}% della media): foto e informazioni curate aiutano.`
+          : "Ti salvano quanto i locali simili in zona.",
+    );
+  } else {
+    const v = p.azioni.find((a) => a.tipo === "apri_scheda");
+    if (v && v.persone >= SOGLIA && v.prima >= SOGLIA) {
+      const d = Math.round(((v.persone - v.prima) / v.prima) * 100);
+      out.push(`La tua scheda è stata vista dal ${Math.abs(d)}% di persone ${d >= 0 ? "in più" : "in meno"} rispetto ai ${p.giorni} giorni prima.`);
+    }
+  }
+  return out.slice(0, 2);
+}

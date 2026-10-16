@@ -1,16 +1,22 @@
 import Link from "next/link";
-import { BadgeCheck, Check, MapPin, Megaphone, X } from "lucide-react";
+import { BadgeCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
-import { mostraPersone, SOGLIA, TREND_ESEMPIO, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
+import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
 import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
 import TracciaFunzione from "@/components/traccia-funzione";
+import Schede from "./schede";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
 // (Verified, Growth, Pro) mostrano cosa entra in ciascuno (per il pitch, nessun pagamento).
+//
+// Struttura (feedback di Lorenzo 16/10: "tante funzioni, uso semplice"): in cima 4 numeri chiave
+// e due frasi "Cosa ti dicono i numeri"; il dettaglio è diviso in quattro schede (Panoramica ·
+// Clienti · Zona · Promozione) e ogni elenco mostra i primi 3 con "Vedi tutto". Nessun dato tolto.
 
 export const PERIODI = [7, 30] as const;
+const VISTE = ["panoramica", "clienti", "zona", "promozione"] as const;
 
 const FASCIA_LABEL: Record<string, string> = {
   mattina: "Mattina", pranzo: "Pranzo", pomeriggio: "Pomeriggio", aperitivo: "Aperitivo", cena: "Cena", notte: "Notte",
@@ -19,20 +25,38 @@ const giornoBreve = (key: string) => new Date(`${key}T12:00:00Z`).toLocaleDateSt
 const fmt = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1 });
 
 function Piano({ nome }: { nome: "Verified" | "Growth" | "Pro" }) {
-  const tone = nome === "Verified" ? "bg-brand/10 text-brand" : nome === "Growth" ? "bg-brand text-white" : "bg-accent text-white";
-  return <span className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold uppercase tracking-wider ${tone}`}>{nome}</span>;
+  const tone = nome === "Verified" ? "text-brand/70" : nome === "Growth" ? "text-brand" : "text-accent";
+  return <span className={`text-[10px] font-display font-semibold uppercase tracking-wider ${tone}`}>{nome}</span>;
 }
 
-function Sezione({ titolo, nota, piano, children, testId }: { titolo: string; nota?: string; piano: "Verified" | "Growth" | "Pro"; children: React.ReactNode; testId?: string }) {
+function Sezione({ titolo, nota, piano, children, testId }: { titolo: string; nota?: string; piano?: "Verified" | "Growth" | "Pro"; children: React.ReactNode; testId?: string }) {
   return (
-    <section data-testid={testId} className="mt-6 rounded-card border border-border bg-white p-4 shadow-card sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-base font-semibold text-brand">{titolo}</h2>
-        <Piano nome={piano} />
+    <section data-testid={testId} className="mt-4 rounded-card border border-border bg-white p-4 sm:p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-display text-[15px] font-semibold text-text">{titolo}</h2>
+        {piano && <Piano nome={piano} />}
       </div>
       {nota && <p className="mt-0.5 text-xs font-sans leading-snug text-text-muted">{nota}</p>}
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+function Sottotitolo({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <h3 className={`mb-2 text-[11px] font-display font-semibold uppercase tracking-wide text-text-muted ${className}`}>{children}</h3>;
+}
+
+// "Vedi tutto": il resto dell'elenco, chiuso. Nativo (<details>), funziona anche senza JS.
+function VediTutto({ n, children, testId }: { n: number; children: React.ReactNode; testId?: string }) {
+  return (
+    <details data-testid={testId} className="group mt-2">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
+        <span className="group-open:hidden">Vedi tutto ({n})</span>
+        <span className="hidden group-open:inline">Mostra meno</span>
+        <ChevronDown size={14} aria-hidden className="transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
   );
 }
 
@@ -44,25 +68,32 @@ function variazione(cur: number, prima: number): { testo: string; su: boolean } 
   return { testo: `${d > 0 ? "+" : ""}${d}%`, su: d >= 0 };
 }
 
-// Barre orizzontali: etichetta, barra e numero di persone (con la soglia).
-function Barre({ voci, vuoto, max = 6, etichetta, testId }: { voci: Voce[]; vuoto: string; max?: number; etichetta?: (k: string) => string; testId?: string }) {
+// Barre orizzontali: etichetta, barra e numero di persone (con la soglia). Primi 3, poi "Vedi tutto".
+const PRIMI = 3;
+function Barre({ voci, vuoto, max = 10, etichetta, testId }: { voci: Voce[]; vuoto: string; max?: number; etichetta?: (k: string) => string; testId?: string }) {
   const list = voci.filter((v) => v.persone > 0 || v.volte > 0).slice(0, max);
   if (list.length === 0) return <p className="text-sm font-sans text-text-muted">{vuoto}</p>;
   const top = Math.max(1, ...list.map((v) => v.persone));
+  const riga = (v: Voce) => (
+    <li key={v.chiave} className="text-sm font-sans">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-text first-letter:uppercase">{etichetta ? etichetta(v.chiave) : v.chiave}</span>
+        <span className="shrink-0 tabular-nums text-xs text-text-muted">{mostraPersone(v.persone)}</span>
+      </div>
+      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface">
+        <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (v.persone / top) * 100)}%` }} />
+      </span>
+    </li>
+  );
   return (
-    <ul data-testid={testId} className="space-y-2">
-      {list.map((v) => (
-        <li key={v.chiave} className="text-sm font-sans">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-text first-letter:uppercase">{etichetta ? etichetta(v.chiave) : v.chiave}</span>
-            <span className="shrink-0 tabular-nums text-xs text-text-muted">{mostraPersone(v.persone)} persone</span>
-          </div>
-          <span className="mt-1 block h-2 overflow-hidden rounded-full bg-surface">
-            <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (v.persone / top) * 100)}%` }} />
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div data-testid={testId}>
+      <ul className="space-y-2.5">{list.slice(0, PRIMI).map(riga)}</ul>
+      {list.length > PRIMI && (
+        <VediTutto n={list.length}>
+          <ul className="space-y-2.5">{list.slice(PRIMI).map(riga)}</ul>
+        </VediTutto>
+      )}
+    </div>
   );
 }
 
@@ -75,10 +106,10 @@ function Fasce({ voci }: { voci: Voce[] }) {
       {voci.map((v) => (
         <li key={v.chiave} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-sm font-sans">
           <span className="text-text">{FASCIA_LABEL[v.chiave] ?? v.chiave}</span>
-          <span className="h-2.5 overflow-hidden rounded-full bg-surface">
+          <span className="h-2 overflow-hidden rounded-full bg-surface">
             <span className="block h-full rounded-full bg-accent" style={{ width: `${v.persone > 0 ? Math.max(4, (v.persone / top) * 100) : 0}%` }} />
           </span>
-          <span className="w-20 text-right text-xs tabular-nums text-text-muted">{mostraPersone(v.persone)}</span>
+          <span className="w-16 text-right text-xs tabular-nums text-text-muted">{mostraPersone(v.persone)}</span>
         </li>
       ))}
     </ul>
@@ -98,17 +129,17 @@ function Andamento({ p }: { p: PannelloRistoratore }) {
   const totSalvati = g.reduce((s, d) => s + d.salvati, 0);
   return (
     <div data-testid="pannello-andamento">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-36 w-full" role="img" aria-label="Persone che hanno visto la scheda, giorno per giorno">
-        {[0.25, 0.5, 0.75].map((f) => (
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-28 w-full" role="img" aria-label="Persone che hanno visto la scheda, giorno per giorno">
+        {[0.5].map((f) => (
           <line key={f} x1={0} x2={W} y1={PAD + f * (H - 2 * PAD)} y2={PAD + f * (H - 2 * PAD)} stroke="var(--color-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         ))}
-        <path d={area} fill="var(--color-brand)" opacity={0.12} />
-        <path d={line} fill="none" stroke="var(--color-brand)" strokeWidth={2.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <path d={area} fill="var(--color-brand)" opacity={0.1} />
+        <path d={line} fill="none" stroke="var(--color-brand)" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         {g.map((d, i) => (
           <g key={d.giorno}>
             <title>{`${giornoBreve(d.giorno)}: ${mostraPersone(d.viste)} hanno visto la scheda, ${mostraPersone(d.salvati)} l'hanno salvato`}</title>
             <rect x={x(i) - W / g.length / 2} y={0} width={W / g.length} height={H} fill="transparent" />
-            {d.salvati >= SOGLIA && <circle cx={x(i)} cy={y(d.viste)} r={3.5} fill="var(--color-accent)" />}
+            {d.salvati >= SOGLIA && <circle cx={x(i)} cy={y(d.viste)} r={3} fill="var(--color-accent)" />}
           </g>
         ))}
       </svg>
@@ -116,9 +147,9 @@ function Andamento({ p }: { p: PannelloRistoratore }) {
         <span>{giornoBreve(g[0].giorno)}</span>
         <span>oggi</span>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-sans text-text-muted">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-brand" aria-hidden />Persone che hanno visto la scheda</span>
-        {totSalvati >= SOGLIA && <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden />Giorni con almeno {SOGLIA} salvataggi</span>}
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-sans text-text-muted">
+        <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-4 rounded-full bg-brand" aria-hidden />Hanno visto la scheda</span>
+        {totSalvati >= SOGLIA && <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-accent" aria-hidden />Giorni con almeno {SOGLIA} salvataggi</span>}
       </p>
     </div>
   );
@@ -137,7 +168,6 @@ function Confronto({ p, categoria, citta }: { p: PannelloRistoratore; categoria:
   ];
   return (
     <div data-testid="pannello-confronto" className="space-y-4">
-      <p className="text-xs font-sans text-text-muted">Media di {c.simili} locali simili su Mapetite{tra}, stesso periodo.</p>
       {righe.map((r) => {
         const top = Math.max(1, r.tuo, r.media);
         const volte = r.media > 0 ? r.tuo / r.media : null;
@@ -154,29 +184,55 @@ function Confronto({ p, categoria, citta }: { p: PannelloRistoratore; categoria:
             <div className="mt-1.5 space-y-1 text-xs font-sans">
               <div className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-2">
                 <span className="text-text">Tu</span>
-                <span className="h-2.5 overflow-hidden rounded-full bg-surface"><span className="block h-full rounded-full bg-brand" style={{ width: `${(r.tuo / top) * 100}%` }} /></span>
-                <span className="w-16 text-right tabular-nums text-text">{mostraPersone(r.tuo)}</span>
+                <span className="h-2 overflow-hidden rounded-full bg-surface"><span className="block h-full rounded-full bg-brand" style={{ width: `${(r.tuo / top) * 100}%` }} /></span>
+                <span className="w-14 text-right tabular-nums text-text">{mostraPersone(r.tuo)}</span>
               </div>
               <div className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-2">
                 <span className="text-text-muted">Media zona</span>
-                <span className="h-2.5 overflow-hidden rounded-full bg-surface"><span className="block h-full rounded-full bg-text-muted/50" style={{ width: `${(r.media / top) * 100}%` }} /></span>
-                <span className="w-16 text-right tabular-nums text-text-muted">{fmt(r.media)}</span>
+                <span className="h-2 overflow-hidden rounded-full bg-surface"><span className="block h-full rounded-full bg-text-muted/50" style={{ width: `${(r.media / top) * 100}%` }} /></span>
+                <span className="w-14 text-right tabular-nums text-text-muted">{fmt(r.media)}</span>
               </div>
             </div>
           </div>
         );
       })}
+      <p className="text-[11px] font-sans text-text-muted">Media di {c.simili} locali simili su Mapetite{tra}, stesso periodo.</p>
     </div>
   );
 }
 
-
 // Trend di zona (piano 8.4): per fascia oraria, le richieste più frequenti di chi cerca nella
 // zona. Anonimi e aggregati. Con pochi dati veri si mostra un esempio DICHIARATO come tale.
+// Le 3 fasce più cercate sono aperte; le altre dietro "Vedi tutto".
 const TREND_MIN = 20;
 function TrendZona({ trend, esempio }: { trend: TrendFascia[]; esempio: boolean }) {
   const top = Math.max(1, ...trend.map((t) => t.persone));
   const picco = trend.reduce((a, b) => (b.persone > a.persone ? b : a), trend[0]);
+  const forti = new Set([...trend].sort((a, b) => b.persone - a.persone).slice(0, PRIMI).map((t) => t.fascia));
+  const riga = (t: TrendFascia) => (
+    <li key={t.fascia} data-testid="trend-fascia">
+      <div className="flex items-baseline justify-between gap-2 text-sm font-sans">
+        <span className="font-display font-semibold text-text">{FASCIA_LABEL[t.fascia] ?? t.fascia}</span>
+        <span className="shrink-0 text-xs tabular-nums text-text-muted">{mostraPersone(t.persone)} persone</span>
+      </div>
+      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface">
+        <span className="block h-full rounded-full bg-accent" style={{ width: `${t.persone > 0 ? Math.max(4, (t.persone / top) * 100) : 0}%` }} />
+      </span>
+      {t.richieste.length > 0 ? (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {t.richieste.map((r) => (
+            <span key={r.chiave} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface px-2.5 py-0.5 text-xs font-sans text-text">
+              <span className="truncate first-letter:uppercase">{r.chiave}</span>
+              <span className="shrink-0 text-text-muted">· {mostraPersone(r.persone)}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs font-sans text-text-muted">Nessuna richiesta particolare.</p>
+      )}
+    </li>
+  );
+  const resto = trend.filter((t) => !forti.has(t.fascia));
   return (
     <div data-testid="trend-zona">
       {esempio && (
@@ -190,31 +246,12 @@ function TrendZona({ trend, esempio }: { trend: TrendFascia[]; esempio: boolean 
           {picco.richieste[0] && <>, soprattutto “{picco.richieste[0].chiave}”</>}.
         </p>
       )}
-      <ul className="space-y-3">
-        {trend.map((t) => (
-          <li key={t.fascia} data-testid="trend-fascia">
-            <div className="flex items-baseline justify-between gap-2 text-sm font-sans">
-              <span className="font-display font-semibold text-text">{FASCIA_LABEL[t.fascia] ?? t.fascia}</span>
-              <span className="shrink-0 text-xs tabular-nums text-text-muted">{mostraPersone(t.persone)} persone</span>
-            </div>
-            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface">
-              <span className="block h-full rounded-full bg-accent" style={{ width: `${t.persone > 0 ? Math.max(4, (t.persone / top) * 100) : 0}%` }} />
-            </span>
-            {t.richieste.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {t.richieste.map((r) => (
-                  <span key={r.chiave} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface px-2.5 py-0.5 text-xs font-sans text-text">
-                    <span className="truncate first-letter:uppercase">{r.chiave}</span>
-                    <span className="shrink-0 text-text-muted">· {mostraPersone(r.persone)}</span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-1 text-xs font-sans text-text-muted">Nessuna richiesta particolare.</p>
-            )}
-          </li>
-        ))}
-      </ul>
+      <ul className="space-y-3">{trend.filter((t) => forti.has(t.fascia)).map(riga)}</ul>
+      {resto.length > 0 && (
+        <VediTutto n={trend.length}>
+          <ul className="space-y-3">{resto.map(riga)}</ul>
+        </VediTutto>
+      )}
     </div>
   );
 }
@@ -242,7 +279,7 @@ function InEvidenzaDemo() {
       </div>
       <p className="mt-1.5 text-[11px] font-sans text-text-muted">Si aggiunge dopo i primi risultati, non prende il posto di nessuno.</p>
 
-      <h3 className="mb-2 mt-5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Quando compare (e quando no)</h3>
+      <Sottotitolo className="mt-5">Quando compare (e quando no)</Sottotitolo>
       <ul className="space-y-2">
         {verifiche.map(({ r, v }) => (
           <li key={r.frase} data-testid={v.mostra ? "evidenza-si" : "evidenza-no"} className="flex gap-2.5 rounded-card bg-surface p-3">
@@ -257,14 +294,46 @@ function InEvidenzaDemo() {
         ))}
       </ul>
 
-      <h3 className="mb-2 mt-5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">La regola</h3>
-      <ul data-testid="evidenza-regole" className="space-y-1.5 text-sm font-sans leading-snug text-text">
-        <li>• Compare solo se rispetta <strong>tutto</strong> quello che la persona ha chiesto: tipo di locale, zona, caratteristiche. Nel dubbio non compare.</li>
-        <li>• Sempre con l&apos;etichetta “Sponsorizzato”, ben visibile.</li>
-        <li>• Al massimo uno per ricerca, e non cambia l&apos;ordine degli altri risultati.</li>
-        <li>• Il verdetto resta quello delle recensioni: pagare non lo cambia.</li>
-      </ul>
+      <VediTutto n={4} testId="evidenza-regole-apri">
+        <ul data-testid="evidenza-regole" className="space-y-1.5 text-sm font-sans leading-snug text-text">
+          <li>• Compare solo se rispetta <strong>tutto</strong> quello che la persona ha chiesto: tipo di locale, zona, caratteristiche. Nel dubbio non compare.</li>
+          <li>• Sempre con l&apos;etichetta “Sponsorizzato”, ben visibile.</li>
+          <li>• Al massimo uno per ricerca, e non cambia l&apos;ordine degli altri risultati.</li>
+          <li>• Il verdetto resta quello delle recensioni: pagare non lo cambia.</li>
+        </ul>
+      </VediTutto>
     </div>
+  );
+}
+
+// Numero chiave della prima schermata: grande, con la tendenza sul periodo prima.
+function Numero({ a, giorni, forte = false }: { a: Azione; giorni: number; forte?: boolean }) {
+  const v = variazione(a.persone, a.prima);
+  return (
+    <div data-testid="numero-chiave" className={`rounded-card p-3.5 ${forte ? "bg-brand text-white" : "bg-surface"}`}>
+      <p className={`text-[12px] font-sans leading-snug ${forte ? "text-white/80" : "text-text-muted"}`}>{a.etichetta}</p>
+      <p className={`mt-1 font-display font-semibold tabular-nums leading-none ${a.persone > 0 && a.persone < SOGLIA ? "text-lg" : "text-[28px]"} ${forte ? "text-white" : "text-brand"}`}>{mostraPersone(a.persone)}</p>
+      <p className={`mt-1.5 text-[11px] font-sans ${forte ? "text-white/80" : "text-text-muted"}`}>
+        {v ? (
+          <><span className={`font-semibold ${forte ? "text-white" : v.su ? "text-success" : "text-accent"}`}>{v.su ? "↑" : "↓"} {v.testo}</span> sui {giorni} giorni prima</>
+        ) : (
+          "persone"
+        )}
+      </p>
+    </div>
+  );
+}
+
+// Scorciatoie dalla Panoramica alle altre schede (gestite da schede.tsx con data-vai).
+function Vai({ id, titolo, testo }: { id: string; titolo: string; testo: string }) {
+  return (
+    <a href={`?vista=${id}`} data-vai={id} className="flex items-center gap-3 py-3 active:opacity-70">
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-sm font-semibold text-text">{titolo}</span>
+        <span className="block truncate text-xs font-sans text-text-muted">{testo}</span>
+      </span>
+      <ChevronRight size={18} aria-hidden className="shrink-0 text-text-muted" />
+    </a>
   );
 }
 
@@ -276,6 +345,7 @@ export default function Pannello({
   base,
   demo = false,
   avviso,
+  vista,
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -284,71 +354,31 @@ export default function Pannello({
   base: string;
   demo?: boolean;
   avviso?: string | null;
+  vista?: string;
 }) {
   const categoria = categoryLabel(locale.category);
-  const viste = p.azioni.find((a) => a.tipo === "apri_scheda")!;
-  const altre = p.azioni.filter((a) => a.tipo !== "apri_scheda");
-  const varViste = variazione(viste.persone, viste.prima);
-  return (
-    <main className="mx-auto max-w-3xl px-4 pb-28 pt-6" data-testid="pannello-ristoratore">
-      {demo && (
-        <p data-testid="pannello-demo-etichetta" className="mb-4 rounded-card border-2 border-dashed border-accent bg-accent-light px-4 py-3 text-sm font-sans text-text">
-          <strong className="font-display">Esempio dimostrativo.</strong> Locale e numeri sono inventati: mostrano come apparirà il pannello quando Mapetite avrà molti utenti.
-        </p>
+  const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
+  const chiave = [az("apri_scheda"), az("salva"), az("ci_sono_stato"), az("percorso")];
+  const frasi = cosaDiconoINumeri(p);
+  const trendEsempio = !demo && p.zona.ricerche < TREND_MIN;
+  const zonaNome = p.zona.nome ? `a ${p.zona.nome}` : "nella tua zona";
+
+  const panoramica = (
+    <>
+      <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
+        {chiave.map((a, i) => <Numero key={a.tipo} a={a} giorni={p.giorni} forte={i === 0} />)}
+      </section>
+
+      {frasi.length > 0 && (
+        <section data-testid="pannello-insight" className="mt-3 rounded-card border border-accent/30 bg-accent-light/60 p-4">
+          <h2 className="flex items-center gap-1.5 text-[11px] font-display font-semibold uppercase tracking-wide text-accent">
+            <Sparkles size={13} aria-hidden />Cosa ti dicono i numeri
+          </h2>
+          <ul className="mt-2 space-y-1.5">
+            {frasi.map((f) => <li key={f} className="text-[15px] font-sans leading-snug text-text">{f}</li>)}
+          </ul>
+        </section>
       )}
-      <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
-      <h1 className="mt-1 font-title text-3xl font-semibold leading-tight text-brand">{locale.name}</h1>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-sans text-text-muted">
-        {verificato ? (
-          <span data-testid="pannello-verificato" className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-xs font-display font-semibold text-brand"><BadgeCheck size={14} aria-hidden />Verificato</span>
-        ) : (
-          <span className="rounded-pill bg-surface px-2.5 py-0.5 text-xs font-display font-semibold text-text-muted">Non ancora verificato</span>
-        )}
-        {categoria && <span>{categoria}</span>}
-        {locale.address && <span className="inline-flex items-center gap-1"><MapPin size={13} aria-hidden />{displayAddress(locale.address)}</span>}
-      </div>
-
-      <nav aria-label="Periodo" className="mt-4 flex gap-2">
-        {PERIODI.map((g) => (
-          <Link
-            key={g}
-            href={`${base}?giorni=${g}`}
-            aria-current={g === p.giorni ? "page" : undefined}
-            className={`min-h-9 rounded-pill border px-4 py-1.5 text-sm font-display font-semibold ${g === p.giorni ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
-          >
-            Ultimi {g} giorni
-          </Link>
-        ))}
-      </nav>
-
-      {avviso && <p className="mt-4 rounded-card bg-accent-light p-3 text-sm font-sans text-text">{avviso}</p>}
-      {p.pochiDati && (
-        <p data-testid="pannello-pochi-dati" className="mt-4 rounded-card bg-surface p-3 text-sm font-sans text-text">
-          <strong className="font-display">Dati ancora pochi:</strong> crescono con i tester. Per proteggere chi usa Mapetite, sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”.
-        </p>
-      )}
-
-      <Sezione titolo="Le persone e il tuo locale" nota={`Persone diverse negli ultimi ${p.giorni} giorni.`} piano="Verified" testId="pannello-azioni">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div className="col-span-2 rounded-card bg-brand p-4 text-white sm:col-span-1">
-            <p className="text-xs font-sans text-white/80">{viste.etichetta}</p>
-            <p className="mt-1 font-display text-3xl font-semibold tabular-nums">{mostraPersone(viste.persone)}</p>
-            <p className="mt-0.5 text-[11px] font-sans text-white/80">
-              {varViste ? <><span className="font-semibold text-white">{varViste.testo}</span> rispetto ai {p.giorni} giorni prima</> : "persone"}
-            </p>
-          </div>
-          {altre.map((a) => {
-            const v = variazione(a.persone, a.prima);
-            return (
-              <div key={a.tipo} className="rounded-card border border-border bg-bg p-3">
-                <p className="text-xs font-sans leading-snug text-text-muted">{a.etichetta}</p>
-                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-brand">{mostraPersone(a.persone)}</p>
-                {v && <p className={`text-[11px] font-sans ${v.su ? "text-success" : "text-accent"}`}>{v.testo} sul periodo prima</p>}
-              </div>
-            );
-          })}
-        </div>
-      </Sezione>
 
       <Sezione titolo="Giorno per giorno" piano="Verified">
         {/* Con meno di 3 persone anche la forma della curva direbbe chi è passato e quando. */}
@@ -359,46 +389,87 @@ export default function Pannello({
         )}
       </Sezione>
 
+      <Sezione titolo="Rispetto ai locali simili" piano="Pro" testId="pannello-confronto-sezione">
+        <Confronto p={p} categoria={categoria} citta={citta} />
+      </Sezione>
+
+      <nav aria-label="Approfondisci" className="mt-4 divide-y divide-border rounded-card border border-border bg-white px-4">
+        <Vai id="clienti" titolo="Clienti" testo="Cosa chiedeva chi ti ha trovato, e tutte le azioni" />
+        <Vai id="zona" titolo={`Zona`} testo={`Cosa cerca la gente ${zonaNome}, ora per ora`} />
+        <Vai id="promozione" titolo="Promozione" testo={demo ? "Come funzionano i posti in evidenza" : "Posti in evidenza e piani"} />
+      </nav>
+    </>
+  );
+
+  const clienti = (
+    <>
       <Sezione
         titolo="Come ti trovano"
-        nota={p.daRicerca.ricerche > 0 ? `Le ricerche da cui le persone hanno aperto la tua scheda (${mostraPersone(p.daRicerca.persone)} persone).` : undefined}
+        nota={p.daRicerca.ricerche > 0 ? `Le ricerche da cui ${mostraPersone(p.daRicerca.persone)} persone hanno aperto la tua scheda.` : undefined}
         piano="Growth"
         testId="pannello-come-ti-trovano"
       >
         {p.daRicerca.ricerche > 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-5">
             <div>
-              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa chiedevano</h3>
+              <Sottotitolo>Cosa chiedevano</Sottotitolo>
               <Barre voci={p.daRicerca.richieste} vuoto="Ricerche senza richieste particolari." testId="pannello-richieste-locale" />
             </div>
-            <div>
-              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Che locale cercavano</h3>
-              <Barre voci={p.daRicerca.tipi} vuoto="—" />
-              <h3 className="mb-2 mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Dove</h3>
-              <Barre voci={p.daRicerca.zone} vuoto="—" />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <Sottotitolo>Che locale cercavano</Sottotitolo>
+                <Barre voci={p.daRicerca.tipi} vuoto="—" />
+              </div>
+              <div>
+                <Sottotitolo>Dove</Sottotitolo>
+                <Barre voci={p.daRicerca.zone} vuoto="—" />
+              </div>
             </div>
           </div>
         ) : (
-          <p className="text-sm font-sans text-text-muted">In questo periodo nessuno ha aperto la tua scheda dai risultati di una ricerca. Qui sotto: cosa cercano le persone nella tua zona.</p>
+          <p className="text-sm font-sans text-text-muted">In questo periodo nessuno ha aperto la tua scheda dai risultati di una ricerca. Nella scheda Zona: cosa cercano le persone intorno a te.</p>
         )}
       </Sezione>
 
+      <Sezione titolo="Tutte le azioni" nota={`Persone diverse negli ultimi ${p.giorni} giorni, e la differenza con i ${p.giorni} giorni prima.`} piano="Verified" testId="pannello-tutte-azioni">
+        <ul className="divide-y divide-border">
+          {p.azioni.map((a) => {
+            const v = variazione(a.persone, a.prima);
+            return (
+              <li key={a.tipo} className="flex items-baseline justify-between gap-3 py-2 text-sm font-sans">
+                <span className="text-text">{a.etichetta}</span>
+                <span className="shrink-0 tabular-nums">
+                  <span className="font-display font-semibold text-brand">{mostraPersone(a.persone)}</span>
+                  {v && <span className={`ml-2 text-xs ${v.su ? "text-success" : "text-accent"}`}>{v.testo}</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </Sezione>
+    </>
+  );
+
+  const zona = (
+    <>
       <Sezione
-        titolo={`Cosa cerca la gente${p.zona.nome ? ` a ${p.zona.nome}` : " nella tua zona"}`}
+        titolo={`Cosa cerca la gente ${zonaNome}`}
         nota={p.zona.ricerche > 0 ? `${mostraPersone(p.zona.persone)} persone hanno cercato nella tua zona.` : undefined}
         piano="Growth"
         testId="pannello-zona"
       >
         {p.zona.ricerche > 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-5">
             <div>
-              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Le richieste più frequenti</h3>
+              <Sottotitolo>Le richieste più frequenti</Sottotitolo>
               <Barre voci={p.zona.richieste} vuoto="Ricerche senza richieste particolari." testId="pannello-richieste-zona" />
             </div>
             <div>
-              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Che locale cercano</h3>
-              <Barre voci={p.zona.tipi} vuoto="—" max={4} />
-              <h3 className="mb-2 mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Quando cercano</h3>
+              <Sottotitolo>Che locale cercano</Sottotitolo>
+              <Barre voci={p.zona.tipi} vuoto="—" />
+            </div>
+            <div>
+              <Sottotitolo>Quando cercano</Sottotitolo>
               <Fasce voci={p.zona.fasce} />
             </div>
           </div>
@@ -407,26 +478,67 @@ export default function Pannello({
         )}
       </Sezione>
 
-      <Sezione
-        titolo={`Trend di zona${p.zona.nome ? ` a ${p.zona.nome}` : ""}`}
-        nota="Cosa chiede chi cerca nella tua zona, fascia per fascia. Anonimo e aggregato."
-        piano="Pro"
-        testId="pannello-trend"
-      >
-        <TrendZona trend={!demo && p.zona.ricerche < TREND_MIN ? TREND_ESEMPIO : p.zona.trend} esempio={!demo && p.zona.ricerche < TREND_MIN} />
+      <Sezione titolo="Trend per fascia oraria" nota="Cosa chiede chi cerca nella tua zona, fascia per fascia. Anonimo e aggregato." piano="Pro" testId="pannello-trend">
+        <TrendZona trend={trendEsempio ? TREND_ESEMPIO : p.zona.trend} esempio={trendEsempio} />
       </Sezione>
+    </>
+  );
 
-      <Sezione titolo="Confronto con la zona" piano="Pro" testId="pannello-confronto-sezione">
-        <Confronto p={p} categoria={categoria} citta={citta} />
-      </Sezione>
+  const promozione = demo ? (
+    <Sezione titolo="Posti in evidenza" nota="Esempio: attivo quando ci saranno ristoratori. Oggi nei risultati veri non c'è nessuno sponsorizzato." piano="Pro" testId="pannello-evidenza">
+      <InEvidenzaDemo />
+    </Sezione>
+  ) : (
+    <Sezione titolo="Posti in evidenza" piano="Pro" testId="pannello-promozione">
+      <p className="text-sm font-sans leading-snug text-text">
+        In arrivo. Un locale in evidenza compare solo quando è adatto a quello che la persona ha chiesto, sempre con l&apos;etichetta “Sponsorizzato”.
+      </p>
+      <Link href="/ristoratore/demo?vista=promozione" className="mt-3 inline-flex items-center gap-1 text-sm font-display font-semibold text-brand">
+        Guarda come funziona<ChevronRight size={16} aria-hidden />
+      </Link>
+    </Sezione>
+  );
 
+  return (
+    <main className="mx-auto max-w-3xl px-4 pb-28 pt-4" data-testid="pannello-ristoratore">
       {demo && (
-        <Sezione titolo="Posti in evidenza" nota="Esempio: attivo quando ci saranno ristoratori. Oggi nei risultati veri non c'è nessuno sponsorizzato." piano="Pro" testId="pannello-evidenza">
-          <InEvidenzaDemo />
-        </Sezione>
+        <p data-testid="pannello-demo-etichetta" className="mb-3 rounded-pill border border-dashed border-accent bg-accent-light px-3 py-1.5 text-center text-xs font-sans text-text">
+          <strong className="font-display">Esempio dimostrativo</strong> · locale e numeri inventati
+        </p>
+      )}
+      <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
+      <h1 className="mt-0.5 font-title text-[26px] font-semibold leading-tight text-brand">{locale.name}</h1>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-sans text-text-muted">
+        {verificato ? (
+          <span data-testid="pannello-verificato" className="inline-flex items-center gap-1 font-display font-semibold text-brand"><BadgeCheck size={14} aria-hidden />Verificato</span>
+        ) : (
+          <span className="font-display font-semibold">Non ancora verificato</span>
+        )}
+        {categoria && <span>· {categoria}</span>}
+        {locale.address && <span className="inline-flex min-w-0 items-center gap-1"><MapPin size={12} aria-hidden /><span className="truncate">{displayAddress(locale.address)}</span></span>}
+      </div>
+
+      {avviso && <p className="mt-3 rounded-card bg-accent-light p-3 text-sm font-sans text-text">{avviso}</p>}
+      {p.pochiDati && (
+        <p data-testid="pannello-pochi-dati" className="mt-3 rounded-card bg-surface p-3 text-sm font-sans text-text">
+          <strong className="font-display">Dati ancora pochi:</strong> crescono con i tester. Per proteggere chi usa Mapetite, sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”.
+        </p>
       )}
 
-      <p className="mt-6 text-xs font-sans leading-relaxed text-text-muted">
+      <Schede
+        iniziale={vista ?? VISTE[0]}
+        periodi={PERIODI}
+        giorni={p.giorni}
+        base={base}
+        schede={[
+          { id: "panoramica", label: "Panoramica", content: panoramica },
+          { id: "clienti", label: "Clienti", content: clienti },
+          { id: "zona", label: "Zona", content: zona },
+          { id: "promozione", label: "Promozione", content: promozione },
+        ]}
+      />
+
+      <p className="mt-6 text-[11px] font-sans leading-relaxed text-text-muted">
         Solo numeri aggregati: non vedi mai chi è una persona. Sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”. Le ricerche sono quello che l&apos;AI ha capito (tipo di locale, richieste, zona), mai la frase scritta.
       </p>
       {demo && (

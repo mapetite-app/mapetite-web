@@ -17,5 +17,5 @@ export default async function RistoratoreDemoPage({ searchParams }: { searchPara
   const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 30;
   const dati = demoDati();
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
