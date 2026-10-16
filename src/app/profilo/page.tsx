@@ -2,7 +2,11 @@ import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import PlaceCard from "@/components/place-card";
-import { cityFromAddress } from "@/lib/city";
+import { cityFromAddress, displayAddress } from "@/lib/city";
+import { getCategoryEmoji } from "@/lib/emoji";
+import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, Send, Settings, Sparkles, Store, Trophy, Users } from "lucide-react";
+import ProfiloSezione from "@/components/profilo-sezione";
+import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import BookingReminder from "@/components/booking-reminder";
 import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
@@ -158,21 +162,23 @@ export default async function ProfiloPage() {
     a[0] === "Altre zone" ? 1 : b[0] === "Altre zone" ? -1 : b[1].length - a[1].length,
   );
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
-  // Contatori come il profilo di Places: voglio andarci / ci sono stato / città.
+  const name = (!("stato" in social) && social.display_name) || (user.email ?? "").split("@")[0] || "Il mio profilo";
+  // Tre numeri come il profilo di Places: salvati / voglio andarci / ci sono stato (le città
+  // sono dette sopra l'anteprima dei salvati).
   const wantCount = saved.filter((r) => r.tags?.includes(STATE_WANT)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
   const cityCount = cityGroups.filter(([c]) => c !== "Altre zone").length;
   const counters = [
     { label: "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
-    { label: "📌 Voglio andarci", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
-    { label: "✓ Ci sono stato", value: doneCount, href: savedHref({ stato: "fatto" }), id: "fatto" },
-    { label: "Città", value: cityCount, href: savedHref(), id: "citta" },
+    { label: "Voglio andarci", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
+    { label: "Ci sono stato", value: doneCount, href: savedHref({ stato: "fatto" }), id: "fatto" },
   ];
 
   // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
   const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
     row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
+  const raccolteCount = new Set(saved.flatMap((r) => (r.tags ?? []).filter((t) => t !== STATE_WANT && t !== STATE_DONE))).size;
 
   const classificaRows: ClassificaRow[] = saved.flatMap((r) =>
     r.places && r.tags?.includes(STATE_DONE)
@@ -187,133 +193,118 @@ export default async function ProfiloPage() {
     .slice(0, 20)
     .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note }));
 
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-6 flex items-center gap-4">
-        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
-          {initial}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate font-display text-base font-semibold text-text">{user.email}</p>
-          <p className="mt-0.5 text-sm text-text-muted">
-            {saved.length} {saved.length === 1 ? "locale salvato" : "locali salvati"} ·{" "}
-            {reviews.length} {reviews.length === 1 ? "recensione" : "recensioni"}
-          </p>
-          <Link href="/me" className="inline-flex min-h-10 items-center text-sm font-display font-semibold text-accent">
-            I tuoi gusti →
-          </Link>
-        </div>
-      </div>
+  const recent = saved.filter((r) => r.places).slice(0, 3);
+  const REVIEWS_PREVIEW = 2;
+  const icon = { size: 18, strokeWidth: 1.75 } as const;
+  const row = "flex min-h-14 items-center gap-3 border-t border-border px-4 py-2 active:bg-surface";
 
-      {/* Prenotazioni richieste dall'assistente (salvate nel telefono). */}
-      <BookingReminder />
+  return (
+    <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
+      {/* Intestazione: chi sei, i tre numeri (toccabili) e l'ingranaggio per le cose secondarie. */}
+      <header className="mb-5">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
+            {initial}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-title text-2xl font-semibold leading-tight text-brand">{name}</h1>
+            <p className="truncate text-xs text-text-muted">{user.email}</p>
+            <Link href="/me" className="inline-flex min-h-8 items-center text-sm font-display font-semibold text-accent">
+              I tuoi gusti →
+            </Link>
+          </div>
+          <a
+            href="#altro"
+            aria-label="Impostazioni e altro"
+            data-testid="profilo-impostazioni"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
+          >
+            <Settings size={20} strokeWidth={1.75} aria-hidden />
+          </a>
+        </div>
+        {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
+        <nav aria-label="La mia guida" data-testid="guida-contatori" className="mt-4 grid grid-cols-3 divide-x divide-border rounded-card border border-border bg-surface">
+          {counters.map((c) => (
+            <Link
+              key={c.id}
+              href={c.href}
+              data-testid={`guida-${c.id}`}
+              className="flex min-h-[64px] flex-col items-center justify-center gap-1 px-1 py-2 text-center active:bg-white"
+            >
+              <span className="font-title text-2xl font-semibold leading-none text-brand">{c.value}</span>
+              <span className="text-[11px] font-display leading-tight text-text-muted">{c.label}</span>
+            </Link>
+          ))}
+        </nav>
+      </header>
 
       {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
       <Link
         href="/stasera"
         data-testid="profilo-stasera"
-        className="mb-4 flex min-h-[84px] items-center gap-4 rounded-card bg-brand px-4 py-4 text-white shadow-float active:scale-[0.99] transition-transform duration-150"
+        className="mb-5 flex min-h-[72px] items-center gap-4 rounded-card bg-brand px-4 py-3 text-white shadow-float active:scale-[0.99] transition-transform duration-150"
       >
-        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-2xl">🍽️</span>
+        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-xl">🍽️</span>
         <span className="min-w-0 flex-1">
-          <span className="block font-display text-lg font-semibold leading-tight">Stasera dove andiamo?</span>
+          <span className="block font-display text-base font-semibold leading-tight">Stasera dove andiamo?</span>
           <span className="mt-0.5 block text-sm text-white/75">Scegli tra i tuoi salvati</span>
         </span>
         <span aria-hidden className="text-xl text-white/70">→</span>
       </Link>
 
-      <ProfiloPrenotazioni />
-
-      {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
-      <ProfiloGusti userId={user.id} />
-
-      {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
-      <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">
-        {counters.map((c) => (
-          <Link
-            key={c.id}
-            href={c.href}
-            data-testid={`guida-${c.id}`}
-            className="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface px-1 py-3 text-center active:scale-[0.97] transition-transform duration-150"
-          >
-            <span className="font-title text-2xl font-semibold leading-none text-brand">{c.value}</span>
-            <span className="text-[11px] font-display leading-tight text-text-muted">{c.label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      {/* Invito (piano 9.1): il proprio link personale, in vista. */}
-      <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
-
+      {/* Promemoria che compaiono solo quando servono. */}
+      <BookingReminder />
       <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
 
-      {/* Diario (4.4): i posti provati con data, voto e nota. */}
-      <Link
-        href="/profilo/diario"
-        data-testid="profilo-diario"
-        className="mb-8 flex min-h-[72px] items-center gap-4 rounded-card border border-border bg-surface px-4 py-3 active:scale-[0.99] transition-transform duration-150"
-      >
-        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-light text-2xl">📔</span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-base font-semibold leading-tight text-text">Il mio diario</span>
-          <span className="mt-0.5 block text-sm text-text-muted">
-            {doneCount === 0 ? "I posti dove sei stato, con voto e note" : `${doneCount} ${doneCount === 1 ? "posto provato" : "posti provati"}, con voto e note`}
-          </span>
-        </span>
-        <span aria-hidden className="text-xl text-text-muted">→</span>
-      </Link>
+      {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
+      <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-8">
+        <h2 id="mie-cose-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le mie cose</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <a href="#raccolte" data-testid="tessera-raccolte" className={TILE_CLASS}>
+            <TileBody icon={<FolderHeart {...icon} />} label="Raccolte" count={raccolteCount} sub="Per occasione" />
+          </a>
+          <Link href="/profilo/diario" data-testid="profilo-diario" className={TILE_CLASS}>
+            <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub={doneCount === 0 ? "Voti e note" : `${doneCount} ${doneCount === 1 ? "provato" : "provati"}`} />
+          </Link>
+          {ranks ? (
+            <a href="#classifica" data-testid="tessera-classifica" className={TILE_CLASS}>
+              <TileBody icon={<Trophy {...icon} />} label="Classifica" count={classificaRows.length} sub="I tuoi preferiti" />
+            </a>
+          ) : (
+            <a href="#ricerche" data-testid="tessera-ricerche" className={TILE_CLASS}>
+              <TileBody icon={<History {...icon} />} label="Ricerche" sub="Da rifare" />
+            </a>
+          )}
+          <ProfiloPrenotazioni />
+          {/* Liste di gruppo (piano 5.5): scegliere insieme agli amici, con i 👍. */}
+          <Link href="/gruppi" data-testid="profilo-gruppi" className={TILE_CLASS}>
+            <TileBody icon={<Users {...icon} />} label="Liste di gruppo" sub="Si vota insieme" />
+          </Link>
+          {/* "Importa" non è più nella barra in basso: si raggiunge da qui. */}
+          <Link href="/importa" data-testid="profilo-importa" className={TILE_CLASS}>
+            <TileBody icon={<Download {...icon} />} label="Importa" sub="Da altre app" />
+          </Link>
+        </div>
+      </section>
 
-      {/* Liste di gruppo (piano 5.5): scegliere insieme agli amici, con i 👍. */}
-      <Link
-        href="/gruppi"
-        data-testid="profilo-gruppi"
-        className="mb-8 flex min-h-[72px] items-center gap-4 rounded-card border border-border bg-surface px-4 py-3 active:scale-[0.99] transition-transform duration-150"
-      >
-        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-light text-2xl">🍽️</span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-base font-semibold leading-tight text-text">Liste di gruppo</span>
-          <span className="mt-0.5 block text-sm text-text-muted">Es. &quot;Cene del giovedì&quot;: ognuno propone, si vota, si sceglie</span>
-          </span>
-          <span aria-hidden className="text-xl text-text-muted">→</span>
-        </Link>
+      <div id="raccolte" className="scroll-mt-4">
+        <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
+      </div>
 
-      {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
-      <Link
-        href="/premium"
-        data-testid="profilo-premium"
-        className="mb-8 flex min-h-[64px] items-center gap-4 rounded-card border border-accent/40 bg-accent-light px-4 py-3 active:scale-[0.99] transition-transform duration-150"
-      >
-        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-xl text-white">✨</span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-base font-semibold leading-tight text-text">Mapetite Premium <span className="text-xs font-semibold text-accent">· in arrivo</span></span>
-          <span className="mt-0.5 block text-sm text-text-muted">Assistente senza limiti, raccolte illimitate, serate organizzate</span>
-        </span>
-        <span aria-hidden className="text-xl text-text-muted">→</span>
-      </Link>
+      {ranks && (
+        <div id="classifica" className="scroll-mt-4">
+          <ProfiloClassifica userId={user.id} initialRows={classificaRows} />
+        </div>
+      )}
 
-      <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
-
-      {ranks && <ProfiloClassifica userId={user.id} initialRows={classificaRows} />}
-
-      <ProfiloRicerche />
-
-      <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
-
-      <section className="mb-10">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="font-title text-xl font-semibold text-brand">I miei locali salvati</h2>
+      {/* Salvati: anteprima breve; l'elenco per città si apre con "Vedi tutti". */}
+      <section className="mb-8" data-testid="profilo-salvati">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <h2 className="font-title text-xl font-semibold text-brand">Ultimi salvati</h2>
           {saved.length > 0 && (
             <Link href={savedHref()} className="inline-flex min-h-10 shrink-0 items-center text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
           )}
         </div>
-        {/* "Importa" non è più nella barra in basso (ora c'è "Salvati"): si raggiunge da qui. */}
-        <Link
-          href="/importa"
-          data-testid="profilo-importa"
-          className="mb-3 flex min-h-11 items-center justify-center rounded-pill border border-dashed border-brand/40 px-4 text-sm font-display font-semibold text-brand active:scale-[0.99]"
-        >
-          + Importa locali
-        </Link>
         {saved.length === 0 ? (
           <div className="rounded-card border border-border bg-surface p-5 text-center">
             <p className="text-sm text-text-muted">Non hai ancora salvato nessun locale.</p>
@@ -322,66 +313,134 @@ export default async function ProfiloPage() {
             </Link>
           </div>
         ) : (
-          cityGroups.map(([city, rows]) => (
-            <div key={city} className="mb-5">
-              <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
-                📍 {city} · {rows.length}
-              </h3>
-              <ul className="space-y-2">
-                {rows.map(({ places: place, tags, note }, i) =>
-                  place ? (
-                    <li key={place.id ?? i}>
-                      {/* Tocco: apre la scheda del locale sulla mappa (prima la card non portava da nessuna parte). */}
-                      <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato" className="block active:scale-[0.99]">
-                        <PlaceCard
-                          name={place.name}
-                          category={place.category}
-                          address={place.address}
-                          tags={tags ?? undefined}
-                          note={note}
-                        />
-                      </Link>
-                    </li>
-                  ) : null
-                )}
-              </ul>
-            </div>
-          ))
+          <>
+            <ul className="divide-y divide-border rounded-card border border-border bg-white">
+              {recent.map(({ places: place }) =>
+                place ? (
+                  <li key={place.id}>
+                    <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato-recente" className="flex min-h-14 items-center gap-3 px-4 py-2 active:bg-surface">
+                      <span aria-hidden className="text-xl">{getCategoryEmoji(place.category, place.name)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-sm font-semibold text-text">{place.name}</span>
+                        <span className="block truncate text-xs text-text-muted">{cityFromAddress(place.address) ?? displayAddress(place.address)}</span>
+                      </span>
+                      <span aria-hidden className="text-text-muted">›</span>
+                    </Link>
+                  </li>
+                ) : null,
+              )}
+            </ul>
+            <details data-testid="profilo-salvati-tutti" className="group mt-2">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-pill border border-border text-sm font-display font-semibold text-brand active:bg-surface [&::-webkit-details-marker]:hidden">
+                Vedi tutti i {saved.length}{cityCount > 1 ? `, divisi per ${cityCount} città` : ""}
+                <ChevronDown aria-hidden size={16} className="transition-transform duration-150 group-open:rotate-180" />
+              </summary>
+              <div className="mt-4">
+                {cityGroups.map(([city, rows]) => (
+                  <div key={city} className="mb-5">
+                    <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
+                      📍 {city} · {rows.length}
+                    </h3>
+                    <ul className="space-y-2">
+                      {rows.map(({ places: place, tags, note }, i) =>
+                        place ? (
+                          <li key={place.id ?? i}>
+                            <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato" className="block active:scale-[0.99]">
+                              <PlaceCard name={place.name} category={place.category} address={place.address} tags={tags ?? undefined} note={note} />
+                            </Link>
+                          </li>
+                        ) : null,
+                      )}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </>
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le mie recensioni</h2>
-        {reviews.length === 0 ? (
-          <p className="text-sm text-text-muted">Non hai ancora scritto recensioni.</p>
-        ) : (
+      {reviews.length > 0 && (
+        <section className="mb-8" data-testid="profilo-recensioni">
+          <h2 className="mb-2 font-title text-xl font-semibold text-brand">Le mie recensioni <span className="text-base text-text-muted">· {reviews.length}</span></h2>
           <ul className="space-y-2">
-            {reviews.map((review) => (
-              <li key={review.id} className="rounded-card border border-border bg-white p-4 shadow-card">
-                <p className="font-display font-semibold text-text">
-                  {review.places?.name ?? "Locale sconosciuto"}
-                </p>
-                <div className="mt-1">
-                  <Stars rating={review.rating} />
-                </div>
-                {review.comment && (
-                  <p className="mt-1.5 text-sm text-text-muted">{review.comment}</p>
-                )}
-              </li>
+            {reviews.slice(0, REVIEWS_PREVIEW).map((review) => (
+              <ReviewItem key={review.id} review={review} />
             ))}
           </ul>
-        )}
+          {reviews.length > REVIEWS_PREVIEW && (
+            <details className="group mt-2">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-pill border border-border text-sm font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
+                Vedi tutte le {reviews.length}
+                <ChevronDown aria-hidden size={16} className="transition-transform duration-150 group-open:rotate-180" />
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {reviews.slice(REVIEWS_PREVIEW).map((review) => (
+                  <ReviewItem key={review.id} review={review} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
+
+      {/* Altro: le cose secondarie in un elenco discreto, ognuna si apre al tocco. */}
+      <section id="altro" aria-labelledby="altro-titolo" className="scroll-mt-4">
+        <h2 id="altro-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Altro</h2>
+        <div className="overflow-hidden rounded-card border border-border bg-white">
+          {/* Invito (piano 9.1): il proprio link personale. */}
+          <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
+            <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
+          </ProfiloSezione>
+          <ProfiloSezione
+            id="pubblico"
+            icon={<Globe {...icon} />}
+            title="Profilo pubblico"
+            hint={"stato" in social ? "In arrivo" : social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
+          >
+            <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
+          </ProfiloSezione>
+          {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
+          <ProfiloSezione id="gusti" icon={<Sparkles {...icon} />} title="Cosa so di te" hint="I gusti che l’assistente ricorda">
+            <ProfiloGusti userId={user.id} />
+          </ProfiloSezione>
+          <ProfiloSezione id="ricerche" icon={<History {...icon} />} title="Le tue ricerche" hint="Da rifare con un tocco">
+            <ProfiloRicerche />
+          </ProfiloSezione>
+          {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
+          <Link href="/premium" data-testid="profilo-premium" className={row}>
+            <Gem {...icon} aria-hidden className="shrink-0 text-accent" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-sm font-semibold text-text">Mapetite Premium <span className="text-xs text-accent">· in arrivo</span></span>
+              <span className="block truncate text-xs text-text-muted">Assistente senza limiti, raccolte illimitate</span>
+            </span>
+            <ChevronRight aria-hidden size={16} className="text-text-muted" />
+          </Link>
+          {/* Lato ristoratori (piano 8). */}
+          <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
+            <Store {...icon} aria-hidden className="shrink-0 text-brand" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-sm font-semibold text-text">Hai un locale?</span>
+              <span className="block truncate text-xs text-text-muted">Mapetite per i ristoratori</span>
+            </span>
+            <ChevronRight aria-hidden size={16} className="text-text-muted" />
+          </Link>
+        </div>
       </section>
 
       <ProfiloAccount loggedIn />
-
-      {/* Lato ristoratori (piano 8): prima la pagina si apriva solo scrivendo l'indirizzo. */}
-      <p className="mt-6 text-center text-sm text-text-muted">
-        Hai un locale?{" "}
-        <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className="font-display font-semibold text-brand underline underline-offset-2">
-          Mapetite per i ristoratori
-        </Link>
-      </p>
     </div>
+  );
+}
+
+function ReviewItem({ review }: { review: ReviewRow }) {
+  return (
+    <li className="rounded-card border border-border bg-white p-4 shadow-card">
+      <p className="font-display font-semibold text-text">{review.places?.name ?? "Locale sconosciuto"}</p>
+      <div className="mt-1">
+        <Stars rating={review.rating} />
+      </div>
+      {review.comment && <p className="mt-1.5 text-sm text-text-muted">{review.comment}</p>}
+    </li>
   );
 }
