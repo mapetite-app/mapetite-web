@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -74,6 +74,23 @@ ok(!hasEnglish("Drink di qualità e staff professionale in una location piacevol
 // Quartiere senza città (15/10): "trattoria Monti" dava solo "Trattoria Monti Roma".
 ok(withDistrict("trattoria Monti", "Monti") === "trattoria quartiere Monti" && withDistrict("bar rione Monti", "Monti") === "bar rione Monti" && withDistrict("aperitivo centro storico", "centro storico") === "aperitivo zona centro storico" && withDistrict("bar Pigneto", "Trastevere") === "bar Pigneto", "quartiere: 'quartiere X' davanti al nome, una volta sola");
 ok(cityNear(41.8986, 12.4769) === "Roma" && cityNear(45.45, 9.18) === "Milano" && cityNear(43.0, 12.0) === null, "città della mappa: Roma, Milano, nessuna lontano dalle città note");
+
+// Zona ambigua (decisione 13a, 16/10): solo un quartiere senza città prende la città della mappa.
+ok(ambiguousDistrict("trattoria a Monti", "Monti") && ambiguousDistrict("aperitivo in centro", "centro"), "zona: 'Monti' e 'centro' da soli sono ambigui → contesto della città della mappa");
+ok(!ambiguousDistrict("trattoria a Monti Roma", "Monti") && !ambiguousDistrict("trattoria a Monti", "Monti, Roma") && !ambiguousDistrict("trattoria a Brera", "Brera, Milano"), "zona: con la città scritta non c'è ambiguità");
+ok(isOtherCity("Parma") && isOtherCity("a Forli") && isOtherCity("L’Aquila") && !isOtherCity("Monti") && !isOtherCity("Trieste") && !isOtherCity("Lodi"), "zona: Parma, Forlì, L'Aquila sono città; Monti no; Trieste e Lodi restano zone di Roma e Milano");
+ok(!ambiguousDistrict("trattoria a Parma", "Parma") && namedOtherCity("trattoria tipica a Parma") === "Parma" && namedOtherCity("pranzo sul prato") === null && namedOtherCity("trattoria a Monti") === null, "zona: 'a Parma' è un'altra città (niente 'quartiere Parma Roma'), 'prato' senza 'a' non è Prato");
+ok(!ambiguousDistrict("trattoria a Monti", null) && !ambiguousDistrict("pizza", ""), "zona: senza zona nessun contesto aggiunto");
+{
+  // Come route.ts costruisce il testo per Google con un quartiere ambiguo e la mappa su Roma.
+  const testo = (q, zona, lat, lng) => {
+    if (!ambiguousDistrict(q, zona)) return q;
+    const city = cityNear(lat, lng);
+    const t = withDistrict(q, zona);
+    return city && !namedCity(t) ? `${t} ${city}` : t;
+  };
+  ok(testo("trattoria Monti", "Monti", 41.8986, 12.4769) === "trattoria quartiere Monti Roma" && testo("trattoria Parma", "Parma", 41.8986, 12.4769) === "trattoria Parma" && testo("aperitivo Isola", "Isola", 45.48, 9.19) === "aperitivo quartiere Isola Milano", "zona: 'Monti' con la mappa su Roma → Roma; 'Parma' resta Parma; 'Isola' con la mappa su Milano → Milano");
+}
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
