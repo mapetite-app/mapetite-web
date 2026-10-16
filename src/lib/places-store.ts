@@ -80,3 +80,30 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
 
   return { place: inserted as StoredPlace, created: true };
 }
+
+// Locale già nel catalogo, senza chiamare Google: per Place ID, oppure (link con nome e coordinate
+// ma senza ID) per nome uguale entro ~150 m. Serve a "Incolla più link" per non spendere quota
+// sui locali che qualcuno ha già salvato in Mapetite.
+export async function findStoredPlace(
+  q: { googlePlaceId?: string | null; name?: string | null; lat?: number | null; lng?: number | null },
+): Promise<StoredPlace | null> {
+  const admin = createAdminClient();
+  if (q.googlePlaceId) {
+    const { data } = await admin.from("places").select(COLUMNS).eq("google_place_id", q.googlePlaceId).maybeSingle();
+    return (data as StoredPlace | null) ?? null;
+  }
+  if (!q.name || q.lat == null || q.lng == null) return null;
+  const d = 0.0015; // ~150 m di latitudine
+  const { data } = await admin
+    .from("places")
+    .select(COLUMNS)
+    .gte("lat", q.lat - d).lte("lat", q.lat + d)
+    .gte("lng", q.lng - d * 1.4).lte("lng", q.lng + d * 1.4)
+    .limit(30);
+  const want = sameName(q.name);
+  return ((data ?? []) as StoredPlace[]).find((p) => sameName(p.name) === want) ?? null;
+}
+
+function sameName(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
