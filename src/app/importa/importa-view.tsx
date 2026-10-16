@@ -64,7 +64,7 @@ function errorText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
 }
 
-export default function ImportaView({ userId }: { userId: string | null }) {
+export default function ImportaView({ userId, benvenuto = false }: { userId: string | null; benvenuto?: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -262,14 +262,28 @@ export default function ImportaView({ userId }: { userId: string | null }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
-      <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
+      {/* Dal primo accesso ("Importa da Google Maps"): prima l'import di tanti link insieme. */}
+      {benvenuto ? (
+        <>
+          <h1 data-testid="importa-benvenuto" className="mb-1 font-title text-3xl font-semibold text-brand">Porta qui i tuoi posti</h1>
+          <p className="mb-6 text-sm text-text-muted">Copia da Google Maps i link dei posti che hai salvato (o la chat dove te li mandi) e incollali qui: li salvo tutti insieme.</p>
+          <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          <div className="mt-6">
+            <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          </div>
+        </>
+      ) : (
+        <>
+          <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
+          <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
 
-      <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
 
-      <div className="mt-6">
-        <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
-      </div>
+          <div className="mt-6">
+            <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
+          </div>
+        </>
+      )}
 
       <div className="mt-6">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
