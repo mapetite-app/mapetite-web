@@ -114,8 +114,14 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
             Verificato dal titolare
           </p>
         )}
-        {city && <p className="mt-2 text-[15px] font-sans text-text-muted">{city}</p>}
-        {kind && <p data-testid="locale-tipo" className="mt-0.5 text-[15px] font-sans text-text-muted">{kind}</p>}
+        {/* Una sola riga di fatti, come la scheda della mappa: tipo · prezzo · voto · città. */}
+        {(kind || city) && (
+          <p className="mt-2 text-[15px] font-sans text-text-muted">
+            {kind && <span data-testid="locale-tipo">{kind}</span>}
+            {kind && city && <span aria-hidden> · </span>}
+            {city && <span>{city}</span>}
+          </p>
+        )}
       </div>
 
       {/* Passaparola: quanti amici (persone che segui) ci sono stati o vogliono provarlo. */}
