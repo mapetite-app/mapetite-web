@@ -8,7 +8,7 @@ import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
-import { sortTags, tagLabel } from "@/lib/tags";
+import { isStateTag, sortTags, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
@@ -67,6 +67,8 @@ export interface BottomSheetProps {
   onOpenArticle?: () => void;
   // Lista dei propri salvati: niente filtri rapidi (mancano orari e conteggi).
   savedMode?: boolean;
+  // "Più vicini" deciso da fuori (foglio Filtri dei salvati): niente chip nella lista.
+  nearest?: boolean;
   // Città sulla riga dei metadati (salvati di più città: "Ristorante · ★ 4,6 · Roma · 600 m").
   showCity?: boolean;
 }
@@ -193,7 +195,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -201,12 +203,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
-  const nearestOn = origin != null && (quickFiltersOn || heading != null);
+  const nearestOn = nearest === undefined && origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
   // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
-  const [nearestFirst, setNearestFirst] = useState(false);
+  const [nearestLocal, setNearestFirst] = useState(false);
+  const nearestFirst = nearest ?? nearestLocal;
   const [shared, setShared] = useState(false);
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
@@ -549,7 +552,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   type="button"
                   onClick={() => onSelect(place)}
                   data-testid="card-risultato"
-                  className="relative flex h-full min-h-[172px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  className={`relative flex h-full w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99] ${savedMode ? "min-h-[150px]" : "min-h-[172px]"}`}
                   style={{ background: coverGradient(place.category, place.name) }}
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
@@ -577,8 +580,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {onSave && savedLabel?.(place.id) && (
                         <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{savedLabel(place.id)}</span>
                       )}
+                      {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
+                      {savedMode && (place.tags ?? []).find(isStateTag) && (
+                        <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel((place.tags ?? []).find(isStateTag)!)}</span>
+                      )}
                     </span>
-                    <span className={`mt-auto pt-6 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave ? "pr-2" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto ${savedMode ? "pt-3 line-clamp-1" : "pt-6 line-clamp-2"} text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave ? "pr-2" : ""}`}>{place.name}</span>
                     <span className="mt-1 truncate text-[11px] font-display font-medium uppercase tracking-wider text-white/75">
                       {metaLine(place, d, origin, showCity)}
                     </span>
@@ -589,7 +596,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className="mt-2 block">
                         {/* Il verdetto deve farsi riconoscere a colpo d'occhio (VISIONE.md): stessa etichetta della scheda. */}
                         <span data-testid="etichetta-verdetto" className="block text-[10px] font-display font-semibold uppercase tracking-wider text-accent before:mr-1 before:content-['✦']">Il verdetto Mapetite</span>
-                        <span className="mt-0.5 line-clamp-2 text-sm font-sans font-medium leading-snug text-white">{d.verdict}</span>
+                        <span className={`mt-0.5 ${savedMode ? "line-clamp-1" : "line-clamp-2"} text-sm font-sans font-medium leading-snug text-white`}>{d.verdict}</span>
                       </span>
                     ) : loadingVerdicts && details ? (
                       <SkeletonLines dark />
@@ -604,7 +611,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.note && (
                       <span className="mt-1 line-clamp-1 text-xs font-sans italic leading-snug text-white/80">“{place.note}”</span>
                     )}
-                    {((d?.goFor ?? []).length > 0 || (place.tags ?? []).length > 0) && (
+                    {/* Nei salvati le raccolte stanno nel foglio "Filtri": la card resta pulita. */}
+                    {!savedMode && ((d?.goFor ?? []).length > 0 || (place.tags ?? []).length > 0) && (
                       <span className="mt-2 flex gap-1.5 overflow-hidden">
                         {(place.tags && place.tags.length > 0 ? sortTags(place.tags).slice(0, 2).map(tagLabel) : d!.goFor!.slice(0, 2)).map((c) => (
                           <span key={c} className="min-w-0 truncate rounded-pill border border-white/30 px-2 py-0.5 text-[11px] font-display">{c}</span>
