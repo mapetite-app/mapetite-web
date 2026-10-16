@@ -1009,7 +1009,12 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
 }
 // Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani, il modulo di richiesta e l'esempio del pannello.
 { const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
-  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href")) === "/per-i-ristoratori/rivendica" && (await page.getByTestId("pannello-demo").getAttribute("href")) === "/ristoratore/demo", "per i ristoratori: tre piani, 'Rivendica il tuo locale' porta al modulo e c'è il pannello d'esempio"); }
+  ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href")) === "/per-i-ristoratori/rivendica" && (await page.getByTestId("pannello-demo").getAttribute("href")) === "/ristoratore/demo", "per i ristoratori: tre piani, 'Rivendica il tuo locale' porta al modulo e c'è il pannello d'esempio");
+  // Feedback 16/10: pagina breve, piani confrontabili riga per riga, un solo invito all'azione.
+  { const righe = await page.getByTestId("piani").locator("tbody tr").count();
+    const cta = await page.getByRole("link", { name: "Rivendica il tuo locale" }).evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("href")))]);
+    const h = await page.evaluate(() => document.documentElement.scrollHeight); const w = await page.evaluate(() => document.documentElement.scrollWidth);
+    ok(righe >= 8 && cta.length === 1 && cta[0] === "/per-i-ristoratori/rivendica" && h < 2300 && w <= 390, `per i ristoratori: tabella dei piani (${righe} righe), un solo invito all'azione, pagina corta (${h}px) e senza scorrimento di lato (${w}px)`); } }
 const r404 = await page.goto(`${BASE}/pagina-che-non-esiste`, { waitUntil: "networkidle" });
 ok(r404?.status() === 404 && await page.getByText("Questa pagina non esiste").isVisible(), "404 in italiano con invito ad aprire la mappa");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
@@ -3873,10 +3878,36 @@ else {
     const lab = rp.getByTestId("pannello-demo-etichetta");
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
-    ok((await rp.getByTestId("pannello-pochi-dati").count()) === 0 && await rp.getByTestId("pannello-confronto").isVisible() && await rp.getByTestId("pannello-fasce").isVisible() && await rp.getByTestId("pannello-andamento").isVisible(), "pannello demo: confronto con la zona, fasce orarie e andamento");
+    // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
+    const nums = rp.getByTestId("numero-chiave");
+    const ins = await rp.getByTestId("pannello-insight").boundingBox();
+    const lastNum = await nums.nth(3).boundingBox();
+    ok((await nums.count()) === 4 && !!lastNum && lastNum.y + lastNum.height <= 844 && !!ins && ins.y < 844 && /Chi ti cerca vuole soprattutto “/.test((await rp.getByTestId("pannello-insight").textContent()) ?? ""),
+      `pannello demo: prima schermata con 4 numeri chiave e 'Cosa ti dicono i numeri' (insight da y ${Math.round(ins?.y ?? 0)})`);
+    const hPan = await rp.evaluate(() => document.documentElement.scrollHeight);
+    ok(hPan < 2400, `pannello demo: panoramica corta, il dettaglio sta nelle schede (${hPan}px, prima ~5000)`);
+    ok((await rp.getByRole("tab").count()) === 4 && (await rp.getByRole("tab", { name: "Panoramica" }).getAttribute("aria-selected")) === "true", "pannello demo: quattro schede, aperta la Panoramica");
+    ok((await rp.getByTestId("pannello-pochi-dati").count()) === 0 && await rp.getByTestId("pannello-confronto").isVisible() && await rp.getByTestId("pannello-andamento").isVisible() && !(await rp.getByTestId("pannello-fasce").isVisible()), "pannello demo: in Panoramica confronto e andamento, le fasce orarie nella scheda Zona");
+    await rp.getByRole("tab", { name: "Zona" }).click();
+    ok(await rp.getByTestId("pannello-fasce").isVisible() && !(await rp.getByTestId("pannello-confronto").isVisible()) && new URL(rp.url()).searchParams.get("vista") === "zona", "pannello demo: la scheda Zona mostra le fasce orarie e resta nell'indirizzo");
+    // Elenchi: primi 3, il resto dietro "Vedi tutto" (niente dati persi).
+    { const rz = rp.getByTestId("pannello-richieste-zona");
+      const vis = await rz.locator("li:visible").count(); const tot = await rz.locator("li").count();
+      await rz.getByText(/^Vedi tutto/).click();
+      ok(vis === 3 && tot > 3 && (await rz.locator("li:visible").count()) === tot, `pannello demo: richieste di zona, 3 visibili e 'Vedi tutto' apre le altre (${vis}/${tot})`); }
+    await rp.getByRole("tab", { name: "Clienti" }).click();
+    ok(await rp.getByTestId("pannello-richieste-locale").isVisible() && (await rp.getByTestId("pannello-tutte-azioni").locator("li").count()) === 6, "pannello demo: scheda Clienti con 'come ti trovano' e tutte e sei le azioni");
+    await rp.getByRole("tab", { name: "Panoramica" }).click();
+    await rp.locator("[data-vai=promozione]").click();
+    ok((await rp.getByRole("tab", { name: "Promozione" }).getAttribute("aria-selected")) === "true" && await rp.getByTestId("pannello-evidenza").isVisible(), "pannello demo: dalla Panoramica la scorciatoia porta alla scheda Promozione");
+    await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });
   await rp.screenshot({ path: `${OUT}/76-pannello-demo-intero.png`, caret: "initial", fullPage: true });
+  // Il cambio di periodo non perde la scheda aperta.
+  await rp.goto(`${BASE}/ristoratore/demo?vista=zona`, { waitUntil: "networkidle" });
+  ok((await rp.getByRole("tab", { name: "Zona" }).getAttribute("aria-selected")) === "true" && (await rp.getByRole("link", { name: "Ultimi 7 giorni" }).getAttribute("href"))?.includes("vista=zona"), "pannello demo: ?vista=zona apre la scheda Zona e il periodo la conserva");
+  await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
   await rp.getByRole("link", { name: "Ultimi 7 giorni" }).click();
   await rp.waitForURL((u) => u.searchParams.get("giorni") === "7", { timeout: 8000 }).catch(() => {});
   ok((await rp.getByRole("link", { name: "Ultimi 7 giorni" }).getAttribute("aria-current")) === "page", "pannello demo: si passa agli ultimi 7 giorni");
@@ -5139,8 +5170,11 @@ else {
   const tp = await tctx.newPage();
   tp.on("pageerror", (e) => errors.push(e.message));
   await tp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  await tp.getByRole("tab", { name: "Zona" }).click();
   const trend = tp.getByTestId("pannello-trend");
   ok(await trend.isVisible() && (await trend.getByTestId("trend-fascia").count()) === 6 && (await trend.getByTestId("trend-esempio").count()) === 0 && await trend.getByTestId("trend-picco").isVisible(), "trend di zona (demo): sei fasce orarie con le richieste e il momento di picco");
+  ok((await trend.getByTestId("trend-fascia").locator("visible=true").count()) === 3, "trend di zona (demo): aperte le 3 fasce più cercate, le altre dietro 'Vedi tutto'");
+  await tp.getByRole("tab", { name: "Promozione" }).click();
   const evd = tp.getByTestId("pannello-evidenza");
   ok(await evd.isVisible() && ((await evd.getByTestId("etichetta-sponsorizzato").textContent()) ?? "").includes("Sponsorizzato"), "in evidenza (demo): card con l'etichetta 'Sponsorizzato'");
   ok((await evd.getByTestId("evidenza-si").count()) === 1 && (await evd.getByTestId("evidenza-no").count()) === 2, "in evidenza (demo): compare solo nella ricerca adatta, non nelle altre due");
@@ -5148,9 +5182,9 @@ else {
   await tp.waitForTimeout(400);
   ok(tEv.some((e) => e.type === "funzione" && e.props?.nome === "ristoratore_evidenza"), "in evidenza (demo): vista registrata (trackFeature)");
   { const w = await tp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `trend e in evidenza: niente scorrimento orizzontale (${w}px)`); }
-  await trend.scrollIntoViewIfNeeded();
+  await tp.getByRole("tab", { name: "Zona" }).click(); await trend.scrollIntoViewIfNeeded();
   await tp.screenshot({ path: `${OUT}/90-trend-zona-demo.png`, caret: "initial" });
-  await evd.scrollIntoViewIfNeeded();
+  await tp.getByRole("tab", { name: "Promozione" }).click(); await evd.scrollIntoViewIfNeeded();
   await tp.screenshot({ path: `${OUT}/91-in-evidenza-demo.png`, caret: "initial" });
   // Nei risultati veri non c'è nessuno sponsorizzato: la parola non compare nel codice della ricerca.
   { const src = ["src/app/api/search/route.ts", "src/components/venue-sheet.tsx", "src/components/place-card.tsx"].map((f) => { try { return readFileSync(new URL(`../../${f}`, import.meta.url), "utf8"); } catch { return ""; } }).join("\n");
@@ -5162,7 +5196,7 @@ else {
     await tctx.addCookies([{ name: "e2e_ristoratore", url: BASE, value: encodeURIComponent(JSON.stringify({ locale: Lt, simili: [Lt], verificato: false, salvati: [], eventi: [
       { created_at: new Date(Date.now() - 3_600_000).toISOString(), type: "ricerca", user_id: null, anon_id: "t1", session_id: "t1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "bar", requisiti: ["tavoli all'aperto"], zona: "Pigneto" } },
     ] })) }]);
-    await tp.goto(`${BASE}/ristoratore/${LT}`, { waitUntil: "networkidle" });
+    await tp.goto(`${BASE}/ristoratore/${LT}`, { waitUntil: "networkidle" }); await tp.getByRole("tab", { name: "Zona" }).click();
     ok(await tp.getByTestId("trend-esempio").isVisible() && (await tp.getByTestId("pannello-evidenza").count()) === 0, "trend di zona (pannello vero, pochi dati): esempio etichettato 'Esempio', niente sezione sponsorizzati");
   } else console.log("SKIP  trend pannello vero: dev server senza E2E_FAKE_USER");
   await tctx.close();
