@@ -4176,7 +4176,7 @@ else {
     ok(m.alta >= 64 && m.fondo === 0 && new Set(m.larghe).size === 1 && m.etichette && m.caratteri >= 11 && !m.sborda, `barra ${w}px: alta ${m.alta}px in fondo, voci larghe uguali (${m.larghe[0]}px), etichette intere da ${m.caratteri}px, niente sbordo`);
     ok(await nav.getByRole("link", { name: "Assistente" }).locator("svg").count() === 1, `barra ${w}px: l'Assistente ha la sua scintilla`);
     { const g = await bp.evaluate(() => { const l = document.querySelector("[data-testid=barra-esplora]"); const c = l.querySelector("span").getBoundingClientRect(); const n = document.querySelector("[data-testid=barra]").getBoundingClientRect(); const lr = l.getBoundingClientRect(); return { d: Math.round(c.width), tondo: getComputedStyle(l.querySelector("span")).borderRadius, centro: Math.abs((c.left + c.right) / 2 - (n.left + n.right) / 2), sporge: c.top < n.top, dentro: c.left >= lr.left - 0.5 && c.right <= lr.right + 0.5 }; });
-      ok(g.d >= 52 && g.centro < 2 && g.sporge && g.dentro, `barra ${w}px: la Mappa è al centro, tonda e più grande (${g.d}px, sporge sopra la barra)`); }
+      ok(g.d >= 44 && g.centro < 2 && !g.sporge && g.dentro, `barra ${w}px: la Mappa è al centro, tonda e più grande (${g.d}px), dentro la barra senza coprire le pagine`); }
     // Ogni voce porta alla pagina giusta ed è l'unica accesa.
     const attese = [
       ["Mappa", "/mappa", (u) => u.pathname === "/mappa" && !u.searchParams.get("vista")],
