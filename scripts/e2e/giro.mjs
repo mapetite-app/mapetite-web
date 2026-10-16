@@ -4117,7 +4117,7 @@ else {
 // Una sola ricerca (simulata), "Un altro" senza nuove chiamate, mai salvati né locali di massa.
 if (!fakeUser) console.log("SKIP  sorprendimi: dev server senza E2E_FAKE_USER");
 else {
-  const sm = (id, name, rating, n, extra = {}) => mk(id, name, 41.9 + Number(id.slice(1)) * 0.001, 12.49, { category: "Trattoria", rating, userRatingCount: n, types: ["restaurant"], photoRef: null, ...extra });
+  const sm = (id, name, rating, n, extra = {}) => mk(id, name, 41.9 + Number(id.slice(1)) * 0.001, 12.49, { category: "Trattoria", rating, userRatingCount: n, types: ["restaurant"], ...extra });
   const SURP = [
     sm("S1", "Trattoria Di Massa", 4.3, 9000),
     sm("S2", "Osteria Già Salvata", 4.6, 300),
@@ -4141,15 +4141,18 @@ else {
   });
   await sctxS.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["pizza"], price_range: "€€" }] }));
   await sctxS.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "S3", verdict: "Carbonara seria e oste che consiglia bene." }] }));
-  await sctxS.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  const surpPhotos = [];
+  await sctxS.route("**/api/places/photo**", (r) => { surpPhotos.push(decodeURIComponent(new URL(r.request().url()).searchParams.get("ref") ?? "")); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }); });
   await sctxS.route("**/api/events", (r) => { surpEvents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await sctxS.route("**/api/search", (r) => {
     surpSearches++; surpBody = r.request().postDataJSON();
     return r.fulfill({ json: { risultati: SURP, filtri_usati: { categoria: null, parole_chiave: [], vicino_a_me: false }, sintesi_pendente: { places: [], token: "x", gruppi: [{ places: SURP.slice(0, 3).map((x) => ({ id: x.id })), token: "g1" }, { places: SURP.slice(3).map((x) => ({ id: x.id })), token: "g2" }] } } });
   });
-  await sctxS.route("**/api/search/synthesis", (r) => {
+  await sctxS.route("**/api/search/synthesis", async (r) => {
     const b = r.request().postDataJSON(); surpSynth.push(b);
-    return r.fulfill({ json: { dettagli: { S4: { verdict: "Porzioni generose, servizio alla mano." } }, esclusi: [] } });
+    await new Promise((res) => setTimeout(res, 700));
+    const first = surpSynth.filter((x) => x.token === b.token).length === 1;
+    return r.fulfill({ json: { dettagli: first ? { S5: { verdict: "Altro locale del gruppo." } } : { S4: { verdict: "Porzioni generose, servizio alla mano." } }, esclusi: [] } });
   });
   await sctxS.route("**/api/places/add", (r) => { surpAdd = r.request().postDataJSON(); return r.fulfill({ json: { place: { id: "00000000-0000-4000-8000-0000000005a4" } } }); });
   const sp = await sctxS.newPage();
@@ -4177,14 +4180,22 @@ else {
   ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Carbonara seria"), "sorprendimi: verdetto Mapetite già scritto (cache) mostrato senza chiamate AI");
   ok(surpSynth.length === 0, "sorprendimi: con il verdetto già in cache nessuna richiesta di verdetti");
   ok((await sp.getByTestId("sorpresa-zona").textContent()).includes("Zona della mappa · Roma"), "sorprendimi: dice in che zona cerca");
+  await sp.getByTestId("sorpresa-foto").locator("img").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await sp.getByTestId("sorpresa-foto").locator("img").isVisible().catch(() => false) && surpPhotos.length === 1 && surpPhotos[0] === "places/S3/photos/AbC_S3",
+    `sorprendimi: la foto della proposta visibile, una sola (${JSON.stringify(surpPhotos)})`);
   await sp.screenshot({ path: `${OUT}/sorprendimi-1.png`, caret: "initial" });
 
   // "Un altro": dagli stessi risultati, mai i salvati né i locali di massa; i chiusi in fondo.
   const seenNames = [await sp.getByTestId("sorpresa-card").getByRole("heading").textContent()];
+  const hVerdict = (await sp.getByTestId("sorpresa-verdetto").boundingBox())?.height ?? 0;
   await sp.getByTestId("sorpresa-altro").click();
   await sp.getByRole("heading", { name: "Trattoria Buona" }).waitFor({ timeout: 3000 }).catch(() => {});
-  await sp.getByTestId("sorpresa-verdetto").waitFor({ timeout: 3000 }).catch(() => {});
-  ok(surpSynth.length === 1 && surpSynth[0]?.token === "g2" && surpSynth[0]?.query === "Trattoria", `sorprendimi: verdetto mancante chiesto una volta per il suo gruppo (${JSON.stringify(surpSynth.map((x) => x.token))})`);
+  const attesa = sp.getByTestId("sorpresa-verdetto-attesa");
+  const hWait = (await attesa.boundingBox().catch(() => null))?.height ?? 0;
+  ok(await attesa.isVisible().catch(() => false) && Math.abs(hWait - hVerdict) <= 2, `sorprendimi: mentre arriva il verdetto c'è il suo segnaposto, alto uguale (${Math.round(hWait)} vs ${Math.round(hVerdict)} px)`);
+  await sp.getByTestId("sorpresa-verdetto").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(surpSynth.length === 2 && surpSynth.every((x) => x.token === "g2" && x.query === "Trattoria"), `sorprendimi: verdetto chiesto per il gruppo del locale MOSTRATO; saltato dall'AI, richiesto una seconda volta (${JSON.stringify(surpSynth.map((x) => x.token))})`);
+  ok(surpPhotos.length === 2 && surpPhotos[1] === "places/S4/photos/AbC_S4", `sorprendimi: 'Un altro' scarica solo la foto della nuova proposta, nessun precaricamento (${surpPhotos.length} foto)`);
   ok((await sp.getByTestId("sorpresa-verdetto").textContent().catch(() => "")).includes("Porzioni generose"), "sorprendimi: il verdetto arriva anche per 'Un altro'");
   await sp.screenshot({ path: `${OUT}/sorprendimi-2-altro.png`, caret: "initial" });
   const headingNow = () => sp.getByTestId("sorpresa-card").getByRole("heading").textContent();
@@ -4251,10 +4262,11 @@ else {
   const whyA = await ap.getByTestId("sorpresa-perche").textContent().catch(() => "");
   ok(anonBody?.query === "ristorante cena" && anonBody?.radius === 11000 && whyA.includes("Adatto all'ora: cena"), `sorprendimi senza accesso: momento della giornata e tutta Roma (${anonBody?.query}, ${anonBody?.radius} m, "${whyA}")`);
   ok(await ap.getByTestId("sorpresa-accedi").isVisible() && (await ap.getByTestId("sorpresa-accedi").getAttribute("href")) === "/login?next=%2Fsorprendimi", "sorprendimi senza accesso: 'Accedi per salvarlo' e poi si torna qui");
-  await ap.waitForTimeout(400);
+  await ap.getByTestId("sorpresa-google").waitFor({ timeout: 5000 }).catch(() => {});
   const anonH = await ap.getByTestId("sorpresa-card").getByRole("heading").textContent().catch(() => null);
-  ok(anonH === "Osteria Già Salvata" && anonSynth === 1 && (await ap.getByTestId("sorpresa-verdetto").count()) === 0 && (await ap.getByTestId("sorpresa-google").count()) === 0,
-    `sorprendimi senza accesso: nessun salvato da escludere, sempre un 💎 non di massa; senza verdetto disponibile nessun testo inventato (${anonH}, ${anonSynth} richiesta di verdetti, verdetto ${await ap.getByTestId("sorpresa-verdetto").count()}, google ${await ap.getByTestId("sorpresa-google").count()})`);
+  const anonG = await ap.getByTestId("sorpresa-google").textContent().catch(() => "");
+  ok(anonH === "Osteria Già Salvata" && anonSynth === 2 && (await ap.getByTestId("sorpresa-verdetto").count()) === 0 && anonG.includes("Dalle recensioni Google") && anonG.includes("Bella vista sulla città."),
+    `sorprendimi senza accesso: nessun salvato da escludere; verdetto mai arrivato (2 richieste) → al suo posto una recensione Google vera, detta da dove viene (${anonH}, ${anonSynth} richieste, "${anonG}")`);
   await ap.screenshot({ path: `${OUT}/sorprendimi-anonimo.png`, caret: "initial" });
   await actxS.close();
 }
