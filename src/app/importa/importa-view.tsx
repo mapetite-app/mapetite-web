@@ -83,19 +83,44 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
   // Ricerca "a mano" chiesta da un altro punto della pagina (es. "Cerca …" sotto un link di Instagram).
   const [manualReq, setManualReq] = useState<{ q: string; n: number } | null>(null);
   const [flashShot, setFlashShot] = useState(false);
+  // Le 4 tessere (Da Google Maps · Da file di Google · Da screenshot · A mano): una sola aperta.
+  // Dal primo accesso si apre subito la guida di Google Maps.
+  const [panel, setPanel] = useState<Panel | null>(benvenuto ? "maps" : null);
+  // Tanti link incollati insieme (chat, nota): li legge la lista di MultiLinkCard.
+  const [multi, setMulti] = useState<{ text: string; n: number } | null>(null);
   // Link del video da cui si sta salvando (piano 5.6d): dopo il salvataggio si collega al locale,
   // così la scheda lo mostra in "Visto su TikTok". Si memorizza solo il link, mai il video.
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [reelLinked, setReelLinked] = useState(false);
-  // "Incolla il link copiato" della guida in cima: stesso percorso della card "Da Google Maps".
-  const googleCard = useRef<{ paste: () => void }>(null);
-
+  const openPanel = (p: Panel) => {
+    setPanel(p);
+    // Dopo il disegno del pannello: lo si porta in vista.
+    window.setTimeout(() => document.getElementById(PANEL_ID[p])?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const goToScreenshot = () => {
-    document.getElementById("da-screenshot")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    openPanel("shot");
     setFlashShot(true);
     window.setTimeout(() => setFlashShot(false), 2000);
   };
-  const searchByHand = (q: string) => setManualReq((r) => ({ q, n: (r?.n ?? 0) + 1 }));
+  const searchByHand = (q: string) => {
+    setManualReq((r) => ({ q, n: (r?.n ?? 0) + 1 }));
+    openPanel("mano");
+  };
+
+  // Link da fuori (/importa#da-screenshot, /importa#a-mano): si apre il pannello giusto.
+  useEffect(() => {
+    const fromHash = () => {
+      const hash = window.location.hash.slice(1);
+      const p = (Object.keys(PANEL_ID) as Panel[]).find((k) => PANEL_ID[k] === hash);
+      if (p) openPanel(p);
+    };
+    const t = window.setTimeout(fromHash, 0);
+    window.addEventListener("hashchange", fromHash);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("hashchange", fromHash);
+    };
+  }, []);
 
   // Revoke blob URL when it changes or on unmount
   useEffect(() => {
@@ -284,52 +309,86 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      {/* Dal primo accesso ("Importa da Google Maps"): prima l'import di tanti link insieme. */}
       {benvenuto ? (
         <>
           <h1 data-testid="importa-benvenuto" className="mb-1 font-title text-3xl font-semibold text-brand">Porta qui i tuoi posti</h1>
-          <p className="mb-6 text-sm text-text-muted">Copia da Google Maps i link dei posti che hai salvato (o la chat dove te li mandi) e incollali qui: li salvo tutti insieme.</p>
-          <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
-          <div className="mt-6">
-            <TakeoutCard userId={userId} />
-          </div>
-          <div className="mt-6">
-            <GoogleMapsCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
-          </div>
+          <p className="mb-5 text-sm text-text-muted">Incolla i link dei posti salvati su Google Maps, anche tutti insieme.</p>
         </>
       ) : (
         <>
-          <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Importa</h1>
-          <p className="mb-6 text-sm text-text-muted">Salva un locale in un gesto: dal link di Google Maps, dal nome o da uno screenshot.</p>
-
-          {userId && <SalvaDaTelefono onPaste={() => googleCard.current?.paste()} />}
-
-          <GoogleMapsCard ref={googleCard} userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
-
-          <div className="mt-6">
-            <MultiLinkCard userId={userId} onScreenshot={goToScreenshot} onSearch={searchByHand} onReadVideo={readVideo} />
-          </div>
-          <div className="mt-6">
-            <TakeoutCard userId={userId} />
-          </div>
+          <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Aggiungi un posto</h1>
+          <p className="mb-5 text-sm text-text-muted">Da un reel, da Google Maps, da uno screenshot: in un gesto.</p>
         </>
       )}
 
-      <div className="mt-6">
+      <GoogleMapsCard
+        userId={userId}
+        onScreenshot={goToScreenshot}
+        onSearch={searchByHand}
+        onReadVideo={readVideo}
+        onMulti={(text) => setMulti((m) => ({ text, n: (m?.n ?? 0) + 1 }))}
+      />
+      <MultiLinkCard
+        userId={userId}
+        onScreenshot={goToScreenshot}
+        onSearch={searchByHand}
+        onReadVideo={readVideo}
+        incoming={multi}
+        onAgain={() => document.getElementById("importa-google-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      />
+      {userId && <SalvaDaTelefono />}
+
+      <p className="mb-2 mt-5 text-center text-xs font-display font-semibold uppercase tracking-widest text-text-muted">Oppure</p>
+      <div className="grid grid-cols-2 gap-3" data-testid="importa-tessere">
+        {TILES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            data-testid={`importa-tessera-${t.id}`}
+            aria-expanded={panel === t.id}
+            aria-controls={PANEL_ID[t.id]}
+            onClick={() => (panel === t.id ? setPanel(null) : openPanel(t.id))}
+            className={`flex min-h-28 flex-col items-start rounded-card border bg-surface p-4 text-left shadow-sm transition-colors active:scale-[0.99] ${panel === t.id ? "border-brand ring-2 ring-brand/20" : "border-border"}`}
+          >
+            <span aria-hidden className="text-3xl leading-none">{t.icon}</span>
+            <span className="mt-2 font-display text-base font-semibold leading-tight text-brand">{t.title}</span>
+            <span className="mt-0.5 text-xs leading-snug text-text-muted">{t.text}</span>
+          </button>
+        ))}
+      </div>
+
+      <section id={PANEL_ID.maps} hidden={panel !== "maps"} className="mt-4 scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-maps-guida">
+        <h2 className="font-display text-lg font-semibold text-brand">
+          <span aria-hidden>📍 </span>Da Google Maps
+        </h2>
+        <ol className="mt-3 space-y-2">
+          {["In Google Maps apri il locale o una tua lista", "Tocca Condividi → Copia link", "Torna qui e tocca Incolla un link"].map((st, i) => (
+            <li key={st} className="flex items-start gap-3 text-sm text-text">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{i + 1}</span>
+              <span className="pt-0.5">{st}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-xs text-text-muted">Su Android, con Mapetite installata, puoi anche scegliere Mapetite direttamente da Condividi.</p>
+      </section>
+
+      <div id={PANEL_ID.file} hidden={panel !== "file"} className="mt-4 scroll-mt-4">
+        <TakeoutCard userId={userId} />
+      </div>
+
+      <div hidden={panel !== "mano"} className="mt-4">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
       </div>
 
       <section
         id="da-screenshot"
+        hidden={panel !== "shot"}
         data-testid="importa-screenshot"
         className={`mt-6 scroll-mt-4 rounded-card border bg-surface p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
       >
       <h2 className="mb-1 font-display text-lg font-semibold text-brand">
         <span aria-hidden>📸 </span>Da uno screenshot
       </h2>
-      <p className="text-sm text-text-muted mb-2">
-        Carica uno screenshot di un post social e aggiungi il locale alla tua mappa in pochi passi.
-      </p>
       <p className="text-sm text-text-muted mb-5" data-testid="importa-condividi-android">
         Su Android puoi anche condividere uno screenshot direttamente a Mapetite da Instagram o TikTok.
       </p>
@@ -507,6 +566,15 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     </div>
   );
 }
+
+type Panel = "maps" | "file" | "shot" | "mano";
+const PANEL_ID: Record<Panel, string> = { maps: "da-google-maps", file: "da-file", shot: "da-screenshot", mano: "a-mano" };
+const TILES: { id: Panel; icon: string; title: string; text: string }[] = [
+  { id: "maps", icon: "📍", title: "Da Google Maps", text: "Copia il link e incollalo" },
+  { id: "file", icon: "🗂️", title: "Da file di Google", text: "Tutti i tuoi salvati in un colpo" },
+  { id: "shot", icon: "📸", title: "Da screenshot", text: "Post e storie: leggo io il nome" },
+  { id: "mano", icon: "✍️", title: "A mano", text: "Scrivi nome e città" },
+];
 
 function Row({
   label,
