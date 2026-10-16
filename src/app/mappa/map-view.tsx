@@ -2379,7 +2379,7 @@ export default function MapView({
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
-          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
+          style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md">
             <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
@@ -2498,7 +2498,7 @@ export default function MapView({
 
       {/* Senza la card in basso, l'invito ad aggiungere alla Home resta per chi torna (ha già cercato). */}
       {chipsOn && view === "all" && aiSearch === null && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-        <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}>
+        <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div className="w-full max-w-md empty:hidden">
             <InstallHint />
           </div>
@@ -2509,7 +2509,7 @@ export default function MapView({
         <div
           data-testid="benvenuto"
           className="absolute inset-x-0 z-10 flex justify-center px-3 pointer-events-none lg:right-[var(--pannello)]"
-          style={{ bottom: "calc(var(--nav-height-mobile) + 0.5rem)" }}
+          style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}
         >
           <div className="pointer-events-auto w-full max-w-md rounded-card bg-surface px-3 pb-3 pt-2 shadow-float">
             <div className="flex items-center justify-between">
@@ -2984,7 +2984,7 @@ export default function MapView({
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
       {nearbySaved && !savedToast && !selected && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
@@ -3000,7 +3000,7 @@ export default function MapView({
         </div>
       )}
       {savedToast && (
-        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + 0.75rem)" }}>
+        <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: selected ? "calc(var(--nav-height-mobile) + 5.75rem)" : "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="salvato-avviso" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 truncate text-sm font-sans">
               <span className="font-semibold">📌 Salvato</span> · {savedToast.name}

@@ -29,7 +29,7 @@ export default async function StaseraPage() {
 
   if (!userId) {
     return (
-      <main className="-mb-[var(--nav-height-mobile)] flex min-h-dvh flex-col items-center justify-center gap-4 bg-brand px-6 pb-[var(--nav-height-mobile)] text-center text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
+      <main className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] flex min-h-dvh flex-col items-center justify-center gap-4 bg-brand px-6 pb-[var(--nav-height-mobile)] text-center text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
         <span aria-hidden className="text-5xl">🍽️</span>
         <h1 className="font-display text-2xl font-bold">Stasera dove andiamo?</h1>
         <p data-testid="stasera-accedi" className="max-w-xs text-sm text-white/80">

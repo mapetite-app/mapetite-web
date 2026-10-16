@@ -758,7 +758,7 @@ export default function VenueSheet({
             dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone). */}
         <div
           data-testid="barra-azioni"
-          className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+0.75rem)] z-10 mt-6 flex justify-center px-4"
+          className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
           <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
             {lead === "prenota" && (
@@ -1037,7 +1037,7 @@ export default function VenueSheet({
       {/* 7. BARRA AZIONI FLOTTANTE: sempre visibile in fondo alla scheda mentre si scorre. */}
       {variant === "a" && (
       <div
-        className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur"
+        className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+var(--nav-sporgenza))] backdrop-blur"
       >
         {saveSlot}
 

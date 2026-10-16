@@ -52,7 +52,7 @@ export default async function InvitoPage({ params }: Props) {
   const titolo = name ? `${name} ti ha invitato su Mapetite` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite";
 
   return (
-    <main data-testid="invito-pagina" className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile))] max-w-md flex-col bg-bg">
+    <main data-testid="invito-pagina" className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-md flex-col bg-bg">
       {codice && <InvitoArrivo codice={codice} loggedIn={loggedIn} />}
 
       <section className="relative overflow-hidden rounded-b-[2rem] bg-brand px-6 pb-8 pt-6 text-white">
