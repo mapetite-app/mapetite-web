@@ -5759,6 +5759,7 @@ if (fakeUser) {
   await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
   ok(tfile.length === 2 && tfile.every((i) => typeof i.lat === "number" && !("url" in i) && i.googlePlaceId === null) && !tfile.some((i) => i.name.includes("Milano")), `file Takeout: al server solo nome e coordinate dei 2 posti di Roma, nessun Place ID inventato dal cid (${tfile.map((i) => i.name).join(", ")})`);
   ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
+  for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
   ok(tins.length === 3 && tins.every((r) => r.user_id === fakeUser && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Voglio andarci, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
   const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
   ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
@@ -5937,6 +5938,89 @@ else {
     }
   }
   await qctx.close();
+}
+
+// Carta del gusto (/profilo/gusto): card condivisibile fatta SOLO dai salvati (numeri e tipi,
+// titolo da regole fisse), immagine PNG verticale, stato vuoto sotto i 3 salvati.
+if (!process.env.E2E_FAKE_USER) console.log("SKIP  carta del gusto: serve E2E_FAKE_USER");
+else {
+  const gEv = [];
+  const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await gc.route("**/api/events", (r) => { gEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await gc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await gc.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  const cartaEv = (nome) => gEv.filter((e) => e.type === "funzione" && e.props?.nome === nome);
+  const setP = (v) => gc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  const pl = (n, category, address, poco) => ({ id: `00000000-0000-4000-8000-0000000007${String(n).padStart(2, "0")}`, name: `Locale Segreto ${n}`, category, address, poco_conosciuto: poco });
+  const R = "Via di Prova 1, 00100 Roma RM, Italy";
+  const M = "Via Tortona 15, 20144 Milano MI, Italy";
+  const saved = [
+    { created_at: "2026-10-10", tags: ["Romantico", "Già visitato"], note: null, places: pl(1, "Trattoria", R, null) },
+    { created_at: "2026-10-09", tags: ["Con amici", "Da provare"], note: null, places: pl(2, "Trattoria", R, null) },
+    { created_at: "2026-10-08", tags: ["Romantico"], note: null, places: pl(3, "italian_restaurant", R, null) },
+    { created_at: "2026-10-07", tags: ["Già visitato"], note: null, places: pl(4, "cocktail_bar", M, null) },
+    { created_at: "2026-10-06", tags: ["Con amici", "Romantico"], note: null, places: pl(5, "wine_bar", R, null) },
+    { created_at: "2026-10-05", tags: ["Da provare"], note: null, places: pl(6, "Trattoria", M, null) },
+  ];
+  await setP({ email: "giulia@example.com", saved, reviews: [] });
+  const g = await gc.newPage();
+  g.on("pageerror", (e) => errors.push(e.message));
+  await g.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const entry = g.getByTestId("profilo-carta-gusto");
+  ok(await entry.isVisible() && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 1, "carta del gusto: ingresso compatto dentro 'Le mie cose'");
+  await entry.click();
+  await g.waitForURL(/\/profilo\/gusto$/, { timeout: 8000 }).catch(() => {});
+  const card = g.getByTestId("carta-gusto");
+  await card.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await card.isVisible(), "carta del gusto: dal profilo si apre la card");
+  ok(await g.getByTestId("carta-titolo").textContent() === "Cacciatore di trattorie" && (await g.getByTestId("carta-perche").textContent())?.includes("4 dei tuoi 6 salvati"), `carta del gusto: titolo da regole con il suo perché (${await g.getByTestId("carta-titolo").textContent()} · ${await g.getByTestId("carta-perche").textContent()})`);
+  const nums = (await g.getByTestId("carta-numeri").textContent()) ?? "";
+  ok(nums.includes("6salvati") && nums.includes("2provati") && nums.includes("2città"), `carta del gusto: numeri veri (salvati, provati, città) (${nums})`);
+  const tipi = await g.getByTestId("carta-tipi").locator("li").allTextContents();
+  ok(tipi.length === 3 && tipi[0].includes("Trattoria") && tipi[0].includes("3"), `carta del gusto: top 3 tipi di locale (${tipi.join(" | ")})`);
+  ok((await g.getByTestId("carta-raccolte").textContent())?.startsWith("Romantico") && !(await g.getByTestId("carta-raccolte").textContent())?.includes("Da provare"), "carta del gusto: raccolte principali, senza i tag di stato");
+  ok((await card.textContent())?.includes("Roma · Milano") && !(await card.textContent())?.includes("Locale Segreto"), "carta del gusto: città sì, nomi dei locali no");
+  ok(!(await card.textContent())?.includes("poco conosciuti"), "carta del gusto: senza il dato 'poco conosciuto' la percentuale non compare (niente numeri inventati)");
+  await g.waitForTimeout(300);
+  ok(cartaEv("carta_gusto_vista").some((e) => e.props?.contesto === "piena"), "carta del gusto: la vista è registrata");
+  ok(await g.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "carta del gusto 390px: niente scorrimento orizzontale");
+  await g.screenshot({ path: `${OUT}/99g-carta-gusto.png`, caret: "initial", fullPage: true });
+  // Immagine PNG verticale (formato storia).
+  const img = await g.request.get(`${BASE}/profilo/gusto/immagine`);
+  const buf = img.ok() ? await img.body() : Buffer.alloc(0);
+  const pngW = buf.length > 24 ? buf.readUInt32BE(16) : 0;
+  const pngH = buf.length > 24 ? buf.readUInt32BE(20) : 0;
+  ok(img.status() === 200 && (img.headers()["content-type"] ?? "").includes("image/png") && pngW === 1080 && pngH === 1920, `carta del gusto: immagine PNG 1080×1920 (${img.status()} ${pngW}×${pngH})`);
+  if (buf.length) { const { writeFileSync } = await import("fs"); writeFileSync(`${OUT}/99h-carta-gusto-immagine.png`, buf); }
+  // "Condividi" senza condivisione di file (Chromium del test): l'immagine si scarica.
+  const dl = g.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+  await g.getByTestId("carta-condividi").click();
+  const file = await dl;
+  ok(file?.suggestedFilename() === "carta-del-gusto-mapetite.png" && (await g.getByTestId("carta-condividi-esito").textContent())?.includes("Immagine salvata"), "carta del gusto: senza condivisione di file l'immagine si scarica");
+  ok(cartaEv("carta_gusto_condividi").some((e) => e.props?.contesto === "scaricata"), "carta del gusto: il tocco su Condividi è registrato");
+  // Con il telefono che condivide file: parte il foglio di condivisione con il PNG.
+  await g.evaluate(() => {
+    window.__condiviso = null;
+    navigator.canShare = () => true;
+    navigator.share = async (d) => { window.__condiviso = { n: d.files?.length ?? 0, type: d.files?.[0]?.type ?? "" }; };
+  });
+  await g.getByTestId("carta-condividi").click();
+  await g.waitForFunction(() => window.__condiviso, null, { timeout: 15000 }).catch(() => {});
+  const sh = await g.evaluate(() => window.__condiviso);
+  ok(sh?.n === 1 && sh?.type === "image/png", `carta del gusto: sul telefono si condivide l'immagine PNG (${JSON.stringify(sh)})`);
+  // Posti poco conosciuti: con il dato presente compare la percentuale e il titolo dedicato.
+  await setP({ email: "giulia@example.com", saved: saved.map((s, i) => ({ ...s, places: { ...s.places, poco_conosciuto: i < 4 } })), reviews: [] });
+  await g.goto(`${BASE}/profilo/gusto`, { waitUntil: "networkidle" });
+  ok((await g.getByTestId("carta-numeri").textContent())?.includes("67%poco conosciuti") && await g.getByTestId("carta-titolo").textContent() === "Cercatore di posti nascosti", "carta del gusto: con il dato 💎 compare la % di poco conosciuti e il titolo 'Cercatore di posti nascosti'");
+  // Meno di 3 salvati: stato vuoto con invito, niente immagine.
+  await setP({ email: "giulia@example.com", saved: saved.slice(0, 1), reviews: [] });
+  await g.goto(`${BASE}/profilo/gusto`, { waitUntil: "networkidle" });
+  const vuota = g.getByTestId("carta-vuota");
+  ok(await vuota.isVisible() && (await vuota.textContent())?.includes("Ancora 2 posti") && await vuota.getByRole("link", { name: "Importa da Instagram o Maps" }).isVisible(), "carta del gusto: sotto i 3 salvati invito a salvare o importare");
+  ok((await g.request.get(`${BASE}/profilo/gusto/immagine`)).status() === 404, "carta del gusto: sotto i 3 salvati nessuna immagine");
+  await g.screenshot({ path: `${OUT}/99i-carta-gusto-vuota.png`, caret: "initial" });
+  { const lost = droppedKeys(gEv); ok(lost.length === 0, `carta del gusto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await gc.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
