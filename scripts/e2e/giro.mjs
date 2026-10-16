@@ -6187,6 +6187,33 @@ else {
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
   await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
+
+  // 5. Microfono: cerchio di 36px ma area di tocco di 44px; la barra di ricerca non cambia altezza.
+  await vctx.addInitScript(() => {
+    const Fake = class { start() {} stop() { this.onend?.(); } };
+    window.SpeechRecognition = Fake;
+    window.webkitSpeechRecognition = Fake;
+  });
+  const tocco = () => vp.evaluate(() => {
+    const m = document.querySelector("[data-testid=microfono]");
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const hit = (x, y) => document.elementFromPoint(x, y)?.closest("[data-testid=microfono]") === m;
+    // 4px fuori dal cerchio su ogni lato (44px in tutto) il tocco arriva ancora al microfono.
+    return { w: Math.round(r.width), h: Math.round(r.height), bordi: [hit(r.left - 3.5, cy), hit(r.right + 3.5, cy), hit(cx, r.top - 3.5), hit(cx, r.bottom + 3.5)], fuori: hit(r.left - 6, cy) };
+  });
+  await vp.goto(`${BASE}/mappa?beta=voce`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const tm = await tocco();
+  const hBarra = Math.round((await vp.getByTestId("barra-ricerca").boundingBox())?.height ?? 0);
+  ok(tm && tm.w === 36 && tm.h === 36 && tm.bordi.every(Boolean) && !tm.fuori, `microfono sulla mappa: cerchio 36px, area di tocco 44px (${JSON.stringify(tm)})`);
+  ok(hBarra === 44, `microfono sulla mappa: la barra di ricerca resta alta 44px (${hBarra}px)`);
+  await vp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const ta = await tocco();
+  ok(ta && ta.w === 36 && ta.h === 36 && ta.bordi.every(Boolean), `microfono nell'assistente: area di tocco 44px senza cambiare il cerchio (${JSON.stringify(ta)})`);
+  await vp.screenshot({ path: `${OUT}/zz-microfono-assistente.png`, caret: "initial" });
   await vctx.close();
 }
 
