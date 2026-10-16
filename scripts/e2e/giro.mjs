@@ -3157,6 +3157,7 @@ else {
     await sctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
     await sctx.route("**/rest/v1/**", (route) => route.fulfill(route.request().method() === "POST" ? { status: 201, body: "" } : { json: [] }));
     await sctx.route("**/api/places/add", (route) => { sAdds.push(route.request().postDataJSON()); return route.fulfill({ json: { place: { id: "33333333-0000-4000-8000-0000000000b1" } } }); });
+    await sctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
     await sctx.route("**/api/search/intent", (route) => { sIntents.push(route.request().postDataJSON()); return route.fulfill({ json: { intent: null } }); });
     // Trastevere: l'aperitivo in piazza; per la cena Google mette prima un posto famoso lontano
     // (5.000 recensioni, a 2 km) e poi una trattoria a due passi: si sceglie la trattoria.
@@ -3244,6 +3245,7 @@ else {
     await s3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
     await s3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
     await s3.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+    await s3.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
     await s3.route("**/api/search", (route) => { const b = route.request().postDataJSON(); const kind = Object.keys(STAGES).find((k) => b.query.startsWith(k)); return route.fulfill({ json: { risultati: STAGES[kind] ?? [], sintesi_pendente: null } }); });
     const s3p = await s3.newPage();
     s3p.on("pageerror", (e) => errors.push(e.message));

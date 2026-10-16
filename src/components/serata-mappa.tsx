@@ -1,6 +1,7 @@
 "use client";
 
-import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
+import { useEffect, useRef } from "react";
+import Map, { Layer, Marker, Source, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 // Mini mappa della serata a tappe (piano 1.2): pin numerati nell'ordine delle tappe e la linea
@@ -20,6 +21,15 @@ function bounds(stops: SerataStop[]): [[number, number], [number, number]] {
 }
 
 export default function SerataMappa({ stops, className = "" }: { stops: SerataStop[]; className?: string }) {
+  const mapRef = useRef<MapRef>(null);
+  const ids = stops.map((s) => s.id).join();
+  // Tappe cambiate (un'alternativa scelta): la stessa mappa si ricentra (senza ricrearla).
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (stops.length > 0) mapRef.current?.fitBounds(bounds(stops), { padding: 44, maxZoom: 17, duration: 400 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- si ricentra solo quando cambiano le tappe
+  }, [ids]);
   if (stops.length === 0) return null;
   const line = {
     type: "Feature" as const,
@@ -29,8 +39,7 @@ export default function SerataMappa({ stops, className = "" }: { stops: SerataSt
   return (
     <div data-testid="serata-mappa" className={`relative overflow-hidden rounded-card border border-border bg-surface ${className}`}>
       <Map
-        // Tappe cambiate (un'alternativa scelta): la mappa si ricentra.
-        key={stops.map((s) => s.id).join()}
+        ref={mapRef}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         initialViewState={{ bounds: bounds(stops), fitBoundsOptions: { padding: 44, maxZoom: 17 } }}
         style={{ width: "100%", height: "100%", isolation: "isolate" }}
