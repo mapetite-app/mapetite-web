@@ -63,9 +63,9 @@ export default function Schede({ schede, iniziale, periodi, giorni, base }: { sc
             key={g}
             href={hrefPeriodo(g)}
             aria-current={g === giorni ? "page" : undefined}
-            className={`rounded-pill px-3 py-1.5 ${g === giorni ? "bg-brand text-white" : "text-brand"}`}
+            className="inline-flex min-h-11 items-center"
           >
-            Ultimi {g} giorni
+            <span className={`rounded-pill px-3 py-1.5 ${g === giorni ? "bg-brand text-white" : "text-brand"}`}>Ultimi {g} giorni</span>
           </a>
         ))}
       </nav>

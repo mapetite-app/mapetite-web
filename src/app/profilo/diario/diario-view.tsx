@@ -124,7 +124,7 @@ export default function DiarioView({ userId, initial, withDate }: { userId: stri
                       data-testid="diario-modifica"
                       onClick={() => setEditing(e)}
                       aria-label={`Modifica ${e.name} nel diario`}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text-muted active:bg-surface"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted active:bg-surface"
                     >
                       <Pencil size={16} aria-hidden />
                     </button>
