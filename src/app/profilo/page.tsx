@@ -14,6 +14,7 @@ import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-clas
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
+import ProfiloGusti from "@/components/profilo-gusti";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -221,6 +222,9 @@ export default async function ProfiloPage() {
       </Link>
 
       <ProfiloPrenotazioni />
+
+      {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
+      <ProfiloGusti userId={user.id} />
 
       {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
       <nav aria-label="La mia guida" data-testid="guida-contatori" className="mb-8 grid grid-cols-4 gap-2">

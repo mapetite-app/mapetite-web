@@ -131,6 +131,9 @@ export default async function MePage() {
         >
           Modifica preferenze
         </Link>
+        <Link href="/profilo#cosa-so-di-te" className="mt-3 flex min-h-10 items-center text-sm font-display font-semibold text-accent">
+          Cosa ricorda l’assistente di te →
+        </Link>
       </div>
     </div>
   );
