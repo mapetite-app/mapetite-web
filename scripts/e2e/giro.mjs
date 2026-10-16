@@ -4699,6 +4699,213 @@ if (fakeUser) {
   console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
 }
 
+// 18. "Ti è stato utile?" in un tocco (piano 7.6) dopo assistente, serata a tappe, Sorprendimi e
+//     prenotazione; domanda settimanale in home; "Valore per i tester" nel pannello. Tutto simulato.
+if (!fakeUser) console.log("SKIP  ti è stato utile: dev server senza E2E_FAKE_USER");
+else {
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>';
+  const uctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const uEv = [];
+  await uctx.route("**/api/events", (r) => { uEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await uctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: SVG }));
+  await uctx.route("**/rest/v1/**", (r) => r.fulfill(r.request().method() === "POST" ? { status: 201, body: "" } : { json: [] }));
+  await uctx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+  await uctx.route("**/api/search/intent", (r) => r.fulfill({ json: { intent: null } }));
+  await uctx.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: [{ ...PLACES[0], phone: "347 123 4567" }, PLACES[1], PLACES[2]] } }));
+  await uctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
+  await uctx.route("https://wa.me/**", (r) => r.fulfill({ contentType: "text/html", body: "<p>WhatsApp</p>" }));
+  const up = await uctx.newPage();
+  up.on("pageerror", (e) => errors.push(e.message));
+  up.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  const utili = () => uEv.filter((e) => e.type === "utile");
+
+  // Assistente: dopo la risposta con i posti, una volta sola, sotto le card.
+  await up.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await up.getByTestId("assistente-campo").fill("rooftop romantico a Roma");
+  await up.keyboard.press("Enter");
+  const ua = up.getByTestId("assistente-risposta").last().getByTestId("utile");
+  await ua.waitFor({ timeout: 10000 }).catch(() => {});
+  ok(await ua.getAttribute("data-contesto").catch(() => null) === "assistente" && (await up.getByTestId("utile").count()) === 1, "utile: 'Ti è stato utile?' dopo la risposta dell'assistente, una sola volta");
+  { const c = await up.getByTestId("assistente-card").last().boundingBox(); const u = await ua.boundingBox().catch(() => null);
+    ok(!!c && !!u && u.y >= c.y + c.height, "utile: sotto le card dei posti, non in mezzo"); }
+  await ua.getByRole("button", { name: "No, non utile" }).click();
+  const um = up.getByTestId("utile-motivi");
+  await um.waitFor({ timeout: 3000 }).catch(() => {});
+  const motivi = await um.getByRole("button").allTextContents();
+  ok(motivi.join("|") === "Risultati sbagliati|Troppo lento|Posti già noti|Altro" && (await um.locator("input, textarea").count()) === 0, `utile: con 👎 'Cosa mancava?' con 4 scelte rapide, niente testo libero (${motivi.join(", ")})`);
+  await um.scrollIntoViewIfNeeded();
+  await up.screenshot({ path: `${OUT}/70-utile-assistente-motivi.png`, caret: "initial" });
+  await um.getByRole("button", { name: "Troppo lento" }).click();
+  await up.getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await up.waitForTimeout(200);
+  { const v = utili();
+    ok(v.length === 2 && v[0].props.voto === "no" && v[0].props.contesto === "assistente" && typeof v[0].props.risultati === "number"
+      && v[1].props.stato === "lento" && v[1].props.contesto === "assistente" && v[1].props.voto === undefined,
+      `utile: 👎 e 'Troppo lento' registrati come due segnali, il motivo solo come scelta (${JSON.stringify(v.map((e) => e.props))})`); }
+  await up.reload({ waitUntil: "networkidle" });
+  await up.getByTestId("assistente-card").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok((await up.getByTestId("utile").count()) === 0 && (await up.getByTestId("utile-motivi").count()) === 0, "utile: ricaricando, la risposta già votata non chiede di nuovo");
+
+  // Prenotazione: dopo l'invio, nel foglio Prenota.
+  await up.getByTestId("assistente-nuova").click().catch(() => {});
+  await up.getByTestId("assistente-campo").fill("prenotami domani alle 21 per 2 con terrazza a Roma");
+  await up.keyboard.press("Enter");
+  await up.getByRole("button", { name: "Prenota da Terrazza Uno" }).click({ timeout: 10000 });
+  await up.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  ok((await up.getByTestId("foglio-prenota").getByTestId("utile").count()) === 0, "utile: nel foglio Prenota non compare prima dell'invio");
+  await up.getByLabel("Il tuo nome").fill("Giulia");
+  const [wa] = await Promise.all([up.waitForEvent("popup"), up.getByTestId("prenota-whatsapp").click()]);
+  await wa.close();
+  await up.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
+  const fu = up.getByTestId("foglio-prenota").getByTestId("utile");
+  ok(await fu.isVisible() && await fu.getAttribute("data-contesto") === "prenota", "utile: dopo l'invio della prenotazione, 'Ti è stato utile?' nel foglio");
+  { const f = await up.getByRole("button", { name: "Fatto" }).boundingBox(); const u = await fu.boundingBox();
+    ok(!!f && !!u && u.y > f.y + f.height, "utile: nel foglio sta sotto 'Fatto', non prima del pulsante principale"); }
+  { const w = await up.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `utile: foglio Prenota senza scorrimento orizzontale (${w}px)`); }
+  await fu.scrollIntoViewIfNeeded();
+  await up.screenshot({ path: `${OUT}/71-utile-prenota.png`, caret: "initial" });
+  await fu.getByRole("button", { name: "Sì, utile" }).click();
+  await up.getByTestId("foglio-prenota").getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await up.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "si" && e.props.contesto === "prenota"), "utile: 👍 dopo la prenotazione registrato con contesto 'prenota'");
+  await up.getByRole("button", { name: "Fatto" }).click();
+
+  // Serata a tappe: contesto "serata".
+  await up.getByTestId("assistente-nuova").click().catch(() => {});
+  await up.goto(`${BASE}/assistente?q=${encodeURIComponent("aperitivo e cena a Trastevere")}`, { waitUntil: "networkidle" });
+  await up.waitForFunction(() => document.querySelectorAll("[data-testid=serata-scelto]").length === 2, null, { timeout: 8000 }).catch(() => {});
+  const us = up.getByTestId("assistente-risposta").last().getByTestId("utile");
+  await us.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await us.getAttribute("data-contesto").catch(() => null) === "serata", "utile: dopo la serata a tappe, con contesto 'serata'");
+  { const s = await up.getByTestId("serata").boundingBox(); const u = await us.boundingBox().catch(() => null);
+    ok(!!s && !!u && u.y >= s.y + s.height, "utile: sotto la serata, in fondo alla risposta"); }
+  await us.getByRole("button", { name: "Sì, utile" }).click().catch(() => {});
+  await up.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "si" && e.props.contesto === "serata" && e.props.risultati === 2), "utile: 👍 sulla serata registrato con le tappe trovate");
+
+  // Sorprendimi: sotto la carta, resta uno solo anche con "Un altro".
+  await uctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [{ tags: ["Mi è piaciuto"], places: { category: "Trattoria", lat: 41.9, lng: 12.49, google_place_id: "GT1" } }] }));
+  const sm = (id, name) => mk(id, name, 41.9 + Number(id.slice(2)) * 0.001, 12.49, { category: "Trattoria", rating: 4.6, userRatingCount: 200, types: ["restaurant"] });
+  await uctx.route("**/api/search", (r) => r.fulfill({ json: { risultati: [sm("SU1", "Trattoria Uno"), sm("SU2", "Trattoria Due")], filtri_usati: { categoria: null, parole_chiave: [], vicino_a_me: false }, sintesi_pendente: null } }));
+  const sp2 = await uctx.newPage();
+  sp2.on("pageerror", (e) => errors.push(e.message));
+  await sp2.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
+  await sp2.goto(`${BASE}/sorprendimi?da=mappa&lat=41.9&lng=12.49`, { waitUntil: "networkidle" });
+  await sp2.getByTestId("sorpresa-card").waitFor({ timeout: 8000 }).catch(() => {});
+  const usp = sp2.getByTestId("utile");
+  ok(await usp.isVisible().catch(() => false) && await usp.getAttribute("data-contesto") === "sorpresa", "utile: 'Ti è stato utile?' sotto la proposta di Sorprendimi");
+  { const c = await sp2.getByTestId("sorpresa-card").boundingBox(); const u = await usp.boundingBox().catch(() => null);
+    ok(!!c && !!u && u.y >= c.y + c.height, "utile: sotto la carta, non sopra i pulsanti"); }
+  await sp2.getByTestId("sorpresa-altro").click();
+  await sp2.waitForTimeout(300);
+  ok((await sp2.getByTestId("utile").count()) === 1, "utile: con 'Un altro' resta una sola domanda");
+  await sp2.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
+  await sp2.waitForTimeout(200);
+  await sp2.screenshot({ path: `${OUT}/72-utile-sorprendimi.png`, caret: "initial" });
+  await usp.getByRole("button", { name: "No, non utile" }).click().catch(() => {});
+  await sp2.getByTestId("utile-motivi").getByRole("button", { name: "Posti già noti" }).click().catch(() => {});
+  await sp2.getByTestId("utile-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await sp2.waitForTimeout(200);
+  ok(utili().some((e) => e.props.voto === "no" && e.props.contesto === "sorpresa") && utili().some((e) => e.props.stato === "gia_noti" && e.props.contesto === "sorpresa"), "utile: 👎 e 'Posti già noti' su Sorprendimi registrati");
+  { const w = await sp2.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `utile: Sorprendimi senza scorrimento orizzontale (${w}px)`); }
+  await sp2.close();
+  const lostU = droppedKeys(utili());
+  ok(lostU.length === 0, `utile: tutte le chiavi dei segnali sono tra quelle che il server conserva (${lostU.join(", ") || "nessuna scartata"})`);
+  ok(!JSON.stringify(uEv).includes("rooftop romantico") && !JSON.stringify(uEv).includes("Giulia"), "utile: nei segnali niente frasi scritte né nomi");
+  { const r = await up.request.post(`${BASE}/api/events`, { data: { type: "utile", props: { contesto: "assistente", stato: "lento" } } });
+    ok(r.status() === 204, `utile: /api/events accetta il motivo del 👎 (${r.status()})`); }
+  await uctx.close();
+
+  // Domanda settimanale in home: solo dopo 2 giorni diversi d'uso, una volta ogni 7 giorni.
+  const day = (n) => { const d = new Date(Date.now() - n * 86_400_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const wctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const wEv = [];
+  await wctx.route("**/api/events", (r) => { wEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await wctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const wp = await wctx.newPage();
+  wp.on("pageerror", (e) => errors.push(e.message));
+  wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, 150)); });
+  await wp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: al primo giorno d'uso la domanda non c'è");
+  ok((await wp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.giorni_uso") ?? "[]"))).length === 1, "settimanale: il giorno d'uso è segnato nel telefono");
+  await wp.evaluate((d) => localStorage.setItem("mapetite.giorni_uso", JSON.stringify([d])), day(2));
+  await wp.reload({ waitUntil: "networkidle" });
+  const dq = wp.getByTestId("domanda-settimanale");
+  await dq.waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await dq.isVisible() && (await dq.textContent()).includes("Quanto ti ha aiutato Mapetite questa settimana a scegliere dove andare?"), "settimanale: dal secondo giorno diverso compare in home");
+  ok((await dq.getByTestId("domanda-voto").getByRole("button").count()) === 5, "settimanale: voto da 1 a 5");
+  { const b = await dq.getByRole("button", { name: "1 su 5" }).boundingBox(); ok(!!b && b.height >= 44 && b.width >= 44, `settimanale: pulsanti grandi abbastanza per il dito (${Math.round(b?.width ?? 0)}×${Math.round(b?.height ?? 0)})`); }
+  { const s = await wp.getByPlaceholder("Chiedi all'AI…").boundingBox().catch(() => null);
+    ok(!!s && s.y + s.height <= 844, `settimanale: il campo di ricerca in home resta sullo schermo (${Math.round((s?.y ?? 0) + (s?.height ?? 0))} px)`); }
+  await dq.scrollIntoViewIfNeeded();
+  await wp.screenshot({ path: `${OUT}/73-settimanale-voto.png`, caret: "initial" });
+  await dq.getByRole("button", { name: "4 su 5" }).click();
+  await dq.getByTestId("domanda-consiglio").waitFor({ timeout: 3000 }).catch(() => {});
+  ok((await dq.textContent()).includes("Lo consiglieresti a un amico?") && (await dq.getByTestId("domanda-consiglio").getByRole("button").allTextContents()).join() === "Sì,Forse,No", "settimanale: poi 'Lo consiglieresti a un amico?' Sì/Forse/No");
+  await wp.screenshot({ path: `${OUT}/74-settimanale-consiglio.png`, caret: "initial" });
+  await dq.getByTestId("domanda-consiglio").getByRole("button", { name: "Forse" }).click();
+  await dq.getByTestId("domanda-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  await wp.waitForTimeout(200);
+  { const s = wEv.filter((e) => e.type === "funzione" && e.props?.nome === "domanda_settimanale");
+    ok(s.length === 2 && s[0].props.voto === 4 && s[1].props.stato === "forse", `settimanale: voto e consiglio registrati (${JSON.stringify(s.map((e) => e.props))})`);
+    const lost = droppedKeys(s);
+    ok(lost.length === 0, `settimanale: chiavi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await wp.reload({ waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: risposta data, non torna prima di 7 giorni");
+  // Dopo 8 giorni torna; chiusa con la X, si ricorda e lo registra.
+  await wp.evaluate(() => localStorage.setItem("mapetite.domanda_settimanale", String(Date.now() - 8 * 86_400_000)));
+  await wp.setViewportSize({ width: 360, height: 780 });
+  await wp.reload({ waitUntil: "networkidle" });
+  await dq.waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await dq.isVisible(), "settimanale: dopo 7 giorni la domanda torna");
+  { const w = await wp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 360, `settimanale 360 px: niente scorrimento orizzontale (${w}px)`); }
+  await dq.scrollIntoViewIfNeeded();
+  await wp.screenshot({ path: `${OUT}/75-settimanale-360.png`, caret: "initial" });
+  await dq.getByRole("button", { name: "Chiudi la domanda" }).click();
+  await wp.waitForTimeout(200);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0 && wEv.some((e) => e.props?.nome === "domanda_settimanale" && e.props?.stato === "chiusa"), "settimanale: si chiude con la X (registrato come 'chiusa')");
+  await wp.reload({ waitUntil: "networkidle" });
+  await wp.waitForTimeout(300);
+  ok((await wp.getByTestId("domanda-settimanale").count()) === 0, "settimanale: chiusa, non riappare ricaricando");
+
+  // Pannello: "Valore per i tester".
+  const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
+  const V = "00000000-0000-0000-0000-00000000000c";
+  const ev = (type, min, props, user = V) => ({ created_at: iso(min), type, user_id: user, anon_id: null, session_id: "sv", props });
+  await wctx.addCookies([{ name: "e2e_eventi", url: BASE, value: encodeURIComponent(JSON.stringify([
+    ev("sessione_inizio", 60, { prima_volta: 1 }),
+    ev("utile", 50, { voto: "si", contesto: "assistente", risultati: 3 }),
+    ev("utile", 49, { voto: "si", contesto: "assistente", risultati: 3 }),
+    ev("utile", 48, { voto: "no", contesto: "assistente", risultati: 3 }),
+    ev("utile", 47, { contesto: "assistente", stato: "lento" }),
+    ev("utile", 46, { voto: "si", contesto: "sorpresa" }),
+    ev("utile", 45, { voto: "si", contesto: "prenota" }),
+    ev("funzione", 40, { nome: "domanda_settimanale", voto: 4 }),
+    ev("funzione", 39, { nome: "domanda_settimanale", stato: "si" }),
+    ev("funzione", 38, { nome: "domanda_settimanale", voto: 5 }, "00000000-0000-0000-0000-00000000000d"),
+    ev("funzione", 37, { nome: "domanda_settimanale", stato: "si" }, "00000000-0000-0000-0000-00000000000d"),
+    ev("funzione", 36, { nome: "domanda_settimanale", stato: "no" }, "00000000-0000-0000-0000-00000000000e"),
+  ])) }]);
+  await wp.setViewportSize({ width: 390, height: 844 });
+  await wp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
+  const uf = (await wp.getByTestId("numeri-utile-funzioni").textContent().catch(() => "")) ?? "";
+  ok(uf.includes("Assistente") && uf.includes("67%") && uf.includes("Sorprendimi") && uf.includes("Prenotazione") && uf.includes("Serata a tappe"), `pannello: % utile per funzione (${uf.slice(0, 160)})`);
+  ok(((await wp.getByTestId("numeri-utile-motivi").textContent().catch(() => "")) ?? "").includes("Troppo lento"), "pannello: cosa mancava dopo un 👎");
+  const st = (await wp.getByTestId("numeri-settimanale").textContent().catch(() => "")) ?? "";
+  ok(st.includes("4,5/5") && st.includes("67%") && st.includes("netto +33"), `pannello: voto medio settimanale e 'lo consiglierebbe' (${st})`);
+  ok(!((await wp.getByTestId("numeri-funzioni").textContent().catch(() => "")) ?? "").includes("domanda settimanale"), "pannello: la domanda settimanale non finisce tra le funzioni");
+  ok(((await wp.getByTestId("numeri-utile").textContent().catch(() => "")) ?? "").includes("su 5 voti"), "pannello: 👍/👎 totali (il motivo non conta come voto)");
+  { const w = await wp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `pannello valore: niente scorrimento orizzontale (${w}px)`); }
+  await wp.getByTestId("numeri-utile").scrollIntoViewIfNeeded();
+  await wp.evaluate(() => window.scrollBy(0, -60));
+  await wp.screenshot({ path: `${OUT}/76-pannello-valore.png`, caret: "initial" });
+  await wctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
