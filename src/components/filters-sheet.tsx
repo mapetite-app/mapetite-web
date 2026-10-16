@@ -8,6 +8,8 @@ export type Filters = {
   // "Dove?": zona, quartiere, via o città scritti a mano ("" = intorno alla mappa).
   zona: string;
   radiusKm: number | null;
+  // Da dove si misura il raggio: dal telefono ("me") o dal centro della mappa ("map").
+  radiusFrom: "me" | "map";
   minRating: number | null;
   minPriceLevel: number | null;
   maxPriceLevel: number | null;
@@ -24,6 +26,7 @@ export type Filters = {
 export const EMPTY_FILTERS: Filters = {
   zona: "",
   radiusKm: null,
+  radiusFrom: "map",
   minRating: null,
   minPriceLevel: null,
   maxPriceLevel: null,
@@ -75,10 +78,10 @@ export function countActive(f: Filters): number {
 // Scelte rapide al posto di cursore e stelline: più chiare e comode col dito.
 const DISTANCE_OPTIONS: { label: string; value: number | null }[] = [
   { label: "Qualsiasi", value: null },
+  { label: "500 m", value: 0.5 },
   { label: "1 km", value: 1 },
-  { label: "3 km", value: 3 },
+  { label: "2 km", value: 2 },
   { label: "5 km", value: 5 },
-  { label: "10 km", value: 10 },
 ];
 
 // Zone suggerite per città (Roma e Milano prima di tutto, VISIONE): un tocco invece di scrivere.
@@ -299,9 +302,10 @@ export default function FiltersSheet({
             </p>
           </section>
 
-          {/* Distanza: misurata dalla mappa, quindi solo senza una zona scritta */}
+          {/* Raggio (piano 2.1): da me o dal centro della mappa, con il cerchio disegnato sulla mappa.
+              Solo senza una zona scritta (il raggio da un altro posto non avrebbe senso). */}
           {!local.zona.trim() && (
-          <section>
+          <section data-testid="filtri-raggio">
             <span className="font-display text-sm font-semibold text-text block mb-2">Quanto lontano?</span>
             <div className="flex flex-wrap gap-2">
               {DISTANCE_OPTIONS.map(({ label, value }) => (
@@ -310,6 +314,16 @@ export default function FiltersSheet({
                 </button>
               ))}
             </div>
+            {local.radiusKm != null && (
+              <div className="mt-2 flex gap-2" role="group" aria-label="Da dove misuro la distanza">
+                <button type="button" data-testid="raggio-da-me" aria-pressed={local.radiusFrom === "me"} onClick={() => setLocal((p) => ({ ...p, radiusFrom: "me" }))} className={chip(local.radiusFrom === "me")}>
+                  📍 Da me
+                </button>
+                <button type="button" data-testid="raggio-da-mappa" aria-pressed={local.radiusFrom !== "me"} onClick={() => setLocal((p) => ({ ...p, radiusFrom: "map" }))} className={chip(local.radiusFrom !== "me")}>
+                  Dal centro della mappa
+                </button>
+              </div>
+            )}
           </section>
           )}
 
