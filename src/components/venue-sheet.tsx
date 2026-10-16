@@ -63,7 +63,7 @@ type VenueSheetProps = {
   onEdit: () => void;
   onClose: () => void;
   saveSlot: React.ReactNode; // <SaveButton .../> renderizzato da map-view
-  communitySlot: React.ReactNode; // recensioni Mapetite + ReviewForm, da map-view
+  communitySlot: React.ReactNode; // "Dalla community Mapetite" (CommunityLocale), da map-view
   origin?: { lat: number; lng: number } | null; // per "Roma · 600 m"
   userPos?: { lat: number; lng: number } | null; // posizione reale dell'utente, per i minuti a piedi
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
@@ -728,11 +728,12 @@ export default function VenueSheet({
         </div>
       )}
 
-      {/* 6. COMMUNITY — recensioni Mapetite + ReviewForm */}
+      {/* 6. COMMUNITY (piani 5.6c, 5.6d): recensioni degli utenti e reel, mai mescolati ai dati Google. */}
       {communitySlot && (
-        <div className="mt-5 border-t border-border px-5 pt-4">
-          <h3 className="font-display text-base font-semibold text-brand">
-            Recensioni Mapetite
+        <div className="mt-5 border-t border-border px-5 pt-4" data-testid="community-scheda">
+          <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+            Dalla community Mapetite
+            <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
           </h3>
           <div className="mt-2">{communitySlot}</div>
         </div>

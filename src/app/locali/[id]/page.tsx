@@ -8,6 +8,7 @@ import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import SalvaLocale from "./salva-locale";
 import AmiciQui from "./amici-qui";
+import CommunityLocale from "@/components/community-locale";
 import { safeNext } from "@/lib/next-path";
 import {
   cleanList,
@@ -20,7 +21,8 @@ import {
 
 // Pagina pubblica di un locale: è dove arriva l'amico a cui è stato condiviso.
 // Stile della scheda B (Places): foto grande, nome, contesto, il verdetto Mapetite
-// (solo se già in cache: mai testo nuovo), percorso, e l'invito a salvarlo in Mapetite.
+// (solo se già in cache: mai testo nuovo), percorso, l'invito a salvarlo in Mapetite e, a parte,
+// "Dalla community Mapetite" (recensioni e reel degli utenti, letti dal telefono).
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -185,6 +187,17 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
       </div>
 
       <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} returnPath={returnPath} highlight={highlightSave} />
+
+      {/* Piani 5.6c e 5.6d: recensioni degli utenti e reel collegati al locale, separati dai dati Google. */}
+      <section data-testid="community-pubblica" className="mx-5 mt-6 border-t border-border pt-4">
+        <h2 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+          Dalla community Mapetite
+          <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
+        </h2>
+        <div className="mt-2">
+          <CommunityLocale id={place.id} userId={userId} contesto="locale" loginHref={`/login?next=${encodeURIComponent(`/locali/${place.id}`)}`} />
+        </div>
+      </section>
 
       {/* Piano 8.1: un invito discreto per chi gestisce il locale (sparisce quando è verificato). */}
       {!place.verified_at && (

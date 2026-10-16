@@ -8,6 +8,8 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 import { trackFeature } from "@/lib/track";
+import { addReel } from "@/lib/community-write";
+import { reelSourceOf } from "@/lib/reel";
 
 function errorText(e: unknown): string {
   if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
@@ -39,10 +41,13 @@ export default function ManualAddCard({
   userId,
   initialQuery = "",
   autoSearch = false,
+  reelUrl = null,
 }: {
   userId: string | null;
   initialQuery?: string;
   autoSearch?: boolean;
+  // Link del reel condiviso (Instagram/TikTok/YouTube, piano 5.6d): si collega al locale salvato.
+  reelUrl?: string | null;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchPlace[] | null>(null);
@@ -97,6 +102,10 @@ export default function ManualAddCard({
     setError(null);
     try {
       const out = await saveSearchPlace(r, userId);
+      if (reelUrl && out.place) {
+        const reel = await addReel(userId, out.place.id, reelUrl);
+        if (reel.esito === "ok") trackFeature("reel", { stato: "salvato_import", fonte: reelSourceOf(reelUrl) ?? "", contesto: "condividi" });
+      }
       setSaved(out);
       setSavedIds((m) => ({ ...m, [r.id]: out.place!.id }));
     } catch (e) {

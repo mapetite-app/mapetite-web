@@ -92,7 +92,7 @@ function logMissing(where: string, error: { code?: string; message: string }) {
 }
 
 // Id di chi segue l'utente (solo i propri follow, RLS).
-async function followedIds(userId: string): Promise<string[] | InArrivo> {
+export async function followedIds(userId: string): Promise<string[] | InArrivo> {
   const f = await fake();
   if (f === "in-arrivo") return { stato: "in-arrivo" };
   if (f) return f.seguo ?? [];

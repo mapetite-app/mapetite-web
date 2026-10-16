@@ -39,7 +39,7 @@ export function findVideoLink(text: string): string | null {
 
 // I link corti dell'app TikTok (vm.tiktok.com/…) si risolvono seguendo il solo rimando (come per i
 // link corti di Google Maps), senza leggere la pagina: l'oEmbed vuole l'indirizzo completo del video.
-async function resolveShortTikTok(url: string): Promise<string> {
+export async function resolveShortTikTok(url: string): Promise<string> {
   const host = new URL(url).hostname.toLowerCase();
   if (host !== "vm.tiktok.com" && host !== "vt.tiktok.com") return url;
   try {

@@ -5352,6 +5352,126 @@ else {
   await gctx.close();
 }
 
+// ─── Community nella scheda del locale: recensioni degli utenti e reel (PIANO-25-OTTOBRE.md 5.6c, 5.6d) ───
+// Dati finti dal cookie "e2e_community" (letto da src/lib/community.ts solo in sviluppo), scritture
+// verso Supabase e anteprime oEmbed intercettate qui: nessuna chiamata vera a Google, TikTok o Supabase.
+if (!fakeUser) console.log("SKIP  community del locale: dev server senza E2E_FAKE_USER");
+else {
+  const CID = "55555555-0000-4000-8000-000000000005";
+  const locC = { place: { id: CID, name: "Osteria del Pigneto", address: "Via del Pigneto 41, 00176 Roma RM, Italy", lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GPIGNETO" }, synthesis: null };
+  const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const setC = (name, value) => cctx.addCookies([{ name, value: encodeURIComponent(JSON.stringify(value)), url: BASE }]);
+  await setC("e2e_locale", locC);
+  const cEv = [];
+  await cctx.route("**/api/events", (r) => { cEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await cctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+  let reviewPost = null;
+  await cctx.route("**/rest/v1/reviews**", (r) => {
+    if (r.request().method() === "POST") { reviewPost = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  let reelPost = null;
+  await cctx.route("**/rest/v1/contenuti_locali**", (r) => {
+    if (r.request().method() === "POST") { reelPost = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const oembedAsked = [];
+  await cctx.route("**/api/places/oembed**", (r) => {
+    oembedAsked.push(new URL(r.request().url()).searchParams.get("url"));
+    return r.fulfill({ json: { titolo: "La carbonara più sincera del Pigneto", autore: "mangiaroma", miniatura: "https://miniature.test/tt.jpg" } });
+  });
+  await cctx.route("https://miniature.test/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="320"><rect width="180" height="320" fill="#a0522d"/></svg>' }));
+  await cctx.route("https://www.tiktok.com/**", (r) => r.fulfill({ contentType: "text/html", body: "<html><body>TikTok</body></html>" }));
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(e.message));
+  const section = cp.getByTestId("community-pubblica");
+  const txt = async (loc) => (await loc.textContent().catch(() => "")) ?? "";
+
+  // 1. Nessuna recensione: la sezione c'è e invita a scrivere la prima; senza migrazione niente reel.
+  await cp.goto(`${BASE}/locali/${CID}`, { waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await section.isVisible() && (await txt(section)).includes("Dalla community Mapetite"), "community: la pagina del locale ha la sezione 'Dalla community Mapetite'");
+  ok(await cp.getByTestId("community-vuota").isVisible() && await cp.getByTestId("recensione-form").isVisible(), "community: senza recensioni invita a scrivere la prima (modulo visibile)");
+  ok((await cp.getByTestId("reel-sezione").count()) === 0, "community: migrazione non applicata (reelPronti false) → nessuna sezione reel, nessun errore");
+
+  // 2. Recensioni degli altri (prima chi segui) e un reel TikTok con l'anteprima ufficiale.
+  await setC("e2e_community", {
+    recensioni: [
+      { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-10-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true },
+      { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false },
+    ],
+    mia: null,
+    reel: [{ id: "v1", url: "https://www.tiktok.com/@mangiaroma/video/7420000000000000001", fonte: "TikTok", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, mio: false }],
+    reelPronti: true,
+  });
+  await cp.goto(`${BASE}/locali/${CID}`, { waitUntil: "networkidle" });
+  await cp.getByTestId("community-media").waitFor({ timeout: 5000 }).catch(() => {});
+  const media = cp.getByTestId("community-media");
+  ok((await txt(media)).includes("4,5") && (await txt(media)).includes("2 recensioni Mapetite"), `community: media e numero delle recensioni Mapetite (${await txt(media)})`);
+  const rows = cp.getByTestId("recensione-community");
+  ok((await rows.count()) === 2 && (await txt(rows.nth(0))).includes("Giulia") && (await txt(rows.nth(0))).includes("Amico") && await rows.nth(0).getByRole("link", { name: "Giulia" }).getAttribute("href") === "/u/giulia.rm", "community: prima la recensione di chi segui, con il link al profilo");
+  ok((await txt(rows.nth(1))).includes("Un membro di Mapetite"), "community: chi ha il profilo privato resta anonimo");
+  const reelSec = cp.getByTestId("reel-sezione");
+  await cp.getByTestId("reel-locale").first().getByText("La carbonara più sincera").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await txt(reelSec)).includes("Visto su TikTok") && (await cp.getByTestId("reel-locale").count()) === 1 && (await txt(cp.getByTestId("reel-locale").first())).includes("@mangiaroma"), "community: 'Visto su TikTok' con titolo e autore dall'oEmbed");
+  ok(oembedAsked.length >= 1 && oembedAsked.every((u) => u?.startsWith("https://www.tiktok.com/")), "community: l'anteprima si chiede solo all'oEmbed, con il link del video");
+  ok(await cp.getByTestId("reel-locale").first().getAttribute("href") === "https://www.tiktok.com/@mangiaroma/video/7420000000000000001" && await cp.getByTestId("reel-locale").first().getAttribute("target") === "_blank", "community: il reel si apre sulla piattaforma (nuova scheda)");
+  ok(cEv.some((e) => e.props?.nome === "community_scheda" && e.props?.risultati === 2 && e.props?.stato === "con_reel"), "community: registrata la vista della sezione con recensioni e reel");
+  await section.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/97-community-locale.png`, caret: "initial" });
+  { const [pop] = await Promise.all([cctx.waitForEvent("page", { timeout: 3000 }).catch(() => null), cp.getByTestId("reel-locale").first().click()]);
+    await pop?.close().catch(() => {});
+    await cp.waitForTimeout(200);
+    ok(cEv.some((e) => e.props?.nome === "reel" && e.props?.stato === "aperto" && e.props?.fonte === "TikTok"), "community: aprire un reel è registrato (fonte TikTok)"); }
+
+  // 3. La tua recensione: senza stelle non parte, con 4 stelle e due righe si pubblica.
+  const form = cp.getByTestId("recensione-form");
+  await form.getByRole("button", { name: "Pubblica" }).click();
+  ok((await txt(form)).includes("Scegli da 1 a 5 stelle") && reviewPost == null, "community: senza stelle la recensione non parte");
+  await form.getByRole("radio", { name: "4 stelle" }).click();
+  await form.getByLabel("Il tuo commento").fill("Amatriciana vera, sala piccola: prenotate.");
+  await form.getByRole("button", { name: "Pubblica" }).click();
+  await cp.getByTestId("mia-recensione").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(reviewPost?.rating === 4 && reviewPost?.comment === "Amatriciana vera, sala piccola: prenotate." && reviewPost?.place_id === CID && reviewPost?.user_id === process.env.E2E_FAKE_USER, `community: recensione scritta a proprio nome sul locale (${JSON.stringify(reviewPost)})`);
+  ok(await cp.getByTestId("mia-recensione").isVisible() && (await txt(cp.getByTestId("mia-recensione"))).includes("Pubblicata") && (await txt(media)).includes("3 recensioni"), "community: dopo la pubblicazione 'La tua recensione' e la media aggiornata");
+  { const r = cEv.filter((e) => e.props?.nome === "recensione_community");
+    ok(r.length === 1 && r[0].props.voto === 4 && r[0].props.stato === "nuova" && r[0].props.contesto === "locale", `community: recensione registrata come evento (${JSON.stringify(r[0]?.props ?? null)})`);
+    const lost = droppedKeys([...r, ...cEv.filter((e) => e.props?.nome === "reel" || e.props?.nome === "community_scheda")]);
+    ok(lost.length === 0, `community: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+
+  // 4. Collegare un reel: link non valido → messaggio; reel Instagram → link pulito, fonte giusta.
+  await cp.getByTestId("reel-aggiungi").click();
+  const rf = cp.getByTestId("reel-form");
+  await rf.getByLabel("Link del video").fill("https://example.com/video");
+  await rf.getByRole("button", { name: "Collega" }).click();
+  ok(await cp.getByTestId("reel-errore").isVisible() && reelPost == null, "community: un link che non è un reel non si salva");
+  await rf.getByLabel("Link del video").fill("https://www.instagram.com/reel/C9xYz12AbCd/?igsh=MTRhbmVzZ3B4");
+  await rf.getByRole("button", { name: "Collega" }).click();
+  await cp.waitForTimeout(400);
+  ok(reelPost?.url === "https://www.instagram.com/reel/C9xYz12AbCd" && reelPost?.fonte === "Instagram" && reelPost?.place_id === CID && Object.keys(reelPost ?? {}).sort().join() === "fonte,place_id,url,user_id", `community: reel salvato con il solo link pulito (${JSON.stringify(reelPost)})`);
+  ok((await cp.getByTestId("reel-locale").count()) === 2 && (await txt(reelSec)).includes("Visto sui social") && (await txt(reelSec)).includes("Salvato da te"), "community: il reel nuovo compare subito ('Visto sui social')");
+  ok(cEv.some((e) => e.props?.nome === "reel" && e.props?.stato === "aggiunto" && e.props?.fonte === "Instagram"), "community: collegare un reel è registrato");
+  ok(oembedAsked.every((u) => !u?.includes("instagram.com")), "community: per Instagram nessuna richiesta oEmbed (serve un token Meta): solo il link");
+  await reelSec.scrollIntoViewIfNeeded();
+  await cp.screenshot({ path: `${OUT}/98-community-reel.png`, caret: "initial" });
+
+  // 5. Telefono piccolo (360 px): niente scorrimento orizzontale della pagina (i reel scorrono nella loro fila).
+  await cp.setViewportSize({ width: 360, height: 780 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await cp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "community 360px: niente scorrimento orizzontale");
+
+  // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
+  await setC("e2e_anonimo", 1);
+  await cp.setViewportSize({ width: 390, height: 844 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  const acc = section.getByRole("link", { name: "Accedi" });
+  ok((await cp.getByTestId("recensione-form").count()) === 0 && (await cp.getByTestId("reel-aggiungi").count()) === 0 && decodeURIComponent((await acc.getAttribute("href").catch(() => "")) ?? "") === `/login?next=/locali/${CID}`, "community senza accesso: niente modulo, 'Accedi' riporta al locale");
+  ok((await cp.getByTestId("recensione-community").count()) === 2, "community senza accesso: le recensioni si leggono comunque");
+  await cctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
