@@ -295,7 +295,9 @@ ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) 
 { const hb = await page.getByTestId("titolo-risposta").evaluate((el) => Math.round(el.closest(".rounded-card").getBoundingClientRect().height));
   ok(hb <= 48 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `intestazione: una sola riga (${hb}px), "Ho capito" e Affina dietro "⋯"`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
-ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+ok((await page.getByRole("button", { name: "Aperto ora" }).count()) === 0, "semplificare: i filtri rapidi non stanno sempre sopra le card (sono dietro '⋯')");
+await apriOpzioni(page);
+ok((await page.getByTestId("filtri-lista").count()) === 1 && await page.getByRole("button", { name: "Aperto ora" }).isVisible(), "lista B: filtri rapidi presenti aprendo '⋯'");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
@@ -336,6 +338,7 @@ await (await esempio(page)).click();
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 const firstCard = () => page.locator("ul.snap-x li").first().getAttribute("data-id");
 ok((await firstCard()) === "P1", "ordine iniziale: prima Terrazza Uno (la più adatta)");
+await apriOpzioni(page);
 await page.getByRole("button", { name: "Più vicini" }).click();
 ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
 await page.waitForTimeout(300);
@@ -371,6 +374,7 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+await apriOpzioni(page);
 await page.getByRole("button", { name: "Aperto ora" }).first().click();
 ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
 ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
