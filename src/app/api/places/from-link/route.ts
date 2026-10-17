@@ -46,6 +46,8 @@ async function resolveOne(apiKey: string, link: string, fallbackName: string | n
       const stored = await findOrCreatePlace(
         { googlePlaceId: id, name: full.name ?? name ?? text!, address: full.address, lat: full.lat, lng: full.lng },
         "from-link",
+        // Nome, indirizzo e posizione da Place Details: dati Google, non del link.
+        full.name ? "google" : "link",
       );
       if ("error" in stored) return { link, error: stored.error };
       return { link, place: stored.place };
@@ -65,9 +67,12 @@ async function resolveOne(apiKey: string, link: string, fallbackName: string | n
   }
   if (!placeId) return { link, error: `Non trovo "${name}" su Google. Prova con un altro link.` };
 
+  // Nome e posizione vengono dal link. Se anche il Place ID è scritto nel link (nessuna chiamata
+  // a Google) è tutto del telefono: un locale nuovo non si collega a quel Place ID.
   const stored = await findOrCreatePlace(
     { googlePlaceId: placeId, name, address: "", lat: info.lat, lng: info.lng },
     "from-link",
+    info.placeId ? "telefono" : "link",
   );
   if ("error" in stored) return { link, error: stored.error };
   return { link, place: stored.place };

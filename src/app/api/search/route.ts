@@ -14,6 +14,7 @@ import { ZONE } from "@/lib/gusti";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
+import { signCatalogEntry } from "@/lib/catalog-sig";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -490,6 +491,9 @@ ESEMPI (input → output atteso):
       goFor: s?.goFor ?? null,
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
+      // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
+      // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
+      ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
     };
   });
 

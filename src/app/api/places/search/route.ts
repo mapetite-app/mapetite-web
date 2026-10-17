@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { searchGooglePlaces } from "@/lib/google-places";
 import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
+import { signCatalogEntry } from "@/lib/catalog-sig";
 
 // Ricerca Google di un locale per nome (Importa: a mano e da screenshot). Ogni chiamata è una
 // Text Search a pagamento sulle 50 al giorno condivise con la ricerca della mappa: solo per chi
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
 
   try {
     const results = await searchGooglePlaces(query.trim());
-    return NextResponse.json({ results });
+    // Firma dei dati Google per il catalogo condiviso (src/lib/catalog-sig.ts).
+    return NextResponse.json({ results: results.map((p) => ({ ...p, firma: signCatalogEntry(p) })) });
   } catch (err) {
     console.error("[places/search] Google:", err);
     return NextResponse.json({ error: "Non riesco a cercare il locale su Google Maps. Riprova." }, { status: 500 });
