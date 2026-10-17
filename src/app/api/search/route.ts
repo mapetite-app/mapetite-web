@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
@@ -138,11 +138,17 @@ export async function POST(request: Request) {
     // Google da solo legge "trattoria Monti" come un nome (1 risultato, visto il 15/10): si aggiunge
     // la città in cui è la mappa, se è una delle città note e la frase non ne nomina un'altra.
     const mapCity = zonaQuartiere && typeof lat === "number" && typeof lng === "number" ? cityNear(lat, lng) : null;
+    // Un quartiere noto dice già la città ("a Moscova" è Milano anche con la mappa su Roma): conta più
+    // della mappa, e la preferenza di 25 km si sposta sul centro di quella città.
+    const zonaCity = zonaQuartiere ? districtCity(intent?.zona, query) : null;
+    const contextCity = zonaCity ?? mapCity;
+    const zonaCentro = zonaCity && zonaCity !== cityNear(lat ?? 0, lng ?? 0) ? cityArea(zonaCity) : null;
+    if (zonaCity && zonaCity !== mapCity) console.log(`[search-quartiere] ${intent?.zona}: quartiere di ${zonaCity} (mappa su ${mapCity ?? "altro"})`);
     // E "quartiere Monti" invece di "Monti": 20 trattorie del rione invece della sola "Trattoria Monti".
     let queryGoogle = intent ? intent.queryGoogle : query.trim();
     if (intent && zonaQuartiere) {
       queryGoogle = withDistrict(queryGoogle, intent.zona!);
-      if (mapCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${mapCity}`;
+      if (contextCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${contextCity}`;
     }
     let locationMode: "bias" | "restrict" | "none" = zonaQuartiere ? "bias" : intent?.zona || (!intent && (city || otherCity)) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
     let area: { lat: number; lng: number; radius: number } | null = null;
@@ -173,8 +179,8 @@ export async function POST(request: Request) {
       risultati = await searchGooglePlaces(queryGoogle, {
         includedType: intent?.includedType ?? undefined,
         locationMode,
-        lat: area?.lat ?? lat,
-        lng: area?.lng ?? lng,
+        lat: area?.lat ?? zonaCentro?.lat ?? lat,
+        lng: area?.lng ?? zonaCentro?.lng ?? lng,
         minRating: typeof body?.minRating === "number" ? body.minRating : undefined,
         minReviews: typeof body?.minReviews === "number" ? body.minReviews : undefined,
         minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,

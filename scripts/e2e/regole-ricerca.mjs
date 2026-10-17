@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -88,11 +88,21 @@ ok(!ambiguousDistrict("trattoria a Monti", null) && !ambiguousDistrict("pizza", 
   // Come route.ts costruisce il testo per Google con un quartiere ambiguo e la mappa su Roma.
   const testo = (q, zona, lat, lng) => {
     if (!ambiguousDistrict(q, zona)) return q;
-    const city = cityNear(lat, lng);
+    const city = districtCity(zona, q) ?? cityNear(lat, lng);
     const t = withDistrict(q, zona);
     return city && !namedCity(t) ? `${t} ${city}` : t;
   };
   ok(testo("trattoria Monti", "Monti", 41.8986, 12.4769) === "trattoria quartiere Monti Roma" && testo("trattoria Parma", "Parma", 41.8986, 12.4769) === "trattoria Parma" && testo("aperitivo Isola", "Isola", 45.48, 9.19) === "aperitivo quartiere Isola Milano", "zona: 'Monti' con la mappa su Roma → Roma; 'Parma' resta Parma; 'Isola' con la mappa su Milano → Milano");
+}
+
+// 17/10 (eventi veri del 16/10 sera): "bar cozy a Moscova" con la mappa su Roma dava bar di Roma.
+{
+  const testo = (q, zona, lat, lng) => { const city = districtCity(zona, q) ?? cityNear(lat, lng); const t = withDistrict(q, zona); return city && !namedCity(t) ? `${t} ${city}` : t; };
+  ok(testo("bar cozy Moscova", "Moscova", 41.8986, 12.4769) === "bar cozy quartiere Moscova Milano", "quartiere: 'Moscova' con la mappa su Roma → Milano");
+  ok(testo("trattoria Trastevere", "Trastevere", 45.464, 9.19) === "trattoria quartiere Trastevere Roma", "quartiere: 'Trastevere' con la mappa su Milano → Roma");
+  ok(districtCity("Porta Ticinese") === "Milano" && districtCity("Colonne di San Lorenzo") === "Milano" && districtCity("San Lorenzo") === "Roma", "quartiere: i nomi più lunghi vincono (Colonne di San Lorenzo è Milano, San Lorenzo è Roma)");
+  ok(districtCity("centro") === null && districtCity("Duomo") === null && districtCity("Trieste") === null, "quartiere: 'centro', 'Duomo', 'Trieste' restano alla città della mappa");
+  ok(districtCity(null, "cena romantica a campo de' fiori") === "Roma" && districtCity("NoLo") === "Milano", "quartiere: anche dalla frase (Campo de' Fiori) e con maiuscole (NoLo)");
 }
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

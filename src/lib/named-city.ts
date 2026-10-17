@@ -55,6 +55,38 @@ export function namedOtherCity(query: string): string | null {
   return m ? ALTRE_CITTA.find((c) => norm(c) === m[1]) ?? null : null;
 }
 
+// Quartieri noti delle due città di partenza (VISIONE: Roma e Milano). Un quartiere dice già la città:
+// "bar cozy a Moscova" con la mappa su Roma cercava "quartiere Moscova Roma" e dava 4 bar di Roma
+// (visto negli eventi del 16/10 sera). Solo nomi che esistono in una città sola: niente "Centro",
+// "Duomo", "Centrale", e "Trieste"/"Lodi" restano alla città della mappa (sono anche città).
+const QUARTIERI: Record<string, string[]> = {
+  Roma: [
+    "Trastevere", "Monti", "Rione Monti", "Testaccio", "Prati", "Pigneto", "San Lorenzo", "Ostiense", "Garbatella",
+    "Parioli", "Flaminio", "Esquilino", "Centocelle", "Quadraro", "Monteverde", "Campo de' Fiori", "Campo de Fiori",
+    "Trevi", "Celio", "Aventino", "Ponte Milvio", "Coppedè", "Torpignattara", "Tor Pignattara", "Eur",
+    "Ghetto ebraico", "Pantheon", "Piazza Navona", "Balduina", "Montesacro", "San Saba", "Monteverde Vecchio",
+  ],
+  Milano: [
+    "Brera", "Navigli", "Isola", "Moscova", "Porta Venezia", "Porta Romana", "Porta Garibaldi", "Garibaldi", "NoLo",
+    "Città Studi", "Zona Tortona", "Tortona", "Sempione", "Paolo Sarpi", "Chinatown", "Corso Como", "Lambrate",
+    "Bicocca", "CityLife", "Porta Nuova", "Ticinese", "Corso Garibaldi", "Darsena", "Bovisa", "Loreto",
+    "Corso Buenos Aires", "Sant'Ambrogio", "Magenta", "Porta Ticinese", "Colonne di San Lorenzo", "Arco della Pace",
+  ],
+};
+const QUARTIERI_IDX = Object.entries(QUARTIERI).flatMap(([city, list]) => list.map((q) => ({ city, q: norm(q) })))
+  // I nomi più lunghi prima: "Porta Ticinese" vince su "Ticinese", "Colonne di San Lorenzo" su "San Lorenzo".
+  .sort((a, b) => b.q.length - a.q.length);
+
+// La città di un quartiere noto nominato nella zona (o, se manca, nella frase), altrimenti null.
+export function districtCity(zona: string | null | undefined, query = ""): string | null {
+  for (const text of [zona ?? "", query]) {
+    const t = ` ${norm(text).replace(/[^a-z0-9' ]+/g, " ")} `;
+    const hit = QUARTIERI_IDX.find(({ q }) => t.includes(` ${q} `));
+    if (hit) return hit.city;
+  }
+  return null;
+}
+
 // Zona ambigua = un quartiere senza città: nessuna città nominata nella frase né nella zona.
 // Solo qui la città della mappa fa da contesto (testo per Google e preferenza larga di 25 km).
 export function ambiguousDistrict(query: string, zona: string | null | undefined): boolean {
