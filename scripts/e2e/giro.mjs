@@ -3333,8 +3333,9 @@ else {
   ok(await ap.getByTestId("mappa-assistente").isVisible(), "mappa: 'Parla con l'assistente' nelle Idee (la barra resta la ricerca di oggi)");
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   // Semplificare (Lorenzo 17/10): dalla home l'assistente si apre dalla barra in basso (niente tessera doppia).
-  ok(await ap.getByRole("link", { name: "Assistente" }).first().isVisible(), "home: 'Assistente' nella barra in basso");
-  await ap.getByRole("link", { name: "Assistente" }).first().click();
+  ok(await ap.getByTestId("barra-assistente").isVisible(), "home: 'Assistente' nella barra in basso");
+  // In sviluppo il pulsante "N" di Next.js copre l'angolo in basso a sinistra: clic diretto sul link.
+  await ap.getByTestId("barra-assistente").evaluate((el) => el.click());
   await ap.waitForURL(/\/assistente/);
   await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
   ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
