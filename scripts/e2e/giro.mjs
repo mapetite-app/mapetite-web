@@ -295,7 +295,9 @@ ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) 
 { const hb = await page.getByTestId("titolo-risposta").evaluate((el) => Math.round(el.closest(".rounded-card").getBoundingClientRect().height));
   ok(hb <= 48 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `intestazione: una sola riga (${hb}px), "Ho capito" e Affina dietro "⋯"`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
-ok((await page.getByTestId("filtri-lista").count()) === 1, "lista B: filtri rapidi presenti");
+ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filtri rapidi non stanno sempre sopra le card (sono dietro '⋯')");
+await apriOpzioni(page);
+ok((await page.getByTestId("filtri-lista").count()) === 1 && await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).isVisible(), "lista B: filtri rapidi presenti aprendo '⋯'");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
@@ -336,6 +338,7 @@ await (await esempio(page)).click();
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 const firstCard = () => page.locator("ul.snap-x li").first().getAttribute("data-id");
 ok((await firstCard()) === "P1", "ordine iniziale: prima Terrazza Uno (la più adatta)");
+await apriOpzioni(page);
 await page.getByRole("button", { name: "Più vicini" }).click();
 ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
 await page.waitForTimeout(300);
@@ -371,10 +374,11 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
-await page.getByRole("button", { name: "Aperto ora" }).first().click();
+await apriOpzioni(page);
+await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).click();
 ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
 ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
-await page.getByRole("button", { name: "Aperto ora" }).first().click();
+await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).click();
 // sposto la mappa a mano: compare "Cerca in quest'area"
 await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
 await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
@@ -2086,12 +2090,9 @@ else {
   await v.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await (await esempio(v)).click();
   await v.getByText("Terrazza Uno").first().click();
-  await v.getByTestId("stato-rapido").waitFor({ timeout: 4000 });
-  // Locale non salvato: "✓ Ci sono stato" in scheda apre Salva con lo stato già scelto
-  await v.getByTestId("stato-rapido").getByRole("button", { name: "✓ Ci sono stato" }).click();
-  await v.locator("div.w-80").getByText("Salva locale").waitFor({ timeout: 3000 });
-  ok((await v.locator("div.w-80").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda non salvata: '✓ Ci sono stato' apre Salva con lo stato già scelto");
-  await v.locator("div.w-80").getByRole("button", { name: "Annulla" }).click();
+  await v.getByTestId("barra-azioni").waitFor({ timeout: 4000 });
+  // Semplificare (Lorenzo 17/10): locale non salvato, nessun "Voglio andarci" doppione accanto a "Salva" della barra.
+  ok((await v.getByTestId("stato-rapido").count()) === 0 && (await v.getByTestId("stato-salvato").count()) === 0, "scheda non salvata: niente scelte di stato doppie (si salva dalla barra)");
   await v.locator("button:text-is('Salva')").first().click();
   const modal = v.locator("div.w-80");
   ok((await modal.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva dal pulsante: nessuno stato rimasto dalla scelta annullata");
@@ -2861,10 +2862,10 @@ else {
       const v = q("verdetto-box"), a = q("azioni-scheda"), bar = q("barra-azioni");
       const tiles = [...document.querySelectorAll("[data-testid=azioni-scheda] button")].map((b) => b.getBoundingClientRect());
       const ws = tiles.map((t) => Math.round(t.width));
-      return { verdetto: !!v && !!bar && v.top >= 0 && v.bottom <= bar.top + 1, azioni: !!a && a.top > (v?.bottom ?? 0) - 1, n: tiles.length, uguali: Math.max(...ws) - Math.min(...ws) <= 2, ws: ws.join("/"), dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.height >= 44) };
+      return { verdetto: !!v && !!bar && v.top >= 0 && v.bottom <= bar.top + 1, azioni: !!a && a.bottom < (v?.top ?? 0) + 1, n: tiles.length, ws: ws.join("/"), dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.height >= 44 && t.width >= 44) };
     });
     ok(r.verdetto, "scheda pulita: il verdetto Mapetite è tutto in vista senza scorrere (sopra la barra)");
-    ok(r.azioni && r.n === 4 && r.uguali && r.dentro, `scheda pulita: riga di 4 azioni uguali sotto il verdetto (${r.ws})`); }
+    ok(r.azioni && r.n === 2 && r.dentro, `scheda semplice: Condividi e Altro come icone accanto al nome, sopra il verdetto (${r.ws})`); }
   ok((await s.getByTestId("scheda-tabs").getByRole("tab").allTextContents()).join(" · ") === "Panoramica · Recensioni · Info" && (await s.getByTestId("scheda-tab-panoramica").getAttribute("aria-selected")) === "true", "scheda pulita: sezioni Panoramica · Recensioni · Info, aperta su Panoramica");
   ok(!(await s.getByText("Cosa dicono").isVisible()) && !(await s.getByTestId("copia-indirizzo").isVisible()), "scheda pulita: recensioni e indirizzo non affollano la prima schermata");
   await s.getByTestId("altro-apri").click();
@@ -2872,7 +2873,7 @@ else {
     ok(items.includes("Copia indirizzo") && items.includes("Apri su Google Maps") && items.some((t) => t.includes("Rivendicalo")), `menu Altro: copia indirizzo, Google Maps, rivendica (${items.join(" | ")})`); }
   { const box = await s.getByTestId("altro-menu").boundingBox(); ok(!!box && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390, "menu Altro: tutto dentro lo schermo"); }
   await s.screenshot({ path: `${OUT}/60b-scheda-menu-altro.png`, caret: "initial" });
-  await s.getByRole("button", { name: "Chiudi il menu" }).click();
+  await s.getByRole("button", { name: "Chiudi il menu" }).click({ position: { x: 10, y: 10 } });
   ok((await s.getByTestId("altro-menu").count()) === 0, "menu Altro: si chiude toccando fuori");
   await s.getByTestId("scheda-tab-recensioni").click();
   ok(await s.getByText("Cosa dicono").isVisible() && await s.getByTestId("community-scheda").isVisible(), "scheda: 'Recensioni' mostra Google e la community Mapetite");

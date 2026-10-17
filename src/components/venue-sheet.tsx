@@ -456,12 +456,49 @@ export default function VenueSheet({
       { tag: "Da provare", label: "Voglio andarci", emoji: "📌" },
       { tag: "Già visitato", label: "Ci sono stato", emoji: "✓" },
     ];
-    const ROW_TILE =
-      "flex min-h-[3.75rem] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-[12px] font-display font-semibold leading-[1.15] active:scale-95";
-    const tileOff = `${ROW_TILE} border-border bg-white text-brand`;
-    const tileOn = `${ROW_TILE} border-brand bg-brand text-white`;
     const menuItem =
       "flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-sans text-text active:bg-bg";
+    const ICON_BTN = "flex h-11 w-11 items-center justify-center rounded-full border active:scale-95";
+    const iconBtn = `${ICON_BTN} border-border bg-white text-brand`;
+    const altroMenu = (
+      <>
+                <button type="button" aria-label="Chiudi il menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
+                <div role="menu" data-testid="altro-menu" className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-card border border-border bg-surface py-1 shadow-float">
+                  {isSaved && isUuid(venue.id) && (
+                    <Link
+                      role="menuitem"
+                      href={`/gruppi?proponi=${venue.id}`}
+                      data-testid="proponi-gruppo"
+                      onClick={() => trackFeature("gruppo_proponi_scheda")}
+                      className={menuItem}
+                    >
+                      <UsersRound size={18} className="shrink-0 text-brand" aria-hidden /> Proponi in una lista di gruppo
+                    </Link>
+                  )}
+                  {canEdit && (
+                    <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); onEdit(); }} className={menuItem}>
+                      <Pencil size={18} className="shrink-0 text-brand" aria-hidden /> Modifica tag e nota
+                    </button>
+                  )}
+                  {address && (
+                    <button role="menuitem" type="button" data-testid="altro-copia-indirizzo" onClick={() => { void copyAddress(); setMenuOpen(false); }} className={menuItem}>
+                      <Copy size={18} className="shrink-0 text-brand" aria-hidden /> Copia indirizzo
+                    </button>
+                  )}
+                  <a role="menuitem" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className={menuItem}>
+                    <ExternalLink size={18} className="shrink-0 text-brand" aria-hidden /> Apri su Google Maps
+                  </a>
+                  <Link
+                    role="menuitem"
+                    href={isUuid(venue.id) ? `/per-i-ristoratori/rivendica?locale=${venue.id}` : "/per-i-ristoratori/rivendica"}
+                    data-testid="altro-rivendica"
+                    className={`${menuItem} border-t border-border text-text-muted`}
+                  >
+                    <Store size={18} className="shrink-0" aria-hidden /> È il tuo locale? Rivendicalo
+                  </Link>
+                </div>
+              </>
+    );
     const facts = [
       categoryLabel(category),
       rating != null ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null,
@@ -494,9 +531,32 @@ export default function VenueSheet({
 
         {/* Nome e UNA riga di fatti: tipo · voto · prezzo · distanza · aperto. */}
         <div className="px-5 pt-4">
-          <h2 className="font-title text-[1.75rem] font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.2rem]">
-            {name}
-          </h2>
+          {/* Semplificare (Lorenzo 17/10): Condividi e Altro come icone accanto al nome, non più una riga di riquadri. */}
+          <div className="flex items-start gap-2">
+            <h2 className="min-w-0 flex-1 font-title text-[1.75rem] font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.2rem]">
+              {name}
+            </h2>
+            <div className="relative flex shrink-0 gap-2 pt-0.5" data-testid="azioni-scheda">
+              {shareOn && (
+                <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={iconBtn}>
+                  <Share2 size={18} aria-hidden />
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="altro-apri"
+                aria-label="Altro"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                onClick={() => setMenuOpen((o) => !o)}
+                className={menuOpen ? `${ICON_BTN} border-brand bg-brand text-white` : iconBtn}
+              >
+                <Ellipsis size={18} aria-hidden />
+              </button>
+              {menuOpen && altroMenu}
+            </div>
+          </div>
+          {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
           <p data-testid="scheda-fatti" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] font-sans text-text-muted">
             {facts.map((f, i) => (
               <span key={f} className="inline-flex items-center gap-1.5">
@@ -543,102 +603,33 @@ export default function VenueSheet({
           </div>
         )}
 
-        {/* Azioni principali: icone uguali in una riga. Il resto nel menu "Altro". */}
-        <div className="relative mx-5 mt-4">
-          <div className="flex gap-2" data-testid="azioni-scheda">
-            {!isSaved && onQuickSave && (
-              <div className="contents" data-testid="stato-rapido">
-                {statusTiles.map(({ tag, label, emoji: e }) => (
-                  <button key={tag} type="button" onClick={() => onQuickSave(tag)} aria-label={`${e} ${label}`} className={tileOff}>
-                    <span aria-hidden className="text-lg leading-none">{e}</span>
-                    <span className="text-center">{label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {isSaved && onVisitStatus && (
-              <div className="contents" data-testid="stato-salvato">
-                {statusTiles.map(({ tag, label, emoji: e }) => {
-                  const on = personalTags?.includes(tag) ?? false;
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      aria-pressed={on}
-                      aria-label={`${e} ${label}`}
-                      onClick={() => {
-                        // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?".
-                        if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
-                        onVisitStatus(tag);
-                      }}
-                      className={on ? tileOn : tileOff}
-                    >
-                      <span aria-hidden className="text-lg leading-none">{e}</span>
-                      <span className="text-center">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {shareOn && (
-              <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={tileOff}>
-                <Share2 size={18} aria-hidden />
-                <span>Condividi</span>
-              </button>
-            )}
-            <button
-              type="button"
-              data-testid="altro-apri"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              onClick={() => setMenuOpen((o) => !o)}
-              className={menuOpen ? tileOn : tileOff}
-            >
-              <Ellipsis size={18} aria-hidden />
-              <span>Altro</span>
-            </button>
-          </div>
-          {shareNote && <p role="status" className="mt-1.5 text-xs font-sans text-text-muted">{shareNote}</p>}
-          {menuOpen && (
-            <>
-              <button type="button" aria-label="Chiudi il menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
-              <div role="menu" data-testid="altro-menu" className="absolute bottom-full right-0 z-30 mb-2 w-64 overflow-hidden rounded-card border border-border bg-surface py-1 shadow-float">
-                {isSaved && isUuid(venue.id) && (
-                  <Link
-                    role="menuitem"
-                    href={`/gruppi?proponi=${venue.id}`}
-                    data-testid="proponi-gruppo"
-                    onClick={() => trackFeature("gruppo_proponi_scheda")}
-                    className={menuItem}
-                  >
-                    <UsersRound size={18} className="shrink-0 text-brand" aria-hidden /> Proponi in una lista di gruppo
-                  </Link>
-                )}
-                {canEdit && (
-                  <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); onEdit(); }} className={menuItem}>
-                    <Pencil size={18} className="shrink-0 text-brand" aria-hidden /> Modifica tag e nota
-                  </button>
-                )}
-                {address && (
-                  <button role="menuitem" type="button" data-testid="altro-copia-indirizzo" onClick={() => { void copyAddress(); setMenuOpen(false); }} className={menuItem}>
-                    <Copy size={18} className="shrink-0 text-brand" aria-hidden /> Copia indirizzo
-                  </button>
-                )}
-                <a role="menuitem" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className={menuItem}>
-                  <ExternalLink size={18} className="shrink-0 text-brand" aria-hidden /> Apri su Google Maps
-                </a>
-                <Link
-                  role="menuitem"
-                  href={isUuid(venue.id) ? `/per-i-ristoratori/rivendica?locale=${venue.id}` : "/per-i-ristoratori/rivendica"}
-                  data-testid="altro-rivendica"
-                  className={`${menuItem} border-t border-border text-text-muted`}
+        {/* Stato del salvato: una scelta sola (salvare sta già nella barra in basso). Locale non salvato
+            senza barra (scheda dall'assistente): le due scelte rapide aprono Salva. */}
+        {((isSaved && onVisitStatus) || (!isSaved && onQuickSave && !saveSlot)) && (
+          <div className="mx-5 mt-4 flex rounded-pill bg-bg p-1" data-testid={isSaved ? "stato-salvato" : "stato-rapido"}>
+            {statusTiles.map(({ tag, label, emoji: e }) => {
+              const on = isSaved && (personalTags?.includes(tag) ?? false);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={isSaved ? on : undefined}
+                  aria-label={`${e} ${label}`}
+                  onClick={() => {
+                    if (!isSaved) { onQuickSave?.(tag); return; }
+                    // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?".
+                    if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
+                    onVisitStatus?.(tag);
+                  }}
+                  className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-[14px] font-display font-semibold active:scale-95 ${on ? "bg-surface text-brand shadow-card" : "text-text-muted"}`}
                 >
-                  <Store size={18} className="shrink-0" aria-hidden /> È il tuo locale? Rivendicalo
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
+                  <span aria-hidden>{e}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Tre schede brevi al posto della lunga colonna di riquadri. */}
         <div role="tablist" aria-label="Sezioni della scheda" className="mx-5 mt-5 flex border-b border-border" data-testid="scheda-tabs">

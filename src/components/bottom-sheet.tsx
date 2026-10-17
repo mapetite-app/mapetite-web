@@ -418,6 +418,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
 
   if (allPlaces.length === 0) return null;
 
+  // Semplificare (Lorenzo 17/10): nei risultati di una ricerca i filtri rapidi stanno dietro "⋯"
+  // (con "Ho capito" e "Affina"); restano in vista solo se uno è acceso.
+  const chipsVisible = !title || headerOpen || quick.size > 0 || nearestFirst;
   const quickChips = (
     <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] [&>button]:shrink-0 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" data-testid="filtri-lista">
       {onOpenArticle && (
@@ -430,7 +433,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           ☰ Leggi la risposta
         </button>
       )}
-      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+      {chipsVisible && quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
           type="button"
@@ -441,7 +444,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
-      {nearestOn && (
+      {chipsVisible && nearestOn && (
         <button
           type="button"
           aria-pressed={nearestFirst}
@@ -570,7 +573,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             </div>
           )}
         </div>
-        {(quickFiltersOn || onOpenArticle || nearestOn) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
+        {(onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}

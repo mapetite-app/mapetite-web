@@ -19,12 +19,15 @@ export default function UtileFeedback({
   chiave,
   tono = "chiaro",
   className = "",
+  compatto = false,
 }: {
   contesto: UtileContesto;
   risultati?: number;
   chiave?: string;
   tono?: "chiaro" | "scuro";
   className?: string;
+  // Nella stessa riga di un'altra nota (assistente): domanda in una parola.
+  compatto?: boolean;
 }) {
   const [voto, setVoto] = useState<"si" | "no" | null>(null);
   const [motivo, setMotivo] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export default function UtileFeedback({
   const btn = `flex h-11 w-11 items-center justify-center rounded-full border text-lg active:scale-95 ${scuro ? "border-white/30 bg-white/10" : "border-border bg-white"}`;
   return (
     <div data-testid="utile" data-contesto={contesto} className={`flex items-center gap-2 ${className}`}>
-      <span className={`font-display text-sm font-semibold ${scuro ? "text-white" : "text-brand"}`}>Ti è stato utile?</span>
+      <span className={`font-display ${compatto ? "text-xs" : "text-sm"} font-semibold ${scuro ? "text-white" : "text-brand"}`}>{compatto ? "Utile?" : "Ti è stato utile?"}</span>
       <button type="button" aria-label="Sì, utile" onClick={() => vote("si")} className={btn}>
         👍
       </button>
