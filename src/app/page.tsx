@@ -42,7 +42,9 @@ const EXAMPLES = [
   { emoji: "🥐", title: "Colazione buona", sub: "a Prati, con cornetti veri", q: "Colazione buona a Prati con cornetti veri" },
 ];
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  // Arrivo da "Elimina il mio account" (profilo): conferma che è andata.
+  const accountEliminato = (await searchParams).account === "eliminato";
   // Serve solo all'ultima schermata dell'intro: "Crea il tuo account" o "Inizia a cercare".
   const supabase = await createClient();
   const { data } = await getUser();
@@ -50,7 +52,13 @@ export default async function Home() {
   const counts = await savedCounts(supabase, data?.user?.id ?? null);
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white px-4 md:min-h-[calc(100dvh-3.5rem)]">
-      <HomeIntro loggedIn={loggedIn} />
+      {!accountEliminato && <HomeIntro loggedIn={loggedIn} />}
+      {accountEliminato && (
+        <p role="status" data-testid="account-eliminato" className="mx-auto mt-4 w-full max-w-md rounded-card border border-border bg-surface px-4 py-3 text-center text-sm text-text">
+          <span className="block font-display font-semibold text-brand">Account eliminato</span>
+          I tuoi dati sono stati cancellati. Grazie di aver provato Mapetite.
+        </p>
+      )}
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <LogoMark size={72} className="drop-shadow-sm" />
         <h1 className="mt-4 font-title text-5xl font-semibold tracking-tight text-brand">Mapetite</h1>
