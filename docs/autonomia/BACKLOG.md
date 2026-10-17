@@ -8,7 +8,7 @@ L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
 **Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
-**In corso adesso:** nessuna sessione. Sabato 17/10 sera: "Semplificare" punti 1–4 fatti (PR #59 e #60, in produzione). Prossimo: punto 5 (Salvati, Profilo, Amici).
+**In corso adesso:** nessuna sessione. Sabato 17/10 sera: "Semplificare" punti 1–5 tutti fatti (PR #59, #60 e la PR della sera). Profilo più corto (via i doppioni dei Salvati), intestazione dei Salvati più corta, Amici già pulita.
 **Aggiornato 17/10 alle 16:30 (sabato pomeriggio, branch `claude/quirky-hypatia-fusjec`).** Partito dalle ricerche vere di Lorenzo del 16/10 sera. Fatto: "wine bar tranquillo" dava 1 solo locale, a Bari ("Wine Bar Tranquillo": Google legge l'aggettivo come nome) → ora 12 wine bar di Roma; verdetto Mapetite anche sui salvati che non ce l'hanno (10 su 29 in produzione), scritto quando si apre la scheda, con tetto di 25 al giorno. 10 ricerche Google vere. Manca per il 25/10: prove su telefoni veri, quota Google (Lorenzo).
 **Richiesta di Lorenzo (17/10): confronto con le altre fonti nella scheda — FATTA (PR #56).** Tripadvisor mostra voti veri solo con `TRIPADVISOR_API_KEY` su Vercel (chiave ufficiale gratuita, la crea Lorenzo); senza, solo il link di ricerca. Michelin: nessun servizio ufficiale, solo link.
 **Aggiornato 17/10 alle 12:00 (sabato, sessione delle 10:00, 3 sviluppatori in parallelo).** Partito dagli eventi d'uso di Lorenzo di ieri sera e stamattina. Fatto: "bar cozy a Moscova" con 20 bar invece di 3 (Google leggeva il quartiere come nome del locale: seconda ricerca nel riquadro del quartiere, solo quando ne escono meno di 6); "e a Milano?" non dà più 0 risultati; mappa e assistente ripartono da dove era la mappa (non sempre da Roma); trappole per turisti in fondo anche senza scrivere "non turistico"; "Elimina il mio account" nel profilo; catalogo dei locali che accetta solo dati firmati dal server (proposta della PR #54). 12 ricerche Google vere (2 oltre il budget di 10, per variazioni dell'AI). Manca per il 25/10: prove su telefoni veri, quota Google (Lorenzo), 1 chiamata in più per i link di Google Maps senza coordinate (decisione costi).
@@ -41,7 +41,7 @@ Tutte le informazioni restano, ma meno cose a schermo (regola in `LORENZO.md`). 
 2. **FATTA (PR #60)** — **Home**: 6 blocchi uno sotto l'altro (marchio, ultime ricerche, Sorprendimi/Assistente, esempi, barra, link in fondo). Tenere marchio + barra + esempi; ultime ricerche dentro la barra quando la tocchi; Sorprendimi e Assistente già nella barra in basso.
 3. **FATTA (PR #59)** — **Mappa con risultati**: barra in alto + Esplora/I miei salvati + intestazione dei risultati + 4 chip di filtro + card. Le chip stanno già in "Filtri": toglierle dalla vista.
 4. **FATTA (PR #59)** — **Assistente**: sotto le card, chip + nota "Ho capito…" + "Ti è stato utile?" tutti insieme. Una riga sola.
-5. Controllare con lo stesso criterio Salvati, Profilo, Amici.
+5. **FATTA (PR della sera del 17/10)** — **Salvati, Profilo, Amici.** Profilo: tolti "Stasera dove andiamo?" e "Ultimi salvati" (sono già nella scheda Salvati e nel numero "Salvati"); la carta del gusto è una tessera; "Liste di gruppo" solo in Amici. Salvati: "Condividi" come icona, il numero solo in "Cerca in N salvati". Amici: già con una cosa principale (chi segui e cosa fanno), nessun doppione rimasto.
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
 

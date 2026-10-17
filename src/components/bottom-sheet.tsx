@@ -477,7 +477,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             {!title && heading && (
               <p data-testid="intestazione-lista" className="min-w-0 flex-1 truncate font-title text-[15px] font-semibold leading-snug text-brand">{heading}</p>
             )}
-            <span data-testid="conteggio-risultati" className="shrink-0 text-xs font-sans text-text-muted">
+            {/* Nei salvati il numero c'è già nella casella "Cerca in N salvati": qui non si ripete. */}
+            <span data-testid="conteggio-risultati" className={`shrink-0 text-xs font-sans text-text-muted ${savedMode && !title ? "sr-only" : ""}`}>
               {loadingVerdicts
                 ? "preparo i verdetti…"
                 : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
@@ -506,15 +507,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   const r = await onShareList(places);
                   if (r === "copied") { setShared(true); setTimeout(() => setShared(false), 2000); }
                 }}
-                className="ml-1 flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+                // Solo icona, come "Condividi" nella scheda del locale: la riga resta corta.
+                className={`ml-1 flex h-9 shrink-0 items-center justify-center rounded-full text-brand active:scale-95 ${shared ? "px-3 text-xs font-display font-semibold" : "w-9 bg-bg"}`}
               >
                 {shared ? "✓ Copiata" : (
-                  <>
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-                    </svg>
-                    Condividi
-                  </>
+                  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                  </svg>
                 )}
               </button>
             )}

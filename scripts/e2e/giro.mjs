@@ -1453,6 +1453,10 @@ else {
   ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  // Semplificare 5 (17/10): intestazione dei salvati corta, Condividi come icona e niente "3 posti" ripetuto.
+  { const sh = p.getByTestId("condividi-lista"); const bb = await sh.boundingBox();
+    ok((await sh.getAttribute("aria-label")) === "Condividi questa lista" && !((await sh.textContent()) ?? "").includes("Condividi") && !!bb && bb.width <= 40, `salvati: 'Condividi' è un'icona (${Math.round(bb?.width ?? 0)}px)`);
+    ok(((await p.getByTestId("conteggio-risultati").boundingBox())?.width ?? 0) <= 1 && ((await p.getByLabel("Cerca tra i salvati").getAttribute("placeholder").catch(() => "")) ?? "").includes("3"), "salvati: il numero sta solo in 'Cerca in N salvati'"); }
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
@@ -1678,9 +1682,10 @@ else {
       ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato)");
       // Le mie cose (semplificazione 16/10): una griglia di tessere con il numero, ognuna porta alla sua pagina o sezione.
       const cose = p.getByTestId("profilo-mie-cose");
-      ok(await cose.isVisible() && (await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").count()) === 1, `profilo: griglia 'Le mie cose' con 6 tessere e la riga della carta del gusto (${await cose.locator("a:not([data-testid=profilo-carta-gusto])").count()})`);
-      ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-gruppi").getAttribute("href")) === "/gruppi" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Liste di gruppo · Importa con i loro ingressi");
-      { const sz = await cose.locator("a:not([data-testid=profilo-carta-gusto])").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      // Semplificare 5 (17/10): la carta del gusto è una tessera, le liste di gruppo stanno solo in Amici.
+      ok(await cose.isVisible() && (await cose.locator("a").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await cose.getByTestId("profilo-gruppi").count()) === 0, `profilo: griglia 'Le mie cose' con 6 tessere, carta del gusto compresa, senza liste di gruppo (${await cose.locator("a").count()})`);
+      ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Importa con i loro ingressi");
+      { const sz = await cose.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
       await cose.getByTestId("tessera-raccolte").click();
       await p.waitForFunction(() => { const r = document.getElementById("raccolte")?.getBoundingClientRect(); return !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' porta alle raccolte"));
       // Le cose secondarie stanno chiuse in "Altro": l'ingranaggio in alto ci porta.
@@ -1692,12 +1697,9 @@ else {
       ok(raccolte.length === 4 && raccolte[0].includes("Con amici") && raccolte[0].includes("3 locali") && raccolte[1].includes("Romantico") && !raccolte.some((t) => /Da provare|Già visitato/.test(t)), `profilo: raccolte = tag dell'utente con il numero, senza i due stati (${raccolte.join(" | ")})`);
       ok(await p.getByTestId("raccolta").filter({ hasText: "Con amici" }).getAttribute("href") === "/raccolte/Con%20amici", "profilo: tocco su una cartella = pagina della raccolta (4.1)");
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
-      ok(await p.getByTestId("profilo-stasera").getAttribute("href") === "/stasera" && await p.getByTestId("profilo-stasera").getByText("Stasera dove andiamo?").isVisible(), "profilo: card 'Stasera dove andiamo?' che porta a /stasera");
-      ok((await p.getByTestId("profilo-salvato-recente").count()) === 3 && (await p.getByTestId("profilo-salvato-recente").first().textContent()).includes("Terrazza Uno") && !(await p.getByTestId("profilo-salvato").first().isVisible()), "profilo: anteprima degli ultimi 3 salvati, elenco completo chiuso");
-      const tutti = p.getByTestId("profilo-salvati-tutti");
-      ok((await tutti.locator("summary").textContent()).includes("Vedi tutti i 6, divisi per 2 città"), `profilo: 'Vedi tutti i 6, divisi per 2 città' (${await tutti.locator("summary").textContent()})`);
-      await tutti.locator("summary").click();
-      ok((await p.getByTestId("profilo-salvato").count()) === 6 && await p.getByTestId("profilo-salvato").last().isVisible() && await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: 'Vedi tutti' apre la lista dei salvati per città; le recensioni restano");
+      // Semplificare 5 (17/10): niente doppioni dei Salvati nel profilo ("Stasera" e l'elenco stanno nella scheda Salvati).
+      ok((await p.getByTestId("profilo-stasera").count()) === 0 && (await p.getByTestId("profilo-salvati").count()) === 0 && (await p.getByTestId("profilo-salvato-recente").count()) === 0, "profilo: niente card 'Stasera' né 'Ultimi salvati' (doppioni della scheda Salvati)");
+      ok(await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: le recensioni restano");
       ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
@@ -1810,7 +1812,7 @@ else {
       patches = [];
       await sheet.getByTestId("conferma-elimina").click();
       await waitClosed();
-      ok(patches.length === 1 && has(patches, "03", ["Cena romantica", "Da provare"]) && (await tile("Speciale").count()) === 0 && (await p.getByTestId("profilo-salvato").count()) === 6, `raccolte: elimina toglie solo il tag, il locale resta salvato (${JSON.stringify(patches)})`);
+      ok(patches.length === 1 && has(patches, "03", ["Cena romantica", "Da provare"]) && (await tile("Speciale").count()) === 0, `raccolte: elimina toglie solo il tag, il locale resta salvato (${JSON.stringify(patches)})`);
 
       // Nuova raccolta con 2 locali scelti dalla lista (cercando "milano")
       patches = [];
@@ -5727,7 +5729,8 @@ else {
     ok(r?.status() === 200 && await gp.getByTestId("gruppi-in-arrivo").isVisible(), `gruppi in arrivo: ${path} dice 'in arrivo' invece di rompersi`);
   }
   await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
-  ok(await gp.getByTestId("profilo-gruppi").getAttribute("href") === "/gruppi", "profilo: ingresso 'Liste di gruppo'");
+  // Semplificare 5 (17/10): le liste di gruppo si aprono da Amici (chip "Liste di gruppo"), non più dal profilo.
+  ok((await gp.getByTestId("profilo-gruppi").count()) === 0, "profilo: niente 'Liste di gruppo' (stanno in Amici)");
 
   // Senza account: invito alla registrazione, e il link d'invito torna qui dopo.
   await setCookie(gctx, "e2e_gruppi", dati);
