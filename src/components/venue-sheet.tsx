@@ -21,6 +21,7 @@ import BookingSheet from "@/components/booking-sheet";
 import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
+import ConfrontoFonti from "@/components/confronto-fonti";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -228,6 +229,22 @@ export default function VenueSheet({
   const variant = useVariant("scheda");
   const emoji = getCategoryEmoji(category, name);
   // Riga di contesto della variante B (sezione Info): "Roma · 600 m".
+  // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
+  const confronto = (onMapetite?: () => void) => (
+    <ConfrontoFonti
+      venueId={venue.id}
+      name={name}
+      address={address}
+      category={category}
+      lat={lat}
+      lng={lng}
+      rating={rating}
+      userRatingCount={userRatingCount}
+      mapsUrl={mapsUrl}
+      hasVerdict={verdictText != null || (synthesis?.trim() ?? "") !== ""}
+      onMapetite={onMapetite}
+    />
+  );
   const placeLine = [cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null]
     .filter(Boolean)
     .join(" · ");
@@ -635,6 +652,7 @@ export default function VenueSheet({
 
         {/* Panoramica: chi ci è stato, le tue note, in breve. */}
         <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
+          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
           {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
           {showPersonalBlock && personalBlock(false)}
           {hasOverview && (
@@ -665,11 +683,6 @@ export default function VenueSheet({
                 </p>
               )}
             </div>
-          )}
-          {!friendsData && !showPersonalBlock && !hasOverview && (
-            <p className="mx-5 mt-4 text-sm font-sans text-text-muted">
-              Recensioni, indirizzo e contatti sono nelle altre sezioni qui sopra.
-            </p>
           )}
         </div>
 
@@ -925,6 +938,7 @@ export default function VenueSheet({
 
       {/* 2. CARD VERDETTO (teal): verdetto + matchReason + chip, tutto dentro. */}
       {verdictCard}
+      {confronto(communitySlot ? () => document.querySelector("[data-testid=community-scheda]")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined)}
 
         </>
       )}
