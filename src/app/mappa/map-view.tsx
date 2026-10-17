@@ -2055,14 +2055,15 @@ export default function MapView({
         onClick={goToMyPosition}
         disabled={geoState === "loading"}
         aria-label="La mia posizione"
-        className={`absolute right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60 lg:right-[calc(var(--pannello)+1rem)] lg:top-4 ${barOn ? "top-[4.125rem]" : "top-4"}`}
+        className={`absolute right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60 lg:right-[calc(var(--pannello)+1rem)] lg:top-4 ${barOn ? "top-[4.125rem]" : "top-4"} ${venueOpen ? "max-lg:invisible" : ""}`}
       >
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
       {/* Tocco fuori dal pannello "Ti suggeriamo": si chiude e la mappa torna libera. */}
       {ideasShown && <div aria-hidden data-testid="idee-fuori" className="absolute inset-0 z-10" onClick={() => setIdeasOpen(false)} />}
-      {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
-      <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${barOn ? "w-[calc(100%-2rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+      {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati.
+          Sul telefono, a scheda aperta, si nasconde: sotto il velo si accavallava con "‹ 1 di 2 ›". */}
+      <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${venueOpen ? "max-lg:invisible" : ""} ${barOn ? "w-[calc(100%-2rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
         {/* Da computer, a mappa vuota: titolo del pannello sopra la barra (sul telefono non c'è). */}
         {view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
           <div data-testid="pannello-intro" className="hidden pb-2 lg:block">
