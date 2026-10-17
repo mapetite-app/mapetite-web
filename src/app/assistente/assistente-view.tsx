@@ -20,6 +20,8 @@ import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
 import { aggiungiGusti, fraseConZona, gustiDichiarati, gustiPerRicerca, gustoDa, inFondoPerGusti, metri, type Zona } from "@/lib/gusti";
 import { caricaGusti, caricaZonaAbituale, gustiRicordati, ricordaGusti } from "@/lib/gusti-store";
+import { readLastView } from "@/lib/last-view";
+import { cityNear } from "@/lib/named-city";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
 type Ask = { label: string; send: string };
@@ -52,8 +54,9 @@ type Conv = {
 const KEY = "mapetite.assistente";
 const EMPTY_BOOKING: BookingDetails = { date: null, time: null, people: null, special: null };
 const EMPTY: Conv = { msgs: [], booking: EMPTY_BOOKING, bookingMode: false, lastQuery: null, pos: null };
-// Senza posizione e senza città scritta si cerca intorno a Roma, come la mappa all'apertura.
+// Senza posizione e senza città scritta si cerca dove era la mappa l'ultima volta, altrimenti a Roma.
 const DEFAULT_CENTER = { lat: 41.9028, lng: 12.4964 };
+const fallbackCenter = (): { lat: number; lng: number } => readLastView() ?? DEFAULT_CENTER;
 // Zona dove la persona salva più spesso (letta all'apertura, nessuna chiamata Google).
 let zonaAbitualeCache: Zona | null = null;
 
@@ -258,7 +261,7 @@ async function runSerata(plan: SerataPlan, q: string, pos: { lat: number; lng: n
       serata: { zona: plan.zona, tappe, tagliate: plan.tagliate },
     }],
   }));
-  const start = pos ?? DEFAULT_CENTER;
+  const start = pos ?? fallbackCenter();
   // Con la zona scritta le tappe partono insieme (il testo tiene Google nella zona) e la scelta
   // segue la tappa precedente qui sotto; senza zona una alla volta, con la posizione della
   // tappa precedente come preferenza per Google (il dopocena vicino alla cena).
@@ -296,7 +299,7 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
   const { query: full, usati } = gustiPerRicerca(q, gustiRicordati(), getConv().skipGusti ?? []);
   const gusti = usati.length > 0 ? usati.map((g) => ({ id: g.id, label: g.label })) : undefined;
   setConv((c) => ({ ...c, lastQuery: q, msgs: [...c.msgs, { id: msgId, role: "assistant", text: "", status: "loading", query: q, gusti }] }));
-  const at = pos ?? DEFAULT_CENTER;
+  const at = pos ?? fallbackCenter();
   try {
     // Frase già capita mentre si scriveva (come la mappa): la ricerca non riaspetta l'AI.
     const intent = await intentFor(full);
@@ -328,7 +331,13 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
     const zona = z && !f?.zona && !f?.vicino_a_me && !fraseConZona(q) && (!pos || metri(pos, z) < 20_000)
       ? { nome: z.nome, send: z.citta === "Roma" ? `a ${z.nome}` : `a ${z.nome}, ${z.citta}` }
       : undefined;
-    if (!f?.zona && !pos && !f?.vicino_a_me && !zona) notes.push("Ho cercato intorno a Roma: scrivi la città se sei altrove.");
+    if (!f?.zona && !pos && !f?.vicino_a_me && !zona) {
+      const citta = cityNear(at.lat, at.lng);
+      const last = readLastView();
+      notes.push(last
+        ? `Ho cercato ${citta ? `intorno a ${citta}, ` : ""}dove avevi lasciato la mappa: scrivi la città se sei altrove.`
+        : "Ho cercato intorno a Roma: scrivi la città se sei altrove.");
+    }
     let text: string;
     let asks: Ask[] | undefined;
     if (places.length === 0) {

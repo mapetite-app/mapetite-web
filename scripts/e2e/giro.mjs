@@ -6455,6 +6455,31 @@ else {
   await vctx.close();
 }
 
+// 30. Dove era la mappa (17/10): senza GPS l'assistente e i link senza punto cercano lì, non a Roma.
+{
+  const lctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await lctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.vista", JSON.stringify({ lat: 45.4642, lng: 9.19, zoom: 13, t: Date.now() })); } catch { /* ignorato */ } });
+  await lctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await lctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await lctx.route("**/api/search/intent", (r) => r.fulfill({ json: { intent: null } }));
+  await lctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [], livelli: {} } }));
+  const lBodies = [];
+  await lctx.route("**/api/search", (r) => { lBodies.push(r.request().postDataJSON()); return r.fulfill({ json: { ...SEARCH_FAST, filtri_usati: { categoria: "wine bar", parole_chiave: ["tranquillo"], vicino_a_me: false, zona: null } } }); });
+  const lp = await lctx.newPage();
+  lp.on("pageerror", (e) => errors.push(e.message));
+  await lp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await lp.getByTestId("assistente-campo").fill("wine bar tranquillo");
+  await lp.keyboard.press("Enter");
+  await lp.getByTestId("assistente-nota").first().waitFor({ timeout: 8000 }).catch(() => {});
+  const nota = (await lp.getByTestId("assistente-nota").first().textContent().catch(() => "")) ?? "";
+  ok(lBodies.length === 1 && Math.abs(lBodies[0].lat - 45.4642) < 1e-3 && Math.abs(lBodies[0].lng - 9.19) < 1e-3, `assistente senza GPS: cerca dove era la mappa (Milano), non a Roma (${lBodies[0]?.lat},${lBodies[0]?.lng})`);
+  ok(/intorno a Milano, dove avevi lasciato la mappa/.test(nota), `assistente senza GPS: lo dice ("${nota.slice(0, 90)}")`);
+  await lp.goto(`${BASE}/mappa?q=${encodeURIComponent("bar cozy")}`, { waitUntil: "networkidle" });
+  await lp.waitForTimeout(1500);
+  ok(lBodies.length === 2 && Math.abs(lBodies[1].lat - 45.4642) < 1e-3, `link di ricerca senza punto (home, ricerche recenti): cerca dove era la mappa (${lBodies[1]?.lat})`);
+  await lctx.close();
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
