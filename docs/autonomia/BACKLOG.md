@@ -35,6 +35,14 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 **In PR #31 (notte 12→13/10):** card dei salvati con il verdetto Mapetite (già in memoria, senza costi) e la città; salvati vuoti con "Salva da Google Maps"; indirizzi senza ", Italy"; link di una ricerca aperto a freddo che inquadra i risultati; nomi dei pin che non si sovrappongono; "Password dimenticata?"; "Salva" senza accesso che si completa da solo dopo il login.
 **Manca:** prova dal vivo con Haiku (Lorenzo deve aggiungere `ANTHROPIC_API_KEY` all'ambiente cloud: istruzioni date il 12/10); giro con un account vero; risposta sulla quota Google per l'import (voce 13).
 
+## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
+Tutte le informazioni restano, ma meno cose a schermo (regola in `LORENZO.md`). Punti visti il 17/10, da fare in ordine, con screenshot prima/dopo:
+1. **Scheda del locale**: "Voglio andarci" compare due volte (riquadro sotto il verdetto e "Salva" nella barra in basso). Una sola azione di salvataggio; "Ci sono stato" e "Condividi" dentro "Altro" o nel foglio Salva.
+2. **Home**: 6 blocchi uno sotto l'altro (marchio, ultime ricerche, Sorprendimi/Assistente, esempi, barra, link in fondo). Tenere marchio + barra + esempi; ultime ricerche dentro la barra quando la tocchi; Sorprendimi e Assistente già nella barra in basso.
+3. **Mappa con risultati**: barra in alto + Esplora/I miei salvati + intestazione dei risultati + 4 chip di filtro + card. Le chip stanno già in "Filtri": toglierle dalla vista.
+4. **Assistente**: sotto le card, chip + nota "Ho capito…" + "Ti è stato utile?" tutti insieme. Una riga sola.
+5. Controllare con lo stesso criterio Salvati, Profilo, Amici.
+
 ## Fase 1 — La ricerca funziona (notti 1–4)
 
 ### 1. Ricerca AI che resta quando chiudi e riapri il pannello — FATTA (PR #11)

@@ -94,3 +94,11 @@ Valgono **in modo permanente**, per tutte le sessioni notturne e per ogni altro 
 - Italiano, frasi brevi, niente recap di cose che già sa. Domande dirette, una per volta.
 - In PR: prima "cosa vedi di diverso", poi "come provarlo", poi i dettagli tecnici.
 - Segnala sempre i limiti di quello che hai verificato. Se una tua affermazione precedente era sbagliata, dillo.
+- **Lorenzo, 17/10: elenca SEMPRE le modifiche fatte**, nel messaggio finale e in cima alla PR: una riga per modifica, in parole semplici, cosa cambia per chi usa l'app.
+
+## Regola di prodotto: semplice prima di tutto (Lorenzo, 17/10)
+"Dobbiamo trovare il modo di avere tutte le informazioni ma semplificando l'interfaccia e il numero di cose visualizzate a schermo." Vale per ogni voce, nuova o vecchia:
+- Ogni schermata ha **una cosa principale** da fare; il resto un tocco più in là (foglio, "Altro", scheda), mai tolto.
+- Prima di aggiungere un pulsante, una riga o un riquadro, chiediti cosa togli o nascondi in cambio. Niente doppioni (la stessa azione in due punti dello stesso schermo).
+- Meno testo: etichette di 1–2 parole, una sola frase per spiegare.
+- Ogni sessione dedica tempo a semplificare le schermate esistenti (elenco in `BACKLOG.md`, "Semplificare"), con screenshot prima/dopo in PR.
