@@ -113,6 +113,13 @@ const dd = dedupeSamePlace([
   { name: "drinc. Cocktail & Conversation", lat: 45.4753707, lng: 9.2160187, userRatingCount: 665 },
 ]);
 ok(dd.length === 2 && dd[0].name === "drinc. Cocktail & Conversation", "doppioni: lo stesso locale resta una volta, al primo posto, con la scheda più recensita");
+// Revisione 17/10: locali diversi nello stesso palazzo restano due.
+ok(dedupeSamePlace([
+  { name: "Hotel Splendor Bar", lat: 41.9, lng: 12.49, userRatingCount: 100 },
+  { name: "Hotel Splendor Restaurant", lat: 41.9, lng: 12.49, userRatingCount: 900 },
+  { name: "Mercato Centrale Pizza", lat: 41.901, lng: 12.5, userRatingCount: 50 },
+  { name: "Mercato Centrale Sushi", lat: 41.901, lng: 12.5, userRatingCount: 60 },
+]).length === 4, "doppioni: bar e ristorante dello stesso hotel, banchi dello stesso mercato restano separati");
 ok(dedupeSamePlace([{ name: "Bar Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Bar Bianchi", lat: 41.9, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: due locali diversi nello stesso palazzo restano entrambi");
 ok(dedupeSamePlace([{ name: "Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Rossi", lat: 41.91, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: stesso nome a 1 km sono due locali");
 // Coerenza tra il perché e il livello (perché veri di Haiku, 17/10).
