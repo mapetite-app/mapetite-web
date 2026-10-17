@@ -2980,7 +2980,8 @@ else {
   ok(tEvents.filter((e) => e.type === "sessione_inizio").length === 1, "tracciamento: ricaricando resta la stessa visita");
   await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); });
   await tp.reload({ waitUntil: "load" });
-  await tp.waitForTimeout(300);
+  // Il segnale parte dopo il caricamento: con il server carico 300 ms a volte non bastavano.
+  for (let i = 0; i < 30 && tEvents.filter((e) => e.type === "sessione_inizio").length < 2; i++) await tp.waitForTimeout(100);
   const ses2 = tEvents.filter((e) => e.type === "sessione_inizio");
   ok(ses2.length === 2 && ses2[1].props?.giorni === 0 && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
 
