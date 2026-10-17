@@ -324,3 +324,10 @@ Richiedono nuove tabelle e regole di privacy: Claude prepara una proposta con le
 - **Microfono 44px e QA `--nav-sporgenza` — FATTO**: la variabile arriva nel CSS (vale 0px: il cerchio della Mappa sta nella barra).
 - **Da decidere (Lorenzo)**: quota Google di 50 ricerche/giorno per tutti gli utenti insieme: finita all'01:10 di sabato. Per i tester del 25/10 non basta.
 
+
+## Sabato 17/10 (sessione delle 05:00, branch `claude/brave-mccarthy-253oxg`)
+- **Marchio vero in home — FATTA**: la "m" corallo con la forchetta dell'icona dell'app, disegnata in SVG, al posto dell'emoji 🍽️ (anche nella pagina pubblica del locale). Frasi d'esempio come schede a due righe (Places, `places-01`); ricerche recenti in grigio.
+- **Barra della mappa a tutta larghezza — FATTA**: la frase cercata non si taglia più ("Rooftop romanti…"); "La mia posizione" scende sulla seconda riga, accanto a Esplora/Idee.
+- **Scheda senza accavallamenti — FATTA**: sul telefono, a scheda aperta, barra e posizione si nascondono sotto il velo ("‹ 1 di 2 ›" ci finiva sopra).
+- **Schermata d'avvio su iPhone (6.3) — FATTA**: marchio su fondo teal invece dello schermo bianco all'apertura dell'app installata (11 misure di iPhone, immagini generate in fase di build).
+- **Card dei salvati nel profilo — FATTA**: tipo · via su una riga, stato in corallo, raccolte in grigio.
