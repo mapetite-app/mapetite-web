@@ -1,6 +1,7 @@
 "use client";
 
 import { browserClient } from "@/lib/supabase/client-lazy";
+import { firmaPer } from "@/lib/catalog-firme";
 
 // Salvataggio in un tocco di un risultato di ricerca (id = Place ID Google), come il segnalibro
 // della mappa: il locale entra nel catalogo con /api/places/add (UUID Supabase) e poi in
@@ -15,6 +16,7 @@ export type QuickSavePlace = {
   rating: number | null;
   priceLevel: number | null;
   userRatingCount?: number | null; // solo per "poco conosciuto" (Scopritori), non si salva
+  firma?: string; // firma del server sui dati Google (src/lib/catalog-sig.ts); se manca, dalla sessione
 };
 
 export async function quickSavePlace(
@@ -29,6 +31,7 @@ export async function quickSavePlace(
       googlePlaceId: place.id, name: place.name, address: place.address ?? "",
       lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
       userRatingCount: place.userRatingCount ?? null,
+      firma: place.firma ?? firmaPer(place.id),
     }),
   });
   if (!addRes.ok) throw new Error("add");

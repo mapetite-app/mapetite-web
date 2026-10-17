@@ -18,6 +18,7 @@ import { track, trackFeature } from "@/lib/track";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { quickSavePlace, savedGoogleIds } from "@/lib/quick-save";
 import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
+import { rememberFirme } from "@/lib/catalog-firme";
 import { aggiungiGusti, fraseConZona, gustiDichiarati, gustiPerRicerca, gustoDa, inFondoPerGusti, metri, type Zona } from "@/lib/gusti";
 import { caricaGusti, caricaZonaAbituale, gustiRicordati, ricordaGusti } from "@/lib/gusti-store";
 
@@ -225,6 +226,7 @@ async function fetchTappa(t: TappaPlan, zona: string | null, at: { lat: number; 
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { error: data?.error ?? "Qualcosa è andato storto. Riprova." };
+    rememberFirme(data.risultati);
     const cards = ((data.risultati ?? []) as RawPlace[]).filter((p) => p.lat != null && p.lng != null).map(toCard);
     return { cards, pending: (data.sintesi_pendente ?? null) as Pending };
   } catch {
@@ -314,6 +316,7 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
       patchMsg(msgId, { status: "error", text: data?.error ?? "Qualcosa è andato storto. Riprova." });
       return msgId;
     }
+    rememberFirme(data.risultati);
     // Contro un gusto dichiarato (categoria o nome chiari, es. "seafood_restaurant"): in fondo, mai esclusi.
     const ordered = inFondoPerGusti(((data.risultati ?? []) as RawPlace[]).filter((p) => p.lat != null && p.lng != null).map(toCard), usati);
     const places = ordered.places;

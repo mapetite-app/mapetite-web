@@ -12,6 +12,7 @@ import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
 import { addReel } from "@/lib/community-write";
 import { reelSourceOf } from "@/lib/reel";
+import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 type ImportResult = {
   nome: string | null;
@@ -235,6 +236,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       });
       const data = await res.json();
       const results: GoogleResult[] = (data.results ?? []).slice(0, 5);
+      rememberFirme(results);
       setSearchResults(results);
       if (results.length === 0) setError("Nessun risultato. Prova con un termine diverso.");
     } catch {
@@ -262,6 +264,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
           category: result.category,
           rating: result.rating,
           priceLevel: result.priceLevel,
+          firma: firmaPer(result.id),
         }),
       });
       if (!addRes.ok) {

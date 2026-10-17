@@ -38,6 +38,7 @@ import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
 import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
+import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
 // in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
@@ -197,6 +198,7 @@ function SaveModal({
             rating: place.rating,
             priceLevel: place.priceLevel,
             userRatingCount: reviewCount,
+            firma: firmaPer(place.id),
           }),
         });
         if (!addRes.ok) { setError(true); return; }
@@ -1161,6 +1163,7 @@ export default function MapView({
           googlePlaceId: place.id, name: place.name, address: place.address ?? "",
           lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
           userRatingCount: venueDetails[place.id]?.userRatingCount ?? null,
+          firma: firmaPer(place.id),
         }),
       });
       if (!addRes.ok) throw new Error("add");
@@ -1476,6 +1479,7 @@ export default function MapView({
         }),
       });
       const data = await res.json();
+      rememberFirme(data?.risultati);
       if (searchSeq.current !== ticket) return;
       if (!res.ok) { setFilterError(data.error ?? "Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
@@ -1681,6 +1685,7 @@ export default function MapView({
           }),
         });
         const data = await res.json();
+        rememberFirme(data?.risultati);
         if (searchSeq.current !== ticket) return;
         if (!res.ok) {
           setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
@@ -1998,6 +2003,7 @@ export default function MapView({
       const hit = surpriseFromMemory(surpriseId.slice(0, 300));
       if (!hit || hit.place.lat == null || hit.place.lng == null) return;
       const p = hit.place;
+      rememberFirme([p]);
       const place: Place = {
         id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number,
         tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null,
