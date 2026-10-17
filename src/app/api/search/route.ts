@@ -10,8 +10,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { ZONE } from "@/lib/gusti";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
@@ -146,8 +145,10 @@ export async function POST(request: Request) {
     const zonaCentro = zonaCity && zonaCity !== cityNear(lat ?? 0, lng ?? 0) ? cityArea(zonaCity) : null;
     // Quartiere con un centro noto (src/lib/gusti.ts): preferenza stretta intorno al quartiere
     // (2 km invece di 25) e, dopo Google, i locali lontani in fondo.
-    const zonaNorm = (intent?.zona ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^(quartiere|rione|zona)\s+/, "").trim();
-    const zonaPunto = zonaQuartiere ? ZONE.find((z) => z.nome.toLowerCase() === zonaNorm && (!contextCity || z.citta === contextCity)) ?? null : null;
+    // Anche con la città nella frase ("bar a Brera Milano"): il quartiere conta più della città.
+    const zonaPunto = searchIntent === "natural" && intent?.zona && !intent.vicino_a_me && !wholeCity(intent.zona)
+      ? districtCenter(intent.zona, query)
+      : null;
     if (zonaCity && zonaCity !== mapCity) console.log(`[search-quartiere] ${intent?.zona}: quartiere di ${zonaCity} (mappa su ${mapCity ?? "altro"})`);
     // E "quartiere Monti" invece di "Monti": 20 trattorie del rione invece della sola "Trattoria Monti".
     let queryGoogle = intent ? intent.queryGoogle : query.trim();
@@ -201,6 +202,29 @@ export async function POST(request: Request) {
         // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
         sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
       });
+      // Quartiere noto con pochi risultati: Google legge il nome del quartiere come parte dell'insegna
+      // ("bar cozy quartiere Moscova Milano" → 4 bar, 3 con "Moscova" nel nome: Lorenzo, 17/10). Allora
+      // una seconda ricerca senza il nome, dentro un riquadro di ~1,2 km intorno al centro del quartiere,
+      // e i nuovi locali dopo quelli già trovati. Solo in questo caso: 1 chiamata Google in più.
+      if (zonaPunto && intent && risultati.length < 6) {
+        const q2 = stripDistrict(intent.queryGoogle, zonaPunto.nome, zonaPunto.citta);
+        try {
+          const altri = await searchGooglePlaces(q2, {
+            includedType: intent.includedType ?? undefined,
+            locationMode: "restrict",
+            lat: zonaPunto.lat,
+            lng: zonaPunto.lng,
+            radius: 1200,
+            sortMode: "relevance",
+          });
+          const visti = new Set(risultati.map((p) => p.id));
+          const nuovi = altri.filter((p) => !visti.has(p.id));
+          console.log(`[search-quartiere] ${zonaPunto.nome}: solo ${risultati.length} con il nome, +${nuovi.length} nel riquadro di 1,2 km (query=${JSON.stringify(q2)})`);
+          risultati = [...risultati, ...nuovi];
+        } catch (err) {
+          console.error("[search-quartiere] seconda ricerca non riuscita:", err);
+        }
+      }
     } catch (err) {
       // Un errore di Google (quota giornaliera finita, rete, lentezza) non è "nessun risultato":
       // il telefono mostrerebbe "Non ho trovato nulla, prova con meno requisiti", che è falso.

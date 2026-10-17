@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -162,5 +162,14 @@ ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cine
   const r = demoteFarFrom(monti, [e("La Barrique", 41.8962, 12.4917), e("Solovino (Ostiense)", 41.8556, 12.4784), e("OrganiCool (Talenti)", 41.9408, 12.5389), e("Al Vino Al Vino", 41.8952, 12.4908), e("Domus Vini", 41.8987, 12.4928)]);
   ok(r.places.map((p) => p.name).join() === "La Barrique,Al Vino Al Vino,Domus Vini,Solovino (Ostiense),OrganiCool (Talenti)" && r.demoted.length === 2, "zona: Monti, le enoteche di Ostiense e Talenti vanno in fondo");
   ok(demoteFarFrom(monti, [e("A", 41.8962, 12.4917), e("B", 41.85, 12.47), e("C", 41.94, 12.53)]).demoted.length === 0, "zona: se nel quartiere ne restano meno di 3 non si tocca nulla");
+}
+// Quartiere con pochi risultati (Lorenzo, 17/10: "bar cozy a Moscova" → 3): seconda ricerca nel riquadro, senza il nome.
+{
+  const m = districtCenter("Moscova", "bar cozy a Moscova");
+  ok(m?.citta === "Milano" && Math.abs(m.lat - 45.479) < 0.01, "quartiere: Moscova ha un centro a Milano");
+  ok(districtCenter("quartiere Monti")?.nome === "Monti" && districtCenter("Monti", "trattoria a Monti Milano") === null, "quartiere: 'quartiere Monti' è Monti; Monti con Milano nella frase non si indovina");
+  ok(districtCenter("via del Pigneto") === null && districtCenter("centro") === null, "quartiere: una via o 'centro' non hanno un riquadro");
+  ok(stripDistrict("bar cozy quartiere Moscova Milano", "Moscova", "Milano") === "bar cozy" && stripDistrict("enoteca vini naturali a Monti Roma", "Monti", "Roma") === "enoteca vini naturali", "quartiere: nome e città tolti dalla frase per Google");
+  ok(stripDistrict("Monti", "Monti", "Roma") === "Monti", "quartiere: se resta troppo poco la frase non cambia");
 }
 process.exit(failed === 0 ? 0 : 1);

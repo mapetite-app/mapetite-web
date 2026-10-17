@@ -94,6 +94,59 @@ export function ambiguousDistrict(query: string, zona: string | null | undefined
   return !namedCity(query) && !namedCity(zona) && !isOtherCity(zona) && !namedOtherCity(query);
 }
 
+// Centri approssimativi dei quartieri noti (stessi nomi di QUARTIERI). Con un quartiere nella frase si
+// cerca dentro un riquadro intorno al centro invece di scriverne il nome a Google: "bar cozy quartiere
+// Moscova Milano" dava 4 risultati, quasi tutti con "Moscova" nel nome (Lorenzo, 17/10 mattina).
+const CENTRI: Record<string, [number, number]> = {
+  // Roma
+  "Trastevere": [41.8885, 12.4695], "Monti": [41.8945, 12.4930], "Rione Monti": [41.8945, 12.4930],
+  "Testaccio": [41.8775, 12.4760], "Prati": [41.9080, 12.4600], "Pigneto": [41.8890, 12.5290],
+  "San Lorenzo": [41.8985, 12.5150], "Ostiense": [41.8680, 12.4790], "Garbatella": [41.8600, 12.4880],
+  "Parioli": [41.9250, 12.4950], "Flaminio": [41.9230, 12.4700], "Esquilino": [41.8955, 12.5050],
+  "Centocelle": [41.8780, 12.5590], "Quadraro": [41.8560, 12.5450], "Monteverde": [41.8760, 12.4560],
+  "Monteverde Vecchio": [41.8820, 12.4600], "Campo de' Fiori": [41.8956, 12.4722], "Campo de Fiori": [41.8956, 12.4722],
+  "Trevi": [41.9009, 12.4833], "Celio": [41.8855, 12.4950], "Aventino": [41.8830, 12.4800],
+  "Ponte Milvio": [41.9360, 12.4670], "Coppedè": [41.9180, 12.5030], "Torpignattara": [41.8740, 12.5380],
+  "Tor Pignattara": [41.8740, 12.5380], "Eur": [41.8300, 12.4700], "Ghetto ebraico": [41.8925, 12.4780],
+  "Pantheon": [41.8986, 12.4769], "Piazza Navona": [41.8992, 12.4731], "Balduina": [41.9180, 12.4370],
+  "Montesacro": [41.9420, 12.5300], "San Saba": [41.8800, 12.4850],
+  // Milano
+  "Brera": [45.4720, 9.1870], "Navigli": [45.4520, 9.1750], "Isola": [45.4880, 9.1890],
+  "Moscova": [45.4790, 9.1860], "Porta Venezia": [45.4750, 9.2050], "Porta Romana": [45.4520, 9.2030],
+  "Porta Garibaldi": [45.4840, 9.1870], "Garibaldi": [45.4840, 9.1870], "NoLo": [45.4970, 9.2190],
+  "Città Studi": [45.4780, 9.2270], "Zona Tortona": [45.4520, 9.1640], "Tortona": [45.4520, 9.1640],
+  "Sempione": [45.4780, 9.1700], "Paolo Sarpi": [45.4800, 9.1750], "Chinatown": [45.4800, 9.1750],
+  "Corso Como": [45.4820, 9.1880], "Lambrate": [45.4840, 9.2380], "Bicocca": [45.5150, 9.2110],
+  "CityLife": [45.4780, 9.1560], "Porta Nuova": [45.4830, 9.1900], "Ticinese": [45.4560, 9.1810],
+  "Corso Garibaldi": [45.4770, 9.1840], "Darsena": [45.4530, 9.1780], "Bovisa": [45.5030, 9.1600],
+  "Loreto": [45.4860, 9.2160], "Corso Buenos Aires": [45.4800, 9.2100], "Sant'Ambrogio": [45.4620, 9.1760],
+  "Magenta": [45.4660, 9.1730], "Porta Ticinese": [45.4560, 9.1810], "Colonne di San Lorenzo": [45.4580, 9.1810],
+  "Arco della Pace": [45.4760, 9.1720],
+};
+
+// Il quartiere noto nominato nella zona capita dall'AI ("Moscova", "quartiere Monti"), con città e centro.
+// Se la frase nomina una città diversa da quella del quartiere, null: non si indovina.
+export function districtCenter(zona: string | null | undefined, query = ""): { nome: string; citta: string; lat: number; lng: number } | null {
+  if (!zona || isStreet(zona)) return null;
+  const t = ` ${norm(zona).replace(/[^a-z0-9' ]+/g, " ")} `;
+  const hit = QUARTIERI_IDX.find(({ q }) => t.includes(` ${q} `));
+  if (!hit) return null;
+  const said = namedCity(query) ?? namedCity(zona);
+  if (said && said !== hit.city) return null;
+  const nome = QUARTIERI[hit.city].find((q) => norm(q) === hit.q)!;
+  const c = CENTRI[nome];
+  return c ? { nome, citta: hit.city, lat: c[0], lng: c[1] } : null;
+}
+
+// Toglie dalla frase per Google il quartiere (con "a", "in", "quartiere", "zona"…) e la città: la zona
+// la dice il riquadro. Se resta troppo poco, la frase resta com'è.
+export function stripDistrict(query: string, nome: string, citta: string): string {
+  const esc = nome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "['’]?");
+  const re = new RegExp(`\\s*\\b(?:a|al|ai|in|nel|nei|dalle parti di|vicino a|zona|quartiere|rione)?\\s*(?:(?:quartiere|rione|zona)\\s+)?${esc}(?![a-zà-ÿ])`, "gi");
+  const out = stripCity(query.replace(re, " "), citta).replace(/\s{2,}/g, " ").trim();
+  return out.length >= 3 ? out : query;
+}
+
 // Città della mappa: la più vicina entro 25 km dal centro, altrimenti null.
 export function cityNear(lat: number, lng: number): string | null {
   let best: string | null = null;
