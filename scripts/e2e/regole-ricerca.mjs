@@ -1,7 +1,7 @@
 // Controlli delle regole di ordinamento della ricerca (nessuna chiamata, nessun costo).
 //   node --experimental-strip-types scripts/e2e/regole-ricerca.mjs
 import { demoteOffType } from "../../src/lib/off-type.ts";
-import { demoteMainstream } from "../../src/lib/mainstream.ts";
+import { demoteMainstream, demoteTouristTraps } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
@@ -174,4 +174,12 @@ ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cine
 }
 ok(withDefaultType("Milano", "Milano", null) === "ristorante Milano" && withDefaultType("quartiere Monti", "Monti", null) === "ristorante Monti", "solo zona ('e a Milano?'): si cercano ristoranti, non la città");
 ok(withDefaultType("bar cozy Moscova", "Moscova", "bar") === "bar cozy Moscova" && withDefaultType("qualcosa di dolce Milano", "Milano", null) === "qualcosa di dolce Milano", "solo zona: con un tipo o altre parole la frase resta");
+{
+  const t = (name, rating, userRatingCount) => ({ name, rating, userRatingCount });
+  const nav = [t("Spritz Navigli", 4.0, 4526), t("Il Secco", 4.8, 355), t("Raboucer", 4.8, 998), t("UGO", 4.4, 1335), t("Zog", 4.5, 1859)];
+  const r = demoteTouristTraps("aperitivo sui Navigli", nav);
+  ok(r.places.at(-1).name === "Spritz Navigli" && r.demoted.length === 1, "trappole per turisti: in fondo anche senza 'non turistico' (4,0 con 4.526 recensioni)");
+  ok(demoteTouristTraps("aperitivo da Spritz Navigli", nav).demoted.length === 0, "trappole per turisti: cercato per nome resta dov'è");
+  ok(demoteTouristTraps("aperitivo", [t("A", 4.2, 9000), t("B", 4.6, 300), t("C", 4.5, 200), t("D", 4.4, 100)]).demoted.length === 0, "trappole per turisti: un 4,2 con tante recensioni resta (solo voti sotto 4,2)");
+}
 process.exit(failed === 0 ? 0 : 1);

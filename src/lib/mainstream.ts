@@ -45,3 +45,24 @@ export function demoteMainstream<T extends { name: string; userRatingCount: numb
   const mass = places.filter(isMass);
   return { places: [...kept, ...mass], demoted: mass.map((p) => p.name) };
 }
+
+// Trappole per turisti anche senza "non turistico" nella frase (VISIONE: il sistema non deve spingere
+// verso il posto più popolare). Solo i locali con tantissime recensioni E voto sotto 4,2 (Spritz Navigli,
+// 4,0 con 4.526 recensioni) vanno in fondo, mai esclusi; un locale cercato per nome resta dov'è.
+const nameWords = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+const TRAP_RATING = 4.2; // più severo di MEDIOCRE_RATING: qui la persona non ha chiesto di evitare i posti famosi
+const GENERIC = new Set(["ristorante", "trattoria", "osteria", "pizzeria", "bar", "caffe", "cafe", "cocktail", "bistrot", "enoteca", "roma", "milano", "rome", "milan", "navigli", "trastevere"]);
+
+export function demoteTouristTraps<T extends { name: string; userRatingCount: number | null; rating?: number | null }>(
+  query: string,
+  places: T[],
+): { places: T[]; demoted: string[] } {
+  if (places.length < 4 || wantsOffTheBeatenPath(query)) return { places, demoted: [] };
+  const q = new Set(nameWords(query));
+  const named = (p: T) => nameWords(p.name).some((w) => !GENERIC.has(w) && q.has(w));
+  const isTrap = (p: T) => (p.userRatingCount ?? 0) >= MIN_COUNT && p.rating != null && p.rating < TRAP_RATING && !named(p);
+  const kept = places.filter((p) => !isTrap(p));
+  if (kept.length < 3 || kept.length === places.length) return { places, demoted: [] };
+  const traps = places.filter(isTrap);
+  return { places: [...kept, ...traps], demoted: traps.map((p) => p.name) };
+}
