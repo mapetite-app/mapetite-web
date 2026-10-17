@@ -7,6 +7,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { displayAddress } from "@/lib/city";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
+import { rememberFirme } from "@/lib/catalog-firme";
 import { trackFeature } from "@/lib/track";
 import { addReel } from "@/lib/community-write";
 import { reelSourceOf } from "@/lib/reel";
@@ -77,6 +78,7 @@ export default function ManualAddCard({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Non riesco a cercare su Google Maps in questo momento. Riprova.");
       const found = ((data.results ?? []) as SearchPlace[]).slice(0, 5);
+      rememberFirme(found);
       setSavedIds(await alreadySavedMap(userId, found.map((r) => r.id)).catch(() => ({})));
       setResults(found);
       setSearchedFor(q);

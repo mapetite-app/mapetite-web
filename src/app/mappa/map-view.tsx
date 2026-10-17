@@ -38,6 +38,8 @@ import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
 import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
+import { readLastView, saveLastView } from "@/lib/last-view";
+import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
 // in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
@@ -197,6 +199,7 @@ function SaveModal({
             rating: place.rating,
             priceLevel: place.priceLevel,
             userRatingCount: reviewCount,
+            firma: firmaPer(place.id),
           }),
         });
         if (!addRes.ok) { setError(true); return; }
@@ -876,7 +879,8 @@ export default function MapView({
   const firstView = useRef(viewState);
   useEffect(() => {
     let alive = true;
-    void fetchWeather(firstView.current.latitude, firstView.current.longitude).then((w) => { if (alive) setWeather(w); });
+    const at = readLastView() ?? { lat: firstView.current.latitude, lng: firstView.current.longitude };
+    void fetchWeather(at.lat, at.lng).then((w) => { if (alive) setWeather(w); });
     return () => { alive = false; };
   }, []);
   const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
@@ -1161,6 +1165,7 @@ export default function MapView({
           googlePlaceId: place.id, name: place.name, address: place.address ?? "",
           lat: place.lat, lng: place.lng, category: place.category, rating: place.rating, priceLevel: place.priceLevel,
           userRatingCount: venueDetails[place.id]?.userRatingCount ?? null,
+          firma: firmaPer(place.id),
         }),
       });
       if (!addRes.ok) throw new Error("add");
@@ -1476,6 +1481,7 @@ export default function MapView({
         }),
       });
       const data = await res.json();
+      rememberFirme(data?.risultati);
       if (searchSeq.current !== ticket) return;
       if (!res.ok) { setFilterError(data.error ?? "Ricerca non riuscita. Riprova."); return; }
       type RawPlace = {
@@ -1681,6 +1687,7 @@ export default function MapView({
           }),
         });
         const data = await res.json();
+        rememberFirme(data?.risultati);
         if (searchSeq.current !== ticket) return;
         if (!res.ok) {
           setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
@@ -1956,6 +1963,9 @@ export default function MapView({
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
+    // La mappa riparte da dove era l'ultima volta (non sempre da Roma); un link con "at" o un locale vincono.
+    const last = params.get("at") || params.get("sorpresa") ? null : readLastView();
+    if (last) setTimeout(() => setViewState((v) => ({ ...v, latitude: last.lat, longitude: last.lng, zoom: last.zoom })), 0);
     // Dal profilo: /mappa?salvato=UUID apre i salvati e poi la scheda (quando arrivano).
     const savedId = params.get("salvato");
     if (savedId && /^[0-9a-f-]{36}$/i.test(savedId)) {
@@ -1998,6 +2008,7 @@ export default function MapView({
       const hit = surpriseFromMemory(surpriseId.slice(0, 300));
       if (!hit || hit.place.lat == null || hit.place.lng == null) return;
       const p = hit.place;
+      rememberFirme([p]);
       const place: Place = {
         id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number,
         tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null,
@@ -2037,7 +2048,7 @@ export default function MapView({
       if (center) setViewState((v) => ({ ...v, latitude: center.lat, longitude: center.lng, zoom: 13 }));
       setWelcomeDismissed(true);
       setAiQuery(q);
-      void runAISearch(q, center);
+      void runAISearch(q, center ?? (last ? { lat: last.lat, lng: last.lng } : undefined));
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
   }, []);
@@ -2780,6 +2791,7 @@ export default function MapView({
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
+        onMoveEnd={(evt) => saveLastView({ lat: evt.viewState.latitude, lng: evt.viewState.longitude, zoom: evt.viewState.zoom })}
         onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
         ref={mapRef}
         // isolation: i livelli dei pin (fino a 100, vedi sotto) restano dentro la mappa e non salgono

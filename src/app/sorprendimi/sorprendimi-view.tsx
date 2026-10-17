@@ -12,6 +12,7 @@ import { distanceLabel } from "@/lib/distance";
 import { cityNear, cityArea } from "@/lib/named-city";
 import { quickSavePlace } from "@/lib/quick-save";
 import { track, trackFeature } from "@/lib/track";
+import { rememberFirme } from "@/lib/catalog-firme";
 import { withNext } from "@/lib/next-path";
 import {
   loadMemory,
@@ -147,6 +148,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
         trackFeature("sorpresa", { fonte: origin, contesto: "google", risultati: m.results.length });
       }
       const savedIds = new Set(saved.map((s) => s.googlePlaceId).filter((g): g is string => !!g));
+      rememberFirme(m.results);
       const list = pickCandidates(m.results, savedIds, plan.reason);
       const start = Math.max(0, list.findIndex((x) => x.place.id === m!.currentId));
       m.currentId = list[start]?.place.id ?? null;
@@ -268,6 +270,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
       const { uuid } = await quickSavePlace(userId, {
         id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng,
         category: p.category, rating: p.rating, priceLevel: p.priceLevel, userRatingCount: p.userRatingCount,
+        firma: p.firma,
       }, [WANT_TAG]);
       setSaveState((s) => ({ ...s, [p.id]: "saved" }));
       trackFeature("sorpresa_salva", { fonte: from });

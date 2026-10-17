@@ -6,6 +6,7 @@ import LinkResults from "@/components/link-results";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { withNext } from "@/lib/next-path";
 import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
+import { rememberFirme } from "@/lib/catalog-firme";
 
 const ERRORI: Record<string, string> = {
   illeggibile: "Non riesco a leggere un locale in questa immagine.",
@@ -56,6 +57,7 @@ export default function ScreenshotResult({
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error("Non riesco a cercare il locale su Google Maps. Riprova.");
         const found = ((data.results ?? []) as SearchPlace[]).slice(0, 5);
+        rememberFirme(found);
         setResults(found);
         try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify({ query, found })); } catch { /* storage non disponibile */ }
       })

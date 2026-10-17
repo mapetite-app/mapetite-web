@@ -1,5 +1,7 @@
 "use client";
 
+import { firmaPer } from "@/lib/catalog-firme";
+
 // "Condividi" nella scheda: manda il link Mapetite del locale (/locali/<UUID>), così chi lo riceve
 // vede il verdetto e può salvarlo in Mapetite. I salvati hanno già l'UUID come id; per i risultati
 // di ricerca (id = Google Place ID) la riga in "places" si crea o si ritrova con /api/places/add
@@ -27,6 +29,7 @@ async function placeUuid(p: ShareablePlace): Promise<string | null> {
       body: JSON.stringify({
         googlePlaceId: p.id, name: p.name, address: p.address ?? "", lat: p.lat, lng: p.lng,
         category: p.category, rating: p.rating, priceLevel: p.priceLevel,
+        firma: firmaPer(p.id),
       }),
     });
     const data = await res.json().catch(() => ({}));

@@ -2,7 +2,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isGem } from "@/lib/gem";
 
 // Unico punto in cui si crea (o si ritrova) un locale nella tabella "places",
-// usato da /api/places/add e /api/places/from-link. Chiave: Google Place ID.
+// usato da /api/places/add, from-link, link-preview e import-file. Chiave: Google Place ID.
+//
+// Il catalogo è condiviso: il primo che salva un locale ne scrive i dati per tutti. Per questo
+// ogni scrittura dichiara da dove arrivano i dati ("fonte"):
+//  - "google":   dati usciti da Google sul server (risultato di ricerca firmato, Place Details).
+//                Crea il locale e, se era già nel catalogo, ne corregge i dati con quelli veri.
+//  - "link":     Place ID scelto da Google, ma nome e posizione letti dal link incollato
+//                (il caso normale di "Condividi → Copia link", che costa solo un "IDs Only").
+//                Crea il locale ma non tocca mai uno già esistente.
+//  - "telefono": tutto deciso dal telefono (corpo non firmato, file di Takeout, Place ID scritto
+//                nel link). Mai collegato a un Place ID nuovo: se il locale non c'è, entra nel
+//                catalogo SENZA Place ID (come i posti importati senza ID), così nessuno può dare
+//                un nome falso al locale vero che poi vedrebbero tutti.
+export type Fonte = "google" | "link" | "telefono";
 
 export type NewPlace = {
   googlePlaceId: string;
@@ -35,7 +48,7 @@ export type FindOrCreateResult =
   | { place: StoredPlace; created: boolean }
   | { error: string; status: number };
 
-export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"): Promise<FindOrCreateResult> {
+export async function findOrCreatePlace(input: NewPlace, logTag: string, fonte: Fonte): Promise<FindOrCreateResult> {
   const admin = createAdminClient();
 
   const { data: existing, error: selectError } = await admin
@@ -55,9 +68,15 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
   }
 
   if (existing) {
-    // Niente aggiornamento di "poco conosciuto" da un locale già in catalogo (17/10): voto e numero
-    // di recensioni arrivano dal telefono, e chiunque poteva accendere il badge su qualsiasi locale.
+    // Niente aggiornamento di "poco conosciuto" da un locale già in catalogo (17/10): il badge
+    // si decide solo alla creazione.
+    if (fonte === "google") return { place: await healPlace(existing as StoredPlace, input, logTag), created: false };
     return { place: existing as StoredPlace, created: false };
+  }
+
+  if (fonte === "telefono") {
+    console.log(`[${logTag}] dati non verificati per ${input.googlePlaceId}: entra nel catalogo senza Place ID`);
+    return findOrCreateImportedPlace({ name: input.name, address: input.address, lat: input.lat, lng: input.lng }, logTag);
   }
 
   const { data: inserted, error: insertError } = await admin
@@ -85,8 +104,44 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
     return { error: "Errore nel salvataggio del locale.", status: 500 };
   }
 
-  await markPocoConosciuto((inserted as StoredPlace).id, input);
+  // Il numero di recensioni conta solo se viene da Google (firma): mai dal telefono.
+  if (fonte === "google") await markPocoConosciuto((inserted as StoredPlace).id, input);
   return { place: inserted as StoredPlace, created: true };
+}
+
+// Locale già nel catalogo e dati appena arrivati da Google: se nome, indirizzo, posizione, tipo,
+// voto o prezzo sono diversi (es. scritti da un link, o cambiati su Google) si correggono.
+// I campi che Google non ha dato restano come sono. Mai sui locali verificati da un ristoratore
+// (verified_at): lì decide lui. Senza la colonna verified_at l'aggiornamento fallisce in silenzio.
+async function healPlace(p: StoredPlace, input: NewPlace, logTag: string): Promise<StoredPlace> {
+  const fix: Partial<Record<"name" | "address" | "lat" | "lng" | "category" | "rating" | "price_level", string | number>> = {};
+  if (input.name && input.name !== p.name) fix.name = input.name;
+  if (input.address && input.address !== p.address) fix.address = input.address;
+  if (input.lat !== p.lat) fix.lat = input.lat;
+  if (input.lng !== p.lng) fix.lng = input.lng;
+  if (input.category && input.category !== p.category) fix.category = input.category;
+  if (typeof input.rating === "number" && (p.rating == null || Number(p.rating) !== input.rating)) fix.rating = input.rating;
+  if (typeof input.priceLevel === "number" && p.price_level !== input.priceLevel) fix.price_level = input.priceLevel;
+  if (Object.keys(fix).length === 0) return p;
+  try {
+    const { data, error } = await createAdminClient()
+      .from("places")
+      .update(fix)
+      .eq("id", p.id)
+      .is("verified_at", null)
+      .select(COLUMNS)
+      .maybeSingle();
+    if (error) {
+      if (error.code !== "42703") console.error(`[${logTag}] correzione dati:`, error.message);
+      return p;
+    }
+    if (data && ("name" in fix || "address" in fix || "lat" in fix || "lng" in fix)) {
+      console.log(`[${logTag}] catalogo corretto con i dati Google per ${input.googlePlaceId}:`, Object.keys(fix).join(","));
+    }
+    return (data as StoredPlace | null) ?? p;
+  } catch {
+    return p;
+  }
 }
 
 // Scopritori (piano 5.6): si salva solo la NOSTRA classificazione sì/no (regola del badge
