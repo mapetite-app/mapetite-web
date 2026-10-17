@@ -123,6 +123,8 @@ export function FotoMieEditor({
         if (res.esito !== "non-immagine") break;
       }
     }
+    // Dopo un errore il ciclo si ferma: senza, i segnaposto "Carico…" restavano accesi per sempre.
+    setBusy(0);
   };
 
   const remove = async (f: FotoUtente) => {
