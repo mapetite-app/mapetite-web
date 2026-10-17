@@ -27,7 +27,7 @@ export async function completeOnboarding({
   city,
   dest,
   next,
-}: OnboardingData): Promise<{ error: string } | never> {
+}: OnboardingData): Promise<{ error: string } | { login: string } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
   const citta = cleanCity(city);
@@ -42,8 +42,10 @@ export async function completeOnboarding({
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Accesso scaduto mentre si rispondeva: il telefono conserva le risposte (bozza in
+  // onboarding-view) e va al login; dopo l'accesso chi è nuovo torna all'onboarding, che le ritrova.
   if (!user) {
-    redirect(withNext("/login", back));
+    return { login: withNext("/login", back) };
   }
 
   const { error } = await supabase

@@ -36,6 +36,7 @@ import ClassificaScheda from "@/components/classifica-scheda";
 import CommunityLocale from "@/components/community-locale";
 import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
+import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
@@ -379,16 +380,22 @@ const CHIP_ON = "min-h-10 rounded-pill bg-brand px-3 py-1.5 text-xs font-display
 const CHIP_ACTIVE = "flex min-h-8 items-center gap-1 rounded-pill bg-brand px-2.5 text-xs font-display font-semibold text-white active:scale-95";
 const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand hover:opacity-80";
 
-// Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag).
+// Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag). Il testo si
+// capisce anche come frase (4.5): "quel giapponese che avevo salvato a Milano".
+const savedText = (p: Place) => [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
+  .filter(Boolean).join(" ");
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
-  return list.filter((p) => {
+  const base = list.filter((p) => {
     if (tag !== null && !p.tags?.includes(tag)) return false;
     if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
-    if (!q) return true;
-    return [p.name, p.category, p.address, p.note, ...(p.tags ?? [])]
-      .some((v) => v != null && v.toLocaleLowerCase("it").includes(q));
+    return true;
   });
+  if (!q) return base;
+  const plain = base.filter((p) => [p.name, p.category, p.address, p.note, ...(p.tags ?? [])]
+    .some((v) => v != null && v.toLocaleLowerCase("it").includes(q)));
+  if (plain.length > 0) return plain;
+  return filtraSalvatiNaturale(base, q, savedText, (p) => p.tags);
 }
 
 // Salvati che c'entrano con la frase scritta nella barra (voce 11d): basta una parola
@@ -397,10 +404,12 @@ const STOP_WORDS = new Set(["dove", "posto", "locale", "locali", "vicino", "buon
 function savedMatches(list: Place[], query: string, max = 3): Place[] {
   const words = query.toLocaleLowerCase("it").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !STOP_WORDS.has(w));
   if (words.length === 0) return [];
+  // Prima i salvati che rispondono a tutta la frase ("il giapponese di Milano"), poi quelli con più parole in comune.
+  const whole = new Set(filtraSalvatiNaturale(list, query, savedText, (p) => p.tags).map((p) => p.id));
   const scored = list.map((p) => {
     const text = [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
       .filter(Boolean).join(" ").toLocaleLowerCase("it");
-    return { p, n: words.filter((w) => text.includes(w)).length };
+    return { p, n: words.filter((w) => text.includes(w)).length + (whole.has(p.id) ? 100 : 0) };
   }).filter((x) => x.n > 0);
   return scored.sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.p);
 }
@@ -797,6 +806,7 @@ export default function MapView({
   const [activeTag, setActiveTag] = useState<string | null>(null);
   // Salvati (voce 8): ricerca per testo e filtro per città ricavata dall'indirizzo.
   const [savedQuery, setSavedQuery] = useState("");
+  const savedFitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeCity, setActiveCity] = useState<string | null>(null);
   // "I miei salvati" in una riga (Lorenzo 16/10, "il dono della sintesi"): stato, città, raccolte e
   // ordine stanno nel foglio "Filtri"; sullo schermo restano solo la ricerca e i filtri accesi.
@@ -834,19 +844,19 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
-  // Variante della mappa da far scegliere: ?mappa=chiara (grigia stile Places), resta sul telefono.
+  // Mappa chiara (grigia stile Places) per tutti dal 17/10; ?mappa=standard torna a quella colorata e resta sul telefono.
   const mapVariant = useSyncExternalStore(
     () => () => {},
     () => {
       const v = new URLSearchParams(window.location.search).get("mappa");
       try {
         if (v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
-        return window.localStorage.getItem("mapetite.mappa") ?? "standard";
+        return window.localStorage.getItem("mapetite.mappa") ?? "chiara";
       } catch {
-        return v ?? "standard";
+        return v ?? "chiara";
       }
     },
-    () => "standard",
+    () => "chiara",
   );
   // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
   // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
@@ -2307,7 +2317,16 @@ export default function MapView({
               <input
                 type="search"
                 value={savedQuery}
-                onChange={(e) => { setSavedQuery(e.target.value); setClusterPlaces(null); }}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSavedQuery(v); setClusterPlaces(null);
+                  // Dopo una pausa la mappa va sui salvati trovati ("il giapponese di Milano" da Roma).
+                  if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
+                  savedFitTimer.current = setTimeout(() => {
+                    const found = filterSaved(savedPlaces, activeTag, activeCity, v);
+                    if (v.trim() && found.length > 0) fitToPlaces(found, 150);
+                  }, 600);
+                }}
                 placeholder={`Cerca in ${savedPlaces.length} salvati`}
                 aria-label="Cerca tra i salvati"
                 className="min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"

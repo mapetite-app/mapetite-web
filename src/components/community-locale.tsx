@@ -10,10 +10,13 @@ import { COMMENT_MAX, addReel, saveReview } from "@/lib/community-write";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
+import type { FotoUtente } from "@/lib/foto-utenti";
+import { FotoCommunityStrip, FotoMieEditor } from "@/components/foto-utenti";
 
 // "Dalla community Mapetite" (piani 5.6c e 5.6d) nella scheda della mappa e nella pagina pubblica
 // del locale: la tua recensione (stelle + due righe), quelle degli altri (prima chi segui) e i reel
-// collegati al locale ("Visto su TikTok"). Sempre separata dai dati Google, con l'autore in chiaro.
+// collegati al locale ("Visto su TikTok") e le foto scattate dagli utenti ("Foto di <nome>").
+// Sempre separata dai dati Google, con l'autore in chiaro.
 // Dati da /api/places/community; scritture dal telefono con le regole RLS (src/lib/community-write.ts).
 
 type Props = {
@@ -288,6 +291,26 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         <p className="mt-2 text-sm font-sans text-text-muted">Salva il locale per lasciare la tua recensione.</p>
       )}
 
+      {/* Le tue foto del locale (5.6c): pubbliche come la recensione, mai mescolate a quelle Google. */}
+      {canWrite && c.fotoPronte && (
+        <div data-testid="community-mie-foto" className="mt-3">
+          <p className="font-display text-sm font-semibold text-text">
+            Le tue foto <span className="font-sans text-xs font-normal text-text-muted">· le vedono tutti, come la recensione</span>
+          </p>
+          <div className="mt-2">
+            <FotoMieEditor
+              userId={userId!}
+              placeId={c.placeId!}
+              foto={c.mieFoto.filter((f) => f.pubblica)}
+              onChange={(pub: FotoUtente[]) => setData({ id, c: { ...c, mieFoto: [...c.mieFoto.filter((f) => !f.pubblica), ...pub] } })}
+              pubblica
+              contesto={contesto}
+              testId="community-foto-editor"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Recensioni degli altri */}
       {c.recensioni.length > 0 ? (
         <>
@@ -303,6 +326,9 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       ) : !mine ? (
         <p data-testid="community-vuota" className="mt-2 text-sm font-sans text-text-muted">Ancora nessuna recensione: sii il primo a dire com&apos;era.</p>
       ) : null}
+
+      {/* Foto scattate dagli altri membri, ciascuna con "Foto di <nome>". */}
+      <FotoCommunityStrip foto={c.foto} />
 
       {/* Reel e video collegati al locale */}
       {(c.reel.length > 0 || (canWrite && c.reelPronti)) && (

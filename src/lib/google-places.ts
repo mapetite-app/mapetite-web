@@ -1,4 +1,5 @@
 import { distanceMeters } from "@/lib/distance";
+import { dedupeSamePlace } from "@/lib/dedupe-places";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { refineCategory } from "@/lib/refine-category";
 import { GOOGLE_ATTRIBUTES, isOpenAt, type GoogleAttribute, type WeekTime } from "@/lib/filter-options";
@@ -181,7 +182,15 @@ export async function searchGooglePlaces(
     }
   }
 
-  const googleResponse = await fetch("https://places.googleapis.com/v1/places:searchText", {
+  // Solo in sviluppo con GOOGLE_FIXTURES=<cartella> (es. scripts/fixtures, esclusa da git): la stessa
+  // richiesta si legge dal disco invece di richiamare Google, così le prove ripetute non consumano quota.
+  const fixturePath = process.env.NODE_ENV === "development" && process.env.GOOGLE_FIXTURES
+    ? `${process.env.GOOGLE_FIXTURES}/search-${(await import("node:crypto")).createHash("sha1").update(JSON.stringify(requestBody)).digest("hex").slice(0, 16)}.json`
+    : null;
+  const fixture = fixturePath ? await (await import("node:fs/promises")).readFile(fixturePath, "utf8").catch(() => null) : null;
+  if (fixturePath) console.log(`[google-fixture] ${fixture ? "letta" : "nuova"} ${fixturePath}`);
+
+  const googleResponse = fixture ? new Response(fixture) : await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -199,6 +208,11 @@ export async function searchGooglePlaces(
   }
 
   const data: GoogleSearchTextResponse = await googleResponse.json();
+  if (fixturePath && !fixture) {
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(process.env.GOOGLE_FIXTURES!, { recursive: true });
+    await fs.writeFile(fixturePath, JSON.stringify(data));
+  }
 
   const mapped: PlaceResult[] = (data.places ?? []).map((place) => ({
     id: place.id,
@@ -239,7 +253,7 @@ export async function searchGooglePlaces(
   }));
 
   const excludedByChoice: string[] = [];
-  const filtered = mapped.filter((p) => {
+  const filtered = dedupeSamePlace(mapped).filter((p) => {
     // Pavimento di qualita': sempre attivo, prima dei filtri utente.
     if ((p.rating ?? 0) < FLOOR_RATING) return false;
     if ((p.userRatingCount ?? 0) < FLOOR_REVIEWS) return false;

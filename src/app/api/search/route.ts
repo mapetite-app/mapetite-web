@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
@@ -130,8 +130,11 @@ export async function POST(request: Request) {
     // Quartiere senza città ("trattoria a Monti", "aperitivo in centro"): la mappa resta una
     // preferenza larga (25 km), altrimenti Google poteva rispondere con un "Monti" di un'altra
     // città. Il testo resta più forte: un quartiere di un'altra città si trova comunque.
+    // Una città fuori dalle città note ("trattoria a Parma") è una città, non un quartiere della
+    // città della mappa: niente "quartiere" né città della mappa aggiunti, niente preferenza (13a).
     const city = searchIntent === "natural" ? namedCity(query) : null;
-    const zonaQuartiere = !!intent?.zona && !city && !namedCity(intent.zona);
+    const otherCity = searchIntent === "natural" && !city ? namedOtherCity(query) : null;
+    const zonaQuartiere = searchIntent === "natural" && ambiguousDistrict(query, intent?.zona);
     // Google da solo legge "trattoria Monti" come un nome (1 risultato, visto il 15/10): si aggiunge
     // la città in cui è la mappa, se è una delle città note e la frase non ne nomina un'altra.
     const mapCity = zonaQuartiere && typeof lat === "number" && typeof lng === "number" ? cityNear(lat, lng) : null;
@@ -141,11 +144,15 @@ export async function POST(request: Request) {
       queryGoogle = withDistrict(queryGoogle, intent.zona!);
       if (mapCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${mapCity}`;
     }
-    let locationMode: "bias" | "restrict" | "none" = zonaQuartiere ? "bias" : intent?.zona || (!intent && city) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
+    let locationMode: "bias" | "restrict" | "none" = zonaQuartiere ? "bias" : intent?.zona || (!intent && (city || otherCity)) ? "none" : intent?.vicino_a_me ? "restrict" : "bias";
     let area: { lat: number; lng: number; radius: number } | null = null;
     // Filtri con "Dove?" (zona, quartiere o via scritti a mano): come un quartiere nella frase.
     const zonaFiltro = searchIntent === "structured" && typeof body?.zona === "string" ? body.zona.trim().slice(0, 80) : "";
-    if (zonaFiltro && !wholeCity(zonaFiltro)) {
+    if (zonaFiltro && isOtherCity(zonaFiltro)) {
+      // "Parma" scritto in "Dove?": la città basta, la mappa (su Roma) non deve contare.
+      queryGoogle = `${queryGoogle} ${zonaFiltro}`;
+      locationMode = "none";
+    } else if (zonaFiltro && !wholeCity(zonaFiltro)) {
       const fCity = typeof lat === "number" && typeof lng === "number" ? cityNear(lat, lng) : null;
       queryGoogle = `${queryGoogle} ${isStreet(zonaFiltro) ? zonaFiltro : withDistrict(zonaFiltro, zonaFiltro)}`;
       if (fCity && !namedCity(zonaFiltro)) queryGoogle = `${queryGoogle} ${fCity}`;

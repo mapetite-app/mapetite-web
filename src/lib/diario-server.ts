@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { cleanDate, isMissingVisitedAt, VISITED } from "@/lib/diario";
+import { fotoMie } from "@/lib/foto-utenti-server";
+import type { FotoUtente } from "@/lib/foto-utenti";
 
 // Lettura del diario (piano 4.4): i salvati segnati "Ci sono stato" con data, voto (tag) e nota.
 // La data si legge a parte: senza la colonna visited_at (migrazione 20261015_diario non applicata)
@@ -14,7 +16,10 @@ export type DiaryEntry = {
   note: string | null;
   date: string | null; // AAAA-MM-GG
   savedAt: string;
+  foto: FotoUtente[]; // le tue foto (piano 4.4); la prima è la copertina della voce
 };
+
+export type Diary = { entries: DiaryEntry[]; withDate: boolean; fotoPronte: boolean };
 
 type Row = {
   created_at: string;
@@ -27,7 +32,7 @@ type Row = {
 function toEntries(rows: Row[], dates: Map<string, string | null> | null): DiaryEntry[] {
   return rows.flatMap((r) =>
     r.places && r.tags?.includes(VISITED)
-      ? [{ id: r.places.id, name: r.places.name, category: r.places.category, address: r.places.address, tags: r.tags, note: r.note, date: dates?.get(r.places.id) ?? null, savedAt: r.created_at }]
+      ? [{ id: r.places.id, name: r.places.name, category: r.places.category, address: r.places.address, tags: r.tags, note: r.note, date: dates?.get(r.places.id) ?? null, savedAt: r.created_at, foto: [] }]
       : [],
   );
 }
@@ -49,7 +54,14 @@ async function e2eDiary(): Promise<{ entries: DiaryEntry[]; withDate: boolean } 
   }
 }
 
-export async function loadDiary(userId: string): Promise<{ entries: DiaryEntry[]; withDate: boolean }> {
+/** Diario con le foto: una sola lettura delle foto per tutti i posti provati. */
+export async function loadDiary(userId: string): Promise<Diary> {
+  const { entries, withDate } = await loadEntries(userId);
+  const { foto, pronte } = await fotoMie(userId, entries.map((e) => e.id));
+  return { entries: entries.map((e) => ({ ...e, foto: foto.get(e.id) ?? [] })), withDate, fotoPronte: pronte };
+}
+
+async function loadEntries(userId: string): Promise<{ entries: DiaryEntry[]; withDate: boolean }> {
   const fake = await e2eDiary();
   if (fake) return fake;
   const supabase = await createClient();

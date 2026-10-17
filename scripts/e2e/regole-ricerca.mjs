@@ -3,10 +3,13 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
+import { dedupeSamePlace } from "../../src/lib/dedupe-places.ts";
+import { coherentLevel } from "../../src/lib/match-coherence.ts";
+import { filtraSalvatiNaturale } from "../../src/lib/cerca-salvati.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -75,5 +78,52 @@ ok(!hasEnglish("Drink di qualità e staff professionale in una location piacevol
 ok(withDistrict("trattoria Monti", "Monti") === "trattoria quartiere Monti" && withDistrict("bar rione Monti", "Monti") === "bar rione Monti" && withDistrict("aperitivo centro storico", "centro storico") === "aperitivo zona centro storico" && withDistrict("bar Pigneto", "Trastevere") === "bar Pigneto", "quartiere: 'quartiere X' davanti al nome, una volta sola");
 ok(cityNear(41.8986, 12.4769) === "Roma" && cityNear(45.45, 9.18) === "Milano" && cityNear(43.0, 12.0) === null, "città della mappa: Roma, Milano, nessuna lontano dalle città note");
 
+// Zona ambigua (decisione 13a, 16/10): solo un quartiere senza città prende la città della mappa.
+ok(ambiguousDistrict("trattoria a Monti", "Monti") && ambiguousDistrict("aperitivo in centro", "centro"), "zona: 'Monti' e 'centro' da soli sono ambigui → contesto della città della mappa");
+ok(!ambiguousDistrict("trattoria a Monti Roma", "Monti") && !ambiguousDistrict("trattoria a Monti", "Monti, Roma") && !ambiguousDistrict("trattoria a Brera", "Brera, Milano"), "zona: con la città scritta non c'è ambiguità");
+ok(isOtherCity("Parma") && isOtherCity("a Forli") && isOtherCity("L’Aquila") && !isOtherCity("Monti") && !isOtherCity("Trieste") && !isOtherCity("Lodi"), "zona: Parma, Forlì, L'Aquila sono città; Monti no; Trieste e Lodi restano zone di Roma e Milano");
+ok(!ambiguousDistrict("trattoria a Parma", "Parma") && namedOtherCity("trattoria tipica a Parma") === "Parma" && namedOtherCity("pranzo sul prato") === null && namedOtherCity("trattoria a Monti") === null, "zona: 'a Parma' è un'altra città (niente 'quartiere Parma Roma'), 'prato' senza 'a' non è Prato");
+ok(!ambiguousDistrict("trattoria a Monti", null) && !ambiguousDistrict("pizza", ""), "zona: senza zona nessun contesto aggiunto");
+{
+  // Come route.ts costruisce il testo per Google con un quartiere ambiguo e la mappa su Roma.
+  const testo = (q, zona, lat, lng) => {
+    if (!ambiguousDistrict(q, zona)) return q;
+    const city = cityNear(lat, lng);
+    const t = withDistrict(q, zona);
+    return city && !namedCity(t) ? `${t} ${city}` : t;
+  };
+  ok(testo("trattoria Monti", "Monti", 41.8986, 12.4769) === "trattoria quartiere Monti Roma" && testo("trattoria Parma", "Parma", 41.8986, 12.4769) === "trattoria Parma" && testo("aperitivo Isola", "Isola", 45.48, 9.19) === "aperitivo quartiere Isola Milano", "zona: 'Monti' con la mappa su Roma → Roma; 'Parma' resta Parma; 'Isola' con la mappa su Milano → Milano");
+}
+
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
+// Doppioni (visto dal vivo il 17/10 a Milano): stesso civico, due schede Google.
+const dd = dedupeSamePlace([
+  { name: "drinc.different", lat: 45.4753732, lng: 9.2160213, userRatingCount: 534 },
+  { name: "White Rabbit", lat: 45.49, lng: 9.18, userRatingCount: 1746 },
+  { name: "drinc. Cocktail & Conversation", lat: 45.4753707, lng: 9.2160187, userRatingCount: 665 },
+]);
+ok(dd.length === 2 && dd[0].name === "drinc. Cocktail & Conversation", "doppioni: lo stesso locale resta una volta, al primo posto, con la scheda più recensita");
+ok(dedupeSamePlace([{ name: "Bar Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Bar Bianchi", lat: 41.9, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: due locali diversi nello stesso palazzo restano entrambi");
+ok(dedupeSamePlace([{ name: "Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Rossi", lat: 41.91, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: stesso nome a 1 km sono due locali");
+// Coerenza tra il perché e il livello (perché veri di Haiku, 17/10).
+ok(coherentLevel("alto", "Ristorante con vista panoramica sulla città e atmosfera elegante e sofisticata, perfetto per un anniversario; le recensioni sottolineano un servizio formale e attento ai dettagli, ideale per l'occasione, ma non viene esplicitamente menzionata una terrazza.") === "medio", "coerenza: terrazza non menzionata → non più 'alto'");
+ok(coherentLevel("alto", "Rooftop panoramico con vista iconografica di Milano; le uniche criticità riguardano il servizio talvolta lento, ma la location eccezionale compensa per un anniversario.") === "alto", "coerenza: una critica minore non abbassa il livello");
+ok(coherentLevel("alto", "Trattoria tipica di Trastevere con buona cucina romana; le recensioni la descrivono come locale del quartiere, pur senza escludere una certa affluenza nei fine settimana.") === "alto", "coerenza: 'pur senza escludere' non abbassa");
+ok(coherentLevel("alto", "Piccolo bar sui Navigli con buoni drink, anche se le recensioni non lo descrivono specificamente come non turistico.") === "medio", "coerenza: 'non lo descrivono' come requisito → medio");
+ok(coherentLevel("basso", "non viene menzionata") === "basso", "coerenza: 'basso' resta basso");
+// Ricerca nei salvati in linguaggio naturale (4.5): tutto nel telefono, nessun costo.
+const salvati = [
+  { name: "Wagyu Bar", t: "sushi_restaurant Sushi Via Tortona 3, 20144 Milano MI", tags: ["Da provare"] },
+  { name: "Iyo", t: "japanese_restaurant Giapponese Via Piero della Francesca 74, 20154 Milano MI", tags: ["Già visitato"] },
+  { name: "Zen", t: "japanese_restaurant Giapponese Via Urbana 10, 00184 Roma RM", tags: ["Da provare"] },
+  { name: "Trattoria da Augusto", t: "italian_restaurant Ristorante italiano Piazza de' Renzi 15, 00153 Roma RM nota: carbonara top", tags: ["Già visitato"] },
+  { name: "Er Caffettiere", t: "bar Bar Via Urbana 72, 00184 Roma RM", tags: [] },
+];
+const cerca = (q) => filtraSalvatiNaturale(salvati, q, (p) => `${p.name} ${p.t}`, (p) => p.tags).map((p) => p.name).sort().join(",");
+ok(cerca("quel giapponese che avevo salvato a Milano") === "Iyo,Wagyu Bar", "salvati: 'quel giapponese che avevo salvato a Milano' → i due giapponesi di Milano (sushi compreso)");
+ok(cerca("il giapponese di Milano dove sono già stato") === "Iyo" || cerca("giapponese a Milano provato") === "Iyo", "salvati: giapponese a Milano già provato → solo Iyo");
+ok(cerca("sushi da provare") === "Wagyu Bar,Zen", "salvati: 'sushi da provare' → i giapponesi da provare");
+ok(cerca("trattoria della carbonara") === "Trattoria da Augusto", "salvati: la nota conta ('carbonara')");
+ok(cerca("bar a Roma, zona Monti") === "Er Caffettiere", "salvati: un rione che l'indirizzo non riporta non svuota il risultato");
+ok(cerca("quello che avevo salvato") === "", "salvati: una frase senza niente di concreto non propone niente");
 process.exit(failed === 0 ? 0 : 1);

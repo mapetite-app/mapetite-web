@@ -202,7 +202,9 @@ await shot("03-lista-verdetti");
   await page.keyboard.press("Enter");
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
   await page.waitForTimeout(600);
-  ok(seenPhotos.length > 0 && seenPhotos.every((u) => !u.includes("_nuovo") && u.includes("w=720")), `foto: ricerca ripetuta senza richieste nuove a Google per gli stessi locali (${seenPhotos.length} dalla cache, ${seenPhotos.filter((u) => u.includes("_nuovo")).length} nuove)`);
+  // 0 richieste è giusto anche quello: le immagini già sullo schermo restano (il telefono non le richiede).
+  const fotoVisibile = await page.locator('img[src*="/api/places/photo"]').first().isVisible().catch(() => false);
+  ok(fotoVisibile && seenPhotos.every((u) => !u.includes("_nuovo") && u.includes("w=720")), `foto: ricerca ripetuta senza richieste nuove a Google per gli stessi locali (${seenPhotos.length} dalla cache, ${seenPhotos.filter((u) => u.includes("_nuovo")).length} nuove)`);
   await page.unroute("**/api/search");
   page.off("request", onReq);
 }
@@ -1317,6 +1319,12 @@ else {
   ok(await p.locator("ul.snap-x").getByText("“Tavolo sulla terrazza”").isVisible(), "card salvato: mostra la nota");
   ok(await p.locator("ul.snap-x li").first().getByText(/★ 4,6 · €€/).isVisible(), "card salvato: voto e prezzo salvati");
   await p.screenshot({ path: `${OUT}/12-salvati-ricerca.png`, caret: "initial" });
+  // Ricerca nei salvati come frase (4.5): parole di contorno ignorate, stato e città capiti.
+  await p.getByLabel("Cerca tra i salvati").fill("quell'osteria che volevo provare a Roma");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati come frase: 'quell'osteria che volevo provare a Roma' → Osteria Due");
+  await p.getByLabel("Cerca tra i salvati").fill("il caffè di Milano per il brunch");
+  ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "salvati come frase: 'il caffè di Milano per il brunch' → Caffè Milano (dalla nota)");
+  await p.screenshot({ path: `${OUT}/12b-salvati-frase.png`, caret: "initial" });
   await p.getByLabel("Cerca tra i salvati").fill("sushi");
   ok(await p.getByText("Nessun salvato con questi filtri").isVisible(), "nessun risultato: messaggio chiaro");
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
@@ -2823,7 +2831,7 @@ else {
   await rp.getByLabel("Email").fill("giulia@example.com");
   await rp.getByRole("button", { name: "Mandami il link" }).click();
   await rp.getByTestId("reset-inviato").waitFor({ timeout: 5000 });
-  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes("redirect_to=http://localhost:3000/reimposta-password"), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
+  ok(recover?.body?.email === "giulia@example.com" && decodeURIComponent(recover.url).includes(`redirect_to=${BASE}/reimposta-password`), "password dimenticata: chiede il link a Supabase con il ritorno su /reimposta-password");
   ok(!recover?.body?.code_challenge, "password dimenticata: link che funziona anche aperto in un altro browser (niente PKCE)");
   await rp.screenshot({ path: `${OUT}/37-password-dimenticata.png`, caret: "initial" });
   await rp.goto(`${BASE}/reimposta-password`, { waitUntil: "networkidle" });
@@ -2970,11 +2978,13 @@ else {
   await tp.reload({ waitUntil: "load" });
   await tp.waitForTimeout(300);
   ok(tEvents.filter((e) => e.type === "sessione_inizio").length === 1, "tracciamento: ricaricando resta la stessa visita");
-  await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); });
+  // Giorni attesi: 0, ma 1 se "31 minuti fa" cade ancora nel giorno prima (giro lanciato dopo mezzanotte).
+  const giorniAttesi = await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); return new Date(s.last).getDate() === new Date().getDate() ? 0 : 1; });
   await tp.reload({ waitUntil: "load" });
-  await tp.waitForTimeout(300);
+  // Il segnale parte dopo il caricamento: con il server carico 300 ms a volte non bastavano.
+  for (let i = 0; i < 30 && tEvents.filter((e) => e.type === "sessione_inizio").length < 2; i++) await tp.waitForTimeout(100);
   const ses2 = tEvents.filter((e) => e.type === "sessione_inizio");
-  ok(ses2.length === 2 && ses2[1].props?.giorni === 0 && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
+  ok(ses2.length === 2 && ses2[1].props?.giorni === giorniAttesi && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
 
   // Il server accetta i nuovi tipi e rifiuta quelli inventati.
   { const r1 = await tp.request.post(`${BASE}/api/events`, { data: { type: "pagina", sessionId: "s", props: { pagina: "mappa" } } });
@@ -5027,7 +5037,7 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-2-citta.png`, caret: "initial" });
   await ip.getByRole("button", { name: "Roma", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("onboarding-salta").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, saltabile");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("benvenuto-dopo").isVisible(), "primo accesso: passo 3, import da Google Maps proposto subito, rimandabile");
   await ip.screenshot({ path: `${OUT}/benvenuto-3-importa.png`, caret: "initial" });
   await ip.setViewportSize({ width: 360, height: 740 });
   const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -5056,9 +5066,9 @@ else {
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("onboarding-salta").click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "primo accesso: 'Salta' al passo 2 va al passo 3");
-  await ip.getByTestId("onboarding-salta").click();
+  await ip.getByTestId("benvenuto-dopo").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
-  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Salta' all'ultimo passo → mappa con la ricerca sui gusti, senza città saltata (${new URL(ip.url()).searchParams.get("q")})`);
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Pizzeria", `primo accesso: 'Lo faccio dopo' dopo aver saltato la città → mappa con la ricerca sui gusti, senza città (${new URL(ip.url()).searchParams.get("q")})`);
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Pizza", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
@@ -6135,6 +6145,293 @@ else {
   await g.screenshot({ path: `${OUT}/99i-carta-gusto-vuota.png`, caret: "initial" });
   { const lost = droppedKeys(gEv); ok(lost.length === 0, `carta del gusto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
   await gc.close();
+}
+
+// ─── Foto degli utenti: diario e community (PIANO-25-OTTOBRE.md 4.4 e 5.6c) ───
+// Foto proprie dal cookie "e2e_foto", foto della community dal cookie "e2e_community" (lette dal
+// server solo in sviluppo). Caricamenti verso Supabase Storage e foto_locali intercettati qui:
+// si controlla che l'immagine parta già rimpicciolita nel telefono (JPEG, lato lungo 1600 px, < 500 KB).
+if (!fakeUser) console.log("SKIP  foto degli utenti: dev server senza E2E_FAKE_USER");
+else {
+  const FU = process.env.E2E_FAKE_USER;
+  const fpid = (n) => `00000000-0000-4000-8000-0000000009${n}`;
+  const ROMA = "Via del Pigneto, 10, 00176 Roma RM, Italy";
+  const fpl = (n, name, category) => ({ id: fpid(n), name, category, address: ROMA, lat: 41.89, lng: 12.53 });
+  const fprofilo = {
+    email: "giulia@example.com",
+    saved: [
+      { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", tags: ["Già visitato", "Mi è piaciuto"], note: "Cacio e pepe perfetta", places: fpl("01", "Osteria delle Foto", "restaurant") },
+      { created_at: "2026-10-05T20:00:00Z", visited_at: "2026-10-05", tags: ["Già visitato"], note: null, places: fpl("02", "Bar Senza Foto", "cocktail_bar") },
+    ],
+    reviews: [],
+  };
+  const fotoFinte = { [fpid("01")]: [{ id: "f0000001", url: "https://foto.test/a.jpg", pubblica: false }, { id: "f0000002", url: "https://foto.test/b.jpg", pubblica: false }] };
+  const fctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const setF = (name, value) => fctx.addCookies([{ name, value: encodeURIComponent(JSON.stringify(value)), url: BASE }]);
+  await setF("e2e_profilo", fprofilo);
+  await setF("e2e_foto", fotoFinte);
+  const fEv = [];
+  await fctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await fctx.route("**/api/events", (r) => { fEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await fctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await fctx.route("https://foto.test/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#c8693f"/><circle cx="200" cy="150" r="80" fill="#f4d29c"/></svg>' }));
+  const uploads = [];
+  const storageDeletes = [];
+  await fctx.route("**/storage/v1/object/foto-utenti**", (r) => {
+    const req = r.request();
+    if (req.method() === "POST") { uploads.push({ url: decodeURIComponent(req.url()), body: req.postDataBuffer() ?? Buffer.alloc(0) }); return r.fulfill({ json: { Key: "foto-utenti/x", Id: "x" } }); }
+    if (req.method() === "DELETE") { storageDeletes.push(req.postDataJSON()); return r.fulfill({ json: [] }); }
+    return r.fulfill({ json: {} });
+  });
+  const rowPosts = [];
+  const rowDeletes = [];
+  const rowPatches = [];
+  await fctx.route("**/rest/v1/foto_locali**", (r) => {
+    const req = r.request();
+    if (req.method() === "POST") { rowPosts.push(req.postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    if (req.method() === "DELETE") { rowDeletes.push(decodeURIComponent(req.url())); return r.fulfill({ status: 204, body: "" }); }
+    if (req.method() === "PATCH") { rowPatches.push({ url: decodeURIComponent(req.url()), body: req.postDataJSON() }); return r.fulfill({ status: 204, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  // JPEG dentro il corpo multipart: misure lette dall'intestazione SOF, peso del solo file.
+  const jpegInfo = (buf) => {
+    const start = buf.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+    const end = buf.lastIndexOf(Buffer.from([0xff, 0xd9]));
+    if (start < 0 || end < start) return null;
+    const j = buf.subarray(start, end + 2);
+    for (let i = 2; i < j.length - 9;) {
+      if (j[i] !== 0xff) { i++; continue; }
+      const m = j[i + 1];
+      if (m >= 0xc0 && m <= 0xc3) return { bytes: j.length, h: j.readUInt16BE(i + 5), w: j.readUInt16BE(i + 7) };
+      i += 2 + j.readUInt16BE(i + 2);
+    }
+    return { bytes: j.length, w: 0, h: 0 };
+  };
+  const fp = await fctx.newPage();
+  fp.on("pageerror", (e) => errors.push(e.message));
+  await fp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  // Foto "scattata" col telefono: 4000×3000, generata nel browser (sfumature e dettagli, pesante).
+  await fp.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
+  const bigPhoto = Buffer.from(await fp.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 4000; c.height = 3000;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 4000, 3000);
+    grad.addColorStop(0, "#d9a066"); grad.addColorStop(1, "#3b5e4a");
+    g.fillStyle = grad; g.fillRect(0, 0, 4000, 3000);
+    for (let i = 0; i < 1500; i++) { g.fillStyle = `hsl(${(i * 37) % 360},60%,${30 + (i % 40)}%)`; g.beginPath(); g.arc((i * 997) % 4000, (i * 613) % 3000, 10 + (i % 60), 0, 7); g.fill(); }
+    const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.97));
+    const b = new Uint8Array(await blob.arrayBuffer());
+    let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    return btoa(s);
+  }), "base64");
+  const fotoFile = (name = "IMG_0042.jpg") => ({ name, mimeType: "image/jpeg", buffer: bigPhoto });
+  const ftxt = async (loc) => (await loc.textContent().catch(() => "")) ?? "";
+
+  // 1. Diario: la prima foto è la copertina della voce (+1 se ce ne sono altre); senza foto c'è "+ Aggiungi una foto".
+  const vA = fp.getByTestId("diario-voce").filter({ hasText: "Osteria delle Foto" });
+  const vB = fp.getByTestId("diario-voce").filter({ hasText: "Bar Senza Foto" });
+  const cop = vA.getByTestId("diario-copertina");
+  ok(await cop.isVisible() && (await cop.locator("img").getAttribute("src")) === "https://foto.test/a.jpg" && (await ftxt(cop)).includes("+1"), "foto diario: la prima foto tua è la copertina della voce (+1)");
+  ok((await vB.getByTestId("diario-copertina").count()) === 0 && await vB.getByTestId("diario-aggiungi-foto").isVisible(), "foto diario: senza foto la voce ha l'emoji e '+ Aggiungi una foto'");
+  ok(bigPhoto.length > 500 * 1024, `foto diario: la foto di prova è pesante come una vera (${Math.round(bigPhoto.length / 1024)} KB)`);
+  await cop.click();
+  const lb = fp.getByTestId("foto-lightbox");
+  ok(await lb.isVisible() && (await ftxt(fp.getByTestId("foto-lightbox-autore"))).includes("La tua foto") && (await ftxt(fp.getByTestId("foto-lightbox-autore"))).includes("1 di 2"), "foto diario: un tocco sulla copertina apre le foto a schermo intero, con l'etichetta");
+  await lb.getByRole("button", { name: "Foto successiva" }).click();
+  ok((await ftxt(fp.getByTestId("foto-lightbox-autore"))).includes("2 di 2"), "foto diario: si scorre alla foto successiva");
+  await lb.getByRole("button", { name: "Chiudi la foto" }).click();
+  ok((await lb.count()) === 0, "foto diario: la foto a schermo intero si chiude");
+
+  // 2. Aggiungere una foto dal foglio "Com'è andata?": parte già rimpicciolita, privata, a nome proprio.
+  await vB.getByTestId("diario-aggiungi-foto").click();
+  const ff = fp.getByTestId("diario-foglio");
+  await ff.getByTestId("diario-foto").waitFor({ timeout: 5000 }).catch(() => {});
+  const inp = ff.locator("input[type=file]");
+  ok(await ff.getByTestId("foto-aggiungi").isVisible() && (await inp.getAttribute("accept")) === "image/*" && (await inp.getAttribute("capture")) == null && (await ftxt(ff.getByTestId("diario-foto"))).includes("le vedi solo tu"), "foto diario: nel foglio 'Aggiungi foto' (fotocamera o galleria, solo immagini), private come la nota");
+  { const box = await ff.getByTestId("foto-aggiungi").boundingBox(); ok(box && box.width >= 44 && box.height >= 44, `foto diario: il pulsante 'Aggiungi foto' è grande almeno 44 px (${box?.width}×${box?.height})`); }
+  await inp.setInputFiles(fotoFile());
+  await ff.getByTestId("foto-mia").first().waitFor({ timeout: 15000 }).catch(() => {});
+  const up = uploads[0];
+  const info = up ? jpegInfo(up.body) : null;
+  ok(uploads.length === 1 && new RegExp(`/foto-utenti/${FU}/${fpid("02")}/[0-9a-f-]{36}\\.jpg$`).test(up.url), `foto diario: il file va nella cartella dell'utente, sotto il locale (${up?.url.split("/storage/v1/object/")[1] ?? "nessun caricamento"})`);
+  ok(info && Math.max(info.w, info.h) === 1600 && info.bytes < 500 * 1024 && up.body.includes(Buffer.from("image/jpeg")), `foto diario: rimpicciolita nel telefono, JPEG 1600 px sotto i 500 KB (${info ? `${info.w}×${info.h}, ${Math.round(info.bytes / 1024)} KB` : "nessun JPEG"})`);
+  const rp = rowPosts[0];
+  ok(rowPosts.length === 1 && rp?.user_id === FU && rp?.place_id === fpid("02") && rp?.pubblica === false && rp?.path === up?.url.split("/foto-utenti/")[1] && Object.keys(rp ?? {}).sort().join() === "id,path,place_id,pubblica,user_id", `foto diario: collegata al locale giusto, privata (${JSON.stringify(rp)})`);
+  ok((await ff.getByTestId("foto-mia").count()) === 1 && (await ff.getByTestId("foto-mia").locator("img").getAttribute("src"))?.startsWith("blob:"), "foto diario: l'anteprima compare subito (dal telefono, senza riscaricarla)");
+  { const e = fEv.filter((x) => x.props?.nome === "foto_utente" && x.props?.stato === "aggiunta");
+    ok(e.length === 1 && e[0].props.contesto === "diario" && e[0].props.fonte === "privata" && e[0].props.risultati === 1, `foto diario: 'foto aggiunta' registrata (${JSON.stringify(e[0]?.props ?? null)})`); }
+  // Un file che non è un'immagine non parte.
+  await inp.setInputFiles({ name: "menu.txt", mimeType: "text/plain", buffer: Buffer.from("non sono una foto") });
+  await fp.waitForTimeout(300);
+  ok(await ff.getByTestId("foto-errore").isVisible() && uploads.length === 1, "foto diario: un file che non è una foto non si carica (messaggio chiaro)");
+  await fp.screenshot({ path: `${OUT}/99j-foto-diario-foglio.png`, caret: "initial" });
+  // Chiuso il foglio, la foto è già la copertina della voce (salvata subito, senza "Salva").
+  await ff.getByTestId("diario-salta").click();
+  ok(await vB.getByTestId("diario-copertina").isVisible() && (await vB.getByTestId("diario-aggiungi-foto").count()) === 0, "foto diario: la foto nuova diventa subito la copertina della voce");
+  // Togliere una foto: riga e file.
+  await vB.getByTestId("diario-modifica").click();
+  await ff.getByTestId("foto-togli").first().click();
+  await fp.waitForTimeout(300);
+  ok(rowDeletes.length === 1 && rowDeletes[0].includes(`user_id=eq.${FU}`) && storageDeletes.length === 1 && JSON.stringify(storageDeletes[0]).includes(`${FU}/${fpid("02")}/`) && (await ff.getByTestId("foto-mia").count()) === 0, `foto diario: la × toglie la foto (riga e file) (${rowDeletes.length}/${storageDeletes.length})`);
+  { const box = await ff.getByTestId("foto-aggiungi").boundingBox(); ok(box != null, "foto diario: tolta la foto si può aggiungerne un'altra"); }
+  await ff.getByTestId("diario-salta").click();
+
+  // 3. Massimo 3 foto per locale: con 2 foto e 2 scelte se ne carica una sola, poi il pulsante sparisce.
+  await vA.getByTestId("diario-modifica").click();
+  await ff.getByTestId("diario-foto").waitFor({ timeout: 5000 }).catch(() => {});
+  ok((await ff.getByTestId("foto-mia").count()) === 2, "foto diario: nel foglio ci sono le foto già caricate");
+  const before = uploads.length;
+  await ff.locator("input[type=file]").setInputFiles([fotoFile("IMG_1.jpg"), fotoFile("IMG_2.jpg")]);
+  await ff.getByTestId("foto-mia").nth(2).waitFor({ timeout: 15000 }).catch(() => {});
+  ok(uploads.length - before === 1 && (await ff.getByTestId("foto-mia").count()) === 3 && (await ff.getByTestId("foto-aggiungi").count()) === 0 && (await ftxt(ff.getByTestId("foto-errore"))).includes("al massimo 3"), `foto diario: al massimo 3 foto per locale (${uploads.length - before} caricata)`);
+  // "Mostrale nella scheda del locale": tutte le foto del locale diventano pubbliche.
+  const cond = ff.getByTestId("diario-foto-condividi");
+  await cond.check();
+  await fp.waitForTimeout(300);
+  ok(rowPatches.length === 1 && rowPatches[0].body?.pubblica === true && rowPatches[0].url.includes(`place_id=eq.${fpid("01")}`) && rowPatches[0].url.includes(`user_id=eq.${FU}`) && (await ftxt(ff.getByTestId("diario-foto"))).includes("visibili nella scheda del locale"), `foto diario: 'Mostrale nella scheda' le rende pubbliche (${JSON.stringify(rowPatches[0] ?? null)})`);
+  ok(fEv.some((e) => e.props?.nome === "foto_utente" && e.props?.stato === "pubblicate"), "foto diario: la scelta di mostrarle è registrata");
+  { const w = await fp.evaluate(() => document.documentElement.scrollWidth); const box = await ff.boundingBox(); ok(w <= 390 && box && box.x >= 0 && box.x + box.width <= 390, `foto diario: il foglio con le foto sta nello schermo (${w})`); }
+  await ff.getByTestId("diario-foto").scrollIntoViewIfNeeded();
+  const SHOTS = new URL("../../docs/autonomia/screenshots/2026-10-17/", import.meta.url).pathname;
+  mkdirSync(SHOTS, { recursive: true });
+  await fp.screenshot({ path: `${OUT}/99k-foto-diario.png`, caret: "initial" });
+  await fp.screenshot({ path: `${SHOTS}foto-diario.png`, caret: "initial" });
+  await ff.getByTestId("diario-salta").click();
+  await fp.screenshot({ path: `${OUT}/99l-foto-diario-copertine.png`, caret: "initial" });
+
+  // 4. Community nella pagina del locale: le foto degli altri con "Foto di <nome>", le tue con "Aggiungi foto".
+  const CF = "55555555-0000-4000-8000-000000000009";
+  await setF("e2e_locale", { place: { id: CF, name: "Trattoria delle Foto", address: ROMA, lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GFOTO" }, synthesis: null });
+  const comm = {
+    recensioni: [{ id: "r1", rating: 5, comment: "Tavolo in fondo, carbonara da applausi.", created_at: "2026-10-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true }],
+    mia: null, reel: [], reelPronti: false,
+    foto: [
+      { id: "c0000001", url: "https://foto.test/c1.jpg", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" } },
+      { id: "c0000002", url: "https://foto.test/c2.jpg", autore: null },
+    ],
+    mieFoto: [{ id: "m0000001", url: "https://foto.test/m1.jpg", pubblica: false }],
+    fotoPronte: true,
+  };
+  await setF("e2e_community", comm);
+  await fp.goto(`${BASE}/locali/${CF}`, { waitUntil: "networkidle" });
+  await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {});
+  const strip = fp.getByTestId("foto-community");
+  const autori = await fp.getByTestId("foto-community-autore").allTextContents();
+  ok(await strip.isVisible() && autori.join("|") === "Foto di Giulia|Foto di un membro di Mapetite", `foto community: le foto degli altri con l'etichetta di chi le ha scattate (${autori.join(" | ")})`);
+  ok(await fp.getByTestId("community-pubblica").getByTestId("foto-community").isVisible(), "foto community: le foto stanno nella sezione 'Dalla community Mapetite', separate da quelle Google");
+  const mie = fp.getByTestId("community-mie-foto");
+  ok(await mie.isVisible() && (await mie.getByTestId("foto-mia").count()) === 0 && (await ftxt(mie)).includes("le vedono tutti"), "foto community: 'Le tue foto' mostra solo le tue pubbliche (quelle private del diario restano private)");
+  await fp.getByTestId("foto-community-foto").first().click();
+  ok((await ftxt(fp.getByTestId("foto-lightbox-autore"))).includes("Foto di Giulia"), "foto community: a schermo intero resta 'Foto di Giulia'");
+  await fp.keyboard.press("Escape");
+  await fp.getByTestId("foto-lightbox").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+  const nUp = uploads.length;
+  await mie.locator("input[type=file]").setInputFiles(fotoFile("IMG_3.jpg"));
+  await mie.getByTestId("foto-mia").first().waitFor({ timeout: 15000 }).catch(() => {});
+  const rc = rowPosts.at(-1);
+  ok(uploads.length === nUp + 1 && uploads.at(-1).url.includes(`/foto-utenti/${FU}/${CF}/`) && rc?.pubblica === true && rc?.place_id === CF && rc?.user_id === FU, `foto community: la foto aggiunta alla recensione è pubblica, sul locale giusto (${JSON.stringify(rc)})`);
+  { const e = fEv.filter((x) => x.props?.nome === "foto_utente" && x.props?.stato === "aggiunta" && x.props?.contesto === "locale");
+    ok(e.length === 1 && e[0].props.fonte === "pubblica" && e[0].props.risultati === 1, `foto community: 'foto aggiunta' registrata (${JSON.stringify(e[0]?.props ?? null)})`); }
+  ok(await fp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "foto community 390px: niente scorrimento orizzontale");
+  await strip.scrollIntoViewIfNeeded();
+  await fp.evaluate(() => scrollBy(0, 120));
+  await fp.screenshot({ path: `${OUT}/99m-foto-community.png`, caret: "initial" });
+  await fp.screenshot({ path: `${SHOTS}foto-community.png`, caret: "initial" });
+  { const lost = droppedKeys(fEv.filter((e) => e.props?.nome === "foto_utente"));
+    ok(lost.length === 0, `foto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+
+  // 5. Senza accesso: le foto degli altri si vedono, aggiungerne no. Migrazione non applicata: niente pulsante.
+  await setF("e2e_anonimo", 1);
+  await fp.reload({ waitUntil: "networkidle" });
+  await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await fp.getByTestId("foto-community").isVisible() && (await fp.getByTestId("community-mie-foto").count()) === 0, "foto community senza accesso: le foto si vedono, nessun 'Aggiungi foto'");
+  await fctx.clearCookies({ name: "e2e_anonimo" });
+  await setF("e2e_community", { ...comm, fotoPronte: false, foto: [] });
+  await fp.reload({ waitUntil: "networkidle" });
+  await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {});
+  ok((await fp.getByTestId("community-mie-foto").count()) === 0 && (await fp.getByTestId("foto-community").count()) === 0 && await fp.getByTestId("recensione-form").isVisible(), "foto community senza migrazione: niente foto, la recensione funziona come prima");
+  await fctx.close();
+}
+
+// Voci piccole del 16/10 sera: primo accesso senza doppioni, risposte che non si perdono, microfono.
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const vp = await vctx.newPage();
+  vp.on("pageerror", (e) => errors.push(e.message));
+  // 1. Passo 3 del primo accesso: un solo modo di rimandare ("Lo faccio dopo"), niente "Salta" in alto.
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok(await vp.getByTestId("onboarding-salta").isVisible(), "primo accesso: 'Salta' resta al passo 2");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: al passo 3 niente 'Salta' (doppione di 'Lo faccio dopo')");
+  ok(await vp.getByTestId("benvenuto-dopo").isVisible() && /Lo faccio dopo/.test((await vp.getByTestId("benvenuto-dopo").textContent()) ?? ""), "primo accesso: al passo 3 un solo 'Lo faccio dopo'");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-3-un-solo-dopo.png`, caret: "initial" });
+
+  // 2. Accesso scaduto mentre si risponde: si passa dal login e, tornati, le risposte ci sono ancora.
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto")); // il passo 1 sopra ha lasciato la sua bozza
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0, "risposte conservate: senza bozza l'onboarding parte da capo, senza avviso");
+  await vp.getByRole("button", { name: "Pizza", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Milano", exact: true }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).pathname === "/login", `risposte conservate: senza accesso il salvataggio porta al login (${vp.url().replace(BASE, "")})`);
+  const bozza = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.benvenuto") ?? "null"));
+  ok(bozza?.cuisines?.includes("pizza") && bozza?.city === "Milano" && bozza?.step === 2, `risposte conservate: gusti, città e passo restano sul telefono (${JSON.stringify(bozza && { c: bozza.cuisines, city: bozza.city, step: bozza.step })})`);
+  await vctx.clearCookies({ name: "e2e_anonimo" });
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  await vp.getByTestId("benvenuto-ripreso").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await vp.getByTestId("benvenuto-ripreso").isVisible() && (await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 3", "risposte conservate: dopo l'accesso si riparte dal passo 3 con l'avviso");
+  await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Milano", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: la città scelta c'è ancora");
+  await vp.getByRole("button", { name: "Indietro" }).click();
+  ok((await vp.getByRole("button", { name: "Pizza", exact: true }).getAttribute("aria-pressed")) === "true", "risposte conservate: i gusti scelti ci sono ancora");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByTestId("benvenuto-dopo").click();
+  await vp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);
+  ok((await vp.evaluate(() => localStorage.getItem("mapetite.benvenuto"))) === null, "risposte conservate: salvate le risposte, la bozza sparisce");
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
+  // Una bozza scaduta (più di 2 giorni) o con valori sconosciuti non si riprende.
+  await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now() - 3 * 864e5, step: 2, cuisines: ["pizza"] })));
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 3", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
+
+  // 5. Microfono: cerchio di 36px ma area di tocco di 44px; la barra di ricerca non cambia altezza.
+  await vctx.addInitScript(() => {
+    const Fake = class { start() {} stop() { this.onend?.(); } };
+    window.SpeechRecognition = Fake;
+    window.webkitSpeechRecognition = Fake;
+  });
+  const tocco = () => vp.evaluate(() => {
+    const m = document.querySelector("[data-testid=microfono]");
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const hit = (x, y) => document.elementFromPoint(x, y)?.closest("[data-testid=microfono]") === m;
+    // 4px fuori dal cerchio su ogni lato (44px in tutto) il tocco arriva ancora al microfono.
+    return { w: Math.round(r.width), h: Math.round(r.height), bordi: [hit(r.left - 3.5, cy), hit(r.right + 3.5, cy), hit(cx, r.top - 3.5), hit(cx, r.bottom + 3.5)], fuori: hit(r.left - 6, cy) };
+  });
+  await vp.goto(`${BASE}/mappa?beta=voce`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const tm = await tocco();
+  const hBarra = Math.round((await vp.getByTestId("barra-ricerca").boundingBox())?.height ?? 0);
+  ok(tm && tm.w === 36 && tm.h === 36 && tm.bordi.every(Boolean) && !tm.fuori, `microfono sulla mappa: cerchio 36px, area di tocco 44px (${JSON.stringify(tm)})`);
+  ok(hBarra === 44, `microfono sulla mappa: la barra di ricerca resta alta 44px (${hBarra}px)`);
+  await vp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+  await vp.getByTestId("microfono").waitFor({ timeout: 8000 }).catch(() => {});
+  const ta = await tocco();
+  ok(ta && ta.w === 36 && ta.h === 36 && ta.bordi.every(Boolean), `microfono nell'assistente: area di tocco 44px senza cambiare il cerchio (${JSON.stringify(ta)})`);
+  await vp.screenshot({ path: `${OUT}/zz-microfono-assistente.png`, caret: "initial" });
+  await vctx.close();
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);

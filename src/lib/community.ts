@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { followedIds, viewerId } from "@/lib/social";
 import type { ReelSource } from "@/lib/reel";
+import { fotoMie, fotoPubbliche } from "@/lib/foto-utenti-server";
+import type { FotoCommunity, FotoUtente } from "@/lib/foto-utenti";
 
 // "Dalla community Mapetite" nella scheda del locale (piani 5.6c e 5.6d): recensioni degli utenti
 // (tabella reviews, stelle 1–5 + commento) e reel/video collegati al locale (contenuti_locali).
@@ -10,6 +12,8 @@ import type { ReelSource } from "@/lib/reel";
 // (recensioni_pubbliche, contenuti_pubblici), dove l'autore ha un nome solo se il profilo è
 // pubblico. Finché la migrazione non è applicata: recensioni dalla tabella reviews (anonime, come
 // oggi) e niente reel ("reelPronti: false").
+// Foto degli utenti (migrazione 20261017_foto_utenti.sql): quelle pubbliche degli altri dalla vista
+// foto_pubbliche (stesse regole delle recensioni), le proprie da foto_locali (RLS).
 
 export type Autore = { user_id: string; handle: string; display_name: string | null };
 
@@ -31,9 +35,13 @@ export type Community = {
   reel: CommunityReel[];
   reelPronti: boolean; // tabella contenuti_locali presente
   viewer: boolean; // chi guarda ha l'accesso
+  foto: FotoCommunity[]; // foto pubbliche degli altri
+  mieFoto: FotoUtente[]; // le proprie (anche private: contano per il massimo di 3)
+  fotoPronte: boolean; // tabella foto_locali presente
 };
 
-const EMPTY: Community = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false };
+export const EMPTY_COMMUNITY: Community = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false, foto: [], mieFoto: [], fotoPronte: false };
+const EMPTY = EMPTY_COMMUNITY;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOURCES: readonly string[] = ["Instagram", "TikTok", "YouTube"];
 
@@ -86,7 +94,7 @@ export async function loadCommunity(id: string): Promise<Community> {
   }
   if (!placeId) return { ...EMPTY, viewer: viewer != null };
 
-  const [pub, mine, ids, myReels, pubReels] = await Promise.all([
+  const [pub, mine, ids, myReels, pubReels, altrui, mie] = await Promise.all([
     supabase.from("recensioni_pubbliche").select("id, rating, comment, created_at, user_id, handle, display_name").eq("place_id", placeId).order("created_at", { ascending: false }).limit(50),
     viewer
       ? supabase.from("reviews").select("id, rating, comment").eq("place_id", placeId).eq("user_id", viewer).maybeSingle<{ id: string; rating: number; comment: string | null }>()
@@ -96,6 +104,8 @@ export async function loadCommunity(id: string): Promise<Community> {
       ? supabase.from("contenuti_locali").select("id, url, fonte, user_id").eq("place_id", placeId).eq("user_id", viewer).order("created_at", { ascending: false }).limit(12)
       : Promise.resolve({ data: [] as ReelRow[], error: null }),
     supabase.from("contenuti_pubblici").select("id, url, fonte, user_id, handle, display_name").eq("place_id", placeId).order("created_at", { ascending: false }).limit(24),
+    fotoPubbliche(placeId),
+    viewer ? fotoMie(viewer, [placeId]) : Promise.resolve(null),
   ]);
 
   // Recensioni: vista pubblica; senza migrazione la tabella reviews com'è oggi (lettura pubblica, anonima).
@@ -139,5 +149,8 @@ export async function loadCommunity(id: string): Promise<Community> {
     reel: reel.slice(0, 12),
     reelPronti,
     viewer: viewer != null,
+    foto: altrui,
+    mieFoto: mie?.foto.get(placeId) ?? [],
+    fotoPronte: mie?.pronte ?? false,
   };
 }
