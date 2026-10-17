@@ -966,6 +966,144 @@ ok(await page.getByText("4,5 su Google · 812 recensioni").isVisible() && (await
 await page.getByTestId("scheda-tab-panoramica").click();
 ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (nella riga delle azioni)");
 await shot("15-scheda-b");
+
+// 7-ter-bis. "A confronto" nella scheda (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork.
+// Niente scraping, nessun numero inventato: Tripadvisor ha numeri solo con la chiave dell'API ufficiale.
+{
+  let cf = null, tam = null;
+  try {
+    cf = await import(new URL("../../src/lib/confronto.ts", import.meta.url).href);
+    tam = await import(new URL("../../src/lib/tripadvisor.ts", import.meta.url).href);
+  } catch (e) { ok(false, `confronto: moduli importabili (${e.message})`); }
+  if (cf && tam) {
+    ok(cf.isRistorante("restaurant") && cf.isRistorante("italian_restaurant") && cf.isRistorante("pizza_restaurant") && cf.isRistorante("Trattoria") && !cf.isRistorante("bar") && !cf.isRistorante("cocktail_bar") && !cf.isRistorante("cafe") && !cf.isRistorante("fast_food_restaurant") && !cf.isRistorante(null), "confronto: Michelin e TheFork solo per i ristoranti (non bar, caffè, fast food)");
+    ok(cf.tripadvisorSearchUrl("Da Enzo al 29", "Roma") === "https://www.tripadvisor.it/Search?q=Da%20Enzo%20al%2029%20Roma" && cf.michelinSearchUrl("Da Enzo al 29") === "https://guide.michelin.com/it/it/search?q=Da%20Enzo%20al%2029" && cf.tripadvisorSearchUrl("Roma Sparita", "Roma") === "https://www.tripadvisor.it/Search?q=Roma%20Sparita", "confronto: link alle ricerche ufficiali (nome + città)");
+    ok(cf.mediaVoti([]) === null && cf.mediaVoti([5, 4, 4]).n === 3 && Math.abs(cf.mediaVoti([5, 4, 4]).media - 13 / 3) < 1e-9 && cf.mediaVoti([0, 9]) === null, "confronto: media dei voti Mapetite solo da voti 1–5 veri");
+    // Abbinamento: nome simile E meno di 150 m, servono entrambi.
+    ok(tam.nomiSimili("Da Enzo al 29", "Trattoria Da Enzo") && tam.nomiSimili("Roscioli Salumeria con Cucina", "Salumeria Roscioli") && tam.nomiSimili("Armando al Pantheon", "ARMANDO AL PANTHEON"), "tripadvisor: nomi dello stesso locale riconosciuti");
+    ok(!tam.nomiSimili("Da Enzo al 29", "Da Mario") && !tam.nomiSimili("Bar Roma", "Bar Milano") && !tam.nomiSimili("Enzo", "Enzone") && !tam.nomiSimili("Trattoria", "Trattoria Da Mario"), "tripadvisor: nomi diversi (o solo parole generiche) non si abbinano");
+    const qui = { nome: "Da Enzo al 29", lat: 41.8883, lng: 12.4773 };
+    ok(tam.stessoLocale(qui, { nome: "Trattoria Da Enzo", lat: 41.8887, lng: 12.4773 }) && !tam.stessoLocale(qui, { nome: "Trattoria Da Enzo", lat: 41.8903, lng: 12.4773 }) && !tam.stessoLocale(qui, { nome: "Da Mario", lat: 41.8883, lng: 12.4773 }) && !tam.stessoLocale(qui, { nome: "Da Enzo", lat: null, lng: null }), "tripadvisor: stesso locale solo con nome simile e distanza < 150 m (44 m sì, 222 m no)");
+    // Chiamate all'API simulate: senza chiave nessuna; con chiave ricerca + dettagli, poi la cache.
+    const chiamate = [];
+    const RISPOSTE = {
+      search: { data: [{ location_id: "111", name: "Trattoria Da Enzo" }, { location_id: "222", name: "Da Mario" }] },
+      d111: { location_id: "111", name: "Trattoria Da Enzo", latitude: "41.8886", longitude: "12.4774", rating: "4.5", num_reviews: "4396", web_url: "https://www.tripadvisor.it/Restaurant_Review-g187791-d111-Reviews-Da_Enzo.html", rating_image_url: "https://www.tripadvisor.it/img/cdsi/img2/ratings/traveler/4.5-MCID-5.svg" },
+    };
+    let lontano = false;
+    const fakeFetch = async (url) => {
+      chiamate.push(url);
+      const u = new URL(url);
+      if (u.pathname.endsWith("/location/search")) return { ok: true, status: 200, json: async () => RISPOSTE.search };
+      if (u.pathname.includes("/location/111/details")) return { ok: true, status: 200, json: async () => ({ ...RISPOSTE.d111, ...(lontano ? { latitude: "41.8950" } : {}) }) };
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    const st = tam.nuovoStato();
+    const senza = await tam.cercaTripadvisor(qui, { key: undefined, fetch: fakeFetch, stato: st });
+    ok(senza.stato === "senza-chiave" && chiamate.length === 0, "tripadvisor: senza TRIPADVISOR_API_KEY nessuna chiamata esterna");
+    const t0 = Date.parse("2026-10-17T10:00:00Z");
+    const con = await tam.cercaTripadvisor(qui, { key: "chiave-finta", fetch: fakeFetch, stato: st, now: () => t0 });
+    ok(con.stato === "trovato" && con.dato.rating === 4.5 && con.dato.numReviews === 4396 && con.dato.webUrl.startsWith("https://www.tripadvisor.it/Restaurant_Review") && con.dato.ratingImageUrl?.endsWith("4.5-MCID-5.svg"), "tripadvisor (chiave simulata): voto, recensioni, pagina e bolle dall'API ufficiale");
+    ok(chiamate.length === 2 && chiamate[0].startsWith("https://api.content.tripadvisor.com/api/v1/location/search?") && chiamate[0].includes("latLong=41.8883%2C12.4773") && chiamate[1].includes("/location/111/details") && !chiamate.some((c) => c.includes("/222/")), `tripadvisor: una ricerca per nome e posizione + i dettagli del solo candidato simile (${chiamate.length} chiamate)`);
+    await tam.cercaTripadvisor(qui, { key: "chiave-finta", fetch: fakeFetch, stato: st, now: () => t0 + 3600_000 });
+    ok(chiamate.length === 2, "tripadvisor: entro 24 ore la stessa scheda non richiama l'API (cache in memoria)");
+    await tam.cercaTripadvisor(qui, { key: "chiave-finta", fetch: fakeFetch, stato: st, now: () => t0 + 25 * 3600_000 });
+    ok(chiamate.length === 4, "tripadvisor: dopo 24 ore la cache scade");
+    lontano = true;
+    const st2 = tam.nuovoStato();
+    const far = await tam.cercaTripadvisor(qui, { key: "chiave-finta", fetch: fakeFetch, stato: st2, now: () => t0 });
+    ok(far.stato === "nessuno", "tripadvisor: stesso nome ma a più di 150 m → nessun voto (meglio niente che un dato sbagliato)");
+    const st3 = tam.nuovoStato(); st3.giorno = "2026-10-17"; st3.chiamate = tam.TA_TETTO_GIORNO - 1;
+    const prima = chiamate.length;
+    const lim = await tam.cercaTripadvisor({ ...qui, nome: "Altro Posto" }, { key: "chiave-finta", fetch: fakeFetch, stato: st3, now: () => t0 });
+    ok(lim.stato === "limite" && chiamate.length === prima, `tripadvisor: oltre il tetto di ${tam.TA_TETTO_GIORNO} chiamate al giorno nessuna chiamata`);
+    const st4 = tam.nuovoStato();
+    for (let i = 0; i < tam.TA_CACHE_MAX + 20; i++) st4.cache.set(`k${i}`, { esito: { stato: "nessuno" }, scade: t0 + 1e9 });
+    await tam.cercaTripadvisor(qui, { key: "chiave-finta", fetch: fakeFetch, stato: st4, now: () => t0 });
+    ok(st4.cache.size <= tam.TA_CACHE_MAX, `tripadvisor: la cache in memoria non supera ${tam.TA_CACHE_MAX} voci`);
+    ok(tam.datoDaDettagli({ web_url: "https://evil.example/x", rating: "5" }) === null && tam.datoDaDettagli({ web_url: "https://www.tripadvisor.it/x", rating: "9", num_reviews: "abc" })?.rating === null, "tripadvisor: link non Tripadvisor scartato, voti fuori scala mai mostrati");
+  }
+
+  // Route del server: senza chiave risponde subito, senza chiamare Tripadvisor.
+  { const r = await fetch(`${BASE}/api/places/tripadvisor?nome=Terrazza%20Uno&lat=41.9&lng=12.49`);
+    const j = await r.json().catch(() => null);
+    if (j?.stato === "senza-chiave" || j?.stato == null) ok(r.status === 200 && j?.stato === "senza-chiave", `route /api/places/tripadvisor: senza chiave risponde "senza-chiave" (${r.status} ${JSON.stringify(j)})`);
+    else console.log(`SKIP  route tripadvisor senza chiave: il dev server ha TRIPADVISOR_API_KEY (${j.stato})`);
+    const bad = await fetch(`${BASE}/api/places/tripadvisor?nome=&lat=x`);
+    ok(bad.status === 400, "route /api/places/tripadvisor: richiesta senza nome o posizione rifiutata (400)"); }
+
+  // Scheda di un bar (Terrazza Uno, ★ 4,5 · 812): Google con i numeri, Tripadvisor solo come ricerca.
+  const box = page.getByTestId("confronto");
+  ok(await box.isVisible() && (await box.textContent()).includes("A confronto"), "confronto: riquadro 'A confronto' visibile nella Panoramica della scheda");
+  const g = page.getByTestId("confronto-google");
+  const gt = (await g.textContent()) ?? "";
+  ok(gt.includes("4,5") && gt.includes("812 recensioni") && (await g.getAttribute("href"))?.startsWith("https://www.google.com/maps/search/?api=1&query=Terrazza%20Uno") && await g.getAttribute("target") === "_blank", `confronto: Google ★ 4,5 · 812 recensioni, tocco → Google Maps in nuova scheda (${gt})`);
+  const tl = page.getByTestId("confronto-link-tripadvisor");
+  ok(await tl.isVisible() && await tl.getAttribute("href") === "https://www.tripadvisor.it/Search?q=Terrazza%20Uno%20Roma" && await tl.getAttribute("target") === "_blank" && (await tl.textContent()).includes("Cercalo su Tripadvisor"), "confronto: 'Cercalo su Tripadvisor' apre la ricerca ufficiale in nuova scheda");
+  ok((await page.getByTestId("confronto-tripadvisor").count()) === 0 && !/\d/.test((await tl.textContent()) ?? ""), "confronto: senza chiave nessun numero Tripadvisor");
+  ok((await page.getByTestId("confronto-link-michelin").count()) === 0 && (await page.getByTestId("confronto-link-thefork").count()) === 0, "confronto: per un bar niente Michelin né TheFork");
+  ok(((await page.getByTestId("confronto-mapetite").textContent()) ?? "").includes("verdetto"), "confronto: riga Mapetite rimanda al verdetto (testo non duplicato)");
+  ok(await tl.locator("svg").count() === 1, "confronto: le righe link hanno l'icona del link esterno");
+  await ctx.route("https://www.tripadvisor.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<html><body>Tripadvisor</body></html>" }));
+  const [pop] = await Promise.all([ctx.waitForEvent("page", { timeout: 3000 }).catch(() => null), tl.click()]);
+  await pop?.close().catch(() => {});
+  await page.waitForTimeout(300);
+  const ce = events.filter((e) => e.props?.nome === "confronto_fonte");
+  ok(ce.some((e) => e.props?.contesto === "tripadvisor" && e.props?.stato === "ricerca"), "confronto: tocco registrato come 'confronto_fonte' (contesto tripadvisor)");
+  ok(ce.every((e) => Object.keys(e.props).every((k) => ["nome", "contesto", "stato"].includes(k))) && droppedKeys(ce).length === 0, "confronto: il segnale non porta dati personali (solo nome, contesto, stato)");
+
+  // Ristorante con voti della community e Tripadvisor con la chiave (risposta del server simulata).
+  const REST = [
+    mk("R1", "Osteria Bella", 41.888, 12.53, { category: "restaurant", address: "Via del Pigneto 41, 00176 Roma RM, Italy", rating: 4.6, userRatingCount: 1234 }),
+    mk("R2", "Trattoria Senza Voto", 41.889, 12.531, { category: "restaurant", rating: null, userRatingCount: null }),
+  ];
+  const comm = { placeId: null, recensioni: [5, 4].map((v, i) => ({ id: `c${i}`, rating: v, comment: null, created_at: "2026-10-10T20:00:00Z", autore: null, amico: false })), mia: { rating: 4, comment: null }, reel: [], reelPronti: false, viewer: true, foto: [], mieFoto: [], fotoPronte: false };
+  const taChiesti = [];
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: REST, sintesi_pendente: null } }));
+  await page.route("**/api/places/community**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? comm : { ...comm, recensioni: [], mia: null } }));
+  await page.route("**/api/places/tripadvisor**", (r) => {
+    const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
+    if (u.searchParams.get("nome") !== "Osteria Bella") return r.fulfill({ json: { stato: "nessuno" } });
+    return r.fulfill({ json: { stato: "trovato", dato: { rating: 4, numReviews: 1532, webUrl: "https://www.tripadvisor.it/Restaurant_Review-g187791-d1-Reviews-Osteria_Bella.html", ratingImageUrl: "https://www.tripadvisor.it/img/cdsi/img2/ratings/traveler/4.0-MCID-5.svg", nome: "Osteria Bella" } } });
+  });
+  await ctx.route("https://www.tripadvisor.it/img/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="16"><g fill="#00aa6c"><circle cx="8" cy="8" r="7"/><circle cx="26" cy="8" r="7"/><circle cx="44" cy="8" r="7"/><circle cx="62" cy="8" r="7"/></g><circle cx="80" cy="8" r="6" fill="none" stroke="#00aa6c" stroke-width="2"/></svg>' }));
+  await page.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.getByText("Osteria Bella").first().click();
+  await page.locator("h2", { hasText: "Osteria Bella" }).waitFor({ timeout: 5000 });
+  await page.getByTestId("confronto-tripadvisor").waitFor({ timeout: 5000 }).catch(() => {});
+  const mp = page.getByTestId("confronto-mapetite");
+  ok(((await mp.textContent()) ?? "").includes("★ 4,3") && ((await mp.textContent()) ?? "").includes("3 recensioni"), `confronto: voto medio Mapetite con il numero (${await mp.textContent()})`);
+  const tr = page.getByTestId("confronto-tripadvisor");
+  ok(await tr.isVisible() && ((await tr.textContent()) ?? "").includes("1.532 recensioni") && await tr.getAttribute("href") === "https://www.tripadvisor.it/Restaurant_Review-g187791-d1-Reviews-Osteria_Bella.html" && await tr.getAttribute("target") === "_blank" && await tr.locator("img").getAttribute("alt") === "4,0 su 5" && ((await tr.textContent()) ?? "").includes("Tripadvisor"), "confronto (chiave simulata): riga Tripadvisor con bolle ufficiali, recensioni, attribuzione e link alla pagina");
+  ok((await page.getByTestId("confronto-link-tripadvisor").count()) === 0, "confronto: con i dati Tripadvisor non c'è anche il link di ricerca");
+  const mi = page.getByTestId("confronto-link-michelin"), tf = page.getByTestId("confronto-link-thefork");
+  ok(await mi.getAttribute("href") === "https://guide.michelin.com/it/it/search?q=Osteria%20Bella" && await mi.getAttribute("target") === "_blank" && (await mi.textContent()).includes("Cercalo nella Guida Michelin"), "confronto: ristorante → 'Cercalo nella Guida Michelin' (nuova scheda)");
+  ok(await tf.getAttribute("href") === "https://www.thefork.it/search?queryText=Osteria%20Bella%20Roma" && await tf.getAttribute("target") === "_blank", "confronto: ristorante → 'Cercalo su TheFork' (nuova scheda)");
+  ok(((await page.getByTestId("confronto-google").textContent()) ?? "").includes("1.234 recensioni"), "confronto: numero recensioni Google con il separatore delle migliaia");
+  await page.getByTestId("confronto").scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const el = document.querySelector("[data-testid=confronto]");
+    let sc = el?.parentElement;
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+    if (el && sc) sc.scrollTop += el.getBoundingClientRect().top - sc.getBoundingClientRect().top - 60;
+  });
+  await page.waitForTimeout(300);
+  await shot("15b-confronto-scheda");
+  await mp.click();
+  ok(await page.getByTestId("scheda-tab-recensioni").getAttribute("aria-selected") === "true", "confronto: tocco su Mapetite → sezione Recensioni (community)");
+  ok(events.some((e) => e.props?.nome === "confronto_fonte" && e.props?.contesto === "mapetite" && e.props?.stato === "voti"), "confronto: tocco su Mapetite registrato");
+  // Locale senza dati Google nella scheda (come i salvati): la riga Google è solo il link.
+  await page.getByLabel("Chiudi", { exact: true }).first().click();
+  await page.getByText("Trattoria Senza Voto").first().click();
+  await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 5000 });
+  await page.waitForTimeout(400);
+  const g2 = ((await page.getByTestId("confronto-google").textContent()) ?? "");
+  ok(g2.includes("Apri su Google Maps") && !/\d/.test(g2), `confronto: senza voto Google la riga è solo il link (${g2})`);
+  ok((await page.getByTestId("confronto-mapetite").count()) === 0 && await page.getByTestId("confronto-link-tripadvisor").isVisible(), "confronto: senza voti né verdetto niente riga Mapetite; Tripadvisor non abbinato → link di ricerca");
+  ok(taChiesti.length >= 2, "confronto: la scheda chiede Tripadvisor al nostro server, mai direttamente al sito");
+  await page.unroute("**/api/search"); await page.unroute("**/api/places/community**"); await page.unroute("**/api/places/tripadvisor**");
+}
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
 await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
