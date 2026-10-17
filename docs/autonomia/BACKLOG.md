@@ -37,10 +37,10 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 
 ## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
 Tutte le informazioni restano, ma meno cose a schermo (regola in `LORENZO.md`). Punti visti il 17/10, da fare in ordine, con screenshot prima/dopo:
-1. **Scheda del locale**: "Voglio andarci" compare due volte (riquadro sotto il verdetto e "Salva" nella barra in basso). Una sola azione di salvataggio; "Ci sono stato" e "Condividi" dentro "Altro" o nel foglio Salva.
+1. **FATTA (PR #59)** — **Scheda del locale**: "Voglio andarci" compare due volte (riquadro sotto il verdetto e "Salva" nella barra in basso). Una sola azione di salvataggio; "Ci sono stato" e "Condividi" dentro "Altro" o nel foglio Salva.
 2. **Home**: 6 blocchi uno sotto l'altro (marchio, ultime ricerche, Sorprendimi/Assistente, esempi, barra, link in fondo). Tenere marchio + barra + esempi; ultime ricerche dentro la barra quando la tocchi; Sorprendimi e Assistente già nella barra in basso.
-3. **Mappa con risultati**: barra in alto + Esplora/I miei salvati + intestazione dei risultati + 4 chip di filtro + card. Le chip stanno già in "Filtri": toglierle dalla vista.
-4. **Assistente**: sotto le card, chip + nota "Ho capito…" + "Ti è stato utile?" tutti insieme. Una riga sola.
+3. **FATTA (PR #59)** — **Mappa con risultati**: barra in alto + Esplora/I miei salvati + intestazione dei risultati + 4 chip di filtro + card. Le chip stanno già in "Filtri": toglierle dalla vista.
+4. **FATTA (PR #59)** — **Assistente**: sotto le card, chip + nota "Ho capito…" + "Ti è stato utile?" tutti insieme. Una riga sola.
 5. Controllare con lo stesso criterio Salvati, Profilo, Amici.
 
 ## Fase 1 — La ricerca funziona (notti 1–4)
