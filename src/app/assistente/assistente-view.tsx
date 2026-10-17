@@ -863,22 +863,32 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     ))}
                   </div>
                 )}
-                {/* Dettagli onesti in una riga piccola: cosa ho capito e cosa ho fatto. */}
-                {m.status !== "loading" && (m.understood || m.note) && (
-                  <p data-testid="assistente-nota" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
-                    {m.understood && <span data-testid="assistente-capito">Ho capito: {m.understood}. </span>}
-                    {m.note}
-                  </p>
-                )}
-                {/* "Ti è stato utile?" (piano 7.6): una volta per risposta, solo sull'ultima con posti. */}
-                {m.id === last?.id && m.status === "done" && ((m.places?.length ?? 0) > 0 || !!m.serata) && (
-                  <UtileFeedback
-                    contesto={m.serata ? "serata" : "assistente"}
-                    risultati={m.serata ? m.serata.tappe.filter((t) => chosenOf(t)).length : m.places?.length ?? 0}
-                    chiave={`assistente:${m.id}`}
-                    className="mt-4"
-                  />
-                )}
+                {/* Semplificare (Lorenzo 17/10): cosa ho capito e "Utile?" in una riga sola, non due blocchi. */}
+                {(() => {
+                  const nota = m.status !== "loading" && (m.understood || m.note);
+                  const utile = m.id === last?.id && m.status === "done" && ((m.places?.length ?? 0) > 0 || !!m.serata);
+                  if (!nota && !utile) return null;
+                  return (
+                    <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-2">
+                      {nota ? (
+                        <p data-testid="assistente-nota" className="min-w-[55%] flex-1 pt-1 text-xs font-sans leading-relaxed text-text-muted">
+                          {m.understood && <span data-testid="assistente-capito">Ho capito: {m.understood}. </span>}
+                          {m.note}
+                        </p>
+                      ) : <span className="flex-1" />}
+                      {/* "Ti è stato utile?" (piano 7.6): una volta per risposta, solo sull'ultima con posti. */}
+                      {utile && (
+                        <UtileFeedback
+                          contesto={m.serata ? "serata" : "assistente"}
+                          risultati={m.serata ? m.serata.tappe.filter((t) => chosenOf(t)).length : m.places?.length ?? 0}
+                          chiave={`assistente:${m.id}`}
+                          compatto
+                          className="max-w-full shrink-0"
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ),
           )}
