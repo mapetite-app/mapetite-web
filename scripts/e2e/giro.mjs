@@ -1694,6 +1694,50 @@ else {
     await sctx.clearCookies({ name: "e2e_profilo" });
   }
 
+  // "Elimina il mio account" (in fondo al profilo): conferma in due passi. La route è SIMULATA
+  // (page.route): nessuna cancellazione vera. Contesto a parte: l'eliminazione svuota il localStorage.
+  {
+    const ectx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await ectx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+    await ectx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    const ep = await ectx.newPage();
+    ep.on("pageerror", (e) => errors.push(e.message));
+    const delCalls = [];
+    const evs = [];
+    await ep.route("**/api/events", (r) => { try { evs.push(r.request().postDataJSON()); } catch { /* corpo non JSON */ } return r.fulfill({ json: { ok: true } }); });
+    let delStatus = 500;
+    await ep.route("**/api/account/elimina", (r) => { delCalls.push(r.request().method()); return r.fulfill({ status: delStatus, json: delStatus === 200 ? { ok: true } : { error: "Non sono riuscito a eliminare l'account. Riprova tra poco." } }); });
+    await ep.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    const btn = ep.getByTestId("elimina-account");
+    const accBox = await ep.getByTestId("profilo-account").boundingBox();
+    const btnBox = await btn.boundingBox();
+    ok(await btn.isVisible() && (await btn.textContent()) === "Elimina il mio account" && !!accBox && !!btnBox && btnBox.y > accBox.y + accBox.height, "elimina account: 'Elimina il mio account' in fondo al profilo, sotto Feedback ed Esci");
+    ok(btnBox && btnBox.height >= 44, `elimina account: pulsante alto almeno 44px (${Math.round(btnBox?.height ?? 0)})`);
+    await btn.click();
+    const foglio = ep.getByTestId("elimina-account-foglio");
+    ok(await foglio.isVisible() && await foglio.getByRole("dialog", { name: "Eliminare il tuo account?" }).isVisible() && (await foglio.textContent()).includes("Non si può tornare indietro") && (await foglio.textContent()).includes("Le foto che hai caricato"), "elimina account: primo tocco = foglio che spiega cosa si cancella");
+    ok(delCalls.length === 0 && (await foglio.locator("input").count()) === 0, "elimina account: il primo tocco non cancella niente e non chiede di digitare parole");
+    await ep.waitForTimeout(300);
+    await ep.screenshot({ path: `${OUT}/27c-elimina-account.png`, caret: "initial" });
+    await foglio.getByTestId("elimina-account-annulla").click();
+    ok(!(await foglio.isVisible()) && delCalls.length === 0, "elimina account: 'No, tienilo' chiude senza cancellare");
+    // Errore dal server: messaggio chiaro, si resta nel profilo.
+    await btn.click();
+    await ep.getByTestId("elimina-account-conferma").click();
+    await foglio.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(delCalls.length === 1 && delCalls[0] === "POST" && (await foglio.getByRole("alert").textContent())?.includes("Riprova") && ep.url().endsWith("/profilo"), "elimina account: se il server non riesce, lo dice e si resta nel profilo");
+    // Riuscita: dati del telefono tolti, home con "Account eliminato".
+    delStatus = 200;
+    await ep.evaluate(() => { localStorage.setItem("mapetite.recenti", JSON.stringify(["prova"])); localStorage.setItem("mapetite.intro", "visto"); });
+    await ep.getByTestId("elimina-account-conferma").click();
+    await ep.waitForURL((u) => u.pathname === "/" && u.searchParams.get("account") === "eliminato", { timeout: 8000 }).catch(() => {});
+    ok(delCalls.length === 2 && new URL(ep.url()).searchParams.get("account") === "eliminato" && await ep.getByTestId("account-eliminato").getByText("Account eliminato").isVisible(), "elimina account: secondo tocco = chiamata (simulata) e ritorno alla home con 'Account eliminato'");
+    ok((await ep.evaluate(() => localStorage.getItem("mapetite.recenti"))) === null && (await ep.evaluate(() => localStorage.getItem("mapetite.intro"))) === "visto", "elimina account: tolte le ricerche dal telefono, l'intro già vista resta");
+    ok(evs.some((e) => e?.type === "funzione" && e?.props?.nome === "elimina_account") && !JSON.stringify(evs.filter((e) => e?.props?.nome === "elimina_account")).includes("@"), "elimina account: segnale d'uso 'elimina_account' senza dati personali");
+    await ep.screenshot({ path: `${OUT}/27d-account-eliminato.png`, caret: "initial" });
+    await ectx.close();
+  }
+
   // "Stasera dove andiamo?" (/stasera): tre proposte dai propri salvati. Supabase simulato dal browser.
   {
     const sp = (n, name, category, address, lat, lng, tags, note = null, gid = null) => ({ tags, note, places: { id: `00000000-0000-4000-8000-0000000002${n}`, name, category, address, lat, lng, google_place_id: gid ?? `GS${n}`, rating: 4.9, price_level: 2 } });
