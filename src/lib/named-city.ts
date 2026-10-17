@@ -147,6 +147,14 @@ export function stripDistrict(query: string, nome: string, citta: string): strin
   return out.length >= 3 ? out : query;
 }
 
+// "e a Milano?" capito come sola zona, senza tipo di locale: Google cercava "Milano" e non trovava
+// nessun locale (0 risultati nell'assistente, Lorenzo 16/10 sera). Allora si cercano ristoranti.
+export function withDefaultType(queryGoogle: string, zona: string | null | undefined, tipo: string | null | undefined): string {
+  if (tipo || !zona) return queryGoogle;
+  const n = (x: string) => norm(x).replace(/[^a-z0-9' ]+/g, " ").replace(/\b(quartiere|rione|zona|a|in)\b/g, " ").replace(/\s+/g, " ").trim();
+  return n(queryGoogle) === n(zona) || n(queryGoogle) === "" ? `ristorante ${zona}` : queryGoogle;
+}
+
 // Città della mappa: la più vicina entro 25 km dal centro, altrimenti null.
 export function cityNear(lat: number, lng: number): string | null {
   let best: string | null = null;

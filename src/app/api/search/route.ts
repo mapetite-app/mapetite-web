@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       : null;
     if (zonaCity && zonaCity !== mapCity) console.log(`[search-quartiere] ${intent?.zona}: quartiere di ${zonaCity} (mappa su ${mapCity ?? "altro"})`);
     // E "quartiere Monti" invece di "Monti": 20 trattorie del rione invece della sola "Trattoria Monti".
-    let queryGoogle = intent ? intent.queryGoogle : query.trim();
+    let queryGoogle = intent ? withDefaultType(intent.queryGoogle, intent.zona, intent.tipo) : query.trim();
     if (intent && zonaQuartiere) {
       queryGoogle = withDistrict(queryGoogle, intent.zona!);
       if (contextCity && !namedCity(queryGoogle)) queryGoogle = `${queryGoogle} ${contextCity}`;

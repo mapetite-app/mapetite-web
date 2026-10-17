@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -172,4 +172,6 @@ ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cine
   ok(stripDistrict("bar cozy quartiere Moscova Milano", "Moscova", "Milano") === "bar cozy" && stripDistrict("enoteca vini naturali a Monti Roma", "Monti", "Roma") === "enoteca vini naturali", "quartiere: nome e città tolti dalla frase per Google");
   ok(stripDistrict("Monti", "Monti", "Roma") === "Monti", "quartiere: se resta troppo poco la frase non cambia");
 }
+ok(withDefaultType("Milano", "Milano", null) === "ristorante Milano" && withDefaultType("quartiere Monti", "Monti", null) === "ristorante Monti", "solo zona ('e a Milano?'): si cercano ristoranti, non la città");
+ok(withDefaultType("bar cozy Moscova", "Moscova", "bar") === "bar cozy Moscova" && withDefaultType("qualcosa di dolce Milano", "Milano", null) === "qualcosa di dolce Milano", "solo zona: con un tipo o altre parole la frase resta");
 process.exit(failed === 0 ? 0 : 1);
