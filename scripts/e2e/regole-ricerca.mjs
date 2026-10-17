@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream, demoteTouristTraps } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -181,5 +181,18 @@ ok(withDefaultType("bar cozy Moscova", "Moscova", "bar") === "bar cozy Moscova" 
   ok(r.places.at(-1).name === "Spritz Navigli" && r.demoted.length === 1, "trappole per turisti: in fondo anche senza 'non turistico' (4,0 con 4.526 recensioni)");
   ok(demoteTouristTraps("aperitivo da Spritz Navigli", nav).demoted.length === 0, "trappole per turisti: cercato per nome resta dov'è");
   ok(demoteTouristTraps("aperitivo", [t("A", 4.2, 9000), t("B", 4.6, 300), t("C", 4.5, 200), t("D", 4.4, 100)]).demoted.length === 0, "trappole per turisti: un 4,2 con tante recensioni resta (solo voti sotto 4,2)");
+}
+
+// Aggettivi d'atmosfera nella frase per Google ("wine bar tranquillo" → il solo "Wine Bar Tranquillo" a Bari, 16/10).
+ok(stripMood("wine bar tranquillo", ["tranquillo"]) === "wine bar", "atmosfera: 'tranquillo' tolto dalla frase per Google");
+ok(stripMood("bar cozy accogliente Roma", ["cozy", "accogliente"]) === "bar Roma", "atmosfera: più aggettivi tolti, la città resta");
+ok(stripMood("ristorante rooftop terrazza Roma", ["rooftop", "terrazza"]) === null, "atmosfera: rooftop e terrazza restano (vincoli fisici)");
+ok(stripMood("ristorante all'aperto romantico", ["all'aperto", "romantico"]) === "ristorante all'aperto", "atmosfera: 'all'aperto' resta, 'romantico' no");
+ok(stripMood("tranquillo", ["tranquillo"]) === null, "atmosfera: se resta troppo poco la frase non cambia");
+{
+  const roma = { lat: 41.9, lng: 12.48 };
+  const pl = (name, lat, lng) => ({ name, lat, lng });
+  const r = demoteFarFrom(roma, [pl("Wine Bar Tranquillo", 41.12, 16.87), pl("A", 41.9, 12.47), pl("B", 41.89, 12.48), pl("C", 41.91, 12.5)], 30000);
+  ok(r.places.at(-1).name === "Wine Bar Tranquillo" && r.demoted.length === 1, "senza zona: il locale a Bari va in fondo (oltre 30 km dalla mappa)");
 }
 process.exit(failed === 0 ? 0 : 1);

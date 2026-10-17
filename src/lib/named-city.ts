@@ -147,6 +147,28 @@ export function stripDistrict(query: string, nome: string, citta: string): strin
   return out.length >= 3 ? out : query;
 }
 
+// Requisiti di atmosfera ("tranquillo", "cozy") finiti nella frase per Google: Google li legge come
+// parte dell'insegna ("wine bar tranquillo" → il solo "Wine Bar Tranquillo", a Bari: Lorenzo 16/10).
+// Toglie le parole dei requisiti che non sono caratteristiche fisiche (rooftop, terrazza, vista… restano:
+// sono vincoli veri). null se non cambia niente o se resta troppo poco.
+const FISICI = /rooftop|terrazz|vista|panoram|giardin|all.?aperto|dehors|cortile|veranda|piscina|mare|lago|fiume|spiaggia|camino|tetto/;
+const VUOTE = new Set(["con", "per", "una", "uno", "del", "della", "dei", "molto", "poco", "non", "piu"]);
+export function stripMood(queryGoogle: string, requisiti: string[]): string | null {
+  const parole = new Set(
+    requisiti
+      .filter((r) => !FISICI.test(norm(r)))
+      .flatMap((r) => norm(r).split(/[^a-z0-9]+/))
+      .filter((w) => w.length >= 3 && !VUOTE.has(w)),
+  );
+  if (parole.size === 0) return null;
+  const out = queryGoogle
+    .split(/\s+/)
+    .filter((w) => !parole.has(norm(w).replace(/[^a-z0-9]+/g, "")))
+    .join(" ")
+    .trim();
+  return out !== queryGoogle.trim() && out.length >= 3 ? out : null;
+}
+
 // "e a Milano?" capito come sola zona, senza tipo di locale: Google cercava "Milano" e non trovava
 // nessun locale (0 risultati nell'assistente, Lorenzo 16/10 sera). Allora si cercano ristoranti.
 export function withDefaultType(queryGoogle: string, zona: string | null | undefined, tipo: string | null | undefined): string {

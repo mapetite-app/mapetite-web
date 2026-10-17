@@ -1387,6 +1387,9 @@ else {
   // Verdetto già in cache per Terrazza Uno (G1): deve comparire sulla card dei salvati.
   await sctx.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "G1", synthesis: "Terrazza tranquilla.", tags: [], verdict: "Aperitivo lento sui tetti, lontano dalla folla.", go_for: ["tramonto"], dont_expect: [] }] }));
   await sctx.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [{ cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" }] }));
+  // Salvato senza verdetto (Osteria Due, G2): aprendo la scheda il verdetto si chiede al server.
+  const verdettoChiesti = [];
+  await sctx.route("**/api/places/verdetto", async (r) => { verdettoChiesti.push(r.request().postDataJSON()?.googlePlaceId); await new Promise((ok) => setTimeout(ok, 1200)); return r.fulfill({ json: { verdict: "Cacio e pepe da manuale, sala piccola e rumorosa.", synthesis: "Osteria di quartiere.", tags: [], goFor: ["cacio e pepe"], dontExpect: [], userRatingCount: 640, openNow: true, websiteUri: null, phone: null, photoRef: null, selectedReviews: [] } }); });
   await sctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await sctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
@@ -1421,6 +1424,13 @@ else {
   await p.waitForTimeout(500);
   ok((await p.locator("ul.snap-x li").count()) >= 1, "salvati + filtri: dopo 'Applica filtri' la lista resta aperta");
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Osteria Due").isVisible(), "salvati + filtri: 'Ristoranti' tiene solo i ristoranti salvati");
+  await p.locator("ul.snap-x").getByText("Osteria Due").click();
+  ok(await p.getByTestId("verdetto-in-arrivo").waitFor({ timeout: 3000 }).then(() => true, () => false), "salvato senza verdetto: mentre arriva, la scheda dice 'Lo sto scrivendo dalle recensioni…'");
+  await p.getByText("Cacio e pepe da manuale, sala piccola e rumorosa.").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await p.getByText("Cacio e pepe da manuale, sala piccola e rumorosa.").first().isVisible() && verdettoChiesti.length === 1 && verdettoChiesti[0] === "G2", `salvato senza verdetto: aprendo la scheda arriva il verdetto Mapetite (chiesto ${verdettoChiesti.length} volta, per ${verdettoChiesti[0]})`);
+  await p.screenshot({ path: `${OUT}/11f-salvato-verdetto-nuovo.png`, caret: "initial" });
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(300);
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();

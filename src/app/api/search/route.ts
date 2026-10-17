@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream, demoteTouristTraps } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType } from "@/lib/named-city";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { signCatalogEntry } from "@/lib/catalog-sig";
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       console.log(`[search-citta] ${cityWide}: tutta l'area della città, query=${JSON.stringify(queryGoogle)}`);
     }
     try {
-      risultati = await searchGooglePlaces(queryGoogle, {
+      const opzioni: Parameters<typeof searchGooglePlaces>[1] = {
         includedType: intent?.includedType ?? undefined,
         locationMode,
         lat: area?.lat ?? zonaPunto?.lat ?? zonaCentro?.lat ?? lat,
@@ -202,7 +202,8 @@ export async function POST(request: Request) {
         // Città intera: l'ordine di Google tra quartieri lontani non dice niente; si ordina per voto
         // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
         sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
-      });
+      };
+      risultati = await searchGooglePlaces(queryGoogle, opzioni);
       // Quartiere noto con pochi risultati: Google legge il nome del quartiere come parte dell'insegna
       // ("bar cozy quartiere Moscova Milano" → 4 bar, 3 con "Moscova" nel nome: Lorenzo, 17/10). Allora
       // una seconda ricerca senza il nome, dentro un riquadro di ~1,2 km intorno al centro del quartiere,
@@ -224,6 +225,23 @@ export async function POST(request: Request) {
           risultati = [...risultati, ...nuovi];
         } catch (err) {
           console.error("[search-quartiere] seconda ricerca non riuscita:", err);
+        }
+      }
+      // Pochi risultati con un aggettivo d'atmosfera nella frase per Google ("wine bar tranquillo" →
+      // il solo "Wine Bar Tranquillo", a Bari: Lorenzo 16/10 sera). Seconda ricerca senza quelle parole,
+      // con la stessa zona; l'atmosfera la valuta poi Haiku sulle recensioni. 1 chiamata in più, solo qui.
+      if (!zonaPunto && intent && risultati.length < 6) {
+        const q2 = stripMood(queryGoogle, intent.requisiti);
+        if (q2) {
+          try {
+            const altri = await searchGooglePlaces(q2, opzioni);
+            const visti = new Set(risultati.map((p) => p.id));
+            const nuovi = altri.filter((p) => !visti.has(p.id));
+            console.log(`[search-atmosfera] solo ${risultati.length} con ${JSON.stringify(queryGoogle)}, +${nuovi.length} con ${JSON.stringify(q2)}`);
+            risultati = [...risultati, ...nuovi];
+          } catch (err) {
+            console.error("[search-atmosfera] seconda ricerca non riuscita:", err);
+          }
         }
       }
     } catch (err) {
@@ -258,6 +276,16 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.fuori_zona = demoted.slice(0, 10);
         console.log(`[search-zona] ${zonaPunto.nome}: in fondo (oltre 2 km): ${JSON.stringify(demoted)}`);
+      }
+    }
+    // Nessuna zona né città nella frase: si cerca dove è la mappa. Un locale a centinaia di km (trovato
+    // perché il nome somiglia alla frase) va in fondo, detto all'utente come "fuori zona".
+    if (searchIntent === "natural" && intent && !intent.zona && !intent.vicino_a_me && !city && !otherCity && !area && !zonaFiltro && typeof lat === "number" && typeof lng === "number") {
+      const { places, demoted } = demoteFarFrom({ lat, lng }, risultati, 30000);
+      if (demoted.length > 0) {
+        risultati = places;
+        daParte.fuori_zona = [...daParte.fuori_zona, ...demoted].slice(0, 10);
+        console.log(`[search-zona] senza zona: in fondo (oltre 30 km dalla mappa): ${JSON.stringify(demoted)}`);
       }
     }
     // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).

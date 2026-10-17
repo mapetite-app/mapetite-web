@@ -1309,6 +1309,44 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dispatch serve solo al link dal profilo, una volta
   }, [userId]);
 
+  // Salvato senza verdetto (importato da Google Maps, salvato da un link…): lo si chiede aprendo la
+  // sua scheda (VISIONE: il verdetto c'è SEMPRE). Arrivano anche foto, recensioni e orari di Google,
+  // solo da mostrare. Una volta per locale; su errore o tetto del giorno la scheda resta com'era.
+  const verdettoChiesto = useRef(new Set<string>());
+  const [verdettoInCorso, setVerdettoInCorso] = useState<string | null>(null);
+  const selectedSavedId = selected && /^[0-9a-f-]{36}$/i.test(selected.id) && !venueDetails[selected.id]?.verdict ? selected.id : null;
+  useEffect(() => {
+    if (!userId || !selectedSavedId || verdettoChiesto.current.has(selectedSavedId)) return;
+    const googlePlaceId = Object.keys(placeUuids).find((g) => placeUuids[g] === selectedSavedId);
+    if (!googlePlaceId) return;
+    verdettoChiesto.current.add(selectedSavedId);
+    void (async () => {
+      setVerdettoInCorso(selectedSavedId);
+      try {
+        const res = await fetch("/api/places/verdetto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ googlePlaceId }),
+        });
+        if (!res.ok) return;
+        const d = (await res.json()) as Partial<VenueDetails>;
+        if (!d.verdict) return;
+        const det: VenueDetails = {
+          userRatingCount: d.userRatingCount ?? null, openNow: d.openNow ?? null, websiteUri: d.websiteUri ?? null,
+          phone: d.phone ?? null, selectedReviews: d.selectedReviews ?? null, synthesis: d.synthesis ?? null,
+          tags: d.tags ?? null, verdict: d.verdict, goFor: d.goFor ?? null, dontExpect: d.dontExpect ?? null,
+          matchReason: null, photoRef: d.photoRef ?? null, photoAuthor: d.photoAuthor ?? null,
+        };
+        savedSynthRef.current = { ...savedSynthRef.current, [selectedSavedId]: det };
+        setVenueDetails((prev) => ({ ...prev, [selectedSavedId]: { ...det, ...Object.fromEntries(Object.entries(prev[selectedSavedId] ?? {}).filter(([, v]) => v != null)) } }));
+      } catch {
+        // Senza rete: la scheda resta com'era.
+      } finally {
+        setVerdettoInCorso((id) => (id === selectedSavedId ? null : id));
+      }
+    })();
+  }, [userId, selectedSavedId, placeUuids]);
+
   const handleToggle = (placeId: string, saved: boolean) => {
     const uuid = resolveUuid(placeId);
     if (!uuid) return; // senza UUID non c'e' nulla da tracciare
@@ -3018,6 +3056,7 @@ export default function MapView({
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
+              verdettoInArrivo={verdettoInCorso === selected.id}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
               ) : null}
