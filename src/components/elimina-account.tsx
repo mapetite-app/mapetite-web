@@ -60,7 +60,7 @@ export default function EliminaAccount() {
         <button
           type="button"
           data-testid="elimina-account"
-          onClick={() => { setOpen(true); trackFeature("elimina_account", { passo: "apri" }); }}
+          onClick={() => { setOpen(true); trackFeature("elimina_account", { contesto: "apri" }); }}
           className="inline-flex min-h-11 items-center px-3 text-xs font-display font-semibold text-text-muted underline-offset-2 active:underline"
         >
           Elimina il mio account

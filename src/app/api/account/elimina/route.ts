@@ -45,7 +45,7 @@ export async function POST() {
   if (process.env.E2E_FAKE_USER && user.id === process.env.E2E_FAKE_USER) return json(400, { error: "Utente di prova." });
 
   // Segnale d'uso PRIMA di cancellare, senza utente né email: si conta solo che è successo.
-  await recordEvent({ type: "funzione", props: { nome: "elimina_account" } });
+  await recordEvent({ type: "funzione", props: { nome: "elimina_account", contesto: "eliminato" } });
 
   const admin = createAdminClient();
 
