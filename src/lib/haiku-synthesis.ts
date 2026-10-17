@@ -273,6 +273,8 @@ export async function getSynthesis(
   places: PlaceResult[],
   query: string,
   userId: string | null = null,
+  // Solo il verdetto (salvati senza verdetto): niente "perché" legato a una richiesta che non c'è.
+  opts: { soloVerdetto?: boolean } = {},
 ): Promise<Record<string, PlaceSynthesis>> {
   // 1. Limita ai primi SYNTHESIS_LIMIT locali.
   const targets = places.slice(0, SYNTHESIS_LIMIT);
@@ -391,7 +393,9 @@ export async function getSynthesis(
     return { matchReasons, fits, levels, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
-  const matchReasonPromise = matchReasonWork();
+  const matchReasonPromise = opts.soloVerdetto
+    ? Promise.resolve({ matchReasons: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
+    : matchReasonWork();
 
   // 2. Legge la cache.
   const cached = new Map<string, CachedSynthesis>();

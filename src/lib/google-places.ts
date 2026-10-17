@@ -214,43 +214,7 @@ export async function searchGooglePlaces(
     await fs.writeFile(fixturePath, JSON.stringify(data));
   }
 
-  const mapped: PlaceResult[] = (data.places ?? []).map((place) => ({
-    id: place.id,
-    name: place.displayName?.text ?? "",
-    address: place.formattedAddress ?? "",
-    lat: place.location?.latitude ?? null,
-    lng: place.location?.longitude ?? null,
-    category: refineCategory(place.primaryType ?? null, place.types ?? null),
-    rating: place.rating ?? null,
-    userRatingCount: place.userRatingCount ?? null,
-    priceLevel:
-      place.priceLevel != null ? PRICE_LEVEL_MAP[place.priceLevel] ?? null : null,
-    openNow: place.currentOpeningHours?.openNow ?? null,
-    types: place.types ?? null,
-    websiteUri: place.websiteUri ?? null,
-    editorialSummary: place.editorialSummary?.text ?? null,
-    reviewTexts: (() => {
-      const texts = (place.reviews ?? [])
-        .map((r) => r.text?.text)
-        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
-        .slice(0, 5);
-      return texts.length > 0 ? texts : null;
-    })(),
-    reviewItems: (() => {
-      const items = (place.reviews ?? [])
-        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
-        .slice(0, 5)
-        .map((r) => ({ text: r.text!.text!, rating: typeof r.rating === "number" ? r.rating : null }));
-      return items.length > 0 ? items : null;
-    })(),
-    phone: place.nationalPhoneNumber ?? null,
-    photoRef: place.photos?.[0]?.name ?? null,
-    photoAuthor: place.photos?.[0]?.authorAttributions?.[0]?.displayName ?? null,
-    attributes: Object.fromEntries(
-      GOOGLE_ATTRIBUTES.filter((a) => typeof place[a] === "boolean").map((a) => [a, place[a]]),
-    ) as Partial<Record<GoogleAttribute, boolean>>,
-    openingPeriods: place.currentOpeningHours?.periods ?? place.regularOpeningHours?.periods ?? null,
-  }));
+  const mapped: PlaceResult[] = (data.places ?? []).map(mapGooglePlace);
 
   const excludedByChoice: string[] = [];
   const filtered = dedupeSamePlace(mapped).filter((p) => {
@@ -311,4 +275,62 @@ export async function searchGooglePlaces(
   );
 
   return filtered.slice(0, limit);
+}
+
+function mapGooglePlace(place: GooglePlace): PlaceResult {
+  return ({
+    id: place.id,
+    name: place.displayName?.text ?? "",
+    address: place.formattedAddress ?? "",
+    lat: place.location?.latitude ?? null,
+    lng: place.location?.longitude ?? null,
+    category: refineCategory(place.primaryType ?? null, place.types ?? null),
+    rating: place.rating ?? null,
+    userRatingCount: place.userRatingCount ?? null,
+    priceLevel:
+      place.priceLevel != null ? PRICE_LEVEL_MAP[place.priceLevel] ?? null : null,
+    openNow: place.currentOpeningHours?.openNow ?? null,
+    types: place.types ?? null,
+    websiteUri: place.websiteUri ?? null,
+    editorialSummary: place.editorialSummary?.text ?? null,
+    reviewTexts: (() => {
+      const texts = (place.reviews ?? [])
+        .map((r) => r.text?.text)
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+        .slice(0, 5);
+      return texts.length > 0 ? texts : null;
+    })(),
+    reviewItems: (() => {
+      const items = (place.reviews ?? [])
+        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
+        .slice(0, 5)
+        .map((r) => ({ text: r.text!.text!, rating: typeof r.rating === "number" ? r.rating : null }));
+      return items.length > 0 ? items : null;
+    })(),
+    phone: place.nationalPhoneNumber ?? null,
+    photoRef: place.photos?.[0]?.name ?? null,
+    photoAuthor: place.photos?.[0]?.authorAttributions?.[0]?.displayName ?? null,
+    attributes: Object.fromEntries(
+      GOOGLE_ATTRIBUTES.filter((a) => typeof place[a] === "boolean").map((a) => [a, place[a]]),
+    ) as Partial<Record<GoogleAttribute, boolean>>,
+    openingPeriods: place.currentOpeningHours?.periods ?? place.regularOpeningHours?.periods ?? null,
+  });
+}
+
+// Scheda di un locale salvato senza verdetto (/api/places/verdetto): una Place Details con gli stessi
+// dati della ricerca (recensioni comprese, quindi stessa fascia di prezzo: Enterprise + Atmosphere).
+// I dati Google si mostrano e basta: si salva solo il verdetto scritto da Haiku (place_synthesis).
+const DETAILS_FIELD_MASK = FIELD_MASK.split(",").map((f) => f.replace(/^places\./, "")).join(",");
+export async function fetchPlaceDetails(placeId: string): Promise<PlaceResult | null> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=it`, {
+    headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": DETAILS_FIELD_MASK },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) {
+    console.error(`[place-details] Google error ${res.status} per ${placeId}`);
+    return null;
+  }
+  return mapGooglePlace((await res.json()) as GooglePlace);
 }
