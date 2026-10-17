@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { clearRecentSearches, loadRecentSearches, subscribeRecent, useBeta } from "@/lib/beta";
+import { loadRecentSearches, subscribeRecent, useBeta } from "@/lib/beta";
 
 // Le ultime ricerche fatte su questo telefono (solo nel browser), anche nella home.
 export default function HomeRecent() {
@@ -11,13 +11,8 @@ export default function HomeRecent() {
   const recent = on ? (JSON.parse(raw) as string[]).slice(0, 3) : [];
   if (recent.length === 0) return null;
   return (
+    // Semplificare (Lorenzo 17/10): solo le ricerche, senza titolo né "Cancella" (si cancellano dal profilo e dalla mappa).
     <div className="mb-3" data-testid="home-recenti">
-      <div className="mb-1.5 flex items-center justify-between">
-        <p className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le tue ultime ricerche</p>
-        <button type="button" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 text-xs font-sans text-text-muted">
-          Cancella
-        </button>
-      </div>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
         {recent.map((q) => (
           <Link

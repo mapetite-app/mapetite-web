@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Form from "next/form";
-import { MessageCircle, SlidersHorizontal, Sparkles } from "lucide-react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
 import LogoMark from "@/components/logo-mark";
 import { cookies } from "next/headers";
@@ -75,43 +75,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
         <DomandaSettimanale />
         <HomeSaved total={counts.total} want={counts.want} />
         <HomeRecent />
-        {/* Sorprendimi e Assistente affiancati (Lorenzo 16/10: schermo più pulito, stesse funzioni). */}
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        {/* Semplificare (Lorenzo 17/10): un solo carosello sopra la barra. Sorprendimi è la prima scheda;
+            l'Assistente sta già nella barra in basso. Niente titolo: la frase sotto il marchio spiega già. */}
+        <div data-testid="home-suggerimenti" className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
           {/* Sorprendimi (piano 2.5): un posto mai provato che probabilmente ti piace, con il perché. */}
           <Link
             href="/sorprendimi?da=home"
             data-testid="home-sorprendimi"
-            className="flex min-h-14 items-center gap-2.5 rounded-card border border-accent/30 bg-accent-light px-3 py-2.5 active:scale-[0.99]"
+            className="flex min-h-16 w-44 shrink-0 snap-start items-center gap-2.5 rounded-card border border-accent/30 bg-accent-light px-3 py-2.5 text-left active:scale-[0.98]"
           >
             <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-base">🎲</span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block font-display text-sm font-semibold leading-tight text-brand">Sorprendimi</span>
-              <span className="block truncate text-xs font-sans text-text-muted">Un posto nuovo</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-display font-semibold leading-tight text-brand">Sorprendimi</span>
+              <span className="mt-0.5 block text-xs font-sans leading-snug text-text-muted">un posto nuovo per te</span>
             </span>
           </Link>
-          {/* Assistente (piano 1.1): conversazione con seguiti e prenotazione assistita. */}
-          <Link
-            href="/assistente"
-            data-testid="home-assistente"
-            className="flex min-h-14 items-center gap-2.5 rounded-card border border-brand/20 bg-brand/5 px-3 py-2.5 active:scale-[0.99]"
-          >
-            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><MessageCircle size={16} /></span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block font-display text-sm font-semibold leading-tight text-brand">Assistente</span>
-              <span className="block truncate text-xs font-sans text-text-muted">Chiedi e prenota</span>
-            </span>
-          </Link>
-        </div>
-        {/* Una sola barra (Lorenzo 12/10): sopra, frasi già pronte che mostrano come si chiede all'AI;
-            i filtri sono un pulsante dentro la barra, non un secondo blocco. */}
-        <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI come a un amico, per esempio:</p>
-        {/* Schede a due righe come Places ("Places worth knowing / in Rome"): titolo e dettaglio. */}
-        <div data-testid="home-suggerimenti" className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+          {/* Schede a due righe come Places ("Places worth knowing / in Rome"): titolo e dettaglio. */}
           {EXAMPLES.map((e) => (
             <Link
               key={e.q}
               href={`/mappa?q=${encodeURIComponent(e.q)}`}
               aria-label={e.q}
+              data-esempio
               className="flex min-h-16 w-52 shrink-0 snap-start items-center gap-2.5 rounded-card border border-border bg-white px-3 py-2.5 text-left shadow-sm active:scale-[0.98]"
             >
               <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-lg">{e.emoji}</span>
@@ -139,8 +124,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
         </Form>
         {/* Link alti 40px (prima 15px): si toccano senza mirare. */}
         <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs font-sans text-text-muted">
-          <Link href="/mappa" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">Apri la mappa</Link> ·
-          {/* "accedi" solo a chi non è collegato (prima compariva anche a chi aveva già fatto l'accesso). */}
+          {/* "accedi" solo a chi non è collegato. "Apri la mappa" tolto: la Mappa è al centro della barra in basso. */}
           {!loggedIn && <><Link href="/login" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">accedi</Link> ·</>}
           <IntroAgain />
         </p>
