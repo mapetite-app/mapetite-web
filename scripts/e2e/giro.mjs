@@ -18,7 +18,9 @@ const mk = (id, name, lat, lng, extra = {}) => ({
   rating: 4.5, userRatingCount: 812, priceLevel: 2, openNow: true, types: ["bar"],
   websiteUri: "https://example.com", editorialSummary: null, phone: "+39 06 1234 5678", photoRef: `places/${id}/photos/AbC_${id}`,
   selectedReviews: [{ text: "Bella vista sulla città." }], synthesis: null, tags: null,
-  verdict: null, goFor: null, dontExpect: null, matchReason: null, ...extra,
+  verdict: null, goFor: null, dontExpect: null, matchReason: null,
+  // Firma del server sui dati Google (src/lib/catalog-sig.ts): qui finta, il telefono la deve solo inoltrare.
+  firma: `firma-${id}`, ...extra,
 });
 const PLACES = [
   mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R." }),
@@ -1871,10 +1873,11 @@ else {
   const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const writes = [];
   let addMode = "error";
+  const vAdds = [];
   await vctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   await vctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
-  await vctx.route("**/api/places/add", (r) => addMode === "error"
+  await vctx.route("**/api/places/add", (r) => (vAdds.push(r.request().postDataJSON()), addMode === "error")
     ? r.fulfill({ status: 500, json: { error: "x" } })
     : r.fulfill({ json: { place: { id: "11111111-2222-3333-4444-555555555555" } } }));
   await vctx.route("**/rest/v1/saved_places**", (r) => {
@@ -1912,6 +1915,7 @@ else {
   addMode = "ok";
   await modal.getByRole("button", { name: "Salva", exact: true }).click();
   await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
+  ok(vAdds.length > 0 && vAdds.every((b) => b?.googlePlaceId === "P1" && b?.firma === "firma-P1"), "salva: /api/places/add riceve la firma del server sui dati Google del risultato");
   const ins = writes.find((w) => w.m === "POST");
   ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
     "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
@@ -2311,7 +2315,7 @@ if (!fakeUser) {
   const sp = await c.evaluate(() => window.__sharedPlace);
   ok(!!sp && sp.url === `${new URL(BASE).origin}/locali/${SHARE_UUID}?foto=places/P1/photos/AbC_P1`, `condividi locale: link Mapetite /locali/<UUID> con la foto (${sp?.url ?? "nessuno"})`);
   ok(sp?.text === "Terrazza Uno — Vista vera sui tetti di Roma. · su Mapetite", `condividi locale: testo "nome — verdetto · su Mapetite" (${sp?.text ?? ""})`);
-  ok(addCalls.length === 1 && addCalls[0]?.googlePlaceId === "P1" && addCalls[0]?.name === "Terrazza Uno", "condividi locale: il risultato di ricerca diventa una riga in places con /api/places/add (Place ID Google)");
+  ok(addCalls.length === 1 && addCalls[0]?.googlePlaceId === "P1" && addCalls[0]?.name === "Terrazza Uno" && addCalls[0]?.firma === "firma-P1", "condividi locale (con la firma del server): il risultato di ricerca diventa una riga in places con /api/places/add (Place ID Google)");
   ok(cEvents.some((e) => e?.type === "condividi"), "condividi locale: segnale 'condividi' registrato");
   await c.evaluate(() => { window.__sharedPlace = null; });
   await c.getByLabel("Condividi Terrazza Uno").click();
@@ -3191,7 +3195,7 @@ else {
     await cards.getByRole("button", { name: "Salva Terrazza Uno tra i Voglio andarci" }).click();
     await cards.locator("li", { hasText: "Terrazza Uno" }).getByTestId("assistente-salvato").waitFor({ timeout: 5000 });
     ok(true, "assistente: dopo il tocco la card dice 'Salvato'");
-    ok(aAdds.length === 1 && aAdds[0].googlePlaceId === "P1" && aAdds[0].name === "Terrazza Uno", "assistente: il locale entra nel catalogo con /api/places/add (Place ID Google)");
+    ok(aAdds.length === 1 && aAdds[0].googlePlaceId === "P1" && aAdds[0].name === "Terrazza Uno" && aAdds[0].firma === "firma-P1", "assistente (con la firma del server): il locale entra nel catalogo con /api/places/add (Place ID Google)");
     ok(aSaveInserts.length === 1 && aSaveInserts[0].place_id === "33333333-0000-4000-8000-0000000000a1" && JSON.stringify(aSaveInserts[0].tags) === '["Da provare"]', `assistente: salvato in saved_places come 'Da provare' con l'UUID (${JSON.stringify(aSaveInserts[0] ?? null)})`);
     await ap.getByTestId("assistente-salvato-avviso").waitFor({ timeout: 3000 });
     ok((await ap.getByTestId("assistente-salvato-avviso").textContent()).includes("Voglio andarci") && (await ap.getByTestId("assistente-salvato-avviso").getByRole("link", { name: "Sulla mappa" }).getAttribute("href")) === "/mappa?salvato=33333333-0000-4000-8000-0000000000a1",
@@ -3614,7 +3618,7 @@ else {
     // Salva e Prenota sulla tappa (stessi pulsanti delle card dell'assistente).
     await tappe.nth(0).getByTestId("assistente-salva").click();
     await tappe.nth(0).getByTestId("assistente-salvato").waitFor({ timeout: 5000 });
-    ok(sAdds.length === 1 && sAdds[0].googlePlaceId === "SA1", "serata: 'Salva' sulla tappa salva il locale (Place ID Google)");
+    ok(sAdds.length === 1 && sAdds[0].googlePlaceId === "SA1" && sAdds[0].firma === "firma-SA1", "serata (con la firma del server): 'Salva' sulla tappa salva il locale (Place ID Google)");
     await sp.getByTestId("assistente-salvato-avviso").waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
     await tappe.nth(2).getByTestId("assistente-prenota").click();
     await sp.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
@@ -4787,7 +4791,7 @@ else {
   // Salva: entra nei salvati come "Voglio andarci".
   await sp.getByTestId("sorpresa-salva").click();
   await sp.getByText("✓ Salvato").waitFor({ timeout: 4000 }).catch(() => {});
-  ok(surpAdd?.googlePlaceId === "S3" && JSON.stringify(surpInsert?.tags) === '["Da provare"]' && await sp.getByText("✓ Salvato").isVisible(), "sorprendimi: 'Salva' lo mette tra i salvati come 'Voglio andarci'");
+  ok(surpAdd?.googlePlaceId === "S3" && surpAdd?.firma === "firma-S3" && JSON.stringify(surpInsert?.tags) === '["Da provare"]' && await sp.getByText("✓ Salvato").isVisible(), "sorprendimi: 'Salva' lo mette tra i salvati come 'Voglio andarci'");
 
   // 360px: niente scroll orizzontale, azioni visibili.
   await sp.setViewportSize({ width: 360, height: 780 });
@@ -6478,6 +6482,45 @@ else {
   await lp.waitForTimeout(1500);
   ok(lBodies.length === 2 && Math.abs(lBodies[1].lat - 45.4642) < 1e-3, `link di ricerca senza punto (home, ricerche recenti): cerca dove era la mappa (${lBodies[1]?.lat})`);
   await lctx.close();
+}
+
+// Catalogo condiviso (proposta di sicurezza della PR #54): /api/places/add VERO, con un locale già
+// nel catalogo. Nome, indirizzo e voto mandati dal telefono senza firma valida non devono cambiare
+// la riga che vedono tutti. Nessuna chiamata Google; nessuna scrittura (il locale esiste già e i dati
+// firmati sono identici a quelli salvati). Serve il dev server con E2E_FAKE_USER.
+{
+  const SB = process.env.NEXT_PUBLIC_SUPABASE_URL, ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const leggi = (q) => fetch(`${SB}/rest/v1/places?select=id,name,address,lat,lng,category,rating,price_level,google_place_id&${q}`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } })
+    .then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  const rows = fakeUser && SB && ANON ? await leggi("google_place_id=not.is.null&lat=not.is.null&limit=1") : [];
+  const v = rows[0];
+  if (!v) console.log("SKIP  catalogo firmato: serve il dev server con E2E_FAKE_USER e un locale nel catalogo");
+  else {
+    const { createHmac } = await import("crypto");
+    const firma = (entry, key) => { const p = Buffer.from(JSON.stringify(entry)).toString("base64url"); return `${p}.${createHmac("sha256", key).update("catalogo-v1:" + p).digest("hex")}`; };
+    const falso = { id: v.google_place_id, name: "Nome Falso E2E", address: "Via Inventata 1", lat: v.lat, lng: v.lng, category: "bar", rating: 1, priceLevel: 4, userRatingCount: 3 };
+    const add = (extra) => fetch(`${BASE}/api/places/add`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ googlePlaceId: v.google_place_id, name: falso.name, address: falso.address, lat: v.lat, lng: v.lng, category: "bar", rating: 1, priceLevel: 4, ...extra }),
+    }).then(async (r) => ({ status: r.status, place: (await r.json().catch(() => null))?.place ?? null }));
+    const senza = await add({});
+    const rotta = await add({ firma: "abc.def" });
+    const chiaveSbagliata = await add({ firma: firma(falso, "chiave-sbagliata") });
+    const stessi = (p) => !!p && p.id === v.id && p.name === v.name;
+    ok(senza.status === 200 && stessi(senza.place), `catalogo: un salvataggio senza firma ritrova il locale ma non cambia il nome ("${senza.place?.name}")`);
+    ok(rotta.status === 200 && stessi(rotta.place) && chiaveSbagliata.status === 200 && stessi(chiaveSbagliata.place), "catalogo: con una firma rovinata o fatta con un'altra chiave il nome non cambia");
+    const KEY = process.env.SUPABASE_SECRET_KEY;
+    if (KEY) {
+      // Firma vera ma di un ALTRO locale: non vale per questo Place ID.
+      const altro = await add({ firma: firma({ ...falso, id: "ChIJaltroLocaleE2E00000" }, KEY) });
+      ok(altro.status === 200 && stessi(altro.place), "catalogo: la firma di un altro locale non vale per questo");
+      // Firma vera con gli stessi dati del catalogo: accettata, nulla da correggere.
+      const vera = await add({ name: v.name, address: v.address ?? "", firma: firma({ id: v.google_place_id, name: v.name, address: v.address ?? "", lat: v.lat, lng: v.lng, category: null, rating: null, priceLevel: null, userRatingCount: null }, KEY) });
+      ok(vera.status === 200 && stessi(vera.place), "catalogo: con la firma del server il salvataggio va a buon fine sullo stesso locale");
+    }
+    const dopo = (await leggi(`id=eq.${v.id}`))[0];
+    ok(!!dopo && JSON.stringify(dopo) === JSON.stringify(v), "catalogo: dopo i tentativi la riga del locale è identica (nome, indirizzo, posizione, voto)");
+  }
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);

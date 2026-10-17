@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { findOrCreatePlace } from "@/lib/places-store";
+import { verifyCatalogEntry } from "@/lib/catalog-sig";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
+  // Solo in sviluppo, per il giro automatico (scripts/e2e/giro.mjs), come /api/places/search.
+  const devUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
 
-  if (!userData?.user) {
+  if (!userData?.user && !devUser) {
     return NextResponse.json({ error: "Devi accedere per aggiungere un locale." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
-  const { googlePlaceId, name, address, lat, lng, category, rating, priceLevel, userRatingCount } = body ?? {};
+  const { googlePlaceId, name, address, lat, lng, category, rating, priceLevel } = body ?? {};
 
   if (
     typeof googlePlaceId !== "string" ||
@@ -35,12 +38,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Dati del locale non validi." }, { status: 400 });
   }
 
-  // Numero di recensioni: serve solo a classificare "poco conosciuto" (Scopritori), non si salva.
-  const reviews = typeof userRatingCount === "number" && Number.isFinite(userRatingCount) && userRatingCount >= 0 ? userRatingCount : null;
-  const result = await findOrCreatePlace(
-    { googlePlaceId, name, address, lat, lng, category, rating, priceLevel, userRatingCount: reviews },
-    "add/route",
-  );
+  // Firma del server (src/lib/catalog-sig.ts): se c'è ed è valida, nel catalogo vanno i dati
+  // firmati da Google, non quelli del corpo. Senza firma i dati restano del telefono: il locale
+  // si salva lo stesso, ma non si collega a un Place ID nuovo (vedi "fonte" in places-store).
+  const signed = verifyCatalogEntry(body?.firma, googlePlaceId);
+  const result = signed
+    ? await findOrCreatePlace(
+        {
+          googlePlaceId, name: signed.name, address: signed.address, lat: signed.lat, lng: signed.lng,
+          category: signed.category, rating: signed.rating, priceLevel: signed.priceLevel, userRatingCount: signed.userRatingCount,
+        },
+        "add/route",
+        "google",
+      )
+    : await findOrCreatePlace({ googlePlaceId, name, address, lat, lng, category, rating, priceLevel }, "add/route", "telefono");
+  if (!signed) console.log(`[add/route] firma ${body?.firma ? "non valida" : "assente"} per ${googlePlaceId}`);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

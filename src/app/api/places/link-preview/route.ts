@@ -56,7 +56,8 @@ async function preview(apiKey: string, link: string, budget: number): Promise<Pr
     const known = await findStoredPlace(info.placeId ? { googlePlaceId: info.placeId } : { name, lat: info.lat, lng: info.lng });
     if (known) return ok(known, 0, address);
     if (info.placeId && hasCoords && name) {
-      const stored = await findOrCreatePlace({ googlePlaceId: info.placeId, name, address, lat: info.lat!, lng: info.lng! }, "link-preview");
+      // Place ID, nome e posizione scritti nel link, nessuna chiamata a Google: dati del telefono.
+      const stored = await findOrCreatePlace({ googlePlaceId: info.placeId, name, address, lat: info.lat!, lng: info.lng! }, "link-preview", "telefono");
       return "error" in stored ? later(name, 0, stored.error) : ok(stored.place, 0, address);
     }
 
@@ -66,7 +67,7 @@ async function preview(apiKey: string, link: string, budget: number): Promise<Pr
       calls = 1;
       const id = await findPlaceId(apiKey, info.query ?? name, info.lat!, info.lng!);
       if (!id) return { stato: "non_riconosciuto", chiamate: calls, motivo: `Non trovo "${name}" su Google.` };
-      const stored = await findOrCreatePlace({ googlePlaceId: id, name, address, lat: info.lat!, lng: info.lng! }, "link-preview");
+      const stored = await findOrCreatePlace({ googlePlaceId: id, name, address, lat: info.lat!, lng: info.lng! }, "link-preview", "link");
       return "error" in stored ? later(name, calls, stored.error) : ok(stored.place, calls, address);
     }
 
@@ -89,6 +90,7 @@ async function preview(apiKey: string, link: string, budget: number): Promise<Pr
     const stored = await findOrCreatePlace(
       { googlePlaceId: id, name: full.name ?? name ?? text!, address: full.address, lat: full.lat, lng: full.lng },
       "link-preview",
+      full.name ? "google" : "link",
     );
     return "error" in stored ? later(name ?? text, calls, stored.error) : ok(stored.place, calls);
   } catch {

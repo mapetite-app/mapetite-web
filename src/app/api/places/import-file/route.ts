@@ -43,7 +43,8 @@ export async function POST(request: Request) {
       const it = valid(list[i]);
       if (!it) { risultati[i] = { error: "Dati del posto non validi." }; continue; }
       const r = it.googlePlaceId
-        ? await findOrCreatePlace({ googlePlaceId: it.googlePlaceId, name: it.name, address: it.address, lat: it.lat, lng: it.lng }, "import-file")
+        ? // Dati letti dal file sul telefono: si ritrova il locale per Place ID, ma uno nuovo non si collega.
+          await findOrCreatePlace({ googlePlaceId: it.googlePlaceId, name: it.name, address: it.address, lat: it.lat, lng: it.lng }, "import-file", "telefono")
         : await findOrCreateImportedPlace(it);
       if ("error" in r) risultati[i] = { error: r.error };
       else { risultati[i] = { id: r.place.id }; if (r.created) created++; }

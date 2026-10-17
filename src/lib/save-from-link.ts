@@ -1,4 +1,5 @@
 import { browserClient } from "@/lib/supabase/client-lazy";
+import { firmaPer } from "@/lib/catalog-firme";
 
 // "Salva da Google Maps" lato telefono: chiede al server di trovare i locali dai link,
 // poi li aggiunge ai salvati dell'utente con lo stato "Da provare" ("📌 Voglio andarci"),
@@ -54,6 +55,7 @@ export async function saveFromLinks(text: string, userId: string, title?: string
 export type SearchPlace = {
   id: string; name: string; address: string; lat: number | null; lng: number | null;
   category: string | null; rating: number | null; priceLevel: number | null;
+  firma?: string; // firma del server sui dati Google (src/lib/catalog-sig.ts)
 };
 export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<LinkOutcome> {
   if (r.lat == null || r.lng == null) throw new Error("Questo locale non ha una posizione su Google Maps.");
@@ -63,6 +65,7 @@ export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<L
     body: JSON.stringify({
       googlePlaceId: r.id, name: r.name, address: r.address, lat: r.lat, lng: r.lng,
       category: r.category, rating: r.rating, priceLevel: r.priceLevel,
+      firma: r.firma ?? firmaPer(r.id),
     }),
   });
   const data = await res.json().catch(() => ({}));
