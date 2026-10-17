@@ -2873,7 +2873,7 @@ else {
     ok(items.includes("Copia indirizzo") && items.includes("Apri su Google Maps") && items.some((t) => t.includes("Rivendicalo")), `menu Altro: copia indirizzo, Google Maps, rivendica (${items.join(" | ")})`); }
   { const box = await s.getByTestId("altro-menu").boundingBox(); ok(!!box && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390, "menu Altro: tutto dentro lo schermo"); }
   await s.screenshot({ path: `${OUT}/60b-scheda-menu-altro.png`, caret: "initial" });
-  await s.getByRole("button", { name: "Chiudi il menu" }).click();
+  await s.getByRole("button", { name: "Chiudi il menu" }).click({ position: { x: 10, y: 10 } });
   ok((await s.getByTestId("altro-menu").count()) === 0, "menu Altro: si chiude toccando fuori");
   await s.getByTestId("scheda-tab-recensioni").click();
   ok(await s.getByText("Cosa dicono").isVisible() && await s.getByTestId("community-scheda").isVisible(), "scheda: 'Recensioni' mostra Google e la community Mapetite");
