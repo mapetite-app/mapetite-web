@@ -1313,6 +1313,7 @@ export default function MapView({
   // sua scheda (VISIONE: il verdetto c'è SEMPRE). Arrivano anche foto, recensioni e orari di Google,
   // solo da mostrare. Una volta per locale; su errore o tetto del giorno la scheda resta com'era.
   const verdettoChiesto = useRef(new Set<string>());
+  const [verdettoInCorso, setVerdettoInCorso] = useState<string | null>(null);
   const selectedSavedId = selected && /^[0-9a-f-]{36}$/i.test(selected.id) && !venueDetails[selected.id]?.verdict ? selected.id : null;
   useEffect(() => {
     if (!userId || !selectedSavedId || verdettoChiesto.current.has(selectedSavedId)) return;
@@ -1320,6 +1321,7 @@ export default function MapView({
     if (!googlePlaceId) return;
     verdettoChiesto.current.add(selectedSavedId);
     void (async () => {
+      setVerdettoInCorso(selectedSavedId);
       try {
         const res = await fetch("/api/places/verdetto", {
           method: "POST",
@@ -1339,6 +1341,8 @@ export default function MapView({
         setVenueDetails((prev) => ({ ...prev, [selectedSavedId]: { ...det, ...Object.fromEntries(Object.entries(prev[selectedSavedId] ?? {}).filter(([, v]) => v != null)) } }));
       } catch {
         // Senza rete: la scheda resta com'era.
+      } finally {
+        setVerdettoInCorso((id) => (id === selectedSavedId ? null : id));
       }
     })();
   }, [userId, selectedSavedId, placeUuids]);
@@ -3052,6 +3056,7 @@ export default function MapView({
               canEdit={view === "saved"}
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
+              verdettoInArrivo={verdettoInCorso === selected.id}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
               ) : null}

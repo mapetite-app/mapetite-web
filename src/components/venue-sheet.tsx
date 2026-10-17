@@ -76,6 +76,8 @@ type VenueSheetProps = {
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
   // Prenotazione assistita: giorno, ora e persone già capiti (dall'assistente), da confermare.
   booking?: Partial<BookingDetails> | null;
+  // Salvato senza verdetto: il server lo sta scrivendo (/api/places/verdetto).
+  verdettoInArrivo?: boolean;
   // Classifica personale (piano 4.3) sotto "Com'era?": la passa map-view solo per i salvati visitati.
   rankSlot?: React.ReactNode;
 };
@@ -96,6 +98,7 @@ export default function VenueSheet({
   onQuickSave,
   booking = null,
   rankSlot,
+  verdettoInArrivo = false,
 }: VenueSheetProps) {
   const {
     name,
@@ -531,6 +534,12 @@ export default function VenueSheet({
                 {matchReasonText}
               </p>
             )}
+          </div>
+        )}
+        {headline == null && matchReasonText == null && verdettoInArrivo && (
+          <div data-testid="verdetto-in-arrivo" className="mx-5 mt-4 rounded-card bg-brand p-4 shadow-card">
+            <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</p>
+            <p className="mt-1.5 animate-pulse font-sans text-sm text-white/80">Lo sto scrivendo dalle recensioni…</p>
           </div>
         )}
 
