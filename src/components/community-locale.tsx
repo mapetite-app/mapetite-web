@@ -302,6 +302,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
               userId={userId!}
               placeId={c.placeId!}
               foto={c.mieFoto.filter((f) => f.pubblica)}
+              altre={c.mieFoto.filter((f) => !f.pubblica).length}
               onChange={(pub: FotoUtente[]) => setData({ id, c: { ...c, mieFoto: [...c.mieFoto.filter((f) => !f.pubblica), ...pub] } })}
               pubblica
               contesto={contesto}

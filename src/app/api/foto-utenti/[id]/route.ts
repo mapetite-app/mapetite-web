@@ -16,17 +16,22 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   if (!UUID_RE.test(id) || !process.env.SUPABASE_SECRET_KEY) return NOT_FOUND();
   try {
     const supabase = await createClient();
+    // Mai il percorso salvato nella riga (l'utente lo scrive dal telefono): si ricostruisce dagli id,
+    // tutti controllati. Prima "<id>/../../auth/v1/..." faceva leggere al server altri indirizzi
+    // di Supabase con la chiave segreta (la libreria Storage non codifica il percorso).
+    type Riga = { id: string; user_id: string; place_id: string };
     const [pub, own] = await Promise.all([
       supabase.from("foto_pubbliche").select("id").eq("id", id).maybeSingle(),
-      supabase.from("foto_locali").select("path").eq("id", id).maybeSingle<{ path: string }>(),
+      supabase.from("foto_locali").select("id, user_id, place_id").eq("id", id).maybeSingle<Riga>(),
     ]);
     const admin = createAdminClient();
-    let path = own.data?.path ?? null;
-    if (!path && pub.data) {
-      const { data } = await admin.from("foto_locali").select("path").eq("id", id).maybeSingle<{ path: string }>();
-      path = data?.path ?? null;
+    let row = own.data ?? null;
+    if (!row && pub.data) {
+      const { data } = await admin.from("foto_locali").select("id, user_id, place_id").eq("id", id).maybeSingle<Riga>();
+      row = data ?? null;
     }
-    if (!path) return NOT_FOUND();
+    if (!row || ![row.id, row.user_id, row.place_id].every((x) => UUID_RE.test(x))) return NOT_FOUND();
+    const path = `${row.user_id}/${row.place_id}/${row.id}.jpg`;
     const { data: file, error } = await admin.storage.from(FOTO_BUCKET).download(path);
     if (error || !file) {
       console.error("[foto] file non letto:", error?.message);

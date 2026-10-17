@@ -23,9 +23,10 @@ export default function HomeRecent() {
           <Link
             key={q}
             href={`/mappa?q=${encodeURIComponent(q)}`}
-            className="flex min-h-10 max-w-64 shrink-0 items-center rounded-pill bg-accent-light px-3.5 text-sm font-sans text-accent active:scale-95"
+            className="flex min-h-10 max-w-64 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-3.5 text-sm font-sans text-text active:scale-95"
           >
-            <span className="truncate">↻ {q}</span>
+            <span aria-hidden className="text-text-muted">↻</span>
+            <span className="truncate">{q}</span>
           </Link>
         ))}
       </div>

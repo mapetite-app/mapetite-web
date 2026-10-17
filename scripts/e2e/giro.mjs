@@ -524,7 +524,12 @@ ok((await page.getByTestId("barra-ricerca").count()) === 0 && (await page.getByR
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 const bar = await page.getByTestId("barra-ricerca").boundingBox();
 const loc = await page.getByRole("button", { name: "La mia posizione", exact: true }).boundingBox();
-ok(!!bar && !!loc && bar.y < 80 && bar.x + bar.width <= loc.x, "barra: in cima, non copre il pulsante posizione");
+ok(!!bar && !!loc && bar.y < 80 && (bar.x + bar.width <= loc.x || bar.y + bar.height <= loc.y), "barra: in cima, non copre il pulsante posizione");
+// 17/10: la barra prende tutta la larghezza (la frase non si taglia), la posizione scende sulla seconda riga.
+{
+  const fb = await page.getByRole("button", { name: "Filtri", exact: true }).boundingBox();
+  ok(!!fb && !!bar && !!loc && fb.x + fb.width >= 390 - 16 - 1 && loc.y >= bar.y + bar.height, `barra: campo + Filtri fino al bordo destro, posizione sotto (${Math.round((fb?.x ?? 0) + (fb?.width ?? 0))}px)`);
+}
 ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella card iniziale niente secondo campo");
 await shot("22-barra");
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
@@ -725,6 +730,13 @@ await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
 ok(await page.getByText("Chiedi all'AI come a un amico, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
 ok((await page.getByTestId("home-suggerimenti").getByRole("link").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
+// 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
+ok(await page.getByRole("img", { name: "Mapetite" }).first().isVisible(), "home: il marchio Mapetite (non più l'emoji)");
+{
+  const avvii = await page.locator('link[rel="apple-touch-startup-image"]').evaluateAll((ls) => ls.map((l) => l.getAttribute("href")));
+  const r = avvii[4] ? await page.request.get(`${BASE}${avvii[4]}`) : null;
+  ok(avvii.length >= 10 && r?.status() === 200 && r.headers()["content-type"] === "image/png", `iPhone: ${avvii.length} schermate d'avvio, l'immagine si apre`);
+}
 { const f = await page.getByTestId("home-filtri").boundingBox(); const bar = await page.getByLabel("Cosa cerchi?").boundingBox(); ok(!!f && !!bar && Math.abs((f.y + f.height / 2) - (bar.y + bar.height / 2)) < 12, "home: 'Filtri' dentro la barra, non un secondo blocco"); }
 ok((await page.getByTestId("home-recenti").getByRole("link").count()) >= 1, "home: le ultime ricerche fatte su questo telefono, a un tocco");
 await page.getByTestId("home-filtri").click();
@@ -784,6 +796,15 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
   ok((await page.getByTestId("messi-da-parte").textContent()) === "🧭 Ho messo da parte 3 locali molto famosi (Tonnarello, Nannarella…)", "risultati: dice quali locali molto famosi ha messo da parte (non 'turistici': non lo sappiamo)");
   await shot("05d-messi-da-parte");
 }, () => ok(false, "risultati: dice quali locali molto famosi ha messo da parte (non 'turistici': non lo sappiamo)"));
+await page.unroute("**/api/search");
+// 17/10: fuori dal quartiere chiesto ("enoteca a Monti"): in fondo e detto.
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: [], fuori_tema: [], fuori_zona: ["Solovino", "OrganiCool"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("messi-da-parte").textContent()) === "🧭 Ho messo in fondo 2 fuori zona (Solovino, OrganiCool)", "risultati: dice quali locali fuori dal quartiere ha messo in fondo");
+}, () => ok(false, "risultati: dice quali locali fuori dal quartiere ha messo in fondo"));
 await page.unroute("**/api/search");
 
 // 5g. Verdetti a gruppi (14/10): quelli delle prime card compaiono senza aspettare gli altri

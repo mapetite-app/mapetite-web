@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -88,11 +88,21 @@ ok(!ambiguousDistrict("trattoria a Monti", null) && !ambiguousDistrict("pizza", 
   // Come route.ts costruisce il testo per Google con un quartiere ambiguo e la mappa su Roma.
   const testo = (q, zona, lat, lng) => {
     if (!ambiguousDistrict(q, zona)) return q;
-    const city = cityNear(lat, lng);
+    const city = districtCity(zona, q) ?? cityNear(lat, lng);
     const t = withDistrict(q, zona);
     return city && !namedCity(t) ? `${t} ${city}` : t;
   };
   ok(testo("trattoria Monti", "Monti", 41.8986, 12.4769) === "trattoria quartiere Monti Roma" && testo("trattoria Parma", "Parma", 41.8986, 12.4769) === "trattoria Parma" && testo("aperitivo Isola", "Isola", 45.48, 9.19) === "aperitivo quartiere Isola Milano", "zona: 'Monti' con la mappa su Roma → Roma; 'Parma' resta Parma; 'Isola' con la mappa su Milano → Milano");
+}
+
+// 17/10 (eventi veri del 16/10 sera): "bar cozy a Moscova" con la mappa su Roma dava bar di Roma.
+{
+  const testo = (q, zona, lat, lng) => { const city = districtCity(zona, q) ?? cityNear(lat, lng); const t = withDistrict(q, zona); return city && !namedCity(t) ? `${t} ${city}` : t; };
+  ok(testo("bar cozy Moscova", "Moscova", 41.8986, 12.4769) === "bar cozy quartiere Moscova Milano", "quartiere: 'Moscova' con la mappa su Roma → Milano");
+  ok(testo("trattoria Trastevere", "Trastevere", 45.464, 9.19) === "trattoria quartiere Trastevere Roma", "quartiere: 'Trastevere' con la mappa su Milano → Roma");
+  ok(districtCity("Porta Ticinese") === "Milano" && districtCity("Colonne di San Lorenzo") === "Milano" && districtCity("San Lorenzo") === "Roma", "quartiere: i nomi più lunghi vincono (Colonne di San Lorenzo è Milano, San Lorenzo è Roma)");
+  ok(districtCity("centro") === null && districtCity("Duomo") === null && districtCity("Trieste") === null, "quartiere: 'centro', 'Duomo', 'Trieste' restano alla città della mappa");
+  ok(districtCity(null, "cena romantica a campo de' fiori") === "Roma" && districtCity("NoLo") === "Milano", "quartiere: anche dalla frase (Campo de' Fiori) e con maiuscole (NoLo)");
 }
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
@@ -103,6 +113,13 @@ const dd = dedupeSamePlace([
   { name: "drinc. Cocktail & Conversation", lat: 45.4753707, lng: 9.2160187, userRatingCount: 665 },
 ]);
 ok(dd.length === 2 && dd[0].name === "drinc. Cocktail & Conversation", "doppioni: lo stesso locale resta una volta, al primo posto, con la scheda più recensita");
+// Revisione 17/10: locali diversi nello stesso palazzo restano due.
+ok(dedupeSamePlace([
+  { name: "Hotel Splendor Bar", lat: 41.9, lng: 12.49, userRatingCount: 100 },
+  { name: "Hotel Splendor Restaurant", lat: 41.9, lng: 12.49, userRatingCount: 900 },
+  { name: "Mercato Centrale Pizza", lat: 41.901, lng: 12.5, userRatingCount: 50 },
+  { name: "Mercato Centrale Sushi", lat: 41.901, lng: 12.5, userRatingCount: 60 },
+]).length === 4, "doppioni: bar e ristorante dello stesso hotel, banchi dello stesso mercato restano separati");
 ok(dedupeSamePlace([{ name: "Bar Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Bar Bianchi", lat: 41.9, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: due locali diversi nello stesso palazzo restano entrambi");
 ok(dedupeSamePlace([{ name: "Rossi", lat: 41.9, lng: 12.5, userRatingCount: 1 }, { name: "Rossi", lat: 41.91, lng: 12.5, userRatingCount: 1 }]).length === 2, "doppioni: stesso nome a 1 km sono due locali");
 // Coerenza tra il perché e il livello (perché veri di Haiku, 17/10).
@@ -126,4 +143,24 @@ ok(cerca("sushi da provare") === "Wagyu Bar,Zen", "salvati: 'sushi da provare' �
 ok(cerca("trattoria della carbonara") === "Trattoria da Augusto", "salvati: la nota conta ('carbonara')");
 ok(cerca("bar a Roma, zona Monti") === "Er Caffettiere", "salvati: un rione che l'indirizzo non riporta non svuota il risultato");
 ok(cerca("quello che avevo salvato") === "", "salvati: una frase senza niente di concreto non propone niente");
+// Revisione 17/10: un tipo che non c'è non propone tutto; frammenti corti solo a parola intera.
+ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cinese salvato → nessun risultato (prima tutto Milano)");
+{
+  const altri = [
+    { name: "Bar Centrale", t: "cafe Piazza della Repubblica 1, Roma", tags: [] },
+    { name: "Trattoria Monteverde", t: "italian_restaurant Via di Monteverde 2, Roma", tags: [] },
+    { name: "Hop Pub", t: "pub Via Roma 3, Roma", tags: [] },
+  ];
+  const c2 = (q) => filtraSalvatiNaturale(altri, q, (p) => `${p.name} ${p.t}`, (p) => p.tags).map((p) => p.name).sort().join(",");
+  ok(c2("il pub") === "Hop Pub", "salvati: 'pub' non trova 'Repubblica'");
+  ok(c2("trattoria a monti") === "Trattoria Monteverde" && c2("monti") === "", "salvati: 'monti' non trova 'Monteverde' (la trattoria resta per il tipo)");
+}
+// Quartiere nominato (ricerca vera del 17/10, "enoteca con vini naturali a Monti"): i lontani in fondo.
+{
+  const monti = { lat: 41.8945, lng: 12.493 };
+  const e = (name, lat, lng) => ({ name, lat, lng });
+  const r = demoteFarFrom(monti, [e("La Barrique", 41.8962, 12.4917), e("Solovino (Ostiense)", 41.8556, 12.4784), e("OrganiCool (Talenti)", 41.9408, 12.5389), e("Al Vino Al Vino", 41.8952, 12.4908), e("Domus Vini", 41.8987, 12.4928)]);
+  ok(r.places.map((p) => p.name).join() === "La Barrique,Al Vino Al Vino,Domus Vini,Solovino (Ostiense),OrganiCool (Talenti)" && r.demoted.length === 2, "zona: Monti, le enoteche di Ostiense e Talenti vanno in fondo");
+  ok(demoteFarFrom(monti, [e("A", 41.8962, 12.4917), e("B", 41.85, 12.47), e("C", 41.94, 12.53)]).demoted.length === 0, "zona: se nel quartiere ne restano meno di 3 non si tocca nulla");
+}
 process.exit(failed === 0 ? 0 : 1);

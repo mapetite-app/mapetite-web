@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import LogoMark from "@/components/logo-mark";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Check, X, Navigation, MapPin, BadgeCheck } from "lucide-react";
@@ -98,7 +99,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
           href="/"
           className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-pill bg-black/45 px-3 py-1.5 font-display text-xs font-semibold text-white backdrop-blur"
         >
-          <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
+          <LogoMark size={18} className="rounded-[5px]" />
           Mapetite
         </Link>
       </div>

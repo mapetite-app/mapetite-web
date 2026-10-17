@@ -1,3 +1,4 @@
+import { avvioStartupImages } from "@/lib/avvio";
 import type { Metadata, Viewport } from "next";
 import { Poppins, Inter, Newsreader } from "next/font/google";
 import OfflineBanner from "@/components/offline-banner";
@@ -58,6 +59,8 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Mapetite",
+    // Schermata d'avvio dell'app installata su iPhone: marchio su fondo teal invece dello schermo bianco.
+    startupImage: avvioStartupImages,
   },
   icons: {
     apple: "/apple-touch-icon.png",

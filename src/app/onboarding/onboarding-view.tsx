@@ -212,7 +212,18 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
     // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
     clearDraft();
-    const result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next });
+    let result: Awaited<ReturnType<typeof completeOnboarding>>;
+    try {
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next });
+    } catch (err) {
+      // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
+      if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+      // Rete caduta (succede in metro): la bozza torna e il pulsante si sblocca.
+      saveDraft(draftNow);
+      setError("Non sono riuscito a salvare: controlla la connessione e riprova.");
+      setSubmitting(null);
+      return;
+    }
     if (result && "login" in result) {
       saveDraft(draftNow);
       router.push(result.login);

@@ -55,7 +55,8 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
   }
 
   if (existing) {
-    await markPocoConosciuto((existing as StoredPlace).id, input);
+    // Niente aggiornamento di "poco conosciuto" da un locale già in catalogo (17/10): voto e numero
+    // di recensioni arrivano dal telefono, e chiunque poteva accendere il badge su qualsiasi locale.
     return { place: existing as StoredPlace, created: false };
   }
 
@@ -91,7 +92,7 @@ export async function findOrCreatePlace(input: NewPlace, logTag = "places-store"
 // Scopritori (piano 5.6): si salva solo la NOSTRA classificazione sì/no (regola del badge
 // "💎 Poco conosciuto"), mai il numero di recensioni di Google. Serve la migrazione
 // 20261016_scopritori.sql: senza la colonna l'aggiornamento fallisce in silenzio e il
-// salvataggio resta identico. Vale anche per un locale già in catalogo (dati più freschi).
+// salvataggio resta identico. Solo alla creazione del locale.
 async function markPocoConosciuto(id: string, input: NewPlace): Promise<void> {
   if (typeof input.rating !== "number" || typeof input.userRatingCount !== "number") return;
   try {

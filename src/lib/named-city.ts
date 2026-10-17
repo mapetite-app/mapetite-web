@@ -55,6 +55,38 @@ export function namedOtherCity(query: string): string | null {
   return m ? ALTRE_CITTA.find((c) => norm(c) === m[1]) ?? null : null;
 }
 
+// Quartieri noti delle due città di partenza (VISIONE: Roma e Milano). Un quartiere dice già la città:
+// "bar cozy a Moscova" con la mappa su Roma cercava "quartiere Moscova Roma" e dava 4 bar di Roma
+// (visto negli eventi del 16/10 sera). Solo nomi che esistono in una città sola: niente "Centro",
+// "Duomo", "Centrale", e "Trieste"/"Lodi" restano alla città della mappa (sono anche città).
+const QUARTIERI: Record<string, string[]> = {
+  Roma: [
+    "Trastevere", "Monti", "Rione Monti", "Testaccio", "Prati", "Pigneto", "San Lorenzo", "Ostiense", "Garbatella",
+    "Parioli", "Flaminio", "Esquilino", "Centocelle", "Quadraro", "Monteverde", "Campo de' Fiori", "Campo de Fiori",
+    "Trevi", "Celio", "Aventino", "Ponte Milvio", "Coppedè", "Torpignattara", "Tor Pignattara", "Eur",
+    "Ghetto ebraico", "Pantheon", "Piazza Navona", "Balduina", "Montesacro", "San Saba", "Monteverde Vecchio",
+  ],
+  Milano: [
+    "Brera", "Navigli", "Isola", "Moscova", "Porta Venezia", "Porta Romana", "Porta Garibaldi", "Garibaldi", "NoLo",
+    "Città Studi", "Zona Tortona", "Tortona", "Sempione", "Paolo Sarpi", "Chinatown", "Corso Como", "Lambrate",
+    "Bicocca", "CityLife", "Porta Nuova", "Ticinese", "Corso Garibaldi", "Darsena", "Bovisa", "Loreto",
+    "Corso Buenos Aires", "Sant'Ambrogio", "Magenta", "Porta Ticinese", "Colonne di San Lorenzo", "Arco della Pace",
+  ],
+};
+const QUARTIERI_IDX = Object.entries(QUARTIERI).flatMap(([city, list]) => list.map((q) => ({ city, q: norm(q) })))
+  // I nomi più lunghi prima: "Porta Ticinese" vince su "Ticinese", "Colonne di San Lorenzo" su "San Lorenzo".
+  .sort((a, b) => b.q.length - a.q.length);
+
+// La città di un quartiere noto nominato nella zona (o, se manca, nella frase), altrimenti null.
+export function districtCity(zona: string | null | undefined, query = ""): string | null {
+  for (const text of [zona ?? "", query]) {
+    const t = ` ${norm(text).replace(/[^a-z0-9' ]+/g, " ")} `;
+    const hit = QUARTIERI_IDX.find(({ q }) => t.includes(` ${q} `));
+    if (hit) return hit.city;
+  }
+  return null;
+}
+
 // Zona ambigua = un quartiere senza città: nessuna città nominata nella frase né nella zona.
 // Solo qui la città della mappa fa da contesto (testo per Google e preferenza larga di 25 km).
 export function ambiguousDistrict(query: string, zona: string | null | undefined): boolean {
@@ -139,4 +171,24 @@ export function stripCity(query: string, name: string): string {
   const re = new RegExp(`\\s*\\b(?:a|in|di|da|zona)?\\s*${c.re.source}`, "gi");
   const out = query.replace(re, "").replace(/\s{2,}/g, " ").trim();
   return out.length >= 3 ? out : query;
+}
+
+// Quartiere nominato ("enoteca a Monti"): i locali a più di maxM metri dal centro del quartiere vanno
+// in fondo, mai esclusi (visto il 17/10 con Google vero: 3 enoteche su 4 in cima erano a Ostiense,
+// Talenti e Monteverde). Se nel quartiere ne restano meno di 3 non si tocca nulla.
+export function demoteFarFrom<T extends { name: string; lat: number | null; lng: number | null }>(
+  center: { lat: number; lng: number },
+  places: T[],
+  maxM = 2000,
+): { places: T[]; demoted: string[] } {
+  const far = (p: T) => {
+    if (p.lat == null || p.lng == null) return false;
+    const dy = (p.lat - center.lat) * 111320;
+    const dx = (p.lng - center.lng) * 111320 * Math.cos((center.lat * Math.PI) / 180);
+    return Math.hypot(dx, dy) > maxM;
+  };
+  const kept = places.filter((p) => !far(p));
+  if (kept.length === places.length || kept.length < 3) return { places, demoted: [] };
+  const lontani = places.filter(far);
+  return { places: [...kept, ...lontani], demoted: lontani.map((p) => p.name) };
 }

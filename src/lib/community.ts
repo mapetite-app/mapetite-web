@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { followedIds, viewerId } from "@/lib/social";
-import type { ReelSource } from "@/lib/reel";
+import { reelSourceOf, type ReelSource } from "@/lib/reel";
 import { fotoMie, fotoPubbliche } from "@/lib/foto-utenti-server";
 import type { FotoCommunity, FotoUtente } from "@/lib/foto-utenti";
 
@@ -136,7 +136,9 @@ export async function loadCommunity(id: string): Promise<Community> {
   const seen = new Set<string>();
   const reel: CommunityReel[] = [];
   for (const r of [...((myReels.data as ReelRow[] | null) ?? []), ...((pubReels.data as ReelRow[] | null) ?? [])]) {
-    if (!SOURCES.includes(r.fonte) || seen.has(r.url)) continue;
+    // Il link deve essere davvero di quella fonte (17/10): chi scrive direttamente nel database
+    // poteva pubblicare un link qualsiasi etichettato "Instagram".
+    if (!SOURCES.includes(r.fonte) || reelSourceOf(r.url) !== r.fonte || seen.has(r.url)) continue;
     seen.add(r.url);
     const mio = r.user_id === viewer;
     reel.push({ id: r.id, url: r.url, fonte: r.fonte as ReelSource, autore: mio ? null : autoreOf(r), mio });

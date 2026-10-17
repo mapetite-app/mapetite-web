@@ -16,12 +16,18 @@ const CASI = [
   [8, "trattoria milanese autentica con cotoletta", MILANO],
   [9, "cocktail bar nascosto a Milano per un appuntamento", MILANO],
   [10, "brunch buono a Isola nel weekend", MILANO],
+  // Prove extra (non in TEST-RICERCHE): da avviare solo scegliendole per numero.
+  [11, "bar cozy a Moscova raggiungibile a piedi", ROMA], // 17/10: quartiere di Milano con la mappa su Roma
+  [12, "pizzeria napoletana non turistica a Roma", ROMA],
+  [13, "enoteca con vini naturali a Monti", ROMA],
+  [14, "ristorante vegano carino per una cena con amici a Milano", MILANO],
+  [15, "posto tranquillo per lavorare al pc con un buon caffè", MILANO],
 ];
-const scelti = process.argv[2] ? new Set(process.argv[2].split(",").map(Number)) : null;
+const scelti = new Set(process.argv[2] ? process.argv[2].split(",").map(Number) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 const post = (path, body) => fetch(BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 
 for (const [n, query, [lat, lng]] of CASI) {
-  if (scelti && !scelti.has(n)) continue;
+  if (!scelti.has(n)) continue;
   const t0 = Date.now();
   const fast = await post("/api/search", { query, source: "world", searchIntent: "natural", phase: "fast", lat, lng });
   const tFast = Date.now() - t0;
@@ -32,7 +38,7 @@ for (const [n, query, [lat, lng]] of CASI) {
   const dettagli = Object.assign({}, ...replies.map((r) => r?.dettagli ?? {}));
   const livelli = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
   const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
-  const aside = new Set([...(fast.da_parte?.turistici ?? []), ...(fast.da_parte?.fuori_tema ?? [])]);
+  const aside = new Set([...(fast.da_parte?.turistici ?? []), ...(fast.da_parte?.fuori_tema ?? []), ...(fast.da_parte?.fuori_zona ?? [])]);
   const tolti = risultati.filter((p) => esclusi.has(p.id));
   risultati = risultati.filter((p) => !esclusi.has(p.id));
   if (risultati.length === 0) risultati = fast.risultati ?? [];

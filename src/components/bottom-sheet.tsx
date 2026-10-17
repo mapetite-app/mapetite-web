@@ -45,7 +45,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -524,13 +524,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               {understood.length > 0 && (
                 <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
               )}
-              {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0) && (
+              {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
                 <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
                   {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
                       Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
                   🧭 {[
                     setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
                     setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
+                    // Fuori dal quartiere chiesto (17/10): in fondo, mai tolti.
+                    (setAside.fuori_zona?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.fuori_zona!.length === 1 ? "uno fuori zona" : `${setAside.fuori_zona!.length} fuori zona`} (${setAside.fuori_zona!.slice(0, 2).join(", ")}${setAside.fuori_zona!.length > 2 ? "…" : ""})` : null,
                   ].filter(Boolean).join(" ")}
                 </p>
               )}

@@ -85,6 +85,7 @@ export function FotoMieEditor({
   pubblica,
   contesto,
   testId = "foto-mie",
+  altre = 0,
 }: {
   userId: string;
   placeId: string;
@@ -93,6 +94,8 @@ export function FotoMieEditor({
   pubblica: boolean; // visibilità delle foto nuove
   contesto: string; // per i segnali d'uso: "diario", "scheda", "locale", "mappa"…
   testId?: string;
+  // Foto dello stesso locale non mostrate qui (le private del diario): contano nel massimo di 3.
+  altre?: number;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(0);
@@ -106,7 +109,7 @@ export function FotoMieEditor({
     const scelti = Array.from(files ?? []);
     if (input.current) input.current.value = ""; // la stessa foto si può riscegliere
     if (scelti.length === 0) return;
-    const posto = FOTO_MAX - list.current.length;
+    const posto = FOTO_MAX - altre - list.current.length;
     if (posto <= 0) { setMsg(ERRORI.troppe); return; }
     const daCaricare = scelti.slice(0, posto);
     if (scelti.length > posto) setMsg(`Ne ho prese ${posto}: al massimo ${FOTO_MAX} foto per locale.`);
@@ -123,6 +126,8 @@ export function FotoMieEditor({
         if (res.esito !== "non-immagine") break;
       }
     }
+    // Dopo un errore il ciclo si ferma: senza, i segnaposto "Carico…" restavano accesi per sempre.
+    setBusy(0);
   };
 
   const remove = async (f: FotoUtente) => {
@@ -134,7 +139,7 @@ export function FotoMieEditor({
     trackFeature("foto_utente", { stato: "rimossa", contesto, risultati: list.current.length });
   };
 
-  const full = foto.length + busy >= FOTO_MAX;
+  const full = foto.length + altre + busy >= FOTO_MAX;
   return (
     <div data-testid={testId}>
       <ul className="flex flex-wrap gap-2">
