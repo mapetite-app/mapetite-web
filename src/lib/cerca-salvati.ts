@@ -82,9 +82,20 @@ export function capisciRicercaSalvati(query: string): FiltroSalvati {
       const syn = SINONIMI[w] ?? SINONIMI[norm(w)];
       // Senza sinonimi: la radice basta ("romani" trova "romana", "giapponesi" trova "giapponese").
       const radice = norm(w).length > 4 ? norm(w).slice(0, -1) : norm(w);
-      return syn ? [...syn.map(norm), radice] : [radice];
+      // "~" = radice: vale solo come parola intera, al più con 2 lettere in più ("mont" trova
+      // "Monti" ma non "Monteverde"). "!" = parola di tipo o cucina: se non c'è, niente risultati.
+      return syn ? ["!", ...syn.map(norm), `~${radice}`] : [`~${radice}`];
     });
   return { parole, stato };
+}
+
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Revisione del 17/10: "pub" trovava "Piazza della Repubblica", "bar" trovava "Barberini".
+// I frammenti valgono solo a inizio parola, quelli di 3 lettere o meno solo come parola intera.
+function trova(t: string, a: string): boolean {
+  if (a === "!") return false;
+  if (a.startsWith("~")) return new RegExp(`(?:^|[^a-z0-9])${esc(a.slice(1))}[a-z]{0,2}(?![a-z0-9])`).test(t);
+  return new RegExp(`(?:^|[^a-z0-9])${esc(a)}${a.length <= 3 ? "(?![a-z0-9])" : ""}`).test(t);
 }
 
 // testo = tutto quello che si sa del locale (nome, tipo ed etichetta, indirizzo, nota, tag).
@@ -92,16 +103,19 @@ export function corrispondeSalvato(f: FiltroSalvati, testo: string, tags: string
   if (f.stato && !(tags ?? []).includes(f.stato)) return false;
   if (f.parole.length === 0) return f.stato != null;
   const t = norm(testo);
-  return f.parole.every((alternative) => alternative.some((a) => t.includes(a)));
+  return f.parole.every((alternative) => alternative.some((a) => trova(t, a)));
 }
 
 // Sulla lista intera: le parole che non compaiono in NESSUN salvato (un rione che l'indirizzo non
-// riporta, un aggettivo) non svuotano il risultato, si ignorano. Se nessuna parola resta e non
-// c'è uno stato, non c'è niente da proporre.
+// riporta, un aggettivo) non svuotano il risultato, si ignorano. Un tipo o una cucina invece no:
+// "quel giapponese a Milano" senza giapponesi salvati non deve proporre tutto Milano.
+// Se nessuna parola resta e non c'è uno stato, non c'è niente da proporre.
 export function filtraSalvatiNaturale<T>(list: T[], query: string, testoDi: (p: T) => string, tagsDi: (p: T) => string[] | null): T[] {
   const f = capisciRicercaSalvati(query);
   const testi = list.map((p) => norm(testoDi(p)));
-  const utili = f.parole.filter((alt) => testi.some((t) => alt.some((a) => t.includes(a))));
+  const presenti = (alt: string[]) => testi.some((t) => alt.some((a) => trova(t, a)));
+  if (f.parole.some((alt) => alt[0] === "!" && !presenti(alt))) return [];
+  const utili = f.parole.filter(presenti);
   if (utili.length === 0 && f.stato == null) return [];
   const g = { parole: utili, stato: f.stato };
   return list.filter((p, i) => corrispondeSalvato(g, testi[i], tagsDi(p)));

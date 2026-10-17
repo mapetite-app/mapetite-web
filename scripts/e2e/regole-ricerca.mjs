@@ -143,4 +143,16 @@ ok(cerca("sushi da provare") === "Wagyu Bar,Zen", "salvati: 'sushi da provare' �
 ok(cerca("trattoria della carbonara") === "Trattoria da Augusto", "salvati: la nota conta ('carbonara')");
 ok(cerca("bar a Roma, zona Monti") === "Er Caffettiere", "salvati: un rione che l'indirizzo non riporta non svuota il risultato");
 ok(cerca("quello che avevo salvato") === "", "salvati: una frase senza niente di concreto non propone niente");
+// Revisione 17/10: un tipo che non c'è non propone tutto; frammenti corti solo a parola intera.
+ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cinese salvato → nessun risultato (prima tutto Milano)");
+{
+  const altri = [
+    { name: "Bar Centrale", t: "cafe Piazza della Repubblica 1, Roma", tags: [] },
+    { name: "Trattoria Monteverde", t: "italian_restaurant Via di Monteverde 2, Roma", tags: [] },
+    { name: "Hop Pub", t: "pub Via Roma 3, Roma", tags: [] },
+  ];
+  const c2 = (q) => filtraSalvatiNaturale(altri, q, (p) => `${p.name} ${p.t}`, (p) => p.tags).map((p) => p.name).sort().join(",");
+  ok(c2("il pub") === "Hop Pub", "salvati: 'pub' non trova 'Repubblica'");
+  ok(c2("trattoria a monti") === "Trattoria Monteverde" && c2("monti") === "", "salvati: 'monti' non trova 'Monteverde' (la trattoria resta per il tipo)");
+}
 process.exit(failed === 0 ? 0 : 1);
