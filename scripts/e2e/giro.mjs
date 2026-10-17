@@ -699,7 +699,7 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
   ok((await intro.getByTestId("intro-avanti").count()) === 0, "intro: al massimo 3 schermate");
   await ip.screenshot({ path: `${OUT}/00-intro-3.png`, caret: "initial" });
   await ip.getByTestId("intro-prova").click();
-  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible() && (await ip.getByTestId("home-suggerimenti").getByRole("link").count()) === 4, "intro: finisce sulla barra di ricerca con le frasi d'esempio");
+  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible() && (await ip.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 4, "intro: finisce sulla barra di ricerca con le frasi d'esempio");
   await ip.reload({ waitUntil: "networkidle" });
   ok((await intro.count()) === 0, "intro: mostrata una volta sola (ricaricando non torna)");
   await ip.getByRole("button", { name: "Come funziona" }).click();
@@ -734,8 +734,9 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
-ok(await page.getByText("Chiedi all'AI come a un amico, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
-ok((await page.getByTestId("home-suggerimenti").getByRole("link").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
+ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI") && (await page.getByText("Chiedi all'AI come a un amico, per esempio:").count()) === 0, "home: si capisce che si chiede all'AI (dalla barra, senza titolo in più)");
+ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
+ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
 // 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
 ok(await page.getByRole("img", { name: "Mapetite" }).first().isVisible(), "home: il marchio Mapetite (non più l'emoji)");
 {
@@ -2951,7 +2952,7 @@ else {
   }
   await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
-  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(Apri la mappa|accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 3 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
+  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 2 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
   await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
   if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
@@ -3331,8 +3332,10 @@ else {
   await idee(ap);
   ok(await ap.getByTestId("mappa-assistente").isVisible(), "mappa: 'Parla con l'assistente' nelle Idee (la barra resta la ricerca di oggi)");
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
-  ok(await ap.getByTestId("home-assistente").isVisible(), "home: collegamento 'Parla con l'assistente'");
-  await ap.getByTestId("home-assistente").click();
+  // Semplificare (Lorenzo 17/10): dalla home l'assistente si apre dalla barra in basso (niente tessera doppia).
+  ok(await ap.getByTestId("barra-assistente").isVisible(), "home: 'Assistente' nella barra in basso");
+  // In sviluppo il pulsante "N" di Next.js copre l'angolo in basso a sinistra: clic diretto sul link.
+  await ap.getByTestId("barra-assistente").evaluate((el) => el.click());
   await ap.waitForURL(/\/assistente/);
   await ap.getByTestId("assistente-benvenuto").waitFor({ timeout: 8000 });
   ok(true, "assistente: si apre dalla home con il benvenuto e gli esempi");
