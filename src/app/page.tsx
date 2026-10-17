@@ -2,6 +2,7 @@ import Link from "next/link";
 import Form from "next/form";
 import { MessageCircle, SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
+import LogoMark from "@/components/logo-mark";
 import { cookies } from "next/headers";
 import HomeIntro, { IntroAgain } from "@/components/home-intro";
 import HomeSaved from "@/components/home-saved";
@@ -51,9 +52,9 @@ export default async function Home() {
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white px-4 md:min-h-[calc(100dvh-3.5rem)]">
       <HomeIntro loggedIn={loggedIn} />
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <span aria-hidden className="text-5xl">🍽️</span>
-        <h1 className="mt-3 font-title text-5xl font-semibold tracking-tight text-brand">Mapetite</h1>
-        <p className="mt-3 max-w-xs text-base font-sans text-text-muted">
+        <LogoMark size={72} className="drop-shadow-sm" />
+        <h1 className="mt-4 font-title text-5xl font-semibold tracking-tight text-brand">Mapetite</h1>
+        <p className="mt-3 max-w-sm text-base font-sans text-text-muted">
           I locali giusti per te, non quelli di tutti. Scrivi cosa cerchi come lo diresti a un amico.
         </p>
       </div>
@@ -96,14 +97,20 @@ export default async function Home() {
         {/* Una sola barra (Lorenzo 12/10): sopra, frasi già pronte che mostrano come si chiede all'AI;
             i filtri sono un pulsante dentro la barra, non un secondo blocco. */}
         <p className="mb-2 text-sm font-display font-semibold text-brand">✨ Chiedi all&apos;AI come a un amico, per esempio:</p>
-        <div data-testid="home-suggerimenti" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+        {/* Schede a due righe come Places ("Places worth knowing / in Rome"): titolo e dettaglio. */}
+        <div data-testid="home-suggerimenti" className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
           {EXAMPLES.map((e) => (
             <Link
               key={e.q}
               href={`/mappa?q=${encodeURIComponent(e.q)}`}
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-surface px-3.5 text-sm font-sans text-text active:scale-[0.98]"
+              aria-label={e.q}
+              className="flex min-h-16 w-52 shrink-0 snap-start items-center gap-2.5 rounded-card border border-border bg-white px-3 py-2.5 text-left shadow-sm active:scale-[0.98]"
             >
-              <span aria-hidden>{e.emoji}</span> “{e.q}”
+              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-lg">{e.emoji}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-display font-semibold leading-tight text-text">{e.title}</span>
+                <span className="mt-0.5 block text-xs font-sans leading-snug text-text-muted">{e.sub}</span>
+              </span>
             </Link>
           ))}
         </div>
