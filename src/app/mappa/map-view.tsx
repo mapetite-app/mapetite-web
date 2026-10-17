@@ -2048,20 +2048,21 @@ export default function MapView({
     <div className="fixed inset-0 md:top-14 lg:grid lg:grid-cols-[minmax(0,1fr)_var(--pannello)] lg:grid-rows-[auto_minmax(0,1fr)] lg:[--pannello:420px] xl:[--pannello:460px]">
       {/* Fondo del pannello da computer (sotto ricerca, lista e scheda). */}
       <div aria-hidden className="hidden lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:border-l lg:border-border lg:bg-bg" />
-      {/* Torna alla mia posizione: sempre raggiungibile, anche dopo aver chiuso la card iniziale. */}
+      {/* Torna alla mia posizione: sempre raggiungibile, anche dopo aver chiuso la card iniziale.
+          Con la barra sta sulla seconda riga, così la frase cercata ha tutta la larghezza (17/10: "Rooftop romanti…"). */}
       <button
         type="button"
         onClick={goToMyPosition}
         disabled={geoState === "loading"}
         aria-label="La mia posizione"
-        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60 lg:right-[calc(var(--pannello)+1rem)]"
+        className={`absolute right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95 disabled:opacity-60 lg:right-[calc(var(--pannello)+1rem)] lg:top-4 ${barOn ? "top-[4.125rem]" : "top-4"}`}
       >
         <LocateFixed size={20} className={geoState === "loading" ? "animate-pulse" : ""} />
       </button>
       {/* Tocco fuori dal pannello "Ti suggeriamo": si chiude e la mappa torna libera. */}
       {ideasShown && <div aria-hidden data-testid="idee-fuori" className="absolute inset-0 z-10" onClick={() => setIdeasOpen(false)} />}
       {/* Pannello controlli superiori: ricerca AI + ricerca luoghi + switch impilati */}
-      <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${barOn ? "w-[calc(100%-5.5rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
+      <div data-testid="pannello-ricerca" className={`absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-1 lg:w-auto lg:max-w-none lg:px-5 lg:pb-3 lg:pt-5 ${barOn ? "w-[calc(100%-2rem)] max-w-md" : "w-80 max-w-[90vw]"}`}>
         {/* Da computer, a mappa vuota: titolo del pannello sopra la barra (sul telefono non c'è). */}
         {view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
           <div data-testid="pannello-intro" className="hidden pb-2 lg:block">
@@ -2204,8 +2205,9 @@ export default function MapView({
           </div>
         )}
         {/* Seconda riga (Lorenzo 16/10: schermo più libero): Esplora/I miei salvati e UN solo accesso
-            a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. */}
-        <div className="flex items-center gap-2">
+            a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. A destra resta
+            libero il posto del pulsante "La mia posizione". */}
+        <div className={`flex items-center gap-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
           <div className="pointer-events-auto flex shrink-0 rounded-pill overflow-hidden shadow-float bg-surface">
             <button
               type="button"

@@ -524,7 +524,9 @@ ok((await page.getByTestId("barra-ricerca").count()) === 0 && (await page.getByR
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 const bar = await page.getByTestId("barra-ricerca").boundingBox();
 const loc = await page.getByRole("button", { name: "La mia posizione", exact: true }).boundingBox();
-ok(!!bar && !!loc && bar.y < 80 && bar.x + bar.width <= loc.x, "barra: in cima, non copre il pulsante posizione");
+ok(!!bar && !!loc && bar.y < 80 && (bar.x + bar.width <= loc.x || bar.y + bar.height <= loc.y), "barra: in cima, non copre il pulsante posizione");
+// 17/10: la barra prende tutta la larghezza (la frase non si taglia), la posizione scende sulla seconda riga.
+ok(!!bar && bar.width >= 390 - 2 * 16 - 1, `barra: a tutta larghezza (${Math.round(bar?.width ?? 0)}px)`);
 ok((await page.getByLabel("Scrivi cosa cerchi").count()) === 0, "barra: nella card iniziale niente secondo campo");
 await shot("22-barra");
 await page.getByRole("button", { name: "Filtri", exact: true }).click();
