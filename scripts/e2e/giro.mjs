@@ -727,6 +727,13 @@ await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
 ok(await page.getByText("Chiedi all'AI come a un amico, per esempio:").isVisible() && (await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "home: si capisce che si chiede all'AI");
 ok((await page.getByTestId("home-suggerimenti").getByRole("link").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
+// 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
+ok(await page.getByRole("img", { name: "Mapetite" }).first().isVisible(), "home: il marchio Mapetite (non più l'emoji)");
+{
+  const avvii = await page.locator('link[rel="apple-touch-startup-image"]').evaluateAll((ls) => ls.map((l) => l.getAttribute("href")));
+  const r = avvii[4] ? await page.request.get(`${BASE}${avvii[4]}`) : null;
+  ok(avvii.length >= 10 && r?.status() === 200 && r.headers()["content-type"] === "image/png", `iPhone: ${avvii.length} schermate d'avvio, l'immagine si apre`);
+}
 { const f = await page.getByTestId("home-filtri").boundingBox(); const bar = await page.getByLabel("Cosa cerchi?").boundingBox(); ok(!!f && !!bar && Math.abs((f.y + f.height / 2) - (bar.y + bar.height / 2)) < 12, "home: 'Filtri' dentro la barra, non un secondo blocco"); }
 ok((await page.getByTestId("home-recenti").getByRole("link").count()) >= 1, "home: le ultime ricerche fatte su questo telefono, a un tocco");
 await page.getByTestId("home-filtri").click();
