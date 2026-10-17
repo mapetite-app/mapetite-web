@@ -38,7 +38,7 @@ type Props = {
 };
 
 const ROW = "flex min-h-11 w-full items-center gap-3 py-1.5 text-left active:opacity-70";
-const NAME = "w-[6.5rem] shrink-0 font-display text-sm font-semibold text-text";
+const NAME = "w-[5.75rem] shrink-0 font-display text-sm font-semibold text-text";
 const LINK_ROW = "flex min-h-10 w-full items-center gap-2 py-1 text-left text-sm font-display font-semibold text-brand active:opacity-70";
 
 export default function ConfrontoFonti({ venueId, name, address, category, lat, lng, rating, userRatingCount, mapsUrl, hasVerdict, onMapetite }: Props) {
@@ -109,7 +109,7 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
               {media ? (
                 <>
                   <span className="font-display font-semibold">★ {votoIt(media.media)}</span>
-                  <span className="text-text-muted"> · {media.n === 1 ? "1 voto" : `${media.n} voti`} della community</span>
+                  <span className="text-text-muted"> · {media.n === 1 ? "1 recensione" : `${media.n} recensioni`}</span>
                 </>
               ) : (
                 <span className="text-text-muted">Il verdetto è qui sopra</span>
@@ -152,16 +152,16 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
             className={ROW}
           >
             <span className={NAME}>Tripadvisor</span>
-            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-sans text-text">
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-sans text-text">
               {taDato.ratingImageUrl ? (
                 // Bolle ufficiali del voto (regole di visualizzazione di Tripadvisor).
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={taDato.ratingImageUrl} alt={taDato.rating != null ? `${votoIt(taDato.rating)} su 5` : ""} className="h-4 w-auto" />
+                <img src={taDato.ratingImageUrl} alt={taDato.rating != null ? `${votoIt(taDato.rating)} su 5` : ""} className="h-3.5 w-auto" />
               ) : taDato.rating != null ? (
                 <span className="font-display font-semibold">{votoIt(taDato.rating)}</span>
               ) : null}
               {taDato.numReviews != null && (
-                <span className="truncate text-text-muted">{taDato.numReviews.toLocaleString("it-IT")} recensioni</span>
+                <span className="whitespace-nowrap text-text-muted">{taDato.numReviews.toLocaleString("it-IT")} recensioni</span>
               )}
             </span>
             <ExternalLink size={15} className="shrink-0 text-text-muted" aria-hidden />
