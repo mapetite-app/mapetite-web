@@ -797,6 +797,15 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
   await shot("05d-messi-da-parte");
 }, () => ok(false, "risultati: dice quali locali molto famosi ha messo da parte (non 'turistici': non lo sappiamo)"));
 await page.unroute("**/api/search");
+// 17/10: fuori dal quartiere chiesto ("enoteca a Monti"): in fondo e detto.
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: [], fuori_tema: [], fuori_zona: ["Solovino", "OrganiCool"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("messi-da-parte").textContent()) === "🧭 Ho messo in fondo 2 fuori zona (Solovino, OrganiCool)", "risultati: dice quali locali fuori dal quartiere ha messo in fondo");
+}, () => ok(false, "risultati: dice quali locali fuori dal quartiere ha messo in fondo"));
+await page.unroute("**/api/search");
 
 // 5g. Verdetti a gruppi (14/10): quelli delle prime card compaiono senza aspettare gli altri
 {

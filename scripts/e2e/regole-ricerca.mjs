@@ -3,7 +3,7 @@
 import { demoteOffType } from "../../src/lib/off-type.ts";
 import { demoteMainstream } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
-import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity } from "../../src/lib/named-city.ts";
+import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
 import { videoSourceOf, findVideoLink } from "../../src/lib/video-caption.ts";
 import { hasEnglish } from "../../src/lib/italian-check.ts";
@@ -154,5 +154,13 @@ ok(cerca("quel cinese che avevo salvato a Milano") === "", "salvati: nessun cine
   const c2 = (q) => filtraSalvatiNaturale(altri, q, (p) => `${p.name} ${p.t}`, (p) => p.tags).map((p) => p.name).sort().join(",");
   ok(c2("il pub") === "Hop Pub", "salvati: 'pub' non trova 'Repubblica'");
   ok(c2("trattoria a monti") === "Trattoria Monteverde" && c2("monti") === "", "salvati: 'monti' non trova 'Monteverde' (la trattoria resta per il tipo)");
+}
+// Quartiere nominato (ricerca vera del 17/10, "enoteca con vini naturali a Monti"): i lontani in fondo.
+{
+  const monti = { lat: 41.8945, lng: 12.493 };
+  const e = (name, lat, lng) => ({ name, lat, lng });
+  const r = demoteFarFrom(monti, [e("La Barrique", 41.8962, 12.4917), e("Solovino (Ostiense)", 41.8556, 12.4784), e("OrganiCool (Talenti)", 41.9408, 12.5389), e("Al Vino Al Vino", 41.8952, 12.4908), e("Domus Vini", 41.8987, 12.4928)]);
+  ok(r.places.map((p) => p.name).join() === "La Barrique,Al Vino Al Vino,Domus Vini,Solovino (Ostiense),OrganiCool (Talenti)" && r.demoted.length === 2, "zona: Monti, le enoteche di Ostiense e Talenti vanno in fondo");
+  ok(demoteFarFrom(monti, [e("A", 41.8962, 12.4917), e("B", 41.85, 12.47), e("C", 41.94, 12.53)]).demoted.length === 0, "zona: se nel quartiere ne restano meno di 3 non si tocca nulla");
 }
 process.exit(failed === 0 ? 0 : 1);

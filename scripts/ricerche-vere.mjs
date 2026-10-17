@@ -38,7 +38,7 @@ for (const [n, query, [lat, lng]] of CASI) {
   const dettagli = Object.assign({}, ...replies.map((r) => r?.dettagli ?? {}));
   const livelli = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
   const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
-  const aside = new Set([...(fast.da_parte?.turistici ?? []), ...(fast.da_parte?.fuori_tema ?? [])]);
+  const aside = new Set([...(fast.da_parte?.turistici ?? []), ...(fast.da_parte?.fuori_tema ?? []), ...(fast.da_parte?.fuori_zona ?? [])]);
   const tolti = risultati.filter((p) => esclusi.has(p.id));
   risultati = risultati.filter((p) => !esclusi.has(p.id));
   if (risultati.length === 0) risultati = fast.risultati ?? [];

@@ -172,3 +172,23 @@ export function stripCity(query: string, name: string): string {
   const out = query.replace(re, "").replace(/\s{2,}/g, " ").trim();
   return out.length >= 3 ? out : query;
 }
+
+// Quartiere nominato ("enoteca a Monti"): i locali a più di maxM metri dal centro del quartiere vanno
+// in fondo, mai esclusi (visto il 17/10 con Google vero: 3 enoteche su 4 in cima erano a Ostiense,
+// Talenti e Monteverde). Se nel quartiere ne restano meno di 3 non si tocca nulla.
+export function demoteFarFrom<T extends { name: string; lat: number | null; lng: number | null }>(
+  center: { lat: number; lng: number },
+  places: T[],
+  maxM = 2000,
+): { places: T[]; demoted: string[] } {
+  const far = (p: T) => {
+    if (p.lat == null || p.lng == null) return false;
+    const dy = (p.lat - center.lat) * 111320;
+    const dx = (p.lng - center.lng) * 111320 * Math.cos((center.lat * Math.PI) / 180);
+    return Math.hypot(dx, dy) > maxM;
+  };
+  const kept = places.filter((p) => !far(p));
+  if (kept.length === places.length || kept.length < 3) return { places, demoted: [] };
+  const lontani = places.filter(far);
+  return { places: [...kept, ...lontani], demoted: lontani.map((p) => p.name) };
+}

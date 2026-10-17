@@ -10,7 +10,8 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
-import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity } from "@/lib/named-city";
+import { ZONE } from "@/lib/gusti";
+import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
   const synthGroups: { places: SynthesisInput[]; token: string }[] = [];
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
-  const daParte: { turistici: string[]; fuori_tema: string[] } = { turistici: [], fuori_tema: [] };
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -143,6 +144,10 @@ export async function POST(request: Request) {
     const zonaCity = zonaQuartiere ? districtCity(intent?.zona, query) : null;
     const contextCity = zonaCity ?? mapCity;
     const zonaCentro = zonaCity && zonaCity !== cityNear(lat ?? 0, lng ?? 0) ? cityArea(zonaCity) : null;
+    // Quartiere con un centro noto (src/lib/gusti.ts): preferenza stretta intorno al quartiere
+    // (2 km invece di 25) e, dopo Google, i locali lontani in fondo.
+    const zonaNorm = (intent?.zona ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^(quartiere|rione|zona)\s+/, "").trim();
+    const zonaPunto = zonaQuartiere ? ZONE.find((z) => z.nome.toLowerCase() === zonaNorm && (!contextCity || z.citta === contextCity)) ?? null : null;
     if (zonaCity && zonaCity !== mapCity) console.log(`[search-quartiere] ${intent?.zona}: quartiere di ${zonaCity} (mappa su ${mapCity ?? "altro"})`);
     // E "quartiere Monti" invece di "Monti": 20 trattorie del rione invece della sola "Trattoria Monti".
     let queryGoogle = intent ? intent.queryGoogle : query.trim();
@@ -179,15 +184,15 @@ export async function POST(request: Request) {
       risultati = await searchGooglePlaces(queryGoogle, {
         includedType: intent?.includedType ?? undefined,
         locationMode,
-        lat: area?.lat ?? zonaCentro?.lat ?? lat,
-        lng: area?.lng ?? zonaCentro?.lng ?? lng,
+        lat: area?.lat ?? zonaPunto?.lat ?? zonaCentro?.lat ?? lat,
+        lng: area?.lng ?? zonaPunto?.lng ?? zonaCentro?.lng ?? lng,
         minRating: typeof body?.minRating === "number" ? body.minRating : undefined,
         minReviews: typeof body?.minReviews === "number" ? body.minReviews : undefined,
         minPriceLevel: typeof body?.minPriceLevel === "number" ? body.minPriceLevel : undefined,
         maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
         openNowOnly: body?.openNowOnly === true ? true : undefined,
         // Con una zona scritta la distanza dal centro della mappa non vale (sarebbe da un altro posto).
-        radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
+        radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaPunto ? 2000 : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
         requiredAttributes: attrs.length > 0 ? attrs : undefined,
         openAt,
@@ -220,6 +225,14 @@ export async function POST(request: Request) {
         // Al telefono solo i nomi: "Nome (irish_pub)" è il formato del log, in inglese.
         daParte.fuori_tema = [...daParte.fuori_tema, ...places.slice(places.length - demoted.length).map((p) => p.name)].slice(0, 10);
         console.log(`[search-tipo] q=${JSON.stringify(query.trim().slice(0, 80))} regola=${rule} in fondo (tipo fuori tema): ${JSON.stringify(demoted)}`);
+      }
+    }
+    if (zonaPunto) {
+      const { places, demoted } = demoteFarFrom(zonaPunto, risultati);
+      if (demoted.length > 0) {
+        risultati = places;
+        daParte.fuori_zona = demoted.slice(0, 10);
+        console.log(`[search-zona] ${zonaPunto.nome}: in fondo (oltre 2 km): ${JSON.stringify(demoted)}`);
       }
     }
     // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
@@ -532,7 +545,7 @@ ESEMPI (input → output atteso):
   return NextResponse.json({
     risultati: risultatiFinali,
     filtri_usati: filtri,
-    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 ? { da_parte: daParte } : {}),
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 ? { da_parte: daParte } : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
     ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken, gruppi: synthGroups } } : {}),
   });
