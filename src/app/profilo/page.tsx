@@ -1,10 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import PlaceCard from "@/components/place-card";
-import { cityFromAddress, displayAddress } from "@/lib/city";
-import { getCategoryEmoji } from "@/lib/emoji";
-import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, Send, Settings, Sparkles, Store, Trophy, Users } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, Send, Settings, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -154,23 +151,12 @@ export default async function ProfiloPage() {
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
-  // Salvati raggruppati per città (ricavata dall'indirizzo, come nella mappa).
-  const byCity = new Map<string, SavedPlaceRow[]>();
-  for (const row of saved) {
-    if (!row.places) continue;
-    const city = cityFromAddress(row.places.address) ?? "Altre zone";
-    byCity.set(city, [...(byCity.get(city) ?? []), row]);
-  }
-  const cityGroups = [...byCity.entries()].sort((a, b) =>
-    a[0] === "Altre zone" ? 1 : b[0] === "Altre zone" ? -1 : b[1].length - a[1].length,
-  );
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
   const name = (!("stato" in social) && social.display_name) || (user.email ?? "").split("@")[0] || "Il mio profilo";
-  // Tre numeri come il profilo di Places: salvati / voglio andarci / ci sono stato (le città
-  // sono dette sopra l'anteprima dei salvati).
+  // Tre numeri come il profilo di Places: salvati / voglio andarci / ci sono stato. Sono l'unico
+  // ingresso ai salvati dal profilo (Semplificare 5, 17/10): l'elenco vero è la scheda "Salvati".
   const wantCount = saved.filter((r) => r.tags?.includes(STATE_WANT)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
-  const cityCount = cityGroups.filter(([c]) => c !== "Altre zone").length;
   const counters = [
     { label: "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
     { label: "Voglio andarci", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
@@ -196,7 +182,6 @@ export default async function ProfiloPage() {
     .slice(0, 20)
     .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note }));
 
-  const recent = saved.filter((r) => r.places).slice(0, 3);
   const REVIEWS_PREVIEW = 2;
   const icon = { size: 18, strokeWidth: 1.75 } as const;
   const row = "flex min-h-14 items-center gap-3 border-t border-border px-4 py-2 active:bg-surface";
@@ -242,20 +227,6 @@ export default async function ProfiloPage() {
         {gems && <ScopritoreRiga gemme={gems.gemme} provate={gems.provate} />}
       </header>
 
-      {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai propri salvati. */}
-      <Link
-        href="/stasera"
-        data-testid="profilo-stasera"
-        className="mb-5 flex min-h-[72px] items-center gap-4 rounded-card bg-brand px-4 py-3 text-white shadow-float active:scale-[0.99] transition-transform duration-150"
-      >
-        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-xl">🍽️</span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-base font-semibold leading-tight">Stasera dove andiamo?</span>
-          <span className="mt-0.5 block text-sm text-white/75">Scegli tra i tuoi salvati</span>
-        </span>
-        <span aria-hidden className="text-xl text-white/70">→</span>
-      </Link>
-
       {/* Promemoria che compaiono solo quando servono. */}
       <BookingReminder />
       <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
@@ -280,28 +251,15 @@ export default async function ProfiloPage() {
             </a>
           )}
           <ProfiloPrenotazioni />
-          {/* Liste di gruppo (piano 5.5): scegliere insieme agli amici, con i 👍. */}
-          <Link href="/gruppi" data-testid="profilo-gruppi" className={TILE_CLASS}>
-            <TileBody icon={<Users {...icon} />} label="Liste di gruppo" sub="Si vota insieme" />
-          </Link>
           {/* "Importa" non è più nella barra in basso: si raggiunge da qui. */}
           <Link href="/importa" data-testid="profilo-importa" className={TILE_CLASS}>
             <TileBody icon={<Download {...icon} />} label="Importa" sub="Da Instagram e Maps" />
           </Link>
+          {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
+          <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className={TILE_CLASS}>
+            <TileBody icon={<IdCard {...icon} />} label="Carta del gusto" sub="Da condividere" />
+          </Link>
         </div>
-        {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
-        <Link
-          href="/profilo/gusto"
-          data-testid="profilo-carta-gusto"
-          className="mt-2 flex min-h-14 items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 active:scale-[0.99] transition-transform duration-150"
-        >
-          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><IdCard {...icon} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-display text-[13px] font-semibold leading-tight text-text">La tua carta del gusto</span>
-            <span className="mt-0.5 block truncate text-[11px] leading-tight text-text-muted">Il tuo gusto in una card da condividere</span>
-          </span>
-          <ChevronRight aria-hidden size={16} className="text-text-muted" />
-        </Link>
       </section>
 
       <div id="raccolte" className="scroll-mt-4">
@@ -313,69 +271,6 @@ export default async function ProfiloPage() {
           <ProfiloClassifica userId={user.id} initialRows={classificaRows} />
         </div>
       )}
-
-      {/* Salvati: anteprima breve; l'elenco per città si apre con "Vedi tutti". */}
-      <section className="mb-8" data-testid="profilo-salvati">
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <h2 className="font-title text-xl font-semibold text-brand">Ultimi salvati</h2>
-          {saved.length > 0 && (
-            <Link href={savedHref()} className="inline-flex min-h-10 shrink-0 items-center text-sm font-display font-semibold text-accent">Sulla mappa →</Link>
-          )}
-        </div>
-        {saved.length === 0 ? (
-          <div className="rounded-card border border-border bg-surface p-5 text-center">
-            <p className="text-sm text-text-muted">Non hai ancora salvato nessun locale.</p>
-            <Link href="/mappa" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
-              Cerca un locale
-            </Link>
-          </div>
-        ) : (
-          <>
-            <ul className="divide-y divide-border rounded-card border border-border bg-white">
-              {recent.map(({ places: place }) =>
-                place ? (
-                  <li key={place.id}>
-                    <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato-recente" className="flex min-h-14 items-center gap-3 px-4 py-2 active:bg-surface">
-                      <span aria-hidden className="text-xl">{getCategoryEmoji(place.category, place.name)}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-display text-sm font-semibold text-text">{place.name}</span>
-                        <span className="block truncate text-xs text-text-muted">{cityFromAddress(place.address) ?? displayAddress(place.address)}</span>
-                      </span>
-                      <span aria-hidden className="text-text-muted">›</span>
-                    </Link>
-                  </li>
-                ) : null,
-              )}
-            </ul>
-            <details data-testid="profilo-salvati-tutti" className="group mt-2">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-pill border border-border text-sm font-display font-semibold text-brand active:bg-surface [&::-webkit-details-marker]:hidden">
-                Vedi tutti i {saved.length}{cityCount > 1 ? `, divisi per ${cityCount} città` : ""}
-                <ChevronDown aria-hidden size={16} className="transition-transform duration-150 group-open:rotate-180" />
-              </summary>
-              <div className="mt-4">
-                {cityGroups.map(([city, rows]) => (
-                  <div key={city} className="mb-5">
-                    <h3 className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
-                      📍 {city} · {rows.length}
-                    </h3>
-                    <ul className="space-y-2">
-                      {rows.map(({ places: place, tags, note }, i) =>
-                        place ? (
-                          <li key={place.id ?? i}>
-                            <Link href={`/mappa?salvato=${place.id}`} data-testid="profilo-salvato" className="block active:scale-[0.99]">
-                              <PlaceCard name={place.name} category={place.category} address={place.address} tags={tags ?? undefined} note={note} />
-                            </Link>
-                          </li>
-                        ) : null,
-                      )}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </details>
-          </>
-        )}
-      </section>
 
       {reviews.length > 0 && (
         <section className="mb-8" data-testid="profilo-recensioni">
