@@ -204,7 +204,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: quota
-            ? "Oggi le ricerche sono finite: riprova domani, oppure cerca tra i tuoi salvati."
+            // La quota Google si azzera a mezzanotte della costa ovest USA, cioè alle 9:00 in Italia.
+            ? "Le ricerche nuove sono finite per ora: ripartono alle 9:00. Intanto puoi cercare tra i tuoi salvati."
             : "La ricerca non è disponibile in questo momento: riprova tra poco.",
         },
         { status: 503 },
