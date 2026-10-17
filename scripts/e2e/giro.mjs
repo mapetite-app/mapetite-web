@@ -2978,12 +2978,13 @@ else {
   await tp.reload({ waitUntil: "load" });
   await tp.waitForTimeout(300);
   ok(tEvents.filter((e) => e.type === "sessione_inizio").length === 1, "tracciamento: ricaricando resta la stessa visita");
-  await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); });
+  // Giorni attesi: 0, ma 1 se "31 minuti fa" cade ancora nel giorno prima (giro lanciato dopo mezzanotte).
+  const giorniAttesi = await tp.evaluate(() => { const s = JSON.parse(localStorage.getItem("mapetite.sessione")); s.last = Date.now() - 31 * 60_000; localStorage.setItem("mapetite.sessione", JSON.stringify(s)); return new Date(s.last).getDate() === new Date().getDate() ? 0 : 1; });
   await tp.reload({ waitUntil: "load" });
   // Il segnale parte dopo il caricamento: con il server carico 300 ms a volte non bastavano.
   for (let i = 0; i < 30 && tEvents.filter((e) => e.type === "sessione_inizio").length < 2; i++) await tp.waitForTimeout(100);
   const ses2 = tEvents.filter((e) => e.type === "sessione_inizio");
-  ok(ses2.length === 2 && ses2[1].props?.giorni === 0 && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
+  ok(ses2.length === 2 && ses2[1].props?.giorni === giorniAttesi && ses2[1].sessionId !== ses2[0].sessionId, "tracciamento: dopo 30 minuti di pausa nuova visita, con i giorni dall'ultima");
 
   // Il server accetta i nuovi tipi e rifiuta quelli inventati.
   { const r1 = await tp.request.post(`${BASE}/api/events`, { data: { type: "pagina", sessionId: "s", props: { pagina: "mappa" } } });
