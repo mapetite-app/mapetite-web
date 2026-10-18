@@ -164,7 +164,7 @@ export default function GoogleMapsCard({
               onClick={() => setShowField(true)}
               className="mt-1 min-h-11 w-full text-center text-sm text-white/80 underline"
             >
-              Oppure incolla a mano
+              Oppure incollalo in un riquadro
             </button>
           )}
 
