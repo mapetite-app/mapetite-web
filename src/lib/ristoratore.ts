@@ -28,7 +28,7 @@ export type RistLocale = {
   google_place_id: string | null;
 };
 
-export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null };
+export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null; visited_at?: string | null };
 
 export type Voce = { chiave: string; volte: number; persone: number };
 export type Azione = { tipo: AzioneTipo; etichetta: string; persone: number; volte: number; prima: number };
@@ -50,6 +50,10 @@ export type PannelloRistoratore = {
   // e non ci è ancora stato; occasioni = le raccolte in cui l'ha messo. Solo nel pannello: non cambia
   // mai l'ordine dei risultati (VISIONE: niente premi alla popolarità).
   inAttesa: { persone: number; occasioni: Voce[] };
+  // Visite vere (POSIZIONAMENTO.md, proposta 4): persone che nel periodo hanno segnato "Ci sono
+  // stato" su Mapetite, e il loro "Com'è andata?". Legate a una persona vera che aveva salvato il
+  // locale: non si falsificano come una recensione anonima.
+  visite: { persone: number; piaciuto: number; nonPiaciuto: number };
 };
 
 export const AZIONI = [
@@ -272,11 +276,33 @@ export function computeRistoratore(
     confronto: { simili: altri.length, mediaViste: media("apri_scheda"), mediaSalvati: media("salva"), viste, salvati: salvatiN },
     pochiDati: viste < SOGLIA,
     inAttesa: inAttesa(input.attesa ?? [], locale.id),
+    visite: visiteVere(input.attesa ?? [], locale.id, start, today),
   };
 }
 
+// Voti del "Com'è andata?" (= LIKE e DISLIKE di src/lib/diario.ts, ripetuti: qui nessun import).
+const PIACIUTO = "Mi è piaciuto";
+const NON_PIACIUTO = "Non fa per me";
+
+// Visite del periodo [from, to] (indici di giorno): la data della visita se c'è, altrimenti il salvataggio.
+export function visiteVere(rows: RistSalvataggio[], placeId: string, from: number, to: number): { persone: number; piaciuto: number; nonPiaciuto: number } {
+  const chi = new Set<string>();
+  const su = new Set<string>();
+  const giu = new Set<string>();
+  for (const r of rows) {
+    const tags = r.tags ?? [];
+    if (r.place_id !== placeId || !tags.includes(STATO_VISITATO)) continue;
+    const d = dayIndex(dayKey(r.visited_at ?? r.created_at));
+    if (d < from || d > to) continue;
+    chi.add(r.user_id);
+    if (tags.includes(PIACIUTO)) su.add(r.user_id);
+    else if (tags.includes(NON_PIACIUTO)) giu.add(r.user_id);
+  }
+  return { persone: chi.size, piaciuto: su.size, nonPiaciuto: giu.size };
+}
+
 // Stati e voti del salvataggio: non sono occasioni.
-const STATI = new Set(["Da provare", STATO_VISITATO]);
+const STATI = new Set(["Da provare", STATO_VISITATO, PIACIUTO, NON_PIACIUTO]);
 export function inAttesa(rows: RistSalvataggio[], placeId: string): { persone: number; occasioni: Voce[] } {
   const chi = new Set<string>();
   const occ = tally();

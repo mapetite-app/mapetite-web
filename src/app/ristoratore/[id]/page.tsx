@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminEmail } from "@/lib/admin";
+import { puoGestireLocale } from "@/lib/ristoratore-accesso";
 import { cityFromAddress } from "@/lib/city";
 import { computeRistoratore, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
+import { pulisciGiorni } from "@/lib/serate";
 import Pannello, { PERIODI } from "../pannello";
 
 // Pannello del ristoratore (PIANO-25-OTTOBRE.md 8.2), id = UUID del locale in places.
@@ -21,7 +21,8 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null };
+type Serate = { giorni: number[]; at: string | null };
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate };
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
 // scripts/e2e/giro.mjs), perché il giro non può leggere il database. Senza cookie si passa
@@ -33,28 +34,10 @@ async function e2eDati(id: string): Promise<Dati | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
-    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null };
+    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null } };
   } catch {
     return null;
   }
-}
-
-// Admin o titolare verificato. Senza tabella claims resta solo l'admin.
-async function puoVedere(placeId: string): Promise<boolean> {
-  const { data } = await getUser();
-  const user = data?.user;
-  if (!user) return false;
-  if (isAdminEmail(user.email)) return true;
-  const { data: claim, error } = await createAdminClient()
-    .from("claims")
-    .select("id")
-    .eq("place_id", placeId)
-    .eq("user_id", user.id)
-    .eq("stato", "verificata")
-    .limit(1)
-    .maybeSingle();
-  if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[ristoratore] lettura claims:", error.code, error.message);
-  return !!claim;
 }
 
 async function carica(id: string, giorni: number): Promise<Dati | null> {
@@ -103,10 +86,13 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     salvati.push(...((data ?? []) as RistSalvataggio[]));
   }
   // Tutti i salvataggi del locale, anche vecchi (non solo del periodo): chi lo vuole ancora provare.
-  const { data: tutti, error: aErr } = await db.from("saved_places").select("place_id,user_id,created_at,tags").eq("place_id", id).limit(5000);
+  const { data: tutti, error: aErr } = await db.from("saved_places").select("place_id,user_id,created_at,tags,visited_at").eq("place_id", id).limit(5000);
   if (aErr) console.error("[ristoratore] lettura salvataggi del locale:", aErr.message);
   const attesa = (tutti ?? []) as RistSalvataggio[];
-  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso };
+  // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
+  const { data: sr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<{ giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null }>();
+  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null };
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate };
 }
 
 export default async function RistoratorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -117,10 +103,10 @@ export default async function RistoratorePage({ params, searchParams }: { params
 
   let dati = await e2eDati(id);
   if (!dati) {
-    if (!(await puoVedere(id))) notFound();
+    if (!(await puoGestireLocale(id))) notFound();
     dati = await carica(id, giorni);
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }

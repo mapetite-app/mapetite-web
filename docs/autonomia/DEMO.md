@@ -64,6 +64,8 @@ Il filo del discorso è la visione: **raccogli, organizza, ritrova, scegli**, e 
 
 **4:30 — I ristoratori (il modello di business).** Apri `mapetite-web.vercel.app/per-i-ristoratori` (nell'app non c'è ancora un pulsante: scrivilo nel browser, o tieni la scheda aperta) → **"Guarda un pannello d'esempio"**.
 - Il pannello: persone che hanno visto la scheda, "Cosa chiedevano", "Quando cercano", confronto con la media della zona.
+- Nella Panoramica, il riquadro scuro: "31 ti vogliono provare" e "👍 10 su 11" (visite vere: persone che l'avevano salvato e ci sono andate). Dì: "Non sono recensioni anonime: dietro ogni numero c'è una persona che l'aveva salvato."
+- Scheda **Promozione → Serate tranquille**: tocca un giorno, "Salva". Dì: "Il martedì è vuoto? Lo dice qui, e chi l'ha salvato vede 'Martedì c'è posto' nella scheda. Niente sconti, niente commissioni sul coperto."
 - Dì: "I ristoratori non pagano per esserci. Pagano per domanda qualificata: persone che stanno già scegliendo. E per sapere cosa cerca la gente nella loro zona: un dato che nessun altro ha, perché nessun altro è verticale sul food."
 
 **4:50 — Chiusura (a voce).** "Instagram ti fa scoprire, Google Maps ti fa arrivare. Mapetite è il pezzo in mezzo: non perdi il posto, lo ritrovi quando serve, e scopri quelli giusti per te. Partiamo da Roma e Milano."

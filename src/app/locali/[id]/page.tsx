@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import LogoMark from "@/components/logo-mark";
+import PostoLocale from "@/components/posto-locale";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Check, X, Navigation, MapPin, BadgeCheck } from "lucide-react";
@@ -115,6 +116,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
             Verificato dal titolare
           </p>
         )}
+        {place.verified_at && <PostoLocale venueId={place.id} soloPosto />}
         {/* Una sola riga di fatti, come la scheda della mappa: tipo · prezzo · voto · città. */}
         {(kind || city) && (
           <p className="mt-2 text-[15px] font-sans text-text-muted">
