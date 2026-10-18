@@ -2431,7 +2431,7 @@ if (!fakeUser) {
   // Link di Instagram incollato nella card Google Maps: messaggio chiaro, nessuna chiamata.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
-  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   const soc = gcard.getByTestId("link-social");
@@ -2452,7 +2452,7 @@ if (!fakeUser) {
 
   // TikTok e YouTube Shorts incollati.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
@@ -2466,7 +2466,7 @@ if (!fakeUser) {
   ok(capBodies.at(-1)?.link === "https://vm.tiktok.com/ZMabc123/" && mSearch.length === s2 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano" && await mp.getByText("Seleziona il locale corretto").isVisible(), "tiktok: dal video legge nome e città e propone i locali da salvare");
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   ok(await gcard.getByText("Leggo la descrizione del video di YouTube", { exact: false }).isVisible() && await gcard.getByTestId("link-social-video").isVisible() && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps");
@@ -2594,7 +2594,7 @@ else {
   await pp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
   ok(await pp.getByTestId("salvato-pubblico").isVisible() && pubInsert?.place_id === LOC_ID && JSON.stringify(pubInsert?.tags) === '["Da provare"]' && pubInsert?.user_id === "00000000-0000-0000-0000-000000000001", "pagina pubblica: 'Salva in Mapetite' salva come '📌 Voglio andarci' e lo conferma");
   ok((await pp.getByRole("link", { name: "Aprilo sulla tua mappa" }).getAttribute("href")) === `/mappa?salvato=${LOC_ID}`, "pagina pubblica: dopo il salvataggio porta al locale sulla mappa");
-  ok((await pp.getByRole("link", { name: "Scopri Mapetite" }).getAttribute("href")) === "/", "pagina pubblica: 'Scopri Mapetite' porta alla home");
+  ok((await pp.getByRole("link", { name: "Mapetite", exact: true }).first().getAttribute("href")) === "/" && (await pp.getByTestId("invito-mapetite").count()) === 0, "pagina pubblica: il marchio porta alla home; da collegati nessun riquadro d'invito (solo 'Salva')");
   // Foto di un altro locale nel link: ignorata (resta l'emoji).
   const before = pubPhotos.length;
   await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/ALTRO/photos/XyZ`, { waitUntil: "networkidle" });
@@ -2607,6 +2607,7 @@ else {
   await pctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await pp.goto(`${BASE}/locali/${LOC_ID}`, { waitUntil: "networkidle" });
   ok(await pp.getByTestId("invito-accedi").isVisible(), "pagina pubblica da disconnessi: spiega di creare un account e poi tornare qui");
+  ok(((await pp.getByTestId("community-pubblica").textContent()) ?? "").includes("Accedi per dire com'era"), "pagina pubblica da disconnessi: 'Accedi per dire com'era' con lo spazio (era 'Accediper')");
   const back = encodeURIComponent(`/locali/${LOC_ID}?salva=1`);
   ok(await pp.getByTestId("invito-accedi").getByRole("link", { name: "Hai già un account? Accedi" }).getAttribute("href") === `/login?next=${back}`, "pagina pubblica da disconnessi: 'Accedi' riporta al locale (next)");
   ok(await pp.getByRole("link", { name: "Entra" }).first().getAttribute("href") === `/login?next=${encodeURIComponent(`/locali/${LOC_ID}`)}`, "pagina pubblica da disconnessi: 'Entra' nella barra riporta al locale");
@@ -5198,7 +5199,7 @@ if (fakeUser) {
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
   ok((await mc.count()) === 0, "incolla più link: 'Incolla altri link' torna all'unico Incolla");
   const n0 = previews.length;
-  await mp.getByTestId("importa-google").getByRole("button", { name: "Oppure incolla a mano" }).click();
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
