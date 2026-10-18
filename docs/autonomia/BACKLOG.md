@@ -8,7 +8,7 @@ L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
 **Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
-**Ricerche Google vere oggi (dalle 9:00 del 18/10):** 8 (sessione 1: 1; sessione 2: 7, finite alle 10:45). Tetto 10 al giorno per tutte le sessioni insieme: ne restano 2.
+**Ricerche Google vere oggi (dalle 9:00 del 18/10):** 9 (sessione 1: 2; sessione 2: 7). Tetto 10 al giorno per tutte le sessioni insieme: ne resta 1.
 **Quota Google, i numeri (18/10):** ricerche dei tester in produzione per giorno: 23 (15/10), 17 (16/10), 12 (17/10). Sabato la quota di 50 è finita alle 22:34 con solo 12 ricerche vere: il resto l'hanno usato le prove delle sessioni di sviluppo (circa 30). Da oggi il pannello `/admin/numeri` mostra "Google oggi: N su 50". Con 10 tester attivi (5 ricerche a testa al giorno) la quota basta solo se le sessioni non la usano: decisione sul budget di Lorenzo.
 **In corso adesso:** domenica 18/10 dalle 17:15, branch `claude/quirky-hypatia-q2lwz2` (richiesta di Lorenzo: semplificare per chi apre l'app la prima volta, ricerca che finisce a Bari, studio di Corner, proposte per i ristoratori). Non tocco Premium, prenotazioni, pagina pubblica del locale e Importa (PR #73 della terza sessione).
 **Seconda sessione (domenica 18/10 dalle 10:10, branch `claude/quirky-hypatia-9k5tm1`, PR separata):** locali di massa fuori dalle prime 3 posizioni anche senza "non turistico" (caso "pranzo di lavoro"); poi grafica dei risultati e della scheda contro i riferimenti Places. Non tocca gli eventi d'uso.
