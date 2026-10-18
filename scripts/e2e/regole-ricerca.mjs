@@ -43,6 +43,9 @@ ok(exclusionNotAsked("trattoria a Trastevere", "Locale frequentato principalment
 ok(!exclusionNotAsked("trattoria autentica a Trastevere", "Frequentato quasi solo da turisti."), "esclusione per 'turistico' con 'autentica' nella frase: resta");
 ok(!exclusionNotAsked("rooftop a Roma", "Non ha una terrazza né una vista."), "esclusione per un requisito fisico: resta");
 
+ok(coherentLevel("alto", "Vista panoramica sulla città e atmosfera unica, servizio formale. Manca menzione esplicita di terrazza nelle recensioni.") === "medio", "coerenza: 'manca menzione esplicita di terrazza' non resta 'alto' (Torre, 18/10)");
+ok(coherentLevel("alto", "Terrazza al 7° piano, servizio impeccabile, non manca nulla per un anniversario.") === "alto", "coerenza: 'non manca nulla' resta 'alto'");
+
 // Emoji (src/lib/emoji.ts): visto dal vivo il 13/10 sera, un cocktail bar con "Restaurant" nel nome aveva 🍝.
 ok(getCategoryEmoji("cocktail_bar", "The Vista Rooftop Roma | Pantheon Terrace Bar & Restaurant") === "🍸", "emoji: cocktail bar con 'Restaurant' nel nome ha 🍸");
 ok(getCategoryEmoji("cocktail_bar", "Rooftop Tre") === "🍸", "emoji: cocktail bar ha 🍸");
