@@ -1049,7 +1049,7 @@ await shot("15-scheda-b");
   ok((await page.getByTestId("confronto-link-michelin").count()) === 0 && (await page.getByTestId("confronto-link-thefork").count()) === 0, "confronto: per un bar niente Michelin né TheFork");
   ok((await page.getByTestId("confronto-mapetite").count()) === 0, "confronto: senza voti della community niente riga Mapetite (era un doppione del verdetto)");
   ok(await page.evaluate(() => { const b = document.querySelector("[data-testid=pannello-panoramica] h3"); const c = document.querySelector("[data-testid=confronto]"); return !b || !c || !!(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING); }), "confronto: viene dopo 'In breve' nella Panoramica");
-  ok(await page.evaluate(() => { const r = [...document.querySelectorAll("[data-testid=confronto-cerca] > *")].map((e) => e.getBoundingClientRect().top); return r.length > 0 && r.every((t) => Math.abs(t - r[0]) < 4); }), "confronto: 'Cercalo su' e le guide in una riga sola");
+  ok(await page.evaluate(() => { const r = [...document.querySelectorAll("[data-testid=confronto-cerca] > *")].map((e) => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }); return r.length > 0 && r.every((t) => Math.abs(t - r[0]) < 4); }), "confronto: 'Cercalo su' e le guide in una riga sola");
   await ctx.route("https://www.tripadvisor.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<html><body>Tripadvisor</body></html>" }));
   const [pop] = await Promise.all([ctx.waitForEvent("page", { timeout: 3000 }).catch(() => null), tl.click()]);
   await pop?.close().catch(() => {});
