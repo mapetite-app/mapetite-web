@@ -3326,8 +3326,11 @@ else {
       { id: "b", date: "2026-10-14", placeName: "Ieri", via: "telefono" },
       { id: "c", date: "2026-10-14", placeName: "Ieri risposto", via: "telefono", outcome: "bene" },
       { id: "d", date: "2026-10-01", placeName: "Vecchia", via: "sito" },
+      { id: "e", date: "2026-10-16", time: "20:00", placeName: "Domani", via: "whatsapp" },
+      { id: "f", date: "2026-10-16", placeName: "Domani nascosto", via: "whatsapp", dismissedEve: true },
     ];
     const rem = bk.bookingReminders(list, now);
+    ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso)");
     ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
   }
   if (as) {
@@ -3570,6 +3573,17 @@ else {
     await ap.getByTestId("disdetta-whatsapp").evaluate((a) => { a.removeAttribute("target"); a.setAttribute("href", "#"); a.click(); });
     await ap.waitForTimeout(300);
     ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta"); }
+  // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
+  await ap.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t4", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", phone: "06 1234 5678", createdAt: Date.now() }]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  { const dom = ap.getByTestId("promemoria-domani");
+    const ok1 = await dom.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    ok(ok1 && ((await dom.textContent()) ?? "").includes("Domani alle 21:00") && (await dom.getByText("Percorso").count()) === 0, "promemoria: il giorno prima 'Domani alle 21:00', senza Percorso");
+    await dom.getByTestId("promemoria-non-vado").click();
+    ok(((await dom.getByTestId("disdetta-chiama").getAttribute("href")) ?? "") === "tel:0612345678" && ((await dom.getByTestId("promemoria-disdetta-testo").textContent()) ?? "").includes("di domani"), "promemoria: con un fisso la disdetta si fa chiamando, messaggio 'di domani'"); }
 
   // Scheda della mappa: stesso pulsante Prenota
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });

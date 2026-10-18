@@ -63,32 +63,33 @@ function Disdetta({ b }: { b: BookingRequest }) {
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
-  const { today, howWasIt } = bookingReminders(list);
-  if (today.length === 0 && howWasIt.length === 0) return null;
+  const { today, tomorrow, howWasIt } = bookingReminders(list);
+  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0) return null;
+  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))];
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
-      {today.map((b) => (
-        <section key={b.id} data-testid="promemoria-oggi" className="rounded-card bg-brand p-4 text-white shadow-card">
+      {prossime.map(({ b, domani }) => (
+        <section key={b.id} data-testid={domani ? "promemoria-domani" : "promemoria-oggi"} className="rounded-card bg-brand p-4 text-white shadow-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                <CalendarCheck size={14} /> Oggi{b.time ? ` alle ${b.time}` : ""}
+                <CalendarCheck size={14} /> {domani ? "Domani" : "Oggi"}{b.time ? ` alle ${b.time}` : ""}
               </p>
               <p className="mt-1 truncate font-title text-lg font-semibold leading-tight">{b.placeName}</p>
               <p className="mt-0.5 text-sm font-sans text-white/80">
                 {b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"} · ` : ""}{VIA[b.via]}
               </p>
             </div>
-            <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
+            <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, domani ? { dismissedEve: true } : { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
               <X size={16} />
             </button>
           </div>
           <p className="mt-2 text-xs font-sans text-white/70">
-            La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.{" "}
+            {domani ? "Se non puoi più andare, avvisa il locale: libera il tavolo per qualcun altro." : "La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate."}{" "}
             <Link href="/prenotazioni" data-testid="promemoria-tutte" className="font-semibold text-white underline underline-offset-2">Le mie prenotazioni</Link>
           </p>
           <div className="mt-3 flex gap-2">
-            {b.lat != null && b.lng != null && (
+            {!domani && b.lat != null && b.lng != null && (
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
                 target="_blank"

@@ -235,6 +235,7 @@ export type BookingRequest = BookingDetails & {
   dismissed?: boolean;
   confirmed?: boolean;    // l'utente ha segnato "Il locale ha confermato" (assente nelle richieste vecchie)
   phone?: string | null;  // numero del locale, per avvisare se non si va più (assente nelle richieste vecchie)
+  dismissedEve?: boolean; // promemoria del giorno prima nascosto (quello del giorno stesso resta)
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -278,12 +279,15 @@ export function removeBooking(id: string) {
 
 // Cosa ricordare oggi: la prenotazione di oggi (promemoria) e, dal giorno dopo e per 3 giorni,
 // "Com'è andata?" su quelle passate ancora senza risposta.
-export function bookingReminders(list: BookingRequest[], now: Date = new Date()): { today: BookingRequest[]; howWasIt: BookingRequest[] } {
+export function bookingReminders(list: BookingRequest[], now: Date = new Date()): { today: BookingRequest[]; tomorrow: BookingRequest[]; howWasIt: BookingRequest[] } {
   const todayKey = dateKey(now);
+  const tomorrowKey = dateKey(addDays(now, 1));
   const oldest = dateKey(addDays(now, -3));
   const live = list.filter((b) => b.date && !b.dismissed);
   return {
     today: live.filter((b) => b.date === todayKey).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+    // Il giorno prima (contro i tavoli vuoti): se non si può più andare, è il momento giusto per avvisare.
+    tomorrow: live.filter((b) => b.date === tomorrowKey && !b.dismissedEve).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     howWasIt: live.filter((b) => b.date! < todayKey && b.date! >= oldest && !b.outcome),
   };
 }
