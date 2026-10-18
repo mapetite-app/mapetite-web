@@ -244,7 +244,6 @@ export default function VenueSheet({
       rating={rating}
       userRatingCount={userRatingCount}
       mapsUrl={mapsUrl}
-      hasVerdict={verdictText != null || (synthesis?.trim() ?? "") !== ""}
       onMapetite={onMapetite}
     />
   );
@@ -653,7 +652,6 @@ export default function VenueSheet({
 
         {/* Panoramica: chi ci è stato, le tue note, in breve. */}
         <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
-          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
           {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
           {showPersonalBlock && personalBlock(false)}
           {hasOverview && (
@@ -685,6 +683,8 @@ export default function VenueSheet({
               )}
             </div>
           )}
+          {/* Prima cosa dice Mapetite (In breve), poi il confronto con le altre fonti (Semplificare, 18/10). */}
+          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
         </div>
 
         {/* Recensioni: Google e community Mapetite, mai mescolate. */}

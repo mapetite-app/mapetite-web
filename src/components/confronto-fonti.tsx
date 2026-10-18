@@ -33,15 +33,14 @@ type Props = {
   rating: number | null;
   userRatingCount: number | null;
   mapsUrl: string;
-  hasVerdict: boolean;
   onMapetite?: () => void; // porta alla sezione Recensioni (community)
 };
 
 const ROW = "flex min-h-11 w-full items-center gap-3 py-1.5 text-left active:opacity-70";
 const NAME = "w-[5.75rem] shrink-0 font-display text-sm font-semibold text-text";
-const LINK_ROW = "flex min-h-10 w-full items-center gap-2 py-1 text-left text-sm font-display font-semibold text-brand active:opacity-70";
+const LINK_PILL = "inline-flex min-h-9 items-center gap-1 rounded-pill border border-border px-2.5 text-xs font-display font-semibold text-brand active:opacity-70";
 
-export default function ConfrontoFonti({ venueId, name, address, category, lat, lng, rating, userRatingCount, mapsUrl, hasVerdict, onMapetite }: Props) {
+export default function ConfrontoFonti({ venueId, name, address, category, lat, lng, rating, userRatingCount, mapsUrl, onMapetite }: Props) {
   const citta = cityFromAddress(address);
   const showTa = mostraTripadvisor();
   const tocco = (fonte: FonteConfronto, stato: string) => trackFeature("confronto_fonte", { contesto: fonte, stato });
@@ -79,12 +78,13 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
     rating != null
       ? `★ ${votoIt(rating)}${userRatingCount != null ? ` · ${userRatingCount.toLocaleString("it-IT")} recensioni` : ""}`
       : null;
-  const showMapetite = media != null || hasVerdict;
+  // Senza voti della community la riga diceva solo "Il verdetto è qui sopra": un doppione (Semplificare, 18/10).
+  const showMapetite = media != null;
 
   const links: { fonte: FonteConfronto; href: string; label: string }[] = [
-    ...(showTa && !taDato ? [{ fonte: "tripadvisor" as const, href: tripadvisorSearchUrl(name, citta), label: "Cercalo su Tripadvisor" }] : []),
-    ...(mostraMichelin(category) ? [{ fonte: "michelin" as const, href: michelinSearchUrl(name), label: "Cercalo nella Guida Michelin" }] : []),
-    ...(mostraTheFork(category) ? [{ fonte: "thefork" as const, href: theforkSearchUrl(name, citta), label: "Cercalo su TheFork" }] : []),
+    ...(showTa && !taDato ? [{ fonte: "tripadvisor" as const, href: tripadvisorSearchUrl(name, citta), label: "Tripadvisor" }] : []),
+    ...(mostraMichelin(category) ? [{ fonte: "michelin" as const, href: michelinSearchUrl(name), label: "Michelin" }] : []),
+    ...(mostraTheFork(category) ? [{ fonte: "thefork" as const, href: theforkSearchUrl(name, citta), label: "TheFork" }] : []),
   ];
 
   return (
@@ -168,8 +168,10 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
           </a>
         )}
 
+        {/* Le ricerche sulle altre guide in una riga sola, non tre righe da riquadro (Semplificare, 18/10). */}
         {links.length > 0 && (
-          <div className="flex flex-col py-1">
+          <div data-testid="confronto-cerca" className="flex flex-wrap items-center gap-1.5 py-2.5">
+            <span className="mr-0.5 text-xs font-sans text-text-muted">Cercalo su</span>
             {links.map((l) => (
               <a
                 key={l.fonte}
@@ -178,11 +180,10 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
                 rel="noopener noreferrer"
                 data-testid={`confronto-link-${l.fonte}`}
                 onClick={() => tocco(l.fonte, "ricerca")}
-                aria-label={`${l.label} (si apre in una nuova scheda)`}
-                className={LINK_ROW}
+                aria-label={`Cercalo su ${l.label} (si apre in una nuova scheda)`}
+                className={LINK_PILL}
               >
-                <span className="min-w-0 flex-1">{l.label}</span>
-                <ExternalLink size={15} className="shrink-0" aria-hidden />
+                {l.label}
               </a>
             ))}
           </div>
