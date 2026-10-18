@@ -7,7 +7,7 @@ import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import { PostoRiga } from "@/components/posto-persona";
 import { getCategoryEmoji } from "@/lib/emoji";
-import { loadProfilePage } from "@/lib/social";
+import { loadProfilePage, loadVerdetti } from "@/lib/social";
 import { personName, profilePath } from "@/lib/handle";
 import { mapSpots } from "@/lib/social-view";
 import { isStateTag } from "@/lib/tags";
@@ -67,6 +67,8 @@ export default async function RaccoltaPubblicaPage({ params }: Props) {
   const who = personName(profile);
   const path = publicCollectionPath(profile.handle, name);
   const spots = mapSpots(places);
+  // Verdetto Mapetite sotto i posti (come nel profilo pubblico): chi apre il link capisce perché andarci.
+  const verdetti = await loadVerdetti(places.slice(0, 60).map((p) => p.place_id));
 
   return (
     <main className="mx-auto min-h-dvh max-w-md bg-bg pb-10" data-testid="raccolta-pubblica">
@@ -99,7 +101,7 @@ export default async function RaccoltaPubblicaPage({ params }: Props) {
       <section className="mt-5 px-4" aria-label="Locali della raccolta">
         <ul className="space-y-2">
           {places.map((s) => (
-            <li key={s.place_id}><PostoRiga spot={s} /></li>
+            <li key={s.place_id}><PostoRiga spot={s} verdict={verdetti[s.place_id] ?? null} /></li>
           ))}
         </ul>
       </section>

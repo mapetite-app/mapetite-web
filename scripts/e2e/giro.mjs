@@ -4184,6 +4184,7 @@ else {
       ],
       seguo: [],
       mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+      verdetti: { "44444444-0000-4000-8000-0000000007b2": "Carbonara seria, conto onesto." },
     };
     const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
     await gc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
@@ -4202,6 +4203,7 @@ else {
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
+    ok((await g.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Carbonara seria, conto onesto.", "raccolta condivisa: il verdetto Mapetite sotto il posto che ce l'ha");
     ok(await g.getByTestId("condividi-raccolta-pubblica").isVisible() && !(await g.content()).includes("Il tavolo"), "raccolta condivisa: pulsante Condividi, nessuna nota privata");
     await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });
