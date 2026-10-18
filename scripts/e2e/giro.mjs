@@ -6722,6 +6722,45 @@ else {
   }
 }
 
+// Posizione già permessa (18/10): la mappa parte da dove sei, senza mai chiedere il permesso all'apertura.
+// Lorenzo a Milano il 17/10 apriva la mappa su Roma e doveva riscrivere "a Milano".
+{
+  const MILANO = { latitude: 45.4642, longitude: 9.19 };
+  const prova = async ({ permesso, ultima, url, scrivi }) => {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
+    let body = null;
+    await c.route("**/api/search", async (route) => { body = JSON.parse(route.request().postData() ?? "{}"); return route.fulfill({ json: SEARCH_FAST }); });
+    await c.route("**/api/search/intent", (route) => route.fulfill({ status: 503, json: {} }));
+    await c.route("**/api/search/synthesis", (route) => route.fulfill({ json: SYNTH }));
+    await c.addInitScript((u) => {
+      try {
+        localStorage.setItem("mapetite.intro", "visto");
+        if (u) localStorage.setItem("mapetite.vista", JSON.stringify({ ...u, zoom: 13, t: Date.now() }));
+      } catch { /* ignorato */ }
+    }, ultima ?? null);
+    const g = await c.newPage();
+    g.on("pageerror", (e) => errors.push(e.message));
+    await g.goto(`${BASE}${url}`, { waitUntil: "networkidle" });
+    if (scrivi) {
+      await g.waitForTimeout(800);
+      await g.getByLabel("Cosa cerchi?").fill(scrivi);
+      await g.getByLabel("Cosa cerchi?").press("Enter");
+    }
+    for (let i = 0; i < 40 && !body; i++) await g.waitForTimeout(150);
+    await c.close();
+    return body ? { lat: body.lat, lng: body.lng } : null;
+  };
+  const vicino = (b, lat, lng) => !!b && Math.abs(b.lat - lat) < 0.05 && Math.abs(b.lng - lng) < 0.05;
+  const a1 = await prova({ permesso: true, url: "/mappa", scrivi: "wine bar tranquillo" });
+  ok(vicino(a1, 45.4642, 9.19), `posizione permessa, nessuna ultima vista: la ricerca scritta parte da Milano (${JSON.stringify(a1)})`);
+  const a2 = await prova({ permesso: true, ultima: { lat: 41.9028, lng: 12.4964 }, url: "/mappa?q=wine%20bar%20tranquillo" });
+  ok(vicino(a2, 45.4642, 9.19), `posizione permessa, ultima vista a Roma: la ricerca dalla home parte da Milano (${JSON.stringify(a2)})`);
+  const a3 = await prova({ permesso: true, ultima: { lat: 45.4785, lng: 9.1606 }, url: "/mappa?q=wine%20bar%20tranquillo" });
+  ok(vicino(a3, 45.4785, 9.1606) && Math.abs(a3.lng - 9.19) > 0.02, `ultima vista nella stessa città: resta quella, non salta sulla posizione (${JSON.stringify(a3)})`);
+  const a4 = await prova({ permesso: false, url: "/mappa?q=wine%20bar%20tranquillo" });
+  ok(vicino(a4, 41.9028, 12.4964), `senza permesso: nessuna richiesta, si parte da Roma come prima (${JSON.stringify(a4)})`);
+}
+
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

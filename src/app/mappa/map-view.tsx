@@ -38,7 +38,7 @@ import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
 import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
-import { readLastView, saveLastView } from "@/lib/last-view";
+import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
@@ -1997,13 +1997,27 @@ export default function MapView({
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
+  // La mappa è stata spostata con il dito: la posizione arrivata dopo non la sposta più.
+  const touchedMap = useRef(false);
   useEffect(() => {
     if (sharedSearchDone.current) return;
     sharedSearchDone.current = true;
     const params = new URLSearchParams(window.location.search);
     // La mappa riparte da dove era l'ultima volta (non sempre da Roma); un link con "at" o un locale vincono.
-    const last = params.get("at") || params.get("sorpresa") ? null : readLastView();
+    const linked = Boolean(params.get("at") || params.get("sorpresa"));
+    const last = linked ? null : readLastView();
     if (last) setTimeout(() => setViewState((v) => ({ ...v, latitude: last.lat, longitude: last.lng, zoom: last.zoom })), 0);
+    // Posizione già permessa (mai chiesta qui): la mappa parte da dove sei se non c'è un'ultima vista
+    // o se l'ultima vista è in un'altra città (oltre 30 km). Lorenzo a Milano, 17/10: mappa su Roma.
+    const here = linked ? Promise.resolve(null) : grantedPosition();
+    const startHere = (pos: { lat: number; lng: number } | null): pos is { lat: number; lng: number } =>
+      pos !== null && (!last || distanceMeters(pos, last) > 30000);
+    const plainOpen = ["salvato", "vista", "filtri", "q"].every((k) => !params.get(k));
+    void here.then((pos) => {
+      if (pos) setUserPos(pos);
+      if (!plainOpen || !startHere(pos) || touchedMap.current || searchSeq.current > 0) return;
+      setViewState((v) => ({ ...v, latitude: pos.lat, longitude: pos.lng, zoom: 13 }));
+    });
     // Dal profilo: /mappa?salvato=UUID apre i salvati e poi la scheda (quando arrivano).
     const savedId = params.get("salvato");
     if (savedId && /^[0-9a-f-]{36}$/i.test(savedId)) {
@@ -2082,12 +2096,14 @@ export default function MapView({
     const rest = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
     // Fuori dal ciclo dell'effetto: gli aggiornamenti di stato partono dopo il primo disegno.
-    setTimeout(() => {
-      if (center) setViewState((v) => ({ ...v, latitude: center.lat, longitude: center.lng, zoom: 13 }));
+    // Senza "at" la ricerca parte da dove sei (permesso già dato) o dall'ultima vista.
+    void (center ? Promise.resolve(null) : here).then((pos) => {
+      const start = center ?? (startHere(pos) ? pos : last ? { lat: last.lat, lng: last.lng } : undefined);
+      if (start) setViewState((v) => ({ ...v, latitude: start.lat, longitude: start.lng, zoom: center || startHere(pos) ? 13 : v.zoom }));
       setWelcomeDismissed(true);
       setAiQuery(q);
-      void runAISearch(q, center ?? (last ? { lat: last.lat, lng: last.lng } : undefined));
-    }, 0);
+      void runAISearch(q, start);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
   }, []);
 
@@ -2830,7 +2846,11 @@ export default function MapView({
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
         onMoveEnd={(evt) => saveLastView({ lat: evt.viewState.latitude, lng: evt.viewState.longitude, zoom: evt.viewState.zoom })}
-        onMoveStart={(evt) => { if ((evt as { originalEvent?: unknown }).originalEvent && aiSearch !== null) setMovedSinceSearch(true); }}
+        onMoveStart={(evt) => {
+          if (!(evt as { originalEvent?: unknown }).originalEvent) return;
+          touchedMap.current = true;
+          if (aiSearch !== null) setMovedSinceSearch(true);
+        }}
         ref={mapRef}
         // isolation: i livelli dei pin (fino a 100, vedi sotto) restano dentro la mappa e non salgono
         // mai sopra barra, pulsanti e card della pagina.
