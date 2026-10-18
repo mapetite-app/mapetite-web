@@ -1,1 +1,29 @@
-{"permissions":{"allow":["Bash(curl *https://api.supabase.com/v1/projects/*)","Bash(curl *https://api.vercel.com/*)","Bash(curl *https://mapetite-web.vercel.app*)","Bash(curl *https://mapetite-*-lorenzomapetite.vercel.app*)"]},"autoMode":{"environment":["$defaults","Progetto Mapetite di Lorenzo. Le sessioni notturne sono autorizzate in modo permanente da Lorenzo (15/10/2026, docs/autonomia/LORENZO.md) a: merge su main dopo i controlli e verifica del deploy di produzione; lettura di Vercel e del database Supabase di produzione; migrazioni che aggiungono tabelle o colonne; apertura del sito; aggiornamento di LORENZO.md e BACKLOG.md."]}}
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *https://api.supabase.com/v1/projects/*)",
+      "Bash(curl *https://api.vercel.com/*)",
+      "Bash(curl *https://mapetite-web.vercel.app*)",
+      "Bash(curl *https://mapetite-*-lorenzomapetite.vercel.app*)"
+    ]
+  },
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "Progetto Mapetite di Lorenzo. Le sessioni notturne sono autorizzate in modo permanente da Lorenzo (15/10/2026, docs/autonomia/LORENZO.md) a: merge su main dopo i controlli e verifica del deploy di produzione; lettura di Vercel e del database Supabase di produzione; migrazioni che aggiungono tabelle o colonne; apertura del sito; aggiornamento di LORENZO.md e BACKLOG.md."
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && git pull --ff-only origin main 2>&1 | tail -3 || true",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
