@@ -109,6 +109,9 @@ export async function POST(request: Request) {
 
   // Il ramo saved aggiunge tags/note personali (assenti nel ramo world): campi opzionali.
   let risultati: (PlaceResult & { tags?: string[] | null; note?: string | null })[];
+  // Chiamate Text Search fatte da questa ricerca (1, o 2 con la seconda ricerca): nel segnale "ricerca",
+  // così il pannello dei numeri sa quanta quota Google si è usata oggi.
+  let googleCalls = 0;
   // Sintesi editoriale Haiku: solo sul ramo world, opzionale e degradabile.
   let sintesi: Record<string, PlaceSynthesis> = {};
   let synthInput: SynthesisInput[] | null = null;
@@ -216,6 +219,7 @@ export async function POST(request: Request) {
         sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
       };
       risultati = await searchGooglePlaces(queryGoogle, opzioni);
+      googleCalls++;
       // Quartiere noto con pochi risultati: Google legge il nome del quartiere come parte dell'insegna
       // ("bar cozy quartiere Moscova Milano" → 4 bar, 3 con "Moscova" nel nome: Lorenzo, 17/10). Allora
       // una seconda ricerca senza il nome, dentro un riquadro di ~1,2 km intorno al centro del quartiere,
@@ -231,6 +235,7 @@ export async function POST(request: Request) {
             radius: 1200,
             sortMode: "relevance",
           });
+          googleCalls++;
           const visti = new Set(risultati.map((p) => p.id));
           const nuovi = altri.filter((p) => !visti.has(p.id));
           console.log(`[search-quartiere] ${zonaPunto.nome}: solo ${risultati.length} con il nome, +${nuovi.length} nel riquadro di 1,2 km (query=${JSON.stringify(q2)})`);
@@ -248,6 +253,7 @@ export async function POST(request: Request) {
         if (q2) {
           try {
             const altri = await searchGooglePlaces(q2, opzioni);
+            googleCalls++;
             const visti = new Set(risultati.map((p) => p.id));
             const nuovi = altri.filter((p) => !visti.has(p.id));
             console.log(`[search-atmosfera] solo ${risultati.length} con ${JSON.stringify(queryGoogle)}, +${nuovi.length} con ${JSON.stringify(q2)}`);
@@ -621,6 +627,7 @@ ESEMPI (input → output atteso):
           caratteristiche: caratteristiche.slice(0, 12),
           aperto_a: typeof body?.openAtId === "string" ? body.openAtId.slice(0, 20) : null,
           risultati: risultati.length,
+          google: googleCalls,
         },
       });
     });

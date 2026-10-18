@@ -167,6 +167,24 @@ export const dayKey = (t: number | string | Date): string => romeDay.format(new 
 const dayIndex = (key: string) => Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8, 10)) / DAY;
 const keyOfIndex = (i: number) => new Date(i * DAY).toISOString().slice(0, 10);
 
+// Quota Google: 50 ricerche al giorno, che ripartono a mezzanotte in California (alle 9:00 in Italia,
+// alle 8:00 nelle settimane in cui l'ora legale non coincide). "Oggi" per la quota è quindi il giorno di Los Angeles.
+export const QUOTA_GOOGLE = 50;
+const laDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" });
+// Chiamate Text Search di oggi: ogni ricerca dice quante ne ha fatte (1, o 2 con la seconda ricerca);
+// le ricerche registrate prima del 18/10 non lo dicono e contano 1. Ogni link incollato in Importa ne fa 1.
+// Non conta le prove delle sessioni di sviluppo (non scrivono eventi): quelle sono nel BACKLOG.
+export function googleOggi(rows: EventRow[], now: number = Date.now()): number {
+  const oggi = laDay.format(new Date(now));
+  let n = 0;
+  for (const r of rows) {
+    if (laDay.format(new Date(r.created_at)) !== oggi) continue;
+    if (r.type === "ricerca") n += typeof r.props?.google === "number" ? r.props.google : 1;
+    else if (r.type === "funzione" && r.props?.nome === "import_link") n += 1;
+  }
+  return n;
+}
+
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const ratio = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 10) / 10 : null);
 
