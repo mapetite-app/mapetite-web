@@ -22,6 +22,7 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
+import PostoLocale from "@/components/posto-locale";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -577,6 +578,8 @@ export default function VenueSheet({
               💎 Poco conosciuto
             </span>
           )}
+          {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
+          <PostoLocale venueId={venue.id} />
         </div>
 
         {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}

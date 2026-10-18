@@ -2989,7 +2989,7 @@ else {
   }
   await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
-  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 2 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
+  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 1 && hs.every((h) => h >= 40), `360px home: 'Come funziona' alto almeno 40px e niente 'accedi' doppione di 'Entra' (${hs.map(Math.round).join(", ")})`); }
   await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
   if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
@@ -4268,6 +4268,11 @@ else {
     { const sv = (u, tags, place = L.id) => ({ place_id: place, user_id: u, created_at: at(10), tags });
       const a = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), sv("u2", ["Romantico", "👍 Mi è piaciuto"]), sv("u3", ["Già visitato", "Romantico"]), sv("u4", ["Da provare"]), sv("u5", ["Romantico"], "altro")], L.id);
       ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`); }
+    // Visite vere (POSIZIONAMENTO proposta 4, 18/10): chi ha segnato "Ci sono stato" nel periodo (data della visita), con il voto.
+    { const v = (u, tags, visited, place = L.id) => ({ place_id: place, user_id: u, created_at: at(1), tags, visited_at: visited });
+      const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
+      const r = rs.visiteVere([v("u1", ["Già visitato", "Mi è piaciuto"], at(14)), v("u2", ["Già visitato", "Non fa per me"], at(12)), v("u3", ["Già visitato"], at(13)), v("u4", ["Già visitato", "Mi è piaciuto"], at(2)), v("u5", ["Da provare", "Mi è piaciuto"], at(14)), v("u6", ["Già visitato", "Mi è piaciuto"], at(14), "altro")], L.id, today - 6, today);
+      ok(r.persone === 3 && r.piaciuto === 1 && r.nonPiaciuto === 1, `ristoratore: visite vere del periodo con il voto, non quelle vecchie o di altri locali (${JSON.stringify(r)})`); }
     const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
     const eventi = [
       // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
@@ -4295,6 +4300,20 @@ else {
     ok(p.perGiorno.length === 7 && p.perGiorno.at(-2).viste === 1, "ristoratore: andamento giorno per giorno");
   }
 
+  // Serate tranquille (POSIZIONAMENTO proposta 1, 18/10): la riga della scheda, solo per locali verificati e informazioni recenti.
+  { let se = null;
+    try { se = await import(new URL("../../src/lib/serate.ts", import.meta.url).href); } catch (e) { ok(false, `serate: modulo src/lib/serate.ts importabile (${e.message})`); }
+    if (se) {
+      const dom = Date.parse("2026-10-18T18:00:00Z"); // domenica sera a Roma
+      const fresco = "2026-10-10T10:00:00Z";
+      const f = (giorni, extra = {}) => se.frasePosto({ verificato: true, giorni, at: fresco, ...extra }, dom);
+      ok(se.oggiARoma(dom) === 0 && se.oggiARoma(Date.parse("2026-10-18T22:30:00Z")) === 1, "serate: il giorno è quello di Roma (domenica 23:30 UTC = lunedì)");
+      ok(f([2, 3]) === "Martedì e mercoledì c'è posto" && f([3, 1]) === "Lunedì e mercoledì c'è posto" && f([6, 1]) === "Lunedì e sabato c'è posto", `serate: giorni dal più vicino (${f([2, 3])} / ${f([6, 1])})`);
+      ok(f([0]) === "Stasera c'è posto" && f([0, 2]) === "Stasera c'è posto (anche martedì)" && f([0, 1, 2, 3, 4, 5, 6]) === "C'è posto tutte le sere", `serate: stasera e tutte le sere (${f([0, 2])})`);
+      ok(f([2], { verificato: false }) === null && f([]) === null && f([2], { at: "2026-08-01T10:00:00Z" }) === null && f([2], { at: null }) === null, "serate: niente riga senza verifica, senza giorni o con un'informazione di oltre 60 giorni");
+      ok(JSON.stringify(se.pulisciGiorni([0, 9, 2, 2, "3", 1.5, 6])) === "[2,6,0]", "serate: giorni puliti e in ordine di settimana");
+    } }
+
   const LOC = "44444444-0000-4000-8000-0000000000a1";
   const locR = {
     place: { id: LOC, name: "Osteria Pigneto", address: "Via del Pigneto 10, 00176 Roma RM, Italy", lat: 41.888, lng: 12.53, category: "restaurant", rating: 4.5, price_level: 2, google_place_id: "GOSTERIA" },
@@ -4321,6 +4340,16 @@ else {
   await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
   await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
   ok(await rp.getByTestId("locale-verificato").isVisible() && (await rp.getByTestId("rivendica-locale").count()) === 0, "locale verificato: badge 'Verificato dal titolare' e niente invito a rivendicare");
+  ok((await rp.getByTestId("posto-stasera").count()) === 0, "locale verificato senza serate tranquille: nessuna riga 'c'è posto'");
+  { const oggi = new Date().toLocaleDateString("en-US", { timeZone: "Europe/Rome", weekday: "short" });
+    const g = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[oggi];
+    await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString() });
+    await rp.reload({ waitUntil: "networkidle" });
+    await rp.getByTestId("posto-stasera").waitFor({ timeout: 5000 }).catch(() => {});
+    const t = (await rp.getByTestId("posto-stasera").textContent().catch(() => "")) ?? "";
+    ok(t.includes("Stasera c'è posto") && t.includes("dice il locale") && (await rp.getByTestId("posto-locale").getByText("Verificato").count()) === 0, `locale verificato con serate tranquille: 'Stasera c'è posto · dice il locale', senza un secondo badge (${t})`);
+    await rp.screenshot({ path: `${OUT}/70b-locale-serate.png`, caret: "initial" });
+    await rctx.clearCookies({ name: "e2e_serate" }); }
   await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
   await setCookie("e2e_locale", locR);
 
@@ -4384,6 +4413,17 @@ else {
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
+  // Serate tranquille sul pannello vero: si salvano (cookie e2e_serate al posto di places) e la scheda le rilegge per Place ID.
+  { await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [] });
+    await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione`, { waitUntil: "networkidle" });
+    const st = rp.getByTestId("serate-tranquille");
+    await st.getByRole("button", { name: "venerdì" }).click();
+    await rp.getByTestId("serate-salva").click();
+    await st.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+    const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+    const vietato = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: "44444444-0000-4000-8000-0000000000ff", giorni: [1] } });
+    ok(await st.getByText("Salvato").isVisible() && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
+    await rctx.clearCookies({ name: "e2e_serate" }); }
 
   // Esempio dimostrativo: etichetta in cima, numeri pieni, periodo 7/30 giorni.
   { const r = await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
@@ -4391,7 +4431,8 @@ else {
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
     { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
-      ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`); }
+      ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
+      ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)"); }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();
@@ -4414,6 +4455,15 @@ else {
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     await rp.locator("[data-vai=promozione]").click();
     ok((await rp.getByRole("tab", { name: "Promozione" }).getAttribute("aria-selected")) === "true" && await rp.getByTestId("pannello-evidenza").isVisible(), "pannello demo: dalla Panoramica la scorciatoia porta alla scheda Promozione");
+    { const st = rp.getByTestId("serate-tranquille");
+      const premuti = await st.locator("button[aria-pressed=true]").evaluateAll((b) => b.map((x) => x.getAttribute("aria-label")));
+      const salva = rp.getByTestId("serate-salva");
+      const primaDis = await salva.isDisabled();
+      await st.getByRole("button", { name: "giovedì" }).click();
+      const ant = (await rp.getByTestId("serate-anteprima").textContent()) ?? "";
+      await salva.click();
+      ok(premuti.join() === "martedì,mercoledì" && primaDis && /c'è posto/.test(ant) && /giovedì/i.test(ant) && await st.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: serate tranquille, giorni da toccare, anteprima della riga e salvataggio finto (${premuti.join()} → ${ant.slice(0, 80)})`);
+      await rp.getByTestId("pannello-serate").screenshot({ path: `${OUT}/76b-pannello-serate.png` }); }
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });

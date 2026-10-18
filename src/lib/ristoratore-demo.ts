@@ -46,7 +46,8 @@ function pick<T>(r: () => number, list: [T, number][]): T {
 // Salvataggi d'esempio per "Ti vogliono provare" (domanda latente): raccolte tipiche e qualche visita.
 const ATTESA: [string[], number][] = [
   [["Da provare"], 12], [["Da provare", "Con amici"], 9], [["Da provare", "Romantico"], 7],
-  [["Da provare", "Cena di lavoro"], 3], [["Già visitato", "Con amici"], 6],
+  [["Da provare", "Cena di lavoro"], 3], [["Già visitato", "Con amici", "Mi è piaciuto"], 6],
+  [["Già visitato", "Mi è piaciuto"], 4], [["Già visitato"], 2], [["Già visitato", "Non fa per me"], 1],
 ];
 
 export function demoDati(now: number = Date.now()): { locale: RistLocale; citta: string; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[] } {
@@ -114,6 +115,6 @@ export function demoDati(now: number = Date.now()): { locale: RistLocale; citta:
     }
   }
   let u = 0;
-  const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags })));
+  const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags, visited_at: tags.includes("Già visitato") ? new Date(now - (u % 25) * 86_400_000).toISOString() : null })));
   return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [], attesa };
 }

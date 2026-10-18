@@ -6,6 +6,7 @@ import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, t
 import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
 import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
+import SerateTranquille from "./serate";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -346,6 +347,7 @@ export default function Pannello({
   demo = false,
   avviso,
   vista,
+  serate = { giorni: [], at: null },
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -355,6 +357,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
+  serate?: { giorni: number[]; at: string | null };
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -364,6 +367,7 @@ export default function Pannello({
   const zonaNome = p.zona.nome ? `a ${p.zona.nome}` : "nella tua zona";
 
   const attesa = p.inAttesa;
+  const risposte = p.visite.piaciuto + p.visite.nonPiaciuto;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
@@ -372,17 +376,29 @@ export default function Pannello({
 
       {/* Domanda latente: il dato che nessun altro dà al ristoratore (POSIZIONAMENTO.md, proposta 2).
           Compatta, sotto i 4 numeri: la prima schermata resta quella. */}
-      {attesa.persone > 0 && (
+      {(attesa.persone > 0 || risposte >= SOGLIA) && (
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
-          <p className="flex items-baseline gap-2">
-            <span className="font-title text-2xl font-semibold leading-none">{mostraPersone(attesa.persone)}</span>
-            <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare: hanno salvato il locale e non ci sono ancora state</span>
-          </p>
+          {attesa.persone > 0 && (
+            <p className="flex items-baseline gap-2">
+              <span className="font-title text-2xl font-semibold leading-none">{mostraPersone(attesa.persone)}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare: hanno salvato il locale e non ci sono ancora state</span>
+            </p>
+          )}
           {attesa.occasioni.some((o) => o.persone >= SOGLIA) && (
             <p className="mt-2 flex flex-wrap gap-1.5" aria-label="Per quale occasione">
               {attesa.occasioni.filter((o) => o.persone >= SOGLIA).map((o) => (
                 <span key={o.chiave} className="rounded-pill bg-white/15 px-2.5 py-0.5 text-xs font-display font-semibold">{o.chiave} · {o.persone}</span>
               ))}
+            </p>
+          )}
+          {/* Visite vere (POSIZIONAMENTO.md, proposta 4): il "Com'è andata?" di chi ci è stato davvero.
+              Solo sopra la soglia di risposte: con 1 o 2 si riconoscerebbe chi ha risposto. */}
+          {risposte >= SOGLIA && (
+            <p data-testid="pannello-visite-vere" className={`flex items-baseline gap-2 ${attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">👍 {p.visite.piaciuto.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">
+                su {risposte.toLocaleString("it-IT")}: chi ti aveva salvato, ci è andato e ha detto com&apos;è andata ({p.giorni} giorni)
+              </span>
             </p>
           )}
         </section>
@@ -415,7 +431,7 @@ export default function Pannello({
       <nav aria-label="Approfondisci" className="mt-4 divide-y divide-border rounded-card border border-border bg-white px-4">
         <Vai id="clienti" titolo="Clienti" testo="Cosa chiedeva chi ti ha trovato, e tutte le azioni" />
         <Vai id="zona" titolo={`Zona`} testo={`Cosa cerca la gente ${zonaNome}, ora per ora`} />
-        <Vai id="promozione" titolo="Promozione" testo={demo ? "Come funzionano i posti in evidenza" : "Posti in evidenza e piani"} />
+        <Vai id="promozione" titolo="Promozione" testo="Serate tranquille e posti in evidenza" />
       </nav>
     </>
   );
@@ -503,7 +519,7 @@ export default function Pannello({
     </>
   );
 
-  const promozione = demo ? (
+  const evidenza = demo ? (
     <Sezione titolo="Posti in evidenza" nota="Esempio: attivo quando ci saranno ristoratori. Oggi nei risultati veri non c'è nessuno sponsorizzato." piano="Pro" testId="pannello-evidenza">
       <InEvidenzaDemo />
     </Sezione>
@@ -516,6 +532,16 @@ export default function Pannello({
         Guarda come funziona<ChevronRight size={16} aria-hidden />
       </Link>
     </Sezione>
+  );
+
+  // Serate tranquille (POSIZIONAMENTO.md, proposta 1): lo strumento gratuito contro i tavoli vuoti, prima dei posti in evidenza.
+  const promozione = (
+    <>
+      <Sezione titolo="Serate tranquille" nota="I giorni in cui di solito hai posto. Chi ti ha salvato lo vede nella tua scheda: niente sconti, niente commissioni." piano="Verified" testId="pannello-serate">
+        <SerateTranquille placeId={locale.id} iniziali={demo ? [2, 3] : serate.giorni} at={demo ? new Date().toISOString() : serate.at} verificato={verificato} demo={demo} />
+      </Sezione>
+      {evidenza}
+    </>
   );
 
   return (
