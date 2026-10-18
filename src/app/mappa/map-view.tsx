@@ -2300,7 +2300,10 @@ export default function MapView({
                 </span>
               </button>
             ))}
-            <p className="px-1 pt-1 text-xs font-sans text-text-muted">Premi Invio per cercare nuovi posti con l&apos;AI.</p>
+            {/* Con le ricerche Google finite Invio non trova posti nuovi: niente invito a premerlo. */}
+            {!(aiError && /ripartono alle 9:00/.test(aiError)) && (
+              <p className="px-1 pt-1 text-xs font-sans text-text-muted">Premi Invio per cercare nuovi posti con l&apos;AI.</p>
+            )}
           </div>
         )}
         {/* Seconda riga (Lorenzo 16/10: schermo più libero): Esplora/I miei salvati e UN solo accesso

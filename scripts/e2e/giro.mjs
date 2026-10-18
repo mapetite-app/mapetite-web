@@ -1629,6 +1629,7 @@ else {
     await p.getByLabel("Cosa cerchi?").press("Enter");
     const btn = p.getByTestId("errore-salvati");
     ok(await btn.waitFor({ timeout: 5000 }).then(() => true, () => false) && /Cerca nei tuoi \d+ salvati/.test((await btn.textContent()) ?? ""), `quota finita: accanto al messaggio 'Cerca nei tuoi salvati' (${await btn.textContent().catch(() => "")})`);
+    ok(!(await p.getByText("Premi Invio per cercare nuovi posti con l'AI.").isVisible().catch(() => false)), "quota finita: niente 'Premi Invio per cercare nuovi posti'");
     await p.screenshot({ path: `${OUT}/25b-quota-finita.png`, caret: "initial" });
     await btn.click().catch(() => {});
     ok(await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => true, () => false), "quota finita: un tocco apre i salvati");
