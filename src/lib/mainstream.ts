@@ -96,3 +96,13 @@ export function lowerMassFromTop<T extends { name: string; userRatingCount: numb
   const rest = places.filter((p) => !head.includes(p));
   return { places: [...head, ...rest], lowered: lowered.map((p) => p.name) };
 }
+
+// Esclusione dell'AI per un requisito che la frase non contiene. Visto dal vivo il 18/10: "trattoria a
+// Trastevere" → Da Enzo escluso perché "frequentato da turisti, non corrisponde al profilo di autentica
+// trattoria". "Autentica" e "non turistica" non c'erano: LORENZO.md vuole esclusioni solo per requisiti
+// espliciti. Allora il locale resta (e non va in fondo per questo).
+const TURISTICO = /turist|trappola/i; // solo la fama: "poco autentica" per una "pizzeria verace" è un requisito di cucina
+
+export function exclusionNotAsked(query: string, fitReason: string): boolean {
+  return TURISTICO.test(fitReason) && !wantsOffTheBeatenPath(query);
+}

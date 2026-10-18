@@ -1,7 +1,7 @@
 // Controlli delle regole di ordinamento della ricerca (nessuna chiamata, nessun costo).
 //   node --experimental-strip-types scripts/e2e/regole-ricerca.mjs
 import { demoteOffType } from "../../src/lib/off-type.ts";
-import { demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "../../src/lib/mainstream.ts";
+import { demoteMainstream, demoteTouristTraps, lowerMassFromTop, exclusionNotAsked } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
@@ -37,6 +37,11 @@ ok(demoteMainstream("trattoria a Trastevere", trastevere).demoted.length === 0, 
   ok(lowerMassFromTop("trattoria", [t2("A", 4.5, 9000), t2("B", 4.6, 8500), t2("C", 4.5, 7000), t2("D", 4.4, 6000)]).lowered.length === 0, "tutti con tante recensioni: nessuno spostamento");
   ok(lowerMassFromTop("trattoria", [t2("A", 4.5, 3000), t2("Huge", 4.6, 50000), t2("C", 4.5, 2000)]).lowered.length === 0, "3 risultati o meno: nessuno spostamento");
 }
+
+// Esclusioni dell'AI per "turistico" solo se la frase lo chiede (18/10: Da Enzo escluso per "trattoria a Trastevere").
+ok(exclusionNotAsked("trattoria a Trastevere", "Locale frequentato principalmente da turisti con menù turistico, non corrisponde al profilo di autentica trattoria trasteverina."), "esclusione per 'turistico' senza richiesta: annullata");
+ok(!exclusionNotAsked("trattoria autentica a Trastevere", "Frequentato quasi solo da turisti."), "esclusione per 'turistico' con 'autentica' nella frase: resta");
+ok(!exclusionNotAsked("rooftop a Roma", "Non ha una terrazza né una vista."), "esclusione per un requisito fisico: resta");
 
 // Emoji (src/lib/emoji.ts): visto dal vivo il 13/10 sera, un cocktail bar con "Restaurant" nel nome aveva 🍝.
 ok(getCategoryEmoji("cocktail_bar", "The Vista Rooftop Roma | Pantheon Terrace Bar & Restaurant") === "🍸", "emoji: cocktail bar con 'Restaurant' nel nome ha 🍸");
