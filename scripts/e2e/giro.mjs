@@ -5776,7 +5776,8 @@ else {
   ok((await gp.getByTestId("gruppo-posto").first().getByTestId("gruppo-in-testa").count()) === 1, "lista di gruppo: '🏆 In testa' sul più votato");
   ok((await gp.getByTestId("gruppo-posto").first().innerText()).includes("Piace a Giulia e Marco"), "lista di gruppo: si vede a chi piace");
   ok((await gp.getByTestId("gruppo-membri").innerText()).includes("Tu") && (await gp.getByTestId("gruppo-membri").innerText()).includes("Marco"), "lista di gruppo: chi c'è nella lista (tu per primo)");
-  ok(await gp.getByTestId("gruppo-condividi").isVisible() && (await gp.getByTestId("gruppo-condividi").textContent())?.includes("Condividi il link d'invito"), "lista di gruppo: 'Condividi il link d'invito'");
+  // 18/10: con gli amici già dentro l'invito è un pulsante "Invita" accanto al nome, niente riquadro grande.
+  ok(await gp.getByTestId("gruppo-condividi").isVisible() && (await gp.getByTestId("gruppo-condividi").textContent())?.trim() === "Invita" && (await gp.getByTestId("gruppo-invita").count()) === 0, "lista di gruppo: 'Invita' compatto accanto al nome, niente riquadro grande");
   await noHScroll("lista di gruppo");
   await gp.screenshot({ path: `${OUT}/95-gruppo-lista.png`, caret: "initial" });
   const trattoria = gp.getByTestId("gruppo-posto").filter({ hasText: "Trattoria Uno" });

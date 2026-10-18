@@ -139,6 +139,9 @@ export default function GruppoVista({
   };
 
   const totaleVoti = posti.reduce((n, p) => n + p.voti, 0);
+  // Riquadro grande solo finché nella lista non c'è nessun altro (o appena creata).
+  const invitoGrande = appenaCreata || membri.length <= 1;
+  const testoInvito = `Scegliamo insieme dove andare: entra in "${gruppo.nome}" su Mapetite e vota il tuo posto preferito.`;
 
   return (
     <div>
@@ -148,6 +151,19 @@ export default function GruppoVista({
           <h1 className="font-title text-2xl font-semibold leading-tight text-brand break-words">{gruppo.nome}</h1>
           <p className="mt-0.5 text-sm text-text-muted" data-testid="gruppo-numeri">{numeriGruppo({ membri: membri.length || gruppo.membri, posti: posti.length })}</p>
         </div>
+        {/* Con gli amici già dentro l'invito è un pulsante piccolo: in primo piano restano i posti e i voti. */}
+        {!invitoGrande && (
+          <CondividiLink
+            path={invito}
+            title={`${gruppo.nome} · Mapetite`}
+            text={testoInvito}
+            cosa="gruppo"
+            label="Invita"
+            variant="outline"
+            testId="gruppo-condividi"
+            className="shrink-0"
+          />
+        )}
       </header>
 
       {membri.length > 0 && (
@@ -161,27 +177,26 @@ export default function GruppoVista({
         </ul>
       )}
 
-      <section
-        data-testid="gruppo-invita"
-        className={`mt-4 rounded-card p-4 ${appenaCreata || membri.length <= 1 ? "bg-brand text-white" : "border border-border bg-surface"}`}
-      >
-        <p className={`font-display text-[15px] font-semibold ${appenaCreata || membri.length <= 1 ? "text-white" : "text-brand"}`}>
-          {appenaCreata ? "Lista creata! Ora invita gli amici" : membri.length <= 1 ? "Invita gli amici nella lista" : "Invita altri amici"}
-        </p>
-        <p className={`mt-0.5 text-sm ${appenaCreata || membri.length <= 1 ? "text-white/80" : "text-text-muted"}`}>
-          Manda il link nel vostro gruppo WhatsApp: chi lo apre entra, propone posti e vota.
-        </p>
-        <CondividiLink
-          path={invito}
-          title={`${gruppo.nome} · Mapetite`}
-          text={`Scegliamo insieme dove andare: entra in "${gruppo.nome}" su Mapetite e vota il tuo posto preferito.`}
-          cosa="gruppo"
-          label="Condividi il link d'invito"
-          variant={appenaCreata || membri.length <= 1 ? "outline" : "solid"}
-          testId="gruppo-condividi"
-          className="mt-3 w-full"
-        />
-      </section>
+      {invitoGrande && (
+        <section data-testid="gruppo-invita" className="mt-4 rounded-card bg-brand p-4 text-white">
+          <p className="font-display text-[15px] font-semibold text-white">
+            {appenaCreata ? "Lista creata! Ora invita gli amici" : "Invita gli amici nella lista"}
+          </p>
+          <p className="mt-0.5 text-sm text-white/80">
+            Manda il link nel vostro gruppo WhatsApp: chi lo apre entra, propone posti e vota.
+          </p>
+          <CondividiLink
+            path={invito}
+            title={`${gruppo.nome} · Mapetite`}
+            text={testoInvito}
+            cosa="gruppo"
+            label="Condividi il link d'invito"
+            variant="outline"
+            testId="gruppo-condividi"
+            className="mt-3 w-full"
+          />
+        </section>
+      )}
 
       <section className="mt-6" aria-labelledby="posti-titolo">
         <div className="flex items-center justify-between gap-2">
