@@ -284,7 +284,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       )}
       {userId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">
-          <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link> per dire com&apos;era.
+          <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>{" "}per dire com&apos;era.
         </p>
       )}
       {userId != null && c.placeId == null && (
