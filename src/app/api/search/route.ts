@@ -6,7 +6,7 @@ import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
 import { distanceMeters } from "@/lib/distance";
-import { recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
+import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteMainstream, demoteTouristTraps } from "@/lib/mainstream";
@@ -586,7 +586,7 @@ ESEMPI (input → output atteso):
 
   // Segnale "ricerca" (VISIONE.md: dati sui comportamenti di scoperta, utili anche ai ristoratori).
   // Mai la frase scritta: solo cosa ha capito l'AI o i filtri scelti. Dopo la risposta, senza attese.
-  if (source === "world") {
+  if (source === "world" && !isAutomated(request)) {
     // Visitatore e sessione dai cookie del telefono (src/lib/track.ts): la ricerca entra negli imbuti.
     const jar = await cookies();
     const anonId = jar.get(ANON_COOKIE)?.value ?? null;
