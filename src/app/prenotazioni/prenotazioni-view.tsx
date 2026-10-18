@@ -281,8 +281,7 @@ export default function PrenotazioniView() {
 
   return (
     <main className="mx-auto w-full max-w-lg px-4 pb-10 pt-6">
-      <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Prenotazioni</p>
-      <h1 className="mt-1 font-title text-3xl font-semibold leading-tight text-text">Le mie prenotazioni</h1>
+      <h1 className="font-title text-3xl font-semibold leading-tight text-text">Le mie prenotazioni</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">Le richieste che hai mandato ai locali, salvate su questo telefono.</p>
 
       {!mounted ? (
