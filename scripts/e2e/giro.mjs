@@ -55,8 +55,9 @@ async function idee(pg) {
   await pan.waitFor({ timeout: 5000 });
 }
 // Frase d'esempio "Rooftop romantico…": visibile subito (card vecchie) o aprendo "Idee".
+// Con la mappa su Milano (ultima vista salvata da un test sui salvati di Milano) l'esempio è "… a Milano" (18/10).
 async function esempio(pg) {
-  const b = pg.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true });
+  const b = pg.getByRole("button", { name: /^Rooftop romantico per due a (Roma|Milano)$/ });
   const idea = pg.getByTestId("apri-idee");
   for (let i = 0; i < 50; i++) {
     if (await b.isVisible().catch(() => false)) return b;
