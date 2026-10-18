@@ -1584,6 +1584,7 @@ else {
   ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Voglio andarci': acceso anche nel foglio Filtri");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   await vaiEsplora(p);
+  await p.waitForURL((u) => !u.search.includes("vista="), { timeout: 5000 }).catch(() => {});
   await p.waitForTimeout(300);
   ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
   await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
