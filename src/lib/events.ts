@@ -39,8 +39,9 @@ let noSessionColumn = false;
 
 export async function recordEvent(e: EventInput): Promise<void> {
   if (!process.env.SUPABASE_SECRET_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) return;
-  // Giro automatico (sviluppo con utente finto): niente dati di prova nel database vero.
-  if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER) return;
+  // In sviluppo (giro automatico e prove dal vivo delle sessioni notturne) niente dati di prova nel
+  // database vero: il 18/10 una prova con curl era finita tra le ricerche di Lorenzo nel pannello dei numeri.
+  if (process.env.NODE_ENV === "development") return;
   const row: Record<string, unknown> = {
     type: e.type,
     user_id: e.userId && UUID.test(e.userId) ? e.userId : null,
