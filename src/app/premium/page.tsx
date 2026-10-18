@@ -32,25 +32,21 @@ export default function PremiumPage() {
         <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
           Per chi esce spesso e vuole scegliere ancora meglio. Quello che usi oggi resta gratis: Premium aggiunge, non toglie.
         </p>
+        <p data-testid="premium-nessun-pagamento" className="mt-3 text-sm font-sans leading-relaxed text-white">
+          <strong className="font-display">Non si paga niente.</strong> Tocca “Mi interessa” su quello che vorresti per primo.
+        </p>
       </section>
 
-      <p data-testid="premium-nessun-pagamento" className="mt-4 rounded-card bg-surface p-3 text-sm font-sans text-text">
-        <strong className="font-display">Non si paga niente:</strong> Premium non è ancora attivo. Tocca “Mi interessa” sulle funzioni che vorresti per prime: ci aiuti a decidere da dove partire.
-      </p>
-
-      <ul className="mt-5 space-y-3">
+      {/* Un solo elenco (Lorenzo 17/10, "semplice prima di tutto"): niente riquadro per voce
+          né "In arrivo" ripetuto, già detto in cima. */}
+      <ul className="mt-5 divide-y divide-border rounded-card border border-border bg-white shadow-card">
         {FUNZIONI.map((f) => (
-          <li key={f.id} data-testid="premium-funzione" className="rounded-card border border-border bg-white p-4 shadow-card">
-            <div className="flex items-start gap-3">
-              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-light text-xl">{f.icon}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-display text-base font-semibold text-text">{f.title}</h2>
-                  <span className="rounded-pill bg-surface px-2 py-0.5 text-[10px] font-display font-semibold uppercase tracking-wider text-text-muted">In arrivo</span>
-                </div>
-                <p className="mt-1 text-sm font-sans leading-snug text-text-muted">{f.text}</p>
-                <MiInteressa id={f.id} />
-              </div>
+          <li key={f.id} data-testid="premium-funzione" className="flex items-start gap-3 p-4">
+            <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-light text-lg">{f.icon}</span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-base font-semibold leading-snug text-text">{f.title}</h2>
+              <p className="mt-0.5 text-sm font-sans leading-snug text-text-muted">{f.text}</p>
+              <MiInteressa id={f.id} />
             </div>
           </li>
         ))}
