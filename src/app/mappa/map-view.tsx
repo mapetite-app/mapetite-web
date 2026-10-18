@@ -2306,34 +2306,12 @@ export default function MapView({
             )}
           </div>
         )}
-        {/* Seconda riga (Lorenzo 16/10: schermo più libero): Esplora/I miei salvati e UN solo accesso
+        {/* Seconda riga (Lorenzo 16/10: schermo più libero): UN solo accesso
             a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. A destra resta
             libero il posto del pulsante "La mia posizione". */}
         <div className={`flex items-center gap-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
-          <div className="pointer-events-auto flex shrink-0 rounded-pill overflow-hidden shadow-float bg-surface">
-            <button
-              type="button"
-              onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
-              className={
-                view === "all"
-                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
-                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-              }
-            >
-              Esplora
-            </button>
-            <button
-              type="button"
-              onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
-              className={
-                view === "saved"
-                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
-                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-              }
-            >
-              I miei salvati
-            </button>
-          </div>
+          {/* Niente più "Esplora / I miei salvati" (Lorenzo 18/10, chi apre l'app la prima volta): era un
+              doppione della barra in basso, dove "Salvati" e "Mappa" fanno la stessa cosa. */}
           {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
             <button
               type="button"
