@@ -1,10 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { CalendarCheck, Navigation, X } from "lucide-react";
-import { bookingReminders, loadBookings, removeBooking, subscribeBookings, updateBooking, type BookingRequest } from "@/lib/booking";
-import { track } from "@/lib/track";
+import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
+import { bookingReminders, cancelMessage, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { track, trackFeature } from "@/lib/track";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
 // "Stasera alle 21:00 da …", dal giorno dopo "Com'è andata?". In home e nel profilo.
@@ -16,7 +16,52 @@ const VIA: Record<BookingRequest["via"], string> = {
   copiato: "messaggio copiato",
 };
 
+// "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
+// è già scritto; un tocco per mandarlo da dove era partita la richiesta. Senza numero si copia.
+function Disdetta({ b }: { b: BookingRequest }) {
+  const [copied, setCopied] = useState(false);
+  let name = "";
+  try { name = window.localStorage.getItem("mapetite.nome") ?? ""; } catch { /* storage non disponibile */ }
+  const text = cancelMessage(b, name);
+  const wa = whatsappNumber(b.phone);
+  const done = (contesto: string) => {
+    trackFeature("prenotazione_disdetta", { contesto });
+    updateBooking(b.id, { outcome: "non-andato", dismissed: true });
+  };
+  const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
+  return (
+    <div data-testid="promemoria-disdetta" className="mt-3 rounded-btn bg-white/10 p-3">
+      <p className="text-xs font-sans text-white/80">Avvisa il locale: così dà il tavolo a qualcun altro.</p>
+      <p data-testid="promemoria-disdetta-testo" className="mt-1.5 text-sm font-sans italic text-white">“{text}”</p>
+      <div className="mt-2.5 flex gap-2">
+        {wa ? (
+          <a href={`https://wa.me/${wa}?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" data-testid="disdetta-whatsapp" onClick={() => done("whatsapp")} className={btn}>
+            <MessageCircle size={15} /> WhatsApp
+          </a>
+        ) : b.phone ? (
+          <a href={telHref(b.phone)} data-testid="disdetta-chiama" onClick={() => done("telefono")} className={btn}>
+            <Phone size={15} /> Chiama
+          </a>
+        ) : (
+          <button
+            type="button"
+            data-testid="disdetta-copia"
+            onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); } catch { /* copia non riuscita: il testo resta da leggere */ } done("copiato"); }}
+            className={btn}
+          >
+            <Copy size={15} /> {copied ? "Copiato" : "Copia il messaggio"}
+          </button>
+        )}
+      </div>
+      <button type="button" onClick={() => removeBooking(b.id)} className="mt-2 min-h-9 text-xs font-display font-semibold text-white/80 underline underline-offset-2">
+        Non l&apos;avevo inviata: toglila
+      </button>
+    </div>
+  );
+}
+
 export default function BookingReminder() {
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const { today, howWasIt } = bookingReminders(list);
   if (today.length === 0 && howWasIt.length === 0) return null;
@@ -54,10 +99,17 @@ export default function BookingReminder() {
                 <Navigation size={15} /> Percorso
               </a>
             )}
-            <button type="button" onClick={() => removeBooking(b.id)} className="min-h-10 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white">
-              Non l&apos;ho inviata
+            <button
+              type="button"
+              data-testid="promemoria-non-vado"
+              aria-expanded={cancelling === b.id}
+              onClick={() => setCancelling(cancelling === b.id ? null : b.id)}
+              className="min-h-10 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white"
+            >
+              Non vado più
             </button>
           </div>
+          {cancelling === b.id && <Disdetta b={b} />}
         </section>
       ))}
       {howWasIt.slice(0, 1).map((b) => (

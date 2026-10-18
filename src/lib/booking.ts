@@ -194,6 +194,19 @@ export function bookingMessage(b: BookingDetails, name: string | null, now: Date
   return `${parts.join("")} ${sign}`;
 }
 
+// Disdetta (contro i tavoli prenotati e vuoti: 12,8% in media, docs/autonomia/POSIZIONAMENTO.md):
+// il messaggio per il locale, già scritto, così avvisare costa un tocco.
+export function cancelMessage(b: BookingDetails, name: string | null, now: Date = new Date()): string {
+  const greeting = now.getHours() < 13 ? "Buongiorno" : "Buonasera";
+  const parts = [`${greeting}, purtroppo non riesco a venire: disdico la prenotazione`];
+  if (b.people) parts.push(` per ${b.people} ${b.people === 1 ? "persona" : "persone"}`);
+  if (b.date) parts.push(` di ${dayLabel(b.date, now)}`);
+  if (b.time) parts.push(` alle ${b.time}`);
+  parts.push(". Mi scuso, così potete dare il tavolo a qualcun altro.");
+  const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
+  return `${parts.join("")} ${sign}`;
+}
+
 // Numero per WhatsApp: solo i cellulari italiani (3xx) o numeri già internazionali.
 // Un fisso di solito non ha WhatsApp: meglio non proporre una via che non funziona.
 export function whatsappNumber(phone: string | null | undefined): string | null {
@@ -221,6 +234,7 @@ export type BookingRequest = BookingDetails & {
   outcome?: "bene" | "male" | "non-andato" | null;
   dismissed?: boolean;
   confirmed?: boolean;    // l'utente ha segnato "Il locale ha confermato" (assente nelle richieste vecchie)
+  phone?: string | null;  // numero del locale, per avvisare se non si va più (assente nelle richieste vecchie)
 };
 
 const KEY = "mapetite.prenotazioni";

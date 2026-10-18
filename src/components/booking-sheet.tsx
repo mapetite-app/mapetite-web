@@ -91,6 +91,7 @@ export default function BookingSheet({
       lat: place.lat,
       lng: place.lng,
       via,
+      phone: place.phone ?? null,
     });
     // Segnali esistenti (src/lib/track.ts): sito e chiama, con "da: prenota" per distinguerli.
     const where = place.lat != null && place.lng != null ? { id: place.id, lat: place.lat, lng: place.lng } : { id: place.id };

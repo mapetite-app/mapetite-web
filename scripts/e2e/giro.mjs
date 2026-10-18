@@ -3556,6 +3556,20 @@ else {
   await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
   await actx.clearCookies({ name: "e2e_profilo" });
+  // "Non vado più" (18/10, contro i tavoli vuoti): messaggio di disdetta già scritto e un tocco per mandarlo.
+  await ap.evaluate(() => {
+    const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() }]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await ap.getByTestId("promemoria-non-vado").click();
+  { const t = (await ap.getByTestId("promemoria-disdetta-testo").textContent()) ?? "";
+    const href = (await ap.getByTestId("disdetta-whatsapp").getAttribute("href")) ?? "";
+    ok(/disdico la prenotazione per 2 persone di oggi \d\d\/\d\d alle 21:00/.test(t) && href.startsWith("https://wa.me/393331234567?text=") && decodeURIComponent(href).includes("disdico la prenotazione"), `promemoria: 'Non vado più' prepara la disdetta per WhatsApp (${t.slice(0, 80)})`);
+    await ashot("56b-promemoria-disdetta");
+    await ap.getByTestId("disdetta-whatsapp").evaluate((a) => { a.removeAttribute("target"); a.setAttribute("href", "#"); a.click(); });
+    await ap.waitForTimeout(300);
+    ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta"); }
 
   // Scheda della mappa: stesso pulsante Prenota
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
