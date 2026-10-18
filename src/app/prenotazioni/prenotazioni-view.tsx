@@ -14,7 +14,6 @@ import {
   subscribeBookings,
   updateBooking,
   type BookingRequest,
-  type BookingStatus,
 } from "@/lib/booking";
 import { track } from "@/lib/track";
 
@@ -89,22 +88,6 @@ function DateTile({ date, muted }: { date: string | null; muted?: boolean }) {
   );
 }
 
-// Tre passi: Richiesta inviata → Confermata → Fatta.
-function Steps({ status }: { status: BookingStatus }) {
-  const reached = status === "inviata" ? 0 : status === "confermata" ? 1 : 2;
-  const steps = ["Richiesta inviata", "Confermata", "Fatta"];
-  return (
-    <ol data-testid="prenotazione-passi" aria-label="Stato della prenotazione" className="mt-3 flex items-center gap-1.5">
-      {steps.map((s, i) => (
-        <li key={s} aria-current={i === reached ? "step" : undefined} className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className={`h-1 rounded-full ${i <= reached ? (i === reached ? "bg-accent" : "bg-brand") : "bg-border"}`} />
-          <span className={`truncate text-[11px] font-display ${i === reached ? "font-semibold text-text" : "text-text-muted"}`}>{s}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 function RemoveButton({ b, confirmText }: { b: BookingRequest; confirmText: string }) {
   const [asking, setAsking] = useState(false);
   if (asking) {
@@ -164,7 +147,6 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           </p>
         </div>
       </div>
-      <Steps status={status} />
       {status === "inviata" ? (
         <div className="mt-3">
           <button
