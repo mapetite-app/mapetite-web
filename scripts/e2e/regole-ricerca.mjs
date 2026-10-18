@@ -1,7 +1,7 @@
 // Controlli delle regole di ordinamento della ricerca (nessuna chiamata, nessun costo).
 //   node --experimental-strip-types scripts/e2e/regole-ricerca.mjs
 import { demoteOffType } from "../../src/lib/off-type.ts";
-import { demoteMainstream, demoteTouristTraps } from "../../src/lib/mainstream.ts";
+import { demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "../../src/lib/mainstream.ts";
 import { getCategoryEmoji } from "../../src/lib/emoji.ts";
 import { namedCity, demoteOtherCity, withDistrict, cityNear, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "../../src/lib/named-city.ts";
 import { refineCategory } from "../../src/lib/refine-category.ts";
@@ -25,6 +25,18 @@ ok(demoteOffType("cocktail bar", [p("Pub 1", "pub"), p("Pub 2", "pub"), p("Pub 3
 const trastevere = [p("Da Enzo", "restaurant", 10239), p("A", "restaurant", 3900), p("B", "restaurant", 2000), p("C", "restaurant", 4100), p("D", "restaurant", 3000)];
 ok(demoteMainstream("trattoria autentica non turistica a Trastevere", trastevere).places.at(-1)?.name === "Da Enzo", "non turistico: Da Enzo in fondo");
 ok(demoteMainstream("trattoria a Trastevere", trastevere).demoted.length === 0, "richiesta normale: Da Enzo resta");
+
+// Il più famoso non apre la lista (18/10): Tonnarello con 110k recensioni scende dopo i primi 3, mai in fondo.
+{
+  const tr = [t2("Tonnarello", 4.5, 110000), t2("A", 4.6, 3000), t2("B", 4.5, 4000), t2("C", 4.4, 2500), t2("D", 4.7, 900)];
+  function t2(name, rating, userRatingCount) { return { name, rating, userRatingCount }; }
+  const r = lowerMassFromTop("trattoria a Trastevere", tr);
+  ok(r.places.map((x) => x.name).join(",") === "A,B,C,Tonnarello,D", "il più famoso scende al 4° posto, non in fondo");
+  ok(lowerMassFromTop("cena da Tonnarello", tr).lowered.length === 0, "il più famoso cercato per nome resta primo");
+  ok(lowerMassFromTop("trattoria non turistica a Trastevere", tr).lowered.length === 0, "con 'non turistico' decide l'altra regola (in fondo)");
+  ok(lowerMassFromTop("trattoria", [t2("A", 4.5, 9000), t2("B", 4.6, 8500), t2("C", 4.5, 7000), t2("D", 4.4, 6000)]).lowered.length === 0, "tutti con tante recensioni: nessuno spostamento");
+  ok(lowerMassFromTop("trattoria", [t2("A", 4.5, 3000), t2("Huge", 4.6, 50000), t2("C", 4.5, 2000)]).lowered.length === 0, "3 risultati o meno: nessuno spostamento");
+}
 
 // Emoji (src/lib/emoji.ts): visto dal vivo il 13/10 sera, un cocktail bar con "Restaurant" nel nome aveva 🍝.
 ok(getCategoryEmoji("cocktail_bar", "The Vista Rooftop Roma | Pantheon Terrace Bar & Restaurant") === "🍸", "emoji: cocktail bar con 'Restaurant' nel nome ha 🍸");

@@ -8,7 +8,7 @@ import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
 import { recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
-import { demoteMainstream, demoteTouristTraps } from "@/lib/mainstream";
+import { demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
@@ -305,6 +305,14 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.turistici = [...daParte.turistici, ...demoted].slice(0, 10);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (molte recensioni, voto sotto 4,2): ${JSON.stringify(demoted)}`);
+      }
+    }
+    // Il più famoso non apre la lista solo perché è il più famoso: scende dopo i primi 3, resta in vista.
+    if (searchIntent === "natural") {
+      const { places, lowered } = lowerMassFromTop(query.trim(), risultati);
+      if (lowered.length > 0) {
+        risultati = places;
+        console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} dopo i primi 3 (molte più recensioni degli altri): ${JSON.stringify(lowered)}`);
       }
     }
     // Città nominata ("a Milano"): i locali di un'altra città vanno in fondo (mai esclusi), per ultimi.
