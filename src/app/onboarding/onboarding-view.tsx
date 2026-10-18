@@ -6,6 +6,8 @@ import { ArrowLeft } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { trackFeature } from "@/lib/track";
+import { cityArea } from "@/lib/named-city";
+import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
@@ -212,6 +214,10 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
     // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
     clearDraft();
+    // La città scelta diventa il punto di partenza di mappa, assistente e Sorprendimi su questo
+    // telefono, anche senza gusti scelti o passando da Importa (18/10: un tester di Milano partiva da Roma).
+    const area = chosenCity ? cityArea(chosenCity) : null;
+    if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
       result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next });

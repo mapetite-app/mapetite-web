@@ -3120,6 +3120,15 @@ else {
     ok(n.utile.si === 1 && n.utile.no === 0 && n.sessioni.totale === 2 && !n.senzaTracciamento, `numeri: 👍/👎 e visite (${n.sessioni.totale})`);
     ok(nm.computeNumeri(rows.filter((r) => ["ricerca", "salva", "apri_scheda"].includes(r.type)), 30, now).senzaTracciamento, "numeri: avviso se la migrazione del tracciamento non è applicata");
     ok(nm.computeNumeri([], 1, now).attivi.totale === 0, "numeri: nessun evento, nessun errore");
+    // Quota Google di oggi (18/10): giorno di Los Angeles, cioè dalle 9:00 italiane (alle 8:00 UTC qui sotto).
+    { const g = nm.googleOggi([
+        ev("ricerca", 15, A, { h: 8, p: { google: 2 } }),
+        ev("ricerca", 15, A, { h: 11, p: { modo: "ai" } }),
+        ev("funzione", 15, A, { h: 11, p: { nome: "import_link" } }),
+        ev("ricerca", 15, A, { h: 6, p: { google: 1 } }),
+        ev("funzione", 15, A, { h: 11, p: { nome: "filtri" } }),
+      ], now);
+      ok(g === 4 && nm.QUOTA_GOOGLE === 50, `numeri: chiamate Google di oggi = 2 + 1 + 1 link, senza quelle di prima delle 9:00 (${g})`); }
     // Eventi dedicati (assistente, prenotazioni, raccolte): tipi esistenti + da/via/cosa nel payload.
     const rows2 = [
       ev("pagina", 14, B, { p: { pagina: "assistente" } }),
@@ -3246,6 +3255,7 @@ else {
   ]);
   await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
   ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
+  ok(/Google oggi: 1 su 50/.test((await tp.getByTestId("numeri-google").textContent()) ?? ""), `pannello: quota Google di oggi (${await tp.getByTestId("numeri-google").textContent()})`);
   ok((await tp.getByTestId("numeri-imbuto").textContent())?.includes("Scheda aperta dai risultati"), "pannello: imbuto ricerca → scheda → azione");
   ok((await tp.getByTestId("numeri-errori").textContent())?.includes("Cannot read properties of undefined"), "pannello: errori con la pagina");
   ok((await tp.getByTestId("numeri-ritorni").textContent())?.includes("1 su 1"), "pannello: ritorni dopo 1/3/7 giorni");
@@ -5284,6 +5294,9 @@ else {
   ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2 && await ip.getByTestId("importa-maps-guida").isVisible(), `primo accesso: l'import si apre con 'Incolla un link' in cima e la guida di Google Maps aperta (${Math.round(mb?.y ?? -1)})`);
   await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
   ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
+  // 18/10: la città scelta diventa il punto di partenza di mappa e assistente, anche passando da Importa.
+  { const v = await ip.evaluate(() => { try { return JSON.parse(localStorage.getItem("mapetite.vista") ?? "null"); } catch { return null; } });
+    ok(!!v && Math.abs(v.lat - 41.893) < 0.01 && Math.abs(v.lng - 12.483) < 0.01, `primo accesso: la città scelta (Roma) resta come punto di partenza della mappa (${JSON.stringify(v)})`); }
 
   // "Salta" sulle schermate 2 e 3: si salta solo quella; alla fine la mappa cerca sui gusti, nella città.
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });

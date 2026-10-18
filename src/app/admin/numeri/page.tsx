@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
-import { computeNumeri, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
+import { computeNumeri, googleOggi, QUOTA_GOOGLE, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
 
 // Pannello di Lorenzo (PIANO-25-OTTOBRE.md 7.5): i tester usano Mapetite? Tornano? Cosa usano?
 // Solo per gli indirizzi in src/lib/admin.ts, per tutti gli altri 404. Legge `events` con la
@@ -375,12 +375,19 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
     ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>()]
     : await Promise.all([loadRows(), loadEmails()]);
   const n = computeNumeri(rows, giorni, undefined, emails);
+  const google = googleOggi(rows);
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-12 pt-6">
       <h1 className="font-title text-2xl font-semibold text-brand">Numeri dei tester</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">Solo per te. Aggiornati a ogni apertura della pagina.</p>
 
+      {/* Quota Google (Lorenzo decide il budget): quante ricerche di oggi sono già andate. */}
+      {!errore && (
+        <p data-testid="numeri-google" className={`mt-3 rounded-card px-3 py-2 text-sm font-sans ${google >= QUOTA_GOOGLE * 0.8 ? "bg-accent-light text-text" : "bg-surface text-text-muted"}`}>
+          <span className="font-display font-semibold text-text">Google oggi: {google} su {QUOTA_GOOGLE}</span> ricerche · ripartono alle 9:00
+        </p>
+      )}
       <nav aria-label="Periodo" className="mt-4 flex gap-2">
         {PERIODI.map((p) => (
           <Link
