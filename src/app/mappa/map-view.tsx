@@ -2019,6 +2019,22 @@ export default function MapView({
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
   }, [view]);
 
+  // La voce già accesa nella barra in basso, toccata di nuovo (src/components/nav-bar.tsx): "Salvati"
+  // riapre l'elenco dei salvati, "Mappa" torna a Esplora pulita. Prima lo facevano i pulsanti in alto.
+  useEffect(() => {
+    const onBarra = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id === "salvati") {
+        setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" });
+      } else if (id === "esplora") {
+        setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" });
+      }
+    };
+    window.addEventListener("mapetite:barra", onBarra);
+    return () => window.removeEventListener("mapetite:barra", onBarra);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo setter e azioni senza stato proprio
+  }, []);
+
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
@@ -2306,34 +2322,12 @@ export default function MapView({
             )}
           </div>
         )}
-        {/* Seconda riga (Lorenzo 16/10: schermo più libero): Esplora/I miei salvati e UN solo accesso
+        {/* Seconda riga (Lorenzo 16/10: schermo più libero): UN solo accesso
             a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. A destra resta
             libero il posto del pulsante "La mia posizione". */}
         <div className={`flex items-center gap-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
-          <div className="pointer-events-auto flex shrink-0 rounded-pill overflow-hidden shadow-float bg-surface">
-            <button
-              type="button"
-              onClick={() => { setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" }); }}
-              className={
-                view === "all"
-                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
-                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-              }
-            >
-              Esplora
-            </button>
-            <button
-              type="button"
-              onClick={() => { setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
-              className={
-                view === "saved"
-                  ? "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-brand text-white"
-                  : "min-h-10 px-3 py-2 text-sm font-display font-semibold bg-surface text-text-muted hover:text-text"
-              }
-            >
-              I miei salvati
-            </button>
-          </div>
+          {/* Niente più "Esplora / I miei salvati" (Lorenzo 18/10, chi apre l'app la prima volta): era un
+              doppione della barra in basso, dove "Salvati" e "Mappa" fanno la stessa cosa. */}
           {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
             <button
               type="button"
@@ -2414,7 +2408,7 @@ export default function MapView({
           </div>
         )}
         {savedControlsOn && (
-          <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float">
+          <div data-testid="salvati-filtri" className={`pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
             {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
                 ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
             <div className="flex items-center gap-1.5">
@@ -2472,17 +2466,21 @@ export default function MapView({
       {/* Messaggio se non loggato e vista "salvati" */}
       {view === "saved" && !userId && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none lg:static lg:col-start-2 lg:row-start-2 lg:items-start lg:px-5 lg:pt-2">
-          <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
-            <p className="text-2xl mb-2">🔒</p>
-            <p className="font-display font-semibold text-text">Accesso richiesto</p>
+          {/* Chi non ha l'account (prima volta): cosa sono i Salvati, in una frase, e un solo pulsante (Albo). */}
+          <div data-testid="salvati-senza-account" className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
+            <p className="text-3xl mb-2" aria-hidden>📌</p>
+            <p className="font-display font-semibold text-text">La tua mappa dei locali</p>
             <p className="mt-1 text-sm font-sans text-text-muted">
-              Accedi per vedere la tua mappa personale
+              Salvi un posto da Instagram, TikTok o Google Maps e lo ritrovi qui quando devi scegliere.
             </p>
             <a
-              href="/login"
-              className="mt-4 inline-block rounded-btn bg-brand px-4 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95"
+              href="/signup?next=%2Fmappa%3Fvista%3Dsalvati"
+              className="mt-4 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
             >
-              Accedi
+              Crea la tua mappa
+            </a>
+            <a href="/login?next=%2Fmappa%3Fvista%3Dsalvati" className="mt-2 block min-h-10 py-2 text-sm font-display font-semibold text-brand">
+              Hai già un account? Accedi
             </a>
           </div>
         </div>

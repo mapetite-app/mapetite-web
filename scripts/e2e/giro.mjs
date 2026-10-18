@@ -54,6 +54,9 @@ async function idee(pg) {
   await pg.getByTestId("apri-idee").click();
   await pan.waitFor({ timeout: 5000 });
 }
+// Sulla mappa non c'è più "Esplora / I miei salvati" (doppione della barra in basso, 18/10): si passa dalla barra.
+const vaiSalvati = (pg) => pg.locator("nav").first().getByRole("link", { name: "Salvati" }).evaluate((a) => a.click());
+const vaiEsplora = (pg) => pg.locator("nav").first().getByRole("link", { name: "Mappa" }).evaluate((a) => a.click());
 // Frase d'esempio "Rooftop romantico…": visibile subito (card vecchie) o aprendo "Idee".
 // Con la mappa su Milano (ultima vista salvata da un test sui salvati di Milano) l'esempio è "… a Milano" (18/10).
 async function esempio(pg) {
@@ -151,6 +154,7 @@ ok(await page.getByRole("button", { name: "Filtri", exact: true }).getByText("Fi
 ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "barra in alto: si capisce che è la ricerca con l'AI");
 { const pr = await page.getByTestId("pannello-ricerca").boundingBox(); ok(!!pr && pr.y + pr.height < 130, `mappa libera: sopra la mappa solo barra + una riga (fino a ${Math.round((pr?.y ?? 0) + (pr?.height ?? 0))} px)`); }
 { const ib = await page.getByTestId("apri-idee").boundingBox(); ok(!!ib && ib.y < 160 && ib.x + ib.width <= 390, `'Idee' nella riga di 'Esplora / I miei salvati' (y ${Math.round(ib?.y ?? 0)})`); }
+ok((await page.getByRole("button", { name: "I miei salvati" }).count()) === 0 && (await page.getByRole("button", { name: "Esplora", exact: true }).count()) === 0, "mappa: niente 'Esplora / I miei salvati' (stanno già nella barra in basso)");
 await shot("01-benvenuto");
 await idee(page);
 { const pan = page.getByTestId("idee-pannello");
@@ -1365,7 +1369,7 @@ await page.waitForTimeout(200);
 ok((await page.getByTestId("recenti").count()) === 0 && (await page.getByTestId("cancella-recenti").count()) === 0, "ricerche recenti: 'Cancella' le toglie subito");
 
 // 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
-if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => page.getByRole("button", { name: "I miei salvati" }).click()).then(() => page.getByText("Accesso richiesto").isVisible())) {
+if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => vaiSalvati(page)).then(() => page.getByTestId("salvati-senza-account").isVisible())) {
   console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
 } else {
   await page.getByText("La tua mappa è ancora vuota").waitFor({ timeout: 4000 });
@@ -1381,8 +1385,8 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => pa
 
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
 // Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
-const fakeUser = await page.goto(`${BASE}/mappa`).then(() => page.getByRole("button", { name: "I miei salvati" }).click())
-  .then(() => page.getByText("Accesso richiesto").isVisible({ timeout: 1500 })).then((v) => !v);
+const fakeUser = await page.goto(`${BASE}/mappa`).then(() => vaiSalvati(page))
+  .then(() => page.getByTestId("salvati-senza-account").isVisible({ timeout: 1500 })).then((v) => !v);
 if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
@@ -1405,7 +1409,7 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
-  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await vaiSalvati(p);
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   // Lorenzo 16/10 ("il dono della sintesi"): in alto UNA riga (cerca + Stasera), il resto dietro "Filtri".
   { const box = await p.getByTestId("salvati-filtri").boundingBox();
@@ -1450,7 +1454,7 @@ else {
   await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Azzera" }).click();
   await p.getByRole("button", { name: /Applica filtri/ }).click();
-  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await vaiSalvati(p);
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
@@ -1471,10 +1475,10 @@ else {
     await p.waitForTimeout(600);
     await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" });
     // Dopo una ricerca, tornando ai salvati il verdetto c'è ancora (la ricerca non lo cancella).
-    await p.getByRole("button", { name: "Esplora" }).click();
+    await vaiEsplora(p);
     await (await esempio(p)).click();
     await p.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
-    await p.getByRole("button", { name: "I miei salvati" }).click();
+    await vaiSalvati(p);
     await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
     const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
@@ -1579,7 +1583,8 @@ else {
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Voglio andarci/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Voglio andarci': acceso anche nel foglio Filtri");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
-  await p.getByRole("button", { name: "Esplora" }).click();
+  await vaiEsplora(p);
+  await p.waitForURL((u) => !u.search.includes("vista="), { timeout: 5000 }).catch(() => {});
   await p.waitForTimeout(300);
   ok(!p.url().includes("vista=") && (await p.locator("nav").first().getByRole("link", { name: "Mappa" }).getAttribute("aria-current")) === "page", "Esplora: torna accesa 'Mappa' nella barra in basso");
   await p.locator("nav").first().getByRole("link", { name: "Salvati" }).click();
@@ -2033,12 +2038,12 @@ else {
 
   // "🎲 Scegli tu" (?beta=sorprendimi, spento di default): apre un salvato a caso, prima i "Voglio andarci"
   await p.goto(`${BASE}/mappa?beta=-sorprendimi`, { waitUntil: "networkidle" });
-  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await vaiSalvati(p);
   await p.waitForTimeout(800);
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("scegli-tu").count()) === 0, "scegli tu: si spegne con ?beta=-sorprendimi (acceso di default)");
   await p.goto(`${BASE}/mappa?beta=sorprendimi`, { waitUntil: "networkidle" });
-  await p.getByRole("button", { name: "I miei salvati" }).click();
+  await vaiSalvati(p);
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("scegli-tu").click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
@@ -6839,6 +6844,18 @@ else {
     await a.goto(`${BASE}/sorprendimi?da=home`, { waitUntil: "networkidle" });
     const st = a.getByTestId("sorpresa-quota-stasera");
     ok(await st.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await st.getAttribute("href")) === "/stasera", "Sorprendimi con la quota finita: 'Scegli tra i tuoi salvati' invece di 'Riprova'");
+    await c.close(); }
+  // Salvati senza account (18/10): cosa sono in una frase e "Crea la tua mappa", niente lucchetto.
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const a = await c.newPage();
+    a.on("pageerror", (e) => errors.push(e.message));
+    await a.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await vaiSalvati(a);
+    const box = a.getByTestId("salvati-senza-account");
+    ok(await box.waitFor({ timeout: 5000 }).then(() => true, () => false) && (await box.getByRole("link", { name: "Crea la tua mappa" }).getAttribute("href")) === "/signup?next=%2Fmappa%3Fvista%3Dsalvati" && (await a.getByText("Accesso richiesto").count()) === 0, "salvati senza account: spiegazione in una frase e 'Crea la tua mappa' che torna ai salvati");
+    await a.screenshot({ path: `${OUT}/08c-salvati-senza-account.png`, caret: "initial" });
     await c.close(); }
   // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
   for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {

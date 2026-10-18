@@ -195,6 +195,11 @@ export async function POST(request: Request) {
       locationMode = "restrict";
       console.log(`[search-citta] ${cityWide}: tutta l'area della città, query=${JSON.stringify(queryGoogle)}`);
     }
+    // Nessun luogo nella frase (né zona, né città, né "vicino a me", né "Dove?" nei filtri): si cerca solo
+    // intorno alla mappa, entro 30 km. Con la sola preferenza Google rispondeva con il locale che si chiama
+    // come la frase anche a 800 km ("Wine Bar Tranquillo" a Bari con la mappa su Milano: Lorenzo, 16–18/10).
+    const senzaLuogo = searchIntent === "natural" && !intent?.zona && !intent?.vicino_a_me && !city && !otherCity && !zonaQuartiere && !zonaFiltro && !area && typeof lat === "number" && typeof lng === "number";
+    if (senzaLuogo) locationMode = "restrict";
     // Quota giornaliera di Google finita su una delle seconde ricerche (la prima era andata).
     let quotaFinita = false;
     try {
@@ -209,7 +214,7 @@ export async function POST(request: Request) {
         maxPriceLevel: typeof body?.maxPriceLevel === "number" ? body.maxPriceLevel : undefined,
         openNowOnly: body?.openNowOnly === true ? true : undefined,
         // Con una zona scritta la distanza dal centro della mappa non vale (sarebbe da un altro posto).
-        radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaPunto ? 2000 : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : undefined,
+        radius: area ? area.radius : typeof body?.radius === "number" && !zonaFiltro ? body.radius : zonaPunto ? 2000 : zonaQuartiere || zonaFiltro ? 25000 : intent?.vicino_a_me ? 3000 : senzaLuogo ? 30000 : undefined,
         categories: Array.isArray(body?.categories) ? body.categories : undefined,
         requiredAttributes: attrs.length > 0 ? attrs : undefined,
         openAt,

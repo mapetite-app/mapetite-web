@@ -53,6 +53,12 @@ function voci(pathname: string, vista: string | null, search: string | null, log
   ];
 }
 
+// Ritoccare la voce già accesa sulla mappa riporta all'inizio, come nelle app: "Salvati" riapre l'elenco
+// dei salvati, "Mappa" torna a Esplora pulita (18/10: in alto non c'è più "Esplora / I miei salvati").
+function ritocco(id: string, active: boolean, pathname: string) {
+  if (active && pathname === "/mappa") window.dispatchEvent(new CustomEvent("mapetite:barra", { detail: id }));
+}
+
 export default function NavBar({ userId }: { userId: string | null }) {
   // useSearchParams va dentro Suspense; il fallback è la stessa barra senza i parametri.
   return (
@@ -94,6 +100,7 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
                     href={href}
                     data-testid={`barra-${id}`}
                     aria-current={active ? "page" : undefined}
+                    onClick={() => ritocco(id, active, pathname)}
                     className={`group flex flex-1 flex-col items-center justify-center gap-0.5 select-none outline-none [-webkit-tap-highlight-color:transparent] ${active ? "text-brand" : "text-text-muted"}`}
                   >
                     <span
@@ -115,6 +122,7 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
                   href={href}
                   data-testid={`barra-${id}`}
                   aria-current={active ? "page" : undefined}
+                  onClick={() => ritocco(id, active, pathname)}
                   className={`group flex flex-1 flex-col items-center justify-center gap-1 select-none outline-none [-webkit-tap-highlight-color:transparent] transition-colors duration-150 ${
                     active ? "text-brand" : "text-text-muted"
                   }`}
