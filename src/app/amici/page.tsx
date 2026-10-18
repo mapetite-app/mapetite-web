@@ -3,7 +3,7 @@ import Link from "next/link";
 import Avatar from "@/components/avatar";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import { PostoCard } from "@/components/posto-persona";
-import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, viewerId } from "@/lib/social";
+import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, viewerId } from "@/lib/social";
 import ScopritoriAmici from "./scopritori-amici";
 import { personName, profilePath } from "@/lib/handle";
 import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
@@ -35,7 +35,9 @@ export default async function AmiciPage() {
   const [feed, creators] = await Promise.all([loadFeed(viewer), loadCreatorLists(viewer)]);
   const seguo = feed.stato === "in-arrivo" ? [] : feed.seguiti.map((p) => p.id);
   // Scopritori (5.6): null senza la migrazione 20261016_scopritori → la sezione non compare.
-  const [scopritori, mieGemme] = seguo.length > 0 ? await Promise.all([loadScopritori(seguo), loadMyGems(viewer)]) : [null, null];
+  const [scopritori, mieGemme, verdetti] = seguo.length > 0 && feed.stato !== "in-arrivo"
+    ? await Promise.all([loadScopritori(seguo), loadMyGems(viewer), loadVerdetti(feed.attivita.map((s) => s.place_id))])
+    : [null, null, {} as Record<string, string>];
   const hasCreators = creators.some((c) => c.places.length > 0);
   const creatorSection = (
     <div id="creator" className="scroll-mt-4">
@@ -135,7 +137,7 @@ export default async function AmiciPage() {
                       </div>
                       <div className="-mx-4 mt-3 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
                         {group.slice(0, 10).map((s) => (
-                          <PostoCard key={s.place_id} spot={s} />
+                          <PostoCard key={s.place_id} spot={s} verdict={verdetti[s.place_id] ?? null} />
                         ))}
                       </div>
                     </li>

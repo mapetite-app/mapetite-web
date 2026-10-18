@@ -65,6 +65,7 @@ type FakeSocial = {
   mio?: MySocial;
   creator?: CreatorInfo[];
   scopritori?: ScopritoreRow[]; // assente = migrazione 20261016_scopritori non applicata
+  verdetti?: Record<string, string>; // UUID del locale → verdetto Mapetite
 };
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -184,6 +185,31 @@ export async function loadFeed(userId: string): Promise<FeedPage> {
     return { stato: "in-arrivo" };
   }
   return { stato: "ok", seguiti: (profili as PublicProfile[]) ?? [], attivita: (salvati as PublicSaved[]) ?? [], mio: meState };
+}
+
+// Verdetto Mapetite dei posti del feed (UUID del locale → verdetto), come fa Places con la sua riga
+// di descrizione. È un testo nostro (place_synthesis), mai un contenuto Google; se la lettura
+// fallisce le card restano senza, come prima.
+export async function loadVerdetti(placeIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(placeIds)].slice(0, 60);
+  if (ids.length === 0) return {};
+  const f = await fake();
+  if (f && f !== "in-arrivo") return Object.fromEntries(Object.entries(f.verdetti ?? {}).filter(([k]) => ids.includes(k)));
+  if (f) return {};
+  const supabase = await createClient();
+  const { data: places, error } = await supabase.from("places").select("id, google_place_id").in("id", ids);
+  if (error) { console.error("[amici] lettura places fallita:", error.message); return {}; }
+  const byGoogle = new Map((places ?? []).flatMap((p) => (p.google_place_id ? [[p.google_place_id as string, p.id as string] as const] : [])));
+  if (byGoogle.size === 0) return {};
+  const { data: synth, error: sErr } = await supabase.from("place_synthesis").select("place_id, verdict").in("place_id", [...byGoogle.keys()]);
+  if (sErr) { console.error("[amici] lettura place_synthesis fallita:", sErr.message); return {}; }
+  const out: Record<string, string> = {};
+  for (const r of synth ?? []) {
+    const v = (r.verdict as string | null)?.trim();
+    const id = byGoogle.get(r.place_id as string);
+    if (v && id) out[id] = v;
+  }
+  return out;
 }
 
 // ── "N amici ci sono stati" nella scheda pubblica del locale ─────────────────

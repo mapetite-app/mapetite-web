@@ -2660,6 +2660,8 @@ else {
     ],
     seguo: [GIULIA],
     mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+    // Verdetti Mapetite (18/10): sulle card del feed come la riga di descrizione di Places. Osteria Milano è di chi non segui.
+    verdetti: { [LOC_SOC]: "Cucina romana vera, tavoli fuori nel vicolo.", "44444444-0000-4000-8000-000000000008": "Non deve comparire" },
   };
   const setSocial = (c, v) => c.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
   const soctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -2749,7 +2751,9 @@ else {
     const first = (await att.first().innerText()).replace(/\s+/g, " ");
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
     ok((await att.first().getByTestId("card-attivita").count()) === 3 && await att.first().getByTestId("card-attivita").first().getAttribute("href") === `/locali/${LOC_SOC}`, "amici: card dei locali che aprono la pagina del locale");
-    ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui"); }
+    ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui");
+    { const v = att.first().getByTestId("card-attivita").first().getByTestId("card-attivita-verdetto");
+      ok((await v.textContent()) === "Cucina romana vera, tavoli fuori nel vicolo." && (await att.first().getByTestId("card-attivita-verdetto").count()) === 1 && !(await sp.content()).includes("Non deve comparire"), "amici: sulle card il verdetto Mapetite, solo dove c'è"); } }
   ok(await sp.getByTestId("amici-rendi-pubblico").isVisible() && (await sp.getByTestId("amici-rendi-pubblico").getAttribute("href")) === "/profilo#profilo-pubblico", "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
   // Gerarchia (semplificazione 16/10): ricerca in alto, ingressi compatti, poi chi segui e l'attività.
   { const top = async (id) => (await sp.getByTestId(id).first().boundingBox())?.y ?? -1;
