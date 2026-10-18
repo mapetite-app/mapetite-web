@@ -2450,17 +2450,21 @@ export default function MapView({
       {/* Messaggio se non loggato e vista "salvati" */}
       {view === "saved" && !userId && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none lg:static lg:col-start-2 lg:row-start-2 lg:items-start lg:px-5 lg:pt-2">
-          <div className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
-            <p className="text-2xl mb-2">🔒</p>
-            <p className="font-display font-semibold text-text">Accesso richiesto</p>
+          {/* Chi non ha l'account (prima volta): cosa sono i Salvati, in una frase, e un solo pulsante (Albo). */}
+          <div data-testid="salvati-senza-account" className="bg-surface rounded-card shadow-float p-6 text-center max-w-xs pointer-events-auto lg:w-full lg:max-w-none lg:shadow-none">
+            <p className="text-3xl mb-2" aria-hidden>📌</p>
+            <p className="font-display font-semibold text-text">La tua mappa dei locali</p>
             <p className="mt-1 text-sm font-sans text-text-muted">
-              Accedi per vedere la tua mappa personale
+              Salvi un posto da Instagram, TikTok o Google Maps e lo ritrovi qui quando devi scegliere.
             </p>
             <a
-              href="/login"
-              className="mt-4 inline-block rounded-btn bg-brand px-4 py-2 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95"
+              href="/signup?next=%2Fmappa%3Fvista%3Dsalvati"
+              className="mt-4 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
             >
-              Accedi
+              Crea la tua mappa
+            </a>
+            <a href="/login?next=%2Fmappa%3Fvista%3Dsalvati" className="mt-2 block min-h-10 py-2 text-sm font-display font-semibold text-brand">
+              Hai già un account? Accedi
             </a>
           </div>
         </div>

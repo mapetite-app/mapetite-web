@@ -1369,7 +1369,7 @@ await page.waitForTimeout(200);
 ok((await page.getByTestId("recenti").count()) === 0 && (await page.getByTestId("cancella-recenti").count()) === 0, "ricerche recenti: 'Cancella' le toglie subito");
 
 // 8b. Salvati vuoti (con l'utente finto il giro principale ha zero salvati): invito a cercare
-if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => vaiSalvati(page)).then(() => page.getByText("Accesso richiesto").isVisible())) {
+if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => vaiSalvati(page)).then(() => page.getByTestId("salvati-senza-account").isVisible())) {
   console.log("SKIP  salvati vuoti: dev server senza E2E_FAKE_USER");
 } else {
   await page.getByText("La tua mappa è ancora vuota").waitFor({ timeout: 4000 });
@@ -1386,7 +1386,7 @@ if (await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }).then(() => va
 // 9. Salvati (voce 8): città dall'indirizzo, ricerca nel testo, nota sulle card.
 // Supabase simulato; serve il dev server avviato con E2E_FAKE_USER.
 const fakeUser = await page.goto(`${BASE}/mappa`).then(() => vaiSalvati(page))
-  .then(() => page.getByText("Accesso richiesto").isVisible({ timeout: 1500 })).then((v) => !v);
+  .then(() => page.getByTestId("salvati-senza-account").isVisible({ timeout: 1500 })).then((v) => !v);
 if (!fakeUser) console.log("SKIP  salvati: dev server senza E2E_FAKE_USER");
 else {
   const rows = [
@@ -6842,6 +6842,18 @@ else {
     await a.goto(`${BASE}/sorprendimi?da=home`, { waitUntil: "networkidle" });
     const st = a.getByTestId("sorpresa-quota-stasera");
     ok(await st.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await st.getAttribute("href")) === "/stasera", "Sorprendimi con la quota finita: 'Scegli tra i tuoi salvati' invece di 'Riprova'");
+    await c.close(); }
+  // Salvati senza account (18/10): cosa sono in una frase e "Crea la tua mappa", niente lucchetto.
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const a = await c.newPage();
+    a.on("pageerror", (e) => errors.push(e.message));
+    await a.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await vaiSalvati(a);
+    const box = a.getByTestId("salvati-senza-account");
+    ok(await box.waitFor({ timeout: 5000 }).then(() => true, () => false) && (await box.getByRole("link", { name: "Crea la tua mappa" }).getAttribute("href")) === "/signup?next=%2Fmappa%3Fvista%3Dsalvati" && (await a.getByText("Accesso richiesto").count()) === 0, "salvati senza account: spiegazione in una frase e 'Crea la tua mappa' che torna ai salvati");
+    await a.screenshot({ path: `${OUT}/08c-salvati-senza-account.png`, caret: "initial" });
     await c.close(); }
   // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
   for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {
