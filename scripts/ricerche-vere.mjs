@@ -26,6 +26,7 @@ const CASI = [
   [17, "pasticceria siciliana", ROMA], // 16/10 sera, Lorenzo
   [18, "enoteca con piattini da condividere", ROMA], // 16/10 sera, Lorenzo
   [19, "posto carino per un pranzo di lavoro", ROMA],
+  [20, "trattoria a Trastevere", ROMA], // 18/10: senza "non turistico", il più famoso non deve aprire la lista
 ];
 const scelti = new Set(process.argv[2] ? process.argv[2].split(",").map(Number) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 const post = (path, body) => fetch(BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());

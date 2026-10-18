@@ -629,7 +629,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 text-xl font-title in-data-[titoli=serif]:text-2xl font-semibold leading-tight ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, origin, showCity)}</span>
                       {d?.openNow === true && (

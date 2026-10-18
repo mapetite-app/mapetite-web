@@ -3,6 +3,7 @@ import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import { coherentLevel } from "@/lib/match-coherence";
+import { exclusionNotAsked } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
@@ -99,7 +100,7 @@ Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudi
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
 Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
 - id identico a quello ricevuto
-- matchReason: una frase, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
+- matchReason: una frase di MASSIMO 22 parole, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Parla di COME risponde a ciò che la richiesta chiede (tipo di locale, zona, occasione, atmosfera, caratteristiche): non elencare piatti, servizio o qualità generali del locale se la richiesta non li nomina, perché li dice già il verdetto mostrato accanto (niente doppioni). Non ripetere le parole della richiesta come conferma generica ("ideale per una trattoria a Trastevere"): dì il dato concreto delle recensioni che lo conferma. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
@@ -371,10 +372,15 @@ export async function getSynthesis(
             if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
-              fits.set(o.id, {
-                fit: o.fit,
-                fitReason: typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "",
-              });
+              const fitReason = typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "";
+              // "Turistico" senza che la frase chieda "non turistico": il locale resta, al livello medio.
+              if (!o.fit && exclusionNotAsked(query, fitReason)) {
+                console.log(`[search-exclude-annullata] query=${JSON.stringify(query.slice(0, 80))} id=${o.id} motivo=${JSON.stringify(fitReason)} (requisito non scritto nella frase)`);
+                fits.set(o.id, { fit: true, fitReason: "" });
+                if (levels.get(o.id) === "basso") levels.set(o.id, "medio");
+              } else {
+                fits.set(o.id, { fit: o.fit, fitReason });
+              }
             }
           }
         } catch (err) {
