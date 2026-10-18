@@ -425,6 +425,14 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 const SIMILAR_MAX_METERS = 15_000;
 // "Sei vicino a un locale che volevi provare": entro ~10 minuti a piedi.
 const NEARBY_SAVED_METERS = 800;
+// Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
+function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
+  return places
+    .filter((p) => p.tags?.includes(VISIT_WANT))
+    .map((p) => ({ place: p, meters: distanceMeters(here, p) }))
+    .filter((x) => x.meters <= NEARBY_SAVED_METERS)
+    .sort((a, b) => a.meters - b.meters)[0] ?? null;
+}
 function similarSaved(place: Place, saved: Place[]): string | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
@@ -1148,6 +1156,24 @@ export default function MapView({
   // "La mia posizione" e un suo "Voglio andarci" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showNearby = (near: { place: Place; meters: number } | null) => {
+    if (!near) return;
+    setNearbySaved(near);
+    if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
+    nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
+  };
+  // All'apertura con la posizione già permessa (VISIONE: "ritrovarlo nel momento giusto"): se sei
+  // vicino a un posto che volevi provare, la mappa te lo dice da sola. Una volta per apertura,
+  // solo sulla mappa libera (non sopra una ricerca o una scheda).
+  const nearbyChecked = useRef(false);
+  useEffect(() => {
+    if (nearbyChecked.current || !userPos || savedPlaces.length === 0) return;
+    nearbyChecked.current = true;
+    if (aiSearch !== null) return;
+    const near = nearestWanted(savedPlaces, userPos);
+    if (near) setTimeout(() => showNearby(near), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showNearby cambia a ogni disegno; basta la prima posizione
+  }, [userPos, savedPlaces]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Senza accesso: il locale si ricorda e si salva da solo dopo il login (src/lib/pending-save.ts).
   const askLoginToSave = (place: Place, tags: string[] = [VISIT_WANT]) => {
@@ -1843,16 +1869,7 @@ export default function MapView({
         setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setViewState((v) => ({ ...v, latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 14 }));
         const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const near = savedPlaces
-          .filter((p) => p.tags?.includes(VISIT_WANT))
-          .map((p) => ({ place: p, meters: distanceMeters(here, p) }))
-          .filter((x) => x.meters <= NEARBY_SAVED_METERS)
-          .sort((a, b) => a.meters - b.meters)[0];
-        if (near) {
-          setNearbySaved(near);
-          if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
-          nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
-        }
+        showNearby(nearestWanted(savedPlaces, here));
         setGeoState("idle");
         setWelcomeDismissed(true);
       },

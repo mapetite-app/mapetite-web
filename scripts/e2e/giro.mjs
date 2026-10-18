@@ -1603,6 +1603,9 @@ else {
     await sctx.grantPermissions(["geolocation"]);
     await sctx.setGeolocation({ latitude: 41.8906, longitude: 12.4705 });
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    // 18/10: con il permesso già dato l'avviso compare da solo all'apertura, senza toccare niente.
+    { const t0 = await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).then(() => p.getByTestId("vicino-salvato").textContent(), () => "");
+      ok((t0 ?? "").includes("Osteria Due"), `vicino a un salvato: all'apertura della mappa l'avviso compare da solo (${(t0 ?? "").slice(0, 60)})`); }
     await p.waitForTimeout(800);
     await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
     const near = p.getByTestId("vicino-salvato");
