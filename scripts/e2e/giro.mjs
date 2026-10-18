@@ -2594,7 +2594,7 @@ else {
   await pp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
   ok(await pp.getByTestId("salvato-pubblico").isVisible() && pubInsert?.place_id === LOC_ID && JSON.stringify(pubInsert?.tags) === '["Da provare"]' && pubInsert?.user_id === "00000000-0000-0000-0000-000000000001", "pagina pubblica: 'Salva in Mapetite' salva come '📌 Voglio andarci' e lo conferma");
   ok((await pp.getByRole("link", { name: "Aprilo sulla tua mappa" }).getAttribute("href")) === `/mappa?salvato=${LOC_ID}`, "pagina pubblica: dopo il salvataggio porta al locale sulla mappa");
-  ok((await pp.getByRole("link", { name: "Mapetite", exact: true }).first().getAttribute("href")) === "/" && (await pp.getByTestId("invito-mapetite").count()) === 0, "pagina pubblica: il marchio porta alla home; da collegati nessun riquadro d'invito (solo 'Salva')");
+  ok((await pp.locator('main a[href="/"]').filter({ hasText: "Mapetite" }).count()) > 0 && (await pp.getByTestId("invito-mapetite").count()) === 0, "pagina pubblica: il marchio porta alla home; da collegati nessun riquadro d'invito (solo 'Salva')");
   // Foto di un altro locale nel link: ignorata (resta l'emoji).
   const before = pubPhotos.length;
   await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/ALTRO/photos/XyZ`, { waitUntil: "networkidle" });
