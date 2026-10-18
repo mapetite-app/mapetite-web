@@ -2692,6 +2692,7 @@ else {
     ok((await n("visitati")) === "1Visitati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
   { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
   ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
   ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
   await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
   ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");
@@ -4183,6 +4184,7 @@ else {
       ],
       seguo: [],
       mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
+      verdetti: { "44444444-0000-4000-8000-0000000007b2": "Carbonara seria, conto onesto." },
     };
     const gc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
     await gc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
@@ -4201,6 +4203,7 @@ else {
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
+    ok((await g.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Carbonara seria, conto onesto.", "raccolta condivisa: il verdetto Mapetite sotto il posto che ce l'ha");
     ok(await g.getByTestId("condividi-raccolta-pubblica").isVisible() && !(await g.content()).includes("Il tavolo"), "raccolta condivisa: pulsante Condividi, nessuna nota privata");
     await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });

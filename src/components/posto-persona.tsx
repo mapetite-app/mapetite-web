@@ -19,7 +19,7 @@ function meta(s: Spot): string {
 }
 
 /** Riga compatta per le liste del profilo. */
-export function PostoRiga({ spot }: { spot: Spot }) {
+export function PostoRiga({ spot, verdict = null }: { spot: Spot; verdict?: string | null }) {
   const visited = !!spot.tags?.includes("Già visitato");
   const raccolte = (spot.tags ?? []).filter((t) => !isStateTag(t)).slice(0, 2);
   return (
@@ -34,6 +34,7 @@ export function PostoRiga({ spot }: { spot: Spot }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display text-[15px] font-semibold text-text">{spot.name}</span>
         {meta(spot) && <span className="mt-0.5 block truncate text-xs font-sans text-text-muted">{meta(spot)}</span>}
+        {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 text-[13px] font-sans leading-snug text-text">{verdict}</span>}
         {raccolte.length > 0 && (
           <span className="mt-1 flex flex-wrap gap-1">
             {raccolte.map((t) => (
