@@ -151,30 +151,32 @@ export default function GruppoVista({
           <h1 className="font-title text-2xl font-semibold leading-tight text-brand break-words">{gruppo.nome}</h1>
           <p className="mt-0.5 text-sm text-text-muted" data-testid="gruppo-numeri">{numeriGruppo({ membri: membri.length || gruppo.membri, posti: posti.length })}</p>
         </div>
-        {/* Con gli amici già dentro l'invito è un pulsante piccolo: in primo piano restano i posti e i voti. */}
-        {!invitoGrande && (
-          <CondividiLink
-            path={invito}
-            title={`${gruppo.nome} · Mapetite`}
-            text={testoInvito}
-            cosa="gruppo"
-            label="Invita"
-            variant="outline"
-            testId="gruppo-condividi"
-            className="shrink-0"
-          />
-        )}
       </header>
 
       {membri.length > 0 && (
-        <ul data-testid="gruppo-membri" className="-mx-4 mt-4 flex gap-3 overflow-x-auto px-4 pb-1" aria-label="Chi c'è nella lista">
-          {membri.map((m) => (
-            <li key={m.user_id} className="flex w-14 shrink-0 flex-col items-center gap-1 text-center">
-              <Avatar person={{ display_name: m.nome }} size={44} />
-              <span className="w-full truncate text-[11px] font-display text-text">{m.user_id === userId ? "Tu" : m.nome}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-4 flex items-center gap-3">
+          <ul data-testid="gruppo-membri" className="-ml-4 flex min-w-0 flex-1 gap-3 overflow-x-auto pb-1 pl-4" aria-label="Chi c'è nella lista">
+            {membri.map((m) => (
+              <li key={m.user_id} className="flex w-14 shrink-0 flex-col items-center gap-1 text-center">
+                <Avatar person={{ display_name: m.nome }} size={44} />
+                <span className="w-full truncate text-[11px] font-display text-text">{m.user_id === userId ? "Tu" : m.nome}</span>
+              </li>
+            ))}
+          </ul>
+          {/* Con gli amici già dentro l'invito è un pulsante piccolo: in primo piano restano i posti e i voti. */}
+          {!invitoGrande && (
+            <CondividiLink
+              path={invito}
+              title={`${gruppo.nome} · Mapetite`}
+              text={testoInvito}
+              cosa="gruppo"
+              label="Invita"
+              variant="outline"
+              testId="gruppo-condividi"
+              className="shrink-0"
+            />
+          )}
+        </div>
       )}
 
       {invitoGrande && (
