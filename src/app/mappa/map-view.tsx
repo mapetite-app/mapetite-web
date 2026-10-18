@@ -2408,7 +2408,7 @@ export default function MapView({
           </div>
         )}
         {savedControlsOn && (
-          <div data-testid="salvati-filtri" className="pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float">
+          <div data-testid="salvati-filtri" className={`pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
             {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
                 ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
             <div className="flex items-center gap-1.5">
