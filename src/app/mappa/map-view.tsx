@@ -751,6 +751,13 @@ const WELCOME_EXAMPLES = [
   { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino" },
   { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento" },
 ];
+// Con la mappa su Milano (VISIONE: si parte da Roma e Milano) gli esempi parlano di Milano.
+const WELCOME_EXAMPLES_MILANO = [
+  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano" },
+  { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana" },
+  { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino" },
+  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento" },
+];
 
 // Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
 function IdeaGroup({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -1165,6 +1172,7 @@ export default function MapView({
   // All'apertura con la posizione già permessa (VISIONE: "ritrovarlo nel momento giusto"): se sei
   // vicino a un posto che volevi provare, la mappa te lo dice da sola. Una volta per apertura,
   // solo sulla mappa libera (non sopra una ricerca o una scheda).
+  const welcomeExamples = cityNear(viewState.latitude, viewState.longitude) === "Milano" ? WELCOME_EXAMPLES_MILANO : WELCOME_EXAMPLES;
   const nearbyChecked = useRef(false);
   useEffect(() => {
     if (nearbyChecked.current || !userPos || savedPlaces.length === 0) return;
@@ -2370,7 +2378,7 @@ export default function MapView({
               </IdeaGroup>
             )}
             <IdeaGroup title="Prova a chiedere">
-              {WELCOME_EXAMPLES.map((ex) => (
+              {welcomeExamples.map((ex) => (
                 <IdeaRow key={ex.query} label={ex.query} emoji="🔎" title={ex.title} sub={ex.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
               ))}
             </IdeaGroup>
@@ -2578,7 +2586,7 @@ export default function MapView({
                   Cancella
                 </button>
               )}
-              {WELCOME_EXAMPLES.map((ex) => (
+              {welcomeExamples.map((ex) => (
                 <button
                   key={ex.query}
                   type="button"
@@ -2752,7 +2760,7 @@ export default function MapView({
                   {momentExample}
                 </button>
               )}
-              {WELCOME_EXAMPLES.map(({ query: example }) => (
+              {welcomeExamples.map(({ query: example }) => (
                 <button
                   key={example}
                   type="button"
