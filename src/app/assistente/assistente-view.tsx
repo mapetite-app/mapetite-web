@@ -21,7 +21,7 @@ import { loginToSaveUrl, rememberPendingSave } from "@/lib/pending-save";
 import { rememberFirme } from "@/lib/catalog-firme";
 import { aggiungiGusti, fraseConZona, gustiDichiarati, gustiPerRicerca, gustoDa, inFondoPerGusti, metri, type Zona } from "@/lib/gusti";
 import { caricaGusti, caricaZonaAbituale, gustiRicordati, ricordaGusti } from "@/lib/gusti-store";
-import { readLastView } from "@/lib/last-view";
+import { grantedPosition, readLastView } from "@/lib/last-view";
 import { cityNear } from "@/lib/named-city";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
@@ -560,6 +560,13 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
     return () => { alive = false; };
   }, [userId]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  // Posizione già permessa (mai chiesta qui): l'assistente cerca da dove sei, non da Roma o dalla
+  // mappa di ieri (Lorenzo a Milano, 17/10). Sostituisce anche una posizione vecchia della conversazione.
+  useEffect(() => {
+    let alive = true;
+    void grantedPosition().then((pos) => { if (alive && pos) setConv((x) => ({ ...x, pos })); });
+    return () => { alive = false; };
+  }, []);
   // Memoria dei gusti (piano 1.4): gusti ricordati e zona abituale, letti una volta all'apertura.
   useEffect(() => {
     let alive = true;

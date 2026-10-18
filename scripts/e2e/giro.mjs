@@ -6726,7 +6726,7 @@ else {
 // Lorenzo a Milano il 17/10 apriva la mappa su Roma e doveva riscrivere "a Milano".
 {
   const MILANO = { latitude: 45.4642, longitude: 9.19 };
-  const prova = async ({ permesso, ultima, url, scrivi }) => {
+  const prova = async ({ permesso, ultima, url, scrivi, campo = "Cosa cerchi?" }) => {
     const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
     let body = null;
     await c.route("**/api/search", async (route) => { body = JSON.parse(route.request().postData() ?? "{}"); return route.fulfill({ json: SEARCH_FAST }); });
@@ -6743,8 +6743,8 @@ else {
     await g.goto(`${BASE}${url}`, { waitUntil: "networkidle" });
     if (scrivi) {
       await g.waitForTimeout(800);
-      await g.getByLabel("Cosa cerchi?").fill(scrivi);
-      await g.getByLabel("Cosa cerchi?").press("Enter");
+      await g.getByLabel(campo).fill(scrivi);
+      await g.getByLabel(campo).press("Enter");
     }
     for (let i = 0; i < 40 && !body; i++) await g.waitForTimeout(150);
     await c.close();
@@ -6759,6 +6759,12 @@ else {
   ok(vicino(a3, 45.4785, 9.1606) && Math.abs(a3.lng - 9.19) > 0.02, `ultima vista nella stessa città: resta quella, non salta sulla posizione (${JSON.stringify(a3)})`);
   const a4 = await prova({ permesso: false, url: "/mappa?q=wine%20bar%20tranquillo" });
   ok(vicino(a4, 41.9028, 12.4964), `senza permesso: nessuna richiesta, si parte da Roma come prima (${JSON.stringify(a4)})`);
+  const a5 = await prova({ permesso: true, ultima: { lat: 41.9028, lng: 12.4964 }, url: "/assistente", scrivi: "wine bar tranquillo", campo: "Scrivi all'assistente" });
+  ok(vicino(a5, 45.4642, 9.19), `assistente: con la posizione permessa cerca da dove sei, non dalla mappa di ieri a Roma (${JSON.stringify(a5)})`);
+  const a6 = await prova({ permesso: true, url: "/sorprendimi?da=home" });
+  ok(vicino(a6, 45.464, 9.19), `Sorprendimi dalla home: con la posizione permessa la città dove sei (${JSON.stringify(a6)})`);
+  const a7 = await prova({ permesso: false, url: "/sorprendimi?da=home" });
+  ok(vicino(a7, 41.9028, 12.4964), `Sorprendimi senza permesso: Roma come prima (${JSON.stringify(a7)})`);
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
