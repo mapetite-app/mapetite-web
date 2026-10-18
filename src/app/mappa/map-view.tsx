@@ -2019,6 +2019,22 @@ export default function MapView({
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
   }, [view]);
 
+  // La voce già accesa nella barra in basso, toccata di nuovo (src/components/nav-bar.tsx): "Salvati"
+  // riapre l'elenco dei salvati, "Mappa" torna a Esplora pulita. Prima lo facevano i pulsanti in alto.
+  useEffect(() => {
+    const onBarra = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id === "salvati") {
+        setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" });
+      } else if (id === "esplora") {
+        setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" });
+      }
+    };
+    window.addEventListener("mapetite:barra", onBarra);
+    return () => window.removeEventListener("mapetite:barra", onBarra);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo setter e azioni senza stato proprio
+  }, []);
+
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
   // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
   const sharedSearchDone = useRef(false);
