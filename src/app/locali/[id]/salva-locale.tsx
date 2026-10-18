@@ -49,24 +49,17 @@ export default function SalvaLocale({
 
   return (
     <>
-      <section data-testid="invito-mapetite" className="mx-5 mt-6 rounded-card border border-border bg-surface p-5">
-        <p className="font-display text-base font-semibold text-brand">Ti hanno consigliato {placeName}?</p>
-        <p className="mt-1 text-sm font-sans text-text-muted">
-          Salvalo in Mapetite: lo ritrovi sulla tua mappa quando devi scegliere dove andare.
-        </p>
-        {!userId && (
-          <p data-testid="invito-accedi" className="mt-2 text-sm font-sans text-text-muted">
-            Crea un account gratis: poi torni qui e lo salvi con un tocco.{" "}
+      {/* Solo per chi non ha l'accesso: chi è già dentro Mapetite ha il pulsante qui sotto e basta
+          (Lorenzo 17/10, una cosa principale). "Scopri Mapetite" era un doppione del marchio in alto. */}
+      {!userId && (
+        <section data-testid="invito-mapetite" className="mx-5 mt-6 rounded-card border border-border bg-surface p-4">
+          <p className="font-display text-base font-semibold text-brand">Ti hanno consigliato {placeName}?</p>
+          <p data-testid="invito-accedi" className="mt-1 text-sm font-sans text-text-muted">
+            Salvalo in Mapetite e lo ritrovi sulla tua mappa quando devi scegliere.{" "}
             <Link href={withNext("/login", returnPath)} className="font-display font-semibold text-brand">Hai già un account? Accedi</Link>
           </p>
-        )}
-        <Link
-          href="/"
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-pill border border-border bg-white px-5 text-sm font-display font-semibold text-brand"
-        >
-          Scopri Mapetite
-        </Link>
-      </section>
+        </section>
+      )}
 
       <div className="sticky bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 px-5">
         {done ? (
