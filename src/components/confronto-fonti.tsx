@@ -37,8 +37,8 @@ type Props = {
 };
 
 const ROW = "flex min-h-11 w-full items-center gap-3 py-1.5 text-left active:opacity-70";
-const NAME = "w-[5.75rem] shrink-0 font-display text-sm font-semibold text-text";
-const LINK_PILL = "inline-flex min-h-9 items-center gap-1 rounded-pill border border-border px-2.5 text-xs font-display font-semibold text-brand active:opacity-70";
+const NAME = "w-20 shrink-0 font-display text-sm font-semibold text-text";
+const LINK_PILL = "inline-flex shrink-0 whitespace-nowrap min-h-9 items-center gap-1 rounded-pill border border-border px-2 text-xs font-display font-semibold text-brand active:opacity-70";
 
 export default function ConfrontoFonti({ venueId, name, address, category, lat, lng, rating, userRatingCount, mapsUrl, onMapetite }: Props) {
   const citta = cityFromAddress(address);
@@ -170,8 +170,8 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
 
         {/* Le ricerche sulle altre guide in una riga sola, non tre righe da riquadro (Semplificare, 18/10). */}
         {links.length > 0 && (
-          <div data-testid="confronto-cerca" className="flex flex-wrap items-center gap-1.5 py-2.5">
-            <span className="mr-0.5 text-xs font-sans text-text-muted">Cercalo su</span>
+          <div data-testid="confronto-cerca" className="flex items-center gap-1 overflow-x-auto py-2.5 [scrollbar-width:none]">
+            <span className="mr-1 shrink-0 whitespace-nowrap text-xs font-sans text-text-muted">Cercalo su</span>
             {links.map((l) => (
               <a
                 key={l.fonte}
