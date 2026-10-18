@@ -2738,7 +2738,8 @@ else {
   { const top = async (id) => (await sp.getByTestId(id).first().boundingBox())?.y ?? -1;
     const [cerca, ingressi, seguiti, attivita] = [await sp.getByLabel("Cerca persone per nome").boundingBox().then((b) => b?.y ?? -1), await top("amici-ingressi"), await top("seguiti"), await top("attivita")];
     ok(cerca > 0 && cerca < ingressi && ingressi < seguiti && seguiti < attivita && attivita < 844, `amici: ricerca → ingressi → chi segui → attività, l'attività già nel primo schermo (${[cerca, ingressi, seguiti, attivita].map(Math.round).join(" < ")})`);
-    ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-gruppi").getAttribute("href")) === "/gruppi", "amici: ingresso compatto 'Liste di gruppo'"); }
+    ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-gruppi").getAttribute("href")) === "/gruppi", "amici: ingresso compatto 'Liste di gruppo'");
+    ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-invita").getAttribute("href")) === "/profilo#invita", "amici: 'Invita un amico' porta al proprio link d'invito"); }
   await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
   let searchUrl = null;
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
