@@ -4376,7 +4376,7 @@ else {
     const lab = rp.getByTestId("pannello-demo-etichetta");
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
-    { const t = ((await rp.getByTestId("pannello-in-attesa").textContent()) ?? "").replace(/\s+/g, " ");
+    { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`); }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
