@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { EVENT_TYPES, recordEvent, type EventType } from "@/lib/events";
+import { EVENT_TYPES, isAutomated, recordEvent, type EventType } from "@/lib/events";
 import { clientKey } from "@/lib/ai-limit";
 
 // Segnali dal telefono (aperture scheda, salvataggi, percorso…). Solo campi previsti,
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!allowEvent(clientKey(request, data?.user?.id))) return new NextResponse(null, { status: 204 });
+  if (isAutomated(request)) return new NextResponse(null, { status: 204 });
   const props: Record<string, string | number> = {};
   for (const k of PROP_KEYS) {
     const v = body?.props?.[k];

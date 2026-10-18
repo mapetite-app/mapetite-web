@@ -11,6 +11,7 @@ import { cityFromAddress } from "@/lib/city";
 import { distanceLabel } from "@/lib/distance";
 import { cityNear, cityArea } from "@/lib/named-city";
 import { quickSavePlace } from "@/lib/quick-save";
+import { grantedPosition } from "@/lib/last-view";
 import { track, trackFeature } from "@/lib/track";
 import { rememberFirme } from "@/lib/catalog-firme";
 import { withNext } from "@/lib/next-path";
@@ -55,14 +56,23 @@ async function loadTaste(userId: string): Promise<{ saved: (SavedForTaste & { la
   return { saved, prefs };
 }
 
-// Dove cercare: il centro della mappa da cui si arriva; dalla home la città dove hai più salvati; se no Roma.
-function startCenter(saved: { lat: number | null; lng: number | null }[]): Center {
+// Dove cercare: il centro della mappa da cui si arriva; dalla home la città dove sei (se il permesso
+// della posizione è già dato: mai chiesto qui), poi la città dove hai più salvati; se no Roma.
+async function startCenter(saved: { lat: number | null; lng: number | null }[]): Promise<Center> {
   const params = new URLSearchParams(window.location.search);
   const lat = Number(params.get("lat"));
   const lng = Number(params.get("lng"));
   if (params.get("lat") && params.get("lng") && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
     const city = cityNear(lat, lng);
     return { lat, lng, radius: 3000, label: city ? `Zona della mappa · ${city}` : "Zona della mappa", precise: true };
+  }
+  const here = await grantedPosition();
+  if (here) {
+    // Una città nota: tutta la città, come dai salvati (stessa memoria della sorpresa, niente chiamate
+    // in più a ogni passo). Altrove i 3 km intorno a te.
+    const city = cityNear(here.lat, here.lng);
+    const area = city ? cityArea(city) : null;
+    return city && area ? { ...area, label: city, precise: false } : { ...here, radius: 3000, label: "Vicino a te", precise: true };
   }
   const counts = new Map<string, number>();
   for (const s of saved) {
@@ -105,7 +115,7 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
         taste.current = userId ? await loadTaste(userId).catch(() => ({ saved: [], prefs: null })) : { saved: [], prefs: null };
       }
       const { saved, prefs } = taste.current;
-      const c = where ?? startCenter(saved);
+      const c = where ?? await startCenter(saved);
       setCenter(c);
       const now = new Date();
       const plan = planSurprise(saved, prefs, now);

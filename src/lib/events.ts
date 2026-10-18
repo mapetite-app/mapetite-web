@@ -37,10 +37,17 @@ let newTypesWarned = false;
 // Colonna session_id assente (migrazione 20261015 non ancora applicata): si scrive senza.
 let noSessionColumn = false;
 
+// Browser automatici e robot (user agent): non sono persone. I controlli Playwright dopo ogni merge
+// (HeadlessChrome) contavano nel pannello come "nuovi visitatori": ~150 visite "solo home" in 3 giorni.
+// Elenco preciso (non "bot" e basta: i telefoni CUBOT sono persone vere).
+const AUTOMATED_UA = /HeadlessChrome|Playwright|Googlebot|bingbot|YandexBot|DuckDuckBot|Applebot|AhrefsBot|SemrushBot|facebookexternalhit|Lighthouse|vercel-screenshot|\bcrawler\b|\bspider\b/i;
+export const isAutomated = (request: Request): boolean => AUTOMATED_UA.test(request.headers.get("user-agent") ?? "");
+
 export async function recordEvent(e: EventInput): Promise<void> {
   if (!process.env.SUPABASE_SECRET_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) return;
-  // Giro automatico (sviluppo con utente finto): niente dati di prova nel database vero.
-  if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER) return;
+  // In sviluppo (giro automatico e prove dal vivo delle sessioni notturne) niente dati di prova nel
+  // database vero: il 18/10 una prova con curl era finita tra le ricerche di Lorenzo nel pannello dei numeri.
+  if (process.env.NODE_ENV === "development") return;
   const row: Record<string, unknown> = {
     type: e.type,
     user_id: e.userId && UUID.test(e.userId) ? e.userId : null,
