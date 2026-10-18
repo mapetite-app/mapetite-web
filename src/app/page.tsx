@@ -103,8 +103,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
         </Form>
         {/* Link alti 40px (prima 15px): si toccano senza mirare. */}
         <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1 text-xs font-sans text-text-muted">
-          {/* "accedi" solo a chi non è collegato. "Apri la mappa" tolto: la Mappa è al centro della barra in basso. */}
-          {!loggedIn && <><Link href="/login" className="inline-flex min-h-10 items-center px-1 font-semibold text-brand">accedi</Link> ·</>}
+          {/* "accedi" tolto (18/10): era un doppione di "Entra" nella barra in basso (e in alto da computer). "Apri la mappa" tolto: la Mappa è al centro della barra. */}
           <IntroAgain />
         </p>
       </div>

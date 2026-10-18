@@ -2989,7 +2989,7 @@ else {
   }
   await qp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   ok(await placeholderFits("input[name=q]"), "360px home: il testo d'esempio del campo si legge per intero");
-  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 2 && hs.every((h) => h >= 40), `360px home: link in fondo alti almeno 40px (${hs.map(Math.round).join(", ")})`); }
+  { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 1 && hs.every((h) => h >= 40), `360px home: 'Come funziona' alto almeno 40px e niente 'accedi' doppione di 'Entra' (${hs.map(Math.round).join(", ")})`); }
   await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
   if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
