@@ -8,7 +8,7 @@ L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
 **Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
-**Ricerche Google vere oggi (dalle 9:00 del 18/10):** 1 (sessione 1). Tetto 10 al giorno per tutte le sessioni insieme.
+**Ricerche Google vere oggi (dalle 9:00 del 18/10):** 8 (sessione 1: 1; sessione 2: 7, finite alle 10:45). Tetto 10 al giorno per tutte le sessioni insieme: ne restano 2.
 **In corso adesso:** domenica 18/10 dalle 10:00, tutto il giorno, branch `claude/quirky-hypatia-q2lwz2` (una sessione sola; chi parte dopo lavori su questo branch e scelga voci diverse). Voci prese: mappa che parte da dove sei (fatto), quota Google finita a metà ricerca (fatto), eventi delle prove fuori dal database vero (fatto); poi assistente e Sorprendimi dalla posizione vera, pagine Salvati/Stasera/Prenotazioni (non risultati e scheda: li fa la seconda sessione).
 **Seconda sessione (domenica 18/10 dalle 10:10, branch `claude/quirky-hypatia-9k5tm1`, PR separata):** locali di massa fuori dalle prime 3 posizioni anche senza "non turistico" (caso "pranzo di lavoro"); poi grafica dei risultati e della scheda contro i riferimenti Places. Non tocca gli eventi d'uso.
 **Aggiornato 17/10 alle 16:30 (sabato pomeriggio, branch `claude/quirky-hypatia-fusjec`).** Partito dalle ricerche vere di Lorenzo del 16/10 sera. Fatto: "wine bar tranquillo" dava 1 solo locale, a Bari ("Wine Bar Tranquillo": Google legge l'aggettivo come nome) → ora 12 wine bar di Roma; verdetto Mapetite anche sui salvati che non ce l'hanno (10 su 29 in produzione), scritto quando si apre la scheda, con tetto di 25 al giorno. 10 ricerche Google vere. Manca per il 25/10: prove su telefoni veri, quota Google (Lorenzo).
