@@ -5,6 +5,7 @@ import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
+import { distanceMeters } from "@/lib/distance";
 import { recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
@@ -36,6 +37,15 @@ const VERDICT_GROUPS = [2, 3, 3, 4];
 // Strip chars that could break PostgREST or() filter string syntax
 const sanitize = (s: string): string =>
   s.replace(/[^a-zA-ZÀ-ÿ0-9 ]/g, "").trim().slice(0, 100);
+
+// Quota giornaliera di Google finita: searchGooglePlaces lancia "… error 429 …".
+const isQuota = (err: unknown) => err instanceof Error && /error 429/.test(err.message);
+const quotaResponse = () =>
+  NextResponse.json(
+    // La quota Google si azzera a mezzanotte della costa ovest USA, cioè alle 9:00 in Italia.
+    { error: "Le ricerche nuove sono finite per ora: ripartono alle 9:00. Intanto puoi cercare tra i tuoi salvati." },
+    { status: 503 },
+  );
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -182,6 +192,8 @@ export async function POST(request: Request) {
       locationMode = "restrict";
       console.log(`[search-citta] ${cityWide}: tutta l'area della città, query=${JSON.stringify(queryGoogle)}`);
     }
+    // Quota giornaliera di Google finita su una delle seconde ricerche (la prima era andata).
+    let quotaFinita = false;
     try {
       const opzioni: Parameters<typeof searchGooglePlaces>[1] = {
         includedType: intent?.includedType ?? undefined,
@@ -225,6 +237,7 @@ export async function POST(request: Request) {
           risultati = [...risultati, ...nuovi];
         } catch (err) {
           console.error("[search-quartiere] seconda ricerca non riuscita:", err);
+          if (isQuota(err)) quotaFinita = true;
         }
       }
       // Pochi risultati con un aggettivo d'atmosfera nella frase per Google ("wine bar tranquillo" →
@@ -241,6 +254,7 @@ export async function POST(request: Request) {
             risultati = [...risultati, ...nuovi];
           } catch (err) {
             console.error("[search-atmosfera] seconda ricerca non riuscita:", err);
+            if (isQuota(err)) quotaFinita = true;
           }
         }
       }
@@ -248,16 +262,8 @@ export async function POST(request: Request) {
       // Un errore di Google (quota giornaliera finita, rete, lentezza) non è "nessun risultato":
       // il telefono mostrerebbe "Non ho trovato nulla, prova con meno requisiti", che è falso.
       console.error("[search/route] Google Places error:", err);
-      const quota = err instanceof Error && /error 429/.test(err.message);
-      return NextResponse.json(
-        {
-          error: quota
-            // La quota Google si azzera a mezzanotte della costa ovest USA, cioè alle 9:00 in Italia.
-            ? "Le ricerche nuove sono finite per ora: ripartono alle 9:00. Intanto puoi cercare tra i tuoi salvati."
-            : "La ricerca non è disponibile in questo momento: riprova tra poco.",
-        },
-        { status: 503 },
-      );
+      if (isQuota(err)) return quotaResponse();
+      return NextResponse.json({ error: "La ricerca non è disponibile in questo momento: riprova tra poco." }, { status: 503 });
     }
     // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
     // (un pub per la colazione) vanno in fondo, mai esclusi.
@@ -287,6 +293,10 @@ export async function POST(request: Request) {
         daParte.fuori_zona = [...daParte.fuori_zona, ...demoted].slice(0, 10);
         console.log(`[search-zona] senza zona: in fondo (oltre 30 km dalla mappa): ${JSON.stringify(demoted)}`);
       }
+      // Quota Google finita proprio sulla seconda ricerca: restano solo locali lontani (il "Wine Bar
+      // Tranquillo" di Bari con la mappa su Milano, Lorenzo 17/10 alle 22:34). Meglio dirlo che mostrarli.
+      const vicini = risultati.filter((p) => p.lat == null || p.lng == null || distanceMeters({ lat, lng }, { lat: p.lat, lng: p.lng }) <= 30000);
+      if (quotaFinita && vicini.length === 0) return quotaResponse();
     }
     // "Non turistico", "autentico"…: i locali di massa vanno in fondo (mai esclusi).
     if (searchIntent === "natural") {
