@@ -6820,6 +6820,10 @@ else {
     await a.getByLabel("Scrivi all'assistente").press("Enter");
     const l = a.getByTestId("assistente-quota-salvati");
     ok(await l.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await l.getAttribute("href")) === "/mappa?vista=salvati", "assistente con la quota finita: 'Cerca nei tuoi salvati' sotto il messaggio");
+    // Sorprendimi con la quota finita: invece di "Riprova" (fallirebbe fino alle 9:00) la scelta tra i salvati.
+    await a.goto(`${BASE}/sorprendimi?da=home`, { waitUntil: "networkidle" });
+    const st = a.getByTestId("sorpresa-quota-stasera");
+    ok(await st.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await st.getAttribute("href")) === "/stasera", "Sorprendimi con la quota finita: 'Scegli tra i tuoi salvati' invece di 'Riprova'");
     await c.close(); }
   // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
   for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {
