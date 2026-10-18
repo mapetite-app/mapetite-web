@@ -1974,7 +1974,8 @@ else {
     }
     ok((await sq.getByTestId("stasera-verdetto").count()) <= 1, "stasera: verdetto solo dove c'è in cache (mai inventato)");
     const card0 = sq.getByTestId("stasera-proposta").first();
-    ok(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d/.test((await card0.getByTestId("stasera-percorso").getAttribute("href")) ?? "") && (await card0.getByTestId("stasera-mappa").getAttribute("href")) === `/mappa?salvato=${first[0].id}`, "stasera: 'Percorso' apre Google Maps, 'Apri nella mappa' apre il salvato");
+    ok(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d/.test((await card0.getByTestId("stasera-percorso").getAttribute("href")) ?? "") && (await card0.getByTestId("stasera-mappa").getAttribute("href")) === `/mappa?salvato=${first[0].id}`, "stasera: 'Percorso' apre Google Maps, il nome apre il salvato sulla mappa");
+    ok((await card0.locator("a").count()) === 2, `stasera: un solo pulsante sotto la proposta (Percorso), il nome è il link alla mappa (${await card0.locator("a").count()} link)`);
     await sq.screenshot({ path: `${OUT}/41-stasera-proposte.png`, caret: "initial" });
     // Altri 3: niente ripetizioni finché ce ne sono; poi si ricomincia il giro
     await sq.getByTestId("stasera-altri").click();
