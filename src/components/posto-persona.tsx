@@ -52,7 +52,7 @@ export function PostoRiga({ spot }: { spot: Spot }) {
 }
 
 /** Card a tutta altezza per il feed (stile Places: fondo scuro, nome grande, tipo in maiuscoletto). */
-export function PostoCard({ spot }: { spot: Spot }) {
+export function PostoCard({ spot, verdict = null }: { spot: Spot; verdict?: string | null }) {
   const visited = !!spot.tags?.includes("Già visitato");
   const city = cityFromAddress(spot.address);
   const kind = categoryLabel(spot.category);
@@ -60,7 +60,7 @@ export function PostoCard({ spot }: { spot: Spot }) {
     <Link
       href={`/locali/${spot.place_id}`}
       data-testid="card-attivita"
-      className="relative flex h-40 w-[78%] max-w-[280px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-card bg-brand p-4 text-white shadow-card active:scale-[0.99] transition-transform duration-150"
+      className="relative flex min-h-40 w-[78%] max-w-[280px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-card bg-brand p-4 text-white shadow-card active:scale-[0.99] transition-transform duration-150"
     >
       <span aria-hidden className="pointer-events-none absolute -right-3 -bottom-4 text-[88px] leading-none opacity-25">
         {getCategoryEmoji(spot.category, spot.name)}
@@ -68,6 +68,8 @@ export function PostoCard({ spot }: { spot: Spot }) {
       <span className="relative min-w-0">
         <span className="line-clamp-2 font-title text-xl font-semibold leading-tight">{spot.name}</span>
         {kind && <span className="mt-1 block truncate text-[11px] font-display font-semibold uppercase tracking-wider text-white/70">{kind}</span>}
+        {/* Come la riga di descrizione di Places: il verdetto Mapetite, se c'è già. */}
+        {verdict && <span data-testid="card-attivita-verdetto" className="mt-1.5 line-clamp-2 text-[13px] font-sans leading-snug text-white/90">{verdict}</span>}
       </span>
       <span className="relative flex items-center gap-2">
         <span className={`rounded-pill px-2.5 py-1 text-[11px] font-display font-semibold ${visited ? "bg-accent text-white" : "bg-white/15 text-white"}`}>
