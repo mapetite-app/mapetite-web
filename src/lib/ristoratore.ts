@@ -46,6 +46,10 @@ export type PannelloRistoratore = {
   zona: { nome: string | null; ricerche: number; persone: number; tipi: Voce[]; richieste: Voce[]; fasce: Voce[]; trend: TrendFascia[] };
   confronto: { simili: number; mediaViste: number | null; mediaSalvati: number | null; viste: number; salvati: number };
   pochiDati: boolean;
+  // Domanda latente (docs/autonomia/POSIZIONAMENTO.md, proposta 2): chi ha salvato il locale, da sempre,
+  // e non ci è ancora stato; occasioni = le raccolte in cui l'ha messo. Solo nel pannello: non cambia
+  // mai l'ordine dei risultati (VISIONE: niente premi alla popolarità).
+  inAttesa: { persone: number; occasioni: Voce[] };
 };
 
 export const AZIONI = [
@@ -122,7 +126,7 @@ function richiesteDi(p: Record<string, unknown>): string[] {
 }
 
 export function computeRistoratore(
-  input: { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[] },
+  input: { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa?: RistSalvataggio[] },
   giorni: number,
   now: number = Date.now(),
 ): PannelloRistoratore {
@@ -267,7 +271,22 @@ export function computeRistoratore(
     zona: { nome: citta, ricerche: zn.n, persone: zn.persone.size, tipi: zn.tipi.list(), richieste: zn.richieste.list(), fasce: fasceOrdinate, trend },
     confronto: { simili: altri.length, mediaViste: media("apri_scheda"), mediaSalvati: media("salva"), viste, salvati: salvatiN },
     pochiDati: viste < SOGLIA,
+    inAttesa: inAttesa(input.attesa ?? [], locale.id),
   };
+}
+
+// Stati e voti del salvataggio: non sono occasioni.
+const STATI = new Set(["Da provare", STATO_VISITATO]);
+export function inAttesa(rows: RistSalvataggio[], placeId: string): { persone: number; occasioni: Voce[] } {
+  const chi = new Set<string>();
+  const occ = tally();
+  for (const r of rows) {
+    const tags = r.tags ?? [];
+    if (r.place_id !== placeId || tags.includes(STATO_VISITATO)) continue;
+    chi.add(r.user_id);
+    for (const t of tags) if (!STATI.has(t) && !/^(👍|👎)/u.test(t)) occ.add(t, r.user_id);
+  }
+  return { persone: chi.size, occasioni: occ.list().slice(0, 4) };
 }
 
 // Esempio DICHIARATO del trend di zona, quando i dati veri della zona sono ancora pochi: la

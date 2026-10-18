@@ -43,7 +43,13 @@ function pick<T>(r: () => number, list: [T, number][]): T {
   return list[list.length - 1][0];
 }
 
-export function demoDati(now: number = Date.now()): { locale: RistLocale; citta: string; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[] } {
+// Salvataggi d'esempio per "Ti vogliono provare" (domanda latente): raccolte tipiche e qualche visita.
+const ATTESA: [string[], number][] = [
+  [["Da provare"], 12], [["Da provare", "Con amici"], 9], [["Da provare", "Romantico"], 7],
+  [["Da provare", "Cena di lavoro"], 3], [["Già visitato", "Con amici"], 6],
+];
+
+export function demoDati(now: number = Date.now()): { locale: RistLocale; citta: string; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[] } {
   const r = rng(20261025);
   const eventi: RistEvento[] = [];
   const simili: RistLocale[] = Array.from({ length: 11 }, (_, i) => ({
@@ -107,5 +113,7 @@ export function demoDati(now: number = Date.now()): { locale: RistLocale; citta:
       }
     }
   }
-  return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [] };
+  let u = 0;
+  const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags })));
+  return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [], attesa };
 }

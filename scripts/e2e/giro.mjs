@@ -4250,6 +4250,10 @@ else {
     const at = (d, h = 10, m = 0) => new Date(Date.UTC(2026, 9, d, h, m)).toISOString();
     const L = { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Trattoria Uno", address: "Via del Pigneto 10, 00176 Roma RM, Italy", category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GUNO" };
     const peer = (i) => ({ ...L, id: `aaaaaaaa-0000-4000-8000-00000000010${i}`, name: `Simile ${i}`, google_place_id: `GS${i}` });
+    // Domanda latente (18/10): chi ha salvato il locale e non ci è stato, con le occasioni; voti e stati non sono occasioni.
+    { const sv = (u, tags, place = L.id) => ({ place_id: place, user_id: u, created_at: at(10), tags });
+      const a = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), sv("u2", ["Romantico", "👍 Mi è piaciuto"]), sv("u3", ["Già visitato", "Romantico"]), sv("u4", ["Da provare"]), sv("u5", ["Romantico"], "altro")], L.id);
+      ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`); }
     const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
     const eventi = [
       // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
@@ -4372,6 +4376,8 @@ else {
     const lab = rp.getByTestId("pannello-demo-etichetta");
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
+    { const t = ((await rp.getByTestId("pannello-in-attesa").textContent()) ?? "").replace(/\s+/g, " ");
+      ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`); }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();
