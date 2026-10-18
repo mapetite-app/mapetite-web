@@ -22,7 +22,15 @@ function project(lat: number, lng: number, zoom: number): { x: number; y: number
 }
 
 function labelWidth(name: string): number {
-  return Math.min(LABEL_MAX_W, name.length * 6.2 + 16);
+  return Math.min(LABEL_MAX_W, pinName(name).length * 6.2 + 16);
+}
+
+// Nome corto sul pin: l'insegna senza la descrizione che Google aggiunge dopo un trattino o una barra
+// ("La Sora Cencia – Trattoria tipica romana a Trastevere" → "La Sora Cencia"), così non si legge
+// "La Sora Cencia …". Il nome intero resta nella card e nella scheda.
+export function pinName(name: string): string {
+  const head = name.split(/\s+[–—|-]\s+|\s*\(|,\s+/)[0].trim();
+  return head.length >= 3 ? head : name;
 }
 
 function overlaps(a: Rect, b: Rect): boolean {

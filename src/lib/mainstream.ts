@@ -66,3 +66,43 @@ export function demoteTouristTraps<T extends { name: string; userRatingCount: nu
   const traps = places.filter(isTrap);
   return { places: [...kept, ...traps], demoted: traps.map((p) => p.name) };
 }
+
+// Nessuna richiesta "non turistica" e nessuna trappola: il locale con molte più recensioni degli altri
+// (Tonnarello a Trastevere, 110k contro una mediana di ~4.000) non deve aprire la lista solo perché è
+// il più famoso (VISIONE: spingere verso il posto giusto, non il più popolare). Non va in fondo e non
+// è "messo da parte": scende solo dopo i primi TOP_FREE risultati, dove resta in vista. Cercato per nome
+// resta dov'è. Soglia più alta di massPredicate: qui la persona non ha chiesto niente sulla fama.
+const TOP_FREE = 3;
+const HUGE_COUNT = 8000;
+
+export function lowerMassFromTop<T extends { name: string; userRatingCount: number | null; rating?: number | null }>(
+  query: string,
+  places: T[],
+): { places: T[]; lowered: string[] } {
+  if (places.length <= TOP_FREE || wantsOffTheBeatenPath(query)) return { places, lowered: [] };
+  const counts = places.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
+  const median = counts[Math.floor(counts.length / 2)] ?? 0;
+  const limit = Math.max(HUGE_COUNT, median * RATIO);
+  const q = new Set(nameWords(query));
+  const named = (p: T) => nameWords(p.name).some((w) => !GENERIC.has(w) && q.has(w));
+  const isHuge = (p: T) => (p.userRatingCount ?? 0) > limit && !named(p);
+  const top = places.slice(0, TOP_FREE);
+  if (!top.some(isHuge)) return { places, lowered: [] };
+  const others = places.filter((p) => !isHuge(p));
+  // Servono abbastanza alternative per riempire le prime posizioni, altrimenti non si tocca nulla.
+  if (others.length < TOP_FREE) return { places, lowered: [] };
+  const lowered = top.filter(isHuge);
+  const head = others.slice(0, TOP_FREE);
+  const rest = places.filter((p) => !head.includes(p));
+  return { places: [...head, ...rest], lowered: lowered.map((p) => p.name) };
+}
+
+// Esclusione dell'AI per un requisito che la frase non contiene. Visto dal vivo il 18/10: "trattoria a
+// Trastevere" → Da Enzo escluso perché "frequentato da turisti, non corrisponde al profilo di autentica
+// trattoria". "Autentica" e "non turistica" non c'erano: LORENZO.md vuole esclusioni solo per requisiti
+// espliciti. Allora il locale resta (e non va in fondo per questo).
+const TURISTICO = /turist|trappola/i; // solo la fama: "poco autentica" per una "pizzeria verace" è un requisito di cucina
+
+export function exclusionNotAsked(query: string, fitReason: string): boolean {
+  return TURISTICO.test(fitReason) && !wantsOffTheBeatenPath(query);
+}

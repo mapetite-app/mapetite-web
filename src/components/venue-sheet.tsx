@@ -244,7 +244,6 @@ export default function VenueSheet({
       rating={rating}
       userRatingCount={userRatingCount}
       mapsUrl={mapsUrl}
-      hasVerdict={verdictText != null || (synthesis?.trim() ?? "") !== ""}
       onMapetite={onMapetite}
     />
   );
@@ -533,7 +532,8 @@ export default function VenueSheet({
         <div className="px-5 pt-4">
           {/* Semplificare (Lorenzo 17/10): Condividi e Altro come icone accanto al nome, non più una riga di riquadri. */}
           <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 font-title text-[1.75rem] font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.2rem]">
+            {/* Nomi lunghi ("La Tavernetta 29 da Tony e Andrea") su 2 righe, non 3: il verdetto resta in vista. */}
+            <h2 className={`min-w-0 flex-1 font-title font-semibold leading-tight text-text ${name.length > 24 ? "text-[1.4rem] in-data-[titoli=serif]:text-[1.8rem]" : "text-[1.75rem] in-data-[titoli=serif]:text-[2.2rem]"}`}>
               {name}
             </h2>
             <div className="relative flex shrink-0 gap-2 pt-0.5" data-testid="azioni-scheda">
@@ -652,7 +652,6 @@ export default function VenueSheet({
 
         {/* Panoramica: chi ci è stato, le tue note, in breve. */}
         <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
-          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
           {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
           {showPersonalBlock && personalBlock(false)}
           {hasOverview && (
@@ -684,6 +683,8 @@ export default function VenueSheet({
               )}
             </div>
           )}
+          {/* Prima cosa dice Mapetite (In breve), poi il confronto con le altre fonti (Semplificare, 18/10). */}
+          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
         </div>
 
         {/* Recensioni: Google e community Mapetite, mai mescolate. */}
@@ -773,7 +774,8 @@ export default function VenueSheet({
           data-testid="barra-azioni"
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
-          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float">
+          {/* Bordo chiaro: sopra il riquadro scuro del verdetto la barra si fondeva con il testo sotto (18/10). */}
+          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float ring-[3px] ring-surface">
             {lead === "prenota" && (
               <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`}>
                 <CalendarCheck size={18} aria-hidden />
