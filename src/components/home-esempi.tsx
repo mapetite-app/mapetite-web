@@ -29,7 +29,8 @@ export default function HomeEsempi() {
   useEffect(() => {
     let alive = true;
     const last = readLastView();
-    if (last && cityNear(last.lat, last.lng) === "Milano") setEsempi(MILANO);
+    // Fuori dal ciclo dell'effetto, come nella mappa.
+    if (last && cityNear(last.lat, last.lng) === "Milano") setTimeout(() => { if (alive) setEsempi(MILANO); }, 0);
     // La posizione vera (se già permessa) vince sull'ultima vista della mappa.
     void grantedPosition().then((pos) => {
       if (!alive || !pos) return;
