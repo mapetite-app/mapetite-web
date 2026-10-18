@@ -1974,7 +1974,8 @@ else {
     }
     ok((await sq.getByTestId("stasera-verdetto").count()) <= 1, "stasera: verdetto solo dove c'è in cache (mai inventato)");
     const card0 = sq.getByTestId("stasera-proposta").first();
-    ok(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d/.test((await card0.getByTestId("stasera-percorso").getAttribute("href")) ?? "") && (await card0.getByTestId("stasera-mappa").getAttribute("href")) === `/mappa?salvato=${first[0].id}`, "stasera: 'Percorso' apre Google Maps, 'Apri nella mappa' apre il salvato");
+    ok(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=-?\d/.test((await card0.getByTestId("stasera-percorso").getAttribute("href")) ?? "") && (await card0.getByTestId("stasera-mappa").getAttribute("href")) === `/mappa?salvato=${first[0].id}`, "stasera: 'Percorso' apre Google Maps, il nome apre il salvato sulla mappa");
+    ok((await card0.locator("a").count()) === 2, `stasera: un solo pulsante sotto la proposta (Percorso), il nome è il link alla mappa (${await card0.locator("a").count()} link)`);
     await sq.screenshot({ path: `${OUT}/41-stasera-proposte.png`, caret: "initial" });
     // Altri 3: niente ripetizioni finché ce ne sono; poi si ricomincia il giro
     await sq.getByTestId("stasera-altri").click();
@@ -4103,7 +4104,8 @@ else {
     await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
     ok((await p.getByTestId("raccolta-titolo").textContent()) === "Con amici" && (await p.getByTestId("raccolta-locale").count()) === 2, "pagina raccolta: titolo e i 2 locali");
     ok(await p.getByTestId("raccolta-verdetto").getByText("Cucina romana di quartiere, senza turisti.").isVisible() && await p.getByText("“Il tavolo in fondo”").isVisible(), "pagina raccolta: verdetto in cache e la tua nota");
-    ok((await p.getByTestId("raccolta-locale").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && (await p.getByTestId("raccolta-sulla-mappa").getAttribute("href")) === "/mappa?vista=salvati&tag=Con+amici", "pagina raccolta: un locale apre la sua scheda; 'Sulla mappa' apre la mappa filtrata");
+    ok((await p.getByTestId("raccolta-locale").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && (await p.getByTestId("raccolta-sulla-mappa").getAttribute("href")) === "/mappa?vista=salvati&tag=Con+amici", "pagina raccolta: un locale apre la sua scheda; la mini-mappa apre la mappa filtrata");
+    ok((await p.getByTestId("raccolta-sulla-mappa").count()) === 1, "pagina raccolta: un solo ingresso alla mappa (la mini-mappa, niente pulsante doppio)");
     ok(await p.getByTestId("raccolta-privata").isVisible() && (await p.getByTestId("condividi-raccolta").count()) === 0, "pagina raccolta: profilo non pubblico → spiega come condividerla");
     await p.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
     ok(await p.getByTestId("mappa-persona").isVisible(), "pagina raccolta: mini mappa");

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
@@ -98,7 +99,8 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
 
   return (
     <li data-testid="stasera-proposta" data-id={spot.id} className="rounded-card bg-white p-4 text-text shadow-float">
-      <div className="flex items-start gap-3">
+      {/* Semplificare (18/10): nome e foto aprono il posto sulla mappa; sotto resta un solo pulsante, Percorso. */}
+      <Link href={mapHref} data-testid="stasera-mappa" aria-label={`Apri ${spot.name} nella mappa`} className="flex items-start gap-3 active:opacity-80">
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-btn bg-accent-light text-3xl leading-none">
           {emoji}
         </span>
@@ -114,7 +116,8 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
             </span>
           )}
         </div>
-      </div>
+        <ChevronRight aria-hidden size={20} className="mt-1 shrink-0 text-text-muted" />
+      </Link>
 
       {spot.note && (
         <p data-testid="stasera-nota" className="mt-3 border-l-2 border-accent pl-3 text-[15px] italic text-text">
@@ -138,25 +141,16 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <a
-          href={directionsUrl(spot)}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-testid="stasera-percorso"
-          onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { fonte: "stasera" })}
-          className="flex min-h-11 items-center justify-center rounded-pill bg-brand font-display text-sm font-semibold text-white active:scale-[0.98]"
-        >
-          Percorso
-        </a>
-        <Link
-          href={mapHref}
-          data-testid="stasera-mappa"
-          className="flex min-h-11 items-center justify-center rounded-pill border border-border font-display text-sm font-semibold text-brand active:scale-[0.98]"
-        >
-          Apri nella mappa
-        </Link>
-      </div>
+      <a
+        href={directionsUrl(spot)}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="stasera-percorso"
+        onClick={() => track("percorso", { id: spot.id, lat: spot.lat ?? undefined, lng: spot.lng ?? undefined }, { fonte: "stasera" })}
+        className="mt-4 flex min-h-11 items-center justify-center rounded-pill bg-brand font-display text-sm font-semibold text-white active:scale-[0.98]"
+      >
+        Percorso
+      </a>
     </li>
   );
 }

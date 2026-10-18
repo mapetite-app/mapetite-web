@@ -80,6 +80,7 @@ export default async function RaccoltaPage({ params }: Props) {
   const me = "stato" in social ? null : social;
   const shareable = me?.is_public && me.handle ? publicCollectionPath(me.handle, name) : null;
   const visited = rows.filter((r) => r.tags.includes("Già visitato")).length;
+  const mapHref = `/mappa?${new URLSearchParams({ vista: "salvati", tag: name }).toString()}`;
 
   return (
     <main className="mx-auto min-h-dvh max-w-md bg-bg pb-10" data-testid="raccolta-pagina">
@@ -107,28 +108,34 @@ export default async function RaccoltaPage({ params }: Props) {
               Condividi
             </Link>
           )}
-          <Link
-            href={`/mappa?${new URLSearchParams({ vista: "salvati", tag: name }).toString()}`}
-            data-testid="raccolta-sulla-mappa"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
-          >
-            <MapIcon size={16} aria-hidden /> Sulla mappa
-          </Link>
+          {/* Con la mini-mappa qui sotto, è lei ad aprire la mappa: niente pulsante doppio (Semplificare, 18/10). */}
+          {spots.length === 0 && (
+            <Link
+              href={mapHref}
+              data-testid="raccolta-sulla-mappa"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
+            >
+              <MapIcon size={16} aria-hidden /> Sulla mappa
+            </Link>
+          )}
           <span className="flex-1" />
           <RaccoltaAzioni userId={userId} name={name} rows={rows.map((r) => ({ placeId: r.placeId, tags: r.tags }))} allTags={allTags} others={others} />
         </div>
         {!shareable && (
           <p data-testid="raccolta-privata" className="mt-2 text-xs text-text-muted">
-            Per mandare il link a un amico, rendi pubblico il tuo profilo: la raccolta si aprirà in sola lettura, senza le tue note.
+            Per condividerla rendi pubblico il profilo (le note restano tue).
           </p>
         )}
       </header>
 
       {spots.length > 0 && (
         <section className="mt-5 px-4" aria-label="Mappa della raccolta">
-          <div className="h-44">
-            <MappaPersonaLazy spots={spots} className="h-full w-full" />
-          </div>
+          <Link href={mapHref} data-testid="raccolta-sulla-mappa" aria-label="Apri la raccolta sulla mappa" className="relative block h-44">
+            <span className="pointer-events-none block h-full w-full">
+              <MappaPersonaLazy spots={spots} className="h-full w-full" />
+            </span>
+            <span className="absolute bottom-2 right-2 rounded-pill bg-white/95 px-3 py-1.5 text-xs font-display font-semibold text-brand shadow-card">Apri sulla mappa ›</span>
+          </Link>
         </section>
       )}
 
