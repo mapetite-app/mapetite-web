@@ -68,6 +68,10 @@ export default async function AmiciPage() {
                 <span aria-hidden>⭐</span> Creator da seguire
               </a>
             )}
+            {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo). */}
+            <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
+              <span aria-hidden>💌</span> Invita un amico
+            </Link>
             {!feed.mio?.is_public && (
               <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className={chip}>
                 <span aria-hidden>🙋</span> Fatti trovare
