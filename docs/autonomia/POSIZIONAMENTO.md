@@ -56,7 +56,7 @@ Salvare da TikTok lo fanno ormai in tanti (Punkt AI, Doko, JoySpot, Korka, GeoTo
 2. **FATTA (18/10 sera) — "Domanda latente" nel pannello del ristoratore.** "32 persone hanno salvato il tuo locale e non ci sono ancora state; 9 per 'romantico'." È il dato che nessuno gli dà.
    - Lo vede solo il ristoratore: non cambia mai l'ordine dei risultati (VISIONE: niente premi alla popolarità).
    - I dati ci sono già (salvataggi e "Ci sono stato").
-3. **IN PARTE FATTA (18/10 sera): "Non vado più" nel promemoria di oggi prepara la disdetta per il locale (WhatsApp, chiamata o testo). Manca il promemoria del giorno prima. — Promemoria anti tavoli vuoti per le prenotazioni fatte con Mapetite.** Il giorno prima: "Domani alle 21 da X: confermi?" Con un tocco l'utente conferma o disdice, e la disdetta prepara il messaggio per il locale.
+3. **FATTA (18/10 sera): promemoria il giorno prima e il giorno stesso, con "Non vado più" che prepara la disdetta per il locale (WhatsApp, chiamata o testo). — Promemoria anti tavoli vuoti per le prenotazioni fatte con Mapetite.** Il giorno prima: "Domani alle 21 da X: confermi?" Con un tocco l'utente conferma o disdice, e la disdetta prepara il messaggio per il locale.
    - I numeri del settore dicono −32% di tavoli vuoti con i promemoria.
    - È il primo argomento di vendita verso i ristoratori.
 4. **Visite vere al posto delle recensioni anonime.** Il "Com'è andata?" di chi ha salvato e poi è andato diventa, nel pannello del ristoratore, "12 visite confermate questo mese, 10 👍". Non si possono falsificare come le recensioni, ed è in linea con la nuova legge sulle recensioni (verifica della presenza reale).
