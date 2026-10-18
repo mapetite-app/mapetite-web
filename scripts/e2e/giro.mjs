@@ -2692,6 +2692,7 @@ else {
     ok((await n("visitati")) === "1Visitati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
   { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
   ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
   ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
   await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
   ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");

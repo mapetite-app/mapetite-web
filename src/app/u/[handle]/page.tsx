@@ -8,7 +8,7 @@ import InvitoMapetite from "@/components/invito-mapetite";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import { PostoRiga } from "@/components/posto-persona";
-import { loadProfilePage, loadScopritori } from "@/lib/social";
+import { loadProfilePage, loadScopritori, loadVerdetti } from "@/lib/social";
 import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
 import { isVisited, mapSpots, plural, publicCollections } from "@/lib/social-view";
@@ -91,7 +91,8 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const want = places.filter((p) => !isVisited(p)); // salvato e non ancora visitato = da provare
   // Top per città (piano 4.3): solo i visitati messi in classifica; nascosta senza la migrazione.
   // Scopritori (5.6): badge "💎 Scopritore" solo se ha gemme e la migrazione è applicata.
-  const [ranks, scopritori] = await Promise.all([loadPublicRanks(profile.id), loadScopritori([profile.id])]);
+  // Verdetto Mapetite sulle righe (come le card degli amici): chi apre il link capisce perché andarci.
+  const [ranks, scopritori, verdetti] = await Promise.all([loadPublicRanks(profile.id), loadScopritori([profile.id]), loadVerdetti([...visited, ...want].slice(0, 60).map((p) => p.place_id))]);
   const scopritore = scopritori?.find((s) => s.id === profile.id && s.gemme > 0) ?? null;
   const tops = ranks
     ? topByCity(visited.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 5).slice(0, 3)
@@ -219,7 +220,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
               <h2 id="visitati-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Già provati</h2>
               <ul className="space-y-2">
                 {visited.slice(0, 30).map((s) => (
-                  <li key={s.place_id}><PostoRiga spot={s} /></li>
+                  <li key={s.place_id}><PostoRiga spot={s} verdict={verdetti[s.place_id] ?? null} /></li>
                 ))}
               </ul>
             </section>
@@ -229,7 +230,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
               <h2 id="voglio-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Da provare</h2>
               <ul className="space-y-2">
                 {want.slice(0, 30).map((s) => (
-                  <li key={s.place_id}><PostoRiga spot={s} /></li>
+                  <li key={s.place_id}><PostoRiga spot={s} verdict={verdetti[s.place_id] ?? null} /></li>
                 ))}
               </ul>
             </section>
