@@ -40,6 +40,27 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 **In PR #31 (notte 12→13/10):** card dei salvati con il verdetto Mapetite (già in memoria, senza costi) e la città; salvati vuoti con "Salva da Google Maps"; indirizzi senza ", Italy"; link di una ricerca aperto a freddo che inquadra i risultati; nomi dei pin che non si sovrappongono; "Password dimenticata?"; "Salva" senza accesso che si completa da solo dopo il login.
 **Manca:** prova dal vivo con Haiku (Lorenzo deve aggiungere `ANTHROPIC_API_KEY` all'ambiente cloud: istruzioni date il 12/10); giro con un account vero; risposta sulla quota Google per l'import (voce 13).
 
+## Redesign lista risultati – variante scelta — PRONTA (Lorenzo, 18/10)
+Lorenzo non è soddisfatto del foglio dei risultati sulla mappa. Il 18/10 ha guardato 4 direzioni generate con /design-shotgun (Rivista, Carosello scuro, Lista compatta, Pila) e ha scelto **B "Carosello scuro"** (modello: `places-04`).
+- Mockup scelto: `riferimenti/mapetite-lista-risultati-B-scelta.jpg`. Com'è oggi: `riferimenti/mapetite-lista-risultati-prima.png`.
+- Nel mockup nomi, foto e verdetti sono inventati dall'AI che disegna: si prende la struttura, mai i contenuti.
+
+Cosa cambia per chi usa l'app (codice: `src/components/bottom-sheet.tsx`, `src/app/mappa/map-view.tsx`):
+1. **Via il riquadro intestazione sopra le card** (titolo della richiesta, "N posti", "⋯", ✕). La richiesta è già nella barra in alto. Al suo posto una pillola piccola sotto la barra, a sinistra: "12 posti". Toccandola si apre il foglio con quello che oggi sta in "⋯" (Ho capito, Affina, Condividi). La ✕ della barra chiude la ricerca: niente seconda ✕.
+2. **Card più alte, a foto piena, la card attiva al centro** con le vicine che si vedono ai due lati. Dentro, dall'alto: Salva (cerchio con bordo, in alto a destra); categoria in maiuscoletto piccolo e spaziato ("ROOFTOP BAR"); nome grande in Poppins bianco; pillola verde "Aperto ora" (o "Chiuso ora" come oggi); verdetto Mapetite su una riga con la scintilla corallo; fino a 2 chip con bordo dei punti forti (`goFor`); in fondo "1 di 12".
+3. **Pin con la foto del locale** in un cerchio con bordo teal e nome sotto; il pin della card attiva più grande, bordo e nome in corallo. Dove la foto non c'è (oltre `PHOTO_CARDS` o foto non arrivata) resta l'emoji di oggi.
+4. Niente puntini di pagina (con 12 risultati sono troppi): basta "1 di 12".
+
+Vincoli (non negoziabili):
+- Chip dei punti forti **solo da `goFor` veri**: se mancano, nessuna chip (mai riempirle con testo generico). Verdetto assente → frase di Google come oggi, mai inventata.
+- La card non deve saltare quando arriva il verdetto (controllo già nel giro: ±24 px). Riservare lo spazio di verdetto e chip fin dall'inizio.
+- Restano: "Questi risultati non vanno?" come ultima card, "📌 Salvato", "✨ Come … che hai salvato", "Chiuso ora", tocco sulla card = scheda, card ↔ pin sincronizzati.
+- Foto: stesso limite e stesse regole di oggi (nessuna foto Google salvata sui nostri server, nessuna chiamata in più). Costo Google invariato.
+- Contrasto: testo bianco su foto con sfumatura scura in basso (come oggi), leggibile anche su foto chiare.
+- Prima accesa per tutti, con `?lista=b-vecchia` per tornare indietro per una settimana; poi si toglie.
+
+Come si verifica: aggiornare `scripts/e2e/giro.mjs` (niente intestazione sopra le card, pillola "N posti" che apre Affina/Condividi, "1 di N", chip solo con `goFor`), screenshot a 390×844 e 360×800 in PR affiancati al mockup e a `places-04`.
+
 ## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
 Tutte le informazioni restano, ma meno cose a schermo (regola in `LORENZO.md`). Punti visti il 17/10, da fare in ordine, con screenshot prima/dopo:
 1. **FATTA (PR #59)** — **Scheda del locale**: "Voglio andarci" compare due volte (riquadro sotto il verdetto e "Salva" nella barra in basso). Una sola azione di salvataggio; "Ci sono stato" e "Condividi" dentro "Altro" o nel foglio Salva.
