@@ -1629,6 +1629,7 @@ else {
     await p.getByLabel("Cosa cerchi?").press("Enter");
     const btn = p.getByTestId("errore-salvati");
     ok(await btn.waitFor({ timeout: 5000 }).then(() => true, () => false) && /Cerca nei tuoi \d+ salvati/.test((await btn.textContent()) ?? ""), `quota finita: accanto al messaggio 'Cerca nei tuoi salvati' (${await btn.textContent().catch(() => "")})`);
+    await p.screenshot({ path: `${OUT}/25b-quota-finita.png`, caret: "initial" });
     await btn.click().catch(() => {});
     ok(await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => true, () => false), "quota finita: un tocco apre i salvati");
     await p.unroute("**/api/search");
@@ -6807,6 +6808,18 @@ else {
     await m.waitForTimeout(1000);
     await idee(m);
     ok(await m.getByRole("button", { name: "Rooftop romantico per due a Milano", exact: true }).isVisible() && (await m.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 0, "mappa su Milano: 'Prova a chiedere' con gli esempi di Milano");
+    await c.close(); }
+  // Assistente con la quota Google finita: il messaggio porta ai propri salvati.
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await c.route("**/api/search", (r) => r.fulfill({ status: 503, json: { error: "Le ricerche nuove sono finite per ora: ripartono alle 9:00. Intanto puoi cercare tra i tuoi salvati." } }));
+    await c.route("**/api/search/intent", (r) => r.fulfill({ status: 503, json: {} }));
+    const a = await c.newPage();
+    a.on("pageerror", (e) => errors.push(e.message));
+    await a.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
+    await a.getByLabel("Scrivi all'assistente").fill("un posto per un aperitivo");
+    await a.getByLabel("Scrivi all'assistente").press("Enter");
+    const l = a.getByTestId("assistente-quota-salvati");
+    ok(await l.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await l.getAttribute("href")) === "/mappa?vista=salvati", "assistente con la quota finita: 'Cerca nei tuoi salvati' sotto il messaggio");
     await c.close(); }
   // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
   for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {
