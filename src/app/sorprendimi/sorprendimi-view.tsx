@@ -330,9 +330,16 @@ export default function SorprendimiView({ userId }: { userId: string | null }) {
         {phase === "errore" && (
           <div data-testid="sorpresa-errore" className="mt-12 text-center">
             <p className="font-display text-lg font-semibold">{error}</p>
-            <button type="button" onClick={() => void run(center ?? undefined)} className="mt-4 min-h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-white">
-              Riprova
-            </button>
+            {/* Quota Google finita: "Riprova" fallirebbe fino alle 9:00; "Stasera" sceglie tra i salvati, senza Google. */}
+            {userId && /ripartono alle 9:00/.test(error ?? "") ? (
+              <Link href="/stasera" data-testid="sorpresa-quota-stasera" className="mt-4 inline-flex min-h-11 items-center rounded-pill bg-accent px-6 font-display text-sm font-semibold text-white">
+                🍽️ Scegli tra i tuoi salvati
+              </Link>
+            ) : (
+              <button type="button" onClick={() => void run(center ?? undefined)} className="mt-4 min-h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-white">
+                Riprova
+              </button>
+            )}
           </div>
         )}
 

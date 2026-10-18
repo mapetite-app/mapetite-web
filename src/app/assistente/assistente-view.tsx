@@ -758,6 +758,12 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                   <>
                     {/* Risposta in una bolla breve, come in un'app di messaggistica. */}
                     <p className={`w-fit max-w-[92%] rounded-2xl rounded-bl-md bg-surface px-4 py-2.5 text-[15px] font-sans leading-snug ${m.status === "error" ? "text-error" : "text-text"}`}>{m.text}</p>
+                    {/* Quota Google finita: i propri salvati funzionano sempre (come sulla mappa). */}
+                    {m.status === "error" && userId && /ripartono alle 9:00/.test(m.text) && (
+                      <Link href="/mappa?vista=salvati" data-testid="assistente-quota-salvati" className="mt-2 inline-flex min-h-10 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95">
+                        📌 Cerca nei tuoi salvati
+                      </Link>
+                    )}
                   </>
                 )}
                 {m.gusti && m.gusti.length > 0 && (
