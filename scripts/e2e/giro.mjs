@@ -6809,6 +6809,8 @@ else {
   ok(vicino(a6, 45.464, 9.19), `Sorprendimi dalla home: con la posizione permessa la città dove sei (${JSON.stringify(a6)})`);
   const a7 = await prova({ permesso: false, url: "/sorprendimi?da=home" });
   ok(vicino(a7, 41.9028, 12.4964), `Sorprendimi senza permesso: Roma come prima (${JSON.stringify(a7)})`);
+  const a8 = await prova({ permesso: false, ultima: { lat: 45.4785, lng: 9.1606 }, url: "/sorprendimi?da=home" });
+  ok(vicino(a8, 45.464, 9.19), `Sorprendimi senza permesso ma con la mappa lasciata a Milano (o Milano scelta al primo accesso): cerca a Milano (${JSON.stringify(a8)})`);
   // Mappa su Milano: "Prova a chiedere" con gli esempi di Milano.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: MILANO });
     await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });

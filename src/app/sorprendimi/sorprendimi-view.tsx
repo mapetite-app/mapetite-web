@@ -11,7 +11,7 @@ import { cityFromAddress } from "@/lib/city";
 import { distanceLabel } from "@/lib/distance";
 import { cityNear, cityArea } from "@/lib/named-city";
 import { quickSavePlace } from "@/lib/quick-save";
-import { grantedPosition } from "@/lib/last-view";
+import { grantedPosition, readLastView } from "@/lib/last-view";
 import { track, trackFeature } from "@/lib/track";
 import { rememberFirme } from "@/lib/catalog-firme";
 import { withNext } from "@/lib/next-path";
@@ -57,7 +57,8 @@ async function loadTaste(userId: string): Promise<{ saved: (SavedForTaste & { la
 }
 
 // Dove cercare: il centro della mappa da cui si arriva; dalla home la città dove sei (se il permesso
-// della posizione è già dato: mai chiesto qui), poi la città dove hai più salvati; se no Roma.
+// della posizione è già dato: mai chiesto qui), poi quella dove hai lasciato la mappa (o scelta al primo
+// accesso), poi la città dove hai più salvati; se no Roma.
 async function startCenter(saved: { lat: number | null; lng: number | null }[]): Promise<Center> {
   const params = new URLSearchParams(window.location.search);
   const lat = Number(params.get("lat"));
@@ -74,6 +75,11 @@ async function startCenter(saved: { lat: number | null; lng: number | null }[]):
     const area = city ? cityArea(city) : null;
     return city && area ? { ...area, label: city, precise: false } : { ...here, radius: 3000, label: "Vicino a te", precise: true };
   }
+  // Poi la città dell'ultima vista della mappa (anche quella scelta al primo accesso), se è una città nota.
+  const last = readLastView();
+  const lastCity = last ? cityNear(last.lat, last.lng) : null;
+  const lastArea = lastCity ? cityArea(lastCity) : null;
+  if (lastCity && lastArea) return { ...lastArea, label: lastCity, precise: false };
   const counts = new Map<string, number>();
   for (const s of saved) {
     if (s.lat == null || s.lng == null) continue;
