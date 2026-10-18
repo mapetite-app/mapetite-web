@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HomeEsempi from "@/components/home-esempi";
 import Form from "next/form";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import HomeRecent from "@/components/home-recent";
@@ -34,13 +35,6 @@ async function savedCounts(supabase: Awaited<ReturnType<typeof createClient>>, u
 // Il modulo porta a /mappa?q=..., dove la ricerca parte da sola (funziona anche senza JS).
 // <Form> di Next: con JS niente ricaricamento completo (navigazione interna come i suggerimenti),
 // e la pagina /mappa si precarica mentre si scrive: la ricerca parte prima.
-const EXAMPLES = [
-  { emoji: "🌇", title: "Rooftop romantico", sub: "per due a Roma", q: "Rooftop romantico per due a Roma" },
-  { emoji: "🍝", title: "Trattoria vera", sub: "non turistica a Trastevere", q: "Trattoria autentica non turistica a Trastevere" },
-  { emoji: "🍸", title: "Cocktail bar", sub: "elegante per un appuntamento", q: "Cocktail bar elegante per un appuntamento" },
-  // Niente "qui vicino": dalla home la posizione non è ancora nota.
-  { emoji: "🥐", title: "Colazione buona", sub: "a Prati, con cornetti veri", q: "Colazione buona a Prati con cornetti veri" },
-];
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   // Arrivo da "Elimina il mio account" (profilo): conferma che è andata.
@@ -90,22 +84,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
               <span className="mt-0.5 block text-xs font-sans leading-snug text-text-muted">un posto nuovo per te</span>
             </span>
           </Link>
-          {/* Schede a due righe come Places ("Places worth knowing / in Rome"): titolo e dettaglio. */}
-          {EXAMPLES.map((e) => (
-            <Link
-              key={e.q}
-              href={`/mappa?q=${encodeURIComponent(e.q)}`}
-              aria-label={e.q}
-              data-esempio
-              className="flex min-h-16 w-52 shrink-0 snap-start items-center gap-2.5 rounded-card border border-border bg-white px-3 py-2.5 text-left shadow-sm active:scale-[0.98]"
-            >
-              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-lg">{e.emoji}</span>
-              <span className="min-w-0">
-                <span className="block text-sm font-display font-semibold leading-tight text-text">{e.title}</span>
-                <span className="mt-0.5 block text-xs font-sans leading-snug text-text-muted">{e.sub}</span>
-              </span>
-            </Link>
-          ))}
+          <HomeEsempi />
         </div>
         <Form action="/mappa" className="flex items-center gap-1.5 rounded-card border border-border bg-surface py-2 pl-3.5 pr-2 shadow-card">
           <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />

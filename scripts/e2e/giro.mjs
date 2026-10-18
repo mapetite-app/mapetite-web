@@ -1604,6 +1604,9 @@ else {
     await sctx.grantPermissions(["geolocation"]);
     await sctx.setGeolocation({ latitude: 41.8906, longitude: 12.4705 });
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    // 18/10: con il permesso già dato l'avviso compare da solo all'apertura, senza toccare niente.
+    { const t0 = await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).then(() => p.getByTestId("vicino-salvato").textContent(), () => "");
+      ok((t0 ?? "").includes("Osteria Due"), `vicino a un salvato: all'apertura della mappa l'avviso compare da solo (${(t0 ?? "").slice(0, 60)})`); }
     await p.waitForTimeout(800);
     await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
     const near = p.getByTestId("vicino-salvato");
@@ -6766,6 +6769,28 @@ else {
   ok(vicino(a6, 45.464, 9.19), `Sorprendimi dalla home: con la posizione permessa la città dove sei (${JSON.stringify(a6)})`);
   const a7 = await prova({ permesso: false, url: "/sorprendimi?da=home" });
   ok(vicino(a7, 41.9028, 12.4964), `Sorprendimi senza permesso: Roma come prima (${JSON.stringify(a7)})`);
+  // Mappa su Milano: "Prova a chiedere" con gli esempi di Milano.
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: MILANO });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const m = await c.newPage();
+    m.on("pageerror", (e) => errors.push(e.message));
+    await m.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await m.waitForTimeout(1000);
+    await idee(m);
+    ok(await m.getByRole("button", { name: "Rooftop romantico per due a Milano", exact: true }).isVisible() && (await m.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 0, "mappa su Milano: 'Prova a chiedere' con gli esempi di Milano");
+    await c.close(); }
+  // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
+  for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    const h = await c.newPage();
+    h.on("pageerror", (e) => errors.push(e.message));
+    await h.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const ok1 = await h.getByTestId("home-suggerimenti").getByRole("link", { name: atteso, exact: true }).waitFor({ timeout: 4000 }).then(() => true, () => false);
+    const n = await h.getByTestId("home-suggerimenti").locator("[data-esempio]").count();
+    ok(ok1 && n === 4, `home ${permesso ? "a Milano" : "senza permesso"}: esempi con "${atteso}" (${n} esempi)`);
+    await c.close();
+  }
 }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
