@@ -5284,6 +5284,9 @@ else {
   ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2 && await ip.getByTestId("importa-maps-guida").isVisible(), `primo accesso: l'import si apre con 'Incolla un link' in cima e la guida di Google Maps aperta (${Math.round(mb?.y ?? -1)})`);
   await ip.screenshot({ path: `${OUT}/benvenuto-importa-arrivo.png`, caret: "initial" });
   ok(ievents.some((e) => e?.props?.nome === "benvenuto_importa"), "primo accesso: scelta 'importa' tracciata");
+  // 18/10: la città scelta diventa il punto di partenza di mappa e assistente, anche passando da Importa.
+  { const v = await ip.evaluate(() => { try { return JSON.parse(localStorage.getItem("mapetite.vista") ?? "null"); } catch { return null; } });
+    ok(!!v && Math.abs(v.lat - 41.893) < 0.01 && Math.abs(v.lng - 12.483) < 0.01, `primo accesso: la città scelta (Roma) resta come punto di partenza della mappa (${JSON.stringify(v)})`); }
 
   // "Salta" sulle schermate 2 e 3: si salta solo quella; alla fine la mappa cerca sui gusti, nella città.
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
