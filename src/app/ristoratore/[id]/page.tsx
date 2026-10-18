@@ -21,7 +21,7 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; verificato: boolean; avviso: string | null };
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null };
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
 // scripts/e2e/giro.mjs), perché il giro non può leggere il database. Senza cookie si passa
@@ -33,7 +33,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
-    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], verificato: !!v.verificato, avviso: null };
+    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null };
   } catch {
     return null;
   }
@@ -102,7 +102,11 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     const { data } = await db.from("saved_places").select("place_id,user_id,created_at,tags").in("place_id", ids.slice(i, i + 200)).gte("created_at", since);
     salvati.push(...((data ?? []) as RistSalvataggio[]));
   }
-  return { locale, citta, simili, eventi, salvati, verificato, avviso };
+  // Tutti i salvataggi del locale, anche vecchi (non solo del periodo): chi lo vuole ancora provare.
+  const { data: tutti, error: aErr } = await db.from("saved_places").select("place_id,user_id,created_at,tags").eq("place_id", id).limit(5000);
+  if (aErr) console.error("[ristoratore] lettura salvataggi del locale:", aErr.message);
+  const attesa = (tutti ?? []) as RistSalvataggio[];
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso };
 }
 
 export default async function RistoratorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {

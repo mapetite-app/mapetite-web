@@ -3556,6 +3556,20 @@ else {
   await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
   await actx.clearCookies({ name: "e2e_profilo" });
+  // "Non vado più" (18/10, contro i tavoli vuoti): messaggio di disdetta già scritto e un tocco per mandarlo.
+  await ap.evaluate(() => {
+    const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() }]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await ap.getByTestId("promemoria-non-vado").click();
+  { const t = (await ap.getByTestId("promemoria-disdetta-testo").textContent()) ?? "";
+    const href = (await ap.getByTestId("disdetta-whatsapp").getAttribute("href")) ?? "";
+    ok(/disdico la prenotazione per 2 persone di oggi \d\d\/\d\d alle 21:00/.test(t) && href.startsWith("https://wa.me/393331234567?text=") && decodeURIComponent(href).includes("disdico la prenotazione"), `promemoria: 'Non vado più' prepara la disdetta per WhatsApp (${t.slice(0, 80)})`);
+    await ashot("56b-promemoria-disdetta");
+    await ap.getByTestId("disdetta-whatsapp").evaluate((a) => { a.removeAttribute("target"); a.setAttribute("href", "#"); a.click(); });
+    await ap.waitForTimeout(300);
+    ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta"); }
 
   // Scheda della mappa: stesso pulsante Prenota
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
@@ -4236,6 +4250,10 @@ else {
     const at = (d, h = 10, m = 0) => new Date(Date.UTC(2026, 9, d, h, m)).toISOString();
     const L = { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "Trattoria Uno", address: "Via del Pigneto 10, 00176 Roma RM, Italy", category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GUNO" };
     const peer = (i) => ({ ...L, id: `aaaaaaaa-0000-4000-8000-00000000010${i}`, name: `Simile ${i}`, google_place_id: `GS${i}` });
+    // Domanda latente (18/10): chi ha salvato il locale e non ci è stato, con le occasioni; voti e stati non sono occasioni.
+    { const sv = (u, tags, place = L.id) => ({ place_id: place, user_id: u, created_at: at(10), tags });
+      const a = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), sv("u2", ["Romantico", "👍 Mi è piaciuto"]), sv("u3", ["Già visitato", "Romantico"]), sv("u4", ["Da provare"]), sv("u5", ["Romantico"], "altro")], L.id);
+      ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`); }
     const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
     const eventi = [
       // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
@@ -4358,6 +4376,8 @@ else {
     const lab = rp.getByTestId("pannello-demo-etichetta");
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
+    { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
+      ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`); }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();

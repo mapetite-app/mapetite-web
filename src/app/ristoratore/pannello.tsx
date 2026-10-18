@@ -363,11 +363,30 @@ export default function Pannello({
   const trendEsempio = !demo && p.zona.ricerche < TREND_MIN;
   const zonaNome = p.zona.nome ? `a ${p.zona.nome}` : "nella tua zona";
 
+  const attesa = p.inAttesa;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
         {chiave.map((a, i) => <Numero key={a.tipo} a={a} giorni={p.giorni} forte={i === 0} />)}
       </section>
+
+      {/* Domanda latente: il dato che nessun altro dà al ristoratore (POSIZIONAMENTO.md, proposta 2).
+          Compatta, sotto i 4 numeri: la prima schermata resta quella. */}
+      {attesa.persone > 0 && (
+        <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
+          <p className="flex items-baseline gap-2">
+            <span className="font-title text-2xl font-semibold leading-none">{mostraPersone(attesa.persone)}</span>
+            <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare: hanno salvato il locale e non ci sono ancora state</span>
+          </p>
+          {attesa.occasioni.some((o) => o.persone >= SOGLIA) && (
+            <p className="mt-2 flex flex-wrap gap-1.5" aria-label="Per quale occasione">
+              {attesa.occasioni.filter((o) => o.persone >= SOGLIA).map((o) => (
+                <span key={o.chiave} className="rounded-pill bg-white/15 px-2.5 py-0.5 text-xs font-display font-semibold">{o.chiave} · {o.persone}</span>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
 
       {frasi.length > 0 && (
         <section data-testid="pannello-insight" className="mt-3 rounded-card border border-accent/30 bg-accent-light/60 p-4">
