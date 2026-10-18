@@ -1620,6 +1620,20 @@ else {
     await sctx.clearPermissions();
   }
 
+  // Quota Google finita (18/10): il messaggio offre subito i propri salvati.
+  {
+    await p.route("**/api/search", (r) => r.fulfill({ status: 503, json: { error: "Le ricerche nuove sono finite per ora: ripartono alle 9:00. Intanto puoi cercare tra i tuoi salvati." } }));
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.waitForTimeout(800);
+    await p.getByLabel("Cosa cerchi?").fill("aperitivo a Monti");
+    await p.getByLabel("Cosa cerchi?").press("Enter");
+    const btn = p.getByTestId("errore-salvati");
+    ok(await btn.waitFor({ timeout: 5000 }).then(() => true, () => false) && /Cerca nei tuoi \d+ salvati/.test((await btn.textContent()) ?? ""), `quota finita: accanto al messaggio 'Cerca nei tuoi salvati' (${await btn.textContent().catch(() => "")})`);
+    await btn.click().catch(() => {});
+    ok(await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => true, () => false), "quota finita: un tocco apre i salvati");
+    await p.unroute("**/api/search");
+  }
+
   // "Fatti suggerire": con 3 salvati di cui 2 bar a Roma compare "✨ Dai tuoi salvati: Bar a Roma, fuori dai soliti giri"
   {
     const rows3 = [rows[0], { ...rows[1], places: { ...rows[1].places, category: "bar" } }, rows[2]];

@@ -2259,14 +2259,22 @@ export default function MapView({
         </div>
         {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
         {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden) && (
-          <button
-            type="button"
-            data-testid="errore-barra"
-            onClick={() => setAiError(null)}
-            className="pointer-events-auto self-start rounded-card bg-surface px-3 py-2 text-left text-sm font-sans text-error shadow-float"
-          >
-            {aiError} ✕
-          </button>
+          <div data-testid="errore-barra" className="pointer-events-auto flex flex-col items-start gap-2 self-start rounded-card bg-surface px-3 py-2 shadow-float">
+            <button type="button" onClick={() => setAiError(null)} className="text-left text-sm font-sans text-error">
+              {aiError} ✕
+            </button>
+            {/* Quota Google finita (25/10, tanti tester insieme): i propri salvati funzionano sempre, un tocco. */}
+            {/ripartono alle 9:00/.test(aiError) && savedPlaces.length > 0 && (
+              <button
+                type="button"
+                data-testid="errore-salvati"
+                onClick={() => { setAiError(null); setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" }); }}
+                className="min-h-10 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95"
+              >
+                📌 Cerca nei tuoi {savedPlaces.length} salvati
+              </button>
+            )}
+          </div>
         )}
         {/* Mentre scrivi: prima i tuoi salvati che c'entrano (un tocco = la sua scheda), poi Invio cerca nel mondo. */}
         {barOn && view === "all" && aiSearch === null && !aiSearching && aiQuery.trim().length >= 4 && savedMatches(savedPlaces, aiQuery).length > 0 && (
