@@ -1074,7 +1074,12 @@ await shot("15-scheda-b");
 
   // Scheda di un bar (Terrazza Uno, ★ 4,5 · 812): Google con i numeri, Tripadvisor solo come ricerca.
   const box = page.getByTestId("confronto");
-  ok(await box.isVisible() && (await box.textContent()).includes("A confronto"), "confronto: riquadro 'A confronto' visibile nella Panoramica della scheda");
+  // Semplificare (20/10): il confronto sta in cima alle Recensioni, non più nella Panoramica.
+  ok((await page.getByTestId("pannello-panoramica").getByTestId("confronto").count()) === 0, "scheda semplificata: 'A confronto' non è più nella Panoramica");
+  ok(await page.getByTestId("segnali-scheda").evaluate((el) => getComputedStyle(el).display === "none" || el.getBoundingClientRect().height < 40), "scheda semplificata: i segnali sotto il nome stanno in una riga sola (o spariscono se non ci sono)");
+  ok((await page.getByTestId("orari-oggi").count()) === 0, "scheda: senza orari Google niente riga 'Oggi' (mai orari inventati)");
+  await page.getByTestId("scheda-tab-recensioni").click();
+  ok(await box.isVisible() && (await box.textContent()).includes("A confronto"), "confronto: riquadro 'A confronto' visibile in cima alle Recensioni");
   const g = page.getByTestId("confronto-google");
   const gt = (await g.textContent()) ?? "";
   ok(gt.includes("4,5") && gt.includes("812 recensioni") && (await g.getAttribute("href"))?.startsWith("https://www.google.com/maps/search/?api=1&query=Terrazza%20Uno") && await g.getAttribute("target") === "_blank", `confronto: Google ★ 4,5 · 812 recensioni, tocco → Google Maps in nuova scheda (${gt})`);
@@ -1083,7 +1088,7 @@ await shot("15-scheda-b");
   ok((await page.getByTestId("confronto-tripadvisor").count()) === 0 && !/\d/.test((await tl.textContent()) ?? ""), "confronto: senza chiave nessun numero Tripadvisor");
   ok((await page.getByTestId("confronto-link-michelin").count()) === 0 && (await page.getByTestId("confronto-link-thefork").count()) === 0, "confronto: per un bar niente Michelin né TheFork");
   ok((await page.getByTestId("confronto-mapetite").count()) === 0, "confronto: senza voti della community niente riga Mapetite (era un doppione del verdetto)");
-  ok(await page.evaluate(() => { const b = document.querySelector("[data-testid=pannello-panoramica] h3"); const c = document.querySelector("[data-testid=confronto]"); return !b || !c || !!(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING); }), "confronto: viene dopo 'In breve' nella Panoramica");
+  ok(await page.evaluate(() => { const p = document.querySelector("[data-testid=pannello-recensioni]"); const c = document.querySelector("[data-testid=confronto]"); return !!p && !!c && p.contains(c) && [...p.children].indexOf(c.closest("[data-testid=pannello-recensioni] > *")) === 0; }), "confronto: è la prima cosa delle Recensioni");
   ok(await page.evaluate(() => { const r = [...document.querySelectorAll("[data-testid=confronto-cerca] > *")].map((e) => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }); return r.length > 0 && r.every((t) => Math.abs(t - r[0]) < 4); }), "confronto: 'Cercalo su' e le guide in una riga sola");
   await ctx.route("https://www.tripadvisor.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<html><body>Tripadvisor</body></html>" }));
   const [pop] = await Promise.all([ctx.waitForEvent("page", { timeout: 3000 }).catch(() => null), tl.click()]);
@@ -1096,7 +1101,9 @@ await shot("15-scheda-b");
   // Ristorante con voti della community e Tripadvisor con la chiave (risposta del server simulata).
   const REST = [
     mk("R1", "Osteria Bella", 41.888, 12.53, { category: "restaurant", address: "Via del Pigneto 41, 00176 Roma RM, Italy", rating: 4.6, userRatingCount: 1234 }),
-    mk("R2", "Trattoria Senza Voto", 41.889, 12.531, { category: "restaurant", rating: null, userRatingCount: null }),
+    // Chiusa adesso, con orari Google: riapre tra 3 ore, ogni giorno per un'ora (scheda: "Chiuso ora · apre …", Info: "Oggi …").
+    mk("R2", "Trattoria Senza Voto", 41.889, 12.531, { category: "restaurant", rating: null, userRatingCount: null, openNow: false,
+      orari: (() => { const t = new Date(Date.now() + 3 * 3600e3); const m = t.getHours() * 60 + t.getMinutes(); return [0, 1, 2, 3, 4, 5, 6].map((g) => [g * 1440 + m, g * 1440 + Math.min(m + 60, 1439)]); })() }),
   ];
   const comm = { placeId: null, recensioni: [5, 4].map((v, i) => ({ id: `c${i}`, rating: v, comment: null, created_at: "2026-10-10T20:00:00Z", autore: null, amico: false })), mia: { rating: 4, comment: null }, reel: [], reelPronti: false, viewer: true, foto: [], mieFoto: [], fotoPronte: false };
   const taChiesti = [];
@@ -1112,6 +1119,7 @@ await shot("15-scheda-b");
   await (await esempio(page)).click();
   await page.getByText("Osteria Bella").first().click();
   await page.locator("h2", { hasText: "Osteria Bella" }).waitFor({ timeout: 5000 });
+  await page.getByTestId("scheda-tab-recensioni").click();
   await page.getByTestId("confronto-tripadvisor").waitFor({ timeout: 5000 }).catch(() => {});
   const mp = page.getByTestId("confronto-mapetite");
   ok(((await mp.textContent()) ?? "").includes("★ 4,3") && ((await mp.textContent()) ?? "").includes("3 recensioni"), `confronto: voto medio Mapetite con il numero (${await mp.textContent()})`);
@@ -1132,7 +1140,7 @@ await shot("15-scheda-b");
   await page.waitForTimeout(300);
   await shot("15b-confronto-scheda");
   await mp.click();
-  ok(await page.getByTestId("scheda-tab-recensioni").getAttribute("aria-selected") === "true", "confronto: tocco su Mapetite → sezione Recensioni (community)");
+  ok(await page.getByTestId("scheda-tab-recensioni").getAttribute("aria-selected") === "true", "confronto: tocco su Mapetite → resta nelle Recensioni (scende alla community)");
   ok(events.some((e) => e.props?.nome === "confronto_fonte" && e.props?.contesto === "mapetite" && e.props?.stato === "voti"), "confronto: tocco su Mapetite registrato");
   // Locale senza dati Google nella scheda (come i salvati): la riga Google è solo il link.
   await page.getByLabel("Chiudi", { exact: true }).first().click();
@@ -1141,10 +1149,17 @@ await shot("15-scheda-b");
   if (!(await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 1200 }).then(() => true, () => false))) await page.getByText("Trattoria Senza Voto").first().click();
   await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 5000 });
   await page.waitForTimeout(400);
+  await page.getByTestId("scheda-tab-recensioni").click();
   const g2 = ((await page.getByTestId("confronto-google").textContent()) ?? "");
   ok(g2.includes("Apri su Google Maps") && !/\d/.test(g2), `confronto: senza voto Google la riga è solo il link (${g2})`);
   ok((await page.getByTestId("confronto-mapetite").count()) === 0 && await page.getByTestId("confronto-link-tripadvisor").isVisible(), "confronto: senza voti né verdetto niente riga Mapetite; Tripadvisor non abbinato → link di ricerca");
   ok(taChiesti.length >= 2, "confronto: la scheda chiede Tripadvisor al nostro server, mai direttamente al sito");
+  { const r = ((await page.getByTestId("riapre").textContent().catch(() => "")) ?? "");
+    ok(r.startsWith("Chiuso ora") && /apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso ora · apre alle …' su una riga sua (${r})`);
+    ok(!((await page.getByTestId("scheda-fatti").textContent()) ?? "").includes("Chiuso"), "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
+    await page.getByTestId("scheda-tab-info").click();
+    const o = ((await page.getByTestId("orari-oggi").textContent().catch(() => "")) ?? "");
+    ok(/^Oggi (\d{2}:\d{2}–\d{2}:\d{2}|Chiuso)$/.test(o.trim()), `scheda, Info: orari di oggi da Google (${o})`); }
   await page.unroute("**/api/search"); await page.unroute("**/api/places/community**"); await page.unroute("**/api/places/tripadvisor**");
 }
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -3391,6 +3406,9 @@ else {
       ok(or.prossimaApertura(o, giovedi(16, 0)) === "oggi alle 19:00" && or.prossimaApertura(o, giovedi(23, 45)) === "domani alle 12:00" && or.prossimaApertura(o, new Date(2026, 9, 18, 23, 50)) === "martedì alle 12:00", "orari: prossima apertura (oggi, domani, dopo il lunedì di chiusura)");
       ok(or.apertoIl(or.compattaOrari([{ open: { day: 5, hour: 18, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }]), new Date(2026, 9, 17, 1, 0)) === true, "orari: aperto dopo mezzanotte se chiude alle 2");
       ok(or.apertoIl(or.compattaOrari([{ open: { day: 0, hour: 0, minute: 0 } }]), giovedi(4, 0)) === true, "orari: h24 sempre aperto");
+      // Scheda, Info (20/10): "Oggi 12:00–15:00 · 19:00–23:30" come Places.
+      ok(or.orariDelGiorno(o, giovedi(9, 0)) === "12:00–15:00 · 19:00–23:30" && or.orariDelGiorno(o, new Date(2026, 9, 19, 9, 0)) === "Chiuso" && or.orariDelGiorno(null, giovedi(9, 0)) === null && or.orariDelGiorno(or.compattaOrari([{ open: { day: 0, hour: 0, minute: 0 } }]), giovedi(9, 0)) === "Aperto 24 ore", "orari: orari del giorno (fasce, lunedì chiuso, senza orari niente, h24)");
+      ok(or.orariDelGiorno(or.compattaOrari([{ open: { day: 5, hour: 18, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }]), new Date(2026, 9, 16, 9, 0)) === "18:00–02:00", "orari: chi chiude dopo mezzanotte resta nel giorno in cui apre");
     } }
   let as = null;
   try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }

@@ -23,7 +23,7 @@ import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
 import PostoLocale from "@/components/posto-locale";
-import type { Orari } from "@/lib/orari";
+import { orariDelGiorno, prossimaApertura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
@@ -471,6 +471,10 @@ export default function VenueSheet({
     const hasOverview =
       showSynthesisBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
+    // Orari Google della ricerca (i salvati non li hanno): oggi in Info, "apre alle 19:00" se chiuso.
+    const adesso = new Date();
+    const oggi = orariDelGiorno(venue.orari, adesso);
+    const riapre = openNow === false ? prossimaApertura(venue.orari, adesso) : null;
     const tabs = [
       ["panoramica", "Panoramica"],
       ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
@@ -590,7 +594,7 @@ export default function VenueSheet({
                 <span className={i === 0 ? "text-text" : ""}>{f}</span>
               </span>
             ))}
-            {openNow != null && (
+            {openNow != null && !riapre && (
               <span className="inline-flex items-center gap-1.5">
                 {facts.length > 0 && <span aria-hidden>·</span>}
                 <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
@@ -598,15 +602,28 @@ export default function VenueSheet({
               </span>
             )}
           </p>
-          {gem && (
-            <span data-testid="gemma" className="mt-2 inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
-              💎 Poco conosciuto
-            </span>
+          {/* Come Places: chiuso → quando riapre, su una riga sua (orari Google della ricerca). */}
+          {riapre && (
+            <p data-testid="riapre" className="mt-1 flex items-center gap-1.5 text-[14px] font-sans text-text-muted">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-error" />
+              <span className="text-error">Chiuso ora</span>
+              <span aria-hidden>·</span>
+              <span>apre {riapre.replace(/^oggi /, "")}</span>
+            </p>
           )}
-          {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
-          <PostoLocale venueId={venue.id} />
-          {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
-          <BuoniPastoRiga venueId={venue.id} />
+          {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
+              Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
+          <div data-testid="segnali-scheda" className="mt-2 flex flex-wrap items-center gap-1.5 empty:hidden [&>*]:mt-0!">
+            {gem && (
+              <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
+                💎 Poco conosciuto
+              </span>
+            )}
+            {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
+            <PostoLocale venueId={venue.id} />
+            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
+            <BuoniPastoRiga venueId={venue.id} />
+          </div>
         </div>
 
         {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}
@@ -713,13 +730,16 @@ export default function VenueSheet({
               )}
             </div>
           )}
-          {/* Prima cosa dice Mapetite (In breve), poi il confronto con le altre fonti (Semplificare, 18/10). */}
-          {confronto(hasReviewsTab ? () => { setTab("recensioni"); document.getElementById("scheda-tab-recensioni")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined)}
+          {/* Senza la scheda Recensioni il confronto con le altre fonti resta qui, dopo In breve. */}
+          {!hasReviewsTab && confronto()}
         </div>
 
         {/* Recensioni: Google e community Mapetite, mai mescolate. */}
         {hasReviewsTab && (
           <div role="tabpanel" id="scheda-pannello-recensioni" aria-labelledby="scheda-tab-recensioni" hidden={activeTab !== "recensioni"} data-testid="pannello-recensioni">
+            {/* Semplificare (20/10): "A confronto" in cima alle Recensioni, come il riepilogo dei voti di
+                Google Maps; la Panoramica resta verdetto + In breve. La riga Mapetite porta alla community. */}
+            {confronto(communitySlot ? () => document.querySelector("[data-testid=community-scheda]")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined)}
             {hasReviews && (
               <div className="mx-5 mt-4">
                 <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
@@ -766,6 +786,12 @@ export default function VenueSheet({
                   {placeLine}
                 </p>
               )}
+              {oggi && (
+                <p data-testid="orari-oggi" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text">
+                  <Clock size={18} className="shrink-0 text-brand" aria-hidden />
+                  <span><span className="font-display font-semibold">Oggi</span> {oggi}</span>
+                </p>
+              )}
               {userRatingCount != null && rating != null && (
                 <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
                   <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
@@ -783,7 +809,7 @@ export default function VenueSheet({
                 </a>
               )}
               <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-accent">
-                <Clock size={18} className="shrink-0" aria-hidden /> Orari e foto su Google Maps →
+                <ExternalLink size={18} className="shrink-0" aria-hidden /> {oggi ? "Tutti gli orari e le foto su Google Maps →" : "Orari e foto su Google Maps →"}
               </a>
             </div>
           </div>

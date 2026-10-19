@@ -15,7 +15,7 @@ export default function BuoniPastoRiga({ venueId }: { venueId: string }) {
   const f = fraseBuoni(c);
   if (!f) return null;
   return (
-    <p data-testid="buoni-pasto" className="mt-2 inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-xs font-display font-semibold text-brand">
+    <p data-testid="buoni-pasto" className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-xs font-display font-semibold text-brand">
       🎫 {f.testo}
     </p>
   );

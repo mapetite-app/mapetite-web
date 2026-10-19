@@ -28,8 +28,10 @@ export default function PostoLocale({ venueId, soloPosto = false }: { venueId: s
   return (
     <p data-testid="posto-locale" className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-display font-semibold">
       {!soloPosto && (
-        <span className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-brand">
-          <BadgeCheck size={13} aria-hidden /> Verificato
+        // Con "c'è posto" accanto basta la spunta (Semplificare, 20/10): una pillola in meno sotto il nome.
+        <span className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-brand" title="Verificato dal titolare">
+          <BadgeCheck size={13} aria-hidden />
+          {posto ? <span className="sr-only">Verificato</span> : "Verificato"}
         </span>
       )}
       {posto && (
