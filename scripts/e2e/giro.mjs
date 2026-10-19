@@ -1076,7 +1076,7 @@ await shot("15-scheda-b");
   const box = page.getByTestId("confronto");
   // Semplificare (20/10): il confronto sta in cima alle Recensioni, non più nella Panoramica.
   ok((await page.getByTestId("pannello-panoramica").getByTestId("confronto").count()) === 0, "scheda semplificata: 'A confronto' non è più nella Panoramica");
-  ok(await page.getByTestId("segnali-scheda").evaluate((el) => getComputedStyle(el).display === "none" || el.getBoundingClientRect().height < 40), "scheda semplificata: i segnali sotto il nome stanno in una riga sola (o spariscono se non ci sono)");
+  ok(await page.getByTestId("segnali-scheda").evaluate((el) => getComputedStyle(el).display === "none"), "scheda semplificata: senza segnali il blocco sotto il nome sparisce (nessuno spazio vuoto)");
   ok((await page.getByTestId("orari-oggi").count()) === 0, "scheda: senza orari Google niente riga 'Oggi' (mai orari inventati)");
   await page.getByTestId("scheda-tab-recensioni").click();
   ok(await box.isVisible() && (await box.textContent()).includes("A confronto"), "confronto: riquadro 'A confronto' visibile in cima alle Recensioni");
@@ -1109,6 +1109,9 @@ await shot("15-scheda-b");
   const taChiesti = [];
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: REST, sintesi_pendente: null } }));
   await page.route("**/api/places/community**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? comm : { ...comm, recensioni: [], mia: null } }));
+  // Osteria Bella è verificata, con "c'è posto" e buoni pasto confermati da 3 persone.
+  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : { verificato: false, giorni: [], at: null } }));
+  await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
     if (u.searchParams.get("nome") !== "Osteria Bella") return r.fulfill({ json: { stato: "nessuno" } });
@@ -1119,6 +1122,14 @@ await shot("15-scheda-b");
   await (await esempio(page)).click();
   await page.getByText("Osteria Bella").first().click();
   await page.locator("h2", { hasText: "Osteria Bella" }).waitFor({ timeout: 5000 });
+  { await page.getByTestId("buoni-pasto").waitFor({ timeout: 5000 }).catch(() => {});
+    await page.getByTestId("posto-stasera").waitFor({ timeout: 5000 }).catch(() => {});
+    const v = page.locator("h2", { hasText: "Osteria Bella" }).getByTestId("verificato-scheda");
+    ok(await v.isVisible() && (await v.getAttribute("aria-label")) === "Verificato dal titolare", "scheda: locale verificato → spunta accanto al nome (non più una pillola in più)");
+    ok((await page.getByTestId("segnali-scheda").getByText("Verificato", { exact: true }).count()) === 0, "scheda: nessuna pillola 'Verificato' sotto il nome");
+    const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
+    ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
+    await shot("15c-scheda-segnali"); }
   await page.getByTestId("scheda-tab-recensioni").click();
   await page.getByTestId("confronto-tripadvisor").waitFor({ timeout: 5000 }).catch(() => {});
   const mp = page.getByTestId("confronto-mapetite");
@@ -1161,6 +1172,7 @@ await shot("15-scheda-b");
     const o = ((await page.getByTestId("orari-oggi").textContent().catch(() => "")) ?? "");
     ok(/^Oggi (\d{2}:\d{2}–\d{2}:\d{2}|Chiuso)$/.test(o.trim()), `scheda, Info: orari di oggi da Google (${o})`); }
   await page.unroute("**/api/search"); await page.unroute("**/api/places/community**"); await page.unroute("**/api/places/tripadvisor**");
+  await page.unroute("**/api/ristoratore/serate**"); await page.unroute("**/rest/v1/rpc/buoni_pasto_conteggio**");
 }
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
@@ -1619,7 +1631,7 @@ else {
   await p.getByLabel("Cerca tra i salvati").fill("");
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
-  ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · lo dicono 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
+  ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   // Diario (4.4): dopo "Ci sono stato" si apre il foglio "Com'è andata?", saltabile
   await p.getByTestId("diario-foglio").waitFor({ timeout: 5000 }).catch(() => {});
@@ -3409,6 +3421,10 @@ else {
       // Scheda, Info (20/10): "Oggi 12:00–15:00 · 19:00–23:30" come Places.
       ok(or.orariDelGiorno(o, giovedi(9, 0)) === "12:00–15:00 · 19:00–23:30" && or.orariDelGiorno(o, new Date(2026, 9, 19, 9, 0)) === "Chiuso" && or.orariDelGiorno(null, giovedi(9, 0)) === null && or.orariDelGiorno(or.compattaOrari([{ open: { day: 0, hour: 0, minute: 0 } }]), giovedi(9, 0)) === "Aperto 24 ore", "orari: orari del giorno (fasce, lunedì chiuso, senza orari niente, h24)");
       ok(or.orariDelGiorno(or.compattaOrari([{ open: { day: 5, hour: 18, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }]), new Date(2026, 9, 16, 9, 0)) === "18:00–02:00", "orari: chi chiude dopo mezzanotte resta nel giorno in cui apre");
+      { const notte = or.compattaOrari([{ open: { day: 6, hour: 22, minute: 0 }, close: { day: 0, hour: 4, minute: 0 } }]);
+        const dom1 = new Date(2026, 9, 18, 1, 0); // domenica all'1: la serata di sabato è ancora in corso
+        ok(or.orariDelGiorno(notte, dom1) === "22:00–04:00" && or.apertoIl(notte, dom1) === true && or.prossimaChiusura(notte, dom1) === "alle 04:00", "orari: all'1 di notte il bar aperto 22–4 mostra la serata in corso (non 'Oggi Chiuso') e 'chiude alle 04:00'"); }
+      ok(or.prossimaChiusura(o, giovedi(20, 0)) === "alle 23:30" && or.prossimaChiusura(o, giovedi(16, 0)) === null && or.prossimaChiusura(null, giovedi(20, 0)) === null, "orari: prossima chiusura solo se è aperto adesso");
     } }
   let as = null;
   try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }

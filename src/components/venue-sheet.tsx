@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -22,8 +22,8 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
-import PostoLocale from "@/components/posto-locale";
-import { orariDelGiorno, prossimaApertura, type Orari } from "@/lib/orari";
+import { PostoPillola, useInfoLocale } from "@/components/posto-locale";
+import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
@@ -242,6 +242,8 @@ export default function VenueSheet({
   };
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
   const variant = useVariant("scheda");
+  // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
+  const infoLocale = useInfoLocale(venue.id);
   const emoji = getCategoryEmoji(category, name);
   // Riga di contesto della variante B (sezione Info): "Roma · 600 m".
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
@@ -474,7 +476,11 @@ export default function VenueSheet({
     // Orari Google della ricerca (i salvati non li hanno): oggi in Info, "apre alle 19:00" se chiuso.
     const adesso = new Date();
     const oggi = orariDelGiorno(venue.orari, adesso);
-    const riapre = openNow === false ? prossimaApertura(venue.orari, adesso) : null;
+    // Con gli orari, aperto/chiuso si calcola adesso (la scheda può restare aperta a lungo);
+    // senza, vale quello che Google ha detto alla ricerca.
+    const aperto = apertoIl(venue.orari, adesso) ?? openNow;
+    const riapre = aperto === false ? prossimaApertura(venue.orari, adesso) : null;
+    const chiude = aperto === true ? prossimaChiusura(venue.orari, adesso) : null;
     const tabs = [
       ["panoramica", "Panoramica"],
       ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
@@ -565,6 +571,11 @@ export default function VenueSheet({
             {/* Nomi lunghi ("La Tavernetta 29 da Tony e Andrea") su 2 righe, non 3: il verdetto resta in vista. */}
             <h2 className={`min-w-0 flex-1 font-title font-semibold leading-tight text-text ${name.length > 24 ? "text-[1.4rem] in-data-[titoli=serif]:text-[1.8rem]" : "text-[1.75rem] in-data-[titoli=serif]:text-[2.2rem]"}`}>
               {name}
+              {infoLocale && (
+                <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-0.5 align-middle text-brand">
+                  <title>Verificato dal titolare</title>
+                </BadgeCheck>
+              )}
             </h2>
             <div className="relative flex shrink-0 gap-2 pt-0.5" data-testid="azioni-scheda">
               {shareOn && (
@@ -594,35 +605,37 @@ export default function VenueSheet({
                 <span className={i === 0 ? "text-text" : ""}>{f}</span>
               </span>
             ))}
-            {openNow != null && !riapre && (
+            {aperto != null && !riapre && !chiude && (
               <span className="inline-flex items-center gap-1.5">
                 {facts.length > 0 && <span aria-hidden>·</span>}
-                <span aria-hidden className={`h-2 w-2 rounded-full ${openNow ? "bg-success" : "bg-error"}`} />
-                <span className={openNow ? "text-success" : "text-error"}>{openNow ? "Aperto ora" : "Chiuso ora"}</span>
+                <span aria-hidden className={`h-2 w-2 rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                <span className={aperto ? "text-success" : "text-error"}>{aperto ? "Aperto ora" : "Chiuso ora"}</span>
               </span>
             )}
           </p>
-          {/* Come Places: chiuso → quando riapre, su una riga sua (orari Google della ricerca). */}
-          {riapre && (
-            <p data-testid="riapre" className="mt-1 flex items-center gap-1.5 text-[14px] font-sans text-text-muted">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-error" />
-              <span className="text-error">Chiuso ora</span>
+          {/* Come Places: con gli orari Google, "Chiuso ora · apre alle 19:00" o "Aperto ora · chiude alle 23:00",
+              su una riga sua. */}
+          {(riapre || chiude) && (
+            <p data-testid={riapre ? "riapre" : "chiude"} className="mt-1 flex items-center gap-1.5 text-[14px] font-sans text-text-muted">
+              <span aria-hidden className={`h-2 w-2 rounded-full ${riapre ? "bg-error" : "bg-success"}`} />
+              <span className={riapre ? "text-error" : "text-success"}>{riapre ? "Chiuso ora" : "Aperto ora"}</span>
               <span aria-hidden>·</span>
-              <span>apre {riapre.replace(/^oggi /, "")}</span>
+              <span>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `chiude ${chiude}`}</span>
             </p>
           )}
           {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
               Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
-          <div data-testid="segnali-scheda" className="mt-2 flex flex-wrap items-center gap-1.5 empty:hidden [&>*]:mt-0!">
+          <div data-testid="segnali-scheda" className="mt-2 flex flex-wrap items-center gap-1.5 empty:hidden">
             {gem && (
               <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
                 💎 Poco conosciuto
               </span>
             )}
-            {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
-            <PostoLocale venueId={venue.id} />
-            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
+            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10).
+                Prima di "c'è posto": è corta e sta accanto a 💎, così i segnali restano su 2 righe. */}
             <BuoniPastoRiga venueId={venue.id} />
+            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
+            <PostoPillola info={infoLocale} />
           </div>
         </div>
 
