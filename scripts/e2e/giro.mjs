@@ -1596,6 +1596,7 @@ else {
   // Buoni pasto (PROPOSTE.md 19/10): la riga in scheda solo con almeno 2 risposte concordi; risposta nel diario.
   let buoniScritti = [];
   await p.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: [{ si: 3, no: 1 }] }));
+  await p.route("**/api/places/visite**", (r) => r.fulfill({ json: { persone: 5, piaciuto: 4 } }));
   await p.route("**/rest/v1/buoni_pasto**", (r) => {
     if (r.request().method() === "POST") { buoniScritti.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
     if (r.request().method() === "DELETE") { buoniScritti.push("tolta"); return r.fulfill({ status: 204, body: "" }); }
@@ -1605,6 +1606,7 @@ else {
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · lo dicono 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
+  ok(await p.getByTestId("visite-mapetite").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("visite-mapetite").textContent())?.includes("👍 4 su 5 che ci sono stati, su Mapetite"), () => false), "scheda: chi ci è stato su Mapetite e com'era (👍 4 su 5)");
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   // Diario (4.4): dopo "Ci sono stato" si apre il foglio "Com'è andata?", saltabile
   await p.getByTestId("diario-foglio").waitFor({ timeout: 5000 }).catch(() => {});
@@ -3391,6 +3393,8 @@ else {
       ok(or.prossimaApertura(o, giovedi(16, 0)) === "oggi alle 19:00" && or.prossimaApertura(o, giovedi(23, 45)) === "domani alle 12:00" && or.prossimaApertura(o, new Date(2026, 9, 18, 23, 50)) === "martedì alle 12:00", "orari: prossima apertura (oggi, domani, dopo il lunedì di chiusura)");
       ok(or.apertoIl(or.compattaOrari([{ open: { day: 5, hour: 18, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }]), new Date(2026, 9, 17, 1, 0)) === true, "orari: aperto dopo mezzanotte se chiude alle 2");
       ok(or.apertoIl(or.compattaOrari([{ open: { day: 0, hour: 0, minute: 0 } }]), giovedi(4, 0)) === true, "orari: h24 sempre aperto");
+      { const d = or.prossimaAperturaData(o, giovedi(23, 45));
+        ok(d && d.getDate() === 16 && d.getHours() === 12 && d.getMinutes() === 0, `orari: data della prossima apertura per il promemoria (${d?.toString().slice(0, 21)})`); }
     } }
   let as = null;
   try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }
@@ -3432,6 +3436,13 @@ else {
       { id: "s9", placeId: "G", date: "2026-10-14", time: "20:30", placeName: "Passata 2", via: "whatsapp" },
     ];
     const gr = bk.doubleBookings(dop, now).map((g) => g.map((x) => x.id).join("+"));
+    { const rr = bk.bookingReminders([
+        { id: "r1", date: "2026-10-16", time: "21:00", placeName: "Riaperto", via: "whatsapp", riapre: now.getTime() - 60_000 },
+        { id: "r2", date: "2026-10-16", time: "21:00", placeName: "Non ancora riaperto", via: "whatsapp", riapre: now.getTime() + 3_600_000 },
+        { id: "r3", date: "2026-10-16", time: "21:00", placeName: "Confermato", via: "whatsapp", riapre: now.getTime() - 60_000, confirmed: true },
+        { id: "r4", date: "2026-10-14", time: "21:00", placeName: "Passato", via: "whatsapp", riapre: now.getTime() - 60_000 },
+      ], now);
+      ok(rr.risposta.map((x) => x.id).join() === "r1", `prenota: 'ti hanno risposto?' solo dopo la riapertura, se non confermata e ancora da fare (${rr.risposta.map((x) => x.id).join()})`); }
     ok(gr.join() === "s1+s2", `prenota: due tavoli la stessa sera trovati; pranzo, stesso locale, disdette e passate esclusi (${gr.join(" | ")})`);
     ok(bk.doubleBookings([{ id: "x1", placeId: "A", date: "2026-10-17", time: null, placeName: "X", via: "sito" }, { id: "x2", placeId: "B", date: "2026-10-17", time: "13:00", placeName: "Y", via: "sito" }], now).length === 1, "prenota: senza ora la prenotazione vale per pranzo e sera");
   }
@@ -3710,6 +3721,20 @@ else {
     await ap.waitForTimeout(300);
     ok((await ap.getByTestId("promemoria-doppio").count()) === 0 && ((await ap.getByTestId("promemoria-domani").textContent()) ?? "").includes("Terrazza Uno") && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "doppia_prenotazione"), "doppia prenotazione: avvisato l'altro locale resta il promemoria del tavolo tenuto"); }
 
+  // Richiesta mandata a locale chiuso: alla riapertura "ti hanno risposto?" (Sì, confermato / Non ancora).
+  await ap.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "r1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() - 3_600_000, riapre: Date.now() - 60_000, dismissedEve: true }]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  { const rsp = ap.getByTestId("promemoria-risposta");
+    const vis = await rsp.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    ok(vis && ((await rsp.textContent()) ?? "").includes("Terrazza Uno: ti hanno risposto?"), "prenota a locale chiuso: alla riapertura 'Terrazza Uno: ti hanno risposto?'");
+    await ashot("56e-ti-hanno-risposto");
+    if (vis) await rsp.getByTestId("risposta-confermata").click();
+    await ap.waitForTimeout(300);
+    const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+    ok((await ap.getByTestId("promemoria-risposta").count()) === 0 && saved[0]?.confirmed === true, "prenota a locale chiuso: 'Sì, confermato' segna la prenotazione confermata e il promemoria sparisce"); }
   // Scheda della mappa: stesso pulsante Prenota. Terrazza Uno con orari Google: solo 12–15 tutti i giorni.
   const soloPranzo = Array.from({ length: 7 }, (_, d) => [d * 1440 + 720, d * 1440 + 900]);
   const soloSera = Array.from({ length: 7 }, (_, d) => [d * 1440 + 1140, d * 1440 + 1410]);

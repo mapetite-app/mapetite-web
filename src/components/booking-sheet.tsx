@@ -16,7 +16,7 @@ import {
   type BookingRequest,
 } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
-import { apertoIl, dataOra, prossimaApertura, type Orari } from "@/lib/orari";
+import { apertoIl, dataOra, prossimaApertura, prossimaAperturaData, type Orari } from "@/lib/orari";
 import UtileFeedback from "@/components/utile-feedback";
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
@@ -109,6 +109,8 @@ export default function BookingSheet({
       lng: place.lng,
       via,
       phone: place.phone ?? null,
+      // Locale chiuso adesso (dati Google): alla riapertura il promemoria chiede se hanno risposto.
+      riapre: place.openNow === false && (via === "whatsapp" || via === "copiato") ? prossimaAperturaData(place.orari, new Date())?.getTime() ?? null : null,
     });
     // Segnali esistenti (src/lib/track.ts): sito e chiama, con "da: prenota" per distinguerli.
     const where = place.lat != null && place.lng != null ? { id: place.id, lat: place.lat, lng: place.lng } : { id: place.id };

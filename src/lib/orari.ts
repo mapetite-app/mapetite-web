@@ -36,8 +36,8 @@ export function apertoIl(orari: Orari | null | undefined, quando: Date): boolean
 
 const hhmm = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
-// "oggi alle 19:00", "domani alle 12:30", "lunedì alle 12:00": la prossima apertura dopo `da`.
-export function prossimaApertura(orari: Orari | null | undefined, da: Date): string | null {
+// Minuti da `da` alla prossima apertura (null = orari mancanti).
+function minutiAllApertura(orari: Orari | null | undefined, da: Date): number | null {
   if (!orari || orari.length === 0) return null;
   const t = minutoSettimana(da);
   let best: number | null = null;
@@ -45,7 +45,23 @@ export function prossimaApertura(orari: Orari | null | undefined, da: Date): str
     const diff = (o - t + WEEK) % WEEK;
     if (diff > 0 && (best == null || diff < best)) best = diff;
   }
+  return best;
+}
+
+// Il momento della prossima apertura (per il promemoria "ti hanno risposto?").
+export function prossimaAperturaData(orari: Orari | null | undefined, da: Date): Date | null {
+  const m = minutiAllApertura(orari, da);
+  if (m == null) return null;
+  const d = new Date(da.getTime() + m * 60_000);
+  d.setSeconds(0, 0);
+  return d;
+}
+
+// "oggi alle 19:00", "domani alle 12:30", "lunedì alle 12:00": la prossima apertura dopo `da`.
+export function prossimaApertura(orari: Orari | null | undefined, da: Date): string | null {
+  const best = minutiAllApertura(orari, da);
   if (best == null) return null;
+  const t = minutoSettimana(da);
   const at = t + best;
   const giorni = Math.floor(at / 1440) - Math.floor(t / 1440);
   const giorno = giorni === 0 ? "oggi" : giorni === 1 ? "domani" : DAYS[Math.floor(at / 1440) % 7];
