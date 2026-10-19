@@ -179,6 +179,7 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
           mode="modifica"
           onSave={(v) => save(editing, v)}
           onClose={() => setEditing(null)}
+          buoni={{ userId, placeId: editing.id }}
           foto={fotoPronte ? { userId, placeId: editing.id, initial: editing.foto, onChange: (f) => setFoto(editing.id, f), contesto: "diario" } : undefined}
         />
       )}

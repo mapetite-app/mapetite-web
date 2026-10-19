@@ -89,6 +89,7 @@ type VenueSheetProps = {
   bookingAlternatives?: BookingAlternative[];
   onBookAlternative?: (id: string, details: BookingDetails) => void;
   autoBook?: boolean;
+  onBookingClosed?: () => void;
 };
 
 export default function VenueSheet({
@@ -111,6 +112,7 @@ export default function VenueSheet({
   bookingAlternatives,
   onBookAlternative,
   autoBook = false,
+  onBookingClosed,
 }: VenueSheetProps) {
   const {
     name,
@@ -407,7 +409,7 @@ export default function VenueSheet({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => trackFeature("recensione_google", userRatingCount != null ? { risultati: userRatingCount } : undefined)}
-                className="mt-2 flex min-h-10 items-center gap-1.5 text-xs font-sans text-text-muted underline-offset-2 hover:underline"
+                className="mt-2 flex min-h-11 items-center gap-1.5 text-xs font-sans text-text-muted underline-offset-2 hover:underline"
               >
                 ✍️ Ti è piaciuto? Aiuta il locale: lascia due righe su Google
               </a>
@@ -793,7 +795,7 @@ export default function VenueSheet({
           <BookingSheet
             place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng, orari: venue.orari ?? null }}
             initial={booking}
-            onClose={() => setBookingOpen(false)}
+            onClose={() => { setBookingOpen(false); onBookingClosed?.(); }}
             alternative={bookingAlternatives}
             onAlternative={onBookAlternative}
           />
@@ -1027,7 +1029,7 @@ export default function VenueSheet({
         <BookingSheet
           place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng, orari: venue.orari ?? null }}
           initial={booking}
-          onClose={() => setBookingOpen(false)}
+          onClose={() => { setBookingOpen(false); onBookingClosed?.(); }}
           alternative={bookingAlternatives}
           onAlternative={onBookAlternative}
         />

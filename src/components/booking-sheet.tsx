@@ -219,7 +219,7 @@ export default function BookingSheet({
                   type="button"
                   aria-pressed={details.time === t}
                   onClick={() => setDetails((b) => ({ ...b, time: t }))}
-                  className={`min-h-10 shrink-0 rounded-pill border px-3 text-sm font-sans font-semibold ${details.time === t ? "border-brand bg-brand text-white" : chiusoAlle(t) ? "border-border bg-white text-text-muted line-through decoration-1" : "border-border bg-white text-text"}`}
+                  className={`min-h-11 shrink-0 rounded-pill border px-3 text-sm font-sans font-semibold ${details.time === t ? "border-brand bg-brand text-white" : chiusoAlle(t) ? "border-border bg-white text-text-muted line-through decoration-1" : "border-border bg-white text-text"}`}
                 >
                   {t}
                 </button>

@@ -37,6 +37,7 @@ export default function DiarioFoglio({
   onSave,
   onClose,
   foto,
+  buoni: buoniProp,
 }: {
   place: { name: string; category: string | null };
   initial: { date: string | null; voto: Voto | null; note: string | null };
@@ -47,6 +48,8 @@ export default function DiarioFoglio({
   onSave: (v: DiarioValori) => Promise<boolean>;
   onClose: () => void;
   foto?: DiarioFoto;
+  // Buoni pasto (PROPOSTE.md 19/10): chi risponde e su quale locale (UUID), anche senza le foto.
+  buoni?: { userId: string; placeId: string };
 }) {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const today = dayKey(new Date());
@@ -67,8 +70,8 @@ export default function DiarioFoglio({
   // Buoni pasto (PROPOSTE.md 19/10): facoltativo, si salva subito (come le foto). null = non detto.
   const [buoni, setBuoni] = useState<boolean | null>(null);
   const [buoniErr, setBuoniErr] = useState(false);
-  const buoniUser = foto?.userId ?? null;
-  const buoniPlace = foto?.placeId ?? null;
+  const buoniUser = buoniProp?.userId ?? foto?.userId ?? null;
+  const buoniPlace = buoniProp?.placeId ?? foto?.placeId ?? null;
   useEffect(() => {
     if (!buoniUser || !buoniPlace) return;
     let vivo = true;
@@ -213,7 +216,7 @@ export default function DiarioFoglio({
               🎫 Buoni pasto? <span className="font-sans font-normal text-text-muted">· se li hai visti</span>
             </p>
             {([[true, "Sì"], [false, "No"]] as const).map(([v, label]) => (
-              <button key={label} type="button" aria-pressed={buoni === v} aria-label={`Buoni pasto: ${label}`} onClick={() => void scegliBuoni(v)} className={chip(buoni === v)}>
+              <button key={label} type="button" aria-pressed={buoni === v} aria-label={`Buoni pasto: ${label}`} onClick={() => void scegliBuoni(v)} className={`${chip(buoni === v)} min-h-11`}>
                 {label}
               </button>
             ))}

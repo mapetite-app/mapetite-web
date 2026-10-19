@@ -3173,6 +3173,8 @@ export default function MapView({
                 .filter((p): p is Place => p != null)
                 .map((p) => ({ id: p.id, name: p.name, verdict: venueDetails[p.id]?.verdict ?? null, orari: venueDetails[p.id]?.orari ?? null })) : undefined}
               onBookAlternative={(id, details) => { setPendingBooking({ placeId: id, details }); dispatch({ type: "OPEN_VENUE", placeId: id }); }}
+              // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
+              onBookingClosed={() => setPendingBooking(null)}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
               ) : null}

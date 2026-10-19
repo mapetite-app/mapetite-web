@@ -573,11 +573,11 @@ ESEMPI (input → output atteso):
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { reviewTexts, reviewItems, attributes, openingPeriods, ...rest } = p;
+    const { reviewTexts, reviewItems, attributes, openingPeriods, regularPeriods, ...rest } = p;
     return {
       ...rest,
       // Orari compatti per il foglio Prenota ("a quell'ora risulta chiuso"): dati Google solo da mostrare.
-      orari: compattaOrari(openingPeriods),
+      orari: compattaOrari(regularPeriods),
       selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
       synthesis: s?.synthesis || null,
       tags: s?.tags?.length ? s.tags : rest.tags ?? null,
