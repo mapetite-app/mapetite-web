@@ -608,7 +608,7 @@ export default function VenueSheet({
           {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
           <PostoLocale venueId={venue.id} />
           {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
-          <BuoniPastoRiga venueId={venue.id} />
+          <BuoniPastoRiga venueId={venue.id} category={category} />
         </div>
 
         {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}

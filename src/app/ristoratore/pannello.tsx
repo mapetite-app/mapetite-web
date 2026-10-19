@@ -407,7 +407,7 @@ export default function Pannello({
             <p data-testid="pannello-disdette" className={`flex items-baseline gap-2 ${attesa.persone > 0 || risposte >= SOGLIA ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
               <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔁 {p.disdette.n.toLocaleString("it-IT")}</span>
               <span className="text-sm font-sans leading-snug text-white/90">
-                {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: chi aveva prenotato da Mapetite ti ha avvisato invece di non presentarsi{p.disdette.orePrimaMedia != null ? `, in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""} ({p.giorni} giorni)
+                {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: disdetti su Mapetite{p.disdette.orePrimaMedia != null ? ` in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""}, invece di un tavolo vuoto ({p.giorni} giorni)
               </span>
             </p>
           )}
