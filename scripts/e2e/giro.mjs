@@ -3357,6 +3357,21 @@ else {
     const rem = bk.bookingReminders(list, now);
     ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso)");
     ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
+    // Due tavoli per lo stesso pasto (proposta CEO 19/10).
+    const dop = [
+      { id: "s1", placeId: "A", date: "2026-10-17", time: "20:30", placeName: "Uno", via: "whatsapp" },
+      { id: "s2", placeId: "B", date: "2026-10-17", time: "21:30", placeName: "Due", via: "telefono" },
+      { id: "s3", placeId: "C", date: "2026-10-17", time: "13:00", placeName: "Pranzo", via: "telefono" },
+      { id: "s4", placeId: "A", date: "2026-10-18", time: "20:00", placeName: "Uno ripetuta", via: "whatsapp" },
+      { id: "s5", placeId: "A", date: "2026-10-18", time: "20:30", placeName: "Uno di nuovo", via: "whatsapp" },
+      { id: "s6", placeId: "D", date: "2026-10-19", time: "20:00", placeName: "Disdetta", via: "whatsapp", outcome: "non-andato", dismissed: true },
+      { id: "s7", placeId: "E", date: "2026-10-19", time: "21:00", placeName: "Sola", via: "whatsapp" },
+      { id: "s8", placeId: "F", date: "2026-10-14", time: "20:00", placeName: "Passata", via: "whatsapp" },
+      { id: "s9", placeId: "G", date: "2026-10-14", time: "20:30", placeName: "Passata 2", via: "whatsapp" },
+    ];
+    const gr = bk.doubleBookings(dop, now).map((g) => g.map((x) => x.id).join("+"));
+    ok(gr.join() === "s1+s2", `prenota: due tavoli la stessa sera trovati; pranzo, stesso locale, disdette e passate esclusi (${gr.join(" | ")})`);
+    ok(bk.doubleBookings([{ id: "x1", placeId: "A", date: "2026-10-17", time: null, placeName: "X", via: "sito" }, { id: "x2", placeId: "B", date: "2026-10-17", time: "13:00", placeName: "Y", via: "sito" }], now).length === 1, "prenota: senza ora la prenotazione vale per pranzo e sera");
   }
   if (as) {
     ok(as.localRefineOf("più economici") === "economici" && as.localRefineOf("aperti ora") === "aperti" && as.localRefineOf("più vicini") === "vicini" && as.localRefineOf("meno conosciuti") === "meno-noti", "assistente: seguiti riconosciuti");
@@ -3609,6 +3624,27 @@ else {
     ok(ok1 && ((await dom.textContent()) ?? "").includes("Domani alle 21:00") && (await dom.getByText("Percorso").count()) === 0, "promemoria: il giorno prima 'Domani alle 21:00', senza Percorso");
     await dom.getByTestId("promemoria-non-vado").click();
     ok(((await dom.getByTestId("disdetta-chiama").getAttribute("href")) ?? "") === "tel:0612345678" && ((await dom.getByTestId("promemoria-disdetta-testo").textContent()) ?? "").includes("di domani"), "promemoria: con un fisso la disdetta si fa chiamando, messaggio 'di domani'"); }
+  // Due tavoli domani sera (proposta CEO 19/10): un solo promemoria "quale tieni?", poi la disdetta dell'altro.
+  await ap.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+      { id: "d1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", phone: "06 1234 5678", createdAt: Date.now() },
+      { id: "d2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d, time: "20:30", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() },
+    ]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  { const dop = ap.getByTestId("promemoria-doppio");
+    const vis = await dop.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    ok(vis && ((await dop.textContent()) ?? "").includes("Hai 2 tavoli domani sera: quale tieni?") && (await ap.getByTestId("promemoria-domani").count()) === 0 && (await dop.getByTestId("tengo-questo").count()) === 2, "doppia prenotazione: un solo promemoria 'Hai 2 tavoli domani sera: quale tieni?' al posto di due");
+    await ashot("56c-due-tavoli");
+    await dop.getByTestId("tengo-questo").filter({ hasText: "Terrazza Uno" }).click();
+    const testo = (await dop.getByTestId("promemoria-disdetta-testo").textContent()) ?? "";
+    const href = (await dop.getByTestId("disdetta-whatsapp").getAttribute("href")) ?? "";
+    ok(((await dop.textContent()) ?? "").includes("Tieni Terrazza Uno") && (await dop.getByTestId("promemoria-disdetta").count()) === 1 && testo.includes("alle 20:30") && href.startsWith("https://wa.me/393331234567"), "doppia prenotazione: scelto quello da tenere, la disdetta dell'altro (Rooftop Tre, 20:30) è già scritta");
+    await ashot("56d-due-tavoli-scelto");
+    await dop.getByTestId("disdetta-whatsapp").evaluate((a) => { a.removeAttribute("target"); a.setAttribute("href", "#"); a.click(); });
+    await ap.waitForTimeout(300);
+    ok((await ap.getByTestId("promemoria-doppio").count()) === 0 && ((await ap.getByTestId("promemoria-domani").textContent()) ?? "").includes("Terrazza Uno") && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "doppia_prenotazione"), "doppia prenotazione: avvisato l'altro locale resta il promemoria del tavolo tenuto"); }
 
   // Scheda della mappa: stesso pulsante Prenota
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });

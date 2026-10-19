@@ -292,6 +292,35 @@ export function bookingReminders(list: BookingRequest[], now: Date = new Date())
   };
 }
 
+// Due tavoli per lo stesso pasto (proposta CEO 19/10, docs/autonomia/PROPOSTE.md): chi prenota in due posti
+// per la stessa sera spesso non avvisa quello che scarta. Stesso giorno e stessa fascia (pranzo prima
+// delle 16, sera dopo); senza ora vale per entrambe. Solo prenotazioni ancora aperte.
+function mealSlot(time: string | null): "pranzo" | "sera" | null {
+  if (!time) return null;
+  return Number(time.slice(0, 2)) < 16 ? "pranzo" : "sera";
+}
+export function doubleBookings(list: BookingRequest[], now: Date = new Date()): BookingRequest[][] {
+  const todayKey = dateKey(now);
+  const open = list
+    .filter((b) => b.date && b.date >= todayKey && !b.dismissed && !b.outcome)
+    .sort((a, b) => `${a.date} ${a.time ?? ""}`.localeCompare(`${b.date} ${b.time ?? ""}`));
+  const groups: BookingRequest[][] = [];
+  const used = new Set<string>();
+  for (const b of open) {
+    if (used.has(b.id)) continue;
+    const slot = mealSlot(b.time);
+    // Stesso locale due volte = la stessa richiesta ripetuta, non due tavoli.
+    const others = open.filter((o) => o.id !== b.id && !used.has(o.id) && o.date === b.date && o.placeId !== b.placeId
+      && (slot === null || mealSlot(o.time) === null || mealSlot(o.time) === slot));
+    const same = [b, ...others];
+    if (same.length >= 2) {
+      same.forEach((o) => used.add(o.id));
+      groups.push(same);
+    }
+  }
+  return groups;
+}
+
 // ── Pagina "Le mie prenotazioni" ──
 // In arrivo: da oggi in poi (oggi compreso), dalla più vicina. Passate: dalla più recente.
 // Senza giorno (non dovrebbe succedere: il foglio lo chiede) restano in arrivo, in fondo.

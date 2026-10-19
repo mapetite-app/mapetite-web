@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { bookingReminders, cancelMessage, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
@@ -18,7 +18,7 @@ const VIA: Record<BookingRequest["via"], string> = {
 
 // "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
 // è già scritto; un tocco per mandarlo da dove era partita la richiesta. Senza numero si copia.
-function Disdetta({ b }: { b: BookingRequest }) {
+function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
   const [copied, setCopied] = useState(false);
   let name = "";
   try { name = window.localStorage.getItem("mapetite.nome") ?? ""; } catch { /* storage non disponibile */ }
@@ -31,7 +31,7 @@ function Disdetta({ b }: { b: BookingRequest }) {
   const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
   return (
     <div data-testid="promemoria-disdetta" className="mt-3 rounded-btn bg-white/10 p-3">
-      <p className="text-xs font-sans text-white/80">Avvisa il locale: così dà il tavolo a qualcun altro.</p>
+      <p className="text-xs font-sans text-white/80">{titolo ?? "Avvisa il locale: così dà il tavolo a qualcun altro."}</p>
       <p data-testid="promemoria-disdetta-testo" className="mt-1.5 text-sm font-sans italic text-white">“{text}”</p>
       <div className="mt-2.5 flex gap-2">
         {wa ? (
@@ -60,14 +60,81 @@ function Disdetta({ b }: { b: BookingRequest }) {
   );
 }
 
+// "Hai 2 tavoli sabato: quale tieni?" (proposta CEO 19/10): un solo promemoria per i tavoli dello stesso
+// pasto; scelto quello da tenere, la disdetta degli altri è già scritta. Il giorno stesso e il giorno prima.
+function Doppio({ group, domani }: { group: BookingRequest[]; domani: boolean }) {
+  const [kept, setKept] = useState<string | null>(null);
+  const evening = group.some((b) => b.time && Number(b.time.slice(0, 2)) >= 16);
+  const lunch = group.every((b) => b.time && Number(b.time.slice(0, 2)) < 16);
+  const when = domani ? (lunch ? "domani a pranzo" : evening ? "domani sera" : "domani") : lunch ? "oggi a pranzo" : evening ? "stasera" : "oggi";
+  const tenuto = group.find((b) => b.id === kept);
+  return (
+    <section data-testid="promemoria-doppio" className="rounded-card bg-brand p-4 text-white shadow-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            <CalendarCheck size={14} /> {domani ? "Domani" : "Oggi"} · {group.length} tavoli
+          </p>
+          <p className="mt-1 font-title text-lg font-semibold leading-tight">
+            {tenuto ? `Tieni ${tenuto.placeName}` : `Hai ${group.length} tavoli ${when}: quale tieni?`}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="Nascondi il promemoria"
+          onClick={() => group.forEach((b) => updateBooking(b.id, domani ? { dismissedEve: true } : { dismissed: true }))}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      {!tenuto ? (
+        <div className="mt-3 flex flex-col gap-2">
+          {group.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              data-testid="tengo-questo"
+              onClick={() => { setKept(b.id); trackFeature("doppia_prenotazione", { contesto: domani ? "domani" : "oggi" }); }}
+              className="flex min-h-12 items-center justify-between gap-2 rounded-btn bg-white/10 px-3 text-left active:scale-[0.99]"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-display font-semibold">{b.placeName}</span>
+                <span className="block text-xs font-sans text-white/70">{[b.time ? `alle ${b.time}` : null, b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null].filter(Boolean).join(" · ")}</span>
+              </span>
+              <span className="shrink-0 rounded-pill bg-white px-3 py-1.5 text-xs font-display font-semibold text-brand">Tengo questo</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        group.filter((b) => b.id !== kept).map((b) => (
+          <Disdetta key={b.id} b={b} titolo={`Avvisa ${b.placeName}: così dà il tavolo a qualcun altro.`} />
+        ))
+      )}
+    </section>
+  );
+}
+
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const { today, tomorrow, howWasIt } = bookingReminders(list);
-  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0) return null;
-  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))];
+  // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
+  const now = new Date();
+  const todayKey = dateKey(now);
+  const tomorrowD = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const tomorrowKey = dateKey(tomorrowD);
+  const doppi = doubleBookings(list, now)
+    .filter((g) => g[0].date === todayKey || (g[0].date === tomorrowKey && g.some((b) => !b.dismissedEve)))
+    .map((g) => ({ group: g, domani: g[0].date === tomorrowKey }));
+  const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
+  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0) return null;
+  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
+      {doppi.map(({ group, domani }) => (
+        <Doppio key={group.map((b) => b.id).join()} group={group} domani={domani} />
+      ))}
       {prossime.map(({ b, domani }) => (
         <section key={b.id} data-testid={domani ? "promemoria-domani" : "promemoria-oggi"} className="rounded-card bg-brand p-4 text-white shadow-card">
           <div className="flex items-start justify-between gap-2">
