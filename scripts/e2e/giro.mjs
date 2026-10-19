@@ -180,7 +180,7 @@ ok(!(await page.getByTestId("idee-pannello").isVisible()), "Idee: secondo tocco 
 synthDelay = 3000;
 await (await esempio(page)).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-ok(await page.getByText(/preparo i verdetti/).isVisible(), "lista: stato 'preparo i verdetti' mentre aspetta Haiku");
+ok(await page.getByTestId("verdetti-in-arrivo").isVisible() && /^\d+ posti$/.test((await page.getByTestId("conteggio-risultati").textContent()) ?? ""), "lista: puntino 'verdetti in arrivo' nella pillola mentre aspetta Haiku (la pillola resta 'N posti')");
 ok(await page.locator("ul").getByText("Pub Fuori Tema").count() === 1, "lista: prima dei verdetti ci sono tutti i locali");
 const firstCardH = () => page.locator("li", { hasText: "Terrazza Uno" }).first().evaluate((el) => el.getBoundingClientRect().height);
 const hBefore = await page.getByTestId("segnaposto-verdetto").count() > 0 ? await firstCardH() : null;
@@ -302,7 +302,7 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
   ok(m.every((c) => c.verdetto === 1), `card: il verdetto (o la riga Google) c'è su ogni card (${m.map((c) => c.id + ":" + c.verdetto).join(", ")})`);
   ok(m.every((c) => c.segnali <= 1 && c.fatti === 1 && c.righeFatti === 1), `card: UNA riga di fatti e al massimo un segnale (${m.map((c) => c.id + ":" + c.segnali).join(", ")})`); }
 { const pill = await page.getByTestId("opzioni-ricerca").evaluate((el) => { const r = el.getBoundingClientRect(); const bar = document.querySelector("[data-testid=barra-ricerca]").getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), h: Math.round(r.height), sottoBarra: r.top >= bar.bottom - 1 && r.top < bar.bottom + 30, testo: el.querySelector("[data-testid=conteggio-risultati]").textContent.trim() }; });
-  ok(pill.sottoBarra && pill.left <= 20 && pill.h <= 40 && /^\d+ posti$/.test(pill.testo), `lista nuova: pillola '${pill.testo}' sotto la barra, a sinistra (${pill.left},${pill.top}, alta ${pill.h}px)`);
+  ok(pill.sottoBarra && pill.left <= 20 && pill.h >= 44 && pill.h <= 48 && /^\d+ posti$/.test(pill.testo), `lista nuova: pillola '${pill.testo}' sotto la barra, a sinistra (${pill.left},${pill.top}, alta ${pill.h}px)`);
   const sopra = await page.locator("[data-testid=lista-risultati] .rounded-card").evaluateAll((els) => els.filter((e) => !e.closest("ul")).length);
   ok(sopra === 0 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `lista nuova: nessuna intestazione sopra le card; "Ho capito" e Affina dietro la pillola`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
@@ -311,6 +311,10 @@ await apriOpzioni(page);
 ok((await page.getByTestId("filtri-lista").count()) === 1 && await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).isVisible(), "lista B: filtri rapidi presenti toccando la pillola");
 ok(await page.getByRole("button", { name: "Affina" }).isVisible() && await page.getByRole("button", { name: "Condividi questa ricerca" }).isVisible(), "pillola: apre Affina e Condividi");
 await shot("05-pillola-aperta");
+// Tocco fuori simulato (un tocco vero sulla mappa chiuderebbe anche la ricerca).
+await page.evaluate(() => document.querySelector("[data-testid=pin]")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+await page.waitForTimeout(200);
+ok((await page.getByTestId("opzioni-pannello").count()) === 0, "pillola: le opzioni si chiudono toccando fuori");
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
@@ -1165,7 +1169,7 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 await page.waitForTimeout(800);
-ok(!(await page.getByText(/preparo i verdetti/).isVisible()) && (await page.locator("ul.snap-x li[data-id]:not([data-id=\"\"])").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
+ok((await page.getByTestId("verdetti-in-arrivo").count()) === 0 && (await page.locator("ul.snap-x li[data-id]:not([data-id=\"\"])").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
 ok((await page.locator("ul.snap-x li").first().getByTestId("riga-google").textContent()) === "“Bella vista sulla città.”", "senza verdetto: la card mostra una recensione di Google invece di restare vuota");
 ok((await page.getByTestId("punti-forti").count()) === 0, "senza Haiku: nessuna chip di punti forti (mai riempite con testo generico)");
 await shot("21-senza-verdetto");
@@ -3056,7 +3060,7 @@ else {
       const aperta = await qp.getByTestId("opzioni-pannello").isVisible();
       const dentro = await qp.getByTestId("opzioni-pannello").evaluate((el) => el.closest(".rounded-card").getBoundingClientRect().right <= innerWidth);
       await qp.getByTestId("opzioni-ricerca").click();
-      ok(chiusa <= 40 && aperta && dentro, `360px: pillola dei risultati compatta (${chiusa}px), un tocco apre le opzioni dentro lo schermo`); }
+      ok(chiusa <= 48 && aperta && dentro, `360px: pillola dei risultati compatta (${chiusa}px), un tocco apre le opzioni dentro lo schermo`); }
     await qp.waitForTimeout(300);
     { const m = await qp.locator("ul.snap-x li[data-id=L1]").evaluate((li) => {
         const card = li.getBoundingClientRect(); const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;

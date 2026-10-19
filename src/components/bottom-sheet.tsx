@@ -227,6 +227,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
+  // Lista nuova: le opzioni aperte dalla pillola si chiudono toccando fuori o con Esc.
+  const pillRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!headerOpen || !pillSlot) return;
+    const onDown = (e: PointerEvent) => { if (!pillRef.current?.contains(e.target as Node)) setHeaderOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setHeaderOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [headerOpen, pillSlot]);
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
@@ -523,18 +533,19 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // Lista nuova: la richiesta è già scritta nella barra; sotto, a sinistra, solo "12 posti".
     // Un tocco apre quello che prima stava dietro "⋯" (Ho capito, Affina, Condividi, filtri rapidi).
     const pill = nuova && createPortal(
-      <div className="pointer-events-auto relative">
+      <div ref={pillRef} className="pointer-events-auto relative">
         <button
           type="button"
           data-testid="opzioni-ricerca"
-          aria-label="Opzioni della ricerca"
           aria-expanded={headerOpen}
           onClick={() => setHeaderOpen((v) => !v)}
-          className={`flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
+          className={`flex min-h-11 items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
           <span data-testid="titolo-risposta" className="sr-only">{title}</span>
-          {loadingVerdicts && <span aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
-          <span data-testid="conteggio-risultati">{conteggio}</span>
+          {/* Mentre arrivano i verdetti la pillola resta "12 posti" (niente salti di larghezza): basta il puntino. */}
+          {loadingVerdicts && <span data-testid="verdetti-in-arrivo" aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
+          <span data-testid="conteggio-risultati">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>
           {(quick.size > 0 || nearestFirst) && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
         </button>
         {headerOpen && (
@@ -614,7 +625,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[10vw] lg:gap-3" : "gap-3 px-3"}`}>
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[13vw] lg:gap-3" : "gap-3 px-3"}`}>
           {places.map((place) => {
             const d = details?.[place.id];
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
@@ -627,10 +638,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const cat = prettyCategory(place.category);
               const facts = cardFacts({ ...place, category: null }, origin, showCity);
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
-              const chips = (d?.goFor ?? []).slice(0, 2);
+              // Due chip solo se ci stanno intere (frasi brevi), altrimenti una.
+              const goFor = d?.goFor ?? [];
+              const chips = goFor.length >= 2 && goFor[0].length + goFor[1].length <= 28 ? goFor.slice(0, 2) : goFor.slice(0, 1);
               const similar = similarTo?.(place.id) ?? null;
               return (
-                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[80vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
+                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
                     <button
                       type="button"
@@ -657,7 +670,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
                     )}
                     {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 via-55% to-black/0" />
+                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
                     {(stato || saved || gem) && (
                       <span className="absolute left-3 top-3.5">
                         {stato ? (
@@ -670,13 +683,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     )}
                     <span className="relative flex flex-col">
-                      <span data-testid="riga-fatti" className="flex min-w-0 items-baseline text-[11px] font-sans text-white/80">
+                      <span data-testid="riga-fatti" className={`flex min-w-0 items-baseline text-[11px] font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
                         <span className="truncate">
                           {cat && <span className="font-semibold uppercase tracking-[0.16em]">{cat}</span>}
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
                       </span>
-                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
+                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
                       {(d?.openNow != null || similar) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (

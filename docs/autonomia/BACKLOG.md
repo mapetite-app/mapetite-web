@@ -8,9 +8,10 @@ L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
 ## Avanzamento verso il 25/10
 **Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
-**Ricerche Google vere oggi (dalle 9:00 del 18/10):** 9 (sessione 1: 2; sessione 2: 7). Tetto 10 al giorno per tutte le sessioni insieme: ne resta 1.
+**Ricerche Google vere oggi (dalle 9:00 del 19/10):** 3 (sessione di lunedì sera: collaudo della lista nuova, ricerche #2, #3, #9). Tetto 10 al giorno per tutte le sessioni insieme: ne restano 7.
 **Quota Google, i numeri (18/10):** ricerche dei tester in produzione per giorno: 23 (15/10), 17 (16/10), 12 (17/10). Sabato la quota di 50 è finita alle 22:34 con solo 12 ricerche vere: il resto l'hanno usato le prove delle sessioni di sviluppo (circa 30). Da oggi il pannello `/admin/numeri` mostra "Google oggi: N su 50". Con 10 tester attivi (5 ricerche a testa al giorno) la quota basta solo se le sessioni non la usano: decisione sul budget di Lorenzo.
-**In corso adesso:** lunedì 19/10 sera (dalle 21:00, branch `claude/great-cannon-i3oqi3`): "Redesign lista risultati – variante scelta" (B, carosello scuro); avvio del team gstack (DESIGN.md, PROPOSTE, COMPETITOR, PROBLEMI, PARTNER).
+**Prossima voce (scelta dal CEO il 19/10):** "Buoni pasto: qui li accettano?" (proposta 2 di `PROPOSTE.md`, sotto). Poi: verdetto mancante quando un blocco di verdetti fallisce (visto il 19/10: errore 502 su "trattoria a Trastevere", Santa Bonosa senza verdetto: VISIONE vuole il verdetto SEMPRE).
+**In corso adesso:** nessuna sessione. Lunedì 19/10 sera (21:00–23:30, branch `claude/great-cannon-i3oqi3`, PR #81): lista risultati nuova (variante B scelta da Lorenzo), "Hai 2 tavoli: quale tieni?", avvio del team gstack (DESIGN.md, PROPOSTE, COMPETITOR, PROBLEMI, PARTNER).
 **Terza sessione (domenica 18/10 dalle 15:10, branch `claude/quirky-hypatia-l8uare`, PR #73):** controllo a occhi nuovi a 390×844 e semplificazione delle schermate che la prima sessione non tocca: Profilo, Importa, Prenotazioni, accesso/registrazione, pagina pubblica del locale, Per i ristoratori, Premium. Non tocca Stasera, raccolte, gruppi, amici, home, mappa. Bloccata alle 15:20 dai permessi dell'ambiente, ripartita alle 15:40 su richiesta di Lorenzo, finita alle 17:50. Fatto: Premium, Prenotazioni, pagina pubblica del locale, Importa (dettagli sotto, "Domenica 18/10, terza sessione"). Profilo e Diario non visti: servono l'accesso vero.
 **Seconda sessione (domenica 18/10 dalle 10:10, branch `claude/quirky-hypatia-9k5tm1`, PR separata):** locali di massa fuori dalle prime 3 posizioni anche senza "non turistico" (caso "pranzo di lavoro"); poi grafica dei risultati e della scheda contro i riferimenti Places. Non tocca gli eventi d'uso.
 **Aggiornato 18/10 alle 16:20 (domenica, sessione di tutto il giorno chiesta da Lorenzo, PR #63–#70 tutte in produzione).** Partito dagli eventi d'uso di Lorenzo (a Milano, mappa che partiva da Roma). Fatto: mappa, assistente, Sorprendimi ed esempi della home partono da dove sei (permesso già dato) o dalla città scelta al primo accesso; "sei vicino a un posto che volevi provare" all'apertura; quota Google finita a metà ricerca → messaggio chiaro e "Cerca nei tuoi salvati" su mappa, assistente e Sorprendimi; "Google oggi: N su 50" nel pannello; pannello dei numeri senza prove e robot; tetto di 10 ricerche Google vere al giorno per tutte le sessioni; semplificate prenotazioni, liste di gruppo, Stasera, raccolte; "Invita un amico" in Amici; verdetto Mapetite sulle card degli amici, nel profilo pubblico e nella raccolta condivisa. 1 ricerca Google vera. Manca per il 25/10: prove su telefoni veri, decisione sulla quota Google (Lorenzo).
@@ -40,7 +41,7 @@ Aggiornato 12/10 notte. **In produzione (PR #13–#20):** voci 1–8 e 10; lista
 **In PR #31 (notte 12→13/10):** card dei salvati con il verdetto Mapetite (già in memoria, senza costi) e la città; salvati vuoti con "Salva da Google Maps"; indirizzi senza ", Italy"; link di una ricerca aperto a freddo che inquadra i risultati; nomi dei pin che non si sovrappongono; "Password dimenticata?"; "Salva" senza accesso che si completa da solo dopo il login.
 **Manca:** prova dal vivo con Haiku (Lorenzo deve aggiungere `ANTHROPIC_API_KEY` all'ambiente cloud: istruzioni date il 12/10); giro con un account vero; risposta sulla quota Google per l'import (voce 13).
 
-## Redesign lista risultati – variante scelta — PRONTA (Lorenzo, 18/10)
+## Redesign lista risultati – variante scelta — FATTA (PR #81, 19/10)
 Lorenzo non è soddisfatto del foglio dei risultati sulla mappa. Il 18/10 ha guardato 4 direzioni generate con /design-shotgun (Rivista, Carosello scuro, Lista compatta, Pila) e ha scelto **B "Carosello scuro"** (modello: `places-04`).
 - Mockup scelto: `riferimenti/mapetite-lista-risultati-B-scelta.jpg`. Com'è oggi: `riferimenti/mapetite-lista-risultati-prima.png`.
 - Nel mockup nomi, foto e verdetti sono inventati dall'AI che disegna: si prende la struttura, mai i contenuti.
@@ -60,6 +61,13 @@ Vincoli (non negoziabili):
 - Prima accesa per tutti, con `?lista=b-vecchia` per tornare indietro per una settimana; poi si toglie.
 
 Come si verifica: aggiornare `scripts/e2e/giro.mjs` (niente intestazione sopra le card, pillola "N posti" che apre Affina/Condividi, "1 di N", chip solo con `goFor`), screenshot a 390×844 e 360×800 in PR affiancati al mockup e a `places-04`.
+
+Fatto il 19/10 (PR #81). Collaudo indipendente: voto design 5/10 prima → 7,5/10 dopo; corretti chip tagliate, pillola alta 44 px, opzioni che si chiudono toccando fuori, contrasto, pin meno ammassati. Per arrivare a 9 (dal collaudo): `goFor` di 1–3 parole chiesti nel prompt (oggi frasi lunghe, la seconda chip spesso non ci sta), più card visibile ai lati. `?lista=b-vecchia` da togliere dopo il 26/10.
+
+## Proposte del CEO del 19/10 (`PROPOSTE.md`)
+1. **"Hai 2 tavoli sabato: quale tieni?" — FATTA (PR #81).** Due prenotazioni per lo stesso pasto diventano un solo promemoria; scelto il tavolo, la disdetta dell'altro è già scritta.
+2. **"Buoni pasto: qui li accettano?" — PRONTA (prossima voce).** Domanda facoltativa nel "Com'è andata?" di un pranzo; riga in scheda solo con almeno 2 risposte concordi; filtro "Buoni pasto". Sforzo M (una migrazione), costo zero.
+3. **"Cliente di parola" — DA DECIDERE LORENZO.** "Possiamo salvare le prenotazioni sul server e mostrare al locale, solo con il consenso dell'utente, quante volte si è presentato?" Sforzo L.
 
 ## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
 Tutte le informazioni restano, ma meno cose a schermo (regola in `LORENZO.md`). Punti visti il 17/10, da fare in ordine, con screenshot prima/dopo:

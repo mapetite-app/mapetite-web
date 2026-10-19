@@ -889,16 +889,26 @@ export default function MapView({
     () => () => {},
     () => {
       const q = new URLSearchParams(window.location.search).get("lista");
+      if (q === "b-vecchia") return false;
+      if (q === "b") return true;
       try {
-        if (q === "b-vecchia") window.localStorage.setItem("mapetite.lista", q);
-        else if (q === "b") window.localStorage.removeItem("mapetite.lista");
         return window.localStorage.getItem("mapetite.lista") !== "b-vecchia";
       } catch {
-        return q !== "b-vecchia";
+        return true;
       }
     },
     () => true,
   );
+  // La scelta fatta con ?lista= resta per le visite dopo (scritta qui, non durante il disegno).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("lista");
+    try {
+      if (q === "b-vecchia") window.localStorage.setItem("mapetite.lista", q);
+      else if (q === "b") window.localStorage.removeItem("mapetite.lista");
+    } catch {
+      // storage non disponibile: vale solo il parametro
+    }
+  }, []);
   // Posto della pillola "N posti" sotto la barra (la lista nuova ci disegna dentro).
   const [pillSlot, setPillSlot] = useState<HTMLDivElement | null>(null);
   // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
@@ -2993,7 +3003,7 @@ export default function MapView({
                   <span
                     data-testid="pin-foto"
                     className={`block overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
-                      selected?.id === place.id || focusId === place.id ? "h-16 w-16 border-accent" : "h-12 w-12 border-brand"
+                      selected?.id === place.id || focusId === place.id ? "h-14 w-14 border-accent" : "h-11 w-11 border-brand"
                     }`}
                   >
                     <PlacePhoto
