@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
@@ -71,6 +72,9 @@ export interface BottomSheetProps {
   nearest?: boolean;
   // Città sulla riga dei metadati (salvati di più città: "Ristorante · ★ 4,6 · Roma · 600 m").
   showCity?: boolean;
+  // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro"): dove mettere la pillola "N posti"
+  // sotto la barra in alto, al posto dell'intestazione sopra le card. null = lista di prima.
+  pillSlot?: HTMLElement | null;
 }
 
 export type ListDetails = {
@@ -219,10 +223,20 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
+  // Lista nuova: le opzioni aperte dalla pillola si chiudono toccando fuori o con Esc.
+  const pillRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!headerOpen || !pillSlot) return;
+    const onDown = (e: PointerEvent) => { if (!pillRef.current?.contains(e.target as Node)) setHeaderOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setHeaderOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [headerOpen, pillSlot]);
   // Filtri rapidi solo nei risultati di ricerca: per i salvati mancano orari, voto e prezzo
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
@@ -457,9 +471,95 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     </div>
   );
 
+  // "Ho capito", locali messi da parte, Affina e Condividi: dietro "⋯" (lista di prima) o dietro la
+  // pillola "N posti" (lista nuova). Nella lista nuova ci stanno anche i filtri rapidi.
+  const optionsPanel = title ? (
+    <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
+      {understood.length > 0 && (
+        <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
+      )}
+      {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
+        <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
+          {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
+              Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
+          🧭 {[
+            setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
+            setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
+            // Fuori dal quartiere chiesto (17/10): in fondo, mai tolti.
+            (setAside.fuori_zona?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.fuori_zona!.length === 1 ? "uno fuori zona" : `${setAside.fuori_zona!.length} fuori zona`} (${setAside.fuori_zona!.slice(0, 2).join(", ")}${setAside.fuori_zona!.length > 2 ? "…" : ""})` : null,
+          ].filter(Boolean).join(" ")}
+        </p>
+      )}
+      <div className="mt-2 flex gap-2">
+        {onRefine && (
+          <button type="button" onClick={onRefine} className="flex min-h-9 items-center gap-1.5 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4Z" />
+            </svg>
+            Affina
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Condividi questa ricerca"
+          onClick={async () => {
+            const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
+            const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
+            trackFeature("condividi_ricerca");
+            try {
+              if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
+              else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
+            } catch {
+              // foglio di condivisione chiuso: niente da segnalare
+            }
+          }}
+          className="flex min-h-9 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+          </svg>
+          {shared ? "✓ Copiato" : "Condividi"}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
+    const nuova = pillSlot != null && title != null;
+    const conteggio = loadingVerdicts
+      ? "preparo i verdetti…"
+      : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`;
+    // Lista nuova: la richiesta è già scritta nella barra; sotto, a sinistra, solo "12 posti".
+    // Un tocco apre quello che prima stava dietro "⋯" (Ho capito, Affina, Condividi, filtri rapidi).
+    const pill = nuova && createPortal(
+      <div ref={pillRef} className="pointer-events-auto relative">
+        <button
+          type="button"
+          data-testid="opzioni-ricerca"
+          aria-expanded={headerOpen}
+          onClick={() => setHeaderOpen((v) => !v)}
+          className={`flex min-h-11 items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
+        >
+          <span data-testid="titolo-risposta" className="sr-only">{title}</span>
+          {/* Mentre arrivano i verdetti la pillola resta "12 posti" (niente salti di larghezza): basta il puntino. */}
+          {loadingVerdicts && <span data-testid="verdetti-in-arrivo" aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
+          <span data-testid="conteggio-risultati">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>
+          {(quick.size > 0 || nearestFirst) && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
+        </button>
+        {headerOpen && (
+          <div className="absolute left-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),24rem)] rounded-card bg-surface p-3 pb-1 shadow-float">
+            {(quickFiltersOn || nearestOn || onOpenArticle) && <div className="mb-1">{quickChips}</div>}
+            {optionsPanel}
+          </div>
+        )}
+      </div>,
+      pillSlot,
+    );
     return (
+      <>
+      {pill}
       <div
         data-testid="lista-risultati"
         className="pointer-events-none absolute left-0 right-0 z-10 lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-border lg:pb-5"
@@ -467,7 +567,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       >
         {/* Intestazione in UNA riga (Lorenzo 16/10, "il dono della sintesi"): frase cercata + numero,
             un solo "⋯" che apre "Ho capito", i locali messi da parte, Affina e Condividi. */}
-        <div className={`pointer-events-auto mx-3 mb-1.5 bg-surface shadow-float md:max-w-xl lg:mx-5 lg:max-w-none lg:shadow-none ${title || heading ? "rounded-card py-1 pl-4 pr-1" : "w-fit rounded-pill px-4 py-1.5"}`}>
+        {!nuova && <div className={`pointer-events-auto mx-3 mb-1.5 bg-surface shadow-float md:max-w-xl lg:mx-5 lg:max-w-none lg:shadow-none ${title || heading ? "rounded-card py-1 pl-4 pr-1" : "w-fit rounded-pill px-4 py-1.5"}`}>
           <div className="flex min-h-9 items-center gap-1">
             {title && (
               <p data-testid="titolo-risposta" onClick={() => setHeaderOpen((v) => !v)} className={`min-w-0 flex-1 ${headerOpen ? "" : "truncate"} font-title text-[15px] in-data-[titoli=serif]:text-lg font-semibold leading-snug text-brand first-letter:uppercase`}>
@@ -479,9 +579,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             )}
             {/* Nei salvati il numero c'è già nella casella "Cerca in N salvati": qui non si ripete. */}
             <span data-testid="conteggio-risultati" className={`shrink-0 text-xs font-sans text-text-muted ${savedMode && !title ? "sr-only" : ""}`}>
-              {loadingVerdicts
-                ? "preparo i verdetti…"
-                : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`}
+              {conteggio}
             </span>
             {title && (
               <button
@@ -521,62 +619,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               ✕
             </button>
           </div>
-          {title && headerOpen && (
-            <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
-              {understood.length > 0 && (
-                <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
-              )}
-              {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
-                <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
-                  {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
-                      Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
-                  🧭 {[
-                    setAside.turistici.length > 0 ? `Ho messo da parte ${setAside.turistici.length === 1 ? "un locale molto famoso" : `${setAside.turistici.length} locali molto famosi`} (${setAside.turistici.slice(0, 2).join(", ")}${setAside.turistici.length > 2 ? "…" : ""})` : null,
-                    setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
-                    // Fuori dal quartiere chiesto (17/10): in fondo, mai tolti.
-                    (setAside.fuori_zona?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.fuori_zona!.length === 1 ? "uno fuori zona" : `${setAside.fuori_zona!.length} fuori zona`} (${setAside.fuori_zona!.slice(0, 2).join(", ")}${setAside.fuori_zona!.length > 2 ? "…" : ""})` : null,
-                  ].filter(Boolean).join(" ")}
-                </p>
-              )}
-              <div className="mt-2 flex gap-2">
-                {onRefine && (
-                  <button type="button" onClick={onRefine} className="flex min-h-9 items-center gap-1.5 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4Z" />
-                    </svg>
-                    Affina
-                  </button>
-                )}
-                <button
-                  type="button"
-                  aria-label="Condividi questa ricerca"
-                  onClick={async () => {
-                    const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
-                    const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
-                    trackFeature("condividi_ricerca");
-                    try {
-                      if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
-                      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 2000); }
-                    } catch {
-                      // foglio di condivisione chiuso: niente da segnalare
-                    }
-                  }}
-                  className="flex min-h-9 items-center gap-1.5 rounded-pill border border-border px-3 text-xs font-display font-semibold text-brand active:scale-95"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-                  </svg>
-                  {shared ? "✓ Copiato" : "Condividi"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        {(onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
+          {title && headerOpen && optionsPanel}
+        </div>}
+        {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5">
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[13vw] lg:gap-3" : "gap-3 px-3"}`}>
           {places.map((place) => {
             const d = details?.[place.id];
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
@@ -584,6 +633,103 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
             const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount);
+            if (nuova) {
+              const i = places.indexOf(place);
+              const cat = prettyCategory(place.category);
+              const facts = cardFacts({ ...place, category: null }, origin, showCity);
+              // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
+              // Due chip solo se ci stanno intere (frasi brevi), altrimenti una.
+              const goFor = d?.goFor ?? [];
+              const chips = goFor.length >= 2 && goFor[0].length + goFor[1].length <= 28 ? goFor.slice(0, 2) : goFor.slice(0, 1);
+              const similar = similarTo?.(place.id) ?? null;
+              return (
+                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
+                  {onSave && (
+                    <button
+                      type="button"
+                      onClick={() => onSave(place)}
+                      aria-label={isSaved?.(place.id) ? `${place.name} è tra i salvati` : `Salva ${place.name}`}
+                      aria-pressed={isSaved?.(place.id) ?? false}
+                      className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/90 bg-black/25 text-white backdrop-blur-sm active:scale-95"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill={isSaved?.(place.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} aria-hidden>
+                        <path strokeLinejoin="round" d="M6 3.75h12a.75.75 0 0 1 .75.75v16.19l-6.75-4.5-6.75 4.5V4.5A.75.75 0 0 1 6 3.75Z" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(place)}
+                    data-testid="card-risultato"
+                    // Altezza fissa: verdetto e chip che arrivano dopo non fanno saltare la card.
+                    className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
+                    style={{ background: coverGradient(place.category, place.name) }}
+                  >
+                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                    {i < PHOTO_CARDS && d?.photoRef && (
+                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
+                    )}
+                    {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
+                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
+                    {(stato || saved || gem) && (
+                      <span className="absolute left-3 top-3.5">
+                        {stato ? (
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                        ) : saved ? (
+                          <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : (
+                          <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
+                        )}
+                      </span>
+                    )}
+                    <span className="relative flex flex-col">
+                      <span data-testid="riga-fatti" className={`flex min-w-0 items-baseline text-[11px] font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
+                        <span className="truncate">
+                          {cat && <span className="font-semibold uppercase tracking-[0.16em]">{cat}</span>}
+                          {facts && <span>{cat ? " · " : ""}{facts}</span>}
+                        </span>
+                      </span>
+                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
+                      {(d?.openNow != null || similar) && (
+                        <span className="mt-1.5 flex min-w-0 items-center gap-2">
+                          {d?.openNow === true && (
+                            <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
+                          )}
+                          {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
+                          {d?.openNow === false && (
+                            <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-white/20 px-2.5 py-0.5 text-xs font-display font-semibold text-white/90">Chiuso ora</span>
+                          )}
+                          {similar && (
+                            <span data-testid="simile-a" className="truncate text-xs font-sans font-semibold text-accent">✨ Come {similar}, che hai salvato</span>
+                          )}
+                        </span>
+                      )}
+                      {/* Spazio del verdetto riservato (2 righe) fin dall'inizio. */}
+                      <span className="mt-1.5 block min-h-10">
+                        {d?.verdict ? (
+                          <>
+                            <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
+                            <span className="line-clamp-2 text-[13px] font-sans font-medium leading-5 text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
+                          </>
+                        ) : loadingVerdicts && details ? (
+                          <SkeletonLines dark />
+                        ) : googleLine(d) ? (
+                          <span data-testid="riga-google" className="line-clamp-2 text-[13px] font-sans leading-5 text-white/80">{googleLine(d)}</span>
+                        ) : null}
+                      </span>
+                      {chips.length > 0 && (
+                        <span data-testid="punti-forti" className="mt-2 flex min-w-0 gap-1.5">
+                          {chips.map((c) => (
+                            <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
+                          ))}
+                        </span>
+                      )}
+                      <span data-testid="posizione-card" className="mt-2 text-center text-[11px] font-sans text-white/70">{i + 1} di {places.length}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[78vw] max-w-sm shrink-0 snap-center lg:w-auto lg:max-w-none lg:rounded-card lg:transition-shadow ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                 {onSave && (
@@ -680,6 +826,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           )}
         </ul>
       </div>
+      </>
     );
   }
 
