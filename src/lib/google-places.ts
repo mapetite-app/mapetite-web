@@ -63,6 +63,9 @@ export type PlaceResult = {
   // Caratteristiche dichiarate su Google (solo quelle presenti) e orari: servono ai filtri. Solo server.
   attributes?: Partial<Record<GoogleAttribute, boolean>>;
   openingPeriods?: OpeningPeriod[] | null;
+  // Orari della settimana tipo (regularOpeningHours): per il foglio Prenota. I periodi "current" coprono
+  // 7 date tagliate ai bordi: ridotti a giorni della settimana davano il lunedì sera chiuso (QA 20/10).
+  regularPeriods?: OpeningPeriod[] | null;
 };
 
 export type SearchOptions = {
@@ -314,6 +317,7 @@ function mapGooglePlace(place: GooglePlace): PlaceResult {
       GOOGLE_ATTRIBUTES.filter((a) => typeof place[a] === "boolean").map((a) => [a, place[a]]),
     ) as Partial<Record<GoogleAttribute, boolean>>,
     openingPeriods: place.currentOpeningHours?.periods ?? place.regularOpeningHours?.periods ?? null,
+    regularPeriods: place.regularOpeningHours?.periods ?? null,
   });
 }
 

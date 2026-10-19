@@ -15,7 +15,8 @@ import {
   type BookingDetails,
   type BookingRequest,
 } from "@/lib/booking";
-import { track } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
+import { apertoIl, dataOra, prossimaApertura, type Orari } from "@/lib/orari";
 import UtileFeedback from "@/components/utile-feedback";
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
@@ -30,7 +31,12 @@ export type BookingPlace = {
   openNow: boolean | null;
   lat: number | null;
   lng: number | null;
+  orari?: Orari | null; // orari Google della ricerca, se ci sono: "a quell'ora risulta chiuso"
 };
+
+// Altri locali della stessa ricerca (proposta CEO 20/10): se a quell'ora questo è chiuso, si propongono
+// quelli aperti, con il loro verdetto. Il tocco apre il loro foglio Prenota con gli stessi dati.
+export type BookingAlternative = { id: string; name: string; verdict: string | null; orari: Orari | null };
 
 const NAME_KEY = "mapetite.nome";
 const TIMES = ["12:30", "13:00", "19:30", "20:00", "20:30", "21:00", "21:30"];
@@ -49,10 +55,14 @@ export default function BookingSheet({
   place,
   initial,
   onClose,
+  alternative = [],
+  onAlternative,
 }: {
   place: BookingPlace;
   initial?: Partial<BookingDetails> | null;
   onClose: () => void;
+  alternative?: BookingAlternative[];
+  onAlternative?: (id: string, details: BookingDetails) => void;
 }) {
   // Il portale serve perché la scheda del locale sta dentro pannelli con transform:
   // un fixed lì dentro si posizionerebbe rispetto al pannello, non allo schermo.
@@ -81,6 +91,13 @@ export default function BookingSheet({
     return { key: dateKey(d), label: i === 0 ? "Oggi" : i === 1 ? "Domani" : `${SHORT_DAYS[d.getDay()]} ${d.getDate()}` };
   });
   const isToday = details.date === dateKey(today);
+  // Orari Google (se la ricerca li ha dati): un orario in cui il locale risulta chiuso si segnala, senza
+  // bloccare l'invio (gli orari di Google a volte sbagliano). Riapertura: per chi scrive a locale chiuso.
+  const chiusoAlle = (t: string) => (details.date ? apertoIl(place.orari, dataOra(details.date, t) ?? today) === false : false);
+  const chiusoScelto = details.time ? chiusoAlle(details.time) : false;
+  const riapre = place.openNow === false ? prossimaApertura(place.orari, today) : null;
+  const quando = details.date && details.time ? dataOra(details.date, details.time) : null;
+  const aperti = chiusoScelto && quando && onAlternative ? alternative.filter((a) => a.id !== place.id && apertoIl(a.orari, quando) === true).slice(0, 2) : [];
 
   const record = (via: BookingRequest["via"]) => {
     if (name.trim()) rememberName(name);
@@ -202,7 +219,7 @@ export default function BookingSheet({
                   type="button"
                   aria-pressed={details.time === t}
                   onClick={() => setDetails((b) => ({ ...b, time: t }))}
-                  className={`min-h-10 shrink-0 rounded-pill border px-3 text-sm font-sans font-semibold ${details.time === t ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
+                  className={`min-h-11 shrink-0 rounded-pill border px-3 text-sm font-sans font-semibold ${details.time === t ? "border-brand bg-brand text-white" : chiusoAlle(t) ? "border-border bg-white text-text-muted line-through decoration-1" : "border-border bg-white text-text"}`}
                 >
                   {t}
                 </button>
@@ -215,6 +232,28 @@ export default function BookingSheet({
                 className="min-h-10 shrink-0 rounded-pill border border-border bg-white px-3 text-base font-sans text-text"
               />
             </div>
+            {chiusoScelto && (
+              <p data-testid="prenota-chiuso" className="mt-2 text-xs font-sans font-semibold text-error">A quell&apos;ora risulta chiuso (orari Google): meglio un altro orario.</p>
+            )}
+            {aperti.length > 0 && (
+              <div data-testid="prenota-alternative" className="mt-2 rounded-card bg-surface p-3">
+                <p className="text-xs font-display font-semibold text-text">Aperti a quell&apos;ora, dalla tua ricerca:</p>
+                {aperti.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => { trackFeature("prenota_alternativa"); onAlternative?.(a.id, details); }}
+                    className="mt-2 flex min-h-12 w-full items-center justify-between gap-2 rounded-btn border border-border bg-white px-3 text-left active:scale-[0.99]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-display font-semibold text-brand">{a.name}</span>
+                      {a.verdict && <span className="block truncate text-xs font-sans text-text-muted"><span aria-hidden className="text-accent">✦ </span>{a.verdict}</span>}
+                    </span>
+                    <span className="shrink-0 text-xs font-display font-semibold text-accent">Prenota lì</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {/* Persone */}
             <div className="mt-3 flex items-center justify-between rounded-card bg-surface px-4 py-2">
               <p className="text-sm font-display font-semibold text-text">Persone</p>
@@ -303,7 +342,11 @@ export default function BookingSheet({
             <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
               Mapetite non vede i tavoli liberi: la conferma arriva dal locale.
               {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
+              {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
             </p>
+            {chiusoScelto && (
+              <p data-testid="prenota-chiuso-2" className="mt-1 text-xs font-sans font-semibold text-error">A quell&apos;ora risulta chiuso (orari Google): controlla l&apos;orario prima di inviare.</p>
+            )}
 
             <div className={`mt-3 flex flex-col gap-2 ${disabled ? "pointer-events-none opacity-40" : ""}`} aria-disabled={disabled}>
               {wa && (

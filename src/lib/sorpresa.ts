@@ -114,6 +114,7 @@ export type SurprisePlace = {
   priceLevel: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
   selectedReviews: { text: string }[] | null; editorialSummary?: string | null;
   photoRef?: string | null; photoAuthor?: string | null;
+  orari?: [number, number | null][] | null; // orari compatti (src/lib/orari.ts)
   firma?: string; // firma del server per il catalogo (src/lib/catalog-sig.ts)
 };
 

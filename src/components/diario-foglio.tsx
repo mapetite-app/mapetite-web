@@ -9,6 +9,7 @@ import type { FotoUtente } from "@/lib/foto-utenti";
 import { cambiaVisibilita } from "@/lib/foto-utenti-write";
 import { trackFeature } from "@/lib/track";
 import { FotoMieEditor } from "@/components/foto-utenti";
+import { miaRispostaBuoni, rispondiBuoni } from "@/lib/buoni-pasto";
 
 // Foglio leggero "Com'è andata?" (piano 4.4): dopo "Ci sono stato" (o da "Modifica" nel diario)
 // chiede quando, il voto (👍/👎, lo stesso "Com'era?" della scheda) e una nota privata.
@@ -36,6 +37,7 @@ export default function DiarioFoglio({
   onSave,
   onClose,
   foto,
+  buoni: buoniProp,
 }: {
   place: { name: string; category: string | null };
   initial: { date: string | null; voto: Voto | null; note: string | null };
@@ -46,6 +48,8 @@ export default function DiarioFoglio({
   onSave: (v: DiarioValori) => Promise<boolean>;
   onClose: () => void;
   foto?: DiarioFoto;
+  // Buoni pasto (PROPOSTE.md 19/10): chi risponde e su quale locale (UUID), anche senza le foto.
+  buoni?: { userId: string; placeId: string };
 }) {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const today = dayKey(new Date());
@@ -63,6 +67,27 @@ export default function DiarioFoglio({
   const [condividi, setCondividi] = useState(() => (foto?.initial ?? []).some((f) => f.pubblica));
   const [visErr, setVisErr] = useState(false);
   const fotoPlace = foto && !foto.initial ? foto.placeId : null;
+  // Buoni pasto (PROPOSTE.md 19/10): facoltativo, si salva subito (come le foto). null = non detto.
+  const [buoni, setBuoni] = useState<boolean | null>(null);
+  const [buoniErr, setBuoniErr] = useState(false);
+  const buoniUser = buoniProp?.userId ?? foto?.userId ?? null;
+  const buoniPlace = buoniProp?.placeId ?? foto?.placeId ?? null;
+  useEffect(() => {
+    if (!buoniUser || !buoniPlace) return;
+    let vivo = true;
+    void miaRispostaBuoni(buoniUser, buoniPlace).then((v) => { if (vivo && v !== null) setBuoni(v); });
+    return () => { vivo = false; };
+  }, [buoniUser, buoniPlace]);
+  const scegliBuoni = async (v: boolean) => {
+    if (!buoniUser || !buoniPlace) return;
+    const prima = buoni;
+    const next = buoni === v ? null : v;
+    setBuoni(next);
+    setBuoniErr(false);
+    const ok = await rispondiBuoni(buoniUser, buoniPlace, next);
+    if (!ok) { setBuoni(prima); setBuoniErr(true); return; }
+    if (next !== null) trackFeature("buoni_pasto", { stato: next ? "si" : "no", contesto: foto?.contesto ?? "diario" });
+  };
 
   useEffect(() => {
     if (!fotoPlace) return;
@@ -184,6 +209,20 @@ export default function DiarioFoglio({
             </button>
           ))}
         </div>
+
+        {buoniUser && buoniPlace && (
+          <div data-testid="diario-buoni" className="mt-4 flex items-center gap-2">
+            <p className="min-w-0 flex-1 text-sm font-display font-semibold text-text">
+              🎫 Buoni pasto? <span className="font-sans font-normal text-text-muted">· se li hai visti</span>
+            </p>
+            {([[true, "Sì"], [false, "No"]] as const).map(([v, label]) => (
+              <button key={label} type="button" aria-pressed={buoni === v} aria-label={`Buoni pasto: ${label}`} onClick={() => void scegliBuoni(v)} className={`${chip(buoni === v)} min-h-11`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {buoniErr && <p role="alert" className="text-xs text-error">Non sono riuscito a salvarlo. Riprova.</p>}
 
         {foto && fotoPronte && fotoList && (
           <div data-testid="diario-foto" className="mt-4">

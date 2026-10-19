@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
+import type { Orari } from "@/lib/orari";
+import type { BookingDetails } from "@/lib/booking";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
@@ -633,6 +635,7 @@ type VenueDetails = {
   photoRef?: string | null;
   photoAuthor?: string | null;
   editorialSummary?: string | null;
+  orari?: Orari | null;
 };
 
 const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
@@ -911,6 +914,9 @@ export default function MapView({
   }, []);
   // Posto della pillola "N posti" sotto la barra (la lista nuova ci disegna dentro).
   const [pillSlot, setPillSlot] = useState<HTMLDivElement | null>(null);
+  // Prenota un'alternativa aperta (proposta CEO 20/10): la scheda del nuovo locale si apre con il foglio
+  // Prenota già aperto e gli stessi giorno, ora e persone.
+  const [pendingBooking, setPendingBooking] = useState<{ placeId: string; details: BookingDetails } | null>(null);
   // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
   const momentHour = useSyncExternalStore(
     () => () => {},
@@ -1589,7 +1595,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -1598,6 +1604,7 @@ export default function MapView({
         details[p.id] = {
           userRatingCount: p.userRatingCount ?? null,
           openNow: p.openNow ?? null,
+          orari: p.orari ?? null,
           websiteUri: p.websiteUri ?? null,
           phone: p.phone ?? null,
           selectedReviews: p.selectedReviews ?? null,
@@ -1798,7 +1805,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({
@@ -1818,6 +1825,7 @@ export default function MapView({
           details[p.id] = {
             userRatingCount: p.userRatingCount ?? null,
             openNow: p.openNow ?? null,
+            orari: p.orari ?? null,
             websiteUri: p.websiteUri ?? null,
             phone: p.phone ?? null,
             selectedReviews: p.selectedReviews ?? null,
@@ -1929,16 +1937,32 @@ export default function MapView({
       // A gruppi in parallelo (le prime 2 card arrivano per prime, ~3-4 s): ogni verdetto si mostra
       // appena pronto; esclusioni e ordine si applicano una volta sola, a gruppi arrivati.
       const groups = pending.gruppi?.length ? pending.gruppi : [{ places: pending.places, token: pending.token }];
+      // Un gruppo perso (errore del server, rete, AI che non risponde) si richiede UNA volta: il 19/10 dal
+      // vivo un 502 lasciava una trattoria di Trastevere senza verdetto (VISIONE: il verdetto c'è SEMPRE).
+      const fetchGroup = async (g: { places: unknown[]; token: string }): Promise<VerdictReply | null> => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
+          if (searchSeq.current !== id) return null;
+          try {
+            const res = await fetch("/api/search/synthesis", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: searchedQuery, places: g.places, token: g.token }),
+            });
+            if (res.status >= 400 && res.status < 500) return null; // richiesta rifiutata: riprovare non serve
+            if (!res.ok) continue;
+            const part: VerdictReply = await res.json();
+            if (Object.keys(part.dettagli ?? {}).length > 0 || attempt === 1) return part;
+          } catch {
+            // rete: si riprova una volta
+          }
+        }
+        return null;
+      };
       const replies = await Promise.all(groups.map(async (g): Promise<VerdictReply | null> => {
         try {
-          const res = await fetch("/api/search/synthesis", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: searchedQuery, places: g.places, token: g.token }),
-          });
-          if (!res.ok || searchSeq.current !== id) return null;
-          const part: VerdictReply = await res.json();
-          if (searchSeq.current !== id) return null;
+          const part = await fetchGroup(g);
+          if (!part || searchSeq.current !== id) return null;
           setVenueDetails((prev) => {
             const next = { ...prev };
             for (const [pid, d] of Object.entries(part.dettagli ?? {})) {
@@ -2135,7 +2159,7 @@ export default function MapView({
         tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null,
       };
       const details: VenueDetails = {
-        userRatingCount: p.userRatingCount ?? null, openNow: p.openNow ?? null, websiteUri: p.websiteUri ?? null,
+        userRatingCount: p.userRatingCount ?? null, openNow: p.openNow ?? null, orari: p.orari ?? null, websiteUri: p.websiteUri ?? null,
         phone: p.phone ?? null, selectedReviews: p.selectedReviews ?? null, synthesis: null, tags: null,
         verdict: hit.verdict, goFor: null, dontExpect: null, matchReason: null,
         photoRef: p.photoRef ?? null, photoAuthor: p.photoAuthor ?? null, editorialSummary: p.editorialSummary ?? null,
@@ -3141,6 +3165,16 @@ export default function MapView({
               onVisitStatus={(st) => void setVisitStatus(selected.id, st)}
               onOpinion={(op) => void setVisitStatus(selected.id, op, [OPINION_LIKE, OPINION_DISLIKE])}
               verdettoInArrivo={verdettoInCorso === selected.id}
+              booking={pendingBooking?.placeId === selected.id ? pendingBooking.details : null}
+              autoBook={pendingBooking?.placeId === selected.id}
+              bookingAlternatives={aiSearch !== null ? (carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id))
+                .filter((id) => id !== selected.id)
+                .map((id) => displayedPlaces.find((p) => p.id === id))
+                .filter((p): p is Place => p != null)
+                .map((p) => ({ id: p.id, name: p.name, verdict: venueDetails[p.id]?.verdict ?? null, orari: venueDetails[p.id]?.orari ?? null })) : undefined}
+              onBookAlternative={(id, details) => { setPendingBooking({ placeId: id, details }); dispatch({ type: "OPEN_VENUE", placeId: id }); }}
+              // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
+              onBookingClosed={() => setPendingBooking(null)}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address }} />
               ) : null}
