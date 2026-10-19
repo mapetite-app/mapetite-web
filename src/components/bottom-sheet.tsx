@@ -638,9 +638,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const cat = prettyCategory(place.category);
               const facts = cardFacts({ ...place, category: null }, origin, showCity);
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
-              // Due chip solo se ci stanno intere (frasi brevi), altrimenti una.
+              // Chip intere: prima quelle brevi (le frasi lunghe venivano tagliate), due solo se ci stanno insieme.
               const goFor = d?.goFor ?? [];
-              const chips = goFor.length >= 2 && goFor[0].length + goFor[1].length <= 28 ? goFor.slice(0, 2) : goFor.slice(0, 1);
+              const corte = goFor.filter((c) => c.length <= 20);
+              const chips = corte.length >= 2 && corte[0].length + corte[1].length <= 30 ? corte.slice(0, 2) : (corte.length > 0 ? corte : goFor).slice(0, 1);
               const similar = similarTo?.(place.id) ?? null;
               return (
                 <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
@@ -659,7 +660,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   )}
                   <button
                     type="button"
-                    onClick={() => onSelect(place)}
+                    // Come Places: una card di lato si porta prima al centro (e il suo pin si accende);
+                    // il tocco sulla card al centro apre la scheda. Da computer apre subito.
+                    onClick={() => {
+                      if (onFocus && focusedId !== place.id && !window.matchMedia("(min-width: 1024px)").matches) { onFocus(place); return; }
+                      onSelect(place);
+                    }}
                     data-testid="card-risultato"
                     // Altezza fissa: verdetto e chip che arrivano dopo non fanno saltare la card.
                     className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
