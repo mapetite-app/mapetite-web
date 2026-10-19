@@ -16,6 +16,38 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 20/10/2026 (notte, CEO che chiude)
+
+### 4. "A quell'ora è chiuso? Ecco chi è aperto"
+- **Problema:** prenotazioni perse quando il locale è chiuso (`PROBLEMI.md`, 2). Dal 19/10 il foglio Prenota dice se a quell'ora il locale risulta chiuso; oggi però l'utente resta senza alternativa.
+- **Cosa fa:** quando l'ora scelta risulta chiusa, sotto l'avviso compaiono 1–2 locali della stessa ricerca (o dei tuoi salvati) aperti a quell'ora, con il loro verdetto: un tocco apre il loro foglio Prenota con giorno, ora e persone già scritti.
+- **Da dove nasce:** TheFork mostra "altri ristoranti disponibili" ma solo tra i suoi locali affiliati e ordinati per promozione; noi tra i posti adatti alla TUA richiesta (stesso giudizio di Haiku), senza pagare posizioni.
+- **Valore per l'utente:** la serata non salta: passa al secondo posto giusto in un tocco.
+- **Valore per il ristoratore:** domanda qualificata nelle serate in cui altri sono chiusi; è una riga del pannello ("N persone sono arrivate da te perché un altro era chiuso").
+- **Sforzo:** S. Dati già nel telefono (orari e verdetti della ricerca).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 5. "Lascia la recensione dove serve al locale"
+- **Problema:** recensioni false e poca fiducia nelle stelle (`PROBLEMI.md`, 3); i piccoli locali bravi hanno poche recensioni e restano invisibili rispetto ai posti turistici.
+- **Cosa fa:** dopo un "Com'è andata?" con 👍, una riga facoltativa: "Ti è piaciuto? Aiuta il locale: lascia due righe su Google" (link ufficiale di Google alla scrittura della recensione, nessun dato passa da noi). Solo per i locali con meno di 300 recensioni: chi ne ha migliaia non ne ha bisogno.
+- **Da dove nasce:** Beli e Corner tengono le opinioni dentro l'app; il ristoratore piccolo vive delle recensioni Google. Noi siamo gli unici a spingere il passaparola verso chi è poco conosciuto (VISIONE: non mainstream), con recensioni vere di chi c'è stato.
+- **Valore per l'utente:** un gesto utile in un tocco, senza scrivere niente in Mapetite.
+- **Valore per il ristoratore:** recensioni vere di clienti contenti; nel pannello "N clienti Mapetite ti hanno lasciato una recensione". Argomento forte per il piano Verified.
+- **Sforzo:** S.
+- **Costo Google/Haiku:** zero (link pubblico, nessuna chiamata API).
+- **Stato proposto:** PRONTA.
+
+### 6. "Avvisami se si libera" (lista d'attesa della serata)
+- **Problema:** no-show e tavoli liberati all'ultimo (`PROBLEMI.md`, 1). Un tavolo disdetto alle 19 resta vuoto perché nessuno lo sa.
+- **Cosa fa:** su un locale salvato, "Avvisami se si libera stasera". Quando il locale (verificato) segna un tavolo libero nel pannello, chi aspetta riceve una notifica.
+- **Da dove nasce:** Corner e Resy hanno la lista d'attesa ("Notify"); noi la leghiamo ai salvati e alle "Serate tranquille" già fatte.
+- **Valore per l'utente:** entrare nel posto che voleva provare.
+- **Valore per il ristoratore:** riempie il tavolo disdetto senza commissioni; è la funzione che si paga nel piano Growth.
+- **Sforzo:** L. Servono notifiche push (oggi non ci sono) e il titolare attivo nel pannello.
+- **Costo Google/Haiku:** zero; le notifiche push del browser sono gratuite ma vanno costruite.
+- **Stato proposto:** DA DECIDERE LORENZO: "Costruiamo le notifiche push (gratuite) per avvisi come 'si è liberato un tavolo'?"
+
 ## 19/10/2026
 
 ### 1. "Hai due tavoli sabato: quale tieni?"

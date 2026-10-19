@@ -16,6 +16,8 @@ export const metadata: Metadata = {
 
 const PERCHE = [
   { icon: "🎯", title: "Domanda qualificata", text: "Ti trova chi sta già scegliendo e cerca proprio quello che offri." },
+  // PROBLEMI.md 19/10 (commissioni a coperto): le prenotazioni da Mapetite arrivano dirette al locale.
+  { icon: "🤝", title: "Zero commissioni a coperto", text: "Le prenotazioni arrivano direttamente a te, su WhatsApp o al telefono: nessuna percentuale sui clienti." },
   { icon: "🪪", title: "Vetrina verificata", text: "Foto, informazioni e badge “Verificato” gestiti da te." },
   { icon: "📊", title: "Cosa cerca la gente", text: "Richieste reali nella tua zona, ora per ora, e quante persone ti vedono e ti salvano." },
 ];

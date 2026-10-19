@@ -69,6 +69,12 @@ async function esempio(pg) {
   }
   return b;
 }
+// Card del carosello (lista nuova, 19/10): una card di lato al primo tocco si centra, al secondo apre la scheda.
+async function apriCard(pg, nome) {
+  await pg.locator("ul.snap-x").getByText(nome).first().click();
+  if (await pg.getByTestId("barra-azioni").first().waitFor({ timeout: 1200 }).then(() => true, () => false)) return;
+  await pg.locator("ul.snap-x").getByText(nome).first().click();
+}
 // Intestazione dei risultati in una riga (Lorenzo 16/10): "Ho capito", 🧭, Affina e Condividi stanno dietro "⋯".
 async function apriOpzioni(pg) {
   const pan = pg.getByTestId("opzioni-pannello");
@@ -348,6 +354,17 @@ await page.locator("[data-testid=pin]", { hasText: "Terrazza Uno" }).click();
 await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 });
 ok(true, "pin toccato due volte: si apre la scheda");
 await shot("05b-carosello-pin");
+// Card di lato (come Places): il primo tocco la porta al centro, il secondo apre la scheda.
+await page.getByRole("button", { name: "Chiudi" }).last().click().catch(() => {});
+await page.locator("ul.snap-x li[data-id=P3]").waitFor({ timeout: 3000 }).catch(() => {});
+if (await page.locator("ul.snap-x li[data-id=P3]").count() === 1) {
+  await page.locator("ul.snap-x li[data-id=P3] [data-testid=card-risultato]").click({ position: { x: 20, y: 120 } });
+  let c = await centerOf();
+  for (let i = 0; i < 15 && c !== "P3"; i++) { await page.waitForTimeout(200); c = await centerOf(); }
+  ok(c === "P3" && !(await page.getByTestId("verdetto-scheda").isVisible()), "card di lato: il primo tocco la porta al centro (la scheda non si apre)");
+  await page.locator("ul.snap-x li[data-id=P3] [data-testid=card-risultato]").click();
+  ok(await page.getByTestId("verdetto-scheda").waitFor({ timeout: 3000 }).then(() => true, () => false), "card al centro: il tocco apre la scheda");
+} else ok(false, "card di lato: dopo la scheda il carosello non è tornato");
 // Più vicini + Affina
 await page.getByRole("button", { name: "Chiudi" }).last().click().catch(() => {});
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -396,6 +413,7 @@ await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" 
 ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
 ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
 await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).click();
+await page.getByTestId("opzioni-ricerca").click(); // chiude le opzioni (coprono la mappa sotto la barra)
 // sposto la mappa a mano: compare "Cerca in quest'area"
 await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
 await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
@@ -1118,7 +1136,9 @@ await shot("15-scheda-b");
   ok(events.some((e) => e.props?.nome === "confronto_fonte" && e.props?.contesto === "mapetite" && e.props?.stato === "voti"), "confronto: tocco su Mapetite registrato");
   // Locale senza dati Google nella scheda (come i salvati): la riga Google è solo il link.
   await page.getByLabel("Chiudi", { exact: true }).first().click();
+  // Card di lato: il primo tocco la centra, il secondo apre la scheda.
   await page.getByText("Trattoria Senza Voto").first().click();
+  if (!(await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 1200 }).then(() => true, () => false))) await page.getByText("Trattoria Senza Voto").first().click();
   await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 5000 });
   await page.waitForTimeout(400);
   const g2 = ((await page.getByTestId("confronto-google").textContent()) ?? "");
@@ -1168,12 +1188,20 @@ await page.route("**/api/search/synthesis", (r) => r.fulfill({ status: 500, json
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
-await page.waitForTimeout(800);
+await page.waitForTimeout(2000); // c'è un secondo tentativo dopo 0,7 s
 ok((await page.getByTestId("verdetti-in-arrivo").count()) === 0 && (await page.locator("ul.snap-x li[data-id]:not([data-id=\"\"])").count()) === 3, "senza Haiku: restano i 3 locali Google e il caricamento si chiude");
 ok((await page.locator("ul.snap-x li").first().getByTestId("riga-google").textContent()) === "“Bella vista sulla città.”", "senza verdetto: la card mostra una recensione di Google invece di restare vuota");
 ok((await page.getByTestId("punti-forti").count()) === 0, "senza Haiku: nessuna chip di punti forti (mai riempite con testo generico)");
 await shot("21-senza-verdetto");
 await page.unroute("**/api/search/synthesis");
+// Un gruppo di verdetti perso una volta (502 visto dal vivo il 19/10) si richiede: il verdetto arriva lo stesso.
+{ let chiamate = 0;
+  await page.route("**/api/search/synthesis", (r) => { chiamate++; return chiamate === 1 ? r.fulfill({ status: 502, body: "Bad Gateway" }) : r.fallback(); });
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  const arrivato = await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+  ok(arrivato && chiamate === 2, `verdetti: dopo un errore del server si riprova una volta e il verdetto arriva (${chiamate} chiamate)`);
+  await page.unroute("**/api/search/synthesis"); }
 
 // Lista nuova: ?lista=b-vecchia torna alla lista di prima (e se lo ricorda), ?lista=b la riaccende.
 await page.goto(`${BASE}/mappa?lista=b-vecchia`, { waitUntil: "networkidle" });
@@ -1565,13 +1593,27 @@ else {
     if (r.request().method() === "PATCH") { const b = r.request().postDataJSON(); if (b?.tags) patched = b; return r.fulfill({ status: 204, body: "" }); }
     return r.fallback();
   });
+  // Buoni pasto (PROPOSTE.md 19/10): la riga in scheda solo con almeno 2 risposte concordi; risposta nel diario.
+  let buoniScritti = [];
+  await p.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: [{ si: 3, no: 1 }] }));
+  await p.route("**/rest/v1/buoni_pasto**", (r) => {
+    if (r.request().method() === "POST") { buoniScritti.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    if (r.request().method() === "DELETE") { buoniScritti.push("tolta"); return r.fulfill({ status: 204, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
   await p.getByLabel("Cerca tra i salvati").fill("");
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
+  ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · lo dicono 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   // Diario (4.4): dopo "Ci sono stato" si apre il foglio "Com'è andata?", saltabile
   await p.getByTestId("diario-foglio").waitFor({ timeout: 5000 }).catch(() => {});
   ok(await p.getByTestId("diario-foglio").isVisible(), "diario: 'Ci sono stato' nella scheda apre il foglio 'Com'è andata?'");
+  { const sb = p.getByTestId("diario-buoni");
+    const vis = await sb.isVisible().catch(() => false);
+    if (vis) { await sb.getByRole("button", { name: "Buoni pasto: Sì" }).click(); await p.waitForTimeout(400); }
+    await p.getByTestId("diario-foglio").screenshot({ path: `${OUT}/51b-diario-buoni.png` }).catch(() => {});
+    ok(vis && buoniScritti.some((b) => (Array.isArray(b) ? b[0] : b)?.accetta === true) && (await sb.getByRole("button", { name: "Buoni pasto: Sì" }).getAttribute("aria-pressed")) === "true", `buoni pasto: nel 'Com'è andata?' un tocco su Sì lo salva (${JSON.stringify(buoniScritti)})`); }
   await p.getByTestId("diario-salta").click().catch(() => {});
   await p.waitForTimeout(500);
   ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
@@ -1580,6 +1622,9 @@ else {
     await p.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click();
     await p.waitForTimeout(400);
     const t1 = patched?.tags ?? [];
+    { const rg = p.getByTestId("recensione-google");
+      const href = (await rg.count()) ? (await rg.getAttribute("href")) ?? "" : "";
+      ok(href.startsWith("https://search.google.com/local/writereview?placeid=") && (await rg.getAttribute("target")) === "_blank", `dopo 👍: 'Aiuta il locale: lascia due righe su Google' con il link ufficiale (${href || "assente"})`); }
     await p.getByTestId("com-era").getByRole("button", { name: "👎 Non fa per me" }).click();
     await p.waitForTimeout(400);
     const t2 = patched?.tags ?? [];
@@ -2186,7 +2231,7 @@ else {
   await v.goto(`${BASE}/mappa?beta=salva`, { waitUntil: "networkidle" });
   await (await esempio(v)).click();
   // Dalla scheda "Salva" apre il foglio (il segnalibro sulla card ora salva in un tocco).
-  await v.locator("ul.snap-x").getByText("Rooftop Tre").first().click();
+  await apriCard(v, "Rooftop Tre");
   await v.locator("button:text-is('Salva')").first().click();
   const sheet = v.getByTestId("salva-foglio");
   await sheet.waitFor({ timeout: 3000 });
@@ -3334,6 +3379,19 @@ else {
 {
   let bk = null;
   try { bk = await import(new URL("../../src/lib/booking.ts", import.meta.url).href); } catch (e) { ok(false, `prenota: modulo src/lib/booking.ts importabile (${e.message})`); }
+  // Orari Google nel foglio Prenota (19/10): "a quell'ora risulta chiuso" e "riapre domani alle 12:00".
+  { let or = null;
+    try { or = await import(new URL("../../src/lib/orari.ts", import.meta.url).href); } catch (e) { ok(false, `orari: modulo src/lib/orari.ts importabile (${e.message})`); }
+    if (or) {
+      // Aperto tutti i giorni 12:00–15:00 e 19:00–23:30, lunedì chiuso (giorno 1).
+      const periods = [0, 2, 3, 4, 5, 6].flatMap((d) => [{ open: { day: d, hour: 12, minute: 0 }, close: { day: d, hour: 15, minute: 0 } }, { open: { day: d, hour: 19, minute: 0 }, close: { day: d, hour: 23, minute: 30 } }]);
+      const o = or.compattaOrari(periods);
+      const giovedi = (h, m) => new Date(2026, 9, 15, h, m); // giovedì 15/10
+      ok(o.length === 12 && or.apertoIl(o, giovedi(20, 0)) === true && or.apertoIl(o, giovedi(16, 0)) === false && or.apertoIl(null, giovedi(20, 0)) === null, "orari: aperto alle 20, chiuso alle 16, senza orari non si sa");
+      ok(or.prossimaApertura(o, giovedi(16, 0)) === "oggi alle 19:00" && or.prossimaApertura(o, giovedi(23, 45)) === "domani alle 12:00" && or.prossimaApertura(o, new Date(2026, 9, 18, 23, 50)) === "martedì alle 12:00", "orari: prossima apertura (oggi, domani, dopo il lunedì di chiusura)");
+      ok(or.apertoIl(or.compattaOrari([{ open: { day: 5, hour: 18, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } }]), new Date(2026, 9, 17, 1, 0)) === true, "orari: aperto dopo mezzanotte se chiude alle 2");
+      ok(or.apertoIl(or.compattaOrari([{ open: { day: 0, hour: 0, minute: 0 } }]), giovedi(4, 0)) === true, "orari: h24 sempre aperto");
+    } }
   let as = null;
   try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }
   if (bk) {
@@ -3650,19 +3708,47 @@ else {
     await ap.waitForTimeout(300);
     ok((await ap.getByTestId("promemoria-doppio").count()) === 0 && ((await ap.getByTestId("promemoria-domani").textContent()) ?? "").includes("Terrazza Uno") && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "doppia_prenotazione"), "doppia prenotazione: avvisato l'altro locale resta il promemoria del tavolo tenuto"); }
 
-  // Scheda della mappa: stesso pulsante Prenota
+  // Scheda della mappa: stesso pulsante Prenota. Terrazza Uno con orari Google: solo 12–15 tutti i giorni.
+  const soloPranzo = Array.from({ length: 7 }, (_, d) => [d * 1440 + 720, d * 1440 + 900]);
+  const soloSera = Array.from({ length: 7 }, (_, d) => [d * 1440 + 1140, d * 1440 + 1410]);
+  await ap.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.map((x) => (x.id === "P1" ? { ...x, orari: soloPranzo } : x.id === "P3" ? { ...x, orari: soloSera } : x)) } }));
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
   await (await esempio(ap)).click();
   const mapCard = ap.locator("li", { hasText: "Terrazza Uno" }).locator("button", { hasText: "Terrazza Uno" }).first();
   await mapCard.waitFor({ timeout: 8000 });
   await ap.waitForTimeout(1500); // verdetti e riordino del carosello
   await mapCard.click();
+  // Card di lato (lista nuova): il primo tocco la centra, il secondo apre la scheda.
+  if (!(await ap.getByTestId("prenota-scheda").waitFor({ timeout: 1500 }).then(() => true, () => false))) await mapCard.click();
   await ap.getByTestId("prenota-scheda").waitFor({ timeout: 4000 });
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
   ok(await ap.getByTestId("prenota-avanti").isDisabled() && (await ap.getByTestId("prenota-messaggio").count()) === 0, "prenota in 2 passi: senza dati si parte dal passo 1 e 'Avanti' resta spento");
-  await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  { const f = ap.getByTestId("foglio-prenota");
+    await f.getByRole("button", { name: "Oggi", exact: true }).click();
+    const sbarrato = await f.getByRole("button", { name: "21:00", exact: true }).evaluate((el) => el.className.includes("line-through"));
+    await f.getByRole("button", { name: "21:00", exact: true }).click();
+    const avviso = await ap.getByTestId("prenota-chiuso").isVisible().catch(() => false);
+    await f.getByRole("button", { name: "13:00", exact: true }).click();
+    const viaAvviso = (await ap.getByTestId("prenota-chiuso").count()) === 0;
+    ok(sbarrato && avviso && viaAvviso, `prenota: con gli orari Google l'ora in cui il locale è chiuso è barrata e c'è l'avviso; alle 13 no (${sbarrato}, ${avviso}, ${viaAvviso})`);
+    await f.getByRole("button", { name: "21:00", exact: true }).click();
+    await f.screenshot({ path: `${OUT}/58b-prenota-chiuso.png` }).catch(() => {});
+    // Proposta CEO 20/10: chiuso a quell'ora → i locali della stessa ricerca aperti a quell'ora.
+    const alt = ap.getByTestId("prenota-alternative");
+    const altVis = await alt.isVisible().catch(() => false);
+    const altTesto = altVis ? (await alt.textContent()) ?? "" : "";
+    ok(altVis && altTesto.includes("Rooftop Tre") && !altTesto.includes("Pub Fuori Tema"), `prenota: alle 21 Terrazza Uno è chiusa → propone Rooftop Tre, aperto a quell'ora (${altTesto.slice(0, 80)})`);
+    if (altVis) {
+      await alt.getByRole("button", { name: /Rooftop Tre/ }).click();
+      const nuovo = ap.getByRole("dialog", { name: /Prenota da Rooftop Tre/ });
+      const aperto = await nuovo.waitFor({ timeout: 4000 }).then(() => true, () => false);
+      ok(aperto && (await nuovo.getByRole("button", { name: "21:00", exact: true }).getAttribute("aria-pressed")) === "true", "prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con le 21:00 già scelte");
+      await nuovo.getByRole("button", { name: "Chiudi" }).click().catch(() => {});
+    } }
+  await ap.unroute("**/api/search");
+  if (await ap.getByRole("dialog", { name: /Prenota da/ }).count()) await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
   await actx.close();
 

@@ -63,7 +63,8 @@ Ultimo aggiornamento: 19/10/2026.
 **Quanto pesa:** 51,5% delle prenotazioni arriva a locale chiuso; 8 ristoranti su 10 usano ancora l'agenda di carta (Cooperto: [Panorama](https://www.panorama.it/attualita/economia/prenotazioni-online-e-cancellazioni-lampo-otto-ristoranti-su-dieci-rischiano-di-perdere-la-meta-dei-clienti)).
 **OGGI nell'app:** la prenotazione assistita prepara già il messaggio WhatsApp. Aggiunta possibile: se il locale è chiuso adesso, la scheda dice "Chiuso ora: il messaggio arriverà, risponderanno da domani alle 12" (orari Google già in memoria) e il promemoria ricorda di controllare la risposta. Sforzo S.
 **DAVVERO:** richiesta strutturata che il locale conferma in un tocco (email, poi WhatsApp Business: costi e approvazione Meta) o integrazione con un gestionale (vedi `PARTNER.md`).
-**Primo passo:** la riga "Chiuso ora: risponderanno da…" nel foglio Prenota (team).
+**FATTO il 19/10 notte (PR della notte):** nel foglio Prenota, con gli orari Google della ricerca (solo da mostrare, niente salvato), gli orari in cui il locale risulta chiuso sono barrati e scegliendoli compare "A quell'ora risulta chiuso"; a locale chiuso adesso, "Riapre domani alle 12:00: la risposta arriverà probabilmente da allora". Nessuna chiamata Google in più (gli orari erano già nella risposta della ricerca).
+**Primo passo successivo:** il promemoria "Controlla la risposta" alla riapertura (team, S); WhatsApp Business resta da decidere (Lorenzo).
 **Chi lo fa:** team; per WhatsApp Business serve l'ok di Lorenzo (costo nuovo).
 
 ---

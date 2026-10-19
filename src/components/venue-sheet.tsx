@@ -17,12 +17,14 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
-import BookingSheet from "@/components/booking-sheet";
+import BookingSheet, { type BookingAlternative } from "@/components/booking-sheet";
 import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
 import PostoLocale from "@/components/posto-locale";
+import type { Orari } from "@/lib/orari";
+import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -57,6 +59,7 @@ export type Venue = {
   personalTags: string[] | null;
   personalNote: string | null;
   photoRef?: string | null;
+  orari?: Orari | null;
   photoAuthor?: string | null;
 };
 
@@ -81,6 +84,11 @@ type VenueSheetProps = {
   verdettoInArrivo?: boolean;
   // Classifica personale (piano 4.3) sotto "Com'era?": la passa map-view solo per i salvati visitati.
   rankSlot?: React.ReactNode;
+  // Prenota: locali della stessa ricerca da proporre se a quell'ora questo è chiuso; aprendo uno di
+  // loro il foglio Prenota si apre già (autoBook) con gli stessi dati.
+  bookingAlternatives?: BookingAlternative[];
+  onBookAlternative?: (id: string, details: BookingDetails) => void;
+  autoBook?: boolean;
 };
 
 export default function VenueSheet({
@@ -100,6 +108,9 @@ export default function VenueSheet({
   booking = null,
   rankSlot,
   verdettoInArrivo = false,
+  bookingAlternatives,
+  onBookAlternative,
+  autoBook = false,
 }: VenueSheetProps) {
   const {
     name,
@@ -154,7 +165,7 @@ export default function VenueSheet({
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
-  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(autoBook);
   // Scheda B: sezione aperta e menu "Altro".
   const [tab, setTab] = useState<SchedaTab>("panoramica");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -387,6 +398,20 @@ export default function VenueSheet({
                 );
               })}
             </div>
+            {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
+                dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}
+            {personalTags?.includes("Mi è piaciuto") && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (
+              <a
+                data-testid="recensione-google"
+                href={`https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackFeature("recensione_google", userRatingCount != null ? { risultati: userRatingCount } : undefined)}
+                className="mt-2 flex min-h-10 items-center gap-1.5 text-xs font-sans text-text-muted underline-offset-2 hover:underline"
+              >
+                ✍️ Ti è piaciuto? Aiuta il locale: lascia due righe su Google
+              </a>
+            )}
             <VisitaContext.Provider value={{
               askedAt: visitAskedAt,
               consume: () => setVisitAskedAt(null),
@@ -580,6 +605,8 @@ export default function VenueSheet({
           )}
           {/* Locale verificato: badge e, se il titolare l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
           <PostoLocale venueId={venue.id} />
+          {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
+          <BuoniPastoRiga venueId={venue.id} />
         </div>
 
         {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}
@@ -764,9 +791,11 @@ export default function VenueSheet({
 
         {bookingOpen && (
           <BookingSheet
-            place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng }}
+            place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng, orari: venue.orari ?? null }}
             initial={booking}
             onClose={() => setBookingOpen(false)}
+            alternative={bookingAlternatives}
+            onAlternative={onBookAlternative}
           />
         )}
 
@@ -996,9 +1025,11 @@ export default function VenueSheet({
       )}
       {bookingOpen && (
         <BookingSheet
-          place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng }}
+          place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng, orari: venue.orari ?? null }}
           initial={booking}
           onClose={() => setBookingOpen(false)}
+          alternative={bookingAlternatives}
+          onAlternative={onBookAlternative}
         />
       )}
 
