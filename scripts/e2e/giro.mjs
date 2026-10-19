@@ -3674,7 +3674,9 @@ else {
     await ashot("56b-promemoria-disdetta");
     await ap.getByTestId("disdetta-whatsapp").evaluate((a) => { a.removeAttribute("target"); a.setAttribute("href", "#"); a.click(); });
     await ap.waitForTimeout(300);
-    ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta"); }
+    ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta");
+    { const ev = aEvents.find((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta");
+      ok(ev?.googlePlaceId === "P1" && typeof ev?.props?.ore === "number", `disdetta: segnale con il locale e le ore di anticipo, per il pannello del ristoratore (${JSON.stringify({ g: ev?.googlePlaceId, ore: ev?.props?.ore })})`); } }
   // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
@@ -4439,6 +4441,12 @@ else {
       e("ricerca", 11, "a5", { s: "s5", p: { modo: "ai", tipo: "bar", requisiti: ["terrazza"], zona: "Milano" } }),
       // Locale simile visto da 2 persone; uno fuori periodo (40 giorni fa) non conta.
       e("apri_scheda", 14, "a6", { gid: "GS1" }), e("apri_scheda", 14, "a7", { gid: "GS2" }),
+      // Disdette da Mapetite ("Non vado più"): due del locale (una senza ore), una di un altro locale, una vecchia.
+      e("funzione", 13, "a8", { gid: "GUNO", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", ore: 5 } }),
+      e("funzione", 12, "a9", { pid: L.id, p: { nome: "prenotazione_disdetta", contesto: "telefono" } }),
+      e("funzione", 12, "a10", { gid: "GS1", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", ore: 20 } }),
+      e("funzione", 40, "a11", { gid: "GUNO", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", ore: 1 } }),
+      e("funzione", 12, "a12", { gid: "GUNO", p: { nome: "filtri" } }),
     ];
     const salvati = [{ place_id: L.id, user_id: "00000000-0000-0000-0000-0000000000c1", created_at: at(13), tags: ["Già visitato"] }];
     const p = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi, salvati }, 7, now);
@@ -4447,6 +4455,7 @@ else {
     ok(p.daRicerca.ricerche === 1 && p.daRicerca.tipi[0]?.chiave === "trattoria" && p.daRicerca.richieste.some((r) => r.chiave === "tavoli all'aperto") && p.daRicerca.zone[0]?.chiave === "Pigneto", `ristoratore: 'come ti trovano' dalla ricerca della stessa visita (${JSON.stringify(p.daRicerca.richieste)})`);
     ok(p.zona.ricerche === 2 && !p.zona.richieste.some((r) => r.persone > 1) && p.zona.fasce.find((f) => f.chiave === "pranzo")?.persone === 1, `ristoratore: ricerche in zona (città o quartiere nell'indirizzo), non quelle di Milano (${p.zona.ricerche})`);
     ok(p.confronto.simili === 2 && p.confronto.mediaViste === null, "ristoratore: con meno di 3 locali simili niente media (non rivelerebbe il singolo)");
+    ok(p.disdette.n === 2 && p.disdette.orePrimaMedia === 5, `ristoratore: tavoli liberati per tempo del locale e del periodo, ore medie solo dove ci sono (${JSON.stringify(p.disdette)})`);
     ok(rs.mostraPersone(0) === "0" && rs.mostraPersone(2) === "meno di 3" && rs.mostraPersone(3) === "3" && p.pochiDati === false, "ristoratore: sotto 3 persone 'meno di 3'");
     ok(p.perGiorno.length === 7 && p.perGiorno.at(-2).viste === 1, "ristoratore: andamento giorno per giorno");
   }
@@ -4583,7 +4592,9 @@ else {
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
     { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
-      ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)"); }
+      ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)");
+      { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); } }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();

@@ -44,7 +44,7 @@ Ultimo aggiornamento: 19/10/2026.
 | Doppia prenotazione — **FATTA (PR #81, 19/10)** | Se l'utente ha due prenotazioni per la stessa sera: "Hai 2 tavoli sabato: quale tieni?" e prepara la disdetta per l'altro (vedi `PROPOSTE.md`, 19/10) | S |
 | Disdetta fuori orario | "Non vado più" alle 23: se il locale ha solo il telefono, propone l'SMS o il messaggio da mandare la mattina dopo, con promemoria alle 10 | S |
 | Promemoria a 3 ore | Oltre a giorno prima e giorno stesso, uno 3 ore prima con "Confermo / Non vado più" (come previsto in `RICERCA-RISTORATORI.md`, riga 1) | S |
-| Contatore per il ristoratore — **IN CORSO (notte 19→20)** | Nel pannello: "Disdette arrivate da Mapetite questo mese: N, in media X ore prima" (serve salvare l'evento lato server, già tracciato come `prenotazione_disdetta`) | M |
+| Contatore per il ristoratore — **FATTO (notte 19→20)**: "🔁 N tavoli liberati per tempo, in media X ore prima" | Nel pannello: "Disdette arrivate da Mapetite questo mese: N, in media X ore prima" (serve salvare l'evento lato server, già tracciato come `prenotazione_disdetta`) | M |
 
 **DAVVERO, in futuro:**
 - **Carta a garanzia o caparra:** il cliente lascia la carta, la penale scatta solo se non si presenta, secondo le regole del locale. Serve: un fornitore di pagamenti con conti per i singoli locali (per esempio Stripe Connect, citato in `RICERCA-RISTORATORI.md`), autenticazione forte della carta (regole europee sui pagamenti), condizioni scritte con un legale, gestione delle contestazioni. È un servizio a pagamento nuovo: decide Lorenzo.

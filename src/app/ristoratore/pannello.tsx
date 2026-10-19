@@ -376,7 +376,7 @@ export default function Pannello({
 
       {/* Domanda latente: il dato che nessun altro dà al ristoratore (POSIZIONAMENTO.md, proposta 2).
           Compatta, sotto i 4 numeri: la prima schermata resta quella. */}
-      {(attesa.persone > 0 || risposte >= SOGLIA) && (
+      {(attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0) && (
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
           {attesa.persone > 0 && (
             <p className="flex items-baseline gap-2">
@@ -398,6 +398,16 @@ export default function Pannello({
               <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">👍 {p.visite.piaciuto.toLocaleString("it-IT")}</span>
               <span className="text-sm font-sans leading-snug text-white/90">
                 su {risposte.toLocaleString("it-IT")}: chi ti aveva salvato, ci è andato e ha detto com&apos;è andata ({p.giorni} giorni)
+              </span>
+            </p>
+          )}
+          {/* Tavoli liberati per tempo (PROBLEMI.md 1): chi aveva prenotato da Mapetite e non poteva più venire
+              ti ha avvisato con "Non vado più", invece di non presentarsi. */}
+          {p.disdette.n > 0 && (
+            <p data-testid="pannello-disdette" className={`flex items-baseline gap-2 ${attesa.persone > 0 || risposte >= SOGLIA ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔁 {p.disdette.n.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">
+                {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: chi aveva prenotato da Mapetite ti ha avvisato invece di non presentarsi{p.disdette.orePrimaMedia != null ? `, in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""} ({p.giorni} giorni)
               </span>
             </p>
           )}

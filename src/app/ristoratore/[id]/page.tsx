@@ -78,6 +78,14 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     if (!data || data.length < PAGE) break;
   }
 
+  // Disdette fatte da Mapetite ("Non vado più"): poche righe, lette a parte per non caricare tutti gli
+  // altri segnali "funzione".
+  if (!avviso) {
+    const { data: dd, error: dErr } = await db.from("events").select(cols).eq("type", "funzione").eq("props->>nome", "prenotazione_disdetta").gte("created_at", since).limit(5000);
+    if (dErr) console.error("[ristoratore] lettura disdette:", dErr.message);
+    eventi.push(...((dd ?? []) as unknown as RistEvento[]));
+  }
+
   // Salvataggi veri (anche quelli fatti prima che esistesse il segnale "salva").
   const salvati: RistSalvataggio[] = [];
   const ids = simili.map((p) => p.id);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
 import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
+import { dataOra } from "@/lib/orari";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
 // "Stasera alle 21:00 da …", dal giorno dopo "Com'è andata?". In home e nel profilo.
@@ -25,7 +26,10 @@ function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
   const text = cancelMessage(b, name);
   const wa = whatsappNumber(b.phone);
   const done = (contesto: string) => {
-    trackFeature("prenotazione_disdetta", { contesto });
+    // Con il locale e le ore di anticipo: il pannello del ristoratore conta i tavoli liberati per tempo.
+    const quando = b.date && b.time ? dataOra(b.date, b.time) : null;
+    const ore = quando ? Math.max(0, Math.round((quando.getTime() - Date.now()) / 3_600_000)) : null;
+    track("funzione", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { nome: "prenotazione_disdetta", contesto, ...(ore != null ? { ore } : {}) });
     updateBooking(b.id, { outcome: "non-andato", dismissed: true });
   };
   const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
