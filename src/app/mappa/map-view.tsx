@@ -883,6 +883,24 @@ export default function MapView({
     () => (new URLSearchParams(window.location.search).get("lista") === "a" ? "a" : "b"),
     () => "b" as const,
   );
+  // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro": card a foto piena, pillola "N posti",
+  // pin con la foto). ?lista=b-vecchia torna alla lista di prima e se lo ricorda; ?lista=b la riaccende.
+  const listNew = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const q = new URLSearchParams(window.location.search).get("lista");
+      try {
+        if (q === "b-vecchia") window.localStorage.setItem("mapetite.lista", q);
+        else if (q === "b") window.localStorage.removeItem("mapetite.lista");
+        return window.localStorage.getItem("mapetite.lista") !== "b-vecchia";
+      } catch {
+        return q !== "b-vecchia";
+      }
+    },
+    () => true,
+  );
+  // Posto della pillola "N posti" sotto la barra (la lista nuova ci disegna dentro).
+  const [pillSlot, setPillSlot] = useState<HTMLDivElement | null>(null);
   // Suggerimento legato all'ora del telefono: solo sul client (sul server l'ora non è quella dell'utente).
   const momentHour = useSyncExternalStore(
     () => () => {},
@@ -1621,7 +1639,7 @@ export default function MapView({
   // card (le prime 6 della lista B), con lo stesso indirizzo immagine → nessuna foto in più da pagare.
   const pinVariant = useVariant("pin");
   const pinPhotoIds = new Set(
-    pinVariant === "b" && aiSearch !== null && listVariant === "b" && clusterPlaces === null
+    (pinVariant === "b" || listNew) && aiSearch !== null && listVariant === "b" && clusterPlaces === null
       ? carouselOrder.slice(0, PHOTO_CARDS)
       : [],
   );
@@ -2340,6 +2358,7 @@ export default function MapView({
               Idee
             </button>
           )}
+          <div ref={setPillSlot} className="contents" />
         </div>
         {/* "Ti suggeriamo" (Lorenzo 16/10): tutti i suggerimenti dietro un solo tocco (Idee o tocco sulla barra),
             in gruppi brevi come lo storico di Places. Resta nel DOM anche chiuso (nascosto). */}
@@ -2972,8 +2991,9 @@ export default function MapView({
               >
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
-                    className={`block overflow-hidden rounded-xl border-2 bg-white shadow-float transition-transform ${
-                      selected?.id === place.id || focusId === place.id ? "h-14 w-14 scale-110 border-accent" : "h-11 w-11 border-white"
+                    data-testid="pin-foto"
+                    className={`block overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
+                      selected?.id === place.id || focusId === place.id ? "h-16 w-16 border-accent" : "h-12 w-12 border-brand"
                     }`}
                   >
                     <PlacePhoto
@@ -3008,7 +3028,7 @@ export default function MapView({
                 )}
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
                 {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
-                  <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
+                  <span className={`mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
                     {pinName(place.name)}
                   </span>
                 )}
@@ -3286,6 +3306,7 @@ export default function MapView({
           showCity={view === "saved" && aiSearch === null && activeCity === null}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
+          pillSlot={listNew && listVariant === "b" ? pillSlot : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
