@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
+import { DIETE, SCOPERTE, TIPI, capito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
+import { ZONE } from "@/lib/gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
@@ -25,6 +27,12 @@ interface Draft {
   city: string | null;
   otherCity: string;
   otherOpen: boolean;
+  zone: string[];
+  su: string[];
+  giu: string[];
+  visti: string[];
+  scoperta: Scoperta | null;
+  diete: string[];
 }
 
 function readDraftRaw(): string | null {
@@ -47,6 +55,8 @@ function clearDraft() {
   } catch { /* niente da fare */ }
 }
 
+const vuota = (d: Draft) => d.step === 0 && !d.city && !d.otherOpen && !d.zone.length && !d.visti.length && !d.occasions.length && !d.priceRange && !d.diete.length;
+
 // Solo valori che l'onboarding conosce: il contenuto del telefono si ricontrolla come un input.
 function parseDraft(raw: string | null): Draft | null {
   if (!raw) return null;
@@ -55,33 +65,47 @@ function parseDraft(raw: string | null): Draft | null {
     if (!o || typeof o !== "object" || typeof o.ts !== "number" || Date.now() - o.ts > DRAFT_TTL_MS) return null;
     const pick = (v: unknown, allowed: readonly { value: string }[]) =>
       Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && allowed.some((a) => a.value === x)) : [];
+    const city = CITIES.some((c) => c.value === o.city) ? o.city : null;
+    const m = pulisciMappa(o, (z) => ZONE.some((x) => x.nome === z && x.citta === city));
     const d: Draft = {
       step: Number.isInteger(o.step) ? Math.min(Math.max(o.step, 0), TOTAL - 1) : 0,
       cuisines: pick(o.cuisines, CUISINES),
       occasions: pick(o.occasions, OCCASIONS),
       atmospheres: pick(o.atmospheres, ATMOSPHERES),
       priceRange: PRICE_RANGES.some((p) => p.value === o.priceRange) ? o.priceRange : null,
-      city: CITIES.some((c) => c.value === o.city) ? o.city : null,
+      city,
       otherCity: typeof o.otherCity === "string" ? o.otherCity.slice(0, 40) : "",
       otherOpen: o.otherOpen === true,
+      zone: m.zone,
+      su: m.su,
+      giu: m.giu,
+      visti: Array.isArray(o.visti) ? o.visti.filter((x: unknown): x is string => typeof x === "string" && TIPI.some((t) => t.id === x)) : [...m.su, ...m.giu],
+      scoperta: m.scoperta,
+      diete: dieteValide(o.diete),
     };
-    const empty = d.step === 0 && !d.cuisines.length && !d.occasions.length && !d.atmospheres.length && !d.priceRange;
-    return empty ? null : d;
+    return vuota(d) ? null : d;
   } catch {
     return null;
   }
 }
 
-// Primo accesso dopo la registrazione (piano 9.1): tre schermate al massimo, stile Albo.
-// 1) i gusti in una schermata sola, 2) la città, 3) "porta qui i tuoi salvati di Google Maps".
-// Ogni schermata ha la barra di avanzamento; le prime due "Salta", l'ultima "Lo faccio dopo".
+// Primo accesso dopo la registrazione: la "mappa del gusto" (sprint 25/10, LORENZO.md).
+// 1) città e zone, 2) dieci tipi di posto 👍/👎, 3) occasioni, spesa, diete, famosi o chicche,
+// 4) "porta qui i tuoi posti" (Google Maps o il link di un reel), 5) "Ecco cosa ho capito di te"
+// e subito i posti per te. Tutto saltabile: chi vuole provare subito l'app non deve rispondere.
 
 const STEPS = [
-  { kicker: "I TUOI GUSTI", title: "Cosa ti piace?", subtitle: "Tocca quello che ti somiglia: bastano due o tre scelte." },
-  { kicker: "LA TUA CITTÀ", title: "Dove esci di solito?", subtitle: "Così i primi consigli sono già vicino a te." },
-  { kicker: "I TUOI SALVATI", title: "Hai posti salvati su Google Maps?", subtitle: "Portali qui adesso: è il modo più veloce per avere subito la tua mappa." },
+  { kicker: "DOVE ESCI", title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
+  { kicker: "I TUOI GUSTI", title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
+  { kicker: "COME ESCI", title: "Come esci?", subtitle: "Occasioni, spesa e cosa eviti." },
+  { kicker: "I TUOI POSTI", title: "Hai già posti salvati?", subtitle: "Da Google Maps o dal link di un reel: la tua mappa parte già piena." },
+  { kicker: "IL TUO PROFILO", title: "Ecco cosa ho capito di te", subtitle: "Tocca una riga per cambiarla." },
 ] as const;
 const TOTAL = STEPS.length;
+const PASSO_TIPI = 1;
+const PASSO_COME = 2;
+const PASSO_POSTI = 3;
+const PASSO_CAPITO = 4;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
@@ -174,24 +198,30 @@ export default function OnboardingView({ next = null }: { next?: string | null }
 function Benvenuto({ next, initial }: { next: string | null; initial: Draft | null }) {
   const router = useRouter();
   const [step, setStep] = useState(initial?.step ?? 0);
-  const [cuisines, setCuisines] = useState<string[]>(initial?.cuisines ?? []);
+  const cuisines = initial?.cuisines ?? [];
+  const atmospheres = initial?.atmospheres ?? [];
   const [occasions, setOccasions] = useState<string[]>(initial?.occasions ?? []);
-  const [atmospheres, setAtmospheres] = useState<string[]>(initial?.atmospheres ?? []);
   const [priceRange, setPriceRange] = useState<string | null>(initial?.priceRange ?? null);
   const [city, setCity] = useState<string | null>(initial?.city ?? null);
   const [otherCity, setOtherCity] = useState(initial?.otherCity ?? "");
   const [otherOpen, setOtherOpen] = useState(initial?.otherOpen ?? false);
+  const [zone, setZone] = useState<string[]>(initial?.zone ?? []);
+  const [su, setSu] = useState<string[]>(initial?.su ?? []);
+  const [giu, setGiu] = useState<string[]>(initial?.giu ?? []);
+  const [visti, setVisti] = useState<string[]>(initial?.visti ?? []);
+  const [scoperta, setScoperta] = useState<Scoperta | null>(initial?.scoperta ?? null);
+  const [diete, setDiete] = useState<string[]>(initial?.diete ?? []);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ripreso = initial != null;
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
   // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
-  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen };
+  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete };
   const draftJson = JSON.stringify(draftNow);
   useEffect(() => {
     const d = JSON.parse(draftJson) as Draft;
-    if (d.step === 0 && !d.cuisines.length && !d.occasions.length && !d.atmospheres.length && !d.priceRange) return;
+    if (vuota(d)) return;
     saveDraft(d);
   }, [draftJson]);
 
@@ -206,11 +236,33 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
   const progress = ((step + 1) / TOTAL) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
+  const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
+  const dedotta = scopertaDedotta(su);
+  const scopertaOra = scoperta ?? dedotta;
+  // Il tipo di posto da valutare adesso (il primo non ancora visto).
+  const corrente = TIPI.find((t) => !visti.includes(t.id)) ?? null;
+  const gusto = { v: 1 as const, zone, su, giu, scoperta };
+
+  const vota = (id: string, voto: "su" | "giu" | "boh") => {
+    setSu((p) => (voto === "su" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
+    setGiu((p) => (voto === "giu" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
+    const dopo = [...visti.filter((x) => x !== id), id];
+    setVisti(dopo);
+    // Finiti i dieci: si passa da soli alla schermata dopo.
+    if (dopo.length >= TIPI.length) setTimeout(() => setStep(PASSO_COME), 250);
+  };
+  const annullaUltimo = () => {
+    const ultimo = visti[visti.length - 1];
+    if (!ultimo) return;
+    setVisti((p) => p.slice(0, -1));
+    setSu((p) => p.filter((x) => x !== ultimo));
+    setGiu((p) => p.filter((x) => x !== ultimo));
+  };
 
   const finish = async (dest: "importa" | null) => {
     setSubmitting(dest ?? "mappa");
     setError(null);
-    trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}` });
+    trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
     // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
     // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
     clearDraft();
@@ -220,7 +272,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -242,14 +294,17 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     }
   };
 
-  // "Salta" della seconda schermata: si salta solo la città.
-  const skipStep = () => {
-    setCity(null);
-    setOtherOpen(false);
-    setStep(2);
-  };
+  // "Salta" dalla seconda schermata in poi: si salta solo quella, le risposte date restano.
+  const skipStep = () => setStep((s) => Math.min(s + 1, TOTAL - 1));
 
   const saltaCls = "-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline";
+  const righe = capito(gusto, {
+    citta: chosenCity,
+    priceRange,
+    diete,
+    occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
+  });
+  const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
 
   return (
     <div className="flex min-h-screen flex-col bg-bg" data-testid="benvenuto" data-passo={step + 1}>
@@ -270,10 +325,9 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
               {step + 1} di {TOTAL}
             </span>
             {/* Prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
-                Seconda: salta solo la città, così i gusti già scelti non si perdono.
-                Terza: niente "Salta" in alto, basta "Lo faccio dopo" sotto (erano due pulsanti per
-                la stessa cosa). Lo spazio resta vuoto, così "3 di 3" non si sposta. */}
-            {step === TOTAL - 1 ? (
+                Dalla seconda: salta solo quella schermata. Le ultime due hanno già il loro
+                "Lo faccio dopo" / "Mostrami": niente doppioni in alto, lo spazio resta. */}
+            {step >= PASSO_POSTI ? (
               <span aria-hidden className="-mr-2 min-h-11 w-12" />
             ) : step === 0 ? (
               <form action={skipOnboarding}>
@@ -313,25 +367,146 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
         )}
 
         {step === 0 && (
-          <div data-testid="benvenuto-gusti">
-            <Gruppo title="Cucina">
-              <div className="flex flex-wrap gap-2">
-                {CUISINES.map((item) => (
-                  <Chip key={item.value} item={item} selected={cuisines.includes(item.value)} onToggle={(v) => setCuisines((p) => toggle(p, v))} />
-                ))}
+          <div className="flex flex-col gap-3" data-testid="benvenuto-citta">
+            {CITIES.map((c) => {
+              const on = !otherOpen && city === c.value;
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setOtherOpen(false);
+                    setCity(on ? null : c.value);
+                    setZone([]);
+                  }}
+                  className={[
+                    "flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors",
+                    on ? "border-accent bg-accent-light" : "border-border bg-surface",
+                  ].join(" ")}
+                >
+                  <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">{c.emoji}</span>
+                  <span className="flex-1 font-display text-lg font-semibold text-brand">{c.value}</span>
+                  {on && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">✓</span>}
+                </button>
+              );
+            })}
+            {zoneCitta.length > 0 && (
+              <div data-testid="benvenuto-zone" className="rounded-card bg-surface px-4 py-3">
+                <p className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Le tue zone (fino a 3)</p>
+                <div className="flex flex-wrap gap-2">
+                  {zoneCitta.map((z) => (
+                    <Chip
+                      key={z.nome}
+                      item={{ value: z.nome, label: z.nome, emoji: "📍" }}
+                      selected={zone.includes(z.nome)}
+                      onToggle={(v) => setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length >= 3 ? p : [...p, v]))}
+                    />
+                  ))}
+                </div>
               </div>
+            )}
+            <div
+              className={[
+                "rounded-card border-2 px-4 py-3 transition-colors",
+                otherOpen ? "border-accent bg-accent-light" : "border-border bg-surface",
+              ].join(" ")}
+            >
+              <button
+                type="button"
+                aria-pressed={otherOpen}
+                onClick={() => { setOtherOpen((o) => !o); setZone([]); }}
+                className="flex min-h-10 w-full items-center gap-4 text-left"
+              >
+                <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">📍</span>
+                <span className="flex-1 font-display text-lg font-semibold text-brand">Un&apos;altra città</span>
+              </button>
+              {otherOpen && (
+                <input
+                  autoFocus
+                  value={otherCity}
+                  onChange={(e) => setOtherCity(e.target.value)}
+                  maxLength={40}
+                  placeholder="es. Torino"
+                  aria-label="La tua città"
+                  data-testid="benvenuto-altra-citta"
+                  className="mt-3 w-full rounded-btn border border-border bg-white px-3 py-2.5 text-base focus:border-brand focus:outline-none"
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === PASSO_TIPI && (
+          <div data-testid="benvenuto-tipi">
+            {corrente ? (
+              <>
+                <p data-testid="tipi-contatore" className="mb-2 text-xs font-sans text-text-muted">{visti.length + 1} di {TIPI.length}</p>
+                <div
+                  data-testid="tipo-card"
+                  key={corrente.id}
+                  className="relative flex min-h-[15rem] flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
+                  style={{ background: `linear-gradient(160deg, ${corrente.sfondo})` }}
+                >
+                  <span aria-hidden className="absolute right-4 top-3 text-[5.5rem] leading-none drop-shadow">{corrente.emoji}</span>
+                  <span className="mb-2 w-fit rounded-pill bg-black/25 px-2.5 py-0.5 text-[11px] font-display font-semibold uppercase tracking-wider">
+                    {corrente.famoso ? "Molto noto" : "Poco noto"}
+                  </span>
+                  <h2 className="font-title text-2xl font-semibold leading-tight">{corrente.titolo}</h2>
+                  <p className="mt-1 text-sm font-sans text-white/90">{corrente.riga}</p>
+                </div>
+                <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <button type="button" data-testid="tipo-giu" onClick={() => vota(corrente.id, "giu")} className="min-h-14 rounded-pill border-2 border-border bg-white font-display text-base font-semibold text-brand active:scale-95">
+                    👎 No
+                  </button>
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 px-2 text-sm font-display font-semibold text-text-muted">
+                    Non so
+                  </button>
+                  <button type="button" data-testid="tipo-su" onClick={() => vota(corrente.id, "su")} className="min-h-14 rounded-pill bg-accent font-display text-base font-semibold text-white active:scale-95">
+                    👍 Sì
+                  </button>
+                </div>
+                {visti.length > 0 && (
+                  <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
+                    ↶ Torna al precedente
+                  </button>
+                )}
+              </>
+            ) : (
+              <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
+                Fatto: {su.length} ti piacciono, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
+              </p>
+            )}
+          </div>
+        )}
+
+        {step === PASSO_COME && (
+          <div data-testid="benvenuto-come">
+            <Gruppo title="Famosi o chicche?">
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Famosi o chicche?">
+                {SCOPERTE.map((sc) => {
+                  const on = scopertaOra === sc.value;
+                  return (
+                    <button
+                      key={sc.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setScoperta(sc.value)}
+                      className={["flex min-h-16 flex-col items-center justify-center rounded-btn border-2 px-1.5 py-2 text-center", on ? "border-accent bg-accent-light" : "border-border bg-surface"].join(" ")}
+                    >
+                      <span className="font-display text-sm font-semibold text-brand">{sc.label}</span>
+                      <span className="mt-0.5 text-[11px] leading-tight font-sans text-text-muted">{sc.riga}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {!scoperta && dedotta && <p className="mt-1.5 text-xs font-sans text-text-muted">Scelto dai tuoi 👍: cambialo se non è così.</p>}
             </Gruppo>
-            <Gruppo title="Occasione">
+            <Gruppo title="Occasioni">
               <div className="flex flex-wrap gap-2">
                 {OCCASIONS.map((item) => (
                   <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
-                ))}
-              </div>
-            </Gruppo>
-            <Gruppo title="Atmosfera">
-              <div className="flex flex-wrap gap-2">
-                {ATMOSPHERES.map((item) => (
-                  <Chip key={item.value} item={item} selected={atmospheres.includes(item.value)} onToggle={(v) => setAtmospheres((p) => toggle(p, v))} />
                 ))}
               </div>
             </Gruppo>
@@ -357,79 +532,54 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 })}
               </div>
             </Gruppo>
+            <Gruppo title="Cosa eviti">
+              <div className="flex flex-wrap gap-2">
+                {DIETE.map((d) => (
+                  <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
+                ))}
+              </div>
+            </Gruppo>
           </div>
         )}
 
-        {step === 1 && (
-          <div className="flex flex-col gap-3" data-testid="benvenuto-citta">
-            {CITIES.map((c) => {
-              const on = !otherOpen && city === c.value;
-              return (
-                <button
-                  key={c.value}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => {
-                    setOtherOpen(false);
-                    setCity(on ? null : c.value);
-                  }}
-                  className={[
-                    "flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors",
-                    on ? "border-accent bg-accent-light" : "border-border bg-surface",
-                  ].join(" ")}
-                >
-                  <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">{c.emoji}</span>
-                  <span className="flex-1 font-display text-lg font-semibold text-brand">{c.value}</span>
-                  {on && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">✓</span>}
-                </button>
-              );
-            })}
-            <div
-              className={[
-                "rounded-card border-2 px-4 py-3 transition-colors",
-                otherOpen ? "border-accent bg-accent-light" : "border-border bg-surface",
-              ].join(" ")}
-            >
-              <button
-                type="button"
-                aria-pressed={otherOpen}
-                onClick={() => setOtherOpen((o) => !o)}
-                className="flex min-h-10 w-full items-center gap-4 text-left"
-              >
-                <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">📍</span>
-                <span className="flex-1 font-display text-lg font-semibold text-brand">Un&apos;altra città</span>
-              </button>
-              {otherOpen && (
-                <input
-                  autoFocus
-                  value={otherCity}
-                  onChange={(e) => setOtherCity(e.target.value)}
-                  maxLength={40}
-                  placeholder="es. Torino"
-                  aria-label="La tua città"
-                  data-testid="benvenuto-altra-citta"
-                  className="mt-3 w-full rounded-btn border border-border bg-white px-3 py-2.5 text-base focus:border-brand focus:outline-none"
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
+        {step === PASSO_POSTI && (
           <div data-testid="benvenuto-importa">
             <IlluImporta />
             <ol className="mt-6 space-y-2.5">
               {[
-                "Apri Google Maps e i tuoi elenchi salvati",
-                "Copia i link dei posti, o la chat dove te li mandi",
+                "Da Google Maps: copia i link dei tuoi elenchi salvati",
+                "Da Instagram o TikTok: copia il link del reel del posto",
                 "Incollali in Mapetite: li salvo tutti insieme",
-              ].map((s, i) => (
-                <li key={s} className="flex items-start gap-3 text-sm font-sans text-text">
+              ].map((t, i) => (
+                <li key={t} className="flex items-start gap-3 text-sm font-sans text-text">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{i + 1}</span>
-                  <span className="pt-0.5">{s}</span>
+                  <span className="pt-0.5">{t}</span>
                 </li>
               ))}
             </ol>
+          </div>
+        )}
+
+        {step === PASSO_CAPITO && (
+          <div data-testid="benvenuto-capito">
+            {righe.length > 0 ? (
+              <ul className="overflow-hidden rounded-card border border-border bg-white shadow-card">
+                {righe.map((r, i) => (
+                  <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
+                    <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
+                      <span aria-hidden className="text-xl">{r.emoji}</span>
+                      <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
+                      <span className="shrink-0 text-xs font-display font-semibold text-accent">Cambia</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
+                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
+              </p>
+            )}
+            <p className="mt-3 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
           </div>
         )}
       </div>
@@ -437,15 +587,21 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
       {/* Pulsanti in basso */}
       <div className="fixed left-0 right-0 z-40 bg-bg px-6 pb-[calc(1rem+var(--nav-sporgenza))] pt-4 shadow-float" style={{ bottom: "var(--nav-height-mobile)" }}>
         <div className="mx-auto max-w-lg">
-          {step < TOTAL - 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => s + 1)}
-              className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
-            >
-              Continua
-            </button>
-          ) : (
+          {step < PASSO_POSTI ? (
+            step === PASSO_TIPI && corrente ? (
+              <button type="button" onClick={() => setStep(PASSO_COME)} className="flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand">
+                Basta così, continua
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setStep((s) => s + 1)}
+                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
+              >
+                Continua
+              </button>
+            )
+          ) : step === PASSO_POSTI ? (
             <>
               <button
                 type="button"
@@ -454,18 +610,28 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 disabled={!!submitting}
                 className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
               >
-                {submitting === "importa" ? "Un attimo…" : "📍 Importa da Google Maps"}
+                {submitting === "importa" ? "Un attimo…" : "📍 Importa o incolla un link"}
               </button>
               <button
                 type="button"
                 data-testid="benvenuto-dopo"
-                onClick={() => finish(null)}
+                onClick={() => setStep(PASSO_CAPITO)}
                 disabled={!!submitting}
                 className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand disabled:opacity-60"
               >
-                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Lo faccio dopo, continua" : "Lo faccio dopo: mostrami i posti per me"}
+                Lo faccio dopo
               </button>
             </>
+          ) : (
+            <button
+              type="button"
+              data-testid="benvenuto-fine"
+              onClick={() => finish(null)}
+              disabled={!!submitting}
+              className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+            >
+              {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
+            </button>
           )}
           {error && <p className="mt-3 text-center text-sm text-error">{error}</p>}
         </div>

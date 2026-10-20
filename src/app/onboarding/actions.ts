@@ -3,7 +3,9 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { tasteQuery } from "@/lib/preferences";
+import { OCCASIONS, PRICE_RANGES, tasteQuery } from "@/lib/preferences";
+import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } from "@/lib/mappa-gusto";
+import { ZONE } from "@/lib/gusti";
 import { safeNext, withNext } from "@/lib/next-path";
 
 interface OnboardingData {
@@ -17,6 +19,9 @@ interface OnboardingData {
   dest?: "importa" | null;
   // Dove tornare dopo l'onboarding (link condiviso, pagina che chiedeva l'accesso).
   next?: string | null;
+  // Mappa del gusto (sprint 25/10): zone, tipi di posto 👍/👎, "famosi o chicche?", diete.
+  gusto?: unknown;
+  diete?: unknown;
 }
 
 export async function completeOnboarding({
@@ -27,15 +32,28 @@ export async function completeOnboarding({
   city,
   dest,
   next,
+  gusto: gustoRaw,
+  diete: dieteRaw,
 }: OnboardingData): Promise<{ error: string } | { login: string } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
   const citta = cleanCity(city);
-  const gusti = { cuisines, occasions, atmospheres, priceRange };
+  // Tutto si rivalida: solo valori che l'app conosce.
+  const mappa = pulisciMappa(gustoRaw, (z) => ZONE.some((x) => x.nome === z && (!citta || x.citta === citta)));
+  const diete = dieteValide(dieteRaw);
+  const scelteOcc = Array.isArray(occasions) ? occasions.filter((o) => OCCASIONS.some((x) => x.value === o)) : [];
+  const scelteSpesa = PRICE_RANGES.some((x) => x.value === priceRange) ? priceRange : null;
+  const dedotti = gustiDaTipi(mappa.su, { occasions: scelteOcc, priceRange: scelteSpesa });
+  const gusti = {
+    cuisines: [...new Set([...(Array.isArray(cuisines) ? cuisines : []), ...dedotti.cuisines])].slice(0, 8),
+    occasions: dedotti.occasions,
+    atmospheres: [...new Set([...(Array.isArray(atmospheres) ? atmospheres : []), ...dedotti.atmospheres])].slice(0, 8),
+    priceRange: dedotti.priceRange,
+  };
 
   // Solo in sviluppo con E2E_FAKE_USER (giro automatico): niente scritture, solo il percorso.
   if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
-    goOn(gusti, citta, dest, back);
+    goOn(gusti, citta, dest, back, mappa);
   }
 
   const supabase = await createClient();
@@ -51,10 +69,10 @@ export async function completeOnboarding({
   const { error } = await supabase
     .from("profiles")
     .update({
-      cuisines,
-      occasions,
-      atmospheres,
-      price_range: priceRange,
+      cuisines: gusti.cuisines,
+      occasions: gusti.occasions,
+      atmospheres: gusti.atmospheres,
+      price_range: gusti.priceRange,
       onboarding_completed: true,
       updated_at: new Date().toISOString(),
     })
@@ -73,11 +91,24 @@ export async function completeOnboarding({
     if (cityErr) console.error("[onboarding] città:", cityErr.message);
   }
 
-  goOn(gusti, citta, dest, back);
+  // Mappa del gusto e diete a parte: senza le colonne (migrazioni 20261021_mappa_gusto e
+  // 20261016_gusti_ricordati) i gusti di sempre restano salvati, senza errori per l'utente.
+  if (mappa.zone.length || mappa.su.length || mappa.giu.length || mappa.scoperta) {
+    const { error: gErr } = await supabase.from("profiles").update({ gusto: mappa }).eq("id", user.id);
+    if (gErr) console.error("[onboarding] mappa del gusto:", gErr.message);
+  }
+  if (diete.length) {
+    const { data: prof } = await supabase.from("profiles").select("gusti_ricordati").eq("id", user.id).maybeSingle();
+    const prima = Array.isArray(prof?.gusti_ricordati) ? (prof.gusti_ricordati as string[]) : [];
+    const { error: dErr } = await supabase.from("profiles").update({ gusti_ricordati: [...new Set([...prima, ...diete])] }).eq("id", user.id);
+    if (dErr) console.error("[onboarding] diete:", dErr.message);
+  }
+
+  goOn(gusti, citta, dest, back, mappa);
 }
 
 // Dopo l'ultima schermata.
-function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, dest: OnboardingData["dest"], back: string | null): never {
+function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, dest: OnboardingData["dest"], back: string | null, mappa: MappaGusto): never {
   // "Importa i tuoi salvati da Google Maps": /importa si apre con "Incolla più link" in cima.
   if (dest === "importa") redirect("/importa?da=benvenuto");
 
@@ -86,8 +117,11 @@ function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, des
 
   // Momento magia: la mappa si apre già con una ricerca sui gusti appena scelti
   // (1 ricerca Google, una volta per utente, come se la scrivesse lui), nella sua città.
+  // Con la mappa del gusto: "5 posti per te" sul tipo di posto piaciuto, nella zona, "non turistico"
+  // per chi ama le chicche. Senza: la ricerca sui gusti di sempre.
+  const perTe = queryPerTe(mappa, citta);
   const q = tasteQuery(gusti);
-  const full = q && citta ? `${q} a ${citta}` : q;
+  const full = perTe ?? (q && citta ? `${q} a ${citta}` : q);
   redirect(full ? `/mappa?q=${encodeURIComponent(full)}` : "/mappa");
 }
 

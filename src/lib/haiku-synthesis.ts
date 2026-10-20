@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { gustoPerAI, pulisciMappa } from "@/lib/mappa-gusto";
+import { gustoDa, gustiValidi } from "@/lib/gusti";
 import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
@@ -92,9 +94,9 @@ const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano 
 L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in ITALIANO perché risponde (o non risponde bene) alla sua richiesta specifica.
 
 Ti possono essere forniti i GUSTI dell'utente in due forme:
-- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze.
+- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze; "profilo" con le zone dove esce, i tipi di posto che gli piacciono e non, e se preferisce posti poco noti o famosi; "evita" con diete e cose da evitare.
 - storico_stelle_per_tipologia: la media di stelle che l'utente ha dato per tipologia di locale (comportamento reale, più affidabile delle dichiarazioni).
-Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta. Dai peso allo storico comportamentale quando c'è.
+Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta: per esempio "poco noto, come i posti che ami" o "è nella tua zona, Monti", solo se i dati del locale lo confermano. Dai peso allo storico comportamentale quando c'è.
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
@@ -211,6 +213,9 @@ type UserTaste = {
     occasions: string[];
     atmospheres: string[];
     priceRange: string | null;
+    // Mappa del gusto del primo accesso (zone, tipi di posto, famosi o chicche) e cosa evita.
+    profilo?: ReturnType<typeof gustoPerAI>;
+    evita?: string[];
   } | null;
   byCategory: { category: string; avgStars: number; count: number }[];
 };
@@ -220,11 +225,13 @@ async function getUserTaste(userId: string): Promise<UserTaste> {
   try {
     const supabase = createAdminClient();
     const [{ data: profile }, { data: reviews }] = await Promise.all([
+      // Con gusto e gusti_ricordati; senza quelle colonne si rilegge come prima.
       supabase
         .from("profiles")
-        .select("cuisines, occasions, atmospheres, price_range")
+        .select("cuisines, occasions, atmospheres, price_range, gusto, gusti_ricordati")
         .eq("id", userId)
-        .maybeSingle(),
+        .maybeSingle()
+        .then((r) => (r.error ? supabase.from("profiles").select("cuisines, occasions, atmospheres, price_range").eq("id", userId).maybeSingle() : r)),
       // reviews.place_id = UUID interno places → join per leggere la category.
       supabase
         .from("reviews")
@@ -238,6 +245,8 @@ async function getUserTaste(userId: string): Promise<UserTaste> {
           occasions: (profile.occasions as string[] | null) ?? [],
           atmospheres: (profile.atmospheres as string[] | null) ?? [],
           priceRange: (profile.price_range as string | null) ?? null,
+          profilo: gustoPerAI(pulisciMappa((profile as { gusto?: unknown }).gusto, () => true)),
+          evita: gustiValidi((profile as { gusti_ricordati?: unknown }).gusti_ricordati).map((id) => gustoDa(id)?.label).filter((x): x is string => !!x),
         }
       : null;
 
@@ -310,7 +319,9 @@ export async function getSynthesis(
           (taste.declared.cuisines.length > 0 ||
             taste.declared.occasions.length > 0 ||
             taste.declared.atmospheres.length > 0 ||
-            taste.declared.priceRange != null)) ||
+            taste.declared.priceRange != null ||
+            taste.declared.profilo != null ||
+            (taste.declared.evita?.length ?? 0) > 0)) ||
           taste.byCategory.length > 0);
       const tasteBlock = hasTaste
         ? `\n\nGusti dell'utente:\n${JSON.stringify({

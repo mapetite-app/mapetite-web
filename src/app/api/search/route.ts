@@ -10,7 +10,9 @@ import { distanceMeters } from "@/lib/distance";
 import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
-import { demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
+import { demoteMainstream, demoteTouristTraps, lowerMassFromTop, wantsOffTheBeatenPath } from "@/lib/mainstream";
+import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
+import { pulisciMappa, scopertaDedotta } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
@@ -96,6 +98,20 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
   const aiKey = clientKey(request, authUser?.id);
+  // Profilo del gusto (primo accesso, sprint 25/10): "famosi o chicche?" e cosa si evita. Letto in
+  // parallelo con il resto; senza le colonne (migrazioni non applicate) non cambia niente.
+  const profiloPromise = authUser
+    ? Promise.resolve(supabase.from("profiles").select("gusto, gusti_ricordati").eq("id", authUser.id).maybeSingle()).then(
+        ({ data, error }) => {
+          if (error || !data) return null;
+          const m = pulisciMappa((data as { gusto?: unknown }).gusto, () => true);
+          return { chicche: (m.scoperta ?? scopertaDedotta(m.su)) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
+        },
+        () => null,
+      )
+    : Promise.resolve(null);
+  // Gusti del profilo usati in questa ricerca: il telefono lo dice ("Per te: chicche, niente pesce").
+  const perTe: string[] = [];
 
   // Tetto alle chiamate AI (src/lib/ai-limit.ts): le ricerche scritte usano Haiku.
   if (source === "world" && searchIntent === "natural" && !allowAi("ricerca", aiKey)) {
@@ -327,6 +343,29 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.turistici = [...daParte.turistici, ...demoted].slice(0, 10);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (molte recensioni, voto sotto 4,2): ${JSON.stringify(demoted)}`);
+      }
+    }
+    // Profilo del gusto: chi preferisce le chicche ha i locali di massa in fondo anche senza scriverlo
+    // (mai esclusi, detti come "messi da parte"); chi evita pesce o carne ha in fondo quei locali.
+    if (searchIntent === "natural") {
+      const profilo = await profiloPromise;
+      if (profilo?.chicche && !wantsOffTheBeatenPath(query)) {
+        const { places, demoted } = demoteMainstream(`${query.trim()} non turistico`, risultati);
+        if (demoted.length > 0) {
+          risultati = places;
+          daParte.turistici = [...daParte.turistici, ...demoted].slice(0, 10);
+          perTe.push("chicche");
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (profilo: preferisce le chicche): ${JSON.stringify(demoted)}`);
+        }
+      }
+      if (profilo?.diete.length) {
+        const { usati } = gustiPerRicerca(query, profilo.diete);
+        const r = inFondoPerGusti(risultati, usati);
+        if (r.spostati > 0) {
+          risultati = r.places;
+          perTe.push(...usati.filter((g) => g.inFondo).map((g) => g.label));
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${r.spostati} locali ${r.motivo} (profilo)`);
+        }
       }
     }
     // Il più famoso non apre la lista solo perché è il più famoso: scende dopo i primi 3, resta in vista.
@@ -645,6 +684,7 @@ ESEMPI (input → output atteso):
     risultati: risultatiFinali,
     filtri_usati: filtri,
     ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 ? { da_parte: daParte } : {}),
+    ...(perTe.length > 0 ? { per_te: perTe } : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
     ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken, gruppi: synthGroups } } : {}),
   });
