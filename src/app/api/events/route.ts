@@ -12,6 +12,8 @@ import { clientKey } from "@/lib/ai-limit";
 const PROP_KEYS = [
   "fonte", "stato", "posizione",
   "nome", "pagina", "giorni", "prima_volta", "installata", "origine", "voto", "contesto", "risultati", "messaggio",
+  // Disdette da Mapetite (pannello del ristoratore, 20/10): quante ore prima della prenotazione.
+  "ore",
 ] as const;
 const LONG_PROPS: readonly string[] = ["messaggio"];
 

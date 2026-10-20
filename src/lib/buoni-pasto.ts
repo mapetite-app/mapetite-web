@@ -9,6 +9,12 @@ export type ConteggioBuoni = { si: number; no: number };
 
 export const MIN_RISPOSTE = 2;
 
+// Dove si chiede e si mostra: posti da pranzo. Non su cocktail bar, pub, wine bar e locali notturni
+// (collaudo 20/10: la riga su un cocktail bar non c'entrava).
+export function buoniPertinenti(category: string | null | undefined): boolean {
+  return !/cocktail|pub|night|wine|brewery|club|liquor/.test((category ?? "").toLowerCase());
+}
+
 export function fraseBuoni(c: ConteggioBuoni | null): { accetta: boolean; testo: string } | null {
   if (!c) return null;
   if (c.si >= MIN_RISPOSTE && c.si > c.no) return { accetta: true, testo: `Buoni pasto: sì · ${c.si} persone` };

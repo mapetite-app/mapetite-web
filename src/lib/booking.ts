@@ -236,6 +236,8 @@ export type BookingRequest = BookingDetails & {
   confirmed?: boolean;    // l'utente ha segnato "Il locale ha confermato" (assente nelle richieste vecchie)
   phone?: string | null;  // numero del locale, per avvisare se non si va più (assente nelle richieste vecchie)
   dismissedEve?: boolean; // promemoria del giorno prima nascosto (quello del giorno stesso resta)
+  riapre?: number | null;  // richiesta mandata a locale chiuso: quando riapre (ms), per "ti hanno risposto?"
+  dismissedRisposta?: boolean;
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -279,7 +281,7 @@ export function removeBooking(id: string) {
 
 // Cosa ricordare oggi: la prenotazione di oggi (promemoria) e, dal giorno dopo e per 3 giorni,
 // "Com'è andata?" su quelle passate ancora senza risposta.
-export function bookingReminders(list: BookingRequest[], now: Date = new Date()): { today: BookingRequest[]; tomorrow: BookingRequest[]; howWasIt: BookingRequest[] } {
+export function bookingReminders(list: BookingRequest[], now: Date = new Date()): { today: BookingRequest[]; tomorrow: BookingRequest[]; howWasIt: BookingRequest[]; risposta: BookingRequest[] } {
   const todayKey = dateKey(now);
   const tomorrowKey = dateKey(addDays(now, 1));
   const oldest = dateKey(addDays(now, -3));
@@ -289,6 +291,9 @@ export function bookingReminders(list: BookingRequest[], now: Date = new Date())
     // Il giorno prima (contro i tavoli vuoti): se non si può più andare, è il momento giusto per avvisare.
     tomorrow: live.filter((b) => b.date === tomorrowKey && !b.dismissedEve).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     howWasIt: live.filter((b) => b.date! < todayKey && b.date! >= oldest && !b.outcome),
+    // Richiesta mandata a locale chiuso: dopo la riapertura, "ti hanno risposto?" (finché non si conferma
+    // o si nasconde, e solo per prenotazioni ancora da fare).
+    risposta: live.filter((b) => b.riapre != null && b.riapre <= now.getTime() && !b.confirmed && !b.dismissedRisposta && !b.outcome && b.date! >= todayKey),
   };
 }
 

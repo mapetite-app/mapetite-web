@@ -9,7 +9,7 @@ import type { FotoUtente } from "@/lib/foto-utenti";
 import { cambiaVisibilita } from "@/lib/foto-utenti-write";
 import { trackFeature } from "@/lib/track";
 import { FotoMieEditor } from "@/components/foto-utenti";
-import { miaRispostaBuoni, rispondiBuoni } from "@/lib/buoni-pasto";
+import { buoniPertinenti, miaRispostaBuoni, rispondiBuoni } from "@/lib/buoni-pasto";
 
 // Foglio leggero "Com'è andata?" (piano 4.4): dopo "Ci sono stato" (o da "Modifica" nel diario)
 // chiede quando, il voto (👍/👎, lo stesso "Com'era?" della scheda) e una nota privata.
@@ -70,7 +70,7 @@ export default function DiarioFoglio({
   // Buoni pasto (PROPOSTE.md 19/10): facoltativo, si salva subito (come le foto). null = non detto.
   const [buoni, setBuoni] = useState<boolean | null>(null);
   const [buoniErr, setBuoniErr] = useState(false);
-  const buoniUser = buoniProp?.userId ?? foto?.userId ?? null;
+  const buoniUser = buoniPertinenti(place.category) ? buoniProp?.userId ?? foto?.userId ?? null : null;
   const buoniPlace = buoniProp?.placeId ?? foto?.placeId ?? null;
   useEffect(() => {
     if (!buoniUser || !buoniPlace) return;

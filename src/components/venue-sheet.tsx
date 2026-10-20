@@ -25,6 +25,7 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, useInfoLocale } from "@/components/posto-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
+import VisiteMapetite from "@/components/visite-mapetite";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -637,9 +638,11 @@ export default function VenueSheet({
             <AperturaPillola info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10).
                 Prima di "c'è posto": è corta e sta accanto a 💎, così i segnali restano su 2 righe. */}
-            <BuoniPastoRiga venueId={venue.id} />
+            <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
             <PostoPillola info={infoLocale} />
+            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
+            <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
           </div>
         </div>
 

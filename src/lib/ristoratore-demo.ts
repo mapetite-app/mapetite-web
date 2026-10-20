@@ -114,6 +114,14 @@ export function demoDati(now: number = Date.now()): { locale: RistLocale; citta:
       }
     }
   }
+  // Tavoli liberati per tempo ("Non vado più" da Mapetite): generatore a parte, così gli altri numeri
+  // della dimostrazione restano gli stessi di prima.
+  const r2 = rng(20261020);
+  for (let ago = 59; ago >= 0; ago--) {
+    if (r2() >= 0.3) continue;
+    eventi.push({ ...base, anon_id: `demo-d${ago}`, session_id: `s-d${ago}`, google_place_id: DEMO_LOCALE.google_place_id, created_at: new Date(at(ago, 17, 30)).toISOString(), type: "funzione",
+      props: { nome: "prenotazione_disdetta", contesto: r2() < 0.7 ? "whatsapp" : "telefono", ore: 2 + Math.floor(r2() * 26) } });
+  }
   let u = 0;
   const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags, visited_at: tags.includes("Già visitato") ? new Date(now - (u % 25) * 86_400_000).toISOString() : null })));
   return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [], attesa };

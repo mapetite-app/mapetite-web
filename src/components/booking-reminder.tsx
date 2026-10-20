@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
 import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
+import { dataOra } from "@/lib/orari";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
 // "Stasera alle 21:00 da …", dal giorno dopo "Com'è andata?". In home e nel profilo.
@@ -25,7 +26,11 @@ function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
   const text = cancelMessage(b, name);
   const wa = whatsappNumber(b.phone);
   const done = (contesto: string) => {
-    trackFeature("prenotazione_disdetta", { contesto });
+    // Con il locale e le ore di anticipo: il pannello del ristoratore conta i tavoli liberati per tempo.
+    const quando = b.date && b.time ? dataOra(b.date, b.time) : null;
+    const ore = quando ? Math.round((quando.getTime() - Date.now()) / 3_600_000) : null;
+    // Disdetta dopo l'ora del tavolo: si conta, ma non è un "tavolo liberato per tempo".
+    track("funzione", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { nome: "prenotazione_disdetta", contesto, ...(ore != null && ore >= 0 ? { ore } : {}), ...(quando && quando.getTime() < Date.now() ? { stato: "in_ritardo" } : {}) });
     updateBooking(b.id, { outcome: "non-andato", dismissed: true });
   };
   const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
@@ -118,7 +123,7 @@ function Doppio({ group, domani }: { group: BookingRequest[]; domani: boolean })
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
-  const { today, tomorrow, howWasIt } = bookingReminders(list);
+  const { today, tomorrow, howWasIt, risposta } = bookingReminders(list);
   // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
   const now = new Date();
   const todayKey = dateKey(now);
@@ -128,10 +133,28 @@ export default function BookingReminder() {
     .filter((g) => g[0].date === todayKey || (g[0].date === tomorrowKey && g.some((b) => !b.dismissedEve)))
     .map((g) => ({ group: g, domani: g[0].date === tomorrowKey }));
   const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
-  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0) return null;
-  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id));
+  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0) return null;
+  // La richiesta in attesa di risposta ha già la sua scheda ("Hanno riaperto"): niente doppione.
+  const inRisposta = new Set(risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => b.id));
+  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
+      {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto? */}
+      {risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => (
+        <section key={`r-${b.id}`} data-testid="promemoria-risposta" className="rounded-card border border-border bg-surface p-4 shadow-card">
+          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Hanno riaperto</p>
+          <p className="mt-1 font-title text-lg font-semibold leading-tight text-text">{b.placeName}: ti hanno risposto?</p>
+          <p className="mt-0.5 text-sm font-sans text-text-muted">{VIA[b.via]}{b.time ? ` · tavolo alle ${b.time}` : ""}</p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" data-testid="risposta-confermata" onClick={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_risposta", { stato: "confermata" }); }} className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95">
+              Sì, confermato
+            </button>
+            <button type="button" data-testid="risposta-non-ancora" onClick={() => { updateBooking(b.id, { dismissedRisposta: true }); trackFeature("prenotazione_risposta", { stato: "non_ancora" }); }} className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95">
+              Non ancora
+            </button>
+          </div>
+        </section>
+      ))}
       {doppi.map(({ group, domani }) => (
         <Doppio key={group.map((b) => b.id).join()} group={group} domani={domani} />
       ))}

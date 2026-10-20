@@ -54,6 +54,9 @@ export type PannelloRistoratore = {
   // stato" su Mapetite, e il loro "Com'è andata?". Legate a una persona vera che aveva salvato il
   // locale: non si falsificano come una recensione anonima.
   visite: { persone: number; piaciuto: number; nonPiaciuto: number };
+  // Tavoli liberati per tempo: chi aveva prenotato da Mapetite e ha disdetto con "Non vado più"
+  // (evento "funzione" prenotazione_disdetta, con le ore di anticipo quando la prenotazione aveva l'ora).
+  disdette: { n: number; orePrimaMedia: number | null };
 };
 
 export const AZIONI = [
@@ -277,7 +280,28 @@ export function computeRistoratore(
     pochiDati: viste < SOGLIA,
     inAttesa: inAttesa(input.attesa ?? [], locale.id),
     visite: visiteVere(input.attesa ?? [], locale.id, start, today),
+    disdette: disdetteInAnticipo(ev, placeOf, locale.id, start, today),
   };
+}
+
+// Disdette arrivate da Mapetite nel periodo, e in media quante ore prima della prenotazione.
+function disdetteInAnticipo(
+  ev: { r: RistEvento; day: number }[],
+  placeOf: (r: RistEvento) => string | null,
+  placeId: string,
+  from: number,
+  to: number,
+): { n: number; orePrimaMedia: number | null } {
+  let n = 0;
+  const ore: number[] = [];
+  for (const e of ev) {
+    if (e.r.type !== "funzione" || e.r.props?.nome !== "prenotazione_disdetta" || e.day < from || e.day > to || placeOf(e.r) !== placeId) continue;
+    if (e.r.props?.stato === "in_ritardo") continue; // dopo l'ora del tavolo: non è "per tempo"
+    n++;
+    const o = Number(e.r.props?.ore);
+    if (e.r.props?.ore != null && Number.isFinite(o) && o >= 0) ore.push(o);
+  }
+  return { n, orePrimaMedia: ore.length ? Math.round(ore.reduce((s, x) => s + x, 0) / ore.length) : null };
 }
 
 // Voti del "Com'è andata?" (= LIKE e DISLIKE di src/lib/diario.ts, ripetuti: qui nessun import).
