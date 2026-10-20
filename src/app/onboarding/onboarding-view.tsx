@@ -197,11 +197,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
   const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete };
   const draftJson = JSON.stringify(draftNow);
+  // Le risposte prese dal profilo ("Rifalla") diventano bozza solo quando la persona cambia qualcosa.
+  const [partenza] = useState(draftJson);
   useEffect(() => {
     const d = JSON.parse(draftJson) as Draft;
-    if (vuota(d)) return;
+    if (vuota(d) || (!ripreso && draftJson === partenza)) return;
     saveDraft(d);
-  }, [draftJson]);
+  }, [draftJson, partenza, ripreso]);
 
   // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
   useEffect(() => {
