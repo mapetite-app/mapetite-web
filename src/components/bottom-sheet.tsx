@@ -732,11 +732,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                       {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
                       {d?.perTe && (
-                        <span data-testid="per-te-card" className="mt-1 flex min-w-0 items-start gap-1.5 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
-                          <svg viewBox="0 0 24 24" className="mt-[3px] h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                        <span data-testid="per-te-card" className="mt-1 line-clamp-2 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
+                          {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
+                          <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7" />
                           </svg>
-                          <span className="line-clamp-2">Per te: {d.perTe}</span>
+                          Per te: {d.perTe}
                         </span>
                       )}
                       {/* Con il "Per te" le chip restano nella scheda: la card ha un'altezza fissa. */}

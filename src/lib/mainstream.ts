@@ -67,7 +67,7 @@ export function demoteTouristTraps<T extends { name: string; userRatingCount: nu
   return { places: [...kept, ...traps], demoted: traps.map((p) => p.name) };
 }
 
-const WANTS_FAMOUS = /\b(?:famos[oiae]|iconic[oiahe]|celebr[ei]|più\s+conosciut|imperdibil|must\b|classic[oiahe]\s+di|da\s+non\s+perdere)/i;
+const WANTS_FAMOUS = /\b(?:famos[oiae]|iconic[oiahe]|celebr[ei]|più\s+conosciut|più\s+not[oiae]|popolar[ei]|gettonat[oiae]|storic[oiahe]|imperdibil|must\b|classic[oiahe]\s+di|da\s+non\s+perdere)/i;
 
 // Profilo "preferisco le chicche" (primo accesso, sprint 25/10): come demoteMainstream, ma senza che la
 // frase lo chieda, e un locale cercato per nome ("Roscioli") resta dov'è.

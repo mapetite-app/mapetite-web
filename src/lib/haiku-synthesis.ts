@@ -5,7 +5,7 @@ import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import { coherentLevel } from "@/lib/match-coherence";
-import { exclusionNotAsked } from "@/lib/mainstream";
+import { exclusionNotAsked, wantsOffTheBeatenPath } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
@@ -93,7 +93,12 @@ romantico, informale, gruppi, business, veloce, aperitivo, famiglia, intimo, viv
 - dont_expect: DEFAULT array vuoto []. Array di CHIP brevissime (1-4 parole), MASSIMO 2. Lo popoli SOLO se nelle recensioni esiste un limite REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: []. Meglio [] che un difetto inventato. Tono onesto, non stroncatorio.`;
 
 // Motivo di esclusione che parla dei gusti della persona, non della richiesta scritta.
-const TASTE_REASON = /\b(evit|non ami|non ti piac|ti piac|preferisc|tuoi gusti|tuo gusto|dieta|non mangi)/i;
+const TASTE_REASON = /(gust[oi]\b|piac|gradisc|\bam[ai]\b|utente|evit|preferisc|dieta|non mangi)/i;
+// Cose che l'AI non può sapere (il prompt non ha numero di recensioni né indirizzi): se la frase non le chiede,
+// un "per te" o un "perché" che le afferma è inventato e si scarta.
+// Il "perché" può citare le recensioni ("la famosa carbonara", "clientela del quartiere"): lì si scarta solo "poco noto".
+const NON_SAPUTO = /poco not|famos|nascost|chicc|turistic|\bzona\b|quartiere/i;
+const NON_SAPUTO_PERCHE = /poco not|nascost|chicc/i;
 
 const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
@@ -393,9 +398,15 @@ export async function getSynthesis(
             if (!item || typeof item !== "object") continue;
             const o = item as Record<string, unknown>;
             if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
-            if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
-            // Solo con i gusti nel prompt: senza, un "per te" sarebbe per forza inventato.
-            if (hasTaste && typeof o.per_te === "string" && o.per_te.trim()) perTes.set(o.id, o.per_te.trim().slice(0, 60));
+            const chiesto = (t: string, re = NON_SAPUTO) => !re.test(t) || re.test(query) || wantsOffTheBeatenPath(query);
+            if (typeof o.matchReason === "string") {
+              if (chiesto(o.matchReason, NON_SAPUTO_PERCHE)) matchReasons.set(o.id, o.matchReason);
+              else console.log(`[haiku-synthesis] perché scartato (dato non disponibile) id=${o.id} testo=${JSON.stringify(o.matchReason.slice(0, 120))}`);
+            }
+            // Solo con i gusti nel prompt: senza, un "per te" sarebbe per forza inventato. Al massimo 6 parole.
+            if (hasTaste && typeof o.per_te === "string" && o.per_te.trim() && chiesto(o.per_te)) {
+              perTes.set(o.id, o.per_te.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[,;:.]+$/, ""));
+            }
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
               const fitReason = typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "";

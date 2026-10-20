@@ -136,7 +136,9 @@ export async function POST(request: Request) {
   const synthGroups: { places: SynthesisInput[]; token: string }[] = [];
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
-  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
+  // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -364,6 +366,7 @@ export async function POST(request: Request) {
         const r = inFondoPerGusti(risultati, usati);
         if (r.spostati > 0) {
           risultati = r.places;
+          daParte.gusti = r.places.slice(r.places.length - r.spostati).map((p) => p.name);
           perTe.push(...usati.filter((g) => g.inFondo).map((g) => g.label));
           console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${r.spostati} locali ${r.motivo} (profilo)`);
         }
