@@ -22,7 +22,7 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
-import { PostoPillola, useInfoLocale } from "@/components/posto-locale";
+import { AperturaPillola, PostoPillola, useInfoLocale } from "@/components/posto-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 
@@ -631,6 +631,8 @@ export default function VenueSheet({
                 💎 Poco conosciuto
               </span>
             )}
+            {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
+            <AperturaPillola info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10).
                 Prima di "c'è posto": è corta e sta accanto a 💎, così i segnali restano su 2 righe. */}
             <BuoniPastoRiga venueId={venue.id} />

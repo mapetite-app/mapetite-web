@@ -1110,7 +1110,7 @@ await shot("15-scheda-b");
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: REST, sintesi_pendente: null } }));
   await page.route("**/api/places/community**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? comm : { ...comm, recensioni: [], mia: null } }));
   // Osteria Bella è verificata, con "c'è posto" e buoni pasto confermati da 3 persone.
-  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : { verificato: false, giorni: [], at: null } }));
+  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })() } : { verificato: false, giorni: [], at: null } }));
   await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
@@ -1168,6 +1168,9 @@ await shot("15-scheda-b");
   { const r = ((await page.getByTestId("riapre").textContent().catch(() => "")) ?? "");
     ok(r.startsWith("Chiuso ora") && /apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso ora · apre alle …' su una riga sua (${r})`);
     ok(!((await page.getByTestId("scheda-fatti").textContent()) ?? "").includes("Chiuso"), "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
+    await page.getByTestId("aperto-da-poco").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(((await page.getByTestId("aperto-da-poco").textContent().catch(() => "")) ?? "").includes("Aperto da 3 mesi"), "scheda: locale verificato aperto da 3 mesi → '🆕 Aperto da 3 mesi' tra i segnali");
+    ok((await page.getByTestId("posto-stasera").count()) === 0 && await page.locator("h2", { hasText: "Trattoria Senza Voto" }).getByTestId("verificato-scheda").isVisible(), "scheda: verificato senza serate → spunta, nessuna pillola 'c'è posto'");
     await page.getByTestId("scheda-tab-info").click();
     const o = ((await page.getByTestId("orari-oggi").textContent().catch(() => "")) ?? "");
     ok(/^Oggi (\d{2}:\d{2}–\d{2}:\d{2}|Chiuso)$/.test(o.trim()), `scheda, Info: orari di oggi da Google (${o})`); }
@@ -4487,6 +4490,15 @@ else {
 
   // Serate tranquille (POSIZIONAMENTO proposta 1, 18/10): la riga della scheda, solo per locali verificati e informazioni recenti.
   { let se = null;
+    // "Aperto da poco" (PROPOSTE.md, proposta 7): parola del titolare, solo il primo anno.
+    { let ad = null;
+      try { ad = await import(new URL("../../src/lib/aperto-dal.ts", import.meta.url).href); } catch (e) { ok(false, `aperto da poco: modulo src/lib/aperto-dal.ts importabile (${e.message})`); }
+      if (ad) {
+        const oggi = new Date(2026, 9, 20);
+        ok(ad.fraseApertura("2026-07", oggi) === "Aperto da 3 mesi" && ad.fraseApertura("2026-09-01", oggi) === "Aperto da 1 mese" && ad.fraseApertura("2026-10", oggi) === "Appena aperto", "aperto da poco: 'Aperto da 3 mesi', '1 mese', 'Appena aperto'");
+        ok(ad.fraseApertura("2025-10", oggi) === null && ad.fraseApertura("2026-11", oggi) === null && ad.fraseApertura("2026-13", oggi) === null && ad.fraseApertura(null, oggi) === null && ad.fraseApertura("ciao", oggi) === null, "aperto da poco: niente oltre 12 mesi, nel futuro, mese sbagliato o dato assente");
+        ok(ad.fraseApertura("2025-11", oggi) === "Aperto da 11 mesi" && ad.pulisciApertoDal("2026-07-01") === "2026-07", "aperto da poco: 11 mesi ancora sì; data del database letta come mese");
+      } }
     try { se = await import(new URL("../../src/lib/serate.ts", import.meta.url).href); } catch (e) { ok(false, `serate: modulo src/lib/serate.ts importabile (${e.message})`); }
     if (se) {
       const dom = Date.parse("2026-10-18T18:00:00Z"); // domenica sera a Roma
@@ -4607,6 +4619,16 @@ else {
     await st.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
     const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
     const vietato = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: "44444444-0000-4000-8000-0000000000ff", giorni: [1] } });
+    // "Aperto da poco" nello stesso pannello: il mese si salva e la scheda lo rilegge; le serate restano.
+    { const ap = rp.getByTestId("aperto-dal");
+      const due = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 2); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+      await ap.getByTestId("aperto-dal-mese").fill(due);
+      await ap.getByTestId("aperto-dal-salva").click();
+      await ap.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const j2 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      const futuro = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, apertoDal: "2999-01" } });
+      ok(j2.apertoDal === due && JSON.stringify(j2.giorni) === "[5]" && futuro.status() === 400 && ((await ap.getByTestId("aperto-dal-anteprima").textContent()) ?? "").includes("🆕"), `pannello ristoratore: 'Aperto da' salvato e riletto dalla scheda, senza toccare le serate; mese futuro rifiutato (${JSON.stringify(j2)} / ${futuro.status()})`);
+      await rp.screenshot({ path: `${OUT}/71-pannello-aperto-dal.png`, caret: "initial" }); }
     ok(await st.getByText("Salvato").isVisible() && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
     await rctx.clearCookies({ name: "e2e_serate" }); }
 
