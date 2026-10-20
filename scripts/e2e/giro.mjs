@@ -3802,6 +3802,8 @@ else {
   const soloPranzo = Array.from({ length: 7 }, (_, d) => [d * 1440 + 720, d * 1440 + 900]);
   const soloSera = Array.from({ length: 7 }, (_, d) => [d * 1440 + 1140, d * 1440 + 1410]);
   await ap.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.map((x) => (x.id === "P1" ? { ...x, orari: soloPranzo } : x.id === "P3" ? { ...x, orari: soloSera } : x)) } }));
+  // Foglio vuoto: senza prenotazioni precedenti ("Come l'ultima volta" riempirebbe persone e ora). Rimesse dopo.
+  const prenPrima = await ap.evaluate(() => { const v = localStorage.getItem("mapetite.prenotazioni"); localStorage.removeItem("mapetite.prenotazioni"); return v; });
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
   await (await esempio(ap)).click();
   const mapCard = ap.locator("li", { hasText: "Terrazza Uno" }).locator("button", { hasText: "Terrazza Uno" }).first();
@@ -3837,6 +3839,7 @@ else {
       ok(aperto && (await nuovo.getByRole("button", { name: "21:00", exact: true }).getAttribute("aria-pressed")) === "true", "prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con le 21:00 già scelte");
       await nuovo.getByRole("button", { name: "Chiudi" }).click().catch(() => {});
     } }
+  await ap.evaluate((v) => { if (v != null) localStorage.setItem("mapetite.prenotazioni", v); }, prenPrima);
   await ap.unroute("**/api/search");
   if (await ap.getByRole("dialog", { name: /Prenota da/ }).count()) await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
