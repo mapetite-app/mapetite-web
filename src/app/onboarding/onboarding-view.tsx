@@ -152,14 +152,15 @@ function Gruppo({ title, children }: { title: string; children: React.ReactNode 
 // con una bozza il modulo riparte da lì, senza effetti che rimettono a posto lo stato.
 const noSubscribe = () => () => {};
 // Risposte già salvate nel profilo (per "Rifalla"): servono da punto di partenza, mai come bozza.
-export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[] };
+export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[]; cuisines?: string[]; atmospheres?: string[] };
 
 export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
   const draft = parseDraft(raw);
   const base: Draft | null = dalProfilo
     ? {
-        step: 0, cuisines: [], atmospheres: [],
+        // Cucine e atmosfere scelte in /me/preferenze: si tengono (prima "Rifalla" le sovrascriveva).
+        step: 0, cuisines: dalProfilo.cuisines ?? [], atmospheres: dalProfilo.atmospheres ?? [],
         otherCity: dalProfilo.city && !CITIES.some((c) => c.value === dalProfilo.city) ? dalProfilo.city : "",
         city: CITIES.some((c) => c.value === dalProfilo.city) ? dalProfilo.city : null,
         otherOpen: !!dalProfilo.city && !CITIES.some((c) => c.value === dalProfilo.city),
@@ -294,6 +295,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
+  // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
+  const [via, setVia] = useState<"su" | "giu" | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col bg-bg" data-testid="benvenuto" data-passo={step + 1}>
@@ -434,18 +437,22 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 <div
                   data-testid="tipo-card"
                   key={corrente.id}
-                  onPointerDown={(e) => setDrag({ x0: e.clientX, dx: 0 })}
+                  onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); setDrag({ x0: e.clientX, dx: 0 }); }}
                   onPointerMove={(e) => drag && setDrag({ ...drag, dx: e.clientX - drag.x0 })}
                   onPointerUp={() => {
-                    if (drag && Math.abs(drag.dx) > 90) vota(corrente.id, drag.dx > 0 ? "su" : "giu");
+                    if (drag && Math.abs(drag.dx) > 90 && !via) {
+                      const dir = drag.dx > 0 ? "su" : "giu";
+                      setVia(dir);
+                      window.setTimeout(() => { setVia(null); vota(corrente.id, dir); }, 180);
+                    }
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
                   className="relative flex min-h-[20rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
-                    transform: drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
-                    transition: drag ? "none" : "transform 200ms",
+                    transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
+                    transition: drag ? "none" : "transform 180ms ease-in",
                   }}
                 >
                   {drag && Math.abs(drag.dx) > 30 && (

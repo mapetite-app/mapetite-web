@@ -25,11 +25,11 @@ export default async function OnboardingPage({
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect(withNext("/signup", next));
-    const { data: p, error } = await supabase.from("profiles").select("city, occasions, price_range, gusto, gusti_ricordati").eq("id", user.id).maybeSingle();
+    const { data: p, error } = await supabase.from("profiles").select("city, occasions, price_range, cuisines, atmospheres, gusto, gusti_ricordati").eq("id", user.id).maybeSingle();
     if (!error && p) {
-      const r = p as { city?: string | null; occasions?: string[] | null; price_range?: string | null; gusto?: unknown; gusti_ricordati?: unknown };
+      const r = p as { city?: string | null; occasions?: string[] | null; price_range?: string | null; cuisines?: string[] | null; atmospheres?: string[] | null; gusto?: unknown; gusti_ricordati?: unknown };
       const m = pulisciMappa(r.gusto, () => true);
-      dalProfilo = { city: r.city ?? null, occasions: r.occasions ?? [], priceRange: r.price_range ?? null, zone: m.zone, su: m.su, giu: m.giu, scoperta: m.scoperta, diete: dieteValide(r.gusti_ricordati) };
+      dalProfilo = { city: r.city ?? null, occasions: r.occasions ?? [], priceRange: r.price_range ?? null, zone: m.zone, su: m.su, giu: m.giu, scoperta: m.scoperta, diete: dieteValide(r.gusti_ricordati), cuisines: r.cuisines ?? [], atmospheres: r.atmospheres ?? [] };
     }
   }
   // Giro automatico: il profilo già salvato arriva da un cookie (nessun database).

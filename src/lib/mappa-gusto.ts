@@ -121,15 +121,18 @@ export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
   return `${base}${nonTuristico}${dove}`;
 }
 
+// "e altri 3": senza, chi votava 6 tipi ne vedeva 3 e pensava che gli altri non fossero stati capiti.
+const altri = (n: number, shown: number) => (n > shown ? ` e ${n - shown === 1 ? "un altro" : `altri ${n - shown}`}` : "");
+
 /** "Ecco cosa ho capito di te": righe brevi, solo da quello che la persona ha detto. */
 export function capito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
   const out: { chiave: string; emoji: string; testo: string }[] = [];
   const dove = m.zone.length ? m.zone.join(", ") : extra.citta;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto a ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(", ")}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(", ")}${altri(su.length, 3)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(", ")}` });
+  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(", ")}${altri(giu.length, 2)}` });
   const scoperta = m.scoperta ?? scopertaDedotta(m.su);
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
@@ -144,13 +147,14 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
 }
 
 /** Per l'AI dei verdetti: il profilo in parole, senza id interni. */
-export function gustoPerAI(m: MappaGusto): { zone_preferite: string[]; tipi_che_piacciono: string[]; tipi_che_non_piacciono: string[]; preferisce: string | null } | null {
+// Senza le zone: l'AI non sa dove sono i locali (niente indirizzi nel prompt) e con le zone scriveva
+// "quello che cerchi a Monteverde" anche per posti altrove. Le zone le usa già la ricerca.
+export function gustoPerAI(m: MappaGusto): { tipi_che_piacciono: string[]; tipi_che_non_piacciono: string[]; preferisce: string | null } | null {
   const scoperta = m.scoperta ?? scopertaDedotta(m.su);
   const piace = m.su.map((id) => tipoDa(id)?.titolo).filter((x): x is string => !!x);
   const no = m.giu.map((id) => tipoDa(id)?.titolo).filter((x): x is string => !!x);
-  if (!m.zone.length && !piace.length && !no.length && !scoperta) return null;
+  if (!piace.length && !no.length && !scoperta) return null;
   return {
-    zone_preferite: m.zone,
     tipi_che_piacciono: piace,
     tipi_che_non_piacciono: no,
     preferisce: scoperta === "chicche" ? "posti poco noti, non turistici" : scoperta === "famosi" ? "anche i posti famosi" : scoperta === "misto" ? "famosi e poco noti" : null,
