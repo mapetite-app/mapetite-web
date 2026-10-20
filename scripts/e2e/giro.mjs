@@ -3039,6 +3039,31 @@ else {
   ok(sEvents.some((e) => e.type === "percorso" && e.props?.fonte === "barra" && e.googlePlaceId === "S1"), "barra: segnale 'percorso' (da barra)");
   ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenota" && e.props?.fonte === "barra"), "barra: apertura di Prenota registrata");
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  // "Prenota come l'ultima volta" (PROPOSTE 10): persone e ora dell'ultima richiesta a questo locale, il giorno no.
+  await s.evaluate(() => localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "u1", placeId: "S1", placeName: "x", lat: null, lng: null, date: "2026-09-01", time: "20:30", people: 4, special: null, via: "whatsapp", createdAt: Date.now() - 86_400_000 }])));
+  await bar.getByTestId("prenota-scheda").click();
+  await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  { const t = (await s.getByTestId("prenota-come-ultima").textContent().catch(() => "")) ?? "";
+    ok(t.includes("Come l'ultima volta: 4 persone alle 20:30") && (await s.getByTestId("prenota-persone").first().textContent()) === "4" && (await s.getByRole("button", { name: "20:30" }).getAttribute("aria-pressed")) === "true" && (await s.getByTestId("prenota-passo").count()) === 1, `prenota: 'Come l'ultima volta' con 4 persone e le 20:30, il giorno da scegliere (${t})`); }
+  await s.screenshot({ path: `${OUT}/62b-prenota-come-ultima.png`, caret: "initial" });
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
+  // "Sarà la mia 3ª volta da voi" (PROPOSTE 11): nei posti fissi (2 visite), spento finché non lo accendi.
+  await s.route("**/rest/v1/saved_places**", (r) => (r.request().url().includes("google_place_id") ? r.fulfill({ json: [{ visite: 2, tags: ["Già visitato"], places: { google_place_id: "S1" } }] }) : r.fallback()));
+  await bar.getByTestId("prenota-scheda").click();
+  await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await s.getByTestId("foglio-prenota").getByRole("button", { name: "Domani" }).click();
+  await s.getByTestId("foglio-prenota").getByRole("button", { name: "20:30" }).click();
+  if (await s.getByTestId("prenota-avanti").isEnabled().catch(() => false) === false) await s.getByLabel("Una persona in più").click();
+  await s.getByTestId("prenota-avanti").click();
+  await s.getByTestId("prenota-volta").waitFor({ timeout: 3000 }).catch(() => {});
+  { const prima = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    await s.getByTestId("prenota-volta").locator("input").check().catch(() => {});
+    const dopo = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    ok((await s.getByTestId("prenota-volta").textContent().catch(() => "")).includes("3ª volta") && !prima.includes("volta da voi") && dopo.includes("Sarà la mia 3ª volta da voi."), `prenota: nei posti fissi 'Sarà la mia 3ª volta da voi' solo se lo accendi (${dopo})`); }
+  await s.screenshot({ path: `${OUT}/62c-prenota-volta.png`, caret: "initial" });
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await s.unroute("**/rest/v1/saved_places**");
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
   await s.waitForTimeout(300);
@@ -4681,8 +4706,8 @@ else {
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
         ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); }
-      { const t = ((await rp.getByTestId("pannello-tornati").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
-        ok(/↻ \d+ persone di Mapetite sono tornate da te 2 o più volte/.test(t), `pannello demo: clienti che tornano (${t.slice(0, 100)})`); } }
+      { const t = ((await rp.getByTestId("pannello-insight").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        ok(/\d+ persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi/.test(t), `pannello demo: clienti che tornano in 'Cosa ti dicono i numeri' (${t.slice(-110)})`); } }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();
