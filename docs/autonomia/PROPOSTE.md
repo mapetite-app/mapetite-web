@@ -16,6 +16,38 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 20/10/2026 (sessione delle 05:00, CEO che chiude)
+
+### 10. "Prenota come l'ultima volta" (il tavolo del posto fisso in un tocco)
+- **Problema:** `PROBLEMI.md` n. 7: i clienti che tornano valgono la metà del lavoro di un locale, ma per riprenotare si riparte da zero (app, orari, persone).
+- **Cosa fa:** nella scheda di un posto fisso (2+ visite) il foglio Prenota si apre già con lo stesso numero di persone e la stessa fascia oraria dell'ultima prenotazione fatta da Mapetite su quel locale; resta solo da scegliere il giorno.
+- **Da dove nasce:** Beli ora prenota con Resy dentro l'app ([blog Resy](https://blog.resy.com/?p=93063)), ma ogni volta da capo. Noi partiamo da quello che hai già fatto lì.
+- **Valore per l'utente:** riprenotare il solito posto in 2 tocchi.
+- **Valore per il ristoratore:** più prenotazioni dai clienti fedeli, senza commissioni a coperto (`PROBLEMI.md` n. 4).
+- **Sforzo:** S (le prenotazioni sono già sul telefono; si legge l'ultima per quel locale).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 11. "È la mia 3ª volta da voi" nella richiesta di prenotazione (scelto dall'utente)
+- **Problema:** `PROBLEMI.md` n. 7 e n. 1: il ristoratore non riconosce i clienti fedeli quando prenotano, e non sa a chi tenere il tavolo.
+- **Cosa fa:** se il locale è un tuo posto fisso, il messaggio di prenotazione propone una riga in più, spenta di default: "È la mia 3ª volta da voi". La accendi tu, una volta.
+- **Da dove nasce:** SevenRooms e TheFork Manager riconoscono i clienti abituali solo se il locale ha il loro gestionale; noi lo portiamo nella richiesta stessa, decisa dal cliente, senza CRM.
+- **Valore per l'utente:** essere riconosciuto (tavolo migliore, un saluto) senza tessere.
+- **Valore per il ristoratore:** sa chi è un cliente fedele prima che arrivi; base di un piano Pro "i tuoi clienti fissi".
+- **Sforzo:** S (testo della richiesta e un interruttore).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 12. "Grazie di essere tornato": un piccolo omaggio deciso dal locale
+- **Problema:** `PROBLEMI.md` n. 7: i programmi fedeltà funzionano (dati Toast, sotto) ma richiedono POS, tessere o QR.
+- **Cosa fa:** il titolare verificato può offrire un omaggio semplice (un caffè, il dolce) a chi ha segnato "Ci sono tornato" 2+ volte; l'utente lo vede nella scheda e lo mostra al tavolo. Nessun pagamento.
+- **Da dove nasce:** Toast dice che chi entra in un programma fedeltà torna molto di più ([Stacker via KEYT](https://keyt.com/?p=1472466)); Izicap/Nexi lo fanno dal POS. Noi senza hardware, legato alla visita vera.
+- **Valore per l'utente:** un motivo in più per tornare dove sta bene.
+- **Valore per il ristoratore:** fedeltà misurata (il numero "↻ tornati" del pannello) a costo quasi zero: è il cuore di un abbonamento.
+- **Sforzo:** M (omaggio nel pannello, riga in scheda, controllo antiabuso). **Rischio:** "Ci sono tornato" si segna da soli: va legato a una prenotazione o a una prova.
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** **DA DECIDERE LORENZO.** "Lasciamo ai locali verificati offrire un omaggio a chi torna (nessun denaro, solo da mostrare al tavolo)?"
+
 ## 20/10/2026 (seconda sessione della notte, CEO che chiude)
 
 ### 7. "Aperto da poco" (i locali nuovi giusti per te)
@@ -36,7 +68,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** prova di clienti fedeli, non solo nuovi: un numero da piano Growth.
 - **Sforzo:** M (conteggio sulle visite già registrate nel diario, nessun dato nuovo da chiedere).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. Premi o tessera fedeltà: passo separato, DA DECIDERE LORENZO.
+- **Stato proposto:** PRONTA → **FATTA il 20/10 (sessione delle 05:00).** Premi o tessera fedeltà: passo separato, DA DECIDERE LORENZO (proposta 12).
 
 ### 9. Serata di pre-apertura per chi ama il genere
 - **Problema:** come la 7: i primi clienti giusti e le prime recensioni vere.
