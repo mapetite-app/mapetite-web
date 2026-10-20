@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 21/10/2026 (notte, CEO che chiude — solo chiavi di volta, regola dello sprint)
+
+### 13. Tutte le slide del carosello in un colpo ("5 posti a Roma" in 5 screenshot)
+- **Problema:** i post "5 posti dove…" di Instagram sono caroselli: ogni locale sta su una slide. Oggi il Condividi di Android legge solo il primo screenshot e lo dice ("ho letto solo la prima"). Si perdono 4 posti su 5 (`PROBLEMI.md`, 8).
+- **Cosa fa:** condividi fino a 5 screenshot insieme; Mapetite li legge tutti e mostra un elenco unico senza doppioni ("Nel post ci sono 5 posti"): il primo si salva come oggi, gli altri con "+ Salva".
+- **Da dove nasce:** GeoTok e Korka leggono didascalia, scritte e profili taggati di un video, ma un video alla volta ([GeoTok](https://peerlist.io/shalex/project/geotok--save-every-tiktok-worth-eating-at), [Korka](https://apps.apple.com/app/id6762612703)). Places: Save & Organize è gratis solo per 2 posti ([App Store](https://apps.apple.com/us/app/-/id6737359980)). Noi: tutto il carosello, gratis, e ogni posto verificato su Google prima di salvarlo.
+- **Valore per l'utente:** il post "classifica" diventa una lista in un gesto.
+- **Valore per il ristoratore:** sapere da quali post arrivano i salvataggi del proprio locale ("3 persone ti hanno salvato da un post di @creator") nel pannello: dato che oggi nessuno gli dà.
+- **Sforzo:** S. `ricevi` legge fino a 5 immagini, una chiamata Haiku ciascuna (o una sola con più immagini), unisce i locali con `fromParsed`.
+- **Costo Google/Haiku:** Haiku circa 0,3 centesimi a immagine; Google invariato (1 ricerca automatica, le altre a tocco).
+- **Stato proposto:** PRONTA.
+
+### 14. Il verdetto subito, appena salvato dal reel
+- **Problema:** chi salva dal reel vede "✓ Salvato" e un indirizzo: il differenziatore (il verdetto Mapetite) non si vede nel momento più forte della demo.
+- **Cosa fa:** nella card "✓ Salvato in 📌 Voglio andarci" compare la riga del verdetto ("✦ Carbonara da manuale, sala piccola e rumorosa") presa dalla cache o scritta al volo con lo stesso tetto dei verdetti dei salvati (25 al giorno).
+- **Da dove nasce:** Drawer, Corner e Go There trasformano il reel in un pin; nessuno dice se il posto merita ([Drawer](https://apps.apple.com/us/app/-/id582432085), [Corner](https://apps.apple.com/app/id1668282277), [Go There](https://hunted.space/product/go-there)). Noi sì, dalle recensioni e senza inventare.
+- **Valore per l'utente:** sa subito se il posto visto sui social vale davvero, prima ancora di aprirlo.
+- **Valore per il ristoratore:** il verdetto onesto è ciò che i locali verificati potranno arricchire (foto, serate) nel piano a pagamento.
+- **Sforzo:** S. Riusa `/api/places/verdetto` (lo stesso della scheda dei salvati).
+- **Costo Google/Haiku:** per i locali senza verdetto in cache: 1 Place Details + 1 Haiku, dentro il tetto di 25 al giorno già esistente.
+- **Stato proposto:** PRONTA.
+
 ## 20/10/2026 (sessione delle 05:00, CEO che chiude)
 
 ### 10. "Prenota come l'ultima volta" (il tavolo del posto fisso in un tocco)

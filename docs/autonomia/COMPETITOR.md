@@ -131,6 +131,12 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 ### Pubster — nuovo, 20/10
 - Fedeltà con monete virtuali raccolte via QR in pub, pizzerie e bar ([RocketReach](https://rocketreach.co/pubster-profile_b5e9e5cbf42e8c51)). Numeri: dato non trovato. Ultimo controllo: 20/10/2026
 
+### App "salva dal reel" (GeoTok, Korka, Drawer, someday., Go There, Places: Save & Organize) — nuove, 21/10
+- **Cosa fanno:** condividi un TikTok o un reel e l'app trova il posto. GeoTok legge didascalia, scritte e audio e controlla su TripAdvisor e Foursquare, 14,99 $/mese ([Peerlist](https://peerlist.io/shalex/project/geotok--save-every-tiktok-worth-eating-at)); Korka usa didascalie, foto e profili taggati ([App Store](https://apps.apple.com/app/id6762612703)); Drawer e Go There mettono il pin sulla mappa ([Drawer](https://apps.apple.com/us/app/-/id582432085), [Go There](https://hunted.space/product/go-there)); someday. estrae più posti e li mette in raccolte ([Hunted](https://www.hunted.space/product/someday-2)); Places: Save & Organize è gratis solo per 2 posti ([App Store](https://apps.apple.com/us/app/-/id6737359980)). Corner dice di trasformare i link in pin, senza spiegare come ([App Store](https://apps.apple.com/app/id1668282277)). Descrizioni dei produttori, precisione non verificata.
+- **Da prendere:** più posti per video (fatto il 21/10), raccolte automatiche dal post, lettura dei profili taggati (fatto nel prompt).
+- **Meglio noi:** gratis, ogni posto verificato su Google prima di salvarlo (mai pin inventati), salvataggio da solo solo quando combacia, e soprattutto il verdetto onesto e la ricerca per i propri gusti dopo il salvataggio: loro finiscono al pin.
+- Ultimo controllo: 21/10/2026
+
 ## In sintesi: dove nessuno arriva
 1. **Ricerca su tutta Google + verdetto onesto per ogni posto**: Places e Corner cercano solo tra i propri posti; Google ordina per fama.
 2. **Dal salvato al tavolo**: nessuno tiene insieme social → salvato → "sei vicino" → prenotazione → "com'è andata".
