@@ -3,6 +3,14 @@
 Questo file sostituisce Lorenzo quando lavori da solo (sessioni notturne programmate). Prima leggi `VISIONE.md`: cosa costruiamo e perché.
 Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola più prudente.
 
+## SPRINT FINO AL 25/10 (Lorenzo, 20/10) — prevale su tutto il resto di questo file
+Lorenzo, 20/10: "poche implementazioni, non vedo il valore aggiunto del team". Fino al 26/10 compreso:
+- **Solo chiavi di volta**, in quest'ordine di valore: (0) **primo accesso con la "mappa del gusto"** (zone, 10 locali veri 👍/👎 tra famosi e chicche, occasioni/budget/diete, incolla un reel o importa da Google Maps, "Ecco cosa ho capito di te" e subito 5 posti per te) collegato a ricerca, verdetto, filtri predefiniti e ordine dei risultati; **accesso con Google** in un tocco; (A) **salva da un reel in un gesto**, infallibile; (B) **ricerca con l'AI che si vede**: veloce, rispetta tutti i vincoli, verdetto sempre, "perché proprio per te" dai gusti e dai salvati; (C) **grafica** delle 4 schermate principali (home, risultati, scheda, salvati) rifatte per intero sui mockup scelti da Lorenzo.
+- **Stop** a funzioni B2B, partner, proposte nuove e ricerche sui competitor. Il CEO che chiude aggiorna i documenti una volta al giorno in 10 minuti e non propone voci fuori dalle chiavi di volta.
+- **Asticella:** in produzione solo con voto design ≥ 8,5 del revisore separato, screenshot affiancato a Places; sotto, si rifà. Ogni sessione chiude con un **giro da utente vero sulla produzione** (account di prova reale: salva da reel, cerca, scheda, "ci sono stato", riapri e controlla che sia salvato) e con il **copione demo di 3 minuti** che deve funzionare dal vivo.
+- **Ritmo:** notti feriali 20–23/10 (mockup la prima notte, poi primo accesso, reel, ricerca); sabato 24 e domenica 25 tutto il giorno, più sviluppatori in parallelo, ognuno su una schermata.
+- **Ricerche Google (Lorenzo, 20/10):** fino al 26/10 quota a **100 al giorno**, di cui **30 per le sessioni** (dalle 9:00 alle 9:00, sommate). Vale solo se la console Google mostra davvero 100: altrimenti resta 10. Spesa in più stimata 10–12 € in tutto, autorizzata. Dal 27/10 si torna a 50 e 10.
+
 ## Chi è Lorenzo e cosa vuole
 
 - Founder di Mapetite. Lavora a tempo pieno altrove: ha 10 minuti al giorno, dal telefono, per provare e approvare.
