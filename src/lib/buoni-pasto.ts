@@ -17,8 +17,8 @@ export function buoniPertinenti(category: string | null | undefined): boolean {
 
 export function fraseBuoni(c: ConteggioBuoni | null): { accetta: boolean; testo: string } | null {
   if (!c) return null;
-  if (c.si >= MIN_RISPOSTE && c.si > c.no) return { accetta: true, testo: `Buoni pasto: sì · lo dicono ${c.si} persone` };
-  if (c.no >= MIN_RISPOSTE && c.no > c.si) return { accetta: false, testo: `Buoni pasto: no · lo dicono ${c.no} persone` };
+  if (c.si >= MIN_RISPOSTE && c.si > c.no) return { accetta: true, testo: `Buoni pasto: sì · ${c.si} persone` };
+  if (c.no >= MIN_RISPOSTE && c.no > c.si) return { accetta: false, testo: `Buoni pasto: no · ${c.no} persone` };
   return null;
 }
 

@@ -16,6 +16,37 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 20/10/2026 (seconda sessione della notte, CEO che chiude)
+
+### 7. "Aperto da poco" (i locali nuovi giusti per te)
+- **Problema:** `PROBLEMI.md` n. 6: i locali nuovi hanno poche recensioni e Google li mette dietro i famosi; quasi metà chiude entro 5 anni.
+- **Cosa fa:** il titolare verificato scrive nel pannello il mese di apertura; in scheda compare "🆕 Aperto da 3 mesi"; nelle ricerche Mapetite un locale aperto da meno di 12 mesi non è penalizzato per le poche recensioni (sotto il pavimento qualità resta solo se ha almeno qualche voto buono). Dopo: in home "Nuovo vicino ai tuoi posti" per chi ha salvati dello stesso tipo e zona.
+- **Da dove nasce:** Mapstr Plus dà accesso alle pre-aperture solo a Parigi e solo a chi paga ([Tendance Hôtellerie, 31/7/2026](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)); Places le sceglie a mano. Noi gratis, a Roma e Milano, legate ai gusti: mai al più popolare.
+- **Valore per l'utente:** scopre prima degli altri il posto giusto per lui.
+- **Valore per il ristoratore:** è il motivo per verificarsi nei primi mesi, i più fragili; base del piano Growth "fatti trovare da chi ama il tuo genere".
+- **Sforzo:** M (una colonna `aperto_dal` sul locale verificato, riga in scheda, piccola regola nel ranking).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 8. "I tuoi posti fissi" (chi torna, senza tessere)
+- **Problema:** la fedeltà oggi passa da POS e QR (Izicap con Nexi, Pubster); il ristoratore non sa se chi arriva da Mapetite torna.
+- **Cosa fa:** il secondo "Com'è andata?" sullo stesso locale diventa "Ci sei tornato"; nel profilo "I tuoi posti fissi" (2+ visite), da proporre agli amici; nel pannello del ristoratore "N persone di Mapetite sono tornate 2 o più volte" (solo numeri aggregati).
+- **Da dove nasce:** Izicap misura chi paga ([AziendaBanca](https://www.aziendabanca.it/notizie/tecno/izicap-smart-pos-nexi)); noi chi sceglie di tornare, senza tessera né POS.
+- **Valore per l'utente:** una lista "sicuri" pronta, che si costruisce da sola.
+- **Valore per il ristoratore:** prova di clienti fedeli, non solo nuovi: un numero da piano Growth.
+- **Sforzo:** M (conteggio sulle visite già registrate nel diario, nessun dato nuovo da chiedere).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA. Premi o tessera fedeltà: passo separato, DA DECIDERE LORENZO.
+
+### 9. Serata di pre-apertura per chi ama il genere
+- **Problema:** come la 7: i primi clienti giusti e le prime recensioni vere.
+- **Cosa fa:** un locale verificato che sta per aprire invita 10–20 persone di Mapetite con salvati simili nella zona.
+- **Da dove nasce:** Mapstr Plus lo fa per chi paga l'abbonamento; noi scegliamo gli invitati per gusto.
+- **Valore per il ristoratore:** clienti giusti dalla prima sera; possibile servizio a pagamento più avanti.
+- **Sforzo:** L (inviti, posti limitati, rapporto diretto con i locali).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** DA DECIDERE LORENZO: "Proponiamo ai primi ristoratori verificati una serata di pre-apertura gratuita con utenti scelti per gusto?"
+
 ## 20/10/2026 (notte, CEO che chiude)
 
 ### 4. "A quell'ora è chiuso? Ecco chi è aperto"

@@ -116,7 +116,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
             Verificato dal titolare
           </p>
         )}
-        {place.verified_at && <PostoLocale venueId={place.id} soloPosto />}
+        {place.verified_at && <PostoLocale venueId={place.id} />}
         {/* Una sola riga di fatti, come la scheda della mappa: tipo · prezzo · voto · città. */}
         {(kind || city) && (
           <p className="mt-2 text-[15px] font-sans text-text-muted">

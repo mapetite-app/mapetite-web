@@ -6,6 +6,7 @@ import { puoGestireLocale } from "@/lib/ristoratore-accesso";
 import { cityFromAddress } from "@/lib/city";
 import { computeRistoratore, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
+import { pulisciApertoDal } from "@/lib/aperto-dal";
 import Pannello, { PERIODI } from "../pannello";
 
 // Pannello del ristoratore (PIANO-25-OTTOBRE.md 8.2), id = UUID del locale in places.
@@ -21,7 +22,7 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Serate = { giorni: number[]; at: string | null };
+type Serate = { giorni: number[]; at: string | null; apertoDal: string | null };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate };
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
@@ -34,7 +35,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
-    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null } };
+    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal) } };
   } catch {
     return null;
   }
@@ -98,8 +99,12 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   if (aErr) console.error("[ristoratore] lettura salvataggi del locale:", aErr.message);
   const attesa = (tutti ?? []) as RistSalvataggio[];
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
-  const { data: sr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<{ giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null }>();
-  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null };
+  // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
+  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null };
+  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal").eq("id", id).maybeSingle<Sr>();
+  if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<Sr>());
+  if (srErr) console.error("[ristoratore] lettura serate:", srErr.message);
+  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal) };
   return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate };
 }
 

@@ -2,7 +2,7 @@
 
 Per ogni partner: chi è, quanti locali raggiunge (con fonte), cosa ci darebbe, cosa ci guadagna lui, se ha un'API o un programma partner pubblico, e una bozza di email pronta per Lorenzo o Roberto.
 **Nessuno è stato contattato.** Le email sono bozze: le manda Lorenzo o Roberto, quando vogliono.
-Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 19/10/2026.
+Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 20/10/2026.
 
 ## Ordine consigliato
 1. **Zenchef/CoverManager** e **Zucchetti**: risolvono il no-show vero (la prenotazione entra nell'agenda del locale) e non sono concorrenti sul cliente finale.
@@ -120,3 +120,14 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 ## Deliveroo / Glovo
 - **Pertinenza:** bassa. Non facciamo consegne (`RICERCA-RISTORATORI.md`, riga 5: commissioni 22–35% sull'ordine, fonti S7 e S8).
 - **Al massimo:** un link "Ordina" nella scheda se il locale lo fornisce. Nessun contatto consigliato.
+
+## Nexi (con Izicap) — priorità bassa, aggiunto il 20/10
+- **Chi è:** il principale operatore italiano di pagamenti; ha già una convenzione con Fipe per bar e ristoranti ([comunicato Nexi–Fipe, 2022](https://www.fipe.it/wp-content/uploads/2022/02/Nexi_Fipe_ComunicatoStampa.pdf)).
+- **Quanti locali:** circa 1 milione di esercenti in tutto, con le banche partner (stessa fonte, dato 2021). Quanti sono ristoranti: dato non trovato.
+- **Cosa ci darebbe:** visite confermate da un pagamento vero; un canale per proporre Mapetite ai locali dal POS.
+- **Cosa ci guadagna:** un servizio in più sullo SmartPOS: clienti nuovi, non solo fedeltà (Izicap).
+- **API o programma partner pubblico:** dato non trovato.
+- **Bozza di email (per Lorenzo):**
+  > Oggetto: Clienti nuovi per i ristoranti Nexi, dal salvataggio alla visita
+  > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e scegliere bar e ristoranti a Roma e Milano. Portiamo ai locali persone che li avevano già salvati, senza commissioni a coperto. Vorremmo capire se tra i servizi per lo SmartPOS c'è spazio per un'app che porta domanda nuova. Avete un programma per partner terzi? Bastano 20 minuti.
+  > Grazie, Lorenzo
