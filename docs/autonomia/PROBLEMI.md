@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 19/10/2026.
+Ultimo aggiornamento: 20/10/2026.
 
 ---
 
@@ -101,3 +101,14 @@ Ultimo aggiornamento: 19/10/2026.
 **DAVVERO:** elenco ufficiale dei locali convenzionati dai circuiti (Edenred, altri) con un accordo; pagamento con buono pasto dentro l'app.
 **Primo passo:** la domanda "Accettano buoni pasto?" nel "Com'è andata?" (team); email a Edenred (Lorenzo, bozza in `PARTNER.md`).
 **Chi lo fa:** team e Lorenzo.
+
+## 6. I locali nuovi e piccoli non si fanno trovare (e metà chiude entro 5 anni) — 20/10
+- **Chi lo ha:** entrambi. Il ristoratore nuovo ha poche recensioni e Google lo mette dietro i posti famosi; il cliente scopre le aperture solo per caso sui social.
+- **Quanto pesa:**
+  - sopravvivenza a 5 anni intorno al 53% ([Gambero Rosso, Rapporto Fipe 2025](https://www.gamberorosso.it/notizie/attualita/ristorazione-rapporto-fipe-2025/)); 54% per le imprese nate nel 2018 ([Linkiesta](https://www.linkiesta.it/2024/04/tutti-vogliono-aprire-un-ristorante-ma-dopo-cinque-anni-la-meta-chiude/));
+  - nel 2024 10.719 aperture contro 29.097 chiusure (Rapporto Fipe 2025, link sopra);
+  - nel 2025 le imprese del settore sono 324.436 (−1%), bar −2,2% ([Rapporto Fipe 2026, PDF](https://www.confcommerciomilano.it/export/sites/unione/doc/news_comunicati/pdf/2026/fipe_risto_rapp26.pdf); [Teleborsa, 9/4/2026](https://www.teleborsa.it/News/2026/04/09/ristorazione-consumi-a-quota-100-miliardi-di-euro-in-calo-imprese-e-lavoratori-dipendenti-139.html));
+  - quanto pesi la visibilità sulle chiusure: dato non trovato.
+- **OGGI nell'app:** "Aperto da poco" (proposta 7): il titolare verificato indica da quando è aperto, la scheda lo dice, le ricerche non lo penalizzano per le poche recensioni. Già oggi il badge 💎 "Poco conosciuto" spinge i posti con poche recensioni ma voti alti. Sforzo M.
+- **DAVVERO, in futuro:** un elenco affidabile delle nuove aperture (camere di commercio o accordo con Fipe) e pre-aperture con invito (proposta 9).
+- **Primo passo:** proposta 7 (team). **Chi lo fa:** team; i contatti con Fipe Lorenzo o Roberto.

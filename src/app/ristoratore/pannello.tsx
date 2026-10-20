@@ -7,6 +7,7 @@ import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
 import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
 import SerateTranquille from "./serate";
+import ApertoDal from "./aperto-dal";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -357,7 +358,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
-  serate?: { giorni: number[]; at: string | null };
+  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null };
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -539,6 +540,10 @@ export default function Pannello({
     <>
       <Sezione titolo="Serate tranquille" nota="I giorni in cui di solito hai posto. Chi ti ha salvato lo vede nella tua scheda: niente sconti, niente commissioni." piano="Verified" testId="pannello-serate">
         <SerateTranquille placeId={locale.id} iniziali={demo ? [2, 3] : serate.giorni} at={demo ? new Date().toISOString() : serate.at} verificato={verificato} demo={demo} />
+      </Sezione>
+      {/* "Aperto da poco" (PROPOSTE.md, proposta 7): i primi mesi sono i più fragili. */}
+      <Sezione titolo="Aperto da poco" nota="Il mese in cui hai aperto. Per il primo anno la tua scheda lo dice: chi ama il tuo genere ti scopre prima." piano="Verified" testId="pannello-aperto-dal">
+        <ApertoDal placeId={locale.id} iniziale={demo ? null : serate.apertoDal ?? null} verificato={verificato} demo={demo} />
       </Sezione>
       {evidenza}
     </>

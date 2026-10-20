@@ -59,6 +59,13 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - Numeri: dato non trovato.
 - Ultimo controllo: 19/10/2026
 
+### Novità viste il 20/10 (seconda sessione)
+- **Mapstr** — con Mapstr Plus accesso alle pre-aperture dei nuovi locali, per ora solo a Parigi ([Tendance Hôtellerie, 31/7/2026](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)); mappa dei suggerimenti con tre filtri (chi segui, "Mapstr Matching", nuove aperture: [mapstr.com](https://mapstr.com/mapstore/fr/article/article_all-in-map_fr_1), senza data); la scheda di Mapstr Plus cita suggerimenti AI per umore, budget o dieta e un filtro "tavoli disponibili" ([App Store](https://apps.apple.com/FR/app/id917288465)). **Da prendere:** le nuove aperture come segnale. **Meglio noi:** gratis, a Roma e Milano, legate al gusto (proposta 7). Ultimo controllo: 20/10/2026
+- **Corner** — versione 5.16.0 del 26/9/2026, solo correzioni ([App Store](https://apps.apple.com/app/id1668282277)). Ultimo controllo: 20/10/2026
+- **BestieBite** — grafica rifatta, primo accesso più rapido, "serie" giornaliere con premi, avvisi a carte ([App Store](https://apps.apple.com/app/id6444921443), versione senza data); round da 700.000 dollari guidato da Techstars per il lancio negli USA ([TechFundingNews](https://techfundingnews.com/bestie-bite-raises-700k-to-turn-real-diner-videos-into-the-hospitality-worlds-most-trusted-marketing-tool/)). **Meglio noi:** le serie premiano chi apre l'app, non chi sceglie bene; se puntano agli USA Roma resta più libera. Ultimo controllo: 20/10/2026
+- **Albo** — salva da TikTok, Instagram, YouTube, Pinterest, X, Reddit; raccolte condivisibili; gratis con funzioni a pagamento ([TechCrunch](https://techcrunch.com/?p=3146922)). Resta generalista. Ultimo controllo: 20/10/2026
+- **Beli** — nessuna novità 2026 trovata. Ultimo controllo: 20/10/2026
+
 ### Altri consumer trovati il 19/10
 - **CircleRecs (Axel Springer)** — nuovo, uscito ad agosto 2026 secondo la scheda App Store vista in ricerca: salvi ristoranti, li condividi in cerchie private, segui creator pubblici, chiedi idee a parole; la scheda stessa avvisa che i suggerimenti AI possono essere incompleti. Link non verificato: cercare "CircleRecs" sull'App Store. **Da tenere d'occhio:** grande editore dietro, idea simile alle nostre liste di gruppo + assistente. Migliorabile: nessun verdetto onesto per posto (dalla scheda non risulta). Ultimo controllo: 19/10/2026
 - **Places: your feed on a map** — prende i posti dai video di TikTok, Instagram e YouTube e li mette su una mappa; poche valutazioni sullo store ([App Store](https://apps.apple.com/app/id6749470105)). Migliorabile: si ferma alla raccolta, niente aiuto nella scelta. Ultimo controllo: 19/10/2026
@@ -114,6 +121,14 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - Ultimo controllo: 19/10/2026
 
 ---
+
+### Izicap (con Nexi) — nuovo, 20/10
+- **Cosa fa:** fedeltà e CRM per esercenti sul POS. Secondo [AziendaBanca](https://www.aziendabanca.it/notizie/tecno/izicap-smart-pos-nexi) (articolo senza data, probabilmente 2021–22) è installato di default sul 60% degli SmartPOS Nexi; c'è un'offerta in pacchetto con lo SmartPOS ([PRNewswire, 2023](https://www.prnewswire.com/it/comunicati-stampa/una-nuova-partnership-tra-nexi-e-izicap-301739137.html)).
+- **Meglio noi:** loro fidelizzano chi è già cliente; noi portiamo clienti nuovi già interessati e vediamo chi torna senza tessera (proposta 8).
+- Ultimo controllo: 20/10/2026
+
+### Pubster — nuovo, 20/10
+- Fedeltà con monete virtuali raccolte via QR in pub, pizzerie e bar ([RocketReach](https://rocketreach.co/pubster-profile_b5e9e5cbf42e8c51)). Numeri: dato non trovato. Ultimo controllo: 20/10/2026
 
 ## In sintesi: dove nessuno arriva
 1. **Ricerca su tutta Google + verdetto onesto per ogni posto**: Places e Corner cercano solo tra i propri posti; Google ordina per fama.

@@ -59,3 +59,35 @@ export function dataOra(date: string, time: string): Date | null {
   if (!m || !t) return null;
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(t[1]), Number(t[2]));
 }
+
+const dentro = (t: number, o: number, c0: number) => {
+  const c = c0 <= o ? c0 + WEEK : c0;
+  return (t >= o && t < c) || (t + WEEK >= o && t + WEEK < c);
+};
+
+// Chiusura della fascia in corso: "alle 23:00" (anche se è dopo mezzanotte: "alle 02:00").
+// null = non si sa, h24 o adesso è chiuso.
+export function prossimaChiusura(orari: Orari | null | undefined, da: Date): string | null {
+  if (!orari || orari.length === 0) return null;
+  const t = minutoSettimana(da);
+  const f = orari.find(([o, c]) => c != null && dentro(t, o, c));
+  return f ? `alle ${hhmm(f[1] as number)}` : null;
+}
+
+// Orari di un giorno, come Places: "12:30–15:00 · 19:30–23:00", "Chiuso", "Aperto 24 ore".
+// Conta le aperture che iniziano quel giorno (chi chiude dopo mezzanotte resta nel giorno in cui apre).
+// null = orari non noti: la scheda non scrive niente.
+export function orariDelGiorno(orari: Orari | null | undefined, quando: Date): string | null {
+  if (!orari || orari.length === 0) return null;
+  if (orari.some(([, c]) => c == null)) return "Aperto 24 ore";
+  // All'1 di notte un bar aperto dalle 22 alle 4 è ancora "la sera di ieri": si mostrano
+  // gli orari di quel giorno (come Google Maps), non "Chiuso".
+  const t = minutoSettimana(quando);
+  const inCorso = orari.find(([o, c]) => Math.floor(o / 1440) !== quando.getDay() && dentro(t, o, c as number));
+  const giorno = inCorso ? Math.floor(inCorso[0] / 1440) : quando.getDay();
+  const fasce = orari
+    .filter(([o]) => Math.floor(o / 1440) === giorno)
+    .sort((a, b) => a[0] - b[0])
+    .map(([o, c]) => `${hhmm(o)}–${hhmm(c as number)}`);
+  return fasce.length ? fasce.join(" · ") : "Chiuso";
+}
