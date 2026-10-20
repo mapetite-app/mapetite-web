@@ -26,7 +26,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** più prenotazioni dai clienti fedeli, senza commissioni a coperto (`PROBLEMI.md` n. 4).
 - **Sforzo:** S (le prenotazioni sono già sul telefono; si legge l'ultima per quel locale).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA → **FATTA il 20/10** (per ogni locale già prenotato da Mapetite, non solo i posti fissi: il segnale c'è già).
 
 ### 11. "È la mia 3ª volta da voi" nella richiesta di prenotazione (scelto dall'utente)
 - **Problema:** `PROBLEMI.md` n. 7 e n. 1: il ristoratore non riconosce i clienti fedeli quando prenotano, e non sa a chi tenere il tavolo.
@@ -36,7 +36,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** sa chi è un cliente fedele prima che arrivi; base di un piano Pro "i tuoi clienti fissi".
 - **Sforzo:** S (testo della richiesta e un interruttore).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA → **FATTA il 20/10** ("Sarà la mia 3ª volta da voi", neutro rispetto al genere).
 
 ### 12. "Grazie di essere tornato": un piccolo omaggio deciso dal locale
 - **Problema:** `PROBLEMI.md` n. 7: i programmi fedeltà funzionano (dati Toast, sotto) ma richiedono POS, tessere o QR.
