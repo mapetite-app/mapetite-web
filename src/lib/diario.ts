@@ -111,6 +111,3 @@ export function visiteDi(tags: string[] | null | undefined, visite: unknown): nu
   const n = typeof visite === "number" && Number.isFinite(visite) ? Math.max(0, Math.min(999, Math.floor(visite))) : 0;
   return Math.max(n, tags?.includes(VISITED) ? 1 : 0);
 }
-
-/** "2ª volta", "3ª volta"… */
-export const voltaLabel = (n: number) => `${n}ª volta`;

@@ -5073,7 +5073,8 @@ else {
     // "I tuoi posti fissi" (PROPOSTE 8): 2+ visite, dal più frequentato, con "Proponi"
     { const pf = d.getByTestId("posti-fissi");
       const nomiPf = (await pf.getByTestId("posto-fisso").allTextContents().catch(() => [])).join("|");
-      ok(await pf.isVisible().catch(() => false) && /Osteria Due.*3 volte\|.*Bar Sette.*2 volte$/.test(nomiPf) && (await pf.getByTestId("posto-fisso").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && await pf.getByTestId("posti-fissi-condividi").isVisible(), `posti fissi: nel profilo Osteria (3 volte) e Bar (2 volte), toccabili, con 'Proponi' (${nomiPf})`);
+      ok(await pf.isVisible().catch(() => false) && /Osteria Due.*3 volte\|.*Bar Sette.*2 volte$/.test(nomiPf) && (await pf.getByTestId("posto-fisso").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}`, `posti fissi: nel profilo Osteria (3 volte) e Bar (2 volte), toccabili (${nomiPf})`);
+      ok((await pf.getByTestId("posti-fissi-condividi").count()) === 0, "posti fissi: senza profilo pubblico niente 'Proponi' (il link non porterebbe ai posti)");
       await pf.scrollIntoViewIfNeeded().catch(() => {});
       await d.screenshot({ path: `${OUT}/49b-posti-fissi.png`, caret: "initial" }); }
     ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 provati"), "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
@@ -5197,9 +5198,16 @@ else {
     dPatches = [];
     await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
     await d.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).catch(() => {});
-    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06") && (await d.getByTestId("diario-foglio").textContent()).includes("Ci sei tornato · 2ª volta"), `posti fissi: 'Ci sono tornato' scrive 2 visite e oggi, il foglio dice '2ª volta' (${JSON.stringify(dPatches)})`); }
+    ok((await d.getByTestId("diario-foglio").textContent().catch(() => "")).includes("Ci sei tornato · 2ª volta"), "posti fissi: 'Ci sono tornato' apre il foglio '↻ Ci sei tornato · 2ª volta'");
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await d.waitForTimeout(400);
+    ok(!dPatches.some((x) => x.body && "visite" in x.body), `posti fissi: 'Salta' non conta la visita (${JSON.stringify(dPatches)})`);
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`); }
+    ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
     ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });

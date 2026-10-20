@@ -22,8 +22,6 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
   const [stato, setStato] = useState<Stato | null>(null);
   const [open, setOpen] = useState<"nuova" | "modifica" | null>(null);
   const [tornato, setTornato] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [errore, setErrore] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -52,30 +50,29 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
   }, [stato, askedAt, ctx]);
 
   const save = async (v: DiarioValori, mode: "nuova" | "modifica") => {
-    if (stato?.colonna && v.date !== stato.date) {
+    if (tornato != null) {
+      // "Ci sono tornato": la visita si conta solo qui, salvando il foglio ("Salta" non scrive niente).
+      const date = v.date ?? dayKey(new Date());
+      const res = await saveVisit(userId, place.id, { visite: tornato, visited_at: date });
+      if (res === "errore") return false;
+      setStato((s) => (s ? { ...s, visite: tornato, date: res === "ok" ? date : s.date } : s));
+      track("ci_sono_stato", { id: place.id }, { fonte: "tornato", visite: tornato });
+      setTornato(null);
+    } else if (stato?.colonna && v.date !== stato.date) {
       const res = await saveVisit(userId, place.id, { visited_at: v.date });
       if (res === "errore") return false;
       setStato((s) => (s ? { ...s, colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
     }
     if (ctx && v.voto !== ctx.voto) ctx.setVoto(v.voto);
-    trackFeature("diario", { fonte: "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
+    trackFeature("diario", { fonte: tornato != null ? "tornato" : "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
     setOpen(null);
     return true;
   };
 
-  // "↻ Ci sono tornato": una visita in più con la data di oggi, poi lo stesso "Com'è andata?".
-  const torna = async () => {
-    if (!stato || stato.visite == null || busy) return;
-    setBusy(true);
-    setErrore(false);
-    const n = stato.visite + 1;
-    const today = dayKey(new Date());
-    const res = await saveVisit(userId, place.id, { visite: n, visited_at: today });
-    setBusy(false);
-    if (res === "errore") { setErrore(true); return; }
-    setStato((s) => (s ? { ...s, visite: n, date: res === "ok" ? today : s.date } : s));
-    track("ci_sono_stato", { id: place.id }, { fonte: "tornato", visite: n });
-    setTornato(n);
+  // "↻ Ci sono tornato": apre lo stesso "Com'è andata?" con oggi; la visita si conta salvando.
+  const torna = () => {
+    if (!stato || stato.visite == null) return;
+    setTornato(stato.visite + 1);
     setOpen("nuova");
   };
 
@@ -98,8 +95,9 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
               : <span className="font-display font-semibold text-accent">Quando ci sei stato?</span>}
           </button>
         )}
-        {stato.visite != null && (
-          <button type="button" data-testid="diario-scheda-tornato" onClick={() => void torna()} disabled={busy} className="min-h-10 font-display font-semibold text-brand disabled:opacity-60">
+        {/* Non lo stesso giorno della visita già segnata: due tocchi non fanno due visite. */}
+        {stato.visite != null && stato.date !== today && (
+          <button type="button" data-testid="diario-scheda-tornato" onClick={torna} className="min-h-10 font-display font-semibold text-brand">
             ↻ Ci sono tornato
           </button>
         )}
@@ -107,7 +105,6 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
           📔 Diario →
         </Link>
       </div>
-      {errore && <p role="alert" className="text-sm text-error">Non sono riuscito a segnarlo. Riprova.</p>}
       {open && (
         <DiarioFoglio
           place={place}

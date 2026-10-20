@@ -3,7 +3,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import CondividiLink from "@/components/condividi-link";
 
 // "I tuoi posti fissi" (PROPOSTE.md, proposta 8): i locali dove sei tornato almeno 2 volte.
-// Compare solo quando ce n'è almeno uno; un solo pulsante per proporli agli amici.
+// Compare solo quando ce n'è almeno uno; "Proponi" agli amici solo con il profilo pubblico.
 export type PostoFisso = { id: string; name: string; category: string | null; visite: number };
 
 const MAX = 5;
@@ -16,14 +16,15 @@ export default function PostiFissi({ posti, handle }: { posti: PostoFisso[]; han
     <section aria-labelledby="posti-fissi-titolo" data-testid="posti-fissi" className="mb-8">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 id="posti-fissi-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi posti fissi</h2>
-        <CondividiLink
-          path={handle ? `/u/${handle}` : "/"}
+        {/* Senza profilo pubblico il link non porterebbe ai posti: niente "Proponi". */}
+        {handle && <CondividiLink
+          path={`/u/${handle}`}
           title="I miei posti fissi"
           text={`I miei posti fissi: ${nomi}. Li trovi su Mapetite.`}
           cosa="profilo"
           label="Proponi"
           testId="posti-fissi-condividi"
-        />
+        />}
       </div>
       <ul className="overflow-hidden rounded-card border border-border bg-white">
         {top.map((p, i) => (
