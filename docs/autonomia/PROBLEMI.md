@@ -112,3 +112,15 @@ Ultimo aggiornamento: 20/10/2026.
 - **OGGI nell'app:** "Aperto da poco" (proposta 7): il titolare verificato indica da quando è aperto, la scheda lo dice, le ricerche non lo penalizzano per le poche recensioni. Già oggi il badge 💎 "Poco conosciuto" spinge i posti con poche recensioni ma voti alti. Sforzo M.
 - **DAVVERO, in futuro:** un elenco affidabile delle nuove aperture (camere di commercio o accordo con Fipe) e pre-aperture con invito (proposta 9).
 - **Primo passo:** proposta 7 (team). **Chi lo fa:** team; i contatti con Fipe Lorenzo o Roberto.
+
+## 7. I clienti che tornano valgono tanto, ma nessuno li vede (né il locale né il cliente) — 20/10
+- **Chi lo ha:** entrambi. Il ristoratore non sa chi torna se non ha un gestionale con CRM; il cliente, quando deve scegliere "un posto sicuro", non ha una lista dei suoi posti fissi.
+- **Quanto pesa (dati da fonti di settore, USA, da prendere come indicazione):**
+  - circa il 7% degli ospiti con più visite può valere fino al 50% degli ordini (dati Toast, 2026, ripresi da Stacker: [KRDO, 4/9/2026](https://krdo.com/stacker-business-economy/2026/09/04/report-7-of-guests-can-drive-up-to-50-of-restaurant-order-volume/)); chi entra in un programma fedeltà torna molto più spesso (stessa fonte: [KEYT](https://keyt.com/?p=1472466));
+  - il 78,8% degli ospiti non torna dopo un anno secondo Bloom Intelligence ([report 2025](https://bloomintelligence.com/blog/state-of-restaurant-guest-retention-2025/); metodo non visibile);
+  - l'82% dei ristoratori intervistati da Square dice che il programma fedeltà porta visite ripetute (autodichiarato: [BusinessWire, 30/1/2025](https://www.businesswire.com/news/home/20250130230632/en/Squares));
+  - Italia: dato sul ritorno dei clienti non trovato. Per i canali di prenotazione: piattaforme 38%, sito o Google 22%, telefono 21% su 212.000 prenotazioni in 300 ristoranti (osservatorio Incrementoo 2025, via [Beverfood](https://www.beverfood.com/ristorazione-2025-prenotazioni-digitali-e-fidelizzazione/)).
+- **OGGI nell'app (fatto il 20/10):** "↻ Ci sono tornato" nella scheda, "I tuoi posti fissi" nel profilo con "Proponi" agli amici, e nel pannello del ristoratore "↻ N persone di Mapetite sono tornate da te 2 o più volte" (solo da 3 persone in su). Prossimi passi S: "Prenota come l'ultima volta" e "È la mia 3ª volta da voi" (proposte 10 e 11).
+- **DAVVERO, in futuro:** visite confermate (non solo dichiarate) legando "Ci sono tornato" a una prenotazione onorata o al pagamento (Satispay, gestionali di cassa come Cassa in Cloud di TeamSystem: API pubbliche sui clienti non trovate); un omaggio per chi torna (proposta 12, DA DECIDERE LORENZO).
+- **Primo passo:** proposte 10 e 11 (team). **Chi lo fa:** team; i contatti con i gestionali Lorenzo o Roberto.
+

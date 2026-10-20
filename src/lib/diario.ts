@@ -102,3 +102,12 @@ export function isMissingVisitedAt(error: { code?: string; message?: string } | 
   if (!error) return false;
   return error.code === "42703" || error.code === "PGRST204" || /visited_at/.test(error.message ?? "");
 }
+
+// "I tuoi posti fissi" (PROPOSTE.md, proposta 8): saved_places.visite (migrazione 20261020b_visite)
+// conta i "Ci sono tornato". 0 con il tag "Già visitato" = una visita (le righe vecchie non si riscrivono).
+export const POSTO_FISSO = 2;
+
+export function visiteDi(tags: string[] | null | undefined, visite: unknown): number {
+  const n = typeof visite === "number" && Number.isFinite(visite) ? Math.max(0, Math.min(999, Math.floor(visite))) : 0;
+  return Math.max(n, tags?.includes(VISITED) ? 1 : 0);
+}

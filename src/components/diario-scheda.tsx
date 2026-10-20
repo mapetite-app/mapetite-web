@@ -3,32 +3,40 @@
 import { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
-import { cleanDate, dayKey, isMissingVisitedAt, whenLabel } from "@/lib/diario";
+import { cleanDate, dayKey, isMissingVisitedAt, visiteDi, whenLabel } from "@/lib/diario";
 import { saveVisit } from "@/lib/diario-write";
 import { VisitaContext } from "@/lib/visita-context";
-import { trackFeature } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
 import DiarioFoglio, { type DiarioValori } from "@/components/diario-foglio";
 
 // Nella scheda di un locale segnato "Ci sono stato" (piano 4.4): quando ci sei stato e il link
 // al diario. Appena toccato "✓ Ci sono stato" apre il foglio "Com'è andata?" (saltabile).
 // Senza la colonna visited_at (migrazione 20261015_diario non applicata) il foglio chiede solo
 // il voto e la riga della data non compare.
-type Stato = { colonna: boolean; date: string | null };
+// "Ci sono tornato" (PROPOSTE.md 8): conta le visite in saved_places.visite; senza la colonna
+// (migrazione 20261020b_visite non applicata) il pulsante non compare.
+type Stato = { colonna: boolean; date: string | null; visite: number | null };
 
 export default function DiarioScheda({ userId, place }: { userId: string; place: { id: string; name: string; category: string | null } }) {
   const ctx = useContext(VisitaContext);
   const [stato, setStato] = useState<Stato | null>(null);
   const [open, setOpen] = useState<"nuova" | "modifica" | null>(null);
+  const [tornato, setTornato] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const supabase = await browserClient().catch(() => null);
-      if (!supabase) { if (alive) setStato({ colonna: false, date: null }); return; }
-      const { data, error } = await supabase.from("saved_places").select("visited_at").eq("user_id", userId).eq("place_id", place.id).maybeSingle();
+      if (!supabase) { if (alive) setStato({ colonna: false, date: null, visite: null }); return; }
+      const read = (cols: string) => supabase.from("saved_places").select(cols).eq("user_id", userId).eq("place_id", place.id).maybeSingle();
+      let conVisite = true;
+      let { data, error } = await read("visited_at, visite");
+      if (error && /\bvisite\b/.test(error.message ?? "")) { conVisite = false; ({ data, error } = await read("visited_at")); }
       if (!alive) return;
       if (error && !isMissingVisitedAt(error)) console.warn("[diario] lettura data fallita:", error.message);
-      setStato(error ? { colonna: false, date: null } : { colonna: true, date: cleanDate((data as { visited_at?: unknown } | null)?.visited_at) });
+      const row = data as { visited_at?: unknown; visite?: unknown } | null;
+      // La scheda compare solo sui locali "Ci sono stato": almeno una visita.
+      setStato(error ? { colonna: false, date: null, visite: null } : { colonna: true, date: cleanDate(row?.visited_at), visite: conVisite ? visiteDi(["Già visitato"], row?.visite) : null });
     })();
     return () => { alive = false; };
   }, [userId, place.id]);
@@ -42,20 +50,36 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
   }, [stato, askedAt, ctx]);
 
   const save = async (v: DiarioValori, mode: "nuova" | "modifica") => {
-    if (stato?.colonna && v.date !== stato.date) {
+    if (tornato != null) {
+      // "Ci sono tornato": la visita si conta solo qui, salvando il foglio ("Salta" non scrive niente).
+      const date = v.date ?? dayKey(new Date());
+      const res = await saveVisit(userId, place.id, { visite: tornato, visited_at: date });
+      if (res === "errore") return false;
+      setStato((s) => (s ? { ...s, visite: tornato, date: res === "ok" ? date : s.date } : s));
+      track("ci_sono_stato", { id: place.id }, { fonte: "tornato", visite: tornato });
+      setTornato(null);
+    } else if (stato?.colonna && v.date !== stato.date) {
       const res = await saveVisit(userId, place.id, { visited_at: v.date });
       if (res === "errore") return false;
-      setStato((s) => (s ? { colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
+      setStato((s) => (s ? { ...s, colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
     }
     if (ctx && v.voto !== ctx.voto) ctx.setVoto(v.voto);
-    trackFeature("diario", { fonte: "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
+    trackFeature("diario", { fonte: tornato != null ? "tornato" : "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
     setOpen(null);
     return true;
+  };
+
+  // "↻ Ci sono tornato": apre lo stesso "Com'è andata?" con oggi; la visita si conta salvando.
+  const torna = () => {
+    if (!stato || stato.visite == null) return;
+    setTornato(stato.visite + 1);
+    setOpen("nuova");
   };
 
   const close = () => {
     if (open === "nuova") trackFeature("diario", { fonte: "scheda", stato: "saltato" });
     setOpen(null);
+    setTornato(null);
   };
 
   if (!stato) return null;
@@ -67,8 +91,14 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
           <button type="button" data-testid="diario-scheda-data" onClick={() => setOpen("modifica")} className="min-h-10 text-left font-sans text-text">
             <span aria-hidden>📅 </span>
             {stato.date
-              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span> · <span className="font-display font-semibold text-accent">Cambia</span></>
+              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span>{stato.visite != null && stato.visite >= 2 && <span data-testid="diario-scheda-volte"> · {stato.visite} volte</span>} · <span className="font-display font-semibold text-accent">Cambia</span></>
               : <span className="font-display font-semibold text-accent">Quando ci sei stato?</span>}
+          </button>
+        )}
+        {/* Non lo stesso giorno della visita già segnata: due tocchi non fanno due visite. */}
+        {stato.visite != null && stato.date !== today && (
+          <button type="button" data-testid="diario-scheda-tornato" onClick={torna} className="min-h-10 font-display font-semibold text-brand">
+            ↻ Ci sono tornato
           </button>
         )}
         <Link href="/profilo/diario" data-testid="diario-scheda-link" className="ml-auto inline-flex min-h-10 items-center font-display font-semibold text-brand">
@@ -81,6 +111,7 @@ export default function DiarioScheda({ userId, place }: { userId: string; place:
           initial={{ date: open === "nuova" ? stato.date ?? today : stato.date, voto: ctx?.voto ?? null, note: ctx?.note ?? null }}
           withDate={stato.colonna}
           mode={open}
+          volta={open === "nuova" && tornato != null ? tornato : undefined}
           onEditNote={ctx?.onEditNote ? () => { setOpen(null); ctx.onEditNote!(); } : undefined}
           onSave={(v) => save(v, open)}
           onClose={close}

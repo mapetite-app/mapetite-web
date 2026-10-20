@@ -15,13 +15,15 @@ import { loadMyGems, loadMySocial } from "@/lib/social";
 import { ScopritoreRiga } from "@/components/scopritore";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
-import { isMissingVisitedAt } from "@/lib/diario";
+import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
+import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
 
 type SavedPlaceRow = {
   created_at: string;
   rank_score?: number | null; // solo nei dati finti del giro (la colonna si legge a parte)
+  visite?: number | null; // idem (posti fissi, letta a parte)
   tags: string[] | null;
   note: string | null;
   places: {
@@ -148,6 +150,16 @@ export default async function ProfiloPage() {
     if (dErr && !isMissingVisitedAt(dErr)) console.error("[profilo] lettura diario fallita:", dErr.message);
     diaryWithDate = !dErr;
   }
+  // Posti fissi (PROPOSTE.md 8): saved_places.visite, migrazione 20261020b_visite. Senza la colonna
+  // la lettura fallisce e la sezione non compare.
+  let visite = new Map<string, number>();
+  if (fake) {
+    visite = new Map(fake.saved.flatMap((r) => (r.places && r.visite != null ? [[r.places.id, Number(r.visite)] as [string, number]] : [])));
+  } else {
+    const { data: vRaw, error: vErr } = await supabase.from("saved_places").select("place_id, visite").eq("user_id", user.id).gte("visite", POSTO_FISSO);
+    if (vErr && !/\bvisite\b/.test(vErr.message ?? "")) console.error("[profilo] lettura posti fissi fallita:", vErr.message);
+    if (!vErr) visite = new Map((vRaw ?? []).map((r) => [r.place_id as string, Number(r.visite)]));
+  }
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
@@ -181,6 +193,11 @@ export default async function ProfiloPage() {
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .slice(0, 20)
     .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note }));
+
+  const postiFissi: PostoFisso[] = saved
+    .flatMap((r) => (r.places ? [{ id: r.places.id, name: r.places.name, category: r.places.category, visite: visiteDi(r.tags, visite.get(r.places.id)) }] : []))
+    .filter((p) => p.visite >= POSTO_FISSO)
+    .sort((a, b) => b.visite - a.visite || a.name.localeCompare(b.name, "it"));
 
   const REVIEWS_PREVIEW = 2;
   const icon = { size: 18, strokeWidth: 1.75 } as const;
@@ -261,6 +278,8 @@ export default async function ProfiloPage() {
           </Link>
         </div>
       </section>
+
+      <PostiFissi posti={postiFissi} handle={"stato" in social || !social.is_public ? null : social.handle} />
 
       <div id="raccolte" className="scroll-mt-4">
         <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />

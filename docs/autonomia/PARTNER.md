@@ -131,3 +131,14 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Oggetto: Clienti nuovi per i ristoranti Nexi, dal salvataggio alla visita
   > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e scegliere bar e ristoranti a Roma e Milano. Portiamo ai locali persone che li avevano già salvati, senza commissioni a coperto. Vorremmo capire se tra i servizi per lo SmartPOS c'è spazio per un'app che porta domanda nuova. Avete un programma per partner terzi? Bastano 20 minuti.
   > Grazie, Lorenzo
+
+## TeamSystem (Cassa in Cloud) — priorità bassa, aggiunto il 20/10
+- **Chi è:** gestionale di cassa cloud per bar e ristoranti del gruppo TeamSystem ([teamsystem.com/horeca](https://www.teamsystem.com/horeca/)).
+- **Quanti ristoranti raggiunge:** dato non trovato.
+- **Cosa ci darebbe:** in futuro la conferma che una visita è avvenuta (conto pagato), per rendere "Ci sono tornato" una prova e non una dichiarazione.
+- **Cosa ci guadagna:** un canale di clienti nuovi e fedeli misurato per i suoi locali, senza costruire un'app per i clienti.
+- **API o programma partner:** pagina integrazioni pubblica ([integrazioni e API](https://www.teamsystem.com/horeca/cassa-in-cloud/funzionalita/integrazioni-software-api/)); integra già Plateform per il marketing; API sui clienti non trovate.
+- **Bozza email (per Lorenzo o Roberto, da NON inviare senza decisione):**
+  > Oggetto: Mapetite × Cassa in Cloud — clienti che tornano
+  > Buongiorno, sono Lorenzo di Mapetite, l'app che aiuta le persone a salvare e ritrovare i locali scoperti sui social, a Roma e Milano. Ai ristoratori mostriamo quante persone hanno salvato il locale e quante ci tornano. Vorremmo capire se esiste un modo, con il consenso del cliente, di confermare che una visita c'è stata, per dare ai vostri locali un dato affidabile sui clienti fedeli. Avete un programma partner o API per questo? Grazie, Lorenzo
+

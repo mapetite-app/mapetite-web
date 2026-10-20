@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle } from "lucide-react";
@@ -9,6 +9,8 @@ import {
   bookingMessage,
   dateKey,
   dayLabel,
+  lastBookingFor,
+  loadBookings,
   missingDetails,
   telHref,
   whatsappNumber,
@@ -18,6 +20,8 @@ import {
 import { track, trackFeature } from "@/lib/track";
 import { apertoIl, dataOra, prossimaApertura, prossimaAperturaData, type Orari } from "@/lib/orari";
 import UtileFeedback from "@/components/utile-feedback";
+import { browserClient } from "@/lib/supabase/client-lazy";
+import { POSTO_FISSO, visiteDi } from "@/lib/diario";
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
 // (WhatsApp solo se il numero è un cellulare, chiamata, sito), con il messaggio già scritto.
@@ -67,10 +71,13 @@ export default function BookingSheet({
   // Il portale serve perché la scheda del locale sta dentro pannelli con transform:
   // un fixed lì dentro si posizionerebbe rispetto al pannello, non allo schermo.
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
+  // "Come l'ultima volta" (PROPOSTE.md 10): se non arrivano né persone né ora, si riparte da quelle
+  // dell'ultima richiesta a questo locale. Il giorno si sceglie sempre.
+  const [ultima] = useState(() => (typeof window === "undefined" || initial?.people != null || initial?.time != null ? null : lastBookingFor(loadBookings(), place.id)));
   const [details, setDetails] = useState<BookingDetails>({
     date: initial?.date ?? null,
-    time: initial?.time ?? null,
-    people: initial?.people ?? null,
+    time: initial?.time ?? ultima?.time ?? null,
+    people: initial?.people ?? ultima?.people ?? null,
     special: initial?.special ?? null,
   });
   const [name, setName] = useState<string>(() => (typeof window === "undefined" ? "" : readName()));
@@ -82,7 +89,25 @@ export default function BookingSheet({
   // (dalla conversazione o dalla scheda) si parte dal passo 2: un tocco e si scrive al locale.
   const [step, setStep] = useState<1 | 2>(() => (missingDetails({ date: initial?.date ?? null, time: initial?.time ?? null, people: initial?.people ?? null, special: null }).length === 0 ? 2 : 1));
 
-  const message = custom ?? bookingMessage(details, name);
+  // "Sarà la mia 3ª volta da voi" (PROPOSTE.md 11): solo nei posti fissi (2+ visite segnate), spento
+  // finché l'utente non lo accende. La lettura passa dalla RLS: si vedono solo i propri salvati.
+  const [visite, setVisite] = useState(0);
+  const [dicoVolta, setDicoVolta] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const db = await browserClient().catch(() => null);
+      if (!db) return;
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(place.id);
+      const q = db.from("saved_places").select("visite, tags, places!inner(google_place_id)");
+      const { data, error } = await (uuid ? q.eq("place_id", place.id) : q.eq("places.google_place_id", place.id)).limit(1);
+      const row = !error ? (data?.[0] as { visite?: unknown; tags?: string[] | null } | undefined) : undefined;
+      if (alive && row) setVisite(visiteDi(row.tags, row.visite));
+    })();
+    return () => { alive = false; };
+  }, [place.id]);
+  const volta = visite >= POSTO_FISSO ? visite + 1 : null;
+  const message = custom ?? bookingMessage(details, name, undefined, dicoVolta ? volta : null);
   const missing = missingDetails(details);
   const wa = whatsappNumber(place.phone);
   const today = new Date();
@@ -198,6 +223,11 @@ export default function BookingSheet({
         ) : step === 1 ? (
           <>
             <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">Passo 1 di 2 · quando e quanti</p>
+            {ultima && (
+              <p data-testid="prenota-come-ultima" className="mt-2 text-sm font-sans font-semibold text-accent">
+                ↻ Come l&apos;ultima volta{ultima.people ? `: ${ultima.people} ${ultima.people === 1 ? "persona" : "persone"}` : ""}{ultima.time ? `${ultima.people ? "" : ":"} alle ${ultima.time}` : ""}
+              </p>
+            )}
             {/* Giorno */}
             <p className="mt-3 text-sm font-display font-semibold text-text">Quando</p>
             <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -323,6 +353,13 @@ export default function BookingSheet({
                 />
               </label>
             </div>
+
+            {volta && custom == null && (
+              <label data-testid="prenota-volta" className="mt-3 flex min-h-11 items-center gap-3 text-sm font-sans text-text">
+                <input type="checkbox" checked={dicoVolta} onChange={(e) => setDicoVolta(e.target.checked)} className="h-5 w-5 accent-brand" />
+                Scrivi che è la tua {volta}ª volta
+              </label>
+            )}
 
             {/* Messaggio già scritto, modificabile */}
             <div className="mt-4 flex min-h-8 items-center justify-between">

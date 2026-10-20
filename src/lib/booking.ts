@@ -182,7 +182,8 @@ export function missingDetails(b: BookingDetails): ("persone" | "giorno" | "ora"
 }
 
 // Il messaggio per il locale: cortese, breve, modificabile. Solo dati scelti dall'utente.
-export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date()): string {
+// volta: "Sarà la mia 3ª volta da voi" (PROPOSTE.md 11), solo se l'utente lo accende nel foglio Prenota.
+export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date(), volta: number | null = null): string {
   const greeting = now.getHours() < 13 ? "Buongiorno" : "Buonasera";
   const parts = [`${greeting}, vorrei prenotare un tavolo`];
   if (b.people) parts.push(` per ${b.people} ${b.people === 1 ? "persona" : "persone"}`);
@@ -190,6 +191,7 @@ export function bookingMessage(b: BookingDetails, name: string | null, now: Date
   if (b.time) parts.push(` alle ${b.time}`);
   if (b.special) parts.push(`, ${b.special} se possibile`);
   parts.push(". È disponibile?");
+  if (volta && volta >= 2) parts.push(` Sarà la mia ${volta}ª volta da voi.`);
   const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
   return `${parts.join("")} ${sign}`;
 }
@@ -277,6 +279,13 @@ export function updateBooking(id: string, patch: Partial<BookingRequest>) {
 }
 export function removeBooking(id: string) {
   storeBookings(loadBookings().filter((b) => b.id !== id));
+}
+
+// "Prenota come l'ultima volta" (PROPOSTE.md 10): persone e ora dell'ultima richiesta fatta da Mapetite
+// per quel locale (stesso id del foglio Prenota). Solo i dati che c'erano davvero, mai il giorno.
+export function lastBookingFor(list: BookingRequest[], placeId: string): { people: number | null; time: string | null } | null {
+  const prev = list.filter((b) => b.placeId === placeId && (b.people != null || b.time != null)).sort((a, b) => b.createdAt - a.createdAt)[0];
+  return prev ? { people: prev.people ?? null, time: prev.time ?? null } : null;
 }
 
 // Cosa ricordare oggi: la prenotazione di oggi (promemoria) e, dal giorno dopo e per 3 giorni,

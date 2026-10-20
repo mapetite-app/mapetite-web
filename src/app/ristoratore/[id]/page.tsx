@@ -95,7 +95,10 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     salvati.push(...((data ?? []) as RistSalvataggio[]));
   }
   // Tutti i salvataggi del locale, anche vecchi (non solo del periodo): chi lo vuole ancora provare.
-  const { data: tutti, error: aErr } = await db.from("saved_places").select("place_id,user_id,created_at,tags,visited_at").eq("place_id", id).limit(5000);
+  // "visite" (posti fissi, 20261020b_visite.sql): senza la colonna si rilegge senza.
+  const leggiTutti = (cols: string) => db.from("saved_places").select(cols).eq("place_id", id).limit(5000).returns<RistSalvataggio[]>();
+  let { data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at,visite");
+  if (aErr?.code === "42703") ({ data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at"));
   if (aErr) console.error("[ristoratore] lettura salvataggi del locale:", aErr.message);
   const attesa = (tutti ?? []) as RistSalvataggio[];
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.

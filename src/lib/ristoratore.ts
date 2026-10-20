@@ -28,7 +28,7 @@ export type RistLocale = {
   google_place_id: string | null;
 };
 
-export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null; visited_at?: string | null };
+export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null; visited_at?: string | null; visite?: number | null };
 
 export type Voce = { chiave: string; volte: number; persone: number };
 export type Azione = { tipo: AzioneTipo; etichetta: string; persone: number; volte: number; prima: number };
@@ -57,6 +57,8 @@ export type PannelloRistoratore = {
   // Tavoli liberati per tempo: chi aveva prenotato da Mapetite e ha disdetto con "Non vado più"
   // (evento "funzione" prenotazione_disdetta, con le ore di anticipo quando la prenotazione aveva l'ora).
   disdette: { n: number; orePrimaMedia: number | null };
+  // Clienti che tornano (PROPOSTE.md 8): persone che hanno segnato "Ci sono tornato" (2+ visite), da sempre.
+  tornati: number;
 };
 
 export const AZIONI = [
@@ -280,6 +282,7 @@ export function computeRistoratore(
     pochiDati: viste < SOGLIA,
     inAttesa: inAttesa(input.attesa ?? [], locale.id),
     visite: visiteVere(input.attesa ?? [], locale.id, start, today),
+    tornati: tornati(input.attesa ?? [], locale.id),
     disdette: disdetteInAnticipo(ev, placeOf, locale.id, start, today),
   };
 }
@@ -323,6 +326,11 @@ export function visiteVere(rows: RistSalvataggio[], placeId: string, from: numbe
     else if (tags.includes(NON_PIACIUTO)) giu.add(r.user_id);
   }
   return { persone: chi.size, piaciuto: su.size, nonPiaciuto: giu.size };
+}
+
+// Clienti che tornano: saved_places.visite >= 2 (migrazione 20261020b_visite). Una persona = una riga.
+export function tornati(rows: RistSalvataggio[], placeId: string): number {
+  return new Set(rows.filter((r) => r.place_id === placeId && (r.visite ?? 0) >= 2).map((r) => r.user_id)).size;
 }
 
 // Stati e voti del salvataggio: non sono occasioni.
@@ -385,5 +393,7 @@ export function cosaDiconoINumeri(p: PannelloRistoratore): string[] {
       out.push(`La tua scheda è stata vista dal ${Math.abs(d)}% di persone ${d >= 0 ? "in più" : "in meno"} rispetto ai ${p.giorni} giorni prima.`);
     }
   }
-  return out.slice(0, 2);
+  // Clienti che tornano (PROPOSTE.md 8): in più alle due frasi, solo sopra la soglia.
+  const fissi = p.tornati >= SOGLIA ? [`${p.tornati.toLocaleString("it-IT")} persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi.`] : [];
+  return [...out.slice(0, 2), ...fissi];
 }

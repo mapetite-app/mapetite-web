@@ -3039,6 +3039,31 @@ else {
   ok(sEvents.some((e) => e.type === "percorso" && e.props?.fonte === "barra" && e.googlePlaceId === "S1"), "barra: segnale 'percorso' (da barra)");
   ok(sEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenota" && e.props?.fonte === "barra"), "barra: apertura di Prenota registrata");
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  // "Prenota come l'ultima volta" (PROPOSTE 10): persone e ora dell'ultima richiesta a questo locale, il giorno no.
+  await s.evaluate(() => localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "u1", placeId: "S1", placeName: "x", lat: null, lng: null, date: "2026-09-01", time: "20:30", people: 4, special: null, via: "whatsapp", createdAt: Date.now() - 86_400_000 }])));
+  await bar.getByTestId("prenota-scheda").click();
+  await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  { const t = (await s.getByTestId("prenota-come-ultima").textContent().catch(() => "")) ?? "";
+    ok(t.includes("Come l'ultima volta: 4 persone alle 20:30") && (await s.getByTestId("prenota-persone").first().textContent()) === "4" && (await s.getByRole("button", { name: "20:30" }).getAttribute("aria-pressed")) === "true" && (await s.getByTestId("prenota-passo").count()) === 1, `prenota: 'Come l'ultima volta' con 4 persone e le 20:30, il giorno da scegliere (${t})`); }
+  await s.screenshot({ path: `${OUT}/62b-prenota-come-ultima.png`, caret: "initial" });
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
+  // "Sarà la mia 3ª volta da voi" (PROPOSTE 11): nei posti fissi (2 visite), spento finché non lo accendi.
+  await s.route("**/rest/v1/saved_places**", (r) => (r.request().url().includes("google_place_id") ? r.fulfill({ json: [{ visite: 2, tags: ["Già visitato"], places: { google_place_id: "S1" } }] }) : r.fallback()));
+  await bar.getByTestId("prenota-scheda").click();
+  await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await s.getByTestId("foglio-prenota").getByRole("button", { name: "Domani" }).click();
+  await s.getByTestId("foglio-prenota").getByRole("button", { name: "20:30" }).click();
+  if (await s.getByTestId("prenota-avanti").isEnabled().catch(() => false) === false) await s.getByLabel("Una persona in più").click();
+  await s.getByTestId("prenota-avanti").click();
+  await s.getByTestId("prenota-volta").waitFor({ timeout: 3000 }).catch(() => {});
+  { const prima = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    await s.getByTestId("prenota-volta").locator("input").check().catch(() => {});
+    const dopo = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    ok((await s.getByTestId("prenota-volta").textContent().catch(() => "")).includes("3ª volta") && !prima.includes("volta da voi") && dopo.includes("Sarà la mia 3ª volta da voi."), `prenota: nei posti fissi 'Sarà la mia 3ª volta da voi' solo se lo accendi (${dopo})`); }
+  await s.screenshot({ path: `${OUT}/62c-prenota-volta.png`, caret: "initial" });
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await s.unroute("**/rest/v1/saved_places**");
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
   await s.waitForTimeout(300);
@@ -3777,6 +3802,8 @@ else {
   const soloPranzo = Array.from({ length: 7 }, (_, d) => [d * 1440 + 720, d * 1440 + 900]);
   const soloSera = Array.from({ length: 7 }, (_, d) => [d * 1440 + 1140, d * 1440 + 1410]);
   await ap.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.map((x) => (x.id === "P1" ? { ...x, orari: soloPranzo } : x.id === "P3" ? { ...x, orari: soloSera } : x)) } }));
+  // Foglio vuoto: senza prenotazioni precedenti ("Come l'ultima volta" riempirebbe persone e ora). Rimesse dopo.
+  const prenPrima = await ap.evaluate(() => { const v = localStorage.getItem("mapetite.prenotazioni"); localStorage.removeItem("mapetite.prenotazioni"); return v; });
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
   await (await esempio(ap)).click();
   const mapCard = ap.locator("li", { hasText: "Terrazza Uno" }).locator("button", { hasText: "Terrazza Uno" }).first();
@@ -3812,6 +3839,7 @@ else {
       ok(aperto && (await nuovo.getByRole("button", { name: "21:00", exact: true }).getAttribute("aria-pressed")) === "true", "prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con le 21:00 già scelte");
       await nuovo.getByRole("button", { name: "Chiudi" }).click().catch(() => {});
     } }
+  await ap.evaluate((v) => { if (v != null) localStorage.setItem("mapetite.prenotazioni", v); }, prenPrima);
   await ap.unroute("**/api/search");
   if (await ap.getByRole("dialog", { name: /Prenota da/ }).count()) await ap.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   ok((await ap.getByTestId("foglio-prenota").count()) === 0 && await ap.getByTestId("prenota-scheda").isVisible(), "mappa: chiudere il foglio Prenota lascia la scheda aperta");
@@ -4489,6 +4517,9 @@ else {
       const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
       const r = rs.visiteVere([v("u1", ["Già visitato", "Mi è piaciuto"], at(14)), v("u2", ["Già visitato", "Non fa per me"], at(12)), v("u3", ["Già visitato"], at(13)), v("u4", ["Già visitato", "Mi è piaciuto"], at(2)), v("u5", ["Da provare", "Mi è piaciuto"], at(14)), v("u6", ["Già visitato", "Mi è piaciuto"], at(14), "altro")], L.id, today - 6, today);
       ok(r.persone === 3 && r.piaciuto === 1 && r.nonPiaciuto === 1, `ristoratore: visite vere del periodo con il voto, non quelle vecchie o di altri locali (${JSON.stringify(r)})`); }
+    // Clienti che tornano (PROPOSTE 8, 20/10): persone con 2+ visite su questo locale, una volta sola.
+    { const t = rs.tornati([{ place_id: L.id, user_id: "u1", visite: 3 }, { place_id: L.id, user_id: "u2", visite: 1 }, { place_id: L.id, user_id: "u3", visite: 2 }, { place_id: L.id, user_id: "u4" }, { place_id: "altro", user_id: "u5", visite: 4 }], L.id);
+      ok(t === 2, `ristoratore: 'tornati' conta chi ha 2+ visite, non altri locali (${t})`); }
     const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
     const eventi = [
       // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
@@ -4677,7 +4708,9 @@ else {
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
-        ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); } }
+        ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); }
+      { const t = ((await rp.getByTestId("pannello-insight").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        ok(/\d+ persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi/.test(t), `pannello demo: clienti che tornano in 'Cosa ti dicono i numeri' (${t.slice(-110)})`); } }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();
@@ -4992,8 +5025,8 @@ else {
     const profilo = {
       email: "giulia@example.com",
       saved: [
-        { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", tags: ["Con amici", "Già visitato", "Mi è piaciuto"], note: "Carbonara da rifare, chiedere il tavolo fuori", places: pl("01", "Osteria Due", "restaurant", ROMA, 41.89, 12.53) },
-        { created_at: "2026-10-03T20:00:00Z", visited_at: "2026-10-03", tags: ["Già visitato"], note: null, places: pl("02", "Bar Sette", "cocktail_bar", MILANO, 45.45, 9.17) },
+        { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", visite: 3, tags: ["Con amici", "Già visitato", "Mi è piaciuto"], note: "Carbonara da rifare, chiedere il tavolo fuori", places: pl("01", "Osteria Due", "restaurant", ROMA, 41.89, 12.53) },
+        { created_at: "2026-10-03T20:00:00Z", visited_at: "2026-10-03", visite: 2, tags: ["Già visitato"], note: null, places: pl("02", "Bar Sette", "cocktail_bar", MILANO, 45.45, 9.17) },
         { created_at: "2026-09-20T20:00:00Z", visited_at: "2026-09-20", tags: ["Già visitato", "Non fa per me"], note: null, places: pl("03", "Trattoria Tre", "restaurant", ROMA, 41.9, 12.5) },
         { created_at: "2026-09-10T20:00:00Z", visited_at: null, tags: ["Già visitato"], note: null, places: pl("04", "Enoteca Quattro", "wine_bar", ROMA, 41.893, 12.47) },
         { created_at: "2026-08-01T20:00:00Z", visited_at: "2026-08-01", tags: ["Già visitato"], note: "Lunghissima nota senza spazi per vedere se esce dallo schermo:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", places: pl("05", "Antica Trattoria del Ponte Vecchio sul Naviglio Grande", "italian_restaurant", MILANO, 45.451, 9.171) },
@@ -5037,6 +5070,13 @@ else {
     // Ingresso dal profilo
     await d.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
     const card = d.getByTestId("profilo-diario");
+    // "I tuoi posti fissi" (PROPOSTE 8): 2+ visite, dal più frequentato, con "Proponi"
+    { const pf = d.getByTestId("posti-fissi");
+      const nomiPf = (await pf.getByTestId("posto-fisso").allTextContents().catch(() => [])).join("|");
+      ok(await pf.isVisible().catch(() => false) && /Osteria Due.*3 volte\|.*Bar Sette.*2 volte$/.test(nomiPf) && (await pf.getByTestId("posto-fisso").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}`, `posti fissi: nel profilo Osteria (3 volte) e Bar (2 volte), toccabili (${nomiPf})`);
+      ok((await pf.getByTestId("posti-fissi-condividi").count()) === 0, "posti fissi: senza profilo pubblico niente 'Proponi' (il link non porterebbe ai posti)");
+      await pf.scrollIntoViewIfNeeded().catch(() => {});
+      await d.screenshot({ path: `${OUT}/49b-posti-fissi.png`, caret: "initial" }); }
     ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 provati"), "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
     await card.click();
     await d.waitForURL(/\/profilo\/diario/, { timeout: 8000 }).catch(() => {});
@@ -5154,6 +5194,23 @@ else {
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await d.waitForTimeout(500);
     ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
+    // "↻ Ci sono tornato" (PROPOSTE.md 8): seconda visita con la data di oggi, titolo "2ª volta", poi "· 2 volte"
+    dPatches = [];
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).catch(() => {});
+    ok((await d.getByTestId("diario-foglio").textContent().catch(() => "")).includes("Ci sei tornato · 2ª volta"), "posti fissi: 'Ci sono tornato' apre il foglio '↻ Ci sei tornato · 2ª volta'");
+    await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    ok(!dPatches.some((x) => x.body && "visite" in x.body), `posti fissi: 'Salta' non conta la visita (${JSON.stringify(dPatches)})`);
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`); }
+    ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
+    ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
+    await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });
     // Senza migrazione: la scheda non mostra la riga della data e non si rompe
     visitedMissing = true;
     await d.goto(`${BASE}/mappa?salvato=${pid("01")}`, { waitUntil: "networkidle" });

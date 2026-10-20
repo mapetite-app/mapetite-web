@@ -38,6 +38,7 @@ export default function DiarioFoglio({
   onClose,
   foto,
   buoni: buoniProp,
+  volta,
 }: {
   place: { name: string; category: string | null };
   initial: { date: string | null; voto: Voto | null; note: string | null };
@@ -50,6 +51,8 @@ export default function DiarioFoglio({
   foto?: DiarioFoto;
   // Buoni pasto (PROPOSTE.md 19/10): chi risponde e su quale locale (UUID), anche senza le foto.
   buoni?: { userId: string; placeId: string };
+  // "Ci sono tornato" (PROPOSTE.md 8): numero della visita, per il titolo "↻ Ci sei tornato · 2ª volta".
+  volta?: number;
 }) {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const today = dayKey(new Date());
@@ -161,7 +164,7 @@ export default function DiarioFoglio({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
-              {mode === "nuova" ? "✓ Ci sei stato" : "Il tuo diario"}
+              {mode === "nuova" ? (volta && volta >= 2 ? `↻ Ci sei tornato · ${volta}ª volta` : "✓ Ci sei stato") : "Il tuo diario"}
             </p>
             <h2 className="mt-0.5 font-title text-xl font-semibold leading-tight text-text [overflow-wrap:anywhere]">{place.name}</h2>
           </div>
