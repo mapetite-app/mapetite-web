@@ -632,6 +632,8 @@ type VenueDetails = {
   goFor: string[] | null;
   dontExpect: string[] | null;
   matchReason: string | null;
+  // "Per te" della card dei risultati: solo dai gusti forniti all'AI (vedi haiku-synthesis).
+  perTe?: string | null;
   photoRef?: string | null;
   photoAuthor?: string | null;
   editorialSummary?: string | null;
@@ -1595,7 +1597,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -1614,6 +1616,7 @@ export default function MapView({
           goFor: p.goFor ?? null,
           dontExpect: p.dontExpect ?? null,
           matchReason: p.matchReason ?? null,
+          perTe: p.perTe ?? null,
           photoRef: p.photoRef ?? null,
           photoAuthor: p.photoAuthor ?? null,
           editorialSummary: p.editorialSummary ?? null,
@@ -1805,7 +1808,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({
@@ -1835,6 +1838,7 @@ export default function MapView({
             goFor: p.goFor ?? null,
             dontExpect: p.dontExpect ?? null,
             matchReason: p.matchReason ?? null,
+          perTe: p.perTe ?? null,
             photoRef: p.photoRef ?? null,
             photoAuthor: p.photoAuthor ?? null,
             editorialSummary: p.editorialSummary ?? null,

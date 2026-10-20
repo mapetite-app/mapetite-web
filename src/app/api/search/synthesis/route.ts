@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       goFor: s.goFor,
       dontExpect: s.dontExpect,
       matchReason: s.matchReason || null,
+      perTe: s.perTe || null,
     };
   }
   // Quanto ogni locale è adatto alla richiesta secondo Haiku: il telefono mette in cima gli "alto"

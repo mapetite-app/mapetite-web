@@ -625,6 +625,7 @@ ESEMPI (input → output atteso):
       goFor: s?.goFor ?? null,
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
+      perTe: s?.perTe || null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
