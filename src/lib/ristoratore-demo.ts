@@ -123,6 +123,6 @@ export function demoDati(now: number = Date.now()): { locale: RistLocale; citta:
       props: { nome: "prenotazione_disdetta", contesto: r2() < 0.7 ? "whatsapp" : "telefono", ore: 2 + Math.floor(r2() * 26) } });
   }
   let u = 0;
-  const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags, visited_at: tags.includes("Già visitato") ? new Date(now - (u % 25) * 86_400_000).toISOString() : null })));
+  const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags, visited_at: tags.includes("Già visitato") ? new Date(now - (u % 25) * 86_400_000).toISOString() : null, visite: tags.includes("Già visitato") && u % 2 === 0 ? 2 + (u % 3) : 0 })));
   return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [], attesa };
 }

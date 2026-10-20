@@ -377,7 +377,7 @@ export default function Pannello({
 
       {/* Domanda latente: il dato che nessun altro dà al ristoratore (POSIZIONAMENTO.md, proposta 2).
           Compatta, sotto i 4 numeri: la prima schermata resta quella. */}
-      {(attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0) && (
+      {(attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0 || p.tornati >= SOGLIA) && (
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
           {attesa.persone > 0 && (
             <p className="flex items-baseline gap-2">
@@ -410,6 +410,13 @@ export default function Pannello({
               <span className="text-sm font-sans leading-snug text-white/90">
                 {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: disdetti su Mapetite{p.disdette.orePrimaMedia != null ? ` in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""}, invece di un tavolo vuoto ({p.giorni} giorni)
               </span>
+            </p>
+          )}
+          {/* Clienti che tornano (PROPOSTE.md 8): chi ha segnato "Ci sono tornato". Solo sopra la soglia. */}
+          {p.tornati >= SOGLIA && (
+            <p data-testid="pannello-tornati" className={`flex items-baseline gap-2 ${attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0 ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">↻ {p.tornati.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">persone di Mapetite sono tornate da te 2 o più volte</span>
             </p>
           )}
         </section>

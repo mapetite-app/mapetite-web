@@ -4489,6 +4489,9 @@ else {
       const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
       const r = rs.visiteVere([v("u1", ["Già visitato", "Mi è piaciuto"], at(14)), v("u2", ["Già visitato", "Non fa per me"], at(12)), v("u3", ["Già visitato"], at(13)), v("u4", ["Già visitato", "Mi è piaciuto"], at(2)), v("u5", ["Da provare", "Mi è piaciuto"], at(14)), v("u6", ["Già visitato", "Mi è piaciuto"], at(14), "altro")], L.id, today - 6, today);
       ok(r.persone === 3 && r.piaciuto === 1 && r.nonPiaciuto === 1, `ristoratore: visite vere del periodo con il voto, non quelle vecchie o di altri locali (${JSON.stringify(r)})`); }
+    // Clienti che tornano (PROPOSTE 8, 20/10): persone con 2+ visite su questo locale, una volta sola.
+    { const t = rs.tornati([{ place_id: L.id, user_id: "u1", visite: 3 }, { place_id: L.id, user_id: "u2", visite: 1 }, { place_id: L.id, user_id: "u3", visite: 2 }, { place_id: L.id, user_id: "u4" }, { place_id: "altro", user_id: "u5", visite: 4 }], L.id);
+      ok(t === 2, `ristoratore: 'tornati' conta chi ha 2+ visite, non altri locali (${t})`); }
     const e = (type, d, a, extra = {}) => ({ created_at: at(d, extra.h ?? 19, extra.m ?? 0), type, user_id: extra.u ?? null, anon_id: a, session_id: extra.s ?? null, place_id: extra.pid ?? null, google_place_id: extra.gid ?? null, lat: extra.lat ?? null, lng: extra.lng ?? null, props: extra.p ?? {} });
     const eventi = [
       // Ricerca → scheda dai risultati nella stessa visita (solo Place ID Google, come dalla mappa).
@@ -4677,7 +4680,9 @@ else {
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
-        ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); } }
+        ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); }
+      { const t = ((await rp.getByTestId("pannello-tornati").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        ok(/↻ \d+ persone di Mapetite sono tornate da te 2 o più volte/.test(t), `pannello demo: clienti che tornano (${t.slice(0, 100)})`); } }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
     const nums = rp.getByTestId("numero-chiave");
     const ins = await rp.getByTestId("pannello-insight").boundingBox();
@@ -4992,8 +4997,8 @@ else {
     const profilo = {
       email: "giulia@example.com",
       saved: [
-        { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", tags: ["Con amici", "Già visitato", "Mi è piaciuto"], note: "Carbonara da rifare, chiedere il tavolo fuori", places: pl("01", "Osteria Due", "restaurant", ROMA, 41.89, 12.53) },
-        { created_at: "2026-10-03T20:00:00Z", visited_at: "2026-10-03", tags: ["Già visitato"], note: null, places: pl("02", "Bar Sette", "cocktail_bar", MILANO, 45.45, 9.17) },
+        { created_at: "2026-10-12T20:00:00Z", visited_at: "2026-10-12", visite: 3, tags: ["Con amici", "Già visitato", "Mi è piaciuto"], note: "Carbonara da rifare, chiedere il tavolo fuori", places: pl("01", "Osteria Due", "restaurant", ROMA, 41.89, 12.53) },
+        { created_at: "2026-10-03T20:00:00Z", visited_at: "2026-10-03", visite: 2, tags: ["Già visitato"], note: null, places: pl("02", "Bar Sette", "cocktail_bar", MILANO, 45.45, 9.17) },
         { created_at: "2026-09-20T20:00:00Z", visited_at: "2026-09-20", tags: ["Già visitato", "Non fa per me"], note: null, places: pl("03", "Trattoria Tre", "restaurant", ROMA, 41.9, 12.5) },
         { created_at: "2026-09-10T20:00:00Z", visited_at: null, tags: ["Già visitato"], note: null, places: pl("04", "Enoteca Quattro", "wine_bar", ROMA, 41.893, 12.47) },
         { created_at: "2026-08-01T20:00:00Z", visited_at: "2026-08-01", tags: ["Già visitato"], note: "Lunghissima nota senza spazi per vedere se esce dallo schermo:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", places: pl("05", "Antica Trattoria del Ponte Vecchio sul Naviglio Grande", "italian_restaurant", MILANO, 45.451, 9.171) },
@@ -5037,6 +5042,12 @@ else {
     // Ingresso dal profilo
     await d.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
     const card = d.getByTestId("profilo-diario");
+    // "I tuoi posti fissi" (PROPOSTE 8): 2+ visite, dal più frequentato, con "Proponi"
+    { const pf = d.getByTestId("posti-fissi");
+      const nomiPf = (await pf.getByTestId("posto-fisso").allTextContents().catch(() => [])).join("|");
+      ok(await pf.isVisible().catch(() => false) && /Osteria Due.*3 volte\|.*Bar Sette.*2 volte$/.test(nomiPf) && (await pf.getByTestId("posto-fisso").first().getAttribute("href")) === `/mappa?salvato=${pid("01")}` && await pf.getByTestId("posti-fissi-condividi").isVisible(), `posti fissi: nel profilo Osteria (3 volte) e Bar (2 volte), toccabili, con 'Proponi' (${nomiPf})`);
+      await pf.scrollIntoViewIfNeeded().catch(() => {});
+      await d.screenshot({ path: `${OUT}/49b-posti-fissi.png`, caret: "initial" }); }
     ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 provati"), "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
     await card.click();
     await d.waitForURL(/\/profilo\/diario/, { timeout: 8000 }).catch(() => {});
@@ -5154,6 +5165,16 @@ else {
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await d.waitForTimeout(500);
     ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
+    // "↻ Ci sono tornato" (PROPOSTE.md 8): seconda visita con la data di oggi, titolo "2ª volta", poi "· 2 volte"
+    dPatches = [];
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).catch(() => {});
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06") && (await d.getByTestId("diario-foglio").textContent()).includes("Ci sei tornato · 2ª volta"), `posti fissi: 'Ci sono tornato' scrive 2 visite e oggi, il foglio dice '2ª volta' (${JSON.stringify(dPatches)})`); }
+    await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
+    await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });
     // Senza migrazione: la scheda non mostra la riga della data e non si rompe
     visitedMissing = true;
     await d.goto(`${BASE}/mappa?salvato=${pid("01")}`, { waitUntil: "networkidle" });
