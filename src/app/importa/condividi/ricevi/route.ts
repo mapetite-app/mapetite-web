@@ -22,6 +22,7 @@ function sniffImageType(b: Uint8Array): string | null {
 // Limite della API di Anthropic per una singola immagine.
 const MAX_BYTES = 5 * 1024 * 1024;
 const RESULT_PAGE = "/importa/condividi/immagine";
+const LETTO_COOKIE = "mapetite_reel_letto";
 
 const field = (form: FormData, k: string) => {
   const v = form.get(k);
@@ -108,7 +109,11 @@ export async function POST(request: NextRequest) {
   if (!lettura.nome) return result({ errore: "illeggibile" });
   // Gli altri locali dello stesso post ("3 posti dove…") viaggiano insieme, già letti: nessuna nuova lettura AI.
   const altri = (lettura.luoghi ?? []).slice(1);
-  return result({ nome: lettura.nome, citta: lettura.citta, categoria: lettura.categoria, altri: altri.length ? JSON.stringify(altri) : null });
+  const res = result({ nome: lettura.nome, citta: lettura.citta, categoria: lettura.categoria, altri: altri.length ? JSON.stringify(altri) : null });
+  // Segno che la lettura l'ha fatta davvero questo telefono: solo così la pagina dell'esito può
+  // salvare da sola. Un link costruito a mano con ?nome=… chiede sempre "È questo?".
+  res.cookies.set(LETTO_COOKIE, encodeURIComponent(lettura.nome), { httpOnly: true, sameSite: "lax", maxAge: 600, path: RESULT_PAGE });
+  return res;
 }
 
 // Chi apre l'indirizzo a mano (GET) finisce sulla pagina del Condividi.

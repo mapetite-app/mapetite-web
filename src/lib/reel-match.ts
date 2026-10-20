@@ -1,3 +1,5 @@
+import { cityFromAddress } from "@/lib/city";
+
 // Salva da reel: quando il locale trovato su Google è sicuramente quello letto nel video, si salva
 // da solo (il gesto è stato il Condividi); altrimenti si chiede "È questo?". Funzioni pure.
 // Regola anti-errore: nel dubbio si chiede. Un salvataggio sbagliato fatto da solo costa più di un tocco.
@@ -25,28 +27,36 @@ function distinctive(s: string): string[] {
 
 // Nome scritto tutto attaccato come nei profili (@trattoriadaenzo): si confronta anche senza spazi.
 const squash = (s: string) => wordsOf(s).join("");
+const noDigits = (ws: string[]) => ws.filter((w) => !/^\d+$/.test(w));
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((w) => b.includes(w));
+
+// "Roma" ↔ "Rome": Google a volte risponde in inglese.
+const ALIAS: Record<string, string> = { rome: "roma", milan: "milano", naples: "napoli", florence: "firenze", venice: "venezia", turin: "torino" };
+const cityKey = (c: string) => { const k = wordsOf(c).join(" "); return ALIAS[k] ?? k; };
+
+/** Stesso nome: stesse parole distintive (i numeri dell'insegna non contano: "Marchesi 1824"). */
+export function sameName(read: string, google: string): boolean {
+  const mine = noDigits(distinctive(read));
+  const theirs = noDigits(distinctive(google));
+  if (mine.length > 0 && sameSet([...new Set(mine)], [...new Set(theirs)])) return true;
+  // @profilo tutto attaccato: solo se il nome letto è una parola sola, e uguale per intero.
+  if (!/\s/.test(read.trim())) {
+    const b = theirs.join("");
+    return b.length >= 5 && squash(read) === b;
+  }
+  return false;
+}
 
 /**
- * true solo se tutte le parole distintive del nome letto sono nel nome Google (o il nome Google,
- * senza spazi, è dentro il @profilo letto) e, se il video dice la città, l'indirizzo è in quella città.
+ * true solo se il nome è lo stesso e la città del post è quella dell'indirizzo Google
+ * (la città ricavata dall'indirizzo, non una parola qualsiasi: "Via Roma" c'è in ogni comune).
+ * Senza città nel post: false, si chiede.
  */
 export function confidentMatch(
   read: { nome: string; citta?: string | null },
   google: { name: string; address?: string | null },
 ): boolean {
-  const mine = distinctive(read.nome);
-  const theirs = new Set(distinctive(google.name));
-  let nameOk = mine.length > 0 && mine.every((w) => theirs.has(w));
-  if (!nameOk) {
-    const a = squash(read.nome);
-    const b = distinctive(google.name).join("");
-    nameOk = b.length >= 5 && a.includes(b);
-  }
-  if (!nameOk) return false;
-  if (!read.citta) return true;
-  const city = wordsOf(read.citta).join(" ");
-  const addr = wordsOf(google.address ?? "").join(" ");
-  // "Roma" ↔ "Rome": Google a volte risponde in inglese.
-  const alias: Record<string, string> = { roma: "rome", milano: "milan", napoli: "naples", firenze: "florence", venezia: "venice", torino: "turin" };
-  return addr.includes(city) || (alias[city] != null && addr.includes(alias[city]));
+  if (!read.citta || !sameName(read.nome, google.name)) return false;
+  const city = cityFromAddress(google.address);
+  return city != null && cityKey(city) === cityKey(read.citta);
 }

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import ScreenshotResult from "./screenshot-result";
 import type { Luogo } from "@/components/reel-save";
@@ -35,8 +36,14 @@ export default async function CondividiImmaginePage({
   // Solo in sviluppo locale: utente finto per il test automatico (scripts/e2e/giro.mjs).
   const e2eUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
 
+  // Salvataggio da solo solo se la lettura viene dal Condividi di questo telefono (cookie del ricevi).
+  const nome = pick("nome").slice(0, 120);
+  const letto = (await cookies()).get("mapetite_reel_letto")?.value;
+  const autoSave = Boolean(nome && letto && decodeURIComponent(letto).slice(0, 120) === nome);
+
   return (
     <ScreenshotResult
+      autoSave={autoSave}
       nome={pick("nome").slice(0, 120)}
       citta={pick("citta").slice(0, 80)}
       categoria={pick("categoria").slice(0, 40)}

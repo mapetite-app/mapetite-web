@@ -18,6 +18,7 @@ export default function ScreenshotResult({
   citta,
   categoria = "",
   altri = [],
+  autoSave = false,
   errore,
   piu,
   userId,
@@ -26,6 +27,7 @@ export default function ScreenshotResult({
   citta: string;
   categoria?: string;
   altri?: Luogo[];
+  autoSave?: boolean;
   errore: string;
   piu: boolean;
   userId: string | null;
@@ -79,13 +81,13 @@ export default function ScreenshotResult({
             Ho letto <span className="font-semibold">{[nome, citta].filter(Boolean).join(", ")}</span>. Per salvarlo accedi a Mapetite: poi torni qui e lo cerco su Google Maps.
           </p>
           {/* Dopo l'accesso si torna a questa pagina con lo stesso nome letto (nessuna nuova lettura AI). */}
-          <Link href={withNext("/login", `/importa/condividi/immagine?${new URLSearchParams({ nome, ...(citta ? { citta } : {}) })}`)} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
+          <Link href={withNext("/login", `/importa/condividi/immagine?${new URLSearchParams({ nome, ...(citta ? { citta } : {}), ...(altri.length ? { altri: JSON.stringify(altri) } : {}) })}`)} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white">
             Accedi
           </Link>
         </div>
       )}
 
-      {!errore && nome && userId && <ReelSave text="" userId={userId} initial={luoghi} />}
+      {!errore && nome && userId && <ReelSave text="" userId={userId} initial={luoghi} autoSave={autoSave} />}
 
       {!errore && nome && userId && (
         <p className="mt-6 text-sm text-text-muted">

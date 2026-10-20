@@ -2445,17 +2445,32 @@ else {
     await lp.getByTestId("reel-non-e-questo").click();
     await lp.getByTestId("reel-scegli").waitFor({ timeout: 4000 });
     ok(lwrites.slice(w1).some((w) => w.m === "DELETE" && w.url.includes("place_id=eq.00000000-0000-0000-0000-000000000201")), "salva dal reel: 'Non è questo' toglie il locale dai salvati");
+    ok(await lp.getByTestId("reel-tolto").isVisible(), "salva dal reel: dopo 'Non è questo' dice 'Tolto dai salvati'");
     ok(await lp.getByTestId("reel-scegli").getByText("Bar Rossi Bis").isVisible() && await lp.getByTestId("reel-cerca-mano").isVisible(), "salva dal reel: 'Non è questo' propone gli altri risultati e la ricerca a mano");
     await lp.getByTestId("reel-scegli").getByText("Bar Rossi Bis").click();
     await lp.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
     ok(addCalls.at(-1)?.googlePlaceId === "GBR2" && searchCalls.length === 1, "salva dal reel: scelto l'altro, salvato senza un'altra ricerca Google");
     await lp.screenshot({ path: `${OUT}/34-condividi-screenshot-salvato.png`, caret: "initial" });
 
-    // Riaperta: niente ricerca Google ripetuta e niente salvataggio da solo dopo un "Non è questo".
+    ok(reelWrites.length === 0, "salva dal reel: senza link del reel nessun video collegato o tolto");
+    // Riaperta: si vede quello che si è scelto, senza rifare ricerca né salvataggio.
     const w2 = lwrites.length;
+    const a2 = addCalls.length;
     await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
-    await lp.getByTestId("reel-trovato").waitFor({ timeout: 4000 }).catch(() => {});
-    ok(searchCalls.length === 1 && await lp.getByTestId("reel-trovato").isVisible() && !lwrites.slice(w2).some((w) => w.m === "POST"), "salva dal reel: riaperta, chiede 'È questo?' invece di risalvare da solo, senza rifare la ricerca");
+    await lp.getByTestId("reel-salvato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(searchCalls.length === 1 && addCalls.length === a2 && await lp.getByTestId("reel-salvato").getByText("Bar Rossi Bis").isVisible() && !lwrites.slice(w2).some((w) => w.m === "POST"), "salva dal reel: riaperta, mostra il locale scelto senza rifare ricerca né salvataggio");
+    // Link costruito a mano (?nome=…, senza il Condividi di questo telefono): mai salvataggio da solo.
+    {
+      const xctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const xp = await xctx.newPage();
+      const xw = [];
+      await xctx.route("**/api/places/search", (route) => route.fulfill({ json: { results: SEARCH } }));
+      await xctx.route("**/rest/v1/saved_places**", (route) => { xw.push(route.request().method()); return route.fulfill({ status: 201, json: [] }); });
+      await xp.goto(`${BASE}/importa/condividi/immagine?nome=Bar+Rossi&citta=Roma`, { waitUntil: "networkidle" });
+      await xp.getByTestId("reel-trovato").waitFor({ timeout: 5000 }).catch(() => {});
+      ok(await xp.getByTestId("reel-trovato").isVisible() && !xw.includes("POST"), "salva dal reel: un link costruito a mano chiede 'È questo?' e non salva da solo");
+      await xctx.close();
+    }
     // Un altro locale del reel: un tocco = una ricerca; se non combacia chiede conferma.
     await lp.getByTestId("reel-altro").first().click();
     await lp.getByTestId("reel-altri").getByTestId("reel-trovato").waitFor({ timeout: 4000 });
@@ -2643,6 +2658,30 @@ if (!fakeUser) {
   ok(await mp.getByTestId("reel-accedi").isVisible() && !(await mp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa"))), "condividi instagram da disconnessi: invito ad accedere, nessuna lettura");
   await mctx.clearCookies({ name: "e2e_anonimo" });
   await mctx.close();
+}
+
+// 12c. "Per te" nella card dei risultati (chiave B, mockup A): solo se l'AI lo dà dai gusti; con il "Per te" niente chip.
+{
+  const pctx = await browser.newContext({ viewport: { width: 360, height: 800 }, deviceScaleFactor: 2 });
+  const pp = await pctx.newPage();
+  pp.on("pageerror", (e) => errors.push(e.message));
+  await pctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await pctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await pctx.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: [mk("P1", "Terrazza del Gianicolo e Giardino", 41.9, 12.49), mk("P3", "Rooftop Tre", 41.902, 12.494)], sintesi_pendente: { places: [{ id: "P1" }, { id: "P3" }], token: "t" } } }));
+  await pctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {
+    P1: { synthesis: "x", tags: [], verdict: "Tramonto sulle cupole, tavoli lontani tra loro.", goFor: ["vista cupole"], dontExpect: [], matchReason: "Ha una vera terrazza.", perTe: "il tipo di posto tranquillo che ami" },
+    P3: { synthesis: "x", tags: [], verdict: "Cocktail curati sul tetto.", goFor: ["cocktail"], dontExpect: [], matchReason: "È su un rooftop.", perTe: null },
+  }, esclusi: [] } }));
+  await pp.goto(`${BASE}/mappa?q=${encodeURIComponent("rooftop romantico a Roma")}`, { waitUntil: "networkidle" });
+  const c1 = pp.getByTestId("card-risultato").first();
+  await c1.getByTestId("per-te-card").waitFor({ timeout: 10000 }).catch(() => {});
+  ok(await c1.getByTestId("per-te-card").getByText("Per te: il tipo di posto tranquillo che ami").isVisible() && (await c1.getByTestId("punti-forti").count()) === 0, "per te: riga 'Per te' nella card al posto delle chip");
+  ok((await pp.getByTestId("card-risultato").nth(1).getByTestId("per-te-card").count()) === 0 && (await pp.getByTestId("card-risultato").nth(1).getByTestId("punti-forti").count()) === 1, "per te: senza 'Per te' dall'AI restano le chip, niente frase inventata");
+  const card = await c1.boundingBox();
+  const fatti = await c1.getByTestId("riga-fatti").boundingBox();
+  ok(card && fatti && fatti.y > card.y + 8, `per te: a 360px il contenuto sta dentro la card (fatti a ${Math.round((fatti?.y ?? 0) - (card?.y ?? 0))}px dal bordo)`);
+  await pp.screenshot({ path: `${OUT}/40-per-te-card.png`, caret: "initial" });
+  await pctx.close();
 }
 
 // 13. Condividi un locale: link Mapetite (/locali/<UUID>) e pagina pubblica per chi lo riceve.

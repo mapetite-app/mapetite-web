@@ -164,7 +164,7 @@ export default function GoogleMapsCard({
 
           {error && <p className="mt-3 rounded-btn bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
           {reel && (
-            <div className="mt-4 rounded-card bg-white p-3 text-text">
+            <div className="mt-4 text-text">
               <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
