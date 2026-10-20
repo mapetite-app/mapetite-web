@@ -99,6 +99,8 @@ export default function ReelSave({
   const [ask, setAsk] = useState<string | null>(null);
   const [draft, setDraft] = useState(() => placeHintFromText(text) ?? "");
   const [error, setError] = useState<string | null>(null);
+  // Lettura chiesta con un tocco qui (screenshot, nome scritto): vale come il gesto del Condividi.
+  const [daTocco, setDaTocco] = useState(false);
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -151,6 +153,7 @@ export default function ReelSave({
     e.target.value = "";
     if (!f) return;
     trackFeature("import_screenshot");
+    setDaTocco(true);
     setReading(true);
     read({ image: await screenshotForUpload(f) });
   };
@@ -197,7 +200,7 @@ export default function ReelSave({
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} aria-label="Screenshot del reel" />
           <form
             className="flex gap-2"
-            onSubmit={(e) => { e.preventDefault(); if (draft.trim()) read({ caption: draft.trim().slice(0, 2000) }); }}
+            onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { setDaTocco(true); read({ caption: draft.trim().slice(0, 2000) }); } }}
           >
             <input
               value={draft}
@@ -220,7 +223,7 @@ export default function ReelSave({
 
       {luoghi && (
         <>
-          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave} />
+          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave || daTocco} />
           {luoghi.length > 1 && (
             <div className="space-y-2 pt-1" data-testid="reel-altri">
               <p className="text-sm font-semibold text-text">Nel reel ci sono anche</p>
@@ -260,7 +263,7 @@ function PlaceRow({
   auto?: boolean;
   autoSave?: boolean;
 }) {
-  const savedKey = `mapetite.reel-salvato:${queryOf(luogo)}`;
+  const savedKey = `mapetite.reel-salvato:${reelUrl ?? ""}:${queryOf(luogo)}`;
   const [st, setSt] = useState<RowState>(auto ? { s: "searching" } : { s: "idle" });
   const [tolto, setTolto] = useState(false);
   const [reelOk, setReelOk] = useState(false);
@@ -293,9 +296,12 @@ function PlaceRow({
       .then((found) => {
         if (found.length === 0) { setSt({ s: "none" }); return; }
         const [top, ...rest] = found;
-        // Solo la prima ricerca, con il nome letto dal reel, può salvare da sola; mai dopo un "Non è questo",
-        // né se anche un altro risultato ha lo stesso nome (catene, omonimi: "Roscioli" bar e ristorante).
-        const sure = autoSave && !cached(noKey) && confidentMatch(luogo, top) && !rest.some((r) => confidentMatch(luogo, r));
+        // Dopo un "Non è questo" (anche riaperta) il locale scartato non si ripropone: si sceglie tra gli altri.
+        const scartato = cached<string>(noKey);
+        if (isFirst && typeof scartato === "string") { setSt({ s: "choose", options: found.filter((r) => r.id !== scartato) }); return; }
+        // Solo la prima ricerca, con il nome letto dal reel, può salvare da sola; mai se anche un altro
+        // risultato ha lo stesso nome (catene, omonimi: "Roscioli" bar e ristorante).
+        const sure = autoSave && confidentMatch(luogo, top) && !rest.some((r) => confidentMatch(luogo, r));
         if (isFirst && sure) void save(top, rest, true);
         else if (isFirst) setSt({ s: "found", top, rest });
         else setSt({ s: "choose", options: found });
@@ -318,16 +324,23 @@ function PlaceRow({
   }, []);
 
   // "Non è questo": se l'aveva salvato da solo lo si toglie (e il reel con lui), poi le alternative.
-  const notThis = async (rest: SearchPlace[], out: LinkOutcome | null) => {
+  const notThis = async (top: SearchPlace, rest: SearchPlace[], out: LinkOutcome | null) => {
     if (out?.place && !out.alreadySaved) {
-      const client = await browserClient();
-      await client.from("saved_places").delete().eq("user_id", userId).eq("place_id", out.place.id);
-      // Solo questo reel: gli altri video collegati a quel locale restano.
-      if (reelUrl) await client.from("contenuti_locali").delete().eq("user_id", userId).eq("place_id", out.place.id).eq("url", reelUrl);
-      trackFeature("reel_salva", { stato: "annullato", fonte });
-      setTolto(true);
+      try {
+        const client = await browserClient();
+        const { error } = await client.from("saved_places").delete().eq("user_id", userId).eq("place_id", out.place.id);
+        if (error) throw error;
+        // Solo questo reel: gli altri video collegati a quel locale restano.
+        if (reelUrl) await client.from("contenuti_locali").delete().eq("user_id", userId).eq("place_id", out.place.id).eq("url", reelUrl);
+        trackFeature("reel_salva", { stato: "annullato", fonte });
+        setTolto(true);
+      } catch {
+        // Non tolto: lo si dice, e il locale resta salvato (si toglie dai Salvati).
+        setSt({ s: "error", msg: `Non sono riuscito a togliere ${top.name} dai salvati: puoi toglierlo dai Salvati.` });
+        return;
+      }
     }
-    remember(noKey, true);
+    remember(noKey, top.id);
     try { sessionStorage.removeItem(savedKey); } catch { /* storage non disponibile */ }
     setReelOk(false);
     setSt({ s: "choose", options: rest });
@@ -374,7 +387,7 @@ function PlaceRow({
             Apri sulla mappa
           </Link>
           {st.auto && !st.out.alreadySaved && (
-            <button type="button" onClick={() => notThis(st.rest, st.out)} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
+            <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
               Non è questo
             </button>
           )}
@@ -394,7 +407,7 @@ function PlaceRow({
           <button type="button" onClick={() => save(st.top, st.rest, false)} disabled={st.s === "saving"} data-testid="reel-conferma" className={`${btn} bg-brand text-white`}>
             {st.s === "saving" ? "Salvo…" : "Sì, salva"}
           </button>
-          <button type="button" onClick={() => notThis(st.rest, null)} disabled={st.s === "saving"} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
+          <button type="button" onClick={() => notThis(st.top, st.rest, null)} disabled={st.s === "saving"} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
             No, è un altro
           </button>
         </div>
@@ -405,7 +418,7 @@ function PlaceRow({
   // Alternative, nessun risultato o errore: si sceglie tra gli altri o si cerca a mano (1 ricerca a tocco).
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4" data-testid="reel-scegli">
-      {tolto && <p className="text-xs text-text-muted" data-testid="reel-tolto">Tolto dai salvati.</p>}
+      {tolto && <p className="text-sm font-medium text-text" data-testid="reel-tolto">✓ Tolto dai salvati. Qual è quello giusto?</p>}
       {st.s === "error" && <p className="rounded-btn bg-error/10 px-3 py-2 text-sm text-error">{st.msg}</p>}
       {st.s === "none" && <p className="text-sm text-text">Non trovo «{labelOf(luogo)}» su Google Maps.</p>}
       {st.s === "choose" && st.options.length > 0 && (

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractPlace, fromParsed, type ImportResult } from "@/lib/import-caption";
 import { allowAi, clientKey } from "@/lib/ai-limit";
+import { CONDIVISO_COOKIE, condivisoTesto, impronta } from "@/lib/condiviso";
 
 // Destinazione del "Condividi" di Android (share_target POST nel manifest).
 // Arrivano due cose diverse:
@@ -74,7 +75,11 @@ export async function POST(request: NextRequest) {
       if (v) q.set(k, v);
     }
     const qs = q.toString();
-    return go(`/importa/condividi${qs ? `?${qs}` : ""}`);
+    const res = go(`/importa/condividi${qs ? `?${qs}` : ""}`);
+    // Segno del Condividi vero: solo così un reel si salva da solo (un link costruito a mano chiede "È questo?").
+    const testo = condivisoTesto(field(form, "title"), field(form, "text"), field(form, "url"));
+    if (testo) res.cookies.set(CONDIVISO_COOKIE, impronta(testo), { httpOnly: true, sameSite: "lax", maxAge: 600, path: "/importa/condividi" });
+    return res;
   }
 
   const userId = await currentUserId(request);

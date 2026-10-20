@@ -2632,9 +2632,17 @@ if (!fakeUser) {
   await gcard.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
   ok(capBodies.at(-1)?.link === "https://www.youtube.com/shorts/abcDEF" && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps per link");
 
-  // Condividi (Android) da TikTok: la frase dell'app non diventa una ricerca, il video si legge una volta sola.
-  const c1 = capBodies.length;
+  // Link costruito a mano verso /importa/condividi (nessun Condividi vero): legge, ma chiede "È questo?".
+  await mp.evaluate(() => sessionStorage.clear());
+  const wX = mWrites.length;
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
+  await mp.getByTestId("reel-trovato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(await mp.getByTestId("reel-trovato").isVisible() && !mWrites.slice(wX).some((w) => w.m === "POST"), "condividi: un link costruito a mano non salva da solo nei salvati di chi lo apre ('È questo?')");
+  // Condividi (Android) vero, dal POST del ricevi: la frase dell'app non diventa una ricerca, il video si legge una volta sola.
+  await mp.evaluate(() => sessionStorage.clear());
+  const c1 = capBodies.length;
+  { const r = await mctx.request.post(`${BASE}/importa/condividi/ricevi`, { multipart: { text: "Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123" }, maxRedirects: 0 });
+    await mp.goto(new URL(r.headers()["location"] ?? "/importa/condividi", BASE).href, { waitUntil: "networkidle" }); }
   await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
   ok(await mp.getByRole("heading", { name: "Salva dal reel" }).isVisible() && capBodies.length === c1 + 1 && capBodies.at(-1)?.link === "https://www.tiktok.com/@mario/video/123" && await mp.getByTestId("reel-salvato").isVisible() && mFromLink.length === 0, "condividi tiktok: 'Salva dal reel', legge il video e salva in un gesto");
   await mp.reload({ waitUntil: "networkidle" });

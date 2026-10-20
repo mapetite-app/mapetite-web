@@ -34,8 +34,15 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
 const ALIAS: Record<string, string> = { rome: "roma", milan: "milano", naples: "napoli", florence: "firenze", venice: "venezia", turin: "torino" };
 const cityKey = (c: string) => { const k = wordsOf(c).join(" "); return ALIAS[k] ?? k; };
 
+// Tipi di locale: "Bar Basso" e "Pasticceria Basso" non sono lo stesso posto.
+const KINDS = new Set(["ristorante", "trattoria", "osteria", "pizzeria", "bar", "caffe", "cafe", "enoteca", "pub", "bistrot", "bistro", "gelateria", "pasticceria", "sushi", "cocktail", "wine"]);
+const kindsOf = (s: string) => wordsOf(s).filter((w) => KINDS.has(w));
+
 /** Stesso nome: stesse parole distintive (i numeri dell'insegna non contano: "Marchesi 1824"). */
 export function sameName(read: string, google: string): boolean {
+  const ka = kindsOf(read);
+  const kb = kindsOf(google);
+  if (ka.length > 0 && kb.length > 0 && !ka.some((k) => kb.includes(k))) return false;
   const mine = noDigits(distinctive(read));
   const theirs = noDigits(distinctive(google));
   if (mine.length > 0 && sameSet([...new Set(mine)], [...new Set(theirs)])) return true;
