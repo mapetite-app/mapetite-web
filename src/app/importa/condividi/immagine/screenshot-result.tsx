@@ -1,12 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import LinkResults from "@/components/link-results";
-import { cityFromAddress, displayAddress } from "@/lib/city";
 import { withNext } from "@/lib/next-path";
-import { saveSearchPlace, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
-import { rememberFirme } from "@/lib/catalog-firme";
+import ReelSave, { type Luogo } from "@/components/reel-save";
 
 const ERRORI: Record<string, string> = {
   illeggibile: "Non riesco a leggere un locale in questa immagine.",
@@ -15,86 +11,26 @@ const ERRORI: Record<string, string> = {
   grande: "L'immagine è troppo grande (massimo 5 MB): prova con uno screenshot.",
 };
 
-function errorText(e: unknown): string {
-  if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
-  return e instanceof Error && e.message ? e.message : "Qualcosa è andato storto, riprova.";
-}
-
-const SEARCH_KEY = "mapetite.screenshot-ricerca";
-
+// Esito dello screenshot condiviso da Instagram/TikTok (Android): la lettura è già fatta dal ricevi.
+// Ricerca su Google, salvataggio da solo quando combacia e "Non è questo": src/components/reel-save.tsx.
 export default function ScreenshotResult({
   nome,
   citta,
+  categoria = "",
+  altri = [],
   errore,
   piu,
   userId,
 }: {
   nome: string;
   citta: string;
+  categoria?: string;
+  altri?: Luogo[];
   errore: string;
   piu: boolean;
   userId: string | null;
 }) {
-  const query = [nome, citta].filter(Boolean).join(" ");
-  const canSearch = Boolean(nome && !errore && userId);
-  const [results, setResults] = useState<SearchPlace[] | null>(null);
-  const [searching, setSearching] = useState(canSearch);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [others, setOthers] = useState(false);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<LinkOutcome | null>(null);
-  const started = useRef(false);
-
-  // Una sola ricerca Google, come nell'import manuale dello screenshot.
-  const search = () =>
-    fetch("/api/places/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error("Non riesco a cercare il locale su Google Maps. Riprova.");
-        const found = ((data.results ?? []) as SearchPlace[]).slice(0, 5);
-        rememberFirme(found);
-        setResults(found);
-        try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify({ query, found })); } catch { /* storage non disponibile */ }
-      })
-      .catch((e) => setSearchError(errorText(e)))
-      .finally(() => setSearching(false));
-
-  useEffect(() => {
-    if (started.current || !canSearch) return;
-    started.current = true;
-    // Ricaricata o riaperta: stessi risultati di prima, senza una seconda ricerca Google a pagamento.
-    try {
-      const cached = JSON.parse(sessionStorage.getItem(SEARCH_KEY) ?? "null");
-      if (cached?.query === query && Array.isArray(cached.found)) {
-        void Promise.resolve(cached.found as SearchPlace[]).then((found) => { setResults(found); setSearching(false); });
-        return;
-      }
-    } catch { /* storage non disponibile */ }
-    void search();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const save = async (r: SearchPlace) => {
-    if (!userId) return;
-    setSaving(r.id);
-    setSaveError(null);
-    try {
-      setSaved(await saveSearchPlace(r, userId));
-    } catch (e) {
-      setSaveError(errorText(e));
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const top = results?.[0] ?? null;
-  const rest = results?.slice(1) ?? [];
-  const where = (r: SearchPlace) => cityFromAddress(r.address) ?? citta;
+  const luoghi: Luogo[] = nome ? [{ nome, citta: citta || null, categoria: categoria || null }, ...altri] : [];
 
   const manualLink = (label: string) => (
     <Link
@@ -149,107 +85,9 @@ export default function ScreenshotResult({
         </div>
       )}
 
-      {searching && (
-        <p className="text-sm text-text-muted" data-testid="screenshot-attesa">
-          Ho letto «{[nome, citta].filter(Boolean).join(", ")}»: lo cerco su Google Maps…
-        </p>
-      )}
+      {!errore && nome && userId && <ReelSave text="" userId={userId} initial={luoghi} />}
 
-      {searchError && (
-        <div className="space-y-3">
-          <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">{searchError}</p>
-          <button
-            type="button"
-            onClick={() => { setSearching(true); setSearchError(null); void search(); }}
-            disabled={searching}
-            className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
-          >
-            Riprova
-          </button>
-        </div>
-      )}
-
-      {results && !top && (
-        <div className="space-y-3" data-testid="screenshot-nessuno">
-          <p className="text-sm text-text">
-            Nello screenshot ho letto «{[nome, citta].filter(Boolean).join(", ")}», ma non lo trovo su Google Maps.
-          </p>
-          {manualLink("Cercalo a mano in Importa")}
-        </div>
-      )}
-
-      {saved && userId && (
-        <div className="space-y-2">
-          <LinkResults results={[saved]} userId={userId} />
-          {!saved.alreadySaved && <p className="text-xs text-text-muted">Lo trovi tra i salvati in 📌 Voglio andarci.</p>}
-        </div>
-      )}
-
-      {top && !saved && (
-        <div className="space-y-4">
-          <div className="rounded-card border border-border bg-surface p-5" data-testid="screenshot-trovato">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Ho trovato</p>
-            <p className="mt-1 font-display text-xl font-semibold text-brand">
-              {top.name}{where(top) ? `, ${where(top)}` : ""}
-            </p>
-            <p className="mt-0.5 text-xs text-text-muted">{displayAddress(top.address)}</p>
-            <p className="mt-3 text-sm text-text">Lo salvo in <span className="font-medium">📌 Voglio andarci</span>.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => save(top)}
-                disabled={saving !== null}
-                data-testid="screenshot-salva"
-                className="min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white disabled:opacity-60"
-              >
-                {saving === top.id ? "Salvo..." : "Salva"}
-              </button>
-              {!others && (
-                <button
-                  type="button"
-                  onClick={() => setOthers(true)}
-                  disabled={saving !== null}
-                  data-testid="screenshot-non-e-questo"
-                  className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60"
-                >
-                  Non è questo
-                </button>
-              )}
-            </div>
-          </div>
-
-          {saveError && <p className="rounded-btn bg-error/10 px-4 py-3 text-sm text-error">{saveError}</p>}
-
-          {others && (
-            <div className="space-y-3" data-testid="screenshot-altri">
-              {rest.length > 0 && (
-                <>
-                  <p className="text-sm font-semibold text-text">Forse è uno di questi?</p>
-                  <ul className="space-y-2">
-                    {rest.map((r) => (
-                      <li key={r.id}>
-                        <button
-                          type="button"
-                          onClick={() => save(r)}
-                          disabled={saving !== null}
-                          className="w-full rounded-btn border border-border bg-white px-4 py-3 text-left disabled:opacity-60"
-                        >
-                          <p className="text-sm font-semibold text-text">{saving === r.id ? "Salvo..." : r.name}</p>
-                          <p className="mt-0.5 text-xs text-text-muted">{displayAddress(r.address)}</p>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              <p className="text-sm text-text-muted">Non c&apos;è? Carica lo screenshot in Importa e cercalo a mano.</p>
-              {manualLink("Carica lo screenshot a mano")}
-            </div>
-          )}
-        </div>
-      )}
-
-      {saved && (
+      {!errore && nome && userId && (
         <p className="mt-6 text-sm text-text-muted">
           <Link href="/importa" className="inline-flex min-h-11 items-center font-display font-semibold text-brand underline underline-offset-2">Salva altri locali</Link>
         </p>

@@ -2422,28 +2422,44 @@ else {
     await lctx.route("**/api/places/search", (route) => { searchCalls.push(route.request().postDataJSON()); return route.fulfill({ json: { results: SEARCH } }); });
     await lctx.route("**/api/places/add", (route) => { const b = route.request().postDataJSON(); addCalls.push(b); return route.fulfill({ json: { place: { id: b.googlePlaceId === "GBR2" ? "00000000-0000-0000-0000-000000000202" : "00000000-0000-0000-0000-000000000201", name: b.name } } }); });
 
-    await setLettura({ nome: "Bar Rossi", citta: "Roma", categoria: "bar" });
+    const reelWrites = [];
+    await lctx.route("**/rest/v1/contenuti_locali**", (route) => { const req = route.request(); reelWrites.push({ m: req.method(), url: req.url() }); return route.fulfill({ status: req.method() === "POST" ? 201 : 200, json: [] }); });
+    // Salva dal reel (sprint 25/10): un post con 3 locali; il primo combacia con Google e si salva da solo.
+    await setLettura({ luoghi: [{ nome: "Bar Rossi", citta: "Roma", categoria: "bar" }, { nome: "Caffè Verdi", citta: "Roma", categoria: "caffè" }, { nome: "Osteria Blu", citta: "Roma", categoria: "osteria" }] });
     const s1 = await shareImages([["immagini", img("story1.png")], ["immagini", img("story2.png")], ["text", "Guarda questo post"]]);
-    ok(s1.status === 303 && s1.loc.includes("/importa/condividi/immagine?") && s1.loc.includes("piu=1") && s1.loc.includes("nome=Bar+Rossi") && s1.loc.includes("citta=Roma"), `condividi screenshot: letto nome e città, poi pagina dell'esito (${s1.status} ${s1.loc})`);
-    await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
-    await lp.getByTestId("screenshot-trovato").waitFor({ timeout: 5000 });
-    ok(await lp.getByTestId("screenshot-trovato").getByText("Bar Rossi, Roma").isVisible() && await lp.getByText("Ho trovato").isVisible(), "condividi screenshot: 'Ho trovato: Bar Rossi, Roma'");
-    ok(await lp.getByTestId("screenshot-piu").isVisible(), "condividi screenshot: con più immagini dice che ha letto solo la prima");
-    ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "condividi screenshot: una sola ricerca Google con nome e città");
-    await lp.screenshot({ path: `${OUT}/33-condividi-screenshot.png`, caret: "initial" });
+    ok(s1.status === 303 && s1.loc.includes("/importa/condividi/immagine?") && s1.loc.includes("piu=1") && s1.loc.includes("nome=Bar+Rossi") && s1.loc.includes("citta=Roma") && s1.loc.includes("altri="), `condividi screenshot: letto nome, città e gli altri locali del post, poi pagina dell'esito (${s1.status} ${s1.loc.slice(0, 90)})`);
     const w0 = lwrites.length;
-    await lp.getByTestId("screenshot-salva").click();
-    await lp.getByTestId("link-salvato").waitFor({ timeout: 5000 });
+    await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
+    await lp.getByTestId("reel-salvato").waitFor({ timeout: 5000 });
     const ins = lwrites.slice(w0).find((w) => w.m === "POST");
-    ok(addCalls.at(-1)?.googlePlaceId === "GBR1" && JSON.stringify(ins?.body?.tags) === '["Da provare"]' && ins?.body?.place_id === "00000000-0000-0000-0000-000000000201", "condividi screenshot: Salva aggiunge il locale in '📌 Voglio andarci'");
-    ok(await lp.getByText("Salvato in Mapetite:").isVisible() && await lp.getByRole("link", { name: "Apri sulla mappa" }).isVisible(), "condividi screenshot: conferma con 'Apri sulla mappa'");
+    ok(await lp.getByTestId("reel-salvato").getByText("Bar Rossi, Roma").isVisible() && await lp.getByText("✓ Salvato in 📌 Voglio andarci").isVisible(), "salva dal reel: il locale che combacia si salva da solo ('✓ Salvato in 📌 Voglio andarci')");
+    ok(addCalls.at(-1)?.googlePlaceId === "GBR1" && JSON.stringify(ins?.body?.tags) === '["Da provare"]' && ins?.body?.place_id === "00000000-0000-0000-0000-000000000201", "salva dal reel: salvato in 'Da provare' senza toccare niente");
+    ok(await lp.getByTestId("screenshot-piu").isVisible(), "condividi screenshot: con più immagini dice che ha letto solo la prima");
+    ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "salva dal reel: una sola ricerca Google, con nome e città del primo locale");
+    ok(await lp.getByTestId("reel-altri").getByText("Nel reel ci sono anche").isVisible() && await lp.getByTestId("reel-altro").count() === 2, "salva dal reel: 'Nel reel ci sono anche' con gli altri 2 locali, senza cercarli");
+    ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");
+    await lp.screenshot({ path: `${OUT}/33-condividi-screenshot.png`, caret: "initial" });
+
+    // "Non è questo": si toglie dai salvati e si sceglie tra gli altri risultati già arrivati.
+    const w1 = lwrites.length;
+    await lp.getByTestId("reel-non-e-questo").click();
+    await lp.getByTestId("reel-scegli").waitFor({ timeout: 4000 });
+    ok(lwrites.slice(w1).some((w) => w.m === "DELETE" && w.url.includes("place_id=eq.00000000-0000-0000-0000-000000000201")), "salva dal reel: 'Non è questo' toglie il locale dai salvati");
+    ok(await lp.getByTestId("reel-scegli").getByText("Bar Rossi Bis").isVisible() && await lp.getByTestId("reel-cerca-mano").isVisible(), "salva dal reel: 'Non è questo' propone gli altri risultati e la ricerca a mano");
+    await lp.getByTestId("reel-scegli").getByText("Bar Rossi Bis").click();
+    await lp.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
+    ok(addCalls.at(-1)?.googlePlaceId === "GBR2" && searchCalls.length === 1, "salva dal reel: scelto l'altro, salvato senza un'altra ricerca Google");
     await lp.screenshot({ path: `${OUT}/34-condividi-screenshot-salvato.png`, caret: "initial" });
 
-    // "Non è questo": gli altri risultati già arrivati + import manuale.
+    // Riaperta: niente ricerca Google ripetuta e niente salvataggio da solo dopo un "Non è questo".
+    const w2 = lwrites.length;
     await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
-    await lp.getByTestId("screenshot-non-e-questo").click();
-    ok(await lp.getByTestId("screenshot-altri").getByText("Bar Rossi Bis").isVisible() && await lp.getByTestId("screenshot-manuale").getAttribute("href") === "/importa", "condividi screenshot: 'Non è questo' mostra le alternative e porta all'import manuale");
-    ok(searchCalls.length === 1, "condividi screenshot: riaprire la pagina e 'Non è questo' non rifanno la ricerca Google");
+    await lp.getByTestId("reel-trovato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(searchCalls.length === 1 && await lp.getByTestId("reel-trovato").isVisible() && !lwrites.slice(w2).some((w) => w.m === "POST"), "salva dal reel: riaperta, chiede 'È questo?' invece di risalvare da solo, senza rifare la ricerca");
+    // Un altro locale del reel: un tocco = una ricerca; se non combacia chiede conferma.
+    await lp.getByTestId("reel-altro").first().click();
+    await lp.getByTestId("reel-altri").getByTestId("reel-trovato").waitFor({ timeout: 4000 });
+    ok(searchCalls.length === 2 && searchCalls[1]?.query === "Caffè Verdi Roma" && await lp.getByTestId("reel-altri").getByText("Nel reel: «Caffè Verdi, Roma»").isVisible(), "salva dal reel: '+ Salva' su un altro locale fa UNA ricerca e, se il nome non combacia, chiede 'È questo?'");
 
     // Immagine senza locale e file che non è un'immagine: errori in italiano.
     await setLettura({ nome: null, citta: null, categoria: null });
@@ -2491,7 +2507,10 @@ if (!fakeUser) {
   const mAdd = [];
   const mWrites = [];
   const mFromLink = [];
-  await mctx.route("**/api/places/search", (r) => { mSearch.push(r.request().postDataJSON()); return r.fulfill({ json: { results: MANO } }); });
+  const FRATELLI = [{ id: "GOF", name: "Osteria dei Fratelli", address: "Via Tortona 5, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16, category: "restaurant", rating: 4.6, priceLevel: 2 }];
+  await mctx.route("**/api/places/search", (r) => { const b = r.request().postDataJSON(); mSearch.push(b); return r.fulfill({ json: { results: /Osteria dei Fratelli/.test(b?.query ?? "") ? FRATELLI : MANO } }); });
+  const mReels = [];
+  await mctx.route("**/rest/v1/contenuti_locali**", (r) => { const req = r.request(); mReels.push({ m: req.method(), body: req.postDataJSON?.() ?? null }); return r.fulfill({ status: req.method() === "POST" ? 201 : 200, json: [] }); });
   await mctx.route("**/api/places/add", (r) => { const b = r.request().postDataJSON(); mAdd.push(b); return r.fulfill({ json: { place: { id: "00000000-0000-0000-0000-000000000301", name: b.name } } }); });
   await mctx.route("**/api/places/from-link", (r) => { mFromLink.push(r.request().postDataJSON()); return r.fulfill({ status: 400, json: { error: "Non vedo un link di Google Maps." } }); });
   await mctx.route("**/rest/v1/saved_places**", (r) => {
@@ -2541,67 +2560,75 @@ if (!fakeUser) {
   ok(mWrites.some((w) => w.m === "PATCH" && w.body?.note === "Me l'ha detto Marco" && w.url.includes("place_id=eq.00000000-0000-0000-0000-000000000301")), "a mano: nota facoltativa sul salvato");
   await mp.screenshot({ path: `${OUT}/38-importa-a-mano-salvato.png`, caret: "initial" });
 
-  // Link di Instagram incollato nella card Google Maps: messaggio chiaro, nessuna chiamata.
+  // Salva dal reel (sprint 25/10). Lettura AI simulata: la didascalia o il video danno i locali.
+  const capBodies = [];
+  const OF = { nome: "Osteria dei Fratelli", citta: "Milano", categoria: "ristorante" };
+  await mctx.route("**/api/import-caption", (r) => {
+    const b = r.request().postDataJSON();
+    capBodies.push(b);
+    if (b?.link?.includes("/video/999")) return r.fulfill({ status: 422, json: { error: "Non riesco a leggere questo video." } });
+    if (b?.caption) return r.fulfill({ json: { nome: "Pizzeria Bella", citta: "Roma", categoria: "pizzeria", luoghi: [{ nome: "Pizzeria Bella", citta: "Roma", categoria: "pizzeria" }] } });
+    return r.fulfill({ json: { ...OF, luoghi: [OF] } });
+  });
+
+  // Instagram incollato con un nome nel testo: l'AI legge il testo, una ricerca, "È questo?" se il nome non combacia.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
   await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
+  const sI = mSearch.length;
+  const wI = mWrites.length;
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
-  const soc = gcard.getByTestId("link-social");
-  ok(await soc.waitFor({ timeout: 3000 }).then(() => true, () => false) && await soc.getByText("Da Instagram non posso leggere il post.", { exact: false }).isVisible(), "instagram: messaggio 'non posso leggere il post, fai uno screenshot'");
-  ok(!(await mp.getByText("Non vedo un link di Google Maps", { exact: false }).isVisible()) && mFromLink.length === 0, "instagram: niente 'non è un link di Google Maps', nessuna chiamata al server");
-  const cerca = soc.getByTestId("link-social-cerca");
-  ok(await cerca.isVisible() && (await cerca.textContent())?.includes("Pizzeria Bella a Roma"), "instagram: propone 'Cerca 'Pizzeria Bella a Roma''");
-  await soc.scrollIntoViewIfNeeded();
+  await gcard.getByTestId("reel-trovato").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(capBodies.at(-1)?.caption === "Pizzeria Bella a Roma" && mSearch.length === sI + 1 && mSearch.at(-1)?.query === "Pizzeria Bella Roma", "instagram: il nome scritto col link va all'AI e parte UNA ricerca Google");
+  ok(await gcard.getByTestId("reel-trovato").getByText("È questo?").isVisible() && !mWrites.slice(wI).some((w) => w.m === "POST") && mFromLink.length === 0, "instagram: il nome trovato non combacia → 'È questo?', niente salvataggio da solo né errore Google Maps");
+  await gcard.getByTestId("reel-trovato").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${DOCS_SHOTS}/instagram.png`, caret: "initial" });
-  const s0 = mSearch.length;
-  await cerca.click();
-  await mano.getByTestId("mano-risultato").first().waitFor({ timeout: 5000 });
-  ok(mSearch.length === s0 + 1 && mSearch.at(-1)?.query === "Pizzeria Bella a Roma" && (await mano.getByLabel("Nome del locale e città").inputValue()) === "Pizzeria Bella a Roma", "instagram: 'Cerca …' avvia UNA ricerca a mano con il nome");
-  await soc.getByTestId("link-social-screenshot").click();
-  await mp.waitForTimeout(900);
-  const shotBox = await mp.getByTestId("importa-screenshot").boundingBox();
-  ok(shotBox && shotBox.y >= -1 && shotBox.y < 844 / 2, `instagram: 'Carica uno screenshot' porta a 'Da uno screenshot' (y=${Math.round(shotBox?.y ?? -1)})`);
+  await gcard.getByTestId("reel-conferma").click();
+  await gcard.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
+  ok(mAdd.at(-1)?.googlePlaceId === "GM1" && mReels.some((x) => x.m === "POST" && x.body?.url === "https://www.instagram.com/reel/ABC123" && x.body?.fonte === "Instagram"), "instagram: 'Sì, salva' salva il locale e collega il reel (link pulito)");
 
-  // TikTok e YouTube Shorts incollati.
+  // Instagram senza testo: un solo passo, screenshot o nome; nessuna lettura AI prima del tocco.
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
+  const c0 = capBodies.length;
+  const chiedi = mp.getByTestId("reel-chiedi");
+  ok(await chiedi.isVisible() && await chiedi.getByText("Instagram non lascia leggere i reel alle altre app.", { exact: false }).isVisible() && await mp.getByTestId("reel-screenshot").isVisible() && capBodies.length === c0, "condividi instagram: 'Carica lo screenshot' o il nome, senza chiamate");
+  await mp.screenshot({ path: `${OUT}/39-reel-instagram.png`, caret: "initial" });
+  await mp.getByLabel("Screenshot del reel").setInputFiles({ name: "reel.png", mimeType: "image/png", buffer: Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489", "hex") });
+  await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.length === c0 + 1 && typeof capBodies.at(-1)?.image === "string" && await mp.getByTestId("reel-salvato").getByText("Osteria dei Fratelli, Milano").isVisible(), "condividi instagram: dallo screenshot legge il locale, lo trova e lo salva da solo");
+
+  // TikTok incollato: si legge il video da solo e si salva se combacia (nessun tocco in più).
+  await mp.evaluate(() => sessionStorage.clear());
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
+  const sT = mSearch.length;
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
-  ok(await gcard.getByTestId("link-social").waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await gcard.getByTestId("link-social-cerca").isVisible()), "tiktok: messaggio specifico; senza nome nel testo niente 'Cerca'");
-  // "✨ Trova il locale dal video" (14/10): la didascalia del video (oEmbed) va all'AI, poi si sceglie il locale.
-  const capBodies = [];
-  await mctx.route("**/api/import-caption", (r) => { capBodies.push(r.request().postDataJSON()); return r.fulfill({ json: { nome: "Osteria dei Fratelli", citta: "Milano", categoria: "ristorante" } }); });
-  ok(await gcard.getByTestId("link-social-video").isVisible(), "tiktok: pulsante '✨ Trova il locale dal video'");
-  const s2 = mSearch.length;
-  await gcard.getByTestId("link-social-video").click();
-  await mp.getByText("Seleziona il locale corretto").waitFor({ timeout: 5000 }).catch(() => {});
-  ok(capBodies.at(-1)?.link === "https://vm.tiktok.com/ZMabc123/" && mSearch.length === s2 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano" && await mp.getByText("Seleziona il locale corretto").isVisible(), "tiktok: dal video legge nome e città e propone i locali da salvare");
+  await gcard.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.at(-1)?.link === "https://vm.tiktok.com/ZMabc123/" && mSearch.length === sT + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano" && await gcard.getByText("✓ Salvato in 📌 Voglio andarci").isVisible(), "tiktok: incollato il link, legge il video, trova e salva il locale da solo");
+  ok(await gcard.getByTestId("reel-collegato").isVisible() && mReels.some((x) => x.m === "POST" && x.body?.fonte === "TikTok"), "tiktok: il video resta collegato al locale ('Il reel resta collegato')");
+  await gcard.getByTestId("reel-salvato").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
-  ok(await gcard.getByText("Leggo la descrizione del video di YouTube", { exact: false }).isVisible() && await gcard.getByTestId("link-social-video").isVisible() && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps");
+  await gcard.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.at(-1)?.link === "https://www.youtube.com/shorts/abcDEF" && mFromLink.length === 0, "youtube shorts: si legge dal video, nessuna chiamata a Google Maps per link");
 
-  // Condividi (Android) di un link TikTok: niente errore Google Maps.
+  // Condividi (Android) da TikTok: la frase dell'app non diventa una ricerca, il video si legge una volta sola.
+  const c1 = capBodies.length;
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
-  ok(await mp.getByTestId("link-social").isVisible() && await mp.getByRole("heading", { name: "Salva un locale" }).isVisible() && !(await mp.getByTestId("link-social-cerca").isVisible()) && mFromLink.length === 0, "condividi tiktok: messaggio specifico, la frase dell'app non diventa una ricerca");
-  await mp.goto(`${BASE}/importa/condividi?title=${encodeURIComponent("Osteria dei Fratelli Milano")}&text=${encodeURIComponent("https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
-  const s1 = mSearch.length;
-  await mp.getByTestId("link-social-cerca").click();
-  await mp.getByTestId("mano-risultato").first().waitFor({ timeout: 5000 });
-  ok(mSearch.length === s1 + 1 && mSearch.at(-1)?.query === "Osteria dei Fratelli Milano", "condividi tiktok con nome: 'Cerca …' mostra i risultati da salvare");
-  // Condividi da TikTok: "Trova il locale dal video" apre Importa e legge subito il video.
-  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Guarda questo video su TikTok https://www.tiktok.com/@mario/video/123")}`, { waitUntil: "networkidle" });
-  const c0 = capBodies.length;
-  await mp.getByTestId("link-social-video").click();
-  await mp.getByText("Seleziona il locale corretto").waitFor({ timeout: 6000 }).catch(() => {});
-  ok(capBodies.length === c0 + 1 && capBodies.at(-1)?.link === "https://www.tiktok.com/@mario/video/123" && !mp.url().includes("video="), "condividi tiktok: 'Trova il locale dal video' legge il video in Importa (una sola volta)");
+  await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(await mp.getByRole("heading", { name: "Salva dal reel" }).isVisible() && capBodies.length === c1 + 1 && capBodies.at(-1)?.link === "https://www.tiktok.com/@mario/video/123" && await mp.getByTestId("reel-salvato").isVisible() && mFromLink.length === 0, "condividi tiktok: 'Salva dal reel', legge il video e salva in un gesto");
+  await mp.reload({ waitUntil: "networkidle" });
+  await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.length === c1 + 1, "condividi tiktok: ricaricando non rilegge il video (niente AI ripetuta)");
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.tiktok.com/@mario/video/999")}`, { waitUntil: "networkidle" });
+  await mp.getByTestId("reel-chiedi").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await mp.getByTestId("reel-chiedi").getByText("Non riesco a leggere questo video.", { exact: false }).isVisible() && await mp.getByTestId("reel-screenshot").isVisible(), "condividi tiktok illeggibile (privato): passa allo screenshot invece di fermarsi");
   await mctx.unroute("**/api/import-caption");
-  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
-  await mp.getByTestId("link-social-screenshot").click();
-  await mp.waitForURL(/\/importa#da-screenshot/, { timeout: 5000 }).then(() => ok(true, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"), () => ok(false, "condividi instagram: 'Carica uno screenshot' apre Importa sullo screenshot"));
 
   // Da disconnessi: invito ad accedere, nessuna ricerca.
   await mctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
@@ -2613,7 +2640,7 @@ if (!fakeUser) {
   ok(await mp.getByTestId("screenshot-accedi").isVisible() && await mp.getByRole("button", { name: "Leggi locale" }).isDisabled(), "screenshot da disconnessi: 'Leggi locale' spento e invito ad accedere (niente AI e Google senza poter salvare)");
   { const r = await mctx.request.post(`${BASE}/api/places/search`, { data: { query: "x".repeat(201) } }); ok(r.status() === 400, `ricerca locali: testo oltre 200 caratteri rifiutato senza chiamare Google (${r.status()})`); }
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/ABC/")}`, { waitUntil: "networkidle" });
-  ok(await mp.getByTestId("link-social").isVisible() && !(await mp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa"))), "condividi instagram da disconnessi: messaggio, il link non resta in attesa");
+  ok(await mp.getByTestId("reel-accedi").isVisible() && !(await mp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa"))), "condividi instagram da disconnessi: invito ad accedere, nessuna lettura");
   await mctx.clearCookies({ name: "e2e_anonimo" });
   await mctx.close();
 }
@@ -6633,10 +6660,10 @@ else {
   await ip.getByTestId("importa-incolla").click();
   ok(await ip.getByTestId("importa-google").getByTestId("link-salvato").first().waitFor({ timeout: 5000 }).then(() => true, () => false) && await ip.getByText("Osteria Nascosta").isVisible(), "salva da iPhone: il link copiato si salva con un tocco");
   await ip.screenshot({ path: `${OUT}/99b-salva-iphone-salvato.png`, caret: "initial" });
-  // Reel di Instagram: non si legge, si spiega lo screenshot (stesso percorso della card Maps).
+  // Reel di Instagram: non si legge, si chiede lo screenshot in un passo (Salva dal reel).
   await ip.evaluate(() => navigator.clipboard.writeText("https://www.instagram.com/reel/C9xYz12AbCd/"));
   await ip.getByTestId("importa-incolla").click();
-  ok(await ip.getByTestId("link-social").waitFor({ timeout: 4000 }).then(() => true, () => false), "salva da iPhone: un reel di Instagram incollato spiega cosa fare (screenshot)");
+  ok(await ip.getByTestId("reel-chiedi").waitFor({ timeout: 4000 }).then(() => true, () => false) && await ip.getByTestId("reel-screenshot").isVisible(), "salva da iPhone: un reel di Instagram incollato chiede lo screenshot (un passo)");
   await ip.setViewportSize({ width: 360, height: 780 });
   ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "salva da iPhone 360px: niente scorrimento orizzontale");
   await ic.close();

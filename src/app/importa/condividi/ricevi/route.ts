@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { extractPlace, type ImportResult } from "@/lib/import-caption";
+import { extractPlace, fromParsed, type ImportResult } from "@/lib/import-caption";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 
 // Destinazione del "Condividi" di Android (share_target POST nel manifest).
@@ -50,7 +50,7 @@ function fakeReading(request: NextRequest): ImportResult | null {
   if (!raw) return null;
   try {
     const p = JSON.parse(decodeURIComponent(raw));
-    return { nome: p.nome ?? null, citta: p.citta ?? null, categoria: p.categoria ?? null };
+    return fromParsed(p);
   } catch {
     return null;
   }
@@ -106,7 +106,9 @@ export async function POST(request: NextRequest) {
   console.log("[condividi/ricevi] screenshot letto:", lettura.nome ? "trovato" : "nessun locale");
 
   if (!lettura.nome) return result({ errore: "illeggibile" });
-  return result({ nome: lettura.nome, citta: lettura.citta, categoria: lettura.categoria });
+  // Gli altri locali dello stesso post ("3 posti dove…") viaggiano insieme, già letti: nessuna nuova lettura AI.
+  const altri = (lettura.luoghi ?? []).slice(1);
+  return result({ nome: lettura.nome, citta: lettura.citta, categoria: lettura.categoria, altri: altri.length ? JSON.stringify(altri) : null });
 }
 
 // Chi apre l'indirizzo a mano (GET) finisce sulla pagina del Condividi.

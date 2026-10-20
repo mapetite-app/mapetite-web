@@ -2,13 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { extractMapsLinks } from "@/lib/maps-link";
-import { findSocialLink, placeHintFromText } from "@/lib/social-link";
-import SocialLinkHelp from "../social-link-help";
-import { findVideoLink } from "@/lib/video-caption";
-import { findReelLink } from "@/lib/reel";
-import ManualAddCard from "../manual-add-card";
+import { findSocialLink } from "@/lib/social-link";
+import ReelSave from "@/components/reel-save";
 import LinkResults from "@/components/link-results";
 import { clearPendingLink, rememberPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 import { trackFeature } from "@/lib/track";
@@ -44,10 +40,6 @@ export default function ShareImport({
   const fullText = [title, sharedText].filter(Boolean).join("\n");
   // Link di Instagram/TikTok/YouTube Shorts (senza link di Maps): non si chiama il server.
   const social = fullText && extractMapsLinks(fullText).length === 0 ? findSocialLink(fullText) : null;
-  const hint = social ? placeHintFromText(fullText) : null;
-  const video = social ? findVideoLink(fullText) : null;
-  const [manualQuery, setManualQuery] = useState<string | null>(null);
-  const router = useRouter();
   const [busy, setBusy] = useState(Boolean(fullText && userId && !social));
   const started = useRef(false);
 
@@ -74,21 +66,10 @@ export default function ShareImport({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">{social ? "Salva un locale" : "Salva da Google Maps"}</h1>
+      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">{social ? "Salva dal reel" : "Salva da Google Maps"}</h1>
 
-      {social && (
-        <div className="space-y-6">
-          <SocialLinkHelp
-            source={social}
-            hint={hint}
-            onScreenshot={() => router.push("/importa#da-screenshot")}
-            onSearch={(q) => setManualQuery(q)}
-            // Condiviso da TikTok/YouTube: Importa legge la didascalia del video e propone il locale.
-            onReadVideo={video ? () => router.push(`/importa?video=${encodeURIComponent(video)}#da-screenshot`) : undefined}
-          />
-          {manualQuery && <ManualAddCard userId={userId} initialQuery={manualQuery} autoSearch reelUrl={findReelLink(fullText)} />}
-        </div>
-      )}
+      {/* Reel di Instagram/TikTok/YouTube: si legge e si salva da qui, senza passare da Importa. */}
+      {social && <ReelSave text={fullText} userId={userId} />}
 
       {!fullText && (
         <div className="space-y-3" data-testid="condividi-vuoto">
@@ -136,7 +117,7 @@ export default function ShareImport({
         </div>
       )}
 
-      {(results || error) && (
+      {(results || error || social) && (
         <p className="mt-6 text-sm text-text-muted">
           <Link href="/importa" className="inline-flex min-h-11 items-center font-display font-semibold text-brand underline underline-offset-2">Salva altri locali</Link>
         </p>

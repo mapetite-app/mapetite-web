@@ -1,5 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import ScreenshotResult from "./screenshot-result";
+import type { Luogo } from "@/components/reel-save";
+
+// Altri locali dello stesso screenshot (JSON dal ricevi). Si accettano solo stringhe corte: arriva dall'URL.
+function parseAltri(raw: string): Luogo[] {
+  try {
+    const arr: unknown = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+    return arr.slice(0, 4).flatMap((x) => {
+      const nome = s((x as Record<string, unknown>)?.nome, 120);
+      return nome ? [{ nome, citta: s((x as Record<string, unknown>).citta, 80), categoria: s((x as Record<string, unknown>).categoria, 40) }] : [];
+    });
+  } catch {
+    return [];
+  }
+}
 
 // Esito dello screenshot condiviso da Instagram/TikTok (Android): la lettura è già fatta
 // da /importa/condividi/ricevi, qui arrivano solo nome, città ed eventuale errore.
@@ -23,6 +39,8 @@ export default async function CondividiImmaginePage({
     <ScreenshotResult
       nome={pick("nome").slice(0, 120)}
       citta={pick("citta").slice(0, 80)}
+      categoria={pick("categoria").slice(0, 40)}
+      altri={parseAltri(pick("altri"))}
       errore={pick("errore")}
       piu={pick("piu") === "1"}
       userId={e2eUser ?? userData?.user?.id ?? null}
