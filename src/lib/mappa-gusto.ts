@@ -139,7 +139,7 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
   const mangi = extra.diete.filter((id) => id === "vegetariano" || id === "vegano").map((id) => (id === "vegano" ? "vegano" : "vegetariano"));
   const eviti = extra.diete.filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => DIETE.find((d) => d.id === id)?.label.toLowerCase().replace(/^(niente|senza) /, "")).filter(Boolean);
   const frasi = [mangi.length ? `mangi ${mangi.join(" e ")}` : null, eviti.length ? `eviti ${eviti.join(", ")}` : null].filter(Boolean).join("; ");
-  if (frasi) out.push({ chiave: "diete", emoji: "🥗", testo: frasi.charAt(0).toUpperCase() + frasi.slice(1) });
+  if (frasi) out.push({ chiave: "diete", emoji: "🍽️", testo: frasi.charAt(0).toUpperCase() + frasi.slice(1) });
   return out;
 }
 

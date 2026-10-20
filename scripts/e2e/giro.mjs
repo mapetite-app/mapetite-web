@@ -7106,6 +7106,16 @@ else {
   ok((await vp.getByTestId("benvenuto-passo").textContent()) === "2 di 4" && (await vp.getByTestId("tipi-contatore").textContent()) === "1 di 10", "risposte conservate: tipi e zone sconosciuti nella bozza si ignorano");
   await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
 
+  // "Rifalla" (da I tuoi gusti): si riparte da quello che il profilo ha già, diete comprese (non si perdono).
+  await vctx.addCookies([{ name: "e2e_gusto", value: encodeURIComponent(JSON.stringify({ city: "Roma", occasions: [], priceRange: null, zone: ["Monti"], su: ["trattoria"], giu: [], scoperta: "chicche", diete: ["celiaco"] })), url: BASE }]);
+  await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  ok((await vp.getByRole("button", { name: "Roma", exact: true }).getAttribute("aria-pressed")) === "true" && (await vp.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true" && (await vp.getByTestId("benvenuto-ripreso").count()) === 0, "rifalla: città e zone già salvate sono già scelte (senza l'avviso della bozza)");
+  await vp.getByRole("button", { name: "Continua" }).click();
+  await vp.getByRole("button", { name: "Basta così, continua" }).click();
+  ok((await vp.getByRole("button", { name: "Senza glutine", exact: true }).getAttribute("aria-pressed")) === "true" && (await vp.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "rifalla: la dieta salvata (senza glutine) e 'chicche' restano, non si cancellano");
+  await vctx.clearCookies({ name: "e2e_gusto" });
+  await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
+
   // Funzioni pure della mappa del gusto (src/lib/mappa-gusto.ts).
   { const mg = await import(new URL("../../src/lib/mappa-gusto.ts", import.meta.url).href);
     const m = mg.pulisciMappa({ zone: ["Monti", "Atlantide"], su: ["trattoria", "x"], giu: ["trattoria", "gourmet"], scoperta: "boh" }, (z) => z === "Monti");
@@ -7115,6 +7125,12 @@ else {
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");
     ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI"); }
+  { const ms = await import(new URL("../../src/lib/mainstream.ts", import.meta.url).href);
+    const P = (name, n, r = 4.5) => ({ name, userRatingCount: n, rating: r });
+    const lista = [P("Roscioli Salumeria", 12000), P("Osteria Due", 800), P("Trattoria Tre", 600), P("Da Quattro", 900), P("Cinque", 700)];
+    ok(JSON.stringify(ms.demoteForChicche("cena a Monti", lista).demoted) === '["Roscioli Salumeria"]', "chicche: il posto di massa va in fondo anche senza scriverlo");
+    ok(ms.demoteForChicche("Roscioli", lista).demoted.length === 0, "chicche: un locale cercato per nome resta dov'è");
+    ok(ms.demoteForChicche("i posti più famosi di Roma", lista).demoted.length === 0 && ms.demoteForChicche("ristoranti iconici", lista).demoted.length === 0, "chicche: chi chiede i famosi li ha in cima (la frase vince sul profilo)"); }
 
   // 5. Microfono: cerchio di 36px ma area di tocco di 44px; la barra di ricerca non cambia altezza.
   await vctx.addInitScript(() => {

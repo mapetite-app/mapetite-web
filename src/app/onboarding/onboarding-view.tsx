@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
@@ -151,13 +151,28 @@ function Gruppo({ title, children }: { title: string; children: React.ReactNode 
 // Le risposte salvate sul telefono si leggono dopo l'idratazione (sul server non ci sono):
 // con una bozza il modulo riparte da lì, senza effetti che rimettono a posto lo stato.
 const noSubscribe = () => () => {};
-export default function OnboardingView({ next = null }: { next?: string | null }) {
+// Risposte già salvate nel profilo (per "Rifalla"): servono da punto di partenza, mai come bozza.
+export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[] };
+
+export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
   const draft = parseDraft(raw);
-  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft} />;
+  const base: Draft | null = dalProfilo
+    ? {
+        step: 0, cuisines: [], atmospheres: [],
+        otherCity: dalProfilo.city && !CITIES.some((c) => c.value === dalProfilo.city) ? dalProfilo.city : "",
+        city: CITIES.some((c) => c.value === dalProfilo.city) ? dalProfilo.city : null,
+        otherOpen: !!dalProfilo.city && !CITIES.some((c) => c.value === dalProfilo.city),
+        occasions: dalProfilo.occasions.filter((o) => OCCASIONS.some((x) => x.value === o)),
+        priceRange: PRICE_RANGES.some((x) => x.value === dalProfilo.priceRange) ? dalProfilo.priceRange : null,
+        zone: dalProfilo.zone, su: dalProfilo.su, giu: dalProfilo.giu, visti: [...dalProfilo.su, ...dalProfilo.giu],
+        scoperta: dalProfilo.scoperta, diete: dalProfilo.diete,
+      }
+    : null;
+  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} />;
 }
 
-function Benvenuto({ next, initial }: { next: string | null; initial: Draft | null }) {
+function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: Draft | null; ripreso: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(initial?.step ?? 0);
   const cuisines = initial?.cuisines ?? [];
@@ -177,7 +192,6 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
   const [vistoCome, setVistoCome] = useState((initial?.step ?? 0) >= PASSO_COME);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const ripreso = initial != null;
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
   // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
@@ -364,21 +378,6 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 </button>
               );
             })}
-            {zoneCitta.length > 0 && (
-              <div data-testid="benvenuto-zone" className="rounded-card bg-surface px-4 py-3">
-                <p className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Le tue zone (fino a 3)</p>
-                <div className="flex flex-wrap gap-2">
-                  {zoneCitta.map((z) => (
-                    <Chip
-                      key={z.nome}
-                      item={{ value: z.nome, label: z.nome, emoji: "📍" }}
-                      selected={zone.includes(z.nome)}
-                      onToggle={(v) => setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length >= 3 ? p : [...p, v]))}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
             <div
               className={[
                 "rounded-card border-2 px-4 py-3 transition-colors",
@@ -407,6 +406,21 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 />
               )}
             </div>
+            {zoneCitta.length > 0 && (
+              <div data-testid="benvenuto-zone" className="rounded-card bg-surface px-4 py-3">
+                <p className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Le tue zone (fino a 3)</p>
+                <div className="flex flex-wrap gap-2">
+                  {zoneCitta.map((z) => (
+                    <Chip
+                      key={z.nome}
+                      item={{ value: z.nome, label: z.nome, emoji: "📍" }}
+                      selected={zone.includes(z.nome)}
+                      onToggle={(v) => setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length >= 3 ? p : [...p, v]))}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -425,7 +439,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex min-h-[17rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
+                  className="relative flex min-h-[20rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -455,6 +469,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                     👍 Sì
                   </button>
                 </div>
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted">← trascina la card, oppure tocca →</p>
                 {visti.length > 0 && (
                   <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
                     ↶ Torna al precedente
@@ -547,7 +562,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                     <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
                       <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
-                      <span className="shrink-0 text-xs font-display font-semibold text-accent">Cambia</span>
+                      <ChevronRight aria-label="Cambia" size={18} className="shrink-0 text-text-muted" />
                     </button>
                   </li>
                 ))}
