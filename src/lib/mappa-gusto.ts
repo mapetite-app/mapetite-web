@@ -106,7 +106,7 @@ export function gustiDaTipi(su: string[], scelti: { occasions: string[]; priceRa
   };
 }
 
-/** La prima ricerca "5 posti per te": il tipo piaciuto più adatto, la zona, e "non turistico" per chi ama le chicche. */
+/** La prima ricerca "5 posti per te": il tipo piaciuto più adatto, la zona, e "fuori dai giri turistici" per chi ama le chicche. */
 export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
   const scoperta = m.scoperta ?? scopertaDedotta(m.su);
   const tipi = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
@@ -114,7 +114,9 @@ export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
   const primo = (scoperta === "chicche" ? tipi.find((t) => !t.famoso) : scoperta === "famosi" ? tipi.find((t) => t.famoso) : null) ?? tipi[0];
   if (!primo) return null;
   const base = primo.query.charAt(0).toUpperCase() + primo.query.slice(1);
-  const nonTuristico = scoperta === "chicche" ? " non turistico" : "";
+  // "fuori dai giri turistici" (non "non turistico": vale per trattoria e per cocktail bar) attiva
+  // la stessa regola di chi lo scrive (mainstream.ts).
+  const nonTuristico = scoperta === "chicche" ? " fuori dai giri turistici" : "";
   const dove = m.zone[0] ? ` a ${m.zone[0]}` : citta ? ` a ${citta}` : "";
   return `${base}${nonTuristico}${dove}`;
 }

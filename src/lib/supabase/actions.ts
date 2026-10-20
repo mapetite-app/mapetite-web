@@ -100,6 +100,24 @@ export async function signup(formData: FormData) {
   );
 }
 
+// Accesso con Google (sprint 25/10): Supabase apre la pagina di Google e torna su /auth/conferma
+// con `?code=`, che apre la sessione e porta all'onboarding chi è nuovo (o a `next`).
+// Il pulsante compare solo se il provider è acceso su Supabase (googleAttivo, sotto).
+export async function loginGoogle(formData: FormData) {
+  const next = safeNext(formData.get("next"));
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await headers()).get("origin");
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${siteUrl ?? ""}${withNext("/auth/conferma", next)}` },
+  });
+  if (error || !data?.url) {
+    console.error("[auth] google:", error?.code, error?.message);
+    redirect(withNext(`/login?error=${encodeURIComponent("Accesso con Google non riuscito. Riprova o usa email e password.")}`, next));
+  }
+  redirect(data.url);
+}
+
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();

@@ -225,6 +225,11 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     saveDraft(d);
   }, [draftJson]);
 
+  // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
+
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
   useEffect(() => {
     const codice = readStoredInvite();
