@@ -5768,9 +5768,20 @@ else {
   const pp = await ictx.newPage();
   pp.on("pageerror", (e) => errors.push(e.message));
   await pp.goto(`${BASE}/profilo#invita`, { waitUntil: "networkidle" });
+  ok((await pp.getByTestId("invito-mappa-gusto").count()) === 0, "profilo: con la mappa del gusto già fatta, nessun invito a farla");
   ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
   await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
+  // Mappa del gusto (sprint 25/10): chi si è registrato prima riceve l'invito a farla, in cima al profilo.
+  { const pg = await ictx.newPage();
+    await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [], senzaGusto: true })), url: BASE }]);
+    await pg.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    const inv = pg.getByTestId("invito-mappa-gusto");
+    const bx = await inv.boundingBox().catch(() => null);
+    ok(!!bx && bx.y < 400 && (await inv.getAttribute("href")) === "/onboarding", `profilo: senza mappa del gusto, l'invito a farla in cima (${Math.round(bx?.y ?? -1)})`);
+    await pg.screenshot({ path: `${OUT}/profilo-invito-mappa-gusto.png`, caret: "initial" });
+    await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await pg.close(); }
   await pp.getByTestId("invita-amico-condividi").click();
   await pp.getByTestId("invita-amico-condividi").getByText("✓ Link copiato").waitFor({ timeout: 3000 }).catch(() => {});
   const clip = await pp.evaluate(() => navigator.clipboard.readText()).catch(() => "");
