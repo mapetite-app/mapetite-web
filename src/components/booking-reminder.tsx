@@ -28,8 +28,9 @@ function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
   const done = (contesto: string) => {
     // Con il locale e le ore di anticipo: il pannello del ristoratore conta i tavoli liberati per tempo.
     const quando = b.date && b.time ? dataOra(b.date, b.time) : null;
-    const ore = quando ? Math.max(0, Math.round((quando.getTime() - Date.now()) / 3_600_000)) : null;
-    track("funzione", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { nome: "prenotazione_disdetta", contesto, ...(ore != null ? { ore } : {}) });
+    const ore = quando ? Math.round((quando.getTime() - Date.now()) / 3_600_000) : null;
+    // Disdetta dopo l'ora del tavolo: si conta, ma non è un "tavolo liberato per tempo".
+    track("funzione", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { nome: "prenotazione_disdetta", contesto, ...(ore != null && ore >= 0 ? { ore } : {}), ...(quando && quando.getTime() < Date.now() ? { stato: "in_ritardo" } : {}) });
     updateBooking(b.id, { outcome: "non-andato", dismissed: true });
   };
   const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
@@ -133,7 +134,9 @@ export default function BookingReminder() {
     .map((g) => ({ group: g, domani: g[0].date === tomorrowKey }));
   const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
   if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0) return null;
-  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id));
+  // La richiesta in attesa di risposta ha già la sua scheda ("Hanno riaperto"): niente doppione.
+  const inRisposta = new Set(risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => b.id));
+  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
       {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto? */}

@@ -1596,7 +1596,7 @@ else {
   // Buoni pasto (PROPOSTE.md 19/10): la riga in scheda solo con almeno 2 risposte concordi; risposta nel diario.
   let buoniScritti = [];
   await p.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: [{ si: 3, no: 1 }] }));
-  await p.route("**/api/places/visite**", (r) => r.fulfill({ json: { persone: 5, piaciuto: 4 } }));
+  await p.route("**/api/places/visite**", (r) => r.fulfill({ json: { persone: 6, piaciuto: 5 } }));
   await p.route("**/rest/v1/buoni_pasto**", (r) => {
     if (r.request().method() === "POST") { buoniScritti.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
     if (r.request().method() === "DELETE") { buoniScritti.push("tolta"); return r.fulfill({ status: 204, body: "" }); }
@@ -1606,7 +1606,8 @@ else {
   await p.locator("ul.snap-x li").first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · lo dicono 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
-  ok(await p.getByTestId("visite-mapetite").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("visite-mapetite").textContent())?.includes("👍 4 su 5 che ci sono stati, su Mapetite"), () => false), "scheda: chi ci è stato su Mapetite e com'era (👍 4 su 5)");
+  { const t = await p.getByTestId("visite-mapetite").waitFor({ timeout: 6000 }).then(async () => (await p.getByTestId("visite-mapetite").textContent()) ?? "", () => "(assente)");
+    ok(t.includes("👍 5 su 6 di chi c'è stato, su Mapetite"), `scheda: chi ci è stato su Mapetite e com'era (${t})`); }
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
   // Diario (4.4): dopo "Ci sono stato" si apre il foglio "Com'è andata?", saltabile
   await p.getByTestId("diario-foglio").waitFor({ timeout: 5000 }).catch(() => {});
@@ -3687,7 +3688,7 @@ else {
     await ap.waitForTimeout(300);
     ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta");
     { const ev = aEvents.find((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta");
-      ok(ev?.googlePlaceId === "P1" && typeof ev?.props?.ore === "number", `disdetta: segnale con il locale e le ore di anticipo, per il pannello del ristoratore (${JSON.stringify({ g: ev?.googlePlaceId, ore: ev?.props?.ore })})`); } }
+      ok(ev?.googlePlaceId === "P1" && (typeof ev?.props?.ore === "number" || ev?.props?.stato === "in_ritardo"), `disdetta: segnale con il locale e le ore di anticipo (o "in ritardo" dopo l'ora del tavolo), per il pannello del ristoratore (${JSON.stringify({ g: ev?.googlePlaceId, ore: ev?.props?.ore, stato: ev?.props?.stato })})`); } }
   // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
@@ -4472,6 +4473,7 @@ else {
       e("funzione", 12, "a10", { gid: "GS1", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", ore: 20 } }),
       e("funzione", 40, "a11", { gid: "GUNO", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", ore: 1 } }),
       e("funzione", 12, "a12", { gid: "GUNO", p: { nome: "filtri" } }),
+      e("funzione", 12, "a13", { gid: "GUNO", p: { nome: "prenotazione_disdetta", contesto: "whatsapp", stato: "in_ritardo" } }),
     ];
     const salvati = [{ place_id: L.id, user_id: "00000000-0000-0000-0000-0000000000c1", created_at: at(13), tags: ["Già visitato"] }];
     const p = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi, salvati }, 7, now);

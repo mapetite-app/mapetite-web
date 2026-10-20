@@ -296,6 +296,7 @@ function disdetteInAnticipo(
   const ore: number[] = [];
   for (const e of ev) {
     if (e.r.type !== "funzione" || e.r.props?.nome !== "prenotazione_disdetta" || e.day < from || e.day > to || placeOf(e.r) !== placeId) continue;
+    if (e.r.props?.stato === "in_ritardo") continue; // dopo l'ora del tavolo: non è "per tempo"
     n++;
     const o = Number(e.r.props?.ore);
     if (e.r.props?.ore != null && Number.isFinite(o) && o >= 0) ore.push(o);
