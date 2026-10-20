@@ -127,7 +127,7 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
   const dove = m.zone.length ? m.zone.join(", ") : extra.citta;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto a ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ti piacciono: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(", ")}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(", ")}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(", ")}` });
   const scoperta = m.scoperta ?? scopertaDedotta(m.su);
@@ -135,8 +135,11 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
   if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}` });
   if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
-  const diete = extra.diete.map((id) => DIETE.find((d) => d.id === id)?.label.toLowerCase()).filter(Boolean);
-  if (diete.length) out.push({ chiave: "diete", emoji: "🥗", testo: `Sempre: ${diete.join(", ")}` });
+  // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
+  const mangi = extra.diete.filter((id) => id === "vegetariano" || id === "vegano").map((id) => (id === "vegano" ? "vegano" : "vegetariano"));
+  const eviti = extra.diete.filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => DIETE.find((d) => d.id === id)?.label.toLowerCase().replace(/^(niente|senza) /, "")).filter(Boolean);
+  const frasi = [mangi.length ? `mangi ${mangi.join(" e ")}` : null, eviti.length ? `eviti ${eviti.join(", ")}` : null].filter(Boolean).join("; ");
+  if (frasi) out.push({ chiave: "diete", emoji: "🥗", testo: frasi.charAt(0).toUpperCase() + frasi.slice(1) });
   return out;
 }
 

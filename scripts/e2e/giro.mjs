@@ -5681,8 +5681,9 @@ else {
   const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
   ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
   ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
-  // Mappa del gusto (sprint 25/10): 5 passi. 1) città e zone.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 5" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 5 con barra di avanzamento");
+  // Mappa del gusto (sprint 25/10): 4 passi a schermo intero. 1) città e zone.
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 4" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 4 con barra di avanzamento");
+  ok((await ip.getByTestId("barra").count()) === 0, "primo accesso: a schermo intero, senza la barra in basso");
   ok(await ip.getByTestId("benvenuto-citta").isVisible() && (await ip.getByTestId("benvenuto-zone").count()) === 0, "primo accesso: si parte dalla città, le zone compaiono dopo");
   await ip.getByRole("button", { name: "Roma", exact: true }).click();
   await ip.getByRole("button", { name: "Monti", exact: true }).click();
@@ -5690,39 +5691,44 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-1-citta-zone.png`, caret: "initial" });
   // 2) dieci tipi di posto 👍/👎
   await ip.getByRole("button", { name: "Continua" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 5" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 4" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
   await ip.screenshot({ path: `${OUT}/benvenuto-2-tipi.png`, caret: "initial" });
   await ip.getByTestId("tipo-su").click();
   ok((await ip.getByTestId("tipi-contatore").textContent()) === "2 di 10", "primo accesso: dopo il 👍 il tipo successivo");
   await ip.getByRole("button", { name: "↶ Torna al precedente" }).click();
   ok((await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10", "primo accesso: 'Torna al precedente' annulla l'ultimo voto");
+  // Scorrimento col dito: a destra è un 👍.
+  { const cb = await ip.getByTestId("tipo-card").boundingBox();
+    await ip.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2); await ip.mouse.down();
+    await ip.mouse.move(cb.x + cb.width / 2 + 160, cb.y + cb.height / 2, { steps: 6 }); await ip.mouse.up();
+    ok((await ip.getByTestId("tipi-contatore").textContent()) === "2 di 10", "primo accesso: trascinando la card a destra si vota 👍");
+    await ip.getByRole("button", { name: "↶ Torna al precedente" }).click(); }
   for (const v of ["su", "giu", "giu", "su", "su", "su", "giu", "giu", "su", "boh"]) await ip.getByTestId(`tipo-${v}`).click();
   await ip.getByTestId("benvenuto-come").waitFor({ timeout: 3000 }).catch(() => {});
   // 3) come esci: famosi o chicche già proposto dai 👍 (4 chicche su 4), diete
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 5" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
+  ok(!(await ip.getByRole("button", { name: "Aperitivo", exact: true }).isVisible()), "primo accesso: occasioni e spesa un tocco più in là (facoltativo)");
   await ip.getByRole("button", { name: "Niente pesce", exact: true }).click();
+  await ip.getByTestId("come-altro").locator("summary").click();
   await ip.getByRole("button", { name: "Aperitivo", exact: true }).click();
   await ip.screenshot({ path: `${OUT}/benvenuto-3-come.png`, caret: "initial" });
-  // 4) i tuoi posti
+  // 4) "Ecco cosa ho capito", con i posti per te o prima l'import
   await ip.getByRole("button", { name: "Continua" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 5" && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("benvenuto-dopo").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: passo 4, import da Google Maps o link di un reel, rimandabile, niente 'Salta' doppio");
-  await ip.screenshot({ path: `${OUT}/benvenuto-4-importa.png`, caret: "initial" });
-  await ip.setViewportSize({ width: 360, height: 740 });
-  const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  const ob = await ip.getByTestId("benvenuto-dopo").boundingBox();
-  ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`);
-  await ip.setViewportSize({ width: 390, height: 844 });
-  // 5) "Ecco cosa ho capito di te"
-  await ip.getByTestId("benvenuto-dopo").click();
   { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "5 di 5" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("niente pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito di te' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 200)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
+  ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
-  await ip.screenshot({ path: `${OUT}/benvenuto-5-capito.png`, caret: "initial" });
+  await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 360, height: 740 });
+  { const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const ob = await ip.getByTestId("benvenuto-importa-si").boundingBox();
+    ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`); }
+  await ip.setViewportSize({ width: 390, height: 844 });
   await ip.getByTestId("capito-riga").first().click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 5" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando una riga si torna a cambiarla, con le scelte conservate");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 4" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando una riga si torna a cambiarla, con le scelte conservate");
   for (let k = 0; k < 3; k++) await ip.getByRole("button", { name: "Continua" }).click().catch(() => {});
   await ip.getByTestId("benvenuto-importa-si").click();
-  await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Importa o incolla un link' apre l'import"), () => ok(false, `primo accesso: 'Importa o incolla un link' apre l'import (${ip.url()})`));
+  await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Prima porta qui i tuoi posti' apre l'import"), () => ok(false, `primo accesso: 'Prima porta qui i tuoi posti' apre l'import (${ip.url()})`));
   await ip.getByTestId("importa-incolla").waitFor({ timeout: 5000 }).catch(() => {});
   const mb = await ip.getByTestId("importa-incolla").boundingBox();
   ok(await ip.getByTestId("importa-benvenuto").isVisible() && mb && mb.y < 844 / 2 && await ip.getByTestId("importa-maps-guida").isVisible(), `primo accesso: l'import si apre con 'Incolla un link' in cima e la guida di Google Maps aperta (${Math.round(mb?.y ?? -1)})`);
@@ -5740,7 +5746,6 @@ else {
   await ip.getByTestId("tipo-su").click();
   await ip.getByRole("button", { name: "Basta così, continua" }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  await ip.getByTestId("benvenuto-dopo").click();
   await ip.getByTestId("benvenuto-fine").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
   ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Trattoria di quartiere fuori dai giri turistici a Pigneto", `primo accesso: 'Mostrami i posti per me' → trattoria fuori dai giri turistici al Pigneto (${new URL(ip.url()).searchParams.get("q")})`);
@@ -5749,14 +5754,13 @@ else {
   await ip.getByRole("button", { name: "Milano", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
   await ip.getByTestId("onboarding-salta").click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 5", "primo accesso: 'Salta' al passo 2 va al passo 3");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: 'Salta' al passo 2 va al passo 3");
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("tipo-giu").click();
   await ip.getByTestId("tipo-giu").click();
   await ip.getByTestId("tipo-su").click(); // pizzeria con la fila (molto nota)
   await ip.getByRole("button", { name: "Basta così, continua" }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  await ip.getByTestId("benvenuto-dopo").click();
   await ip.getByTestId("benvenuto-fine").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
   ok(new URL(ip.url()).searchParams.get("q") === "Pizzeria napoletana a Milano", `primo accesso: chi ama i posti famosi → la ricerca senza 'fuori dai giri', nella città (${new URL(ip.url()).searchParams.get("q")})`);
@@ -7055,15 +7059,13 @@ else {
   const vctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const vp = await vctx.newPage();
   vp.on("pageerror", (e) => errors.push(e.message));
-  // 1. Passo 4 del primo accesso: un solo modo di rimandare ("Lo faccio dopo"), niente "Salta" in alto.
+  // 1. Ultimo passo del primo accesso: niente "Salta" in alto; senza risposte nessuna sintesi inventata.
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await vp.getByRole("button", { name: "Continua" }).click();
   ok(await vp.getByTestId("onboarding-salta").isVisible(), "primo accesso: 'Salta' resta al passo 2");
   await vp.getByTestId("onboarding-salta").click();
   await vp.getByRole("button", { name: "Continua" }).click();
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 5" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: al passo 4 niente 'Salta' (doppione di 'Lo faccio dopo')");
-  ok(await vp.getByTestId("benvenuto-dopo").isVisible() && /Lo faccio dopo/.test((await vp.getByTestId("benvenuto-dopo").textContent()) ?? ""), "primo accesso: al passo 4 un solo 'Lo faccio dopo'");
-  await vp.getByTestId("benvenuto-dopo").click();
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: all'ultimo passo niente 'Salta'");
   ok(await vp.getByTestId("capito-vuoto").isVisible(), "primo accesso: senza risposte, 'Ecco cosa ho capito' dice che imparerà dall'uso (niente di inventato)");
 
   // 2. Accesso scaduto mentre si risponde: si passa dal login e, tornati, le risposte ci sono ancora.
@@ -7077,17 +7079,16 @@ else {
   await vp.getByTestId("tipo-su").click();
   await vp.getByRole("button", { name: "Basta così, continua" }).click();
   await vp.getByRole("button", { name: "Continua" }).click();
-  await vp.getByTestId("benvenuto-dopo").click();
   await vctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await vp.getByTestId("benvenuto-fine").click();
   await vp.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
   ok(new URL(vp.url()).pathname === "/login", `risposte conservate: senza accesso il salvataggio porta al login (${vp.url().replace(BASE, "")})`);
   const bozza = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.benvenuto") ?? "null"));
-  ok(bozza?.su?.includes("pizza") && bozza?.giu?.length === 2 && bozza?.city === "Milano" && bozza?.step === 4, `risposte conservate: tipi votati, città e passo restano sul telefono (${JSON.stringify(bozza && { su: bozza.su, city: bozza.city, step: bozza.step })})`);
+  ok(bozza?.su?.includes("pizza") && bozza?.giu?.length === 2 && bozza?.city === "Milano" && bozza?.step === 3, `risposte conservate: tipi votati, città e passo restano sul telefono (${JSON.stringify(bozza && { su: bozza.su, city: bozza.city, step: bozza.step })})`);
   await vctx.clearCookies({ name: "e2e_anonimo" });
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await vp.getByTestId("benvenuto-ripreso").waitFor({ timeout: 5000 }).catch(() => {});
-  ok(await vp.getByTestId("benvenuto-ripreso").isVisible() && (await vp.getByTestId("benvenuto-passo").textContent()) === "5 di 5", "risposte conservate: dopo l'accesso si riparte dal passo 5 con l'avviso");
+  ok(await vp.getByTestId("benvenuto-ripreso").isVisible() && (await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4", "risposte conservate: dopo l'accesso si riparte dall'ultimo passo con l'avviso");
   await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
   ok((await vp.getByTestId("capito-riga").allTextContents()).join(" ").includes("pizzeria napoletana"), "risposte conservate: i tipi votati ci sono ancora");
   await vp.getByTestId("benvenuto-fine").click();
@@ -7095,14 +7096,14 @@ else {
   ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria napoletana a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);
   ok((await vp.evaluate(() => localStorage.getItem("mapetite.benvenuto"))) === null, "risposte conservate: salvate le risposte, la bozza sparisce");
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 5", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 4", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
   // Una bozza scaduta (più di 2 giorni) o con valori sconosciuti non si riprende.
   await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now() - 3 * 864e5, step: 2, su: ["pizza"], city: "Roma" })));
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 5", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 4", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
   await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now(), step: 1, su: ["inventato"], zone: ["Atlantide"], city: "Roma" })));
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "2 di 5" && (await vp.getByTestId("tipi-contatore").textContent()) === "1 di 10", "risposte conservate: tipi e zone sconosciuti nella bozza si ignorano");
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "2 di 4" && (await vp.getByTestId("tipi-contatore").textContent()) === "1 di 10", "risposte conservate: tipi e zone sconosciuti nella bozza si ignorano");
   await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
 
   // Funzioni pure della mappa del gusto (src/lib/mappa-gusto.ts).

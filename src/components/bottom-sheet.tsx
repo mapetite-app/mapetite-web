@@ -46,7 +46,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -477,6 +477,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
       {understood.length > 0 && (
         <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
+      )}
+      {/* Mappa del gusto (sprint 25/10): quali gusti del profilo hanno cambiato l'ordine. */}
+      {(setAside?.per_te?.length ?? 0) > 0 && (
+        <p data-testid="per-te" className="mt-1 text-xs font-sans text-accent">
+          ✨ Per te: {setAside!.per_te!.map((g) => (g === "chicche" ? "preferisci le chicche" : g)).join(" · ")}
+        </p>
       )}
       {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
         <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">

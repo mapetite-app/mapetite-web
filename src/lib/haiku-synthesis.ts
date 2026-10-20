@@ -96,7 +96,7 @@ L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in 
 Ti possono essere forniti i GUSTI dell'utente in due forme:
 - dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze; "profilo" con le zone dove esce, i tipi di posto che gli piacciono e non, e se preferisce posti poco noti o famosi; "evita" con diete e cose da evitare.
 - storico_stelle_per_tipologia: la media di stelle che l'utente ha dato per tipologia di locale (comportamento reale, più affidabile delle dichiarazioni).
-Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta: per esempio "poco noto, come i posti che ami" o "è nella tua zona, Monti", solo se i dati del locale lo confermano. Dai peso allo storico comportamentale quando c'è.
+Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta: per esempio "è il tipo di posto che ami, una trattoria di quartiere" quando la categoria o le recensioni lo mostrano. Non dire che un locale è poco noto, famoso o in una certa zona: questi dati non li hai. Dai peso allo storico comportamentale quando c'è.
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.

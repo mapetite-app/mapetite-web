@@ -311,6 +311,8 @@ async function runSearch(q: string, booking: BookingDetails, bookingMode: boolea
       body: JSON.stringify({
         query: full, source: "world", searchIntent: "natural", phase: "fast",
         ...(intent && { intent, intentQuery: full.trim() }),
+        // Gusti spenti per questa conversazione: il server non li riapplica dal profilo.
+        ...((getConv().skipGusti ?? []).length > 0 && { skipGusti: getConv().skipGusti }),
         lat: at.lat, lng: at.lng,
       }),
     });

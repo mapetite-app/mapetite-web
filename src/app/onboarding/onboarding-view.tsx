@@ -97,15 +97,13 @@ function parseDraft(raw: string | null): Draft | null {
 const STEPS = [
   { kicker: "DOVE ESCI", title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
   { kicker: "I TUOI GUSTI", title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
-  { kicker: "COME ESCI", title: "Come esci?", subtitle: "Occasioni, spesa e cosa eviti." },
-  { kicker: "I TUOI POSTI", title: "Hai già posti salvati?", subtitle: "Da Google Maps o dal link di un reel: la tua mappa parte già piena." },
-  { kicker: "IL TUO PROFILO", title: "Ecco cosa ho capito di te", subtitle: "Tocca una riga per cambiarla." },
+  { kicker: "COME ESCI", title: "Famosi o chicche?", subtitle: "E cosa eviti: lo terrò sempre presente." },
+  { kicker: "IL TUO PROFILO", title: "Ecco cosa ho capito", subtitle: "Tocca una riga per cambiarla." },
 ] as const;
 const TOTAL = STEPS.length;
 const PASSO_TIPI = 1;
 const PASSO_COME = 2;
-const PASSO_POSTI = 3;
-const PASSO_CAPITO = 4;
+const PASSO_CAPITO = 3;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
@@ -150,42 +148,6 @@ function Gruppo({ title, children }: { title: string; children: React.ReactNode 
   );
 }
 
-// Illustrazione della terza schermata: i salvati di Google Maps che diventano la tua mappa.
-function IlluImporta() {
-  const rows = [
-    { e: "🍝", n: "Trattoria da provare", c: "Roma" },
-    { e: "🍸", n: "Cocktail bar di Marco", c: "Milano" },
-    { e: "🥐", n: "Colazione in centro", c: "Roma" },
-  ];
-  return (
-    <div aria-hidden className="mx-auto w-full max-w-xs">
-      <div className="rounded-card border border-border bg-white p-3 shadow-card">
-        <p className="mb-2 flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
-          <span>📍</span> Salvati su Google Maps
-        </p>
-        <ul className="space-y-1.5">
-          {rows.map((r) => (
-            <li key={r.n} className="flex items-center gap-2 rounded-btn bg-surface px-2.5 py-2 text-sm font-sans text-text">
-              <span>{r.e}</span>
-              <span className="min-w-0 flex-1 truncate">{r.n}</span>
-              <span className="text-xs text-text-muted">{r.c}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="my-2 text-center text-2xl text-accent">↓</div>
-      <div className="flex items-center gap-3 rounded-card bg-brand p-3 text-white shadow-float">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-2xl">🗺️</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-display font-semibold uppercase tracking-wider text-white/70">Tutti insieme</p>
-          <p className="text-sm font-display font-semibold">Sulla tua mappa Mapetite</p>
-        </div>
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold">✓</span>
-      </div>
-    </div>
-  );
-}
-
 // Le risposte salvate sul telefono si leggono dopo l'idratazione (sul server non ci sono):
 // con una bozza il modulo riparte da lì, senza effetti che rimettono a posto lo stato.
 const noSubscribe = () => () => {};
@@ -211,6 +173,8 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
   const [visti, setVisti] = useState<string[]>(initial?.visti ?? []);
   const [scoperta, setScoperta] = useState<Scoperta | null>(initial?.scoperta ?? null);
   const [diete, setDiete] = useState<string[]>(initial?.diete ?? []);
+  // Diete mandate solo se la persona è passata da "Come esci": saltandolo restano quelle di prima.
+  const [vistoCome, setVistoCome] = useState((initial?.step ?? 0) >= PASSO_COME);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ripreso = initial != null;
@@ -229,6 +193,8 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
+  // Arrivati a "Come esci" una volta, le diete contano (aggiornamento durante il render, non in un effetto).
+  if (step >= PASSO_COME && !vistoCome) setVistoCome(true);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
   useEffect(() => {
@@ -277,7 +243,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: vistoCome ? diete : undefined });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -310,6 +276,8 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
     occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
   });
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
+  // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
+  const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col bg-bg" data-testid="benvenuto" data-passo={step + 1}>
@@ -332,7 +300,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
             {/* Prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
                 Dalla seconda: salta solo quella schermata. Le ultime due hanno già il loro
                 "Lo faccio dopo" / "Mostrami": niente doppioni in alto, lo spazio resta. */}
-            {step >= PASSO_POSTI ? (
+            {step >= PASSO_CAPITO ? (
               <span aria-hidden className="-mr-2 min-h-11 w-12" />
             ) : step === 0 ? (
               <form action={skipOnboarding}>
@@ -450,9 +418,25 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 <div
                   data-testid="tipo-card"
                   key={corrente.id}
-                  className="relative flex min-h-[15rem] flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
-                  style={{ background: `linear-gradient(160deg, ${corrente.sfondo})` }}
+                  onPointerDown={(e) => setDrag({ x0: e.clientX, dx: 0 })}
+                  onPointerMove={(e) => drag && setDrag({ ...drag, dx: e.clientX - drag.x0 })}
+                  onPointerUp={() => {
+                    if (drag && Math.abs(drag.dx) > 90) vota(corrente.id, drag.dx > 0 ? "su" : "giu");
+                    setDrag(null);
+                  }}
+                  onPointerCancel={() => setDrag(null)}
+                  className="relative flex min-h-[17rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
+                  style={{
+                    background: `linear-gradient(160deg, ${corrente.sfondo})`,
+                    transform: drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
+                    transition: drag ? "none" : "transform 200ms",
+                  }}
                 >
+                  {drag && Math.abs(drag.dx) > 30 && (
+                    <span aria-hidden className={`absolute left-4 top-4 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "bg-accent" : "bg-black/50"}`}>
+                      {drag.dx > 0 ? "👍 Sì" : "👎 No"}
+                    </span>
+                  )}
                   <span aria-hidden className="absolute right-4 top-3 text-[5.5rem] leading-none drop-shadow">{corrente.emoji}</span>
                   <span className="mb-2 w-fit rounded-pill bg-black/25 px-2.5 py-0.5 text-[11px] font-display font-semibold uppercase tracking-wider">
                     {corrente.famoso ? "Molto noto" : "Poco noto"}
@@ -479,7 +463,7 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
               </>
             ) : (
               <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
-                Fatto: {su.length} ti piacciono, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
+                Fatto: {su.length} {su.length === 1 ? "ti piace" : "ti piacciono"}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
               </p>
             )}
           </div>
@@ -508,14 +492,26 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
               </div>
               {!scoperta && dedotta && <p className="mt-1.5 text-xs font-sans text-text-muted">Scelto dai tuoi 👍: cambialo se non è così.</p>}
             </Gruppo>
-            <Gruppo title="Occasioni">
+            <Gruppo title="A tavola">
+              <div className="flex flex-wrap gap-2">
+                {DIETE.map((d) => (
+                  <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
+                ))}
+              </div>
+            </Gruppo>
+            <details data-testid="come-altro" className="group rounded-card border border-border bg-surface px-4 py-2" open={occasions.length > 0 || priceRange != null}>
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
+                Occasioni e spesa <span className="text-xs font-sans font-normal text-text-muted">facoltativo</span>
+              </summary>
+              <div className="pt-2">
+              <Gruppo title="Occasioni">
               <div className="flex flex-wrap gap-2">
                 {OCCASIONS.map((item) => (
                   <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
                 ))}
               </div>
-            </Gruppo>
-            <Gruppo title="Spesa tipica">
+              </Gruppo>
+              <Gruppo title="Spesa tipica">
               <div className="grid grid-cols-4 gap-2">
                 {PRICE_RANGES.map((item) => {
                   const on = priceRange === item.value;
@@ -536,32 +532,9 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                   );
                 })}
               </div>
-            </Gruppo>
-            <Gruppo title="Cosa eviti">
-              <div className="flex flex-wrap gap-2">
-                {DIETE.map((d) => (
-                  <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
-                ))}
+              </Gruppo>
               </div>
-            </Gruppo>
-          </div>
-        )}
-
-        {step === PASSO_POSTI && (
-          <div data-testid="benvenuto-importa">
-            <IlluImporta />
-            <ol className="mt-6 space-y-2.5">
-              {[
-                "Da Google Maps: copia i link dei tuoi elenchi salvati",
-                "Da Instagram o TikTok: copia il link del reel del posto",
-                "Incollali in Mapetite: li salvo tutti insieme",
-              ].map((t, i) => (
-                <li key={t} className="flex items-start gap-3 text-sm font-sans text-text">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{i + 1}</span>
-                  <span className="pt-0.5">{t}</span>
-                </li>
-              ))}
-            </ol>
+            </details>
           </div>
         )}
 
@@ -590,9 +563,10 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
       </div>
 
       {/* Pulsanti in basso */}
-      <div className="fixed left-0 right-0 z-40 bg-bg px-6 pb-[calc(1rem+var(--nav-sporgenza))] pt-4 shadow-float" style={{ bottom: "var(--nav-height-mobile)" }}>
+      {/* Senza la barra in basso (primo accesso a schermo intero): i pulsanti stanno sul fondo dello schermo. */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-bg px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-float">
         <div className="mx-auto max-w-lg">
-          {step < PASSO_POSTI ? (
+          {step < PASSO_CAPITO ? (
             step === PASSO_TIPI && corrente ? (
               <button type="button" onClick={() => setStep(PASSO_COME)} className="flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand">
                 Basta così, continua
@@ -606,37 +580,28 @@ function Benvenuto({ next, initial }: { next: string | null; initial: Draft | nu
                 Continua
               </button>
             )
-          ) : step === PASSO_POSTI ? (
+          ) : (
             <>
+              <button
+                type="button"
+                data-testid="benvenuto-fine"
+                onClick={() => finish(null)}
+                disabled={!!submitting}
+                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+              >
+                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
+              </button>
+              {/* I posti già salvati altrove (Google Maps, il link di un reel): dopo la sintesi, non al posto suo. */}
               <button
                 type="button"
                 data-testid="benvenuto-importa-si"
                 onClick={() => finish("importa")}
                 disabled={!!submitting}
-                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-              >
-                {submitting === "importa" ? "Un attimo…" : "📍 Importa o incolla un link"}
-              </button>
-              <button
-                type="button"
-                data-testid="benvenuto-dopo"
-                onClick={() => setStep(PASSO_CAPITO)}
-                disabled={!!submitting}
                 className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand disabled:opacity-60"
               >
-                Lo faccio dopo
+                {submitting === "importa" ? "Un attimo…" : "📍 Prima porta qui i tuoi posti salvati"}
               </button>
             </>
-          ) : (
-            <button
-              type="button"
-              data-testid="benvenuto-fine"
-              onClick={() => finish(null)}
-              disabled={!!submitting}
-              className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-            >
-              {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
-            </button>
           )}
           {error && <p className="mt-3 text-center text-sm text-error">{error}</p>}
         </div>

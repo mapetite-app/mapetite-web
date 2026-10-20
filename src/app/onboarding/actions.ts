@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { OCCASIONS, PRICE_RANGES, tasteQuery } from "@/lib/preferences";
+import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES, tasteQuery } from "@/lib/preferences";
+import { DIETE } from "@/lib/mappa-gusto";
 import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
 import { safeNext, withNext } from "@/lib/next-path";
@@ -38,16 +39,18 @@ export async function completeOnboarding({
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
   const citta = cleanCity(city);
-  // Tutto si rivalida: solo valori che l'app conosce.
+  // Tutto si rivalida: solo valori che l'app conosce (zone, tipi, cucine, atmosfere, occasioni, spesa, diete).
   const mappa = pulisciMappa(gustoRaw, (z) => ZONE.some((x) => x.nome === z && (!citta || x.citta === citta)));
-  const diete = dieteValide(dieteRaw);
+  // Diete: solo se la persona è passata dalla schermata "Come esci" (altrimenti non arrivano e restano quelle di prima).
+  const diete = Array.isArray(dieteRaw) ? dieteValide(dieteRaw) : null;
+  const valide = (v: unknown, lista: { value: string }[]) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && lista.some((l) => l.value === x)) : []);
   const scelteOcc = Array.isArray(occasions) ? occasions.filter((o) => OCCASIONS.some((x) => x.value === o)) : [];
   const scelteSpesa = PRICE_RANGES.some((x) => x.value === priceRange) ? priceRange : null;
   const dedotti = gustiDaTipi(mappa.su, { occasions: scelteOcc, priceRange: scelteSpesa });
   const gusti = {
-    cuisines: [...new Set([...(Array.isArray(cuisines) ? cuisines : []), ...dedotti.cuisines])].slice(0, 8),
+    cuisines: [...new Set([...valide(cuisines, CUISINES), ...dedotti.cuisines])].slice(0, 8),
     occasions: dedotti.occasions,
-    atmospheres: [...new Set([...(Array.isArray(atmospheres) ? atmospheres : []), ...dedotti.atmospheres])].slice(0, 8),
+    atmospheres: [...new Set([...valide(atmospheres, ATMOSPHERES), ...dedotti.atmospheres])].slice(0, 8),
     priceRange: dedotti.priceRange,
   };
 
@@ -69,10 +72,11 @@ export async function completeOnboarding({
   const { error } = await supabase
     .from("profiles")
     .update({
-      cuisines: gusti.cuisines,
-      occasions: gusti.occasions,
-      atmospheres: gusti.atmospheres,
-      price_range: gusti.priceRange,
+      // Solo quello che questa volta c'è: con "Rifalla" saltando un passo le preferenze di prima restano.
+      ...(gusti.cuisines.length > 0 && { cuisines: gusti.cuisines }),
+      ...(gusti.occasions.length > 0 && { occasions: gusti.occasions }),
+      ...(gusti.atmospheres.length > 0 && { atmospheres: gusti.atmospheres }),
+      ...(gusti.priceRange && { price_range: gusti.priceRange }),
       onboarding_completed: true,
       updated_at: new Date().toISOString(),
     })
@@ -97,9 +101,11 @@ export async function completeOnboarding({
     const { error: gErr } = await supabase.from("profiles").update({ gusto: mappa }).eq("id", user.id);
     if (gErr) console.error("[onboarding] mappa del gusto:", gErr.message);
   }
-  if (diete.length) {
+  if (diete) {
+    // Le diete del primo accesso sostituiscono le precedenti ("Rifalla" e tolgo "Niente pesce");
+    // gli altri gusti ricordati dall'assistente (tranquillo, budget…) restano.
     const { data: prof } = await supabase.from("profiles").select("gusti_ricordati").eq("id", user.id).maybeSingle();
-    const prima = Array.isArray(prof?.gusti_ricordati) ? (prof.gusti_ricordati as string[]) : [];
+    const prima = Array.isArray(prof?.gusti_ricordati) ? (prof.gusti_ricordati as string[]).filter((id) => !DIETE.some((d) => d.id === id)) : [];
     const { error: dErr } = await supabase.from("profiles").update({ gusti_ricordati: [...new Set([...prima, ...diete])] }).eq("id", user.id);
     if (dErr) console.error("[onboarding] diete:", dErr.message);
   }
