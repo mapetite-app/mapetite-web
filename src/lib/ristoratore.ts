@@ -393,5 +393,7 @@ export function cosaDiconoINumeri(p: PannelloRistoratore): string[] {
       out.push(`La tua scheda è stata vista dal ${Math.abs(d)}% di persone ${d >= 0 ? "in più" : "in meno"} rispetto ai ${p.giorni} giorni prima.`);
     }
   }
-  return out.slice(0, 2);
+  // Clienti che tornano (PROPOSTE.md 8): in più alle due frasi, solo sopra la soglia.
+  const fissi = p.tornati >= SOGLIA ? [`${p.tornati.toLocaleString("it-IT")} persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi.`] : [];
+  return [...out.slice(0, 2), ...fissi];
 }
