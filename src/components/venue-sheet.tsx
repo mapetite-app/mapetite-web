@@ -25,6 +25,7 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import PostoLocale from "@/components/posto-locale";
 import type { Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
+import VisiteMapetite from "@/components/visite-mapetite";
 
 // Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -609,6 +610,8 @@ export default function VenueSheet({
           <PostoLocale venueId={venue.id} />
           {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
           <BuoniPastoRiga venueId={venue.id} category={category} />
+          {/* Chi ci è stato su Mapetite e com'era (solo da 3 persone in su, PROBLEMI.md 3). */}
+          <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
         </div>
 
         {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}
