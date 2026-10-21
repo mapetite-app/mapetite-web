@@ -3,7 +3,7 @@ import LogoMark from "@/components/logo-mark";
 import PostoLocale from "@/components/posto-locale";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, X, Navigation, MapPin, BadgeCheck } from "lucide-react";
+import { Check, X, Navigation, MapPin, BadgeCheck, Sparkles } from "lucide-react";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
@@ -21,8 +21,11 @@ import {
   validPhotoRef,
 } from "./dati";
 
+// Mockup A "Editoriale" (21/10), come la scheda della mappa: nome e verdetto in serif, fondo carta.
+const SERIF = "font-[family-name:var(--font-newsreader)]";
+
 // Pagina pubblica di un locale: è dove arriva l'amico a cui è stato condiviso.
-// Stile della scheda B (Places): foto grande, nome, contesto, il verdetto Mapetite
+// Stile della scheda (mockup A): foto grande, categoria in maiuscoletto, nome in serif, il verdetto Mapetite
 // (solo se già in cache: mai testo nuovo), percorso, l'invito a salvarlo in Mapetite e, a parte,
 // "Dalla community Mapetite" (recensioni e reel degli utenti, letti dal telefono).
 
@@ -83,16 +86,16 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const directions = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}${place.google_place_id ? `&query_place_id=${encodeURIComponent(place.google_place_id)}` : ""}`;
   const heroFallback = (
-    <div className="flex h-48 items-center justify-center bg-brand/10 text-7xl" aria-hidden>
+    <div className="flex h-56 items-center justify-center bg-brand/10 text-7xl" aria-hidden>
       {emoji}
     </div>
   );
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md bg-bg pb-8" data-testid="locale-pubblico">
+    <main className="mx-auto min-h-dvh max-w-md bg-[#f8f6f2] pb-8" data-testid="locale-pubblico">
       <div className="relative">
         {photoRef ? (
-          <PlacePhoto photoRef={photoRef} alt={place.name} width={800} priority className="h-56 w-full object-cover" fallback={heroFallback} />
+          <PlacePhoto photoRef={photoRef} alt={place.name} width={800} priority className="h-72 w-full object-cover" fallback={heroFallback} />
         ) : (
           heroFallback
         )}
@@ -105,46 +108,50 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         </Link>
       </div>
 
-      <div className="px-5 pt-5">
-        <h1 className="font-title text-3xl font-semibold leading-tight text-text in-data-[titoli=serif]:text-[2.4rem]">
-          {place.name}
-        </h1>
-        {/* Badge "Verificato" (piano 8.1): il titolare ha rivendicato il locale e Mapetite l'ha verificato. */}
-        {place.verified_at && (
-          <p data-testid="locale-verificato" className="mt-2 inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-semibold text-brand">
-            <BadgeCheck size={14} className="shrink-0" aria-hidden />
-            Verificato dal titolare
-          </p>
-        )}
-        {place.verified_at && <PostoLocale venueId={place.id} />}
-        {/* Una sola riga di fatti, come la scheda della mappa: tipo · prezzo · voto · città. */}
+      <div className="px-[22px] pt-[22px]">
+        {/* Riga di categoria in maiuscoletto: tipo · prezzo · voto · città (mockup A). */}
         {(kind || city) && (
-          <p className="mt-2 text-[15px] font-sans text-text-muted">
+          <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">
             {kind && <span data-testid="locale-tipo">{kind}</span>}
             {kind && city && <span aria-hidden> · </span>}
             {city && <span>{city}</span>}
           </p>
         )}
+        <h1 className={`${SERIF} mt-2 font-medium leading-[1.02] tracking-[-0.02em] text-[#141414] ${place.name.length > 22 ? "text-[32px]" : "text-[40px]"}`}>
+          {place.name}
+        </h1>
+        {/* Badge "Verificato" (piano 8.1): il titolare ha rivendicato il locale e Mapetite l'ha verificato. */}
+        {place.verified_at && (
+          <p data-testid="locale-verificato" className="mt-2.5 inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-semibold text-brand">
+            <BadgeCheck size={14} className="shrink-0" aria-hidden />
+            Verificato dal titolare
+          </p>
+        )}
+        {place.verified_at && <PostoLocale venueId={place.id} />}
       </div>
 
       {/* Passaparola: quanti amici (persone che segui) ci sono stati o vogliono provarlo. */}
       <AmiciQui placeId={place.id} />
 
+      {/* Il verdetto Mapetite in corsivo tra due filetti, come una citazione di rivista (solo se in cache). */}
       {hasVerdict && (
-        <section data-testid="verdetto-pubblico" className="mx-5 mt-5 rounded-card bg-brand p-5 shadow-card">
+        <section data-testid="verdetto-pubblico" className="mx-[22px] mt-5 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
           {(verdict != null || synthText != null) && (
             <>
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</p>
-              {verdict && <p className="mt-2 font-display text-xl font-semibold leading-relaxed text-white">{verdict}</p>}
-              {synthText && <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">{synthText}</p>}
+              <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
+                <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
+                Il verdetto Mapetite
+              </p>
+              {verdict && <p className={`${SERIF} mt-2 text-[22px] italic leading-[1.24] tracking-[-0.005em] text-[#141414]`}>{verdict}</p>}
+              {synthText && <p className="mt-2 font-sans text-[15px] leading-relaxed text-[#3d4248]">{synthText}</p>}
             </>
           )}
           {goFor.length > 0 && (
-            <div className={verdict != null || synthText != null ? "mt-4 border-t border-white/15 pt-3" : ""}>
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/80">Ci dovresti andare se</p>
+            <div className={verdict != null || synthText != null ? "mt-3.5" : ""}>
+              <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Ci dovresti andare se</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {goFor.map((chip) => (
-                  <span key={chip} className="inline-flex items-center gap-1 rounded-pill bg-white/15 px-2.5 py-1 text-xs font-display font-medium text-white">
+                  <span key={chip} className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
                     <Check size={12} className="shrink-0" />
                     {chip}
                   </span>
@@ -154,10 +161,10 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
           )}
           {dontExpect.length > 0 && (
             <div className="mt-3">
-              <p className="text-xs font-display font-semibold uppercase tracking-wide text-white/60">Meno adatto se</p>
+              <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Meno adatto se</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {dontExpect.map((chip) => (
-                  <span key={chip} className="inline-flex items-center gap-1 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-display font-medium text-white/60">
+                  <span key={chip} className="inline-flex items-center gap-1 rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
                     <X size={12} className="shrink-0" />
                     {chip}
                   </span>
@@ -169,13 +176,13 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
       )}
 
       {place.address && (
-        <p className="mx-5 mt-5 flex items-start gap-2 text-sm font-sans text-text-muted">
+        <p className="mx-[22px] mt-5 flex items-start gap-2 text-sm font-sans text-text-muted">
           <MapPin size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
           <span>{displayAddress(place.address)}</span>
         </p>
       )}
 
-      <div className="mx-5 mt-4 flex gap-2">
+      <div className="mx-[22px] mt-4 flex gap-2">
         <a
           href={directions}
           target="_blank"
