@@ -615,7 +615,7 @@ function filtriParts(filtri: AIFiltri): string[] {
 
 // Pillola dei risultati (mockup A del 21/10): solo i requisiti ("rooftop · romantico"); il tipo solo se non ce ne sono.
 function capitoBreve(filtri: AIFiltri): string[] {
-  if (filtri.parole_chiave.length > 0) return filtri.parole_chiave.slice(0, 3);
+  if (filtri.parole_chiave.length > 0) return filtri.parole_chiave.slice(0, 2);
   return filtri.categoria ? [categoryLabel(filtri.categoria) as string] : [];
 }
 
@@ -641,7 +641,7 @@ type VenueDetails = {
   // "Per te" della card dei risultati: solo dai gusti forniti all'AI (vedi haiku-synthesis).
   perTe?: string | null;
   // Requisiti della richiesta confermati dalle recensioni ("terrazza", "romantico"): "✓" sulla card.
-  requisiti?: string[] | null;
+  requisiti?: { r: string; prova: string }[] | null;
   photoRef?: string | null;
   photoAuthor?: string | null;
   editorialSummary?: string | null;
@@ -1605,7 +1605,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: string[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
@@ -1817,7 +1817,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: string[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
         };
         const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
         const places: Place[] = raw.map((p) => ({

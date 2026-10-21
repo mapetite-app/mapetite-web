@@ -85,7 +85,7 @@ export type ListDetails = {
   verdict: string | null;
   matchReason: string | null;
   perTe?: string | null;
-  requisiti?: string[] | null;
+  requisiti?: { r: string; prova: string }[] | null;
   goFor: string[] | null;
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
@@ -484,7 +484,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     const chiave = (r: string) => r.split(" ").map((w) => w.replace(/[aeio]$/, "")).join(" ");
     const n = new Map<string, { label: string; ids: Set<string> }>();
     for (const p of places) {
-      for (const r of details?.[p.id]?.requisiti ?? []) {
+      for (const { r } of details?.[p.id]?.requisiti ?? []) {
         const k = chiave(r);
         const k2 = [...n.keys()].find((x) => x === k || x.endsWith(` ${k}`) || k.endsWith(` ${x}`)) ?? k;
         const cur = n.get(k2) ?? { label: r, ids: new Set<string>() };
@@ -572,7 +572,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           data-testid="opzioni-ricerca"
           aria-expanded={headerOpen}
           onClick={() => setHeaderOpen((v) => !v)}
-          className={`flex min-h-11 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
+          className={`flex min-h-11 max-w-[calc(100vw-5.5rem)] items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
           <span data-testid="titolo-risposta" className="sr-only">{title}</span>
           {/* Mentre arrivano i verdetti la pillola resta "12 posti" (niente salti di larghezza): basta il puntino. */}
@@ -686,7 +686,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const chips = corte.length >= 2 && corte[0].length + corte[1].length <= 30 ? corte.slice(0, 2) : (corte.length > 0 ? corte : goFor).slice(0, 1);
               const similar = similarTo?.(place.id) ?? null;
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
-              const req = similar ? [] : (d?.requisiti ?? []).slice(0, 2);
+              const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
                 <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (

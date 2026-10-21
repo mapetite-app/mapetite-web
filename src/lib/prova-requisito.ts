@@ -35,3 +35,16 @@ export function provaRequisito(requisito: string, recensioni: { text: string }[]
   }
   return null;
 }
+
+// Tipi di locale: non sono requisiti da confermare ("trattoria autentica" → resta solo "autentica").
+const TIPI = /^(ristorant|trattori|osteri|pizzeri|enotec|bar|pub|caff|bistrot|locale|posto|cocktail)/;
+
+// Etichetta pulita del requisito: solo parole scritte nella richiesta (stessa radice), senza il tipo
+// di locale. null se ne resta fuori anche una (l'AI aggiungeva "vista" o "cucina romana" non chiesti).
+export function requisitoDellaRichiesta(requisito: string, richiesta: string): string | null {
+  const q = normalizza(richiesta);
+  const parole = requisito.trim().toLowerCase().split(/\s+/).filter((w) => !TIPI.test(normalizza(w)));
+  if (parole.length === 0 || parole.length > 2) return null;
+  const tutte = parole.every((w) => VUOTE.has(w) || w === "non" || new RegExp(`\\b${radice(normalizza(w)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(q));
+  return tutte ? parole.join(" ") : null;
+}

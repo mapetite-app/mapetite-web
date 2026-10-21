@@ -7,6 +7,7 @@ import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import { coherentLevel } from "@/lib/match-coherence";
 import { exclusionNotAsked, wantsOffTheBeatenPath } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
+import { provaRequisito, requisitoDellaRichiesta } from "@/lib/prova-requisito";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
 // (l'SDK ne concede 10 minuti): una risposta a freddo per 12 locali richiede ~15 s.
@@ -58,7 +59,7 @@ export type PlaceSynthesis = {
   perTe: string;
   // Requisiti espliciti della richiesta CONFERMATI da recensioni, descrizione o categorie
   // (chiave B dello sprint: "rispetta tutti i vincoli" si vede sulla card). Solo i confermati.
-  requisiti: string[];
+  requisiti: Requisito[];
   // Adeguatezza ai requisiti espliciti della richiesta (tipo, caratteristica
   // fisica, occasione, atmosfera). false SOLO se chiaramente non li rispetta;
   // nel dubbio true. Il chiamante sposta/esclude i false e ne logga il motivo.
@@ -69,6 +70,8 @@ export type PlaceSynthesis = {
   match: MatchLevel;
 };
 export type MatchLevel = "alto" | "medio" | "basso";
+// Requisito confermato e la frase di recensione Google che lo prova (copiata, mai riscritta).
+export type Requisito = { r: string; prova: string };
 
 // Riga cache: matchReason NON è persistito (dipende dalla query).
 type CachedSynthesis = {
@@ -321,14 +324,14 @@ export async function getSynthesis(
   const matchReasonWork = async (): Promise<{
     matchReasons: Map<string, string>;
     perTes: Map<string, string>;
-    requisiti: Map<string, string[]>;
+    requisiti: Map<string, Requisito[]>;
     fits: Map<string, { fit: boolean; fitReason: string }>;
     levels: Map<string, MatchLevel>;
     cost: number;
   }> => {
     const matchReasons = new Map<string, string>();
     const perTes = new Map<string, string>();
-    const requisiti = new Map<string, string[]>();
+    const requisiti = new Map<string, Requisito[]>();
     const fits = new Map<string, { fit: boolean; fitReason: string }>();
     const levels = new Map<string, MatchLevel>();
     let cost = 0;
@@ -413,14 +416,22 @@ export async function getSynthesis(
             if (hasTaste && typeof o.per_te === "string" && o.per_te.trim() && chiesto(o.per_te)) {
               perTes.set(o.id, o.per_te.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[,;:.]+$/, ""));
             }
-            // Requisiti confermati: solo etichette brevi, italiane, e (se non chieste) niente fama o zona.
+            // Requisiti confermati: il ✓ resta SOLO se la parola è nella richiesta e una frase delle
+            // recensioni la contiene (collaudo del 22/10: l'AI rimandava "romantico" a quasi tutti).
             if (Array.isArray(o.confermati)) {
-              const conf = o.confermati
-                .filter((x): x is string => typeof x === "string")
-                .map((x) => x.trim().toLowerCase())
-                .filter((r) => r.length > 0 && r.length <= 20 && !hasEnglish(r) && chiesto(r))
-                .slice(0, 3);
-              if (conf.length > 0) requisiti.set(o.id, [...new Set(conf)]);
+              const recensioni = (batch.find((p) => p.id === o.id)?.reviewTexts ?? []).map((text) => ({ text }));
+              const conf: Requisito[] = [];
+              for (const x of o.confermati) {
+                if (typeof x !== "string" || x.length > 30 || hasEnglish(x)) continue;
+                const r = requisitoDellaRichiesta(x, query);
+                if (!r || conf.some((c) => c.r === r)) continue;
+                const prova = provaRequisito(r, recensioni);
+                if (prova) conf.push({ r, prova });
+                if (conf.length >= 3) break;
+              }
+              if (conf.length > 0) requisiti.set(o.id, conf);
+              const scartati = o.confermati.filter((x) => typeof x === "string" && !conf.some((c) => c.r === requisitoDellaRichiesta(x, query)));
+              if (scartati.length > 0) console.log(`[requisiti] id=${o.id} senza prova nelle recensioni: ${JSON.stringify(scartati)}`);
             }
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
@@ -458,7 +469,7 @@ export async function getSynthesis(
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = opts.soloVerdetto
-    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), requisiti: new Map<string, string[]>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
+    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), requisiti: new Map<string, Requisito[]>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
     : matchReasonWork();
 
   // 2. Legge la cache.

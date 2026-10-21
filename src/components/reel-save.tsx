@@ -364,10 +364,12 @@ function PlaceRow({
       // Era già nei salvati (dal collaudo del 21/10): il locale resta, si stacca solo questo reel.
       try {
         const client = await browserClient();
-        await client.from("contenuti_locali").delete().eq("user_id", userId).eq("place_id", out.place.id).eq("url", reelUrl);
+        const { error } = await client.from("contenuti_locali").delete().eq("user_id", userId).eq("place_id", out.place.id).eq("url", reelUrl);
+        if (error) throw error;
         trackFeature("reel_salva", { stato: "annullato_gia_salvato", fonte });
       } catch {
-        // reel non staccato: resta nella scheda, si toglie da lì
+        setSt({ s: "error", msg: `Non sono riuscito a staccare il reel da ${top.name}: puoi toglierlo dalla scheda del locale.` });
+        return;
       }
     }
     remember(noKey, top.id);

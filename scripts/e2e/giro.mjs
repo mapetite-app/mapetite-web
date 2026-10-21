@@ -39,7 +39,7 @@ const SEARCH_FAST = {
 };
 const SYNTH = {
   dettagli: {
-    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza.", requisiti: ["rooftop", "romantico"] },
+    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza.", requisiti: [{ r: "rooftop", prova: "Rooftop bellissimo sopra i tetti." }, { r: "romantico", prova: "Serata molto romantica." }] },
     P3: { synthesis: "Rooftop curato.", tags: [], verdict: "Cocktail curati sul tetto.", goFor: ["cocktail"], dontExpect: [], matchReason: "È su un rooftop." },
   },
   esclusi: ["P2"],
@@ -314,7 +314,7 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
 // Mockup A (21/10): "✨ 3 posti · rooftop" (solo i requisiti: tipo e zona no) e "✓ rooftop · ✓ romantico" sulla card confermata.
 { const cap = await page.getByTestId("capito-pillola").innerText().catch(() => "");
-  const pw = await page.getByTestId("opzioni-ricerca").evaluate((el) => el.getBoundingClientRect().right <= window.innerWidth - 8);
+  const pw = await page.getByTestId("opzioni-ricerca").evaluate((el) => el.getBoundingClientRect().right <= window.innerWidth - 60); // non copre il pulsante della posizione (44px + margini)
   ok(/^\s*·?\s*rooftop\s*$/.test(cap) && !/roma/i.test(cap) && pw, `pillola: accanto al numero cosa ha capito l'AI, dentro lo schermo ('${cap.replace(/\s+/g, " ").trim()}')`); }
 { const r1 = await page.locator("ul.snap-x li[data-id=P1]").getByTestId("requisiti-card").innerText().catch(() => "");
   const r3 = await page.locator("ul.snap-x li[data-id=P3]").getByTestId("requisiti-card").count();
