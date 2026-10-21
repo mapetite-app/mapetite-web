@@ -31,7 +31,7 @@ Da sistemare (minori, dal collaudo della mappa del gusto): "Rifalla" somma le cu
 3. **Notte 22→23:** ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga), con ricerche vere prima/dopo su TEST-RICERCHE.
 4. **Venerdì notte, sabato 24 e domenica 25:** le 4 schermate rifatte sui mockup scelti; collaudo ≥ 8,5; giro da utente vero in produzione; copione demo di 3 minuti.
 In pausa fino al 26/10: proposta 7 (ranking "Aperto da poco"), proposte 6, 9, 12, tutto il lato ristoratori.
-**In corso adesso:** nessuna sessione.
+**In corso adesso:** sessione 00:07 del 22/10 (branch `claude/great-cannon-46wh07`): chiave C sui mockup scelti in #87 (scheda A, salvati C in stile A, risultati A con "cosa ho capito") e chiave B (ricerca con l'AI che si vede).
 **Fatto il 21/10 sera (22:30–00:30, chiesto da Lorenzo in chat, PR #91):** **home nuova** sul mockup A. Lorenzo aveva scritto: "la copertina è disordinata e non utile, fai qualcosa di più fico con classifiche o proposte dalle ricerche precedenti".
 - Saluto con giorno e ora ("Mercoledì sera · Roma", "Dove andiamo stasera, Giulia?").
 - Campo "Cosa cerchi?" con le ultime ricerche e tre idee per l'ora.
