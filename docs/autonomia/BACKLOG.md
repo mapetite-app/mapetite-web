@@ -16,17 +16,22 @@ L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 - **(A) Salva dal reel in un gesto:** TikTok e YouTube letti da soli (didascalia), Instagram in un passo (screenshot o nome), fino a 5 locali per post, salvataggio da solo solo se nome e città combaciano con Google e la lettura viene da questo telefono, "Non è questo" per annullare, reel collegato al locale. **Collaudo: bocciata 2 volte** (design 7,5; difetti corretti dopo ogni giro) → per regola **non unita**.
 - **(B) "Per te" nella card dei risultati** (mockup A): **approvata** (8,5).
 - **Mappa del gusto (PR #88):** bocciata al primo giro (Rifalla perdeva cucine e atmosfere), corretta, **approvata al secondo** (8,5). Corretti anche: diete separate da "evita" per l'AI, nessuna esclusione per gusti, niente zone nel prompt, diete che restano in fondo dopo l'ordine dell'AI.
-**Prossima sessione (03:05), in ordine:**
-(a) collaudo NUOVO di "salva dal reel" (solo quella voce; le altre sono approvate): se passa (≥ 8,5, nessun bloccante) merge della PR della notte e controllo della produzione. Per il design del reel il revisore chiedeva: foto o verdetto del locale nel "✓ Salvato" (proposta 14), meno vuoto sotto. Se non passa, Lorenzo può unirla dopo averla provata.
-(b) proposta 14 (il verdetto subito, appena salvato dal reel) e 13 (tutte le slide del carosello): PRONTE, S.
-(c) se Lorenzo ha scelto in PR #87, si costruisce sul mockup scelto.
-Da sistemare (minori, dal collaudo): "Rifalla" somma le cucine dedotte senza mai toglierle; massimo 10 nomi "messi da parte".
+**Fatto il 21/10 mattina (sessione 05:05–07:30, branch `claude/great-cannon-5w74d3`, contiene la PR #89):**
+- **Salva dal reel:** collaudo nuovo, bocciato al primo giro (design 8,0: foto piccola, "È questo?" senza foto), corretto, **approvato al secondo (8,5)** da un revisore nuovo.
+- **Proposta 14 fatta:** verdetto Mapetite e foto grande nel "✓ Salvato" (foto dalla ricerca Google già fatta, nessuna chiamata in più).
+- **Proposta 13 fatta:** carosello fino a 5 screenshot (Condividi di Android e "Carica lo screenshot"), locali uniti senza doppioni anche con accenti diversi.
+- **Proposta 17 fatta:** "Quando ci vai?" (Stasera / Nel weekend) nel "✓ Salvato"; quel giorno il locale è primo in "Stasera dove andiamo?" (migrazione `20261021b_piano_al.sql` applicata).
+**Prossima sessione (22:00 del 21/10), in ordine:**
+(a) se Lorenzo ha scelto in PR #87, si costruisce sul mockup scelto (chiave C, grafica delle 4 schermate).
+(b) chiave B: ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga) con ricerche vere prima/dopo su TEST-RICERCHE (quota sessioni 30 fino al 26/10).
+(c) minori dal collaudo del reel: "Quando ci vai?" non rilegge la scelta dopo una ricarica; "Era già nei tuoi salvati" senza "Non è questo" (il reel resta collegato); @profilo attaccato quasi mai riconosciuto (lato sicuro).
+Da sistemare (minori, dal collaudo della mappa del gusto): "Rifalla" somma le cucine dedotte senza mai toglierle; massimo 10 nomi "messi da parte".
 1. **Notte 20→21: mockup** (design-shotgun, max 4 varianti per schermata) di home, risultati, scheda, salvati e del nuovo primo accesso, affiancati a Places; PR "Scegli il design" per Lorenzo. In parallelo: primo accesso con la "mappa del gusto" (logica e dati, la grafica dopo la scelta) e accesso con Google (se Lorenzo ha creato le credenziali).
 2. **Notte 21→22:** profilo del gusto collegato a ricerca (prompt e ordine), verdetto ("perché per te"), filtri predefiniti, "Per te". Salva da reel infallibile.
 3. **Notte 22→23:** ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga), con ricerche vere prima/dopo su TEST-RICERCHE.
 4. **Venerdì notte, sabato 24 e domenica 25:** le 4 schermate rifatte sui mockup scelti; collaudo ≥ 8,5; giro da utente vero in produzione; copione demo di 3 minuti.
 In pausa fino al 26/10: proposta 7 (ranking "Aperto da poco"), proposte 6, 9, 12, tutto il lato ristoratori.
-**In corso adesso:** sessione 05:05 del 21/10 (branch `claude/great-cannon-5w74d3`, riparte dalla PR #89): nuovo collaudo di "salva dal reel", poi proposte 14 (verdetto subito dopo il salvataggio) e 13 (tutte le slide del carosello).
+**In corso adesso:** nessuna sessione (mattina del 21/10 chiusa, vedi sopra).
 **Sessione del 20/10 22:26–00:30: mappa del gusto in PR #88 (**bocciata 2 volte dal revisore, non unita**: la prossima sessione rifà il collaudo con un revisore nuovo e la unisce se passa), mockup in PR #87 (aspetta la scelta di Lorenzo).
 **Terza sessione (domenica 18/10 dalle 15:10, branch `claude/quirky-hypatia-l8uare`, PR #73):** controllo a occhi nuovi a 390×844 e semplificazione delle schermate che la prima sessione non tocca: Profilo, Importa, Prenotazioni, accesso/registrazione, pagina pubblica del locale, Per i ristoratori, Premium. Non tocca Stasera, raccolte, gruppi, amici, home, mappa. Bloccata alle 15:20 dai permessi dell'ambiente, ripartita alle 15:40 su richiesta di Lorenzo, finita alle 17:50. Fatto: Premium, Prenotazioni, pagina pubblica del locale, Importa (dettagli sotto, "Domenica 18/10, terza sessione"). Profilo e Diario non visti: servono l'accesso vero.
 **Seconda sessione (domenica 18/10 dalle 10:10, branch `claude/quirky-hypatia-9k5tm1`, PR separata):** locali di massa fuori dalle prime 3 posizioni anche senza "non turistico" (caso "pranzo di lavoro"); poi grafica dei risultati e della scheda contro i riferimenti Places. Non tocca gli eventi d'uso.
@@ -99,7 +104,7 @@ Fatto il 19/10 (PR #81). Collaudo indipendente: voto design 5/10 prima → 7,5/1
 13. **Tutte le slide del carosello in un colpo — FATTA (21/10 mattina, branch `claude/great-cannon-5w74d3`).** Condividi di Android e "Carica lo screenshot" leggono fino a 5 immagini; locali uniti senza doppioni.
 14. **Il verdetto subito, appena salvato dal reel — FATTA (21/10 mattina, stesso branch).** Verdetto e foto nel "✓ Salvato", dentro il tetto di 25 verdetti al giorno; senza verdetto nessun testo inventato.
 16. **Importa i preferiti di TikTok in blocco — PRONTA (M, chiave 0 e A, dal 22/10).** Dal file "Scarica i tuoi dati" di TikTok: link dei preferiti letti da soli, elenco dei locali con "+ Salva". Da verificare su un file vero il campo dei preferiti.
-17. **"Quando ci vai?" appena salvato — PRONTA (S).** Chip Stasera / Nel weekend / Più avanti nel "✓ Salvato"; quel giorno il locale torna in cima a "Stasera dove andiamo?". Migrazione piccola (`piano_al`).
+17. **"Quando ci vai?" appena salvato — FATTA (21/10 mattina).** Chip Stasera / Nel weekend / Più avanti nel "✓ Salvato"; quel giorno il locale torna in cima a "Stasera dove andiamo?". Migrazione piccola (`piano_al`).
 15. **App Meta per leggere i reel di Instagram dal link — DA DECIDERE LORENZO.** "Crei tu un'app Meta gratuita (serve il tuo account) così leggiamo la didascalia dei reel di Instagram come per TikTok? I passi te li preparo io."
 
 ## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
