@@ -10,7 +10,7 @@ import { addReel } from "@/lib/community-write";
 import { findReelLink, reelSourceOf, type ReelSource } from "@/lib/reel";
 import { findVideoLink } from "@/lib/video-caption";
 import { findSocialLink, placeHintFromText } from "@/lib/social-link";
-import { confidentMatch } from "@/lib/reel-match";
+import { confidentMatch, stessoLocale } from "@/lib/reel-match";
 import { screenshotForUpload } from "@/lib/screenshot-upload";
 import { trackFeature } from "@/lib/track";
 import PlacePhoto from "@/components/place-photo";
@@ -118,7 +118,7 @@ export default function ReelSave({
         const ok = all.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
         if (ok.length === 0) throw (all[0] as PromiseRejectedResult).reason;
         const found: Luogo[] = [];
-        for (const l of ok.flat()) if (found.length < 8 && !found.some((x) => x.nome.toLowerCase() === l.nome.toLowerCase())) found.push(l);
+        for (const l of ok.flat()) if (found.length < 8 && !found.some((x) => stessoLocale(x.nome, l.nome))) found.push(l);
         return found;
       })
       .then((found) => {
@@ -280,10 +280,12 @@ function PlaceRow({
   const [st, setSt] = useState<RowState>(auto ? { s: "searching" } : { s: "idle" });
   const [tolto, setTolto] = useState(false);
   const [reelOk, setReelOk] = useState(false);
+  // Collegamento del reel in corso: "Non è questo" aspetta, così il reel non resta sul locale sbagliato.
+  const [linking, setLinking] = useState(false);
   const [manual, setManual] = useState(luogo.nome);
   const started = useRef(false);
   const fonte = source ?? "screenshot";
-  const noKey = `mapetite.reel-no:${queryOf(luogo)}`;
+  const noKey = `mapetite.reel-no:${reelUrl ?? ""}:${queryOf(luogo)}`;
 
   const save = async (top: SearchPlace, rest: SearchPlace[], isAuto: boolean) => {
     setSt({ s: "saving", top, rest });
@@ -294,9 +296,14 @@ function PlaceRow({
       remember(savedKey, done);
       trackFeature("reel_salva", { stato: isAuto ? "auto" : "confermato", fonte });
       if (reelUrl && out.place) {
-        const r = await addReel(userId, out.place.id, reelUrl);
-        setReelOk(r.esito === "ok" || r.esito === "doppio");
-        if (r.esito === "ok") trackFeature("reel", { stato: "salvato_import", fonte: reelSourceOf(reelUrl) ?? "", contesto: "reel" });
+        setLinking(true);
+        try {
+          const r = await addReel(userId, out.place.id, reelUrl);
+          setReelOk(r.esito === "ok" || r.esito === "doppio");
+          if (r.esito === "ok") trackFeature("reel", { stato: "salvato_import", fonte: reelSourceOf(reelUrl) ?? "", contesto: "reel" });
+        } finally {
+          setLinking(false);
+        }
       }
     } catch (e) {
       setSt({ s: "error", msg: errorText(e) });
@@ -368,9 +375,10 @@ function PlaceRow({
         type="button"
         onClick={() => search(queryOf(luogo), true)}
         data-testid="reel-altro"
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-card border border-border bg-white px-4 text-left"
+        className="flex min-h-14 w-full items-center gap-3 rounded-card border border-border bg-white px-3 py-1.5 text-left"
       >
-        <span className="min-w-0 truncate text-sm font-semibold text-text">{labelOf(luogo)}</span>
+        <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">{getCategoryEmoji(luogo.categoria, luogo.nome)}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{labelOf(luogo)}</span>
         <span className="shrink-0 text-sm font-display font-semibold text-brand">+ Salva</span>
       </button>
     );
@@ -389,6 +397,7 @@ function PlaceRow({
     const place = st.out.place!;
     return (
       <div className="rounded-card border border-success/30 bg-success/10 p-4" data-testid="reel-salvato" aria-live="polite">
+        {auto && <div className="mb-3"><Foto place={st.top} big /></div>}
         <p className="text-xs font-semibold uppercase tracking-wide text-success">
           {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Voglio andarci"}
         </p>
@@ -401,7 +410,7 @@ function PlaceRow({
             Apri sulla mappa
           </Link>
           {st.auto && !st.out.alreadySaved && (
-            <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
+            <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
               Non è questo
             </button>
           )}
@@ -413,6 +422,7 @@ function PlaceRow({
   if (st.s === "found" || st.s === "saving") {
     return (
       <div className="rounded-card border border-border bg-surface p-4" data-testid="reel-trovato">
+        {auto && <div className="mb-3"><Foto place={st.top} big /></div>}
         <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">È questo?</p>
         <p className="mt-1 font-display text-xl font-semibold text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
@@ -444,10 +454,13 @@ function PlaceRow({
                 <button
                   type="button"
                   onClick={() => save(r, st.options.filter((o) => o.id !== r.id), false)}
-                  className="w-full rounded-btn border border-border bg-white px-4 py-3 text-left"
+                  className="flex w-full items-center gap-3 rounded-btn border border-border bg-white px-3 py-2.5 text-left"
                 >
-                  <p className="text-sm font-semibold text-text">{r.name}</p>
-                  <p className="mt-0.5 text-xs text-text-muted">{displayAddress(r.address)}</p>
+                  <Foto place={r} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-text">{r.name}</span>
+                    <span className="mt-0.5 block text-xs text-text-muted">{displayAddress(r.address)}</span>
+                  </span>
                 </button>
               </li>
             ))}
@@ -468,6 +481,16 @@ function PlaceRow({
         </button>
       </form>
     </div>
+  );
+}
+
+// Foto Google del locale (riferimento dalla ricerca, mai salvato) o, se manca, l'emoji del tipo.
+function Foto({ place, big = false }: { place: { name: string; category: string | null; photoRef?: string | null; photoAuthor?: string | null }; big?: boolean }) {
+  const emoji = <span aria-hidden className={big ? "text-5xl" : "text-xl"}>{getCategoryEmoji(place.category, place.name)}</span>;
+  return (
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-accent-light ${big ? "h-40 w-full rounded-btn" : "h-11 w-11 rounded-btn"}`}>
+      <PlacePhoto photoRef={place.photoRef ?? null} alt={place.name} className="h-full w-full object-cover" fallback={emoji} credit={big ? place.photoAuthor ?? null : null} />
+    </span>
   );
 }
 
@@ -507,9 +530,8 @@ function VerdettoSubito({ place }: { place: SearchPlace }) {
 
   if (v === "attesa") {
     return (
-      <div className="mt-3 flex items-center gap-3 rounded-btn bg-white/70 p-3" data-testid="reel-verdetto-attesa" aria-live="polite">
-        <span aria-hidden className="h-12 w-12 shrink-0 animate-pulse rounded-btn bg-border/60" />
-        <span className="flex-1 space-y-1.5">
+      <div className="mt-3 rounded-btn bg-white/70 p-3" data-testid="reel-verdetto-attesa" aria-live="polite">
+        <span className="block space-y-1.5">
           <span className="block h-3 w-3/4 animate-pulse rounded bg-border/60" />
           <span className="block h-3 w-1/2 animate-pulse rounded bg-border/60" />
         </span>
@@ -520,14 +542,9 @@ function VerdettoSubito({ place }: { place: SearchPlace }) {
     return <p className="mt-2 text-xs text-text-muted" data-testid="reel-verdetto-dopo">✦ Il verdetto Mapetite lo trovi nella scheda.</p>;
   }
   return (
-    <div className="mt-3 flex items-start gap-3 rounded-btn bg-white p-3" data-testid="reel-verdetto">
-      <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-surface text-2xl">
-        <PlacePhoto photoRef={v.photoRef} alt={place.name} className="h-full w-full object-cover" fallback={<span aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Il verdetto Mapetite</span>
-        <span className="mt-0.5 block text-sm font-medium leading-snug text-text"><span aria-hidden className="mr-1 text-accent">✦</span>{v.verdict}</span>
-      </span>
+    <div className="mt-3 rounded-btn bg-white p-3" data-testid="reel-verdetto">
+      <span className="block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Il verdetto Mapetite</span>
+      <span className="mt-0.5 block text-[15px] font-medium leading-snug text-text"><span aria-hidden className="mr-1 text-accent">✦</span>{v.verdict}</span>
     </div>
   );
 }

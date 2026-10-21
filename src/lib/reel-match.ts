@@ -67,3 +67,9 @@ export function confidentMatch(
   const city = cityFromAddress(google.address);
   return city != null && cityKey(city) === cityKey(read.citta);
 }
+
+// Stesso locale letto su due slide anche con accenti o maiuscole diverse ("Caffè Verdi" = "caffe verdi").
+export function stessoLocale(a: string, b: string): boolean {
+  const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return n(a) === n(b);
+}

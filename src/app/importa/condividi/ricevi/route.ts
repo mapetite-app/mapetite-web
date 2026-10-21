@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractPlace, fromParsed, type ImportResult, type Luogo } from "@/lib/import-caption";
 import { allowAi, clientKey } from "@/lib/ai-limit";
+import { stessoLocale } from "@/lib/reel-match";
 import { CONDIVISO_COOKIE, condivisoTesto, impronta } from "@/lib/condiviso";
 
 // Destinazione del "Condividi" di Android (share_target POST nel manifest).
@@ -130,11 +131,13 @@ export async function POST(request: NextRequest) {
   for (const l of letture) {
     for (const x of l?.luoghi?.length ? l.luoghi : l?.nome ? [{ nome: l.nome, citta: l.citta, categoria: l.categoria }] : []) {
       if (luoghi.length >= MAX_LUOGHI) break;
-      if (!luoghi.some((y) => y.nome.toLowerCase() === x.nome.toLowerCase())) luoghi.push(x);
+      if (!luoghi.some((y) => stessoLocale(y.nome, x.nome))) luoghi.push(x);
     }
   }
   console.log(`[condividi/ricevi] ${permesse.length} screenshot letti:`, luoghi.length ? `${luoghi.length} locali` : "nessun locale");
-  if (permesse.length > 1) out.set("lette", String(permesse.length));
+  // Si dicono solo le immagini lette davvero (una che non si legge non conta).
+  const riuscite = letture.filter((l) => l?.nome).length;
+  if (riuscite > 1) out.set("lette", String(riuscite));
 
   const lettura = luoghi[0];
   if (!lettura) return result({ errore: "illeggibile" });

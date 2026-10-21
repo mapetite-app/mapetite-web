@@ -56,6 +56,8 @@ export type SearchPlace = {
   id: string; name: string; address: string; lat: number | null; lng: number | null;
   category: string | null; rating: number | null; priceLevel: number | null;
   firma?: string; // firma del server sui dati Google (src/lib/catalog-sig.ts)
+  photoRef?: string | null; // riferimento foto Google della ricerca (mostrato, mai salvato)
+  photoAuthor?: string | null; // autore della foto, da mostrare (Google lo chiede)
 };
 export async function saveSearchPlace(r: SearchPlace, userId: string): Promise<LinkOutcome> {
   if (r.lat == null || r.lng == null) throw new Error("Questo locale non ha una posizione su Google Maps.");

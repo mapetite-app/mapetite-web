@@ -52,7 +52,7 @@ export default function ScreenshotResult({
       <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Salva dal reel</h1>
 
       {(piu || lette > 1) && !errore && (
-        <p className="mb-4 rounded-btn bg-surface px-4 py-3 text-sm text-text-muted" data-testid="screenshot-piu">
+        <p className="mb-4 rounded-btn bg-accent-light px-4 py-3 text-sm font-semibold text-brand" data-testid="screenshot-piu">
           {piu ? `Ho letto le prime ${lette || 5} immagini` : `Ho letto ${lette} immagini`}
           {luoghi.length > 1 ? `: ${luoghi.length} posti.` : "."}
         </p>
