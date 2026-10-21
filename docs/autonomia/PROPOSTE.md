@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 21/10/2026 (mattina, sessione 05:05, CEO che chiude — solo chiavi di volta)
+
+### 16. Importa i preferiti di TikTok in blocco
+- **Problema:** chi usa TikTok ha decine di video di locali tra i "Preferiti" e non li riaprirà mai (`PROBLEMI.md`, 8). Oggi in Mapetite si salvano uno alla volta.
+- **Cosa fa:** in Importa, "Dai tuoi preferiti di TikTok": si carica il file della richiesta dati di TikTok (Impostazioni → Account → Scarica i tuoi dati, formato JSON); Mapetite prende i link dei preferiti, legge da solo ogni video (didascalia ufficiale, come oggi) e mostra l'elenco dei locali trovati, con "+ Salva" su ognuno (o "Salva tutti quelli sicuri").
+- **Da dove nasce:** Mapstr importa da Google Maps, CSV e KML ([App Store](https://apps.apple.com/app/id917288465)); gli export dei salvati di Instagram esistono solo come estensioni a pagamento che danno link nudi ([Chrome Web Store](https://chromewebstore.google.com/detail/dibmfjgbnhbfhlajpahnbiiabpdabajo)). Nessuno trasforma i preferiti di un social in una mappa. Noi sì, con ogni locale verificato su Google prima di salvarlo.
+- **Valore per l'utente:** "anni di TikTok" diventano una mappa in 2 minuti: è il "wow" del primo accesso (chiave 0).
+- **Valore per il ristoratore:** sapere quanti lo avevano già nei preferiti dei social prima di Mapetite: misura vera della sua visibilità social.
+- **Sforzo:** M. Da verificare su un file vero il nome del campo dei preferiti (non confermato dalle fonti). Tetto: 30 video per caricamento.
+- **Costo Google/Haiku:** Haiku circa 0,1–0,3 centesimi a video (fino a 30); Google solo per i locali salvati, a tocco (o 1 per i "sicuri", dentro la quota).
+- **Stato proposto:** PRONTA (dopo le chiavi di volta, dal 22/10).
+
+### 17. "Quando ci vai?" appena salvato (il salvato che ritorna da solo)
+- **Problema:** `PROBLEMI.md`, 9: il 56% della Gen Z trova locali sui social ma non arriva mai a prenotare.
+- **Cosa fa:** nel "✓ Salvato" (reel, link, ricerca) tre chip: "Stasera", "Nel weekend", "Più avanti". Una data facoltativa nel salvato; quel giorno il locale sta in cima a "Stasera dove andiamo?" e nella home ("Avevi detto: stasera da Bar Rossi"). Nessuna notifica nuova.
+- **Da dove nasce:** Corner e Mapstr salvano senza tempo ([Corner](https://apps.apple.com/app/id1668282277), [Mapstr](https://apps.apple.com/app/id917288465)); Beli lavora dopo la visita (classifica a coppie, consigli dopo 15 locali: [WSJ via To Vima](https://www.tovima.com/wsj/the-app-that-makes-rating-restaurants-fun-again-and-gets-better-the-more-you-use-it/)). Noi chiudiamo il buco tra "salvato" e "andato", con un tocco.
+- **Valore per l'utente:** la lista diventa un piano, senza fatica.
+- **Valore per il ristoratore:** domanda qualificata con una data: "12 persone pensano di venire questo weekend" (VISIONE: utenti già in fase di scelta).
+- **Sforzo:** S (una colonna `piano_al` nei salvati: migrazione piccola, nessun dato toccato).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
 ## 21/10/2026 (notte, CEO che chiude — solo chiavi di volta, regola dello sprint)
 
 ### 13. Tutte le slide del carosello in un colpo ("5 posti a Roma" in 5 screenshot)

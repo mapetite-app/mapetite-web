@@ -75,6 +75,12 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 
 ---
 
+### Controllo del 21/10 mattina
+- **Corner:** ultima versione 5.16.0 del 26/09/2026, solo correzioni ([App Store](https://apps.apple.com/app/id1668282277)). Niente di nuovo da inseguire: il salvataggio dai social resta un pin senza giudizio. Da prendere: la mappa che "cresce" con te. Dove facciamo meglio: verdetto subito dopo il salvataggio (fatto oggi) e caroselli interi.
+- **Beli:** classifica a coppie ("meglio questo o quello?") e consigli personali solo dopo almeno 15 locali classificati ([WSJ via To Vima](https://www.tovima.com/wsj/the-app-that-makes-rating-restaurants-fun-again-and-gets-better-the-more-you-use-it/), [Harvard Crimson, 02/2026](https://www.thecrimson.com/article/2026/2/26/beli-inquiry/)). Da prendere: il gioco a coppie è divertente. Dove facciamo meglio: la mappa del gusto dà consigli dal primo minuto, senza 15 visite.
+- **Mapstr:** Mapstr Plus dà accesso alle pre-aperture di locali nuovi con sconti o dessert (comunicato del 31/07/2026, [Tendance Hôtellerie](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)); importa da Google Maps, CSV e KML ([App Store](https://apps.apple.com/app/id917288465)). Conferma la nostra proposta 9 (in pausa fino al 26/10). Dove facciamo meglio: import dai social, non solo dalle mappe (proposta 16).
+- **Export dei salvati di Instagram:** solo estensioni del browser, spesso a pagamento, che danno link e didascalie senza locali ([esempio](https://chromewebstore.google.com/detail/dibmfjgbnhbfhlajpahnbiiabpdabajo)). Instagram permette di scaricare i propri dati, inclusi i salvati, ma ogni 4 giorni ([guida](https://takeoutday.org/guides/how-to-export-instagram-data)).
+
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager

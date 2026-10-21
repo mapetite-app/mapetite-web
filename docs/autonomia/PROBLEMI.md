@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 20/10/2026.
+Ultimo aggiornamento: 21/10/2026 (mattina).
 
 ---
 
@@ -131,3 +131,10 @@ Ultimo aggiornamento: 20/10/2026.
 - **OGGI nell'app (fatto il 21/10):** "Salva dal reel": TikTok e YouTube letti da soli dalla didascalia, Instagram in un passo (screenshot o nome), più locali per post, salvataggio da solo solo quando il nome e la città combaciano con Google, "Non è questo" per annullare, il reel resta collegato al locale. Prossimi passi S: tutte le slide del carosello (proposta 13), il verdetto subito (proposta 14).
 - **DAVVERO, in futuro:** leggere i reel di Instagram dal link serve l'oEmbed ufficiale di Meta, che vuole un'app Meta (gratuita) con token; le scritte sovrapposte e l'audio dei video si leggerebbero solo scaricando il video, cosa che i termini delle piattaforme non permettono senza accordi. Con i creator: liste ufficiali "i posti del mio video" collegate al reel.
 - **Primo passo:** app Meta per l'oEmbed (Lorenzo: si crea con il suo account; i passi li prepara il team). **Chi lo fa:** Lorenzo (account), team (codice, già pronto a usarlo).
+
+## 9. Salvato ma mai andato: il "voglio andarci" non diventa una serata — 21/10 mattina
+- **Chi lo ha:** entrambi. Il cliente ha la lista ma non decide; il ristoratore era stato scelto e non vede mai la prenotazione.
+- **Quanto pesa:** nell'indagine SevenRooms "Making Booking Social" (Regno Unito, 2.012 persone dai 16 anni, novembre 2022) il **56% della Gen Z** dice di trovare sui social ristoranti dove vorrebbe andare ma di non arrivare mai a prenotare; il 58% prenoterebbe di più se potesse farlo direttamente da dove l'ha visto ([SevenRooms, comunicato](https://sevenrooms.com/press/nearly-2-in-3-restaurants-are-missing-booking-opportunities-enabled-by-social-media/), [PDF](https://go.sevenrooms.com/rs/519-YNM-008/images/Making_Booking_Social_UK.pdf); SevenRooms vende software di prenotazione). Italia: dato non trovato. Quanti salvati di Mapetite diventano "ci sono stato": si può misurare dagli eventi (`reel_salva`, `visita`), da fare nel pannello.
+- **OGGI nell'app:** il verdetto subito dopo il salvataggio (fatto stamattina) dice se vale la pena; "Stasera dove andiamo?" e "sei vicino a un posto che volevi provare" riportano a galla i salvati. Proposta 17: "Quando ci vai?" al momento del salvataggio (S), così il salvato ha una data e ritorna da solo quel giorno.
+- **DAVVERO, in futuro:** prenotazione vera dentro il "✓ Salvato" (collegamento con i sistemi di prenotazione dei locali: TheFork, Zenchef, CoverManager; vedi `PARTNER.md`), e per il ristoratore il numero "ti hanno salvato in 40 dopo il reel di @creator, 6 hanno prenotato".
+- **Primo passo:** proposta 17 (team, S); misura "salvati → ci sono stato" nel pannello `/admin/numeri` (team, S). **Chi lo fa:** team; accordi di prenotazione: Lorenzo/Roberto.

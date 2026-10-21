@@ -96,8 +96,10 @@ Fatto il 19/10 (PR #81). Collaudo indipendente: voto design 5/10 prima → 7,5/1
 12. **"Grazie di essere tornato" (omaggio del locale a chi torna) — DA DECIDERE LORENZO.** "Lasciamo ai locali verificati offrire un omaggio a chi torna (nessun denaro, solo da mostrare al tavolo)?"
 9. **Serata di pre-apertura per chi ama il genere — DA DECIDERE LORENZO.** "Proponiamo ai primi ristoratori verificati una serata di pre-apertura gratuita con utenti scelti per gusto?"
 3. **"Cliente di parola" — DA DECIDERE LORENZO.** "Possiamo salvare le prenotazioni sul server e mostrare al locale, solo con il consenso dell'utente, quante volte si è presentato?" Sforzo L.
-13. **Tutte le slide del carosello in un colpo — PRONTA (S, chiave A).** Il Condividi legge fino a 5 screenshot invece del primo.
-14. **Il verdetto subito, appena salvato dal reel — PRONTA (S, chiave A e B).** Riga del verdetto nel "✓ Salvato", dentro il tetto di 25 verdetti al giorno.
+13. **Tutte le slide del carosello in un colpo — FATTA (21/10 mattina, branch `claude/great-cannon-5w74d3`).** Condividi di Android e "Carica lo screenshot" leggono fino a 5 immagini; locali uniti senza doppioni.
+14. **Il verdetto subito, appena salvato dal reel — FATTA (21/10 mattina, stesso branch).** Verdetto e foto nel "✓ Salvato", dentro il tetto di 25 verdetti al giorno; senza verdetto nessun testo inventato.
+16. **Importa i preferiti di TikTok in blocco — PRONTA (M, chiave 0 e A, dal 22/10).** Dal file "Scarica i tuoi dati" di TikTok: link dei preferiti letti da soli, elenco dei locali con "+ Salva". Da verificare su un file vero il campo dei preferiti.
+17. **"Quando ci vai?" appena salvato — PRONTA (S).** Chip Stasera / Nel weekend / Più avanti nel "✓ Salvato"; quel giorno il locale torna in cima a "Stasera dove andiamo?". Migrazione piccola (`piano_al`).
 15. **App Meta per leggere i reel di Instagram dal link — DA DECIDERE LORENZO.** "Crei tu un'app Meta gratuita (serve il tuo account) così leggiamo la didascalia dei reel di Instagram come per TikTok? I passi te li preparo io."
 
 ## Semplificare — PRIORITÀ di ogni sessione (Lorenzo, 17/10)
