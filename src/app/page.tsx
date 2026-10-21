@@ -72,7 +72,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
   const enfasi = parole.pop();
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-bg px-4 pb-8 md:min-h-[calc(100dvh-3.5rem)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] px-4 pb-8 md:min-h-[calc(100dvh-3.5rem)]">
       {!accountEliminato && <HomeIntro loggedIn={loggedIn} />}
       <div className="mx-auto w-full max-w-md">
         {accountEliminato && (
@@ -136,9 +136,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
                 ))}
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-display font-semibold text-text">I tuoi posti</span>
+                <span className="block text-sm font-display font-semibold text-text">I tuoi posti · {saved.total}</span>
                 <span className="block truncate text-xs font-sans text-text-muted">
-                  {saved.total} {saved.total === 1 ? "salvato" : "salvati"}{saved.want > 0 ? ` · ${saved.want} da provare` : ""}
+                  {saved.want > 0 ? `${saved.want} da provare` : saved.total === 1 ? "1 salvato" : `${saved.total} salvati`}
                 </span>
               </span>
             </Link>

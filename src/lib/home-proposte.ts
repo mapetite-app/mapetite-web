@@ -15,8 +15,10 @@ export function momentoDi(now: Date): { momento: Momento; etichetta: string; dom
   const h = Number(parts.find((p) => p.type === "hour")?.value ?? 12);
   const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
   const wd = parts.find((p) => p.type === "weekday")?.value ?? "";
-  const giorno = GIORNI.find((g) => g.toLowerCase() === wd.toLowerCase()) ?? (wd.charAt(0).toUpperCase() + wd.slice(1));
   const t = h + m / 60;
+  let giorno = GIORNI.find((g) => g.toLowerCase() === wd.toLowerCase()) ?? (wd.charAt(0).toUpperCase() + wd.slice(1));
+  // All'una di sabato, per chi esce, è ancora la notte di venerdì.
+  if (t < 5 && GIORNI.includes(giorno)) giorno = GIORNI[(GIORNI.indexOf(giorno) + 6) % 7];
   const weekend = giorno === "Sabato" || giorno === "Domenica";
   if (t >= 5 && t < 11) return { momento: "colazione", etichetta: `${giorno} mattina`, domanda: "Dove facciamo colazione", weekend };
   if (t >= 11 && t < 15) return { momento: "pranzo", etichetta: `${giorno} a pranzo`, domanda: "Dove mangiamo oggi", weekend };
@@ -40,6 +42,17 @@ const PER_MOMENTO: Record<Momento, string[]> = {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// "al Pigneto", "ai Navigli", "all'Isola": come si dice davvero, non "a Pigneto".
+const PREP: Record<string, string> = {
+  Pigneto: "al", Ostiense: "all'", Garbatella: "alla", Esquilino: "all'", "Centro Storico": "nel", Parioli: "ai",
+  Navigli: "ai", Isola: "all'", "Paolo Sarpi": "in", Tortona: "in zona", Quadraro: "al", Flaminio: "al", Vomero: "al",
+};
+export function aZona(z: string): string {
+  const p = PREP[z];
+  if (!p) return `a ${z}`;
+  return p.endsWith("'") ? `${p}${z}` : `${p} ${z}`;
+}
+
 // Parole delle ricerche fatte → tipo di posto. Serve a proporre "le chicche" di quello che si cerca.
 const DA_RICERCA: { re: RegExp; tipo: string; nome: string }[] = [
   { re: /trattori/i, tipo: "trattoria", nome: "trattorie" },
@@ -49,7 +62,7 @@ const DA_RICERCA: { re: RegExp; tipo: string; nome: string }[] = [
   { re: /wine|enotec|vin[oi]/i, tipo: "enoteca", nome: "enoteche" },
   { re: /rooftop|terrazz|vista/i, tipo: "rooftop", nome: "posti con vista" },
   { re: /brunch|colazion|caff[eè]/i, tipo: "brunch", nome: "posti per la colazione" },
-  { re: /sushi|ramen|giappon|indian|thai|cines|etnic|curry/i, tipo: "mondo", nome: "cucine dal mondo" },
+  { re: /sushi|ramen|giappon|indian|thai|cines|etnic|curry|poke|tacos|messican|corean/i, tipo: "mondo", nome: "" },
   { re: /bistrot|creativ|gourmet|degustazion/i, tipo: "bistrot", nome: "bistrot" },
 ];
 
@@ -77,8 +90,11 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     if (!hit || /turistic|nascost|poco conosciut|chicc/i.test(r)) continue;
     const tipo = tipoDa(hit.tipo)!;
     const dove = zonaDi(r) ?? citta;
+    // Cucine dal mondo: si tiene la parola cercata ("sushi", "ramen"), non "cucina etnica".
+    const parola = hit.nome || (r.match(hit.re)?.[0] ?? "").toLowerCase();
+    const cosa = hit.nome ? tipo.query : parola;
     usati.add(tipo.id);
-    add({ emoji: tipo.emoji, titolo: `${cap(hit.nome)} che pochi conoscono a ${dove}`, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${tipo.query} poco conosciuto fuori dai giri turistici a ${dove}`, sfondo: tipo.sfondo });
+    add({ emoji: tipo.emoji, titolo: `${cap(parola)} che pochi conoscono ${aZona(dove)}`, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} poco conosciuto fuori dai giri turistici ${aZona(dove)}`, sfondo: tipo.sfondo });
     break;
   }
 
@@ -88,17 +104,19 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const ordine = PER_MOMENTO[momento];
     const scelti = [...amati].sort((a, b) => rank(ordine, a.id) - rank(ordine, b.id)).slice(0, 2);
     scelti.forEach((tipo, i) => {
+      usati.add(tipo.id);
       const zona = gusto.zone[i] ?? gusto.zone[0];
       const dove = zona ?? citta;
       const chicche = scoperta === "chicche" ? " fuori dai giri turistici" : "";
-      add({ emoji: tipo.emoji, titolo: `${tipo.titolo} a ${dove}`, perche: zona ? `Ami questi posti · esci a ${zona}` : "Ami questi posti", q: `${tipo.query}${chicche} a ${dove}`, sfondo: tipo.sfondo });
+      add({ emoji: tipo.emoji, titolo: `${tipo.titolo} ${aZona(dove)}`, perche: zona ? `Ami questi posti · esci ${aZona(zona)}` : "Ami questi posti", q: `${tipo.query}${chicche} ${aZona(dove)}`, sfondo: tipo.sfondo });
     });
   }
 
-  // 3. Niente ricerche né gusto: un'idea giusta per l'ora, nella tua città.
-  if (out.length === 0) {
-    const idee = IDEE[momento];
-    for (const id of idee.slice(0, 2)) {
+  // 3. Poche proposte (niente ricerche né gusto, o solo una): idee giuste per l'ora, nella tua città.
+  if (out.length < 2) {
+    for (const id of IDEE[momento]) {
+      if (out.length >= 2) break;
+      if (usati.has(id.tipo)) continue;
       const tipo = tipoDa(id.tipo)!;
       add({ emoji: tipo.emoji, titolo: `${id.titolo} a ${citta}`, perche: id.perche, q: `${id.q} a ${citta}`, sfondo: tipo.sfondo });
     }
@@ -166,7 +184,18 @@ export function classifiche(citta: string, momento: Momento, now: Date, n = 4): 
   const settimana = Math.floor(now.getTime() / (7 * 24 * 3600 * 1000));
   const ruotate = pool.map((c, i) => ({ c, k: (i + settimana) % pool.length }));
   ruotate.sort((a, b) => Number(b.c.momenti.includes(momento)) - Number(a.c.momenti.includes(momento)) || a.k - b.k);
-  return ruotate.slice(0, n).map((x) => x.c);
+  // Mai fuori orario: di mattina niente cocktail, di notte niente colazioni.
+  const stona = (c: Classifica) => FUORI_ORA[momento].length > 0 && c.momenti.every((x) => FUORI_ORA[momento].includes(x));
+  return ruotate.filter((x) => !stona(x.c)).slice(0, n).map((x) => x.c);
 }
+
+const FUORI_ORA: Record<Momento, Momento[]> = {
+  colazione: ["pomeriggio", "aperitivo", "dopocena", "cena"],
+  pranzo: ["dopocena"],
+  pomeriggio: [],
+  aperitivo: ["colazione"],
+  cena: ["colazione"],
+  dopocena: ["colazione", "pranzo"],
+};
 
 export const CITTA_CLASSIFICHE = Object.keys(CLASSIFICHE);

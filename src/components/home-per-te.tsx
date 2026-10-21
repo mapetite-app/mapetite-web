@@ -163,8 +163,9 @@ export default function HomePerTe({
           </span>
         </Link>
       </div>
-      {loggedIn && senzaGusto && (
-        <Link href="/onboarding" data-testid="home-invito-gusto" className="mt-3 flex min-h-14 items-center gap-3 rounded-card border border-accent/30 bg-accent-light px-4 py-3 active:scale-[0.99]">
+      {/* Chiave di volta 0 dello sprint: anche chi non è entrato vede l'invito (passa dalla registrazione). */}
+      {senzaGusto && (
+        <Link href={loggedIn ? "/onboarding" : "/signup?next=%2Fonboarding"} data-testid="home-invito-gusto" className="mt-3 flex min-h-14 items-center gap-3 rounded-card border border-accent/30 bg-accent-light px-4 py-3 active:scale-[0.99]">
           <span aria-hidden className="text-2xl">✨</span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-display font-semibold text-brand">Fai la tua mappa del gusto</span>

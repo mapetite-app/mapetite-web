@@ -774,7 +774,8 @@ ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder")) === "Cosa
 ok(/^(Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato|Domenica) /i.test((await page.getByTestId("home-momento").textContent()) ?? "") && /^Dove /.test((await page.getByRole("heading", { level: 1 }).textContent()) ?? ""), `home: giorno e momento sopra la domanda (${await page.getByTestId("home-momento").textContent()})`);
 { const prop = page.getByTestId("home-proposta"); const n = await prop.count();
   ok(n >= 1 && n <= 3 && (await prop.first().getAttribute("href"))?.startsWith("/mappa?q=") && /✦/.test(await prop.first().innerText()), `home: 'Per te' con 1-3 proposte che aprono una ricerca e dicono perché (${n})`); }
-ok((await page.getByTestId("home-classifica").count()) === 4 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: 4 classifiche della città, numerate");
+ok((await page.getByTestId("home-classifica").count()) >= 3 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: 3-4 classifiche della città, numerate, mai fuori orario");
+ok((await page.getByTestId("home-invito-gusto").getAttribute("href"))?.includes("onboarding"), "home: invito alla mappa del gusto per chi non l'ha fatta");
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
 ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");
 // 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
@@ -1872,7 +1873,7 @@ else {
       await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
       const hs = p.getByTestId("home-salvati");
       await hs.waitFor({ timeout: 4000 }).catch(() => {});
-      ok(await hs.isVisible() && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("6 salvati · 3 da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home: 'I tuoi posti · 6 salvati · 3 da provare' e 'Stasera?'");
+      ok(await hs.isVisible() && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I tuoi posti · 6") && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("3 da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home: 'I tuoi posti · 6', '3 da provare' e 'Stasera?'");
       await p.screenshot({ path: `${OUT}/00c-home-salvati.png`, caret: "initial" });
       await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine" && f !== "home-salvati").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -6070,7 +6071,7 @@ else {
   ok(await dq.isVisible() && (await dq.textContent()).includes("Quanto ti ha aiutato Mapetite questa settimana a scegliere dove andare?"), "settimanale: dal secondo giorno diverso compare in home");
   ok((await dq.getByTestId("domanda-voto").getByRole("button").count()) === 5, "settimanale: voto da 1 a 5");
   { const b = await dq.getByRole("button", { name: "1 su 5" }).boundingBox(); ok(!!b && b.height >= 44 && b.width >= 44, `settimanale: pulsanti grandi abbastanza per il dito (${Math.round(b?.width ?? 0)}×${Math.round(b?.height ?? 0)})`); }
-  { const s = await wp.getByPlaceholder("Chiedi all'AI…").boundingBox().catch(() => null);
+  { const s = await wp.getByPlaceholder("Cosa cerchi?").boundingBox().catch(() => null);
     ok(!!s && s.y + s.height <= 844, `settimanale: il campo di ricerca in home resta sullo schermo (${Math.round((s?.y ?? 0) + (s?.height ?? 0))} px)`); }
   await dq.scrollIntoViewIfNeeded();
   await wp.screenshot({ path: `${OUT}/73-settimanale-voto.png`, caret: "initial" });
