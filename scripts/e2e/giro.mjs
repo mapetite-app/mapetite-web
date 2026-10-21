@@ -734,7 +734,7 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
   ok((await intro.getByTestId("intro-avanti").count()) === 0, "intro: al massimo 3 schermate");
   await ip.screenshot({ path: `${OUT}/00-intro-3.png`, caret: "initial" });
   await ip.getByTestId("intro-prova").click();
-  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible() && (await ip.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 4, "intro: finisce sulla barra di ricerca con le frasi d'esempio");
+  ok((await intro.count()) === 0 && await ip.getByLabel("Cosa cerchi?").isVisible() && (await ip.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3, "intro: finisce sulla barra di ricerca con le idee per l'ora");
   await ip.reload({ waitUntil: "networkidle" });
   ok((await intro.count()) === 0, "intro: mostrata una volta sola (ricaricando non torna)");
   await ip.getByRole("button", { name: "Come funziona" }).click();
@@ -769,9 +769,14 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
 // 5h. Home (/) come Places: esempi e campo portano alla mappa con la ricerca già avviata
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await shot("00-home");
-ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI") && (await page.getByText("Chiedi all'AI come a un amico, per esempio:").count()) === 0, "home: si capisce che si chiede all'AI (dalla barra, senza titolo in più)");
+ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder")) === "Cosa cerchi?" && (await page.getByLabel("Cosa cerchi?").getAttribute("aria-label"))?.includes("Chiedi all'AI"), "home: campo 'Cosa cerchi?' (mockup A), l'AI detta allo screen reader");
+// Home nuova (Lorenzo 21/10): saluto con l'ora, "Per te" con il perché, classifiche della città.
+ok(/^(Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato|Domenica) /i.test((await page.getByTestId("home-momento").textContent()) ?? "") && /^Dove /.test((await page.getByRole("heading", { level: 1 }).textContent()) ?? ""), `home: giorno e momento sopra la domanda (${await page.getByTestId("home-momento").textContent()})`);
+{ const prop = page.getByTestId("home-proposta"); const n = await prop.count();
+  ok(n >= 1 && n <= 3 && (await prop.first().getAttribute("href"))?.startsWith("/mappa?q=") && /✦/.test(await prop.first().innerText()), `home: 'Per te' con 1-3 proposte che aprono una ricerca e dicono perché (${n})`); }
+ok((await page.getByTestId("home-classifica").count()) === 4 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: 4 classifiche della città, numerate");
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
-ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 4 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con frasi d'esempio già scritte sopra");
+ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");
 // 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
 ok(await page.getByRole("img", { name: "Mapetite" }).first().isVisible(), "home: il marchio Mapetite (non più l'emoji)");
 {
@@ -795,7 +800,7 @@ searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-await page.getByRole("link", { name: /Rooftop romantico/ }).last().click(); // l'esempio (la prima è la ricerca recente)
+await page.getByTestId("home-suggerimenti").locator("[data-esempio]").first().click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
 ok(true, "home: un esempio apre la mappa con i risultati");
 
@@ -1862,14 +1867,12 @@ else {
       const sovrapposte = await p.getByTestId("raccolta").evaluateAll((els) => els.some((el) => { const c = el.querySelector("[data-testid=raccolta-copertina]"); const m = el.parentElement?.querySelector("[data-testid=raccolta-menu]"); if (!c || !m) return false; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom; }));
       ok(!sovrapposte, "copertine: le emoji non finiscono sotto il pulsante ⋯");
       await p.screenshot({ path: `${OUT}/27b-profilo-copertine.png`, caret: "initial" });
-      // Home con i salvati (?beta=home-salvati, spenta di default): "N posti da provare" + Stasera / I miei N
-      await p.goto(`${BASE}/?beta=-home-salvati`, { waitUntil: "networkidle" });
-      ok((await p.getByTestId("home-salvati").count()) === 0, "home salvati: si spegne con ?beta=-home-salvati (accesa di default)");
+      // Home: striscia "I tuoi posti" (mockup A): emoji degli ultimi salvati, totale, da provare, "Stasera?".
       await p.evaluate(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* niente */ } });
-      await p.goto(`${BASE}/?beta=home-salvati`, { waitUntil: "networkidle" });
+      await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
       const hs = p.getByTestId("home-salvati");
       await hs.waitFor({ timeout: 4000 }).catch(() => {});
-      ok(await hs.isVisible() && (await hs.textContent().catch(() => ""))?.includes("3 posti da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("Salvati · 6") && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home salvati: '3 posti da provare', 'Stasera dove andiamo?' e 'Salvati · 6'");
+      ok(await hs.isVisible() && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("6 salvati · 3 da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home: 'I tuoi posti · 6 salvati · 3 da provare' e 'Stasera?'");
       await p.screenshot({ path: `${OUT}/00c-home-salvati.png`, caret: "initial" });
       await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine" && f !== "home-salvati").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -7415,16 +7418,16 @@ else {
     ok(await box.waitFor({ timeout: 5000 }).then(() => true, () => false) && (await box.getByRole("link", { name: "Crea la tua mappa" }).getAttribute("href")) === "/signup?next=%2Fmappa%3Fvista%3Dsalvati" && (await a.getByText("Accesso richiesto").count()) === 0, "salvati senza account: spiegazione in una frase e 'Crea la tua mappa' che torna ai salvati");
     await a.screenshot({ path: `${OUT}/08c-salvati-senza-account.png`, caret: "initial" });
     await c.close(); }
-  // Home: gli esempi della città dove sei (Milano), senza permesso quelli di Roma.
-  for (const [permesso, atteso] of [[true, "Rooftop romantico per due a Milano"], [false, "Rooftop romantico per due a Roma"]]) {
+  // Home: idee e classifiche della città dove sei (Milano), senza permesso quelle di Roma.
+  for (const [permesso, atteso] of [[true, "Milano"], [false, "Roma"]]) {
     const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
     await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
     const h = await c.newPage();
     h.on("pageerror", (e) => errors.push(e.message));
     await h.goto(`${BASE}/`, { waitUntil: "networkidle" });
-    const ok1 = await h.getByTestId("home-suggerimenti").getByRole("link", { name: atteso, exact: true }).waitFor({ timeout: 4000 }).then(() => true, () => false);
-    const n = await h.getByTestId("home-suggerimenti").locator("[data-esempio]").count();
-    ok(ok1 && n === 4, `home ${permesso ? "a Milano" : "senza permesso"}: esempi con "${atteso}" (${n} esempi)`);
+    const ok1 = await h.getByTestId("home-classifiche").getByText(`Le classifiche di ${atteso}`).waitFor({ timeout: 4000 }).then(() => true, () => false);
+    const labels = await h.getByTestId("home-suggerimenti").locator("[data-esempio]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+    ok(ok1 && labels.length === 3 && labels.every((l) => l.endsWith(`a ${atteso}`)), `home ${permesso ? "a Milano" : "senza permesso"}: idee e classifiche di ${atteso} (${labels.join(" | ")})`);
     await c.close();
   }
 }
