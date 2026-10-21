@@ -2500,6 +2500,10 @@ else {
     await lp.getByTestId("reel-altro").first().click();
     await lp.getByTestId("reel-altri").getByTestId("reel-trovato").waitFor({ timeout: 4000 });
     ok(searchCalls.length === 2 && searchCalls[1]?.query === "Caffè Verdi Roma" && await lp.getByTestId("reel-altri").getByText("Nel reel: «Caffè Verdi, Roma»").isVisible(), "salva dal reel: '+ Salva' su un altro locale fa UNA ricerca e, se il nome non combacia, chiede 'È questo?'");
+    { const v0 = verdCalls.length;
+      await lp.getByTestId("reel-altri").getByTestId("reel-conferma").click();
+      await lp.getByTestId("reel-altri").getByTestId("reel-salvato").waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await lp.getByTestId("reel-altri").getByTestId("reel-salvato").isVisible() && verdCalls.length === v0 && (await lp.getByTestId("reel-altri").getByTestId("reel-verdetto").count()) === 0 && (await lp.getByTestId("reel-altri").getByRole("link", { name: "Apri sulla mappa" }).count()) === 0, "salva dal reel: un altro locale salvato diventa una riga compatta, senza verdetto in più (nessuna chiamata)"); }
 
     // Immagine senza locale e file che non è un'immagine: errori in italiano.
     await setLettura({ nome: null, citta: null, categoria: null });

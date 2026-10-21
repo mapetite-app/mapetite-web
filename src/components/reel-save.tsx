@@ -394,6 +394,25 @@ function PlaceRow({
     );
   }
 
+  if (st.s === "saved" && !auto) {
+    // Gli altri locali del post: una riga compatta (il verdetto lo trova nella scheda, nessuna chiamata in più).
+    const place = st.out.place!;
+    return (
+      <div className="flex items-center gap-3 rounded-card border border-success/30 bg-success/10 px-3 py-2" data-testid="reel-salvato" aria-live="polite">
+        <Foto place={st.top} />
+        <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-success">{st.out.alreadySaved ? "✓ Era già salvato" : "✓ Salvato"}</span>
+          <span className="block truncate text-sm font-semibold text-brand">{st.top.name}</span>
+        </Link>
+        {st.auto && !st.out.alreadySaved && (
+          <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className="min-h-11 shrink-0 px-2 text-xs font-display font-semibold text-brand underline disabled:opacity-60">
+            Non è questo
+          </button>
+        )}
+      </div>
+    );
+  }
+
   if (st.s === "saved") {
     const place = st.out.place!;
     return (
@@ -405,7 +424,7 @@ function PlaceRow({
         <p className="mt-1 font-display text-xl font-semibold text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
         <VerdettoSubito place={st.top} />
-        {auto && !st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
+        {!st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} bg-brand text-white`}>
@@ -425,9 +444,14 @@ function PlaceRow({
     return (
       <div className="rounded-card border border-border bg-surface p-4" data-testid="reel-trovato">
         {auto && <div className="mb-3"><Foto place={st.top} big /></div>}
-        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">È questo?</p>
-        <p className="mt-1 font-display text-xl font-semibold text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
-        <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
+        <div className="flex items-start gap-3">
+          {!auto && <Foto place={st.top} />}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">È questo?</p>
+            <p className={`mt-1 font-display font-semibold text-brand ${auto ? "text-xl" : "text-lg"}`}>{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
+            <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
+          </div>
+        </div>
         <p className="mt-1 text-xs text-text-muted">Nel reel: «{labelOf(luogo)}»</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={() => save(st.top, st.rest, false)} disabled={st.s === "saving"} data-testid="reel-conferma" className={`${btn} bg-brand text-white`}>
