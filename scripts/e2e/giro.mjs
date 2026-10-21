@@ -77,13 +77,6 @@ async function apriCard(pg, nome) {
   if (await pg.getByTestId("barra-azioni").first().waitFor({ timeout: 1200 }).then(() => true, () => false)) return;
   await pg.locator("ul.snap-x").getByText(nome).first().click();
 }
-// Scheda (mockup A "Editoriale", 21/10): Info, Recensioni e In breve stanno dietro "Orari, contatti, recensioni ›".
-async function apriDettagli(pg) {
-  const d = pg.getByTestId("scheda-dettagli").last();
-  if (await d.isVisible().catch(() => false)) return;
-  await pg.getByTestId("scheda-altro-info").last().click();
-  await d.waitFor({ timeout: 3000 });
-}
 // Intestazione dei risultati in una riga (Lorenzo 16/10): "Ho capito", 🧭, Affina e Condividi stanno dietro "⋯".
 async function apriOpzioni(pg) {
   const pan = pg.getByTestId("opzioni-pannello");
@@ -1014,41 +1007,21 @@ await (await esempio(page)).click();
 await page.getByText("Terrazza Uno").first().click();
 await page.locator("h2", { hasText: "Terrazza Uno" }).waitFor({ timeout: 4000 });
 await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 6000 });
-ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è 'Il verdetto Mapetite' (Lorenzo 12/10)");
-{ const v = await page.getByTestId("verdetto-box").evaluate((el) => { const cs = getComputedStyle(el); const t = el.querySelector("p:last-child"); const ts = t ? getComputedStyle(t) : null; return { top: cs.borderTopWidth, bottom: cs.borderBottomWidth, italic: ts?.fontStyle, serif: /newsreader/i.test(ts?.fontFamily ?? ""), size: parseFloat(ts?.fontSize ?? "0") }; });
-  ok(v.top === "1px" && v.bottom === "1px" && v.italic === "italic" && v.serif && v.size >= 20, `scheda (mockup A): verdetto in corsivo serif grande tra due filetti (${JSON.stringify(v)})`); }
-ok(((await page.getByTestId("per-te-scheda").textContent()) ?? "").replace(/\s+/g, " ").trim() === "Perché qui · Ha una vera terrazza.", "scheda (mockup A): riga 'Perché qui · …' con il perché della ricerca ('Per te' solo dai gusti)");
-// Proposta 18 (22/10): "✓ rooftop" nella scheda, un tocco mostra la frase della recensione che lo prova.
-{ const rq = page.getByTestId("requisiti-scheda");
-  const prima = await page.getByTestId("prova-recensione").count();
-  await rq.getByRole("button", { name: /rooftop/ }).click();
-  const t = (await page.getByTestId("prova-recensione").textContent().catch(() => "")) ?? "";
-  const h = await rq.getByRole("button", { name: /rooftop/ }).evaluate((b) => b.getBoundingClientRect().height);
-  ok(prima === 0 && t.includes("«Rooftop bellissimo sopra i tetti.»") && t.includes("da una recensione su Google") && h >= 44, `scheda: '✓ rooftop' mostra la frase della recensione che lo prova (${t.trim()}, ${Math.round(h)}px)`);
-  await rq.getByRole("button", { name: /rooftop/ }).click(); }
-ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "false" && !(await page.getByTestId("scheda-dettagli").isVisible()), "scheda (mockup A): Info, Recensioni e In breve dietro 'Orari, contatti, recensioni ›'");
+ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è il riquadro 'Il verdetto Mapetite' come prima (Lorenzo 12/10)");
 ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.getByText("tramonto", { exact: true }).count()) >= 1, "scheda B: il perché e i tag usciti dalla card sono nella scheda (nessuna informazione persa)");
-{ const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
-  const caps = await page.getByTestId("scheda-categoria").evaluate((el) => getComputedStyle(el).textTransform);
-  ok(k.join(" · ") === "Bar · €€ · Roma" && caps === "uppercase", `scheda (mockup A): riga di categoria in maiuscoletto tipo · prezzo · città (${k.join(" · ")})`);
-  const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
-  ok(parts.length === 2 && parts[0] === "Aperto ora" && /^[\d,]+ (m|km)$/.test(parts[1]), `scheda (mockup A): UNA riga aperto · distanza (${parts.join(" · ")})`); }
+{ const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
+  ok(parts.length === 5 && parts[0] === "Bar" && parts[1] === "★ 4,5" && parts[2] === "€€" && /^[\d,]+ (m|km)$/.test(parts[3]) && parts[4] === "Aperto ora", `scheda B: UNA riga di fatti tipo · voto · prezzo · distanza · aperto (${parts.join(" · ")})`); }
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
 // Barra azioni stile Places (piano 6.2): Prenota / Percorso / Salva; Chiama e Sito nella riga dei contatti.
 for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid=prenota-scheda]"], ["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"]]) {
   const box = await page.locator(sel).first().boundingBox();
   ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
 }
-// Barra teal (mockup A): Prenota corallo e più larga, Percorso e Salva uguali.
-{ const b = await page.getByTestId("barra-azioni").evaluate((el) => { const t = [...el.querySelectorAll("a, button")]; return { ws: t.map((x) => Math.round(x.getBoundingClientRect().width)), prenota: getComputedStyle(t[0]).backgroundColor, bar: getComputedStyle(el.firstElementChild).backgroundColor, r: parseFloat(getComputedStyle(el.firstElementChild).borderTopLeftRadius) }; });
-  ok(b.ws.length === 3 && b.prenota === "rgb(255, 107, 74)" && b.bar === "rgb(26, 60, 64)" && b.r >= 20 && b.ws[0] > b.ws[1] && Math.abs(b.ws[1] - b.ws[2]) <= 2, `scheda (mockup A): barra teal arrotondata, Prenota corallo più larga, Percorso e Salva uguali (${b.ws.join("/")})`); }
-await apriDettagli(page);
-ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "true" && await page.getByTestId("scheda-tab-info").getAttribute("aria-selected") === "true", "scheda: 'Orari, contatti, recensioni ›' apre il resto, su Info");
 await page.getByTestId("scheda-tab-info").click();
 ok(await page.getByTestId("scheda-info").locator("a[href^='tel:']").isVisible() && await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").isVisible(), "scheda B: Chiama e Sito nella sezione Info");
 ok(await page.getByText("4,5 su Google · 812 recensioni").isVisible() && (await page.getByTestId("citta-distanza").textContent())?.match(/Roma · \d+ m/) != null, "scheda B, Info: voto con numero di recensioni e 'Roma · distanza'");
 await page.getByTestId("scheda-tab-panoramica").click();
-ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (tondo, sulla foto)");
+ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (nella riga delle azioni)");
 await shot("15-scheda-b");
 
 // 7-ter-bis. "A confronto" nella scheda (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork.
@@ -1122,7 +1095,6 @@ await shot("15-scheda-b");
   ok((await page.getByTestId("pannello-panoramica").getByTestId("confronto").count()) === 0, "scheda semplificata: 'A confronto' non è più nella Panoramica");
   ok(await page.getByTestId("segnali-scheda").evaluate((el) => getComputedStyle(el).display === "none"), "scheda semplificata: senza segnali il blocco sotto il nome sparisce (nessuno spazio vuoto)");
   ok((await page.getByTestId("orari-oggi").count()) === 0, "scheda: senza orari Google niente riga 'Oggi' (mai orari inventati)");
-  await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
   ok(await box.isVisible() && (await box.textContent()).includes("A confronto"), "confronto: riquadro 'A confronto' visibile in cima alle Recensioni");
   const g = page.getByTestId("confronto-google");
@@ -1175,7 +1147,6 @@ await shot("15-scheda-b");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
     await shot("15c-scheda-segnali"); }
-  await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
   await page.getByTestId("confronto-tripadvisor").waitFor({ timeout: 5000 }).catch(() => {});
   const mp = page.getByTestId("confronto-mapetite");
@@ -1206,16 +1177,14 @@ await shot("15-scheda-b");
   if (!(await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 1200 }).then(() => true, () => false))) await page.getByText("Trattoria Senza Voto").first().click();
   await page.locator("h2", { hasText: "Trattoria Senza Voto" }).waitFor({ timeout: 5000 });
   await page.waitForTimeout(400);
-  await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
   const g2 = ((await page.getByTestId("confronto-google").textContent()) ?? "");
   ok(g2.includes("Apri su Google Maps") && !/\d/.test(g2), `confronto: senza voto Google la riga è solo il link (${g2})`);
   ok((await page.getByTestId("confronto-mapetite").count()) === 0 && await page.getByTestId("confronto-link-tripadvisor").isVisible(), "confronto: senza voti né verdetto niente riga Mapetite; Tripadvisor non abbinato → link di ricerca");
   ok(taChiesti.length >= 2, "confronto: la scheda chiede Tripadvisor al nostro server, mai direttamente al sito");
   { const r = ((await page.getByTestId("riapre").textContent().catch(() => "")) ?? "");
-    const st = ((await page.getByTestId("stato-apertura").textContent().catch(() => "")) ?? "");
-    ok(st === "Chiuso ora" && /^apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso ora · … · apre alle …' nella riga dei fatti (${st} · ${r})`);
-    ok((((await page.getByTestId("scheda-fatti").textContent()) ?? "").match(/Chiuso/g) ?? []).length === 1, "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
+    ok(r.startsWith("Chiuso ora") && /apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso ora · apre alle …' su una riga sua (${r})`);
+    ok(!((await page.getByTestId("scheda-fatti").textContent()) ?? "").includes("Chiuso"), "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
     await page.getByTestId("aperto-da-poco").waitFor({ timeout: 5000 }).catch(() => {});
     ok(((await page.getByTestId("aperto-da-poco").textContent().catch(() => "")) ?? "").includes("Aperto da 3 mesi"), "scheda: locale verificato aperto da 3 mesi → '🆕 Aperto da 3 mesi' tra i segnali");
     ok((await page.getByTestId("posto-stasera").count()) === 0 && await page.locator("h2", { hasText: "Trattoria Senza Voto" }).getByTestId("verificato-scheda").isVisible(), "scheda: verificato senza serate → spunta, nessuna pillola 'c'è posto'");
@@ -2354,7 +2323,6 @@ else {
     "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni']").first().evaluate((a) => [a, ...a.querySelectorAll("span")].every((el) => el.scrollWidth <= el.clientWidth + 1)), "salvato: la scritta 'Percorso' non viene tagliata");
-  await apriDettagli(v).catch(() => {});
   await v.getByTestId("scheda-tab-info").click().catch(() => {});
   { const box = await v.locator("a[aria-label^='Sito di']").boundingBox(); ok(!!box && box.x + box.width <= 390, "salvato: il pulsante Sito resta nello schermo"); }
   await v.screenshot({ path: `${OUT}/17-salvato.png`, caret: "initial" });
@@ -3200,17 +3168,14 @@ else {
     const tiles = [...el.querySelectorAll("a, button")].map((t) => t.getBoundingClientRect());
     const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
     const ws = tiles.map((t) => t.width);
-    // Mockup A (21/10): Prenota, se c'è, è più larga; gli altri riquadri sono uguali tra loro.
-    const pre = el.querySelector("[data-testid=prenota-scheda]")?.getBoundingClientRect().width ?? null;
-    const altri = [...el.querySelectorAll("a, button")].filter((t) => t.dataset.testid !== "prenota-scheda").map((t) => t.getBoundingClientRect().width);
-    return { dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.bottom <= nav + 1 && t.height >= 44), uguali: Math.max(...altri) - Math.min(...altri) <= 2 && (pre == null || pre > Math.max(...altri)), ws: ws.map(Math.round).join("/") };
+    return { dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.bottom <= nav + 1 && t.height >= 44), uguali: Math.max(...ws) - Math.min(...ws) <= 2, ws: ws.map(Math.round).join("/") };
   });
-  { const r = await barCheck(s); ok(r.dentro && r.uguali, `scheda: tre riquadri (Prenota più larga, gli altri uguali), dentro lo schermo e sopra la barra in basso (${r.ws})`); }
+  { const r = await barCheck(s); ok(r.dentro && r.uguali, `scheda: tre riquadri uguali, dentro lo schermo e sopra la barra in basso (${r.ws})`); }
   ok(await s.getByTestId("amici-qui").isVisible().catch(() => false) || !fakeUser, "scheda della mappa: 'chi dei tuoi amici c'è stato'");
   if (fakeUser) ok((await s.getByTestId("amici-qui").textContent())?.includes("1 amico ci è stato") && (await s.getByTestId("amici-qui").getByRole("link", { name: "Giulia" }).getAttribute("href")) === "/u/giulia.rm", "scheda della mappa: '1 amico ci è stato' con il link al profilo");
   // Carosello: la foto è quella della card (nessuna richiesta foto nuova); la mappa "dove si trova" solo se ci si arriva.
   ok([...sPhotos].every((u) => photosBefore.has(u) || u.includes("S1")) && new Set(sPhotos.filter((u) => u.includes("S1"))).size <= 1, `scheda: nessuna foto Google in più oltre a quella della card (${new Set(sPhotos).size} indirizzi foto)`);
-  ok(staticMaps === 0 && ((await s.getByTestId("carosello-contatore").textContent()) ?? "").replace(/\s+/g, " ").trim() === "1 / 2", `carosello: "1 / 2" (foto + 'dove si trova'), la mappa non si scarica finché non serve (${staticMaps})`);
+  ok(staticMaps === 0 && (await s.getByTestId("carosello-puntini").locator("button").count()) === 2, `carosello: foto + 'dove si trova', la mappa non si scarica finché non serve (${staticMaps})`);
   await s.screenshot({ path: `${OUT}/60-scheda-places-ristorante.png`, caret: "initial" });
   // Scheda pulita (Lorenzo 16/10): verdetto e azioni in vista senza scorrere, il resto in schede e nel menu "Altro".
   { const r = await s.evaluate(() => {
@@ -3221,8 +3186,9 @@ else {
       return { verdetto: !!v && !!bar && v.top >= 0 && v.bottom <= bar.top + 1, azioni: !!a && a.bottom < (v?.top ?? 0) + 1, n: tiles.length, ws: ws.join("/"), dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.height >= 44 && t.width >= 44) };
     });
     ok(r.verdetto, "scheda pulita: il verdetto Mapetite è tutto in vista senza scorrere (sopra la barra)");
-    ok(r.azioni && r.n === 2 && r.dentro, `scheda semplice: Condividi e Altro tondi sulla foto, sopra il verdetto (${r.ws})`); }
-  ok(!(await s.getByText("Cosa dicono").isVisible()) && !(await s.getByTestId("copia-indirizzo").isVisible()) && !(await s.getByTestId("scheda-tabs").isVisible()), "scheda pulita: recensioni, indirizzo e sezioni non affollano la prima schermata");
+    ok(r.azioni && r.n === 2 && r.dentro, `scheda semplice: Condividi e Altro come icone accanto al nome, sopra il verdetto (${r.ws})`); }
+  ok((await s.getByTestId("scheda-tabs").getByRole("tab").allTextContents()).join(" · ") === "Panoramica · Recensioni · Info" && (await s.getByTestId("scheda-tab-panoramica").getAttribute("aria-selected")) === "true", "scheda pulita: sezioni Panoramica · Recensioni · Info, aperta su Panoramica");
+  ok(!(await s.getByText("Cosa dicono").isVisible()) && !(await s.getByTestId("copia-indirizzo").isVisible()), "scheda pulita: recensioni e indirizzo non affollano la prima schermata");
   await s.getByTestId("altro-apri").click();
   { const items = (await s.getByTestId("altro-menu").getByRole("menuitem").allTextContents()).map((t) => t.trim());
     ok(items.includes("Copia indirizzo") && items.includes("Apri su Google Maps") && items.some((t) => t.includes("Rivendicalo")), `menu Altro: copia indirizzo, Google Maps, rivendica (${items.join(" | ")})`); }
@@ -3230,8 +3196,6 @@ else {
   await s.screenshot({ path: `${OUT}/60b-scheda-menu-altro.png`, caret: "initial" });
   await s.getByRole("button", { name: "Chiudi il menu" }).click({ position: { x: 10, y: 10 } });
   ok((await s.getByTestId("altro-menu").count()) === 0, "menu Altro: si chiude toccando fuori");
-  await apriDettagli(s);
-  ok((await s.getByTestId("scheda-tabs").getByRole("tab").allTextContents()).join(" · ") === "Info · Recensioni · In breve" && (await s.getByTestId("scheda-tab-info").getAttribute("aria-selected")) === "true", "scheda: 'Orari, contatti, recensioni ›' apre Info · Recensioni · In breve, su Info");
   await s.getByTestId("scheda-tab-recensioni").click();
   ok(await s.getByText("Cosa dicono").isVisible() && await s.getByTestId("community-scheda").isVisible(), "scheda: 'Recensioni' mostra Google e la community Mapetite");
   await s.getByTestId("scheda-tab-info").click();
@@ -3282,10 +3246,8 @@ else {
   await s.waitForTimeout(300);
   { const r = await s.evaluate(() => {
       const barTop = document.querySelector("[data-testid=barra-azioni]").getBoundingClientRect().top;
-      // Mockup A (21/10): a scheda chiusa l'ultima cosa è "Orari, contatti, recensioni ›" (o le Info aperte).
-      const sections = [...document.querySelectorAll("[data-testid=scheda-trascinabile] h3, [data-testid=scheda-altro-info], [data-testid=scheda-info]")].filter((h) => h.offsetParent != null);
-      const lastEl = sections[sections.length - 1];
-      const last = (lastEl?.tagName === "H3" ? lastEl.parentElement : lastEl)?.getBoundingClientRect();
+      const sections = [...document.querySelectorAll("[data-testid=scheda-trascinabile] h3")].filter((h) => h.offsetParent != null);
+      const last = sections[sections.length - 1]?.parentElement?.getBoundingClientRect();
       return { ok: !!last && last.bottom <= barTop + 1, last: Math.round(last?.bottom ?? 0), barTop: Math.round(barTop) };
     });
     ok(r.ok, `scheda: in fondo la barra non copre l'ultimo contenuto (${r.last} ≤ ${r.barTop})`); }
@@ -3305,7 +3267,7 @@ else {
   // 360 px: stessa barra, niente scorrimento orizzontale.
   await s.setViewportSize({ width: 360, height: 780 });
   await s.waitForTimeout(400);
-  { const r = await barCheck(s); ok(r.dentro && r.uguali, `360px scheda: barra a tre riquadri dentro lo schermo, Prenota più larga (${r.ws})`); }
+  { const r = await barCheck(s); ok(r.dentro && r.uguali, `360px scheda: barra a tre riquadri dentro lo schermo (${r.ws})`); }
   ok(await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollWidth <= el.clientWidth), "360px scheda: niente scorrimento orizzontale");
   await s.screenshot({ path: `${OUT}/64-scheda-places-360.png`, caret: "initial" });
   await sctx.close();
