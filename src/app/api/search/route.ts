@@ -629,6 +629,7 @@ ESEMPI (input → output atteso):
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
       perTe: s?.perTe || null,
+      requisiti: s?.requisiti?.length ? s.requisiti : null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),

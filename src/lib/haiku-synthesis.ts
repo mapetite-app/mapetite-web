@@ -56,6 +56,9 @@ export type PlaceSynthesis = {
   // "Per te" della card (sprint 25/10, mockup A): massimo 7 parole che legano il locale a un gusto
   // FORNITO dell'utente. Vuoto se l'utente non ha gusti o se non c'è un legame concreto.
   perTe: string;
+  // Requisiti espliciti della richiesta CONFERMATI da recensioni, descrizione o categorie
+  // (chiave B dello sprint: "rispetta tutti i vincoli" si vede sulla card). Solo i confermati.
+  requisiti: string[];
   // Adeguatezza ai requisiti espliciti della richiesta (tipo, caratteristica
   // fisica, occasione, atmosfera). false SOLO se chiaramente non li rispetta;
   // nel dubbio true. Il chiamante sposta/esclude i false e ne logga il motivo.
@@ -111,10 +114,11 @@ Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è a
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
-Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
+Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"requisiti":[{"r":string,"ok":boolean|null}],"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
 - id identico a quello ricevuto
 - matchReason: una frase di MASSIMO 22 parole, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Parla di COME risponde a ciò che la richiesta chiede (tipo di locale, zona, occasione, atmosfera, caratteristiche): non elencare piatti, servizio o qualità generali del locale se la richiesta non li nomina, perché li dice già il verdetto mostrato accanto (niente doppioni). Non ripetere le parole della richiesta come conferma generica ("ideale per una trattoria a Trastevere"): dì il dato concreto delle recensioni che lo conferma. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
 - per_te: DEFAULT stringa vuota "". Solo se ti sono forniti i gusti dell'utente E il locale si lega concretamente a uno di essi (categoria, recensioni o descrizione lo mostrano): MASSIMO 6 parole, in seconda persona, che dicono quale gusto soddisfa. Esempi: "il tipo di trattoria che ami", "niente carne, come preferisci", "cucina giapponese, la tua preferita". VIETATO ripetere la richiesta, VIETATO dire poco noto, famoso o zona, VIETATO inventare gusti non forniti. Senza gusti forniti o senza legame concreto: "".
+- requisiti: i requisiti ESPLICITI scritti nella richiesta (caratteristica fisica come terrazza/vista/giardino, atmosfera come romantico/tranquillo/vivace, occasione come appuntamento/gruppo, cucina o piatto come cotoletta/carbonara, "non turistico"), MASSIMO 3, gli stessi e nello stesso ordine per tutti i locali. Ciascuno: "r" = il requisito in 1-2 parole italiane prese dalla richiesta (es. "terrazza", "romantico", "per due"); "ok" = true SOLO se recensioni, descrizione o categorie lo confermano ESPLICITAMENTE per QUESTO locale, false se lo smentiscono, null se non si capisce. Non includere il tipo di locale generico (ristorante, bar), la zona, la città, l'orario o "vicino". Nel dubbio null: un true non confermato è un'invenzione. Senza requisiti espliciti: [].
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta: i GUSTI dell'utente non rendono MAI fit false (un tipo di posto che non ama o un cibo che evita può abbassare match, mai fit).
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
@@ -317,12 +321,14 @@ export async function getSynthesis(
   const matchReasonWork = async (): Promise<{
     matchReasons: Map<string, string>;
     perTes: Map<string, string>;
+    requisiti: Map<string, string[]>;
     fits: Map<string, { fit: boolean; fitReason: string }>;
     levels: Map<string, MatchLevel>;
     cost: number;
   }> => {
     const matchReasons = new Map<string, string>();
     const perTes = new Map<string, string>();
+    const requisiti = new Map<string, string[]>();
     const fits = new Map<string, { fit: boolean; fitReason: string }>();
     const levels = new Map<string, MatchLevel>();
     let cost = 0;
@@ -407,6 +413,16 @@ export async function getSynthesis(
             if (hasTaste && typeof o.per_te === "string" && o.per_te.trim() && chiesto(o.per_te)) {
               perTes.set(o.id, o.per_te.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[,;:.]+$/, ""));
             }
+            // Requisiti confermati: solo etichette brevi, italiane, e (se non chieste) niente fama o zona.
+            if (Array.isArray(o.requisiti)) {
+              const conf = o.requisiti
+                .filter((x): x is { r: string; ok: unknown } => !!x && typeof x === "object" && typeof (x as { r?: unknown }).r === "string")
+                .filter((x) => x.ok === true)
+                .map((x) => x.r.trim().toLowerCase())
+                .filter((r) => r.length > 0 && r.length <= 20 && !hasEnglish(r) && chiesto(r))
+                .slice(0, 3);
+              if (conf.length > 0) requisiti.set(o.id, [...new Set(conf)]);
+            }
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
               const fitReason = typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "";
@@ -439,11 +455,11 @@ export async function getSynthesis(
     } catch (err) {
       console.error("[haiku-synthesis] matchReason call exception:", err);
     }
-    return { matchReasons, perTes, fits, levels, cost };
+    return { matchReasons, perTes, requisiti, fits, levels, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = opts.soloVerdetto
-    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
+    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), requisiti: new Map<string, string[]>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
     : matchReasonWork();
 
   // 2. Legge la cache.
@@ -612,7 +628,7 @@ export async function getSynthesis(
 
   // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
   //    Girava mentre sopra completavano cache read + synthesis + upsert.
-  const { matchReasons, perTes, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
+  const { matchReasons, perTes, requisiti, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
   totalCost += matchReasonCost;
 
   console.log(
@@ -636,6 +652,7 @@ export async function getSynthesis(
       dontExpect: s.dontExpect,
       matchReason: matchReasons.get(id) ?? "",
       perTe: perTes.get(id) ?? "",
+      requisiti: requisiti.get(id) ?? [],
       // Nel dubbio il locale resta: fit mancante = true.
       fit: fits.get(id)?.fit ?? true,
       fitReason: fits.get(id)?.fitReason ?? "",

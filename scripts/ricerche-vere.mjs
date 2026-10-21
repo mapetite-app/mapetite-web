@@ -54,7 +54,7 @@ for (const [n, query, [lat, lng]] of CASI) {
   for (const p of risultati.slice(0, 7)) {
     const d = dettagli[p.id] ?? {};
     console.log(`- [${livelli[p.id] ?? "?"}] ${p.name} | ${p.category} | ${p.rating} (${p.userRatingCount}) | ${(p.address ?? "").slice(0, 35)}`);
-    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}`);
+    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}${d.requisiti?.length ? `\n     ✓ ${d.requisiti.join(", ")}` : ""}`);
   }
   if (tolti.length) console.log("   esclusi:", tolti.map((p) => p.name).join(", "));
 }

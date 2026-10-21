@@ -39,7 +39,7 @@ const SEARCH_FAST = {
 };
 const SYNTH = {
   dettagli: {
-    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza." },
+    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza.", requisiti: ["rooftop", "romantico"] },
     P3: { synthesis: "Rooftop curato.", tags: [], verdict: "Cocktail curati sul tetto.", goFor: ["cocktail"], dontExpect: [], matchReason: "È su un rooftop." },
   },
   esclusi: ["P2"],
@@ -312,6 +312,13 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
   const sopra = await page.locator("[data-testid=lista-risultati] .rounded-card").evaluateAll((els) => els.filter((e) => !e.closest("ul")).length);
   ok(sopra === 0 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `lista nuova: nessuna intestazione sopra le card; "Ho capito" e Affina dietro la pillola`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
+// Mockup A (21/10): "✨ 3 posti · bar · rooftop" (la zona no: è già nella barra) e "✓ rooftop · ✓ romantico" sulla card confermata.
+{ const cap = await page.getByTestId("capito-pillola").innerText().catch(() => "");
+  const pw = await page.getByTestId("opzioni-ricerca").evaluate((el) => el.getBoundingClientRect().right <= window.innerWidth - 8);
+  ok(/bar\s*·\s*rooftop/.test(cap) && !/roma/i.test(cap) && pw, `pillola: accanto al numero cosa ha capito l'AI, dentro lo schermo ('${cap.replace(/\s+/g, " ").trim()}')`); }
+{ const r1 = await page.locator("ul.snap-x li[data-id=P1]").getByTestId("requisiti-card").innerText().catch(() => "");
+  const r3 = await page.locator("ul.snap-x li[data-id=P3]").getByTestId("requisiti-card").count();
+  ok(/✓ rooftop · ✓ romantico/.test(r1) && r3 === 0, `card: '✓ rooftop · ✓ romantico' solo dove le recensioni li confermano ('${r1.replace(/\n/g, " ")}', altri: ${r3})`); }
 ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filtri rapidi non stanno sempre sopra le card (sono dietro la pillola)");
 await apriOpzioni(page);
 ok((await page.getByTestId("filtri-lista").count()) === 1 && await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).isVisible(), "lista B: filtri rapidi presenti toccando la pillola");
@@ -324,6 +331,8 @@ ok((await page.getByTestId("opzioni-pannello").count()) === 0, "pillola: le opzi
 ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 1, "lista B: segnalibro Salva sulla card");
 await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
+// Chiave B (22/10): quanti posti hanno ogni requisito confermato dalle recensioni, solo dai dati dell'AI.
+ok(/^✓ Dalle recensioni: rooftop in 1 posto su \d+ · romantico in 1$/.test((await page.getByTestId("conferme-recensioni").textContent()) ?? ""), `pillola: 'Dalle recensioni: rooftop in 1 posto su N' (${await page.getByTestId("conferme-recensioni").textContent().catch(() => "assente")})`);
 { const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");
