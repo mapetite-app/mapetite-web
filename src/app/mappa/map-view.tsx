@@ -613,6 +613,12 @@ function filtriParts(filtri: AIFiltri): string[] {
   return parts;
 }
 
+// Pillola dei risultati (mockup A del 21/10): solo i requisiti ("rooftop · romantico"); il tipo solo se non ce ne sono.
+function capitoBreve(filtri: AIFiltri): string[] {
+  if (filtri.parole_chiave.length > 0) return filtri.parole_chiave.slice(0, 3);
+  return filtri.categoria ? [categoryLabel(filtri.categoria) as string] : [];
+}
+
 function buildAISummary(filtri: AIFiltri): string {
   const parts = filtriParts(filtri);
   return "Ho cercato: " + (parts.length > 0 ? parts.join(" · ") : "qualsiasi locale");
@@ -3370,6 +3376,7 @@ export default function MapView({
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
+          capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
           setAside={aiSearch?.daParte ?? null}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}

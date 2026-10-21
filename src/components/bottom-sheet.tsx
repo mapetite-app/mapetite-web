@@ -75,6 +75,8 @@ export interface BottomSheetProps {
   // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro"): dove mettere la pillola "N posti"
   // sotto la barra in alto, al posto dell'intestazione sopra le card. null = lista di prima.
   pillSlot?: HTMLElement | null;
+  // Cosa ha capito l'AI, in breve, accanto a "12 posti" nella pillola.
+  capito?: string[];
 }
 
 export type ListDetails = {
@@ -225,7 +227,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [] }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -580,9 +582,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           )}
           <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
           {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
-          {understood.length > 0 && !headerOpen && (
+          {capito.length > 0 && !headerOpen && (
             <span data-testid="capito-pillola" className="min-w-0 truncate font-sans font-normal text-text">
-              {understood.filter((u) => !/^a /.test(u)).slice(0, 3).map((u) => <span key={u}><span aria-hidden className="mx-1.5 text-text-muted">·</span>{u.toLowerCase()}</span>)}
+              {capito.map((u) => <span key={u}><span aria-hidden className="mx-1.5 text-text-muted">·</span>{u.toLowerCase()}</span>)}
             </span>
           )}
           <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>

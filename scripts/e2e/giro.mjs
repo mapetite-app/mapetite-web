@@ -312,10 +312,10 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
   const sopra = await page.locator("[data-testid=lista-risultati] .rounded-card").evaluateAll((els) => els.filter((e) => !e.closest("ul")).length);
   ok(sopra === 0 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `lista nuova: nessuna intestazione sopra le card; "Ho capito" e Affina dietro la pillola`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
-// Mockup A (21/10): "✨ 3 posti · bar · rooftop" (la zona no: è già nella barra) e "✓ rooftop · ✓ romantico" sulla card confermata.
+// Mockup A (21/10): "✨ 3 posti · rooftop" (solo i requisiti: tipo e zona no) e "✓ rooftop · ✓ romantico" sulla card confermata.
 { const cap = await page.getByTestId("capito-pillola").innerText().catch(() => "");
   const pw = await page.getByTestId("opzioni-ricerca").evaluate((el) => el.getBoundingClientRect().right <= window.innerWidth - 8);
-  ok(/bar\s*·\s*rooftop/.test(cap) && !/roma/i.test(cap) && pw, `pillola: accanto al numero cosa ha capito l'AI, dentro lo schermo ('${cap.replace(/\s+/g, " ").trim()}')`); }
+  ok(/^\s*·?\s*rooftop\s*$/.test(cap) && !/roma/i.test(cap) && pw, `pillola: accanto al numero cosa ha capito l'AI, dentro lo schermo ('${cap.replace(/\s+/g, " ").trim()}')`); }
 { const r1 = await page.locator("ul.snap-x li[data-id=P1]").getByTestId("requisiti-card").innerText().catch(() => "");
   const r3 = await page.locator("ul.snap-x li[data-id=P3]").getByTestId("requisiti-card").count();
   ok(/✓ rooftop · ✓ romantico/.test(r1) && r3 === 0, `card: '✓ rooftop · ✓ romantico' solo dove le recensioni li confermano ('${r1.replace(/\n/g, " ")}', altri: ${r3})`); }
