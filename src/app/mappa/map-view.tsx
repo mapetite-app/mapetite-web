@@ -15,11 +15,12 @@ import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } 
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
+import SalvatiLista from "@/components/salvati-lista";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, ChevronRight, Lightbulb, LocateFixed, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
@@ -835,6 +836,8 @@ export default function MapView({
   // ordine stanno nel foglio "Filtri"; sullo schermo restano solo la ricerca e i filtri accesi.
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
   const [savedNearest, setSavedNearest] = useState(false);
+  // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
+  const [salvatiMappa, setSalvatiMappa] = useState(false);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -1138,6 +1141,8 @@ export default function MapView({
 
   const savedFiltered = activeTag !== null || activeCity !== null || savedQuery.trim() !== "";
   const savedControlsOn = view === "saved" && userId != null && savedPlaces.length > 0;
+  // Lista dei salvati a tutto schermo: sopra la mappa finché non si tocca "Vedi sulla mappa".
+  const salvatiListaOn = savedControlsOn && aiSearch === null && clusterPlaces === null && !salvatiMappa;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -2049,7 +2054,7 @@ export default function MapView({
     // Fuori dal ciclo dell'effetto, come gli altri arrivi dall'indirizzo.
     if (vistaParam === "salvati" && view !== "saved") {
       setTimeout(() => {
-        clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null);
+        clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); setSalvatiMappa(false);
         setView("saved"); dispatch({ type: "OPEN_LIST" });
       }, 0);
     } else if (vistaParam !== "salvati" && view === "saved") {
@@ -2081,7 +2086,7 @@ export default function MapView({
     const onBarra = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       if (id === "salvati") {
-        setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" });
+        setSalvatiMappa(false); setView("saved"); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "OPEN_LIST" });
       } else if (id === "esplora") {
         setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); clearAiSearch(); setAiQuery(""); setClusterPlaces(null); setFilterError(null); dispatch({ type: "RESET" });
       }
@@ -2464,7 +2469,7 @@ export default function MapView({
             />
           </div>
         )}
-        {savedControlsOn && (
+        {savedControlsOn && !salvatiListaOn && (
           <div data-testid="salvati-filtri" className={`pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
             {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
                 ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
@@ -2495,6 +2500,16 @@ export default function MapView({
               >
                 <span aria-hidden>🍽️</span> Stasera
               </Link>
+              {/* Torna alla lista dei salvati (la schermata principale di "Salvati"). */}
+              <button
+                type="button"
+                data-testid="salvati-vedi-lista"
+                aria-label="Vedi la lista"
+                onClick={() => setSalvatiMappa(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn border border-border bg-white text-brand active:scale-95"
+              >
+                <ListIcon size={18} aria-hidden />
+              </button>
             </div>
             {/* I filtri accesi restano in vista: un tocco li toglie. */}
             {(activeTag !== null || activeCity !== null || savedNearestOn) && (
@@ -2554,6 +2569,7 @@ export default function MapView({
 
       {/* Empty state — nessun luogo da mostrare */}
       {displayedPlaces.length === 0 &&
+        !salvatiListaOn &&
         !(view === "saved" && !userId) &&
         !(view === "saved" && userId && loadingSaved) &&
         !(view === "all" && aiSearch === null) && (
@@ -3345,7 +3361,37 @@ export default function MapView({
         </div>
       )}
 
-      {overlay.kind === "list" && (
+      {salvatiListaOn && userId && (
+        <SalvatiLista
+          userId={userId}
+          all={savedPlaces}
+          shown={displayedPlaces}
+          activeTag={activeTag}
+          onTag={pickTag}
+          activeCity={activeCity}
+          onClearCity={() => setActiveCity(null)}
+          query={savedQuery}
+          onQuery={setSavedQuery}
+          origin={userPos}
+          locating={geoState === "loading"}
+          onLocate={goToMyPosition}
+          filtersOn={activeCity !== null ? 1 : 0}
+          onFilters={() => setSavedSheetOpen(true)}
+          verdicts={venueDetails}
+          hideOnDesktop={venueOpen}
+          onMap={() => { setSalvatiMappa(true); fitToPlaces(displayedPlaces, 150); }}
+          onOpen={(place, order) => {
+            setCarouselOrder(order);
+            setFocusedId(place.id);
+            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
+            dispatch({ type: "OPEN_VENUE", placeId: place.id });
+            const map = (mapRef.current as { getMap?: () => { jumpTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+            if (map) map.jumpTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+          }}
+        />
+      )}
+
+      {overlay.kind === "list" && !salvatiListaOn && (
         <BottomSheet
           places={clusterPlaces ?? displayedPlaces}
           // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
@@ -3495,15 +3541,16 @@ export default function MapView({
                   </div>
                 </>
               )}
-              <p className={sheetSection}>Ordine</p>
-              <div className="flex flex-wrap items-center gap-1.5">
+              {/* Nella lista l'ordine è per vicinanza (con la posizione): "Ordine" vale per la mappa. */}
+              {!salvatiListaOn && <p className={sheetSection}>Ordine</p>}
+              {!salvatiListaOn && <div className="flex flex-wrap items-center gap-1.5">
                 <button type="button" aria-pressed={!savedNearestOn} onClick={() => setSavedNearest(false)} className={sheetChip(!savedNearestOn)}>Ultimi salvati</button>
                 {userPos ? (
                   <button type="button" aria-pressed={savedNearestOn} onClick={() => setSavedNearest((v) => !v)} className={sheetChip(savedNearestOn)}>Più vicini</button>
                 ) : (
                   <span className="text-xs font-sans text-text-muted">Per ordinarli per distanza tocca <LocateFixed size={12} className="inline" aria-hidden /> in alto</span>
                 )}
-              </div>
+              </div>}
               <button
                 type="button"
                 data-testid="salvati-tipo"
