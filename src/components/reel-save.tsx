@@ -109,12 +109,20 @@ export default function ReelSave({
   const askFor = (why: string) => { setReading(false); setAsk(why); };
 
   // Una o più letture (le slide di un carosello, proposta 13): i locali si uniscono senza doppioni.
-  const read = (body: { link: string } | { caption: string } | { image: string }) => {
+  const read = (body: { link: string } | { caption: string } | { image: string } | { image: string }[]) => {
     setReading(true);
     setError(null);
-    void readReel(body)
+    const bodies = Array.isArray(body) ? body : [body];
+    void Promise.allSettled(bodies.map((b) => readReel(b)))
+      .then((all) => {
+        const ok = all.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+        if (ok.length === 0) throw (all[0] as PromiseRejectedResult).reason;
+        const found: Luogo[] = [];
+        for (const l of ok.flat()) if (found.length < 8 && !found.some((x) => x.nome.toLowerCase() === l.nome.toLowerCase())) found.push(l);
+        return found;
+      })
       .then((found) => {
-        trackFeature("reel_salva", { stato: found.length > 0 ? "letto" : "illeggibile", fonte: source ?? "screenshot", n: found.length });
+        trackFeature("reel_salva", { stato: found.length > 0 ? "letto" : "illeggibile", fonte: source ?? "screenshot", n: found.length, immagini: bodies.length });
         if (found.length === 0) {
           askFor("Qui non trovo il nome di un locale.");
           return;
@@ -127,7 +135,7 @@ export default function ReelSave({
       .catch((e) => {
         setReading(false);
         // Video privato o rimosso: si passa allo screenshot invece di fermarsi.
-        if ("link" in body) askFor("Non riesco a leggere questo video.");
+        if (!Array.isArray(body) && "link" in body) askFor("Non riesco a leggere questo video.");
         else setError(errorText(e));
       });
   };
@@ -152,13 +160,15 @@ export default function ReelSave({
   }, [userId]);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+    // Fino a 5 screenshot insieme: le slide di un carosello "5 posti dove…".
+    const files = Array.from(e.target.files ?? []).slice(0, 5);
     e.target.value = "";
-    if (!f) return;
-    trackFeature("import_screenshot");
+    if (files.length === 0) return;
+    trackFeature("import_screenshot", { n: files.length });
     setDaTocco(true);
     setReading(true);
-    read({ image: await screenshotForUpload(f) });
+    const images = await Promise.all(files.map((f) => screenshotForUpload(f)));
+    read(images.length === 1 ? { image: images[0] } : images.map((image) => ({ image })));
   };
 
   if (!userId) {
@@ -190,7 +200,7 @@ export default function ReelSave({
         <div className="space-y-3 rounded-card border border-border bg-surface p-4" data-testid="reel-chiedi">
           <p className="text-sm text-text">
             <span aria-hidden>📸 </span>
-            {ask} Fai uno screenshot del reel dove si vede il nome o la posizione del locale: al resto penso io.
+            {ask} Fai uno screenshot del reel dove si vede il nome o la posizione del locale (anche più slide insieme): al resto penso io.
           </p>
           <button
             type="button"
@@ -200,7 +210,7 @@ export default function ReelSave({
           >
             📸 Carica lo screenshot
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} aria-label="Screenshot del reel" />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} aria-label="Screenshot del reel" />
           <form
             className="flex gap-2"
             onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { setDaTocco(true); read({ caption: draft.trim().slice(0, 2000) }); } }}

@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { extractPlace, fromParsed, type ImportResult } from "@/lib/import-caption";
+import { extractPlace, fromParsed, type ImportResult, type Luogo } from "@/lib/import-caption";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { CONDIVISO_COOKIE, condivisoTesto, impronta } from "@/lib/condiviso";
 
 // Destinazione del "Condividi" di Android (share_target POST nel manifest).
 // Arrivano due cose diverse:
 //  - un link di Google Maps (title/text/url) → si passa alla pagina /importa/condividi di sempre;
-//  - uno screenshot di Instagram/TikTok (campo "immagini") → Haiku legge nome e città
-//    (la stessa e unica chiamata dell'import manuale) e si va alla pagina con l'esito.
+//  - screenshot di Instagram/TikTok (campo "immagini", fino a 5 slide di un carosello) → Haiku legge
+//    nome e città da ognuno (la stessa chiamata dell'import manuale) e si va alla pagina con l'esito.
 // Le immagini non passano da un redirect: qui si leggono e nell'URL va solo l'esito.
 
 // Formati che Haiku accetta; il tipo si ricava dai primi byte (Android a volte non lo manda).
@@ -22,6 +22,9 @@ function sniffImageType(b: Uint8Array): string | null {
 
 // Limite della API di Anthropic per una singola immagine.
 const MAX_BYTES = 5 * 1024 * 1024;
+// Slide di un carosello lette per condivisione e locali tenuti in tutto (proposta 13).
+const MAX_IMMAGINI = 5;
+const MAX_LUOGHI = 8;
 const RESULT_PAGE = "/importa/condividi/immagine";
 const LETTO_COOKIE = "mapetite_reel_letto";
 
@@ -46,13 +49,15 @@ async function currentUserId(request: NextRequest): Promise<string | null> {
 }
 
 // Solo in sviluppo con E2E_FAKE_USER: lettura finta dal cookie "e2e_lettura" (niente Haiku nei test).
-function fakeReading(request: NextRequest): ImportResult | null {
+// Un array dà una lettura diversa per ogni immagine (carosello), nell'ordine.
+function fakeReadings(request: NextRequest): ImportResult[] | null {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = request.cookies.get("e2e_lettura")?.value;
   if (!raw) return null;
   try {
-    const p = JSON.parse(decodeURIComponent(raw));
-    return fromParsed(p);
+    const p: unknown = JSON.parse(decodeURIComponent(raw));
+    const list = (Array.isArray(p) ? p : [p]).map(fromParsed);
+    return list.length ? list : null;
   } catch {
     return null;
   }
@@ -88,32 +93,53 @@ export async function POST(request: NextRequest) {
     return go(`/login?message=${encodeURIComponent(message)}`);
   }
 
-  // Una sola immagine per condivisione: se ne arrivano di più si legge la prima e lo si dice.
+  // Carosello ("5 posti dove…", una slide per locale): si leggono fino a MAX_IMMAGINI screenshot,
+  // una lettura Haiku ciascuno (in parallelo), e i locali si uniscono senza doppioni nell'ordine delle
+  // slide. Oltre il massimo si leggono le prime e lo si dice.
   const out = new URLSearchParams();
-  if (images.length > 1) out.set("piu", "1");
+  if (images.length > MAX_IMMAGINI) out.set("piu", "1");
   const result = (params: Record<string, string | null>) => {
     for (const [k, v] of Object.entries(params)) if (v) out.set(k, v);
     return go(`${RESULT_PAGE}?${out}`);
   };
 
-  const file = images[0];
-  if (file.size > MAX_BYTES) return result({ errore: "grande" });
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const mediaType = sniffImageType(bytes);
-  if (!mediaType) return result({ errore: "formato" });
+  const prese = images.slice(0, MAX_IMMAGINI);
+  const scelte: { mediaType: string; bytes: Uint8Array }[] = [];
+  let scarto: "grande" | "formato" | null = null;
+  for (const file of prese) {
+    if (file.size > MAX_BYTES) { scarto ??= "grande"; continue; }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const mediaType = sniffImageType(bytes);
+    if (!mediaType) { scarto ??= "formato"; continue; }
+    scelte.push({ mediaType, bytes });
+  }
+  if (scelte.length === 0) return result({ errore: scarto ?? "formato" });
 
-  // Tetto AI (src/lib/ai-limit.ts): conta solo le letture vere con Haiku.
-  const finta = fakeReading(request);
-  if (!finta && !allowAi("screenshot", clientKey(request, userId))) return result({ errore: "limite" });
+  // Tetto AI (src/lib/ai-limit.ts): conta solo le letture vere con Haiku, una per immagine.
+  const finte = fakeReadings(request);
+  const key = clientKey(request, userId);
+  const permesse = finte ? scelte : scelte.filter(() => allowAi("screenshot", key));
+  if (permesse.length === 0) return result({ errore: "limite" });
 
-  const lettura =
-    finta ??
-    (await extractPlace({ image: { mediaType, data: Buffer.from(bytes).toString("base64") } }));
-  console.log("[condividi/ricevi] screenshot letto:", lettura.nome ? "trovato" : "nessun locale");
+  const letture = await Promise.all(permesse.map((img, i) =>
+    finte
+      ? Promise.resolve(finte[Math.min(i, finte.length - 1)])
+      : extractPlace({ image: { mediaType: img.mediaType, data: Buffer.from(img.bytes).toString("base64") } }).catch(() => null),
+  ));
+  const luoghi: Luogo[] = [];
+  for (const l of letture) {
+    for (const x of l?.luoghi?.length ? l.luoghi : l?.nome ? [{ nome: l.nome, citta: l.citta, categoria: l.categoria }] : []) {
+      if (luoghi.length >= MAX_LUOGHI) break;
+      if (!luoghi.some((y) => y.nome.toLowerCase() === x.nome.toLowerCase())) luoghi.push(x);
+    }
+  }
+  console.log(`[condividi/ricevi] ${permesse.length} screenshot letti:`, luoghi.length ? `${luoghi.length} locali` : "nessun locale");
+  if (permesse.length > 1) out.set("lette", String(permesse.length));
 
-  if (!lettura.nome) return result({ errore: "illeggibile" });
-  // Gli altri locali dello stesso post ("3 posti dove…") viaggiano insieme, già letti: nessuna nuova lettura AI.
-  const altri = (lettura.luoghi ?? []).slice(1);
+  const lettura = luoghi[0];
+  if (!lettura) return result({ errore: "illeggibile" });
+  // Gli altri locali del post viaggiano insieme, già letti: nessuna nuova lettura AI.
+  const altri = luoghi.slice(1);
   const res = result({ nome: lettura.nome, citta: lettura.citta, categoria: lettura.categoria, altri: altri.length ? JSON.stringify(altri) : null });
   // Segno che la lettura l'ha fatta davvero questo telefono: solo così la pagina dell'esito può
   // salvare da sola. Un link costruito a mano con ?nome=… chiede sempre "È questo?".

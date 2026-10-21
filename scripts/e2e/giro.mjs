@@ -2428,16 +2428,17 @@ else {
     const reelWrites = [];
     await lctx.route("**/rest/v1/contenuti_locali**", (route) => { const req = route.request(); reelWrites.push({ m: req.method(), url: req.url() }); return route.fulfill({ status: req.method() === "POST" ? 201 : 200, json: [] }); });
     // Salva dal reel (sprint 25/10): un post con 3 locali; il primo combacia con Google e si salva da solo.
-    await setLettura({ luoghi: [{ nome: "Bar Rossi", citta: "Roma", categoria: "bar" }, { nome: "Caffè Verdi", citta: "Roma", categoria: "caffè" }, { nome: "Osteria Blu", citta: "Roma", categoria: "osteria" }] });
+    // Carosello (proposta 13): due slide, una lettura ciascuna; Caffè Verdi in tutte e due resta uno solo.
+    await setLettura([{ luoghi: [{ nome: "Bar Rossi", citta: "Roma", categoria: "bar" }, { nome: "Caffè Verdi", citta: "Roma", categoria: "caffè" }] }, { luoghi: [{ nome: "caffè verdi", citta: "Roma", categoria: "caffè" }, { nome: "Osteria Blu", citta: "Roma", categoria: "osteria" }] }]);
     const s1 = await shareImages([["immagini", img("story1.png")], ["immagini", img("story2.png")], ["text", "Guarda questo post"]]);
-    ok(s1.status === 303 && s1.loc.includes("/importa/condividi/immagine?") && s1.loc.includes("piu=1") && s1.loc.includes("nome=Bar+Rossi") && s1.loc.includes("citta=Roma") && s1.loc.includes("altri="), `condividi screenshot: letto nome, città e gli altri locali del post, poi pagina dell'esito (${s1.status} ${s1.loc.slice(0, 90)})`);
+    ok(s1.status === 303 && s1.loc.includes("/importa/condividi/immagine?") && s1.loc.includes("lette=2") && s1.loc.includes("nome=Bar+Rossi") && s1.loc.includes("citta=Roma") && s1.loc.includes("altri="), `condividi screenshot: letto nome, città e gli altri locali del post, poi pagina dell'esito (${s1.status} ${s1.loc.slice(0, 90)})`);
     const w0 = lwrites.length;
     await lp.goto(new URL(s1.loc, BASE).href, { waitUntil: "networkidle" });
     await lp.getByTestId("reel-salvato").waitFor({ timeout: 5000 });
     const ins = lwrites.slice(w0).find((w) => w.m === "POST");
     ok(await lp.getByTestId("reel-salvato").getByText("Bar Rossi, Roma").isVisible() && await lp.getByText("✓ Salvato in 📌 Voglio andarci").isVisible(), "salva dal reel: il locale che combacia si salva da solo ('✓ Salvato in 📌 Voglio andarci')");
     ok(addCalls.at(-1)?.googlePlaceId === "GBR1" && JSON.stringify(ins?.body?.tags) === '["Da provare"]' && ins?.body?.place_id === "00000000-0000-0000-0000-000000000201", "salva dal reel: salvato in 'Da provare' senza toccare niente");
-    ok(await lp.getByTestId("screenshot-piu").isVisible(), "condividi screenshot: con più immagini dice che ha letto solo la prima");
+    ok((await lp.getByTestId("screenshot-piu").textContent())?.trim() === "Ho letto 2 immagini: 3 posti.", `carosello: legge tutte le slide e unisce i locali senza doppioni (${await lp.getByTestId("screenshot-piu").textContent()})`);
     ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "salva dal reel: una sola ricerca Google, con nome e città del primo locale");
     ok(await lp.getByTestId("reel-altri").getByText("Nel reel ci sono anche").isVisible() && await lp.getByTestId("reel-altro").count() === 2, "salva dal reel: 'Nel reel ci sono anche' con gli altri 2 locali, senza cercarli");
     ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");

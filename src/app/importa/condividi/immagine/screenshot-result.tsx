@@ -21,6 +21,7 @@ export default function ScreenshotResult({
   autoSave = false,
   errore,
   piu,
+  lette = 0,
   userId,
 }: {
   nome: string;
@@ -30,6 +31,8 @@ export default function ScreenshotResult({
   autoSave?: boolean;
   errore: string;
   piu: boolean;
+  // Slide del carosello lette (più di una: si dice quante).
+  lette?: number;
   userId: string | null;
 }) {
   const luoghi: Luogo[] = nome ? [{ nome, citta: citta || null, categoria: categoria || null }, ...altri] : [];
@@ -48,9 +51,10 @@ export default function ScreenshotResult({
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Salva dal reel</h1>
 
-      {piu && (
+      {(piu || lette > 1) && !errore && (
         <p className="mb-4 rounded-btn bg-surface px-4 py-3 text-sm text-text-muted" data-testid="screenshot-piu">
-          Hai condiviso più immagini: ho letto solo la prima.
+          {piu ? `Ho letto le prime ${lette || 5} immagini` : `Ho letto ${lette} immagini`}
+          {luoghi.length > 1 ? `: ${luoghi.length} posti.` : "."}
         </p>
       )}
 

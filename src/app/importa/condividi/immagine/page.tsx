@@ -9,7 +9,7 @@ function parseAltri(raw: string): Luogo[] {
     const arr: unknown = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
     const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
-    return arr.slice(0, 4).flatMap((x) => {
+    return arr.slice(0, 7).flatMap((x) => {
       const nome = s((x as Record<string, unknown>)?.nome, 120);
       return nome ? [{ nome, citta: s((x as Record<string, unknown>).citta, 80), categoria: s((x as Record<string, unknown>).categoria, 40) }] : [];
     });
@@ -50,6 +50,7 @@ export default async function CondividiImmaginePage({
       altri={parseAltri(pick("altri"))}
       errore={pick("errore")}
       piu={pick("piu") === "1"}
+      lette={Math.min(5, Number.parseInt(pick("lette"), 10) || 0)}
       userId={e2eUser ?? userData?.user?.id ?? null}
     />
   );
