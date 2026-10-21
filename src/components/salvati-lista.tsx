@@ -163,7 +163,7 @@ export default function SalvatiLista({
               className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
             />
             {query !== "" && (
-              <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-10 w-10 items-center justify-center text-text-muted">
+              <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-11 w-11 items-center justify-center text-text-muted">
                 <X size={16} aria-hidden />
               </button>
             )}
@@ -229,7 +229,7 @@ export default function SalvatiLista({
           <h2 className="truncate font-display text-base font-semibold text-text">{origin ? "Vicino a te" : "I tuoi salvati"}</h2>
           <div className="flex shrink-0 items-center gap-1.5">
             {activeCity !== null && (
-              <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-9 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
+              <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
                 {activeCity} <X size={12} aria-hidden />
               </button>
             )}

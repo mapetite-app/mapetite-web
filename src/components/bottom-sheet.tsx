@@ -502,7 +502,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       )}
       {conferme.length > 0 && !loadingVerdicts && (
         <p data-testid="conferme-recensioni" className="mt-1 text-xs font-sans text-text">
-          <span aria-hidden className="text-success">✓ </span>Dalle recensioni: {conferme.map(([r, c], k) => `${r} ${k === 0 ? `in ${c} ${c === 1 ? "posto" : "posti"} su ${places.length}` : `in ${c}`}`).join(" · ")}
+          <span aria-hidden className="text-success">✓ </span>Dalle recensioni: {conferme.map(([r, c], k) => `${r} ${k === 0 ? `in ${c} ${c === 1 ? "posto" : "posti"} su ${places.length}` : `in ${c}`}`.replace(/ /g, "\u00a0")).join(" · ")}
         </p>
       )}
       {/* Mappa del gusto (sprint 25/10): quali gusti del profilo hanno cambiato l'ordine. */}

@@ -341,7 +341,7 @@ ok((await page.getByRole("button", { name: "Salva Terrazza Uno" }).count()) === 
 await apriOpzioni(page);
 ok((await page.getByTestId("ho-capito").textContent()) === "Ho capito: Bar · rooftop · a Roma", "lista B: sotto il titolo cosa ha capito l'AI (tipo e requisiti)");
 // Chiave B (22/10): quanti posti hanno ogni requisito confermato dalle recensioni, solo dai dati dell'AI.
-ok(/^✓ Dalle recensioni: rooftop in 1 posto su \d+ · romantico in 1$/.test((await page.getByTestId("conferme-recensioni").textContent()) ?? ""), `pillola: 'Dalle recensioni: rooftop in 1 posto su N' (${await page.getByTestId("conferme-recensioni").textContent().catch(() => "assente")})`);
+ok(/^✓ Dalle recensioni: rooftop\sin\s1\sposto\ssu\s\d+ · romantico\sin\s1$/.test((await page.getByTestId("conferme-recensioni").textContent()) ?? ""), `pillola: 'Dalle recensioni: rooftop in 1 posto su N' (${await page.getByTestId("conferme-recensioni").textContent().catch(() => "assente")})`);
 { const t = await page.locator("ul.snap-x").innerText(); ok(/cocktail bar/i.test(t) && !/cocktail_bar/.test(t), "lista B: categoria in italiano leggibile (Cocktail bar, non cocktail_bar)"); }
 ok(await page.locator("ul.snap-x li").first().evaluate((li) => {
   const name = [...li.querySelectorAll("span")].find((s) => s.textContent === "Terrazza Uno");

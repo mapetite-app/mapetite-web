@@ -14,16 +14,25 @@ function normalizza(t: string): string {
   return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-export function provaRequisito(requisito: string, recensioni: { text: string }[] | null | undefined): string | null {
+// Negazioni vicine alla parola ("niente terrazza", "per niente romantico", "non c'è vista"): non è una prova.
+const NEGAZIONE = /\b(non|niente|nessun[oa]?|senza|manca|mancava|mai)\b/;
+
+// Recensioni con il voto (Google): la prova si cerca prima nelle 5 e 4 stelle, mai in quelle da 1-2
+// (collaudo del 22/10: "✓ rooftop" mostrava la frase di una recensione da 1 stella).
+export function provaRequisito(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined): string | null {
   const parole = normalizza(requisito).split(/\s+/).filter((w) => w.length >= 3 && !VUOTE.has(w));
   // "non turistico": una frase che contiene "turistico" direbbe spesso il contrario.
   if (parole.length === 0 || parole[0] === "non") return null;
   const radici = parole.map(radice).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  for (const r of recensioni ?? []) {
+  const ordinate = [...(recensioni ?? [])].filter((r) => r.rating == null || r.rating >= 3).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
+  for (const r of ordinate) {
     const frasi = r.text.split(/(?<=[.!?…])\s+|\n+/);
     for (const f of frasi) {
       const n = normalizza(f);
       if (!radici.every((x) => new RegExp(`\\b${x}`).test(n))) continue;
+      // Negazione nelle 4 parole prima della parola trovata: si salta la frase.
+      const prima = n.slice(0, n.search(new RegExp(`\\b${radici[0]}`))).split(/\s+/).slice(-5).join(" ");
+      if (NEGAZIONE.test(prima)) continue;
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
       if (pulita.length < 12) continue;
       if (pulita.length <= MAX) return pulita;

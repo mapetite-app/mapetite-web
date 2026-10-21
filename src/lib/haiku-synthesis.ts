@@ -419,7 +419,9 @@ export async function getSynthesis(
             // Requisiti confermati: il ✓ resta SOLO se la parola è nella richiesta e una frase delle
             // recensioni la contiene (collaudo del 22/10: l'AI rimandava "romantico" a quasi tutti).
             if (Array.isArray(o.confermati)) {
-              const recensioni = (batch.find((p) => p.id === o.id)?.reviewTexts ?? []).map((text) => ({ text }));
+              const pl = batch.find((p) => p.id === o.id);
+              // Con il voto se Google l'ha dato: la prova si cerca nelle recensioni positive.
+              const recensioni = pl?.reviewItems?.length ? pl.reviewItems : (pl?.reviewTexts ?? []).map((text) => ({ text }));
               const conf: Requisito[] = [];
               for (const x of o.confermati) {
                 if (typeof x !== "string" || x.length > 30 || hasEnglish(x)) continue;

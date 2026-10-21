@@ -724,7 +724,7 @@ export default function VenueSheet({
                 ))}
               </div>
               {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
-                <p data-testid="prova-recensione" className="mt-2 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                <p data-testid="prova-recensione" ref={(el) => { el?.scrollIntoView({ block: "center", behavior: "smooth" }); }} className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
                   <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
@@ -967,7 +967,7 @@ export default function VenueSheet({
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
               className={TILE}
             >
-              {walk != null ? <Footprints size={17} aria-hidden /> : <Navigation size={17} aria-hidden />}
+              {walk != null ? <Footprints size={17} aria-hidden className="shrink-0" /> : <Navigation size={17} aria-hidden className="shrink-0" />}
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
             </a>
             {saveSlot}
