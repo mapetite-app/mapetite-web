@@ -1,0 +1,38 @@
+# Cose che restano a Lorenzo
+
+Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossime chat se non l'ho fatto, perché è importante che tu possa andare avanti".
+
+**Regola per ogni sessione e ogni chat con Lorenzo:** in fondo al messaggio finale (e in cima a ogni PR) c'è sempre una sezione **"Ti ricordo"** con le voci ancora APERTA di questo file, una riga ciascuna, prima le più importanti.
+- Quando Lorenzo dice che una cosa è fatta, o quando la sessione lo verifica da sola (per esempio il pulsante Google funziona, la chiave c'è su Vercel), la voce passa a FATTA, con la data.
+- Le voci non si tolgono mai: si segnano FATTA.
+
+## Aperte
+
+1. **Accesso con Google in un tocco (sprint, chiave 0) — APERTA.** Il pulsante "Continua con Google" è già pronto e compare da solo quando Google è acceso su Supabase.
+   - Su console.cloud.google.com → API e servizi → Credenziali → "Crea credenziali" → "ID client OAuth", tipo "Applicazione web".
+   - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
+   - Copia ID client e chiave segreta in Supabase (stessa pagina) e accendi Google.
+   - Come si verifica: in /login compare "Continua con Google". Le sessioni lo controllano anche da sole con l'API di gestione Supabase (`external_google_enabled`; il 21/10 alle 23:00 era ancora spento).
+2. **Quota Google a 100 al giorno fino al 26/10 — APERTA (da controllare).** La regola dello sprint vale solo se la console Google mostra davvero 100.
+   - Controlla su console.cloud.google.com → API e servizi → Places API (New) → Quote.
+   - Dimmi il numero che vedi.
+   - Dal 27/10 si torna a 50.
+3. **Prove su telefoni veri (iPhone e Android) — APERTA.**
+   - Installa l'app dalla home del telefono.
+   - Fai il giro: salva da un reel, cerca, apri la scheda, segna "Ci sono stato".
+   - Scrivi in una PR cosa non va. Da qui si prova solo un telefono simulato.
+4. **Reel di Instagram letti dal link — APERTA, facoltativa.** Senza, Instagram funziona con lo screenshot.
+   - Crea un'app gratuita su developers.facebook.com con il tuo account e aggiungi il prodotto "oEmbed".
+   - Mandami ID dell'app e "client token" (Impostazioni → Avanzate), oppure mettili su Vercel come `META_OEMBED_TOKEN` nel formato `IDAPP|CLIENTTOKEN`.
+   - Il codice per usarla lo aggiunge il team quando la chiave c'è.
+5. **Voti veri di Tripadvisor nella scheda — APERTA, facoltativa.** Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
+6. **Decisioni in sospeso — APERTE, una riga ciascuna** (dettagli in `BACKLOG.md`):
+   - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6);
+   - omaggio del locale a chi torna (proposta 12);
+   - serata di pre-apertura con utenti scelti per gusto (proposta 9);
+   - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3).
+
+## Fatte
+
+- **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.
+- **Unire le PR #88 e #89 — FATTA il 21/10**, dalla sessione del mattino (PR #90).
