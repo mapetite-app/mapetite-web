@@ -68,6 +68,8 @@ export type Venue = {
   photoAuthor?: string | null;
   // "Per te" dai gusti (mappa del gusto): scritto dall'AI solo con i gusti veri (vedi haiku-synthesis).
   perTe?: string | null;
+  // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).
+  requisiti?: { r: string; prova: string }[] | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
   editorialSummary?: string | null;
 };
@@ -156,6 +158,8 @@ export default function VenueSheet({
   const friendsKey = venue.id;
   // Tocco su "✓ Ci sono stato" in questa scheda (per il foglio del diario): legato al locale, così
   // passando a un altro con "‹ ›" non si apre lì.
+  // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
+  const [provaAperta, setProvaAperta] = useState<string | null>(null);
   const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
   const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
   const setVisitAskedAt = (at: number | null) => setVisitAsked(at == null ? null : { id: venue.id, at });
@@ -702,14 +706,41 @@ export default function VenueSheet({
             </section>
           ) : null}
 
-          {/* "Per te · …" in corallo: solo il perché già scritto (gusti o ricerca), mai inventato. */}
+          {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
+          {(venue.requisiti?.length ?? 0) > 0 && (
+            <div data-testid="requisiti-scheda" className="mt-3.5">
+              <div className="flex flex-wrap gap-2">
+                {venue.requisiti!.map(({ r }) => (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-expanded={provaAperta === r}
+                    onClick={() => setProvaAperta((x) => (x === r ? null : r))}
+                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e3ddd2] bg-white text-brand"}`}
+                  >
+                    <span aria-hidden className={provaAperta === r ? "text-white" : "text-success"}>✓</span>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
+                <p data-testid="prova-recensione" className="mt-2 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* "Per te · …" in corallo: solo il perché già scritto, mai inventato. "Per te" solo se viene dai
+              gusti; il perché della ricerca si chiama "Perché qui" (non parla della persona). */}
           {perTeLine && (
             <p data-testid="per-te-scheda" className="mt-3.5 flex items-center gap-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
               <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
                 <Sparkles size={15} />
               </span>
               <span className="min-w-0">
-                <b className="font-display font-semibold text-accent">Per te</b> · {perTeLine}
+                <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
               </span>
             </p>
           )}

@@ -1015,7 +1015,15 @@ await page.getByText("Vista vera sui tetti di Roma.").last().waitFor({ timeout: 
 ok(await page.getByTestId("verdetto-scheda").isVisible(), "scheda B: c'è 'Il verdetto Mapetite' (Lorenzo 12/10)");
 { const v = await page.getByTestId("verdetto-box").evaluate((el) => { const cs = getComputedStyle(el); const t = el.querySelector("p:last-child"); const ts = t ? getComputedStyle(t) : null; return { top: cs.borderTopWidth, bottom: cs.borderBottomWidth, italic: ts?.fontStyle, serif: /newsreader/i.test(ts?.fontFamily ?? ""), size: parseFloat(ts?.fontSize ?? "0") }; });
   ok(v.top === "1px" && v.bottom === "1px" && v.italic === "italic" && v.serif && v.size >= 20, `scheda (mockup A): verdetto in corsivo serif grande tra due filetti (${JSON.stringify(v)})`); }
-ok(((await page.getByTestId("per-te-scheda").textContent()) ?? "").replace(/\s+/g, " ").trim() === "Per te · Ha una vera terrazza.", "scheda (mockup A): riga 'Per te · …' con il perché già scritto (mai inventato)");
+ok(((await page.getByTestId("per-te-scheda").textContent()) ?? "").replace(/\s+/g, " ").trim() === "Perché qui · Ha una vera terrazza.", "scheda (mockup A): riga 'Perché qui · …' con il perché della ricerca ('Per te' solo dai gusti)");
+// Proposta 18 (22/10): "✓ rooftop" nella scheda, un tocco mostra la frase della recensione che lo prova.
+{ const rq = page.getByTestId("requisiti-scheda");
+  const prima = await page.getByTestId("prova-recensione").count();
+  await rq.getByRole("button", { name: /rooftop/ }).click();
+  const t = (await page.getByTestId("prova-recensione").textContent().catch(() => "")) ?? "";
+  const h = await rq.getByRole("button", { name: /rooftop/ }).evaluate((b) => b.getBoundingClientRect().height);
+  ok(prima === 0 && t.includes("«Rooftop bellissimo sopra i tetti.»") && t.includes("da una recensione su Google") && h >= 44, `scheda: '✓ rooftop' mostra la frase della recensione che lo prova (${t.trim()}, ${Math.round(h)}px)`);
+  await rq.getByRole("button", { name: /rooftop/ }).click(); }
 ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "false" && !(await page.getByTestId("scheda-dettagli").isVisible()), "scheda (mockup A): Info, Recensioni e In breve dietro 'Orari, contatti, recensioni ›'");
 ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.getByText("tramonto", { exact: true }).count()) >= 1, "scheda B: il perché e i tag usciti dalla card sono nella scheda (nessuna informazione persa)");
 { const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
