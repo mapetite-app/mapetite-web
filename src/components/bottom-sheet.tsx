@@ -478,9 +478,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Quante card hanno ogni requisito confermato dalle recensioni (chiave B: l'AI che si vede).
   // Solo numeri veri dalle risposte dell'AI: niente se nessun requisito è confermato.
   const conferme = (() => {
-    const n = new Map<string, number>();
-    for (const p of places) for (const r of details?.[p.id]?.requisiti ?? []) n.set(r, (n.get(r) ?? 0) + 1);
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+    // "autentica"/"autentico" e "trattoria autentica"/"autentica" sono lo stesso requisito (l'AI li scrive a gruppi).
+    const chiave = (r: string) => r.split(" ").map((w) => w.replace(/[aeio]$/, "")).join(" ");
+    const n = new Map<string, { label: string; ids: Set<string> }>();
+    for (const p of places) {
+      for (const r of details?.[p.id]?.requisiti ?? []) {
+        const k = chiave(r);
+        const k2 = [...n.keys()].find((x) => x === k || x.endsWith(` ${k}`) || k.endsWith(` ${x}`)) ?? k;
+        const cur = n.get(k2) ?? { label: r, ids: new Set<string>() };
+        if (r.length < cur.label.length) cur.label = r;
+        cur.ids.add(p.id);
+        n.set(k2, cur);
+      }
+    }
+    return [...n.values()].map((v): [string, number] => [v.label, v.ids.size]).sort((a, b) => b[1] - a[1]).slice(0, 3);
   })();
   const optionsPanel = title ? (
     <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
