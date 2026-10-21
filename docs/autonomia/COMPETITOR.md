@@ -75,6 +75,12 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 
 ---
 
+### Controllo del 21/10 mattina
+- **Corner:** ultima versione 5.16.0 del 26/09/2026, solo correzioni ([App Store](https://apps.apple.com/app/id1668282277)). Niente di nuovo da inseguire: il salvataggio dai social resta un pin senza giudizio. Da prendere: la mappa che "cresce" con te. Dove facciamo meglio: verdetto subito dopo il salvataggio (fatto oggi) e caroselli interi.
+- **Beli:** classifica a coppie ("meglio questo o quello?") e consigli personali solo dopo almeno 15 locali classificati ([WSJ via To Vima](https://www.tovima.com/wsj/the-app-that-makes-rating-restaurants-fun-again-and-gets-better-the-more-you-use-it/), [Harvard Crimson, 02/2026](https://www.thecrimson.com/article/2026/2/26/beli-inquiry/)). Da prendere: il gioco a coppie è divertente. Dove facciamo meglio: la mappa del gusto dà consigli dal primo minuto, senza 15 visite.
+- **Mapstr:** Mapstr Plus dà accesso alle pre-aperture di locali nuovi con sconti o dessert (comunicato del 31/07/2026, [Tendance Hôtellerie](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)); importa da Google Maps, CSV e KML ([App Store](https://apps.apple.com/app/id917288465)). Conferma la nostra proposta 9 (in pausa fino al 26/10). Dove facciamo meglio: import dai social, non solo dalle mappe (proposta 16).
+- **Export dei salvati di Instagram:** solo estensioni del browser, spesso a pagamento, che danno link e didascalie senza locali ([esempio](https://chromewebstore.google.com/detail/dibmfjgbnhbfhlajpahnbiiabpdabajo)). Instagram permette di scaricare i propri dati, inclusi i salvati, ma ogni 4 giorni ([guida](https://takeoutday.org/guides/how-to-export-instagram-data)).
+
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager
@@ -130,6 +136,12 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 
 ### Pubster — nuovo, 20/10
 - Fedeltà con monete virtuali raccolte via QR in pub, pizzerie e bar ([RocketReach](https://rocketreach.co/pubster-profile_b5e9e5cbf42e8c51)). Numeri: dato non trovato. Ultimo controllo: 20/10/2026
+
+### App "salva dal reel" (GeoTok, Korka, Drawer, someday., Go There, Places: Save & Organize) — nuove, 21/10
+- **Cosa fanno:** condividi un TikTok o un reel e l'app trova il posto. GeoTok legge didascalia, scritte e audio e controlla su TripAdvisor e Foursquare, 14,99 $/mese ([Peerlist](https://peerlist.io/shalex/project/geotok--save-every-tiktok-worth-eating-at)); Korka usa didascalie, foto e profili taggati ([App Store](https://apps.apple.com/app/id6762612703)); Drawer e Go There mettono il pin sulla mappa ([Drawer](https://apps.apple.com/us/app/-/id582432085), [Go There](https://hunted.space/product/go-there)); someday. estrae più posti e li mette in raccolte ([Hunted](https://www.hunted.space/product/someday-2)); Places: Save & Organize è gratis solo per 2 posti ([App Store](https://apps.apple.com/us/app/-/id6737359980)). Corner dice di trasformare i link in pin, senza spiegare come ([App Store](https://apps.apple.com/app/id1668282277)). Descrizioni dei produttori, precisione non verificata.
+- **Da prendere:** più posti per video (fatto il 21/10), raccolte automatiche dal post, lettura dei profili taggati (fatto nel prompt).
+- **Meglio noi:** gratis, ogni posto verificato su Google prima di salvarlo (mai pin inventati), salvataggio da solo solo quando combacia, e soprattutto il verdetto onesto e la ricerca per i propri gusti dopo il salvataggio: loro finiscono al pin.
+- Ultimo controllo: 21/10/2026
 
 ## In sintesi: dove nessuno arriva
 1. **Ricerca su tutta Google + verdetto onesto per ogni posto**: Places e Corner cercano solo tra i propri posti; Google ordina per fama.

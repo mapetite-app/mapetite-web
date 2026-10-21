@@ -4,44 +4,51 @@ import Anthropic from "@anthropic-ai/sdk";
 // Usata da /api/import-caption (Importa → screenshot) e da /importa/condividi/ricevi
 // (screenshot condiviso da Instagram/TikTok su Android): una sola chiamata per immagine.
 
+export type Luogo = { nome: string; citta: string | null; categoria: string | null };
+
 export type ImportResult = {
   nome: string | null;
   citta: string | null;
   categoria: string | null;
+  // Tutti i locali nominati nel post (i reel "5 posti dove…"), il primo è nome/citta/categoria. Max 5.
+  luoghi?: Luogo[];
 };
 
-export const EMPTY: ImportResult = { nome: null, citta: null, categoria: null };
+export const EMPTY: ImportResult = { nome: null, citta: null, categoria: null, luoghi: [] };
+export const MAX_LUOGHI = 5;
 
-const SYSTEM_PROMPT = `Sei un assistente che estrae informazioni su locali da caption di post social (Instagram, TikTok, YouTube) o da screenshot di post social.
+const SYSTEM_PROMPT = `Sei un assistente che estrae i locali (ristoranti, bar, caffè, ecc.) nominati in caption di post social (Instagram, TikTok, YouTube) o in screenshot di post e reel.
 Rispondi SOLO con un oggetto JSON valido, senza testo aggiuntivo, senza backtick, senza markdown.
 La struttura deve essere esattamente:
-{"nome":string|null,"citta":string|null,"categoria":string|null}
+{"luoghi":[{"nome":string,"citta":string|null,"categoria":string|null}]}
 
-Il testo può provenire da uno screenshot di un post social: leggi il nome del locale, la città e la tipologia da quello che vedi nell'immagine.
+DOVE CERCARE (negli screenshot guarda tutto): il tag posizione del post (📍 o la riga sotto il nome del profilo),
+le scritte sovrapposte al video, la didascalia, i @profili taggati, gli hashtag con il nome del locale, l'insegna se leggibile.
 
-REGOLE PER OGNI CAMPO:
-
-"nome": il nome proprio del locale (ristorante, bar, ecc.). Cerca parole con iniziale maiuscola
-o precedute da "da", "al", "il", "@", "#". Se non è identificabile con certezza, metti null.
-
-"citta": la città in cui si trova il locale. Cerca nomi di città, quartieri famosi o riferimenti
-geografici espliciti. Restituisci solo la città (non provincia né nazione). Se assente, null.
-
-"categoria": il tipo di locale. Scegli SOLO tra queste categorie valide:
-pizzeria, sushi, ristorante di pesce, gelateria, pasticceria, caffè, enoteca, bar, pub,
-hamburgheria, ristorante ramen, ristorante cinese, ristorante thai, braceria, trattoria, osteria, ristorante.
-Scegli quella più specifica e pertinente. Se non è deducibile, metti null.
+REGOLE:
+- Inserisci SOLO locali il cui nome è scritto esplicitamente nel testo o nell'immagine. MAI inventare o indovinare un locale
+  da una descrizione ("la carbonara più buona di Roma" senza nome → nessun locale). Se non ce n'è nessuno: {"luoghi":[]}.
+- Il profilo di chi pubblica (creator, food blogger, "Autore:") NON è un locale, a meno che sia chiaramente il profilo del locale stesso.
+- Un @profilo o un hashtag del locale va riscritto come si legge: @trattoria_da_enzo → "Trattoria da Enzo", #pizzeriabella → "Pizzeria Bella".
+- Se il post nomina più locali (classifiche, "3 posti dove…"), mettili tutti nell'ordine in cui compaiono, al massimo 5.
+- "citta": la città del locale (non provincia né nazione). Un quartiere famoso vale la sua città (Trastevere → Roma, Navigli → Milano).
+  Se la città vale per tutto il post, mettila in ogni locale. Se assente, null.
+- "categoria": SOLO una tra pizzeria, sushi, ristorante di pesce, gelateria, pasticceria, caffè, enoteca, bar, pub,
+  hamburgheria, ristorante ramen, ristorante cinese, ristorante thai, braceria, trattoria, osteria, ristorante. Se non deducibile, null.
 
 ESEMPI (input → output atteso):
 
 "Serata magica da Borghese a Milano 🍝 uno dei migliori ristoranti della città! #foodie #milano"
-→ {"nome":"Borghese","citta":"Milano","categoria":"ristorante"}
+→ {"luoghi":[{"nome":"Borghese","citta":"Milano","categoria":"ristorante"}]}
 
-"Finalmente ho provato @SushiZen Roma — nigiri incredibili, ve lo consiglio!"
-→ {"nome":"SushiZen","citta":"Roma","categoria":"sushi"}
+"Finalmente ho provato @sushizen.roma — nigiri incredibili, ve lo consiglio!\nAutore: giulia.mangia"
+→ {"luoghi":[{"nome":"Sushi Zen","citta":"Roma","categoria":"sushi"}]}
 
-"Colazione da sogno alla Pasticceria Martini, Napoli. Il cornetto è una poesia 🥐"
-→ {"nome":"Pasticceria Martini","citta":"Napoli","categoria":"pasticceria"}`;
+"3 colazioni da provare a Napoli 🥐 1. Pasticceria Martini 2. @caffe_mexico 3. Leopoldo"
+→ {"luoghi":[{"nome":"Pasticceria Martini","citta":"Napoli","categoria":"pasticceria"},{"nome":"Caffè Mexico","citta":"Napoli","categoria":"caffè"},{"nome":"Leopoldo","citta":"Napoli","categoria":"pasticceria"}]}
+
+"La carbonara più buona di Roma, non ci credete? 🤤 #roma #carbonara"
+→ {"luoghi":[]}`;
 
 export type ImportImage = { mediaType: string; data: string };
 
@@ -61,7 +68,7 @@ export async function extractPlace(input: { caption?: string; image?: ImportImag
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 256,
+      max_tokens: 400,
       system: SYSTEM_PROMPT,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       messages: [{ role: "user", content: content as any }],
@@ -78,16 +85,29 @@ export async function extractPlace(input: { caption?: string; image?: ImportImag
     }
 
     try {
-      const parsed = JSON.parse(text);
-      return {
-        nome: typeof parsed.nome === "string" ? parsed.nome : null,
-        citta: typeof parsed.citta === "string" ? parsed.citta : null,
-        categoria: typeof parsed.categoria === "string" ? parsed.categoria : null,
-      };
+      return fromParsed(JSON.parse(text));
     } catch {
       return EMPTY; // JSON non valido
     }
   } catch {
     return EMPTY; // errore di rete o della API: niente eccezioni verso chi chiama
   }
+}
+
+const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+
+// Risposta dell'AI → risultato. Accetta anche il vecchio formato {nome, citta, categoria}.
+export function fromParsed(parsed: unknown): ImportResult {
+  const o = (parsed ?? {}) as Record<string, unknown>;
+  const raw = Array.isArray(o.luoghi) ? o.luoghi : o.nome ? [o] : [];
+  const luoghi: Luogo[] = [];
+  for (const l of raw as Record<string, unknown>[]) {
+    const nome = str(l?.nome, 120);
+    if (!nome) continue;
+    if (luoghi.some((x) => x.nome.toLowerCase() === nome.toLowerCase())) continue;
+    luoghi.push({ nome, citta: str(l.citta, 80), categoria: str(l.categoria, 40) });
+    if (luoghi.length === MAX_LUOGHI) break;
+  }
+  const first = luoghi[0];
+  return { nome: first?.nome ?? null, citta: first?.citta ?? null, categoria: first?.categoria ?? null, luoghi };
 }

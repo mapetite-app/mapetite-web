@@ -16,6 +16,50 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 21/10/2026 (mattina, sessione 05:05, CEO che chiude — solo chiavi di volta)
+
+### 16. Importa i preferiti di TikTok in blocco
+- **Problema:** chi usa TikTok ha decine di video di locali tra i "Preferiti" e non li riaprirà mai (`PROBLEMI.md`, 8). Oggi in Mapetite si salvano uno alla volta.
+- **Cosa fa:** in Importa, "Dai tuoi preferiti di TikTok": si carica il file della richiesta dati di TikTok (Impostazioni → Account → Scarica i tuoi dati, formato JSON); Mapetite prende i link dei preferiti, legge da solo ogni video (didascalia ufficiale, come oggi) e mostra l'elenco dei locali trovati, con "+ Salva" su ognuno (o "Salva tutti quelli sicuri").
+- **Da dove nasce:** Mapstr importa da Google Maps, CSV e KML ([App Store](https://apps.apple.com/app/id917288465)); gli export dei salvati di Instagram esistono solo come estensioni a pagamento che danno link nudi ([Chrome Web Store](https://chromewebstore.google.com/detail/dibmfjgbnhbfhlajpahnbiiabpdabajo)). Nessuno trasforma i preferiti di un social in una mappa. Noi sì, con ogni locale verificato su Google prima di salvarlo.
+- **Valore per l'utente:** "anni di TikTok" diventano una mappa in 2 minuti: è il "wow" del primo accesso (chiave 0).
+- **Valore per il ristoratore:** sapere quanti lo avevano già nei preferiti dei social prima di Mapetite: misura vera della sua visibilità social.
+- **Sforzo:** M. Da verificare su un file vero il nome del campo dei preferiti (non confermato dalle fonti). Tetto: 30 video per caricamento.
+- **Costo Google/Haiku:** Haiku circa 0,1–0,3 centesimi a video (fino a 30); Google solo per i locali salvati, a tocco (o 1 per i "sicuri", dentro la quota).
+- **Stato proposto:** PRONTA (dopo le chiavi di volta, dal 22/10).
+
+### 17. "Quando ci vai?" appena salvato (il salvato che ritorna da solo)
+- **Problema:** `PROBLEMI.md`, 9: il 56% della Gen Z trova locali sui social ma non arriva mai a prenotare.
+- **Cosa fa:** nel "✓ Salvato" (reel, link, ricerca) tre chip: "Stasera", "Nel weekend", "Più avanti". Una data facoltativa nel salvato; quel giorno il locale sta in cima a "Stasera dove andiamo?" e nella home ("Avevi detto: stasera da Bar Rossi"). Nessuna notifica nuova.
+- **Da dove nasce:** Corner e Mapstr salvano senza tempo ([Corner](https://apps.apple.com/app/id1668282277), [Mapstr](https://apps.apple.com/app/id917288465)); Beli lavora dopo la visita (classifica a coppie, consigli dopo 15 locali: [WSJ via To Vima](https://www.tovima.com/wsj/the-app-that-makes-rating-restaurants-fun-again-and-gets-better-the-more-you-use-it/)). Noi chiudiamo il buco tra "salvato" e "andato", con un tocco.
+- **Valore per l'utente:** la lista diventa un piano, senza fatica.
+- **Valore per il ristoratore:** domanda qualificata con una data: "12 persone pensano di venire questo weekend" (VISIONE: utenti già in fase di scelta).
+- **Sforzo:** S (una colonna `piano_al` nei salvati: migrazione piccola, nessun dato toccato).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+## 21/10/2026 (notte, CEO che chiude — solo chiavi di volta, regola dello sprint)
+
+### 13. Tutte le slide del carosello in un colpo ("5 posti a Roma" in 5 screenshot)
+- **Problema:** i post "5 posti dove…" di Instagram sono caroselli: ogni locale sta su una slide. Oggi il Condividi di Android legge solo il primo screenshot e lo dice ("ho letto solo la prima"). Si perdono 4 posti su 5 (`PROBLEMI.md`, 8).
+- **Cosa fa:** condividi fino a 5 screenshot insieme; Mapetite li legge tutti e mostra un elenco unico senza doppioni ("Nel post ci sono 5 posti"): il primo si salva come oggi, gli altri con "+ Salva".
+- **Da dove nasce:** GeoTok e Korka leggono didascalia, scritte e profili taggati di un video, ma un video alla volta ([GeoTok](https://peerlist.io/shalex/project/geotok--save-every-tiktok-worth-eating-at), [Korka](https://apps.apple.com/app/id6762612703)). Places: Save & Organize è gratis solo per 2 posti ([App Store](https://apps.apple.com/us/app/-/id6737359980)). Noi: tutto il carosello, gratis, e ogni posto verificato su Google prima di salvarlo.
+- **Valore per l'utente:** il post "classifica" diventa una lista in un gesto.
+- **Valore per il ristoratore:** sapere da quali post arrivano i salvataggi del proprio locale ("3 persone ti hanno salvato da un post di @creator") nel pannello: dato che oggi nessuno gli dà.
+- **Sforzo:** S. `ricevi` legge fino a 5 immagini, una chiamata Haiku ciascuna (o una sola con più immagini), unisce i locali con `fromParsed`.
+- **Costo Google/Haiku:** Haiku circa 0,3 centesimi a immagine; Google invariato (1 ricerca automatica, le altre a tocco).
+- **Stato proposto:** PRONTA.
+
+### 14. Il verdetto subito, appena salvato dal reel
+- **Problema:** chi salva dal reel vede "✓ Salvato" e un indirizzo: il differenziatore (il verdetto Mapetite) non si vede nel momento più forte della demo.
+- **Cosa fa:** nella card "✓ Salvato in 📌 Voglio andarci" compare la riga del verdetto ("✦ Carbonara da manuale, sala piccola e rumorosa") presa dalla cache o scritta al volo con lo stesso tetto dei verdetti dei salvati (25 al giorno).
+- **Da dove nasce:** Drawer, Corner e Go There trasformano il reel in un pin; nessuno dice se il posto merita ([Drawer](https://apps.apple.com/us/app/-/id582432085), [Corner](https://apps.apple.com/app/id1668282277), [Go There](https://hunted.space/product/go-there)). Noi sì, dalle recensioni e senza inventare.
+- **Valore per l'utente:** sa subito se il posto visto sui social vale davvero, prima ancora di aprirlo.
+- **Valore per il ristoratore:** il verdetto onesto è ciò che i locali verificati potranno arricchire (foto, serate) nel piano a pagamento.
+- **Sforzo:** S. Riusa `/api/places/verdetto` (lo stesso della scheda dei salvati).
+- **Costo Google/Haiku:** per i locali senza verdetto in cache: 1 Place Details + 1 Haiku, dentro il tetto di 25 al giorno già esistente.
+- **Stato proposto:** PRONTA.
+
 ## 20/10/2026 (sessione delle 05:00, CEO che chiude)
 
 ### 10. "Prenota come l'ultima volta" (il tavolo del posto fisso in un tocco)

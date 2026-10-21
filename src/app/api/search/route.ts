@@ -10,7 +10,9 @@ import { distanceMeters } from "@/lib/distance";
 import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
-import { demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
+import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
+import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
+import { pulisciMappa, scopertaDedotta } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
@@ -96,6 +98,20 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
   const aiKey = clientKey(request, authUser?.id);
+  // Profilo del gusto (primo accesso, sprint 25/10): "famosi o chicche?" e cosa si evita. Letto in
+  // parallelo con il resto; senza le colonne (migrazioni non applicate) non cambia niente.
+  const profiloPromise = authUser
+    ? Promise.resolve(supabase.from("profiles").select("gusto, gusti_ricordati").eq("id", authUser.id).maybeSingle()).then(
+        ({ data, error }) => {
+          if (error || !data) return null;
+          const m = pulisciMappa((data as { gusto?: unknown }).gusto, () => true);
+          return { chicche: (m.scoperta ?? scopertaDedotta(m.su)) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
+        },
+        () => null,
+      )
+    : Promise.resolve(null);
+  // Gusti del profilo usati in questa ricerca: il telefono lo dice ("Per te: chicche, niente pesce").
+  const perTe: string[] = [];
 
   // Tetto alle chiamate AI (src/lib/ai-limit.ts): le ricerche scritte usano Haiku.
   if (source === "world" && searchIntent === "natural" && !allowAi("ricerca", aiKey)) {
@@ -120,7 +136,9 @@ export async function POST(request: Request) {
   const synthGroups: { places: SynthesisInput[]; token: string }[] = [];
   let esclusi: string[] = [];
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
-  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
+  // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -327,6 +345,31 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.turistici = [...daParte.turistici, ...demoted].slice(0, 10);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (molte recensioni, voto sotto 4,2): ${JSON.stringify(demoted)}`);
+      }
+    }
+    // Profilo del gusto: chi preferisce le chicche ha i locali di massa in fondo anche senza scriverlo
+    // (mai esclusi, detti come "messi da parte"); chi evita pesce o carne ha in fondo quei locali.
+    if (searchIntent === "natural") {
+      const profilo = await profiloPromise;
+      if (profilo?.chicche) {
+        const { places, demoted } = demoteForChicche(query.trim(), risultati);
+        if (demoted.length > 0) {
+          risultati = places;
+          daParte.turistici = [...new Set([...daParte.turistici, ...demoted])].slice(0, 10);
+          perTe.push("chicche");
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo (profilo: preferisce le chicche): ${JSON.stringify(demoted)}`);
+        }
+      }
+      if (profilo?.diete.length) {
+        // Gusti spenti per questa conversazione dall'assistente ("stasera il pesce va bene"): non valgono.
+        const { usati } = gustiPerRicerca(query, profilo.diete, strings(body?.skipGusti));
+        const r = inFondoPerGusti(risultati, usati);
+        if (r.spostati > 0) {
+          risultati = r.places;
+          daParte.gusti = r.places.slice(r.places.length - r.spostati).map((p) => p.name);
+          perTe.push(...usati.filter((g) => g.inFondo).map((g) => g.label));
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${r.spostati} locali ${r.motivo} (profilo)`);
+        }
       }
     }
     // Il più famoso non apre la lista solo perché è il più famoso: scende dopo i primi 3, resta in vista.
@@ -585,6 +628,7 @@ ESEMPI (input → output atteso):
       goFor: s?.goFor ?? null,
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
+      perTe: s?.perTe || null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
@@ -644,7 +688,10 @@ ESEMPI (input → output atteso):
   return NextResponse.json({
     risultati: risultatiFinali,
     filtri_usati: filtri,
-    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 ? { da_parte: daParte } : {}),
+    // "Per te": quali gusti del profilo hanno cambiato l'ordine (il telefono lo dice accanto a "messi da parte").
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || perTe.length > 0
+      ? { da_parte: { ...daParte, ...(perTe.length > 0 ? { per_te: [...new Set(perTe)] } : {}) } }
+      : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.
     ...(synthInput && synthToken ? { sintesi_pendente: { places: synthInput, token: synthToken, gruppi: synthGroups } } : {}),
   });

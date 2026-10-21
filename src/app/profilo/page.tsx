@@ -59,13 +59,13 @@ function savedHref(filter?: { stato?: "voglio" | "fatto"; tag?: string }): strin
 // Solo in sviluppo con E2E_FAKE_USER: profilo finto letto dal cookie "e2e_profilo"
 // (scritto da scripts/e2e/giro.mjs), perché il test non può simulare le letture fatte dal server.
 // In produzione NODE_ENV è sempre "production" e questo ramo non si attiva.
-async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean } | null> {
+async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean; senzaGusto: boolean } | null> {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = (await cookies()).get("e2e_profilo")?.value;
   if (!raw) return null;
   try {
     const data = JSON.parse(decodeURIComponent(raw));
-    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false };
+    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false, senzaGusto: data.senzaGusto === true };
   } catch {
     return null;
   }
@@ -160,6 +160,14 @@ export default async function ProfiloPage() {
     if (vErr && !/\bvisite\b/.test(vErr.message ?? "")) console.error("[profilo] lettura posti fissi fallita:", vErr.message);
     if (!vErr) visite = new Map((vRaw ?? []).map((r) => [r.place_id as string, Number(r.visite)]));
   }
+  // Mappa del gusto (sprint 25/10): chi si è registrato prima non l'ha fatta. Un invito, finché manca.
+  let senzaGusto = false;
+  if (fake) {
+    senzaGusto = fake.senzaGusto;
+  } else {
+    const { data: g, error: gErr } = await supabase.from("profiles").select("gusto").eq("id", user.id).maybeSingle();
+    senzaGusto = !gErr && !(g as { gusto?: unknown } | null)?.gusto;
+  }
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
@@ -243,6 +251,17 @@ export default async function ProfiloPage() {
         </nav>
         {gems && <ScopritoreRiga gemme={gems.gemme} provate={gems.provate} />}
       </header>
+
+      {senzaGusto && (
+        <Link href="/onboarding" data-testid="invito-mappa-gusto" className="mb-6 flex min-h-16 items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-card active:scale-[0.99]">
+          <span aria-hidden className="text-2xl">✨</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-[15px] font-semibold">Fai la tua mappa del gusto</span>
+            <span className="block text-xs font-sans text-white/80">1 minuto: da lì ricerca e verdetti parlano di te</span>
+          </span>
+          <ChevronRight aria-hidden size={18} className="shrink-0 text-white/80" />
+        </Link>
+      )}
 
       {/* Promemoria che compaiono solo quando servono. */}
       <BookingReminder />

@@ -15,6 +15,10 @@ export async function GET(request: NextRequest) {
   const tokenHash = params.get("token_hash");
   const type = params.get("type");
   const next = safeNext(params.get("next"));
+  // Accesso con Google annullato o rifiutato: Google torna qui con ?error=…, senza code.
+  if (!code && !tokenHash && params.get("error")) {
+    redirect(withNext(`/login?error=${encodeURIComponent("Accesso con Google non completato. Riprova o usa email e password.")}`, next));
+  }
   const supabase = await createClient();
 
   let userId: string | null = null;

@@ -76,6 +76,8 @@ function NavBarWithParams({ userId }: { userId: string | null }) {
 function NavBarInner({ userId, vista, search }: { userId: string | null; vista: string | null; search: string | null }) {
   const pathname = usePathname();
   const items = voci(pathname, vista, search, !!userId);
+  // Primo accesso a schermo intero (come Albo): la barra porterebbe fuori dal percorso.
+  if (pathname.startsWith("/onboarding")) return null;
 
   return (
     <>

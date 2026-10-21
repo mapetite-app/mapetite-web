@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { login } from "@/lib/supabase/actions";
 import AuthForm from "@/components/auth-form";
+import { googleAttivo } from "@/lib/supabase/google";
 import { safeNext, withNext } from "@/lib/next-path";
 
 // Errori che arrivano da Supabase nell'indirizzo (link scaduto o già usato): in italiano.
@@ -22,5 +23,5 @@ export default async function LoginPage({
   const error = linkError
     ? "Il link non è più valido (scaduto o già usato). Accedi con email e password, oppure registrati di nuovo."
     : params.error;
-  return <AuthForm mode="login" action={login} error={error} message={params.message} next={next} />;
+  return <AuthForm mode="login" action={login} error={error} message={params.message} next={next} google={await googleAttivo()} />;
 }

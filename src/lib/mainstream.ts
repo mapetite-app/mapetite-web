@@ -67,6 +67,26 @@ export function demoteTouristTraps<T extends { name: string; userRatingCount: nu
   return { places: [...kept, ...traps], demoted: traps.map((p) => p.name) };
 }
 
+const WANTS_FAMOUS = /\b(?:famos[oiae]|iconic[oiahe]|celebr[ei]|più\s+conosciut|più\s+not[oiae]|popolar[ei]|gettonat[oiae]|storic[oiahe]|imperdibil|must\b|classic[oiahe]\s+di|da\s+non\s+perdere)/i;
+
+// Profilo "preferisco le chicche" (primo accesso, sprint 25/10): come demoteMainstream, ma senza che la
+// frase lo chieda, e un locale cercato per nome ("Roscioli") resta dov'è.
+export function demoteForChicche<T extends { name: string; userRatingCount: number | null; rating?: number | null }>(
+  query: string,
+  places: T[],
+): { places: T[]; demoted: string[] } {
+  // Chi chiede proprio i famosi ("i posti più famosi", "iconici", "storici") li vuole in cima: la frase vince sul profilo.
+  if (places.length < 4 || wantsOffTheBeatenPath(query) || WANTS_FAMOUS.test(query)) return { places, demoted: [] };
+  const q = new Set(nameWords(query));
+  const named = (p: T) => nameWords(p.name).some((w) => !GENERIC.has(w) && q.has(w));
+  const isMass = massPredicate(places);
+  const hit = (p: T) => isMass(p) && !named(p);
+  const kept = places.filter((p) => !hit(p));
+  if (kept.length === 0 || kept.length === places.length) return { places, demoted: [] };
+  const mass = places.filter(hit);
+  return { places: [...kept, ...mass], demoted: mass.map((p) => p.name) };
+}
+
 // Nessuna richiesta "non turistica" e nessuna trappola: il locale con molte più recensioni degli altri
 // (Tonnarello a Trastevere, 110k contro una mediana di ~4.000) non deve aprire la lista solo perché è
 // il più famoso (VISIONE: spingere verso il posto giusto, non il più popolare). Non va in fondo e non

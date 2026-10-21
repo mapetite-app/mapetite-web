@@ -6,9 +6,8 @@ import LinkResults from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 import { extractMapsLinks } from "@/lib/maps-link";
 import { extractAllLinks } from "@/lib/multi-link";
-import { findSocialLink, placeHintFromText, type SocialSource } from "@/lib/social-link";
-import SocialLinkHelp from "./social-link-help";
-import { findVideoLink } from "@/lib/video-caption";
+import { findSocialLink } from "@/lib/social-link";
+import ReelSave from "@/components/reel-save";
 import { trackFeature } from "@/lib/track";
 
 const HAS_LINK = /https?:\/\/\S+/;
@@ -19,22 +18,15 @@ function errorText(e: unknown): string {
 }
 
 // "Incolla un link" in cima a Importa (stile "Aggiungi qualsiasi cosa" di Albo): un solo pulsante
-// che capisce da solo il link. Google Maps (anche più link) si salva subito; Instagram/TikTok/YouTube
-// spiegano cosa fare; una chat o una nota con tanti link misti passa alla lista di "Incolla più link".
+// che capisce da solo il link. Google Maps (anche più link) si salva subito; un reel di
+// Instagram/TikTok/YouTube passa a "Salva dal reel" (src/components/reel-save.tsx); una chat o una nota con tanti link misti passa alla lista di "Incolla più link".
 const MAX_DIRECT = 5;
 export default function GoogleMapsCard({
   userId,
-  onScreenshot,
-  onSearch,
-  onReadVideo,
   onMulti,
   ref,
 }: {
   userId: string | null;
-  onScreenshot: () => void;
-  onSearch: (q: string) => void;
-  // Link di TikTok/YouTube: legge la didascalia del video e cerca il locale (vedi ImportaView).
-  onReadVideo?: (url: string) => void;
   // Tanti link misti (chat, nota): li legge la lista di MultiLinkCard.
   onMulti?: (text: string) => void;
   // "Incolla il link copiato" della guida in cima (SalvaDaTelefono) usa lo stesso percorso.
@@ -47,12 +39,13 @@ export default function GoogleMapsCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
-  const [social, setSocial] = useState<{ source: SocialSource; hint: string | null; video: string | null } | null>(null);
+  // Reel incollato: il numero fa ripartire la lettura se si incolla di nuovo.
+  const [reel, setReel] = useState<{ text: string; n: number } | null>(null);
   const text = draft ?? pending ?? "";
 
   const save = async (value: string) => {
     if (!userId) return;
-    setSocial(null);
+    setReel(null);
     if (!HAS_LINK.test(value)) {
       setShowField(true);
       setError("Non vedo un link. Nell'app tocca Condividi → Copia link, poi torna qui.");
@@ -67,13 +60,14 @@ export default function GoogleMapsCard({
       onMulti(value);
       return;
     }
-    // Link di Instagram/TikTok senza link di Maps: niente chiamata, si spiega cosa fare.
-    const source = extractMapsLinks(value).length === 0 ? findSocialLink(value) : null;
-    if (source) {
-      setShowField(true);
+    // Link di Instagram/TikTok/YouTube senza link di Maps: "Salva dal reel".
+    if (extractMapsLinks(value).length === 0 && findSocialLink(value)) {
       setError(null);
       setResults(null);
-      setSocial({ source, hint: placeHintFromText(value), video: findVideoLink(value) });
+      setDraft("");
+      setShowField(false);
+      clearPendingLink();
+      setReel((r) => ({ text: value, n: (r?.n ?? 0) + 1 }));
       return;
     }
     setBusy(true);
@@ -169,15 +163,10 @@ export default function GoogleMapsCard({
           )}
 
           {error && <p className="mt-3 rounded-btn bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
-          {social && (
-            <div className="mt-4 rounded-card bg-white text-text">
-              <SocialLinkHelp
-                source={social.source}
-                hint={social.hint}
-                onScreenshot={onScreenshot}
-                onSearch={onSearch}
-                onReadVideo={social.video && onReadVideo ? () => onReadVideo(social.video as string) : undefined}
-              />
+          {reel && (
+            // Fondo bianco senza margini interni: le card del reel restano leggibili sul teal, senza card dentro card.
+            <div className="mt-4 overflow-hidden rounded-card bg-white text-text">
+              <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
           {results && <div className="mt-4 rounded-card bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}

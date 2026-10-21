@@ -46,7 +46,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
@@ -82,6 +82,7 @@ export type ListDetails = {
   openNow: boolean | null;
   verdict: string | null;
   matchReason: string | null;
+  perTe?: string | null;
   goFor: string[] | null;
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
@@ -478,6 +479,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       {understood.length > 0 && (
         <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
       )}
+      {/* Mappa del gusto (sprint 25/10): quali gusti del profilo hanno cambiato l'ordine. */}
+      {(setAside?.per_te?.length ?? 0) > 0 && (
+        <p data-testid="per-te" className="mt-1 text-xs font-sans text-accent">
+          ✨ Per te: {setAside!.per_te!.map((g) => (g === "chicche" ? "preferisci le chicche" : g)).join(" · ")}
+        </p>
+      )}
       {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
         <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
           {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
@@ -723,7 +730,18 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           <span data-testid="riga-google" className="line-clamp-2 text-[13px] font-sans leading-5 text-white/80">{googleLine(d)}</span>
                         ) : null}
                       </span>
-                      {chips.length > 0 && (
+                      {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
+                      {d?.perTe && (
+                        <span data-testid="per-te-card" className="mt-1 line-clamp-2 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
+                          {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
+                          <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7" />
+                          </svg>
+                          Per te: {d.perTe}
+                        </span>
+                      )}
+                      {/* Con il "Per te" le chip restano nella scheda: la card ha un'altezza fissa. */}
+                      {chips.length > 0 && !d?.perTe && (
                         <span data-testid="punti-forti" className="mt-2 flex min-w-0 gap-1.5">
                           {chips.map((c) => (
                             <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>

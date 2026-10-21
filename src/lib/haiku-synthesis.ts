@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { gustoPerAI, pulisciMappa } from "@/lib/mappa-gusto";
+import { gustoDa, gustiValidi } from "@/lib/gusti";
 import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import { coherentLevel } from "@/lib/match-coherence";
-import { exclusionNotAsked } from "@/lib/mainstream";
+import { exclusionNotAsked, wantsOffTheBeatenPath } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
@@ -51,6 +53,9 @@ export type PlaceSynthesis = {
   goFor: string[];        // chip "Ci dovresti andare se…" — max 3 motivi concreti
   dontExpect: string[];   // chip "Meno adatto se…" — max 2 limiti reali, [] se nessuno
   matchReason: string;    // perché QUESTO locale risponde a QUELLA query. NON cacheabile.
+  // "Per te" della card (sprint 25/10, mockup A): massimo 7 parole che legano il locale a un gusto
+  // FORNITO dell'utente. Vuoto se l'utente non ha gusti o se non c'è un legame concreto.
+  perTe: string;
   // Adeguatezza ai requisiti espliciti della richiesta (tipo, caratteristica
   // fisica, occasione, atmosfera). false SOLO se chiaramente non li rispetta;
   // nel dubbio true. Il chiamante sposta/esclude i false e ne logga il motivo.
@@ -87,21 +92,30 @@ romantico, informale, gruppi, business, veloce, aperitivo, famiglia, intimo, viv
 - go_for: array di CHIP brevissime (1-3 parole, massimo 20 caratteri ciascuna: stanno su un'etichetta piccola), MASSIMO 3. Ogni chip è un motivo CONCRETO e RICORRENTE per andarci, ricavato dai punti di forza citati più volte nelle recensioni. Esempio: ["carbonara","forno a legna","servizio veloce"]. Niente chip generiche ('buon cibo', 'bella atmosfera'): dì cosa specifico. Se non ci sono motivi forti e ricorrenti, array più corto o vuoto [].
 - dont_expect: DEFAULT array vuoto []. Array di CHIP brevissime (1-4 parole), MASSIMO 2. Lo popoli SOLO se nelle recensioni esiste un limite REALE e RICORRENTE — lo stesso limite citato da PIÙ recensioni distinte. Un singolo commento negativo isolato NON basta. VIETATO inventare difetti, VIETATO dedurre limiti non scritti, VIETATO trasformare un punto di forza nel suo rovescio. Nel dubbio: []. Meglio [] che un difetto inventato. Tono onesto, non stroncatorio.`;
 
+// Motivo di esclusione che parla dei gusti della persona, non della richiesta scritta.
+const TASTE_REASON = /(gust[oi]\b|piac|gradisc|\bam[ai]\b|utente|evit|preferisc|dieta|non mangi)/i;
+// Cose che l'AI non può sapere (il prompt non ha numero di recensioni né indirizzi): se la frase non le chiede,
+// un "per te" o un "perché" che le afferma è inventato e si scarta.
+// Il "perché" può citare le recensioni ("la famosa carbonara", "clientela del quartiere"): lì si scarta solo "poco noto".
+const NON_SAPUTO = /poco not|famos|nascost|chicc|turistic|\bzona\b|quartiere/i;
+const NON_SAPUTO_PERCHE = /poco not|nascost|chicc/i;
+
 const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
 L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in ITALIANO perché risponde (o non risponde bene) alla sua richiesta specifica.
 
 Ti possono essere forniti i GUSTI dell'utente in due forme:
-- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze.
+- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze; "profilo" con i tipi di posto che gli piacciono e non, e se preferisce posti poco noti o famosi; "dieta" con la dieta che segue (vegetariano, vegano: i posti adatti a quella dieta gli VANNO BENE); "evita" con le cose da evitare (glutine, pesce, carne…).
 - storico_stelle_per_tipologia: la media di stelle che l'utente ha dato per tipologia di locale (comportamento reale, più affidabile delle dichiarazioni).
-Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta. Dai peso allo storico comportamentale quando c'è.
+Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta: per esempio "è il tipo di posto che ami, una trattoria di quartiere" quando la categoria o le recensioni lo mostrano. Non dire che un locale è poco noto, famoso o in una certa zona (non nominare zone o quartieri che non sono scritti nella richiesta): questi dati non li hai. Dai peso allo storico comportamentale quando c'è.
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
-Struttura esatta: [{"id":string,"matchReason":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
+Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
 - id identico a quello ricevuto
 - matchReason: una frase di MASSIMO 22 parole, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Parla di COME risponde a ciò che la richiesta chiede (tipo di locale, zona, occasione, atmosfera, caratteristiche): non elencare piatti, servizio o qualità generali del locale se la richiesta non li nomina, perché li dice già il verdetto mostrato accanto (niente doppioni). Non ripetere le parole della richiesta come conferma generica ("ideale per una trattoria a Trastevere"): dì il dato concreto delle recensioni che lo conferma. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
-- fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta.
+- per_te: DEFAULT stringa vuota "". Solo se ti sono forniti i gusti dell'utente E il locale si lega concretamente a uno di essi (categoria, recensioni o descrizione lo mostrano): MASSIMO 6 parole, in seconda persona, che dicono quale gusto soddisfa. Esempi: "il tipo di trattoria che ami", "niente carne, come preferisci", "cucina giapponese, la tua preferita". VIETATO ripetere la richiesta, VIETATO dire poco noto, famoso o zona, VIETATO inventare gusti non forniti. Senza gusti forniti o senza legame concreto: "".
+- fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta: i GUSTI dell'utente non rendono MAI fit false (un tipo di posto che non ama o un cibo che evita può abbassare match, mai fit).
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
 - Richieste "non turistico", "autentico", "dove vanno i locali", "nascosto", "poco conosciuto": è un requisito ESPLICITO di atmosfera. Se le recensioni descrivono il locale come turistico (turisti, menù turistico, "trappola per turisti", clientela quasi solo straniera, buttadentro), match è "basso" e matchReason lo dice; se più recensioni lo dicono chiaramente, fit è false. Se le recensioni parlano di clientela del quartiere, romani/milanesi, posto di famiglia, match può essere "alto".`;
@@ -211,6 +225,10 @@ type UserTaste = {
     occasions: string[];
     atmospheres: string[];
     priceRange: string | null;
+    // Mappa del gusto del primo accesso (zone, tipi di posto, famosi o chicche) e cosa evita.
+    profilo?: ReturnType<typeof gustoPerAI>;
+    dieta?: string[];
+    evita?: string[];
   } | null;
   byCategory: { category: string; avgStars: number; count: number }[];
 };
@@ -220,11 +238,13 @@ async function getUserTaste(userId: string): Promise<UserTaste> {
   try {
     const supabase = createAdminClient();
     const [{ data: profile }, { data: reviews }] = await Promise.all([
+      // Con gusto e gusti_ricordati; senza quelle colonne si rilegge come prima.
       supabase
         .from("profiles")
-        .select("cuisines, occasions, atmospheres, price_range")
+        .select("cuisines, occasions, atmospheres, price_range, gusto, gusti_ricordati")
         .eq("id", userId)
-        .maybeSingle(),
+        .maybeSingle()
+        .then((r) => (r.error ? supabase.from("profiles").select("cuisines, occasions, atmospheres, price_range").eq("id", userId).maybeSingle() : r)),
       // reviews.place_id = UUID interno places → join per leggere la category.
       supabase
         .from("reviews")
@@ -238,6 +258,10 @@ async function getUserTaste(userId: string): Promise<UserTaste> {
           occasions: (profile.occasions as string[] | null) ?? [],
           atmospheres: (profile.atmospheres as string[] | null) ?? [],
           priceRange: (profile.price_range as string | null) ?? null,
+          profilo: gustoPerAI(pulisciMappa((profile as { gusto?: unknown }).gusto, () => true)),
+          // "Vegetariano" è una dieta, non una cosa da evitare: in "evita" l'AI scriveva "non adatto a te" sui posti vegetariani.
+          dieta: gustiValidi((profile as { gusti_ricordati?: unknown }).gusti_ricordati).filter((id) => id === "vegetariano" || id === "vegano").map((id) => gustoDa(id)?.label).filter((x): x is string => !!x),
+          evita: gustiValidi((profile as { gusti_ricordati?: unknown }).gusti_ricordati).filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => gustoDa(id)?.label).filter((x): x is string => !!x),
         }
       : null;
 
@@ -292,11 +316,13 @@ export async function getSynthesis(
   // la chiamata synthesis qui sotto (le due richieste si sovrappongono).
   const matchReasonWork = async (): Promise<{
     matchReasons: Map<string, string>;
+    perTes: Map<string, string>;
     fits: Map<string, { fit: boolean; fitReason: string }>;
     levels: Map<string, MatchLevel>;
     cost: number;
   }> => {
     const matchReasons = new Map<string, string>();
+    const perTes = new Map<string, string>();
     const fits = new Map<string, { fit: boolean; fitReason: string }>();
     const levels = new Map<string, MatchLevel>();
     let cost = 0;
@@ -310,7 +336,10 @@ export async function getSynthesis(
           (taste.declared.cuisines.length > 0 ||
             taste.declared.occasions.length > 0 ||
             taste.declared.atmospheres.length > 0 ||
-            taste.declared.priceRange != null)) ||
+            taste.declared.priceRange != null ||
+            taste.declared.profilo != null ||
+            (taste.declared.dieta?.length ?? 0) > 0 ||
+            (taste.declared.evita?.length ?? 0) > 0)) ||
           taste.byCategory.length > 0);
       const tasteBlock = hasTaste
         ? `\n\nGusti dell'utente:\n${JSON.stringify({
@@ -369,7 +398,15 @@ export async function getSynthesis(
             if (!item || typeof item !== "object") continue;
             const o = item as Record<string, unknown>;
             if (typeof o.id !== "string" || !validIds.has(o.id)) continue;
-            if (typeof o.matchReason === "string") matchReasons.set(o.id, o.matchReason);
+            const chiesto = (t: string, re = NON_SAPUTO) => !re.test(t) || re.test(query) || wantsOffTheBeatenPath(query);
+            if (typeof o.matchReason === "string") {
+              if (chiesto(o.matchReason, NON_SAPUTO_PERCHE)) matchReasons.set(o.id, o.matchReason);
+              else console.log(`[haiku-synthesis] perché scartato (dato non disponibile) id=${o.id} testo=${JSON.stringify(o.matchReason.slice(0, 120))}`);
+            }
+            // Solo con i gusti nel prompt: senza, un "per te" sarebbe per forza inventato. Al massimo 6 parole.
+            if (hasTaste && typeof o.per_te === "string" && o.per_te.trim() && chiesto(o.per_te)) {
+              perTes.set(o.id, o.per_te.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[,;:.]+$/, ""));
+            }
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
               const fitReason = typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "";
@@ -378,6 +415,12 @@ export async function getSynthesis(
                 console.log(`[search-exclude-annullata] query=${JSON.stringify(query.slice(0, 80))} id=${o.id} motivo=${JSON.stringify(fitReason)} (requisito non scritto nella frase)`);
                 fits.set(o.id, { fit: true, fitReason: "" });
                 if (levels.get(o.id) === "basso") levels.set(o.id, "medio");
+              } else if (!o.fit && hasTaste && TASTE_REASON.test(fitReason)) {
+                // Escluso per i GUSTI della persona ("sushi, che eviti"): mai fuori, solo in fondo.
+                // Si esclude solo per un requisito scritto nella richiesta (regola di Lorenzo, 10/10).
+                console.log(`[search-exclude-annullata] query=${JSON.stringify(query.slice(0, 80))} id=${o.id} motivo=${JSON.stringify(fitReason)} (gusti, non richiesta)`);
+                fits.set(o.id, { fit: true, fitReason: "" });
+                levels.set(o.id, "basso");
               } else {
                 fits.set(o.id, { fit: o.fit, fitReason });
               }
@@ -396,11 +439,11 @@ export async function getSynthesis(
     } catch (err) {
       console.error("[haiku-synthesis] matchReason call exception:", err);
     }
-    return { matchReasons, fits, levels, cost };
+    return { matchReasons, perTes, fits, levels, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = opts.soloVerdetto
-    ? Promise.resolve({ matchReasons: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
+    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
     : matchReasonWork();
 
   // 2. Legge la cache.
@@ -569,7 +612,7 @@ export async function getSynthesis(
 
   // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
   //    Girava mentre sopra completavano cache read + synthesis + upsert.
-  const { matchReasons, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
+  const { matchReasons, perTes, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
   totalCost += matchReasonCost;
 
   console.log(
@@ -592,6 +635,7 @@ export async function getSynthesis(
       goFor: s.goFor,
       dontExpect: s.dontExpect,
       matchReason: matchReasons.get(id) ?? "",
+      perTe: perTes.get(id) ?? "",
       // Nel dubbio il locale resta: fit mancante = true.
       fit: fits.get(id)?.fit ?? true,
       fitReason: fits.get(id)?.fitReason ?? "",
