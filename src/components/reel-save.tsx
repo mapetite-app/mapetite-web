@@ -13,6 +13,8 @@ import { findSocialLink, placeHintFromText } from "@/lib/social-link";
 import { confidentMatch } from "@/lib/reel-match";
 import { screenshotForUpload } from "@/lib/screenshot-upload";
 import { trackFeature } from "@/lib/track";
+import PlacePhoto from "@/components/place-photo";
+import { getCategoryEmoji } from "@/lib/emoji";
 
 // "Salva dal reel" in un gesto (sprint 25/10, chiave di volta A). Dal link condiviso o incollato:
 //  - TikTok/YouTube: si legge da soli la didascalia (oEmbed ufficiale) → l'AI trova i locali;
@@ -106,6 +108,7 @@ export default function ReelSave({
 
   const askFor = (why: string) => { setReading(false); setAsk(why); };
 
+  // Una o più letture (le slide di un carosello, proposta 13): i locali si uniscono senza doppioni.
   const read = (body: { link: string } | { caption: string } | { image: string }) => {
     setReading(true);
     setError(null);
@@ -381,6 +384,7 @@ function PlaceRow({
         </p>
         <p className="mt-1 font-display text-xl font-semibold text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
+        <VerdettoSubito place={st.top} />
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} bg-brand text-white`}>
@@ -453,6 +457,67 @@ function PlaceRow({
           Cerca
         </button>
       </form>
+    </div>
+  );
+}
+
+// Proposta 14: il verdetto Mapetite subito, nel "✓ Salvato" (il differenziatore nel momento più forte).
+// Stessa via della scheda dei salvati (/api/places/verdetto): dalla cache se c'è, altrimenti
+// 1 Place Details + 1 Haiku dentro il tetto di 25 verdetti nuovi al giorno. Ricordato nel telefono
+// per la sessione: riaperta la pagina non si richiede. Senza verdetto (tetto, errore) non si mostra
+// niente di inventato: solo la riga "lo scrivo appena apri la scheda".
+type Verdetto = { verdict: string | null; photoRef: string | null; photoAuthor: string | null };
+function VerdettoSubito({ place }: { place: SearchPlace }) {
+  const key = `mapetite.reel-verdetto:${place.id}`;
+  const [v, setV] = useState<Verdetto | "attesa" | "no">("attesa");
+  useEffect(() => {
+    const hit = cached<Verdetto>(key);
+    let vivo = true;
+    const t = window.setTimeout(() => {
+      if (hit && typeof hit === "object") { setV(hit); return; }
+      void fetch("/api/places/verdetto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googlePlaceId: place.id }),
+      })
+        .then(async (res) => {
+          const d = (await res.json().catch(() => ({}))) as Partial<Verdetto>;
+          if (!vivo) return;
+          if (!res.ok || !d.verdict) { setV("no"); return; }
+          const got: Verdetto = { verdict: d.verdict, photoRef: d.photoRef ?? null, photoAuthor: d.photoAuthor ?? null };
+          remember(key, got);
+          setV(got);
+          trackFeature("reel_salva", { stato: "verdetto" });
+        })
+        .catch(() => { if (vivo) setV("no"); });
+    }, 0);
+    return () => { vivo = false; window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place.id]);
+
+  if (v === "attesa") {
+    return (
+      <div className="mt-3 flex items-center gap-3 rounded-btn bg-white/70 p-3" data-testid="reel-verdetto-attesa" aria-live="polite">
+        <span aria-hidden className="h-12 w-12 shrink-0 animate-pulse rounded-btn bg-border/60" />
+        <span className="flex-1 space-y-1.5">
+          <span className="block h-3 w-3/4 animate-pulse rounded bg-border/60" />
+          <span className="block h-3 w-1/2 animate-pulse rounded bg-border/60" />
+        </span>
+      </div>
+    );
+  }
+  if (v === "no") {
+    return <p className="mt-2 text-xs text-text-muted" data-testid="reel-verdetto-dopo">✦ Il verdetto Mapetite lo trovi nella scheda.</p>;
+  }
+  return (
+    <div className="mt-3 flex items-start gap-3 rounded-btn bg-white p-3" data-testid="reel-verdetto">
+      <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-surface text-2xl">
+        <PlacePhoto photoRef={v.photoRef} alt={place.name} className="h-full w-full object-cover" fallback={<span aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Il verdetto Mapetite</span>
+        <span className="mt-0.5 block text-sm font-medium leading-snug text-text"><span aria-hidden className="mr-1 text-accent">✦</span>{v.verdict}</span>
+      </span>
     </div>
   );
 }

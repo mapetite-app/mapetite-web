@@ -2421,6 +2421,9 @@ else {
     const addCalls = [];
     await lctx.route("**/api/places/search", (route) => { searchCalls.push(route.request().postDataJSON()); return route.fulfill({ json: { results: SEARCH } }); });
     await lctx.route("**/api/places/add", (route) => { const b = route.request().postDataJSON(); addCalls.push(b); return route.fulfill({ json: { place: { id: b.googlePlaceId === "GBR2" ? "00000000-0000-0000-0000-000000000202" : "00000000-0000-0000-0000-000000000201", name: b.name } } }); });
+    // Verdetto subito (proposta 14): Bar Rossi ce l'ha, Bar Rossi Bis no (tetto del giorno raggiunto).
+    const verdCalls = [];
+    await lctx.route("**/api/places/verdetto", (route) => { const b = route.request().postDataJSON(); verdCalls.push(b); return b.googlePlaceId === "GBR1" ? route.fulfill({ json: { verdict: "Caffè da banco serio, cornetti sfornati la mattina.", photoRef: null } }) : route.fulfill({ status: 429, json: { error: "limite" } }); });
 
     const reelWrites = [];
     await lctx.route("**/rest/v1/contenuti_locali**", (route) => { const req = route.request(); reelWrites.push({ m: req.method(), url: req.url() }); return route.fulfill({ status: req.method() === "POST" ? 201 : 200, json: [] }); });
@@ -2438,6 +2441,8 @@ else {
     ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "salva dal reel: una sola ricerca Google, con nome e città del primo locale");
     ok(await lp.getByTestId("reel-altri").getByText("Nel reel ci sono anche").isVisible() && await lp.getByTestId("reel-altro").count() === 2, "salva dal reel: 'Nel reel ci sono anche' con gli altri 2 locali, senza cercarli");
     ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");
+    await lp.getByTestId("reel-verdetto").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await lp.getByTestId("reel-verdetto").getByText("Caffè da banco serio, cornetti sfornati la mattina.").isVisible() && verdCalls.length === 1 && verdCalls[0]?.googlePlaceId === "GBR1", "salva dal reel: nel '✓ Salvato' compare subito il verdetto Mapetite (una chiamata)");
     await lp.screenshot({ path: `${OUT}/33-condividi-screenshot.png`, caret: "initial" });
 
     // "Non è questo": si toglie dai salvati e si sceglie tra gli altri risultati già arrivati.
@@ -2450,6 +2455,8 @@ else {
     await lp.getByTestId("reel-scegli").getByText("Bar Rossi Bis").click();
     await lp.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
     ok(addCalls.at(-1)?.googlePlaceId === "GBR2" && searchCalls.length === 1, "salva dal reel: scelto l'altro, salvato senza un'altra ricerca Google");
+    await lp.getByTestId("reel-verdetto-dopo").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await lp.getByTestId("reel-verdetto-dopo").isVisible() && (await lp.getByTestId("reel-verdetto").count()) === 0, "salva dal reel: senza verdetto (tetto del giorno) niente di inventato, solo 'lo trovi nella scheda'");
     await lp.screenshot({ path: `${OUT}/34-condividi-screenshot-salvato.png`, caret: "initial" });
 
     ok(reelWrites.length === 0, "salva dal reel: senza link del reel nessun video collegato o tolto");
@@ -2577,6 +2584,8 @@ if (!fakeUser) {
 
   // Salva dal reel (sprint 25/10). Lettura AI simulata: la didascalia o il video danno i locali.
   const capBodies = [];
+  // Il verdetto subito (proposta 14) non deve mai chiamare Google vero dal giro.
+  await mctx.route("**/api/places/verdetto", (r) => r.fulfill({ json: { verdict: "Cucina milanese di casa, porzioni generose.", photoRef: null } }));
   const OF = { nome: "Osteria dei Fratelli", citta: "Milano", categoria: "ristorante" };
   await mctx.route("**/api/import-caption", (r) => {
     const b = r.request().postDataJSON();
