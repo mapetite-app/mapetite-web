@@ -288,7 +288,7 @@ export function IntroAgain() {
         forced = true;
         emit();
       }}
-      className="inline-flex min-h-10 items-center px-1 font-semibold text-brand"
+      className="inline-flex min-h-11 items-center px-1 font-semibold text-brand"
     >
       Come funziona
     </button>

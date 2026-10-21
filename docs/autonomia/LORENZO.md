@@ -11,6 +11,9 @@ Lorenzo, 20/10: "poche implementazioni, non vedo il valore aggiunto del team". F
 - **Ritmo:** notti feriali 20–23/10 (mockup la prima notte, poi primo accesso, reel, ricerca); sabato 24 e domenica 25 tutto il giorno, più sviluppatori in parallelo, ognuno su una schermata.
 - **Ricerche Google (Lorenzo, 20/10):** fino al 26/10 quota a **100 al giorno**, di cui **30 per le sessioni** (dalle 9:00 alle 9:00, sommate). Vale solo se la console Google mostra davvero 100: altrimenti resta 10. Spesa in più stimata 10–12 € in tutto, autorizzata. Dal 27/10 si torna a 50 e 10.
 
+## Ti ricordo (Lorenzo, 21/10) — vale per ogni sessione e ogni chat
+Le cose che può fare solo Lorenzo (account, chiavi, prove su telefono, decisioni) stanno in `DA-FARE-LORENZO.md`. In fondo a ogni messaggio finale e in cima a ogni PR c'è sempre la sezione **"Ti ricordo"**: le voci ancora APERTA, una riga ciascuna. Quando una voce risulta fatta, la si segna FATTA con la data.
+
 ## Chi è Lorenzo e cosa vuole
 
 - Founder di Mapetite. Lavora a tempo pieno altrove: ha 10 minuti al giorno, dal telefono, per provare e approvare.

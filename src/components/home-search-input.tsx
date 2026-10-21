@@ -19,7 +19,7 @@ export default function HomeSearchInput() {
       required
       minLength={3}
       enterKeyHint="search"
-      placeholder="Chiedi all'AI…"
+      placeholder="Cosa cerchi?"
       aria-label="Chiedi all'AI: cosa cerchi?"
       value={q}
       onChange={(e) => setQ(e.target.value)}

@@ -4,3 +4,6 @@
 
 ## Team gstack (dal 18/10/2026, ciclo continuo dal 20/10/2026)
 Ogni voce passa per i ruoli del team gstack (CEO, ingegnere capo, designer, staff engineer, collaudatore, performance): regole complete in `docs/autonomia/LORENZO.md`, sezione "Team gstack". Documenti del team: `DESIGN.md`, `docs/autonomia/PROPOSTE.md`, `COMPETITOR.md`, `PROBLEMI.md`, `PARTNER.md`.
+
+## Ti ricordo (dal 21/10/2026)
+Ogni messaggio finale a Lorenzo e ogni PR chiudono con "Ti ricordo": le voci APERTA di `docs/autonomia/DA-FARE-LORENZO.md`, una riga ciascuna. Le voci fatte si segnano FATTA, con la data.
