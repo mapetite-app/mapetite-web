@@ -31,7 +31,15 @@ Da sistemare (minori, dal collaudo della mappa del gusto): "Rifalla" somma le cu
 3. **Notte 22→23:** ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga), con ricerche vere prima/dopo su TEST-RICERCHE.
 4. **Venerdì notte, sabato 24 e domenica 25:** le 4 schermate rifatte sui mockup scelti; collaudo ≥ 8,5; giro da utente vero in produzione; copione demo di 3 minuti.
 In pausa fino al 26/10: proposta 7 (ranking "Aperto da poco"), proposte 6, 9, 12, tutto il lato ristoratori.
-**In corso adesso (21/10 dalle 22:30, chiesto da Lorenzo in chat, branch `claude/great-cannon-xm1rhn`):** **home nuova** (Lorenzo: "la copertina com'è ora è disordinata e non utile; più fica e utile, con classifiche o proposte in base alle ricerche precedenti"), sul mockup A scelto in #87: saluto con l'ora, "Per te" dalle ricerche e dalla mappa del gusto, "I tuoi posti", classifiche della città. Più il promemoria permanente `DA-FARE-LORENZO.md` ("Ti ricordo" in ogni messaggio e PR).
+**In corso adesso:** nessuna sessione.
+**Fatto il 21/10 sera (22:30–00:30, chiesto da Lorenzo in chat, PR #91):** **home nuova** sul mockup A. Lorenzo aveva scritto: "la copertina è disordinata e non utile, fai qualcosa di più fico con classifiche o proposte dalle ricerche precedenti".
+- Saluto con giorno e ora ("Mercoledì sera · Roma", "Dove andiamo stasera, Giulia?").
+- Campo "Cosa cerchi?" con le ultime ricerche e tre idee per l'ora.
+- "Per te": le chicche di ciò che hai cercato e i tipi che ami nella tua zona, con il perché; Sorprendimi; invito alla mappa del gusto.
+- "I tuoi posti" e "Le classifiche di Roma/Milano" (4 liste numerate, mai fuori orario, ordinate dal verdetto e non dalla fama).
+- Nessuna chiamata a pagamento in home. Collaudo indipendente: **8,6, approvata**. Giro TUTTO OK.
+- Da fare dopo (dal collaudo): immagini nostre per tipo di posto nelle card "Per te" al posto di emoji e sfumatura; anteprima "#1 questa settimana" nelle classifiche, solo da dati già in cache.
+Inoltre: promemoria permanente `DA-FARE-LORENZO.md`, con la sezione "Ti ricordo" in ogni messaggio e in ogni PR.
 **Scelta del design (#87): "tutto come consigliato"**, decisa da Claude su autorizzazione di Lorenzo (21/10, 22:30).
 **Sessione del 20/10 22:26–00:30: mappa del gusto in PR #88 (**bocciata 2 volte dal revisore, non unita**: la prossima sessione rifà il collaudo con un revisore nuovo e la unisce se passa), mockup in PR #87 (aspetta la scelta di Lorenzo).
 **Terza sessione (domenica 18/10 dalle 15:10, branch `claude/quirky-hypatia-l8uare`, PR #73):** controllo a occhi nuovi a 390×844 e semplificazione delle schermate che la prima sessione non tocca: Profilo, Importa, Prenotazioni, accesso/registrazione, pagina pubblica del locale, Per i ristoratori, Premium. Non tocca Stasera, raccolte, gruppi, amici, home, mappa. Bloccata alle 15:20 dai permessi dell'ambiente, ripartita alle 15:40 su richiesta di Lorenzo, finita alle 17:50. Fatto: Premium, Prenotazioni, pagina pubblica del locale, Importa (dettagli sotto, "Domenica 18/10, terza sessione"). Profilo e Diario non visti: servono l'accesso vero.
