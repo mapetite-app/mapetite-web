@@ -4955,7 +4955,7 @@ else {
       await st.getByRole("button", { name: "giovedì" }).click();
       const ant = (await rp.getByTestId("serate-anteprima").textContent()) ?? "";
       await salva.click();
-      ok(premuti.join() === "martedì,mercoledì" && primaDis && /c'è posto/.test(ant) && /giovedì/i.test(ant) && await st.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: serate tranquille, giorni da toccare, anteprima della riga e salvataggio finto (${premuti.join()} → ${ant.slice(0, 80)})`);
+      ok(premuti.join() === "martedì,mercoledì" && primaDis && /c'è posto/.test(ant) && (/giovedì/i.test(ant) || (new Date().toLocaleDateString("it-IT", { weekday: "long", timeZone: "Europe/Rome" }) === "giovedì" && /stasera/i.test(ant))) && /* di giovedì (ora di Roma) la riga dice 'Stasera' */ await st.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: serate tranquille, giorni da toccare, anteprima della riga e salvataggio finto (${premuti.join()} → ${ant.slice(0, 80)})`);
       await rp.getByTestId("pannello-serate").screenshot({ path: `${OUT}/76b-pannello-serate.png` }); }
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
