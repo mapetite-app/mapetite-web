@@ -106,7 +106,12 @@ const TASTE_REASON = /(gust[oi]\b|piac|gradisc|\bam[ai]\b|utente|evit|preferisc|
 const NON_SAPUTO = /poco not|famos|nascost|chicc|turistic|\bzona\b|quartiere/i;
 const NON_SAPUTO_PERCHE = /poco not|nascost|chicc/i;
 
-const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
+// "✓ terrazza" sulle card (chiave B): SPENTO il 22/10 dopo due bocciature del collaudo (prove sbagliate
+// su parole simili, città e lamentele). Il codice è corretto ma va ricollaudato prima di riaccenderlo.
+// Spento, l'AI non scrive il campo (niente 0,6 s in più) e le card non mostrano ✓.
+export const REQUISITI_ACCESI = false;
+
+const MATCH_REASON_SYSTEM_PIENO = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Non usare parole inglesi, calchi o parole inventate. Ogni parola di matchReason deve essere una parola italiana esistente.
 
 L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in ITALIANO perché risponde (o non risponde bene) alla sua richiesta specifica.
 
@@ -126,6 +131,9 @@ Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"confermati
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
 - Richieste "non turistico", "autentico", "dove vanno i locali", "nascosto", "poco conosciuto": è un requisito ESPLICITO di atmosfera. Se le recensioni descrivono il locale come turistico (turisti, menù turistico, "trappola per turisti", clientela quasi solo straniera, buttadentro), match è "basso" e matchReason lo dice; se più recensioni lo dicono chiaramente, fit è false. Se le recensioni parlano di clientela del quartiere, romani/milanesi, posto di famiglia, match può essere "alto".`;
+const MATCH_REASON_SYSTEM = REQUISITI_ACCESI
+  ? MATCH_REASON_SYSTEM_PIENO
+  : MATCH_REASON_SYSTEM_PIENO.replace(`"confermati":string[],`, "").replace(/\n- confermati:[^\n]*/, "");
 
 function costOf(inputTokens: number, outputTokens: number): number {
   return (
@@ -418,7 +426,7 @@ export async function getSynthesis(
             }
             // Requisiti confermati: il ✓ resta SOLO se la parola è nella richiesta e una frase delle
             // recensioni la contiene (collaudo del 22/10: l'AI rimandava "romantico" a quasi tutti).
-            if (Array.isArray(o.confermati)) {
+            if (REQUISITI_ACCESI && Array.isArray(o.confermati)) {
               const pl = batch.find((p) => p.id === o.id);
               // Con il voto se Google l'ha dato: la prova si cerca nelle recensioni positive.
               const recensioni = pl?.reviewItems?.length ? pl.reviewItems : (pl?.reviewTexts ?? []).map((text) => ({ text }));

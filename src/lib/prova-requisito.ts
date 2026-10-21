@@ -17,7 +17,7 @@ function normalizza(t: string): string {
 // Frasi con una negazione, un dubbio o un confronto OVUNQUE ("purtroppo non è stata utilizzabile",
 // "niente di straordinario", "poco romantico", "rispetto a molti rooftop"): non sono una prova.
 // Meglio perdere una prova buona che mostrarne una che dice il contrario (terzo collaudo, 22/10).
-const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspettav\w*|rispetto|altri|invece|tranne|nonostante)\b/;
+const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspett\w*|rispetto|altri|invece|tranne|nonostante|nulla|pero|ma|troppo|lent\w*|pecca|turistic\w*)\b/;
 // "vista" verbo ("l'ho vista", "è stata vista"): non è la vista del locale.
 const VISTA_VERBO = /\b(l'?ho|ho|hai|abbiamo|avevo|stata|stato|l')\s*vist/;
 
@@ -28,22 +28,27 @@ export function provaRequisito(requisito: string, recensioni: { text: string; ra
   // "non turistico": una frase che contiene "turistico" direbbe spesso il contrario.
   if (parole.length === 0 || parole[0] === "non") return null;
   const radici = parole.map(radice).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // Parola intera: la radice e al massimo 3 lettere ("romantic|a" sì, "roma" in "romantica" no,
+  // "tranquill|amente" no). Quarto collaudo, 22/10: "roma" e "romana" si confermavano con "romantica".
+  const parola = (x: string) => new RegExp(`\\b${x}[a-z]{0,3}\\b`);
   // La parola è nel nome del locale ("Terrazza Palestro", "The Vista Rooftop"): le recensioni la usano
   // per chiamare il posto, non per confermarlo. Niente prova (il nome lo dice già da solo).
   const nome = normalizza(nomeLocale);
-  if (nome && radici.some((x) => new RegExp(`\\b${x}`).test(nome))) return null;
-  const ordinate = [...(recensioni ?? [])].filter((r) => r.rating == null || r.rating >= 3).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
+  if (nome && radici.some((x) => parola(x).test(nome))) return null;
+  const ordinate = [...(recensioni ?? [])].filter((r) => r.rating == null || r.rating >= 4).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
   for (const r of ordinate) {
     const frasi = r.text.split(/(?<=[.!?…])\s+|\n+/);
     for (const f of frasi) {
       const n = normalizza(f);
-      if (!radici.every((x) => new RegExp(`\\b${x}`).test(n))) continue;
+      if (!radici.every((x) => parola(x).test(n))) continue;
+      // "vista" che non è il panorama: "cucina a vista", "pietra a vista", "visto il luogo", "vista la location".
+      if (radici.includes("vist") && (/\ba vista\b|\bvisto\b|\bvista (la|il|l'|i|le)\b/.test(n) || !/\bvist[ae]\b/.test(n))) continue;
       if (DUBBIO.test(n) || VISTA_VERBO.test(n)) continue;
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
       if (pulita.length < 12) continue;
       if (pulita.length <= MAX) return pulita;
       // Frase lunga: si taglia attorno alla parola trovata, con i puntini.
-      const at = Math.max(0, normalizza(pulita).search(new RegExp(`\\b${radici[0]}`)) - 50);
+      const at = Math.max(0, normalizza(pulita).search(parola(radici[0])) - 50);
       const pezzo = pulita.slice(at, at + MAX).replace(at > 0 ? /^\S*\s/ : /^$/, "").replace(/\s\S*$/, "");
       return `${at > 0 ? "…" : ""}${pezzo}…`;
     }
@@ -60,6 +65,9 @@ export function requisitoDellaRichiesta(requisito: string, richiesta: string): s
   const q = normalizza(richiesta);
   const parole = requisito.trim().toLowerCase().split(/\s+/).filter((w) => !TIPI.test(normalizza(w)));
   if (parole.length === 0 || parole.length > 2) return null;
-  const tutte = parole.every((w) => VUOTE.has(w) || w === "non" || new RegExp(`\\b${radice(normalizza(w)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(q));
+  // Città e zone non sono requisiti da confermare ("a Milano", "sui Navigli", "a Trastevere", "Roma").
+  const esc = (w: string) => normalizza(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (parole.some((w) => /^(roma|milano|romana|romano|milanese)$/.test(normalizza(w)) || new RegExp(`\\b(a|in|sui|sul|ai|al|nel|nei|zona|vicino)\\s+${esc(w)}\\b`).test(q))) return null;
+  const tutte = parole.every((w) => VUOTE.has(w) || w === "non" || new RegExp(`\\b${radice(normalizza(w)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[a-z]{0,3}\\b`).test(q));
   return tutte ? parole.join(" ") : null;
 }
