@@ -25,7 +25,7 @@ export function reelSourceOf(raw: string): ReelSource | null {
   const host = hostOf(u);
   const path = u.pathname;
   if (host === "instagram.com" && /^\/(reel|reels|p|tv)\/[A-Za-z0-9_-]+/.test(path)) return "Instagram";
-  if (host === "tiktok.com" && (/\/video\/\d+/.test(path) || /^\/t\/[A-Za-z0-9]+/.test(path))) return "TikTok";
+  if (host === "tiktok.com" && (/\/(video|photo)\/\d+/.test(path) || /^\/t\/[A-Za-z0-9]+/.test(path))) return "TikTok";
   if ((host === "vm.tiktok.com" || host === "vt.tiktok.com") && path.length > 1) return "TikTok";
   if (host === "youtube.com" && (/^\/shorts\/[A-Za-z0-9_-]+/.test(path) || (path === "/watch" && u.searchParams.has("v")))) return "YouTube";
   if (host === "youtu.be" && path.length > 1) return "YouTube";

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { replaceTag } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -56,6 +56,16 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     setSheet(next);
   };
   const close = () => { if (!busy) setSheet(null); };
+  // "Nuova" nei Salvati (src/components/salvati-lista.tsx): /profilo?raccolta=nuova apre subito il foglio.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("raccolta") !== "nuova" || initialRows.length === 0) return;
+    params.delete("raccolta");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+    const t = setTimeout(() => { setNotice(null); setError(null); setName(""); setQuery(""); setPicked(new Set()); setSheet({ kind: "nuova" }); }, 0);
+    return () => clearTimeout(t);
+  }, [initialRows.length]);
 
   // Applica "change" a ogni salvato toccato, una riga alla volta, e aggiorna subito l'elenco.
   // Ritorna il numero di righe non aggiornate (0 = tutto ok).

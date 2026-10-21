@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 22/10/2026 (notte, sessione 00:07, CEO che chiude — solo chiavi di volta)
+
+### 18. "Come lo sai?": la frase della recensione dietro ogni ✓
+- **Problema:** `PROBLEMI.md`, 10: le risposte dell'AI sembrano vere ma non si vede da dove vengono.
+- **Cosa fa:** nella scheda, toccando "✓ terrazza" si apre una riga: «"cena in terrazza al tramonto" — da una recensione su Google». Una frase sola, copiata dalle recensioni che la ricerca ha già (mai riscritta).
+- **Da dove nasce:** Ask Maps di Google e l'AI Concierge di OpenTable rispondono ma non mostrano la prova (`COMPETITOR.md`, 22/10). Noi mostriamo la prova in un tocco.
+- **Valore per l'utente:** si fida del ✓ senza leggere 20 recensioni; nella demo dal vivo è il momento "non inventa niente".
+- **Valore per il ristoratore:** vede quali frasi delle recensioni gli portano clienti (nel pannello, dopo).
+- **Sforzo:** S. L'AI indica il numero della recensione, il codice copia la frase (se la frase non c'è parola per parola, niente prova e niente ✓).
+- **Costo Google/Haiku:** zero chiamate Google in più; Haiku pochi token in più per locale (stimato meno di 0,05 centesimi a ricerca).
+- **Stato proposto:** PRONTA (chiave B).
+
+### 19. "Il primo o il secondo?" in una riga
+- **Problema:** con 12 posti tutti adatti si resta a scorrere; la decisione è il punto in cui gli altri lasciano soli (VISIONE: "scegli").
+- **Cosa fa:** sopra il carosello, quando i primi due sono entrambi "molto adatti", una riga: "Terrazza Gallia se volete silenzio, Alto se volete il Duomo". Scritta solo dai verdetti già prodotti.
+- **Da dove nasce:** Beli dà un numero ("Rec Score") ma non dice la differenza; Places non confronta. Noi diciamo la differenza in parole.
+- **Valore per l'utente:** sceglie in 5 secondi.
+- **Valore per il ristoratore:** sapere su cosa vince o perde contro il vicino (pannello, dopo).
+- **Sforzo:** S/M. Una chiamata Haiku piccola dopo i verdetti, solo con i due verdetti in ingresso.
+- **Costo Google/Haiku:** zero Google; Haiku circa 0,02 centesimi a ricerca.
+- **Stato proposto:** PRONTA (chiave B, dopo la 18).
+
 ## 21/10/2026 (mattina, sessione 05:05, CEO che chiude — solo chiavi di volta)
 
 ### 16. Importa i preferiti di TikTok in blocco

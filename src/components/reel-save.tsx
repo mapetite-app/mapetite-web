@@ -360,6 +360,17 @@ function PlaceRow({
         setSt({ s: "error", msg: `Non sono riuscito a togliere ${top.name} dai salvati: puoi toglierlo dai Salvati.` });
         return;
       }
+    } else if (out?.place && reelUrl) {
+      // Era già nei salvati (dal collaudo del 21/10): il locale resta, si stacca solo questo reel.
+      try {
+        const client = await browserClient();
+        const { error } = await client.from("contenuti_locali").delete().eq("user_id", userId).eq("place_id", out.place.id).eq("url", reelUrl);
+        if (error) throw error;
+        trackFeature("reel_salva", { stato: "annullato_gia_salvato", fonte });
+      } catch {
+        setSt({ s: "error", msg: `Non sono riuscito a staccare il reel da ${top.name}: puoi toglierlo dalla scheda del locale.` });
+        return;
+      }
     }
     remember(noKey, top.id);
     try { sessionStorage.removeItem(savedKey); } catch { /* storage non disponibile */ }
@@ -404,7 +415,7 @@ function PlaceRow({
           <span className="block text-[11px] font-semibold uppercase tracking-wide text-success">{st.out.alreadySaved ? "✓ Era già salvato" : "✓ Salvato"}</span>
           <span className="block truncate text-sm font-semibold text-brand">{st.top.name}</span>
         </Link>
-        {st.auto && !st.out.alreadySaved && (
+        {st.auto && (
           <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className="min-h-11 shrink-0 px-2 text-xs font-display font-semibold text-brand underline disabled:opacity-60">
             Non è questo
           </button>
@@ -430,7 +441,7 @@ function PlaceRow({
           <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} bg-brand text-white`}>
             Apri sulla mappa
           </Link>
-          {st.auto && !st.out.alreadySaved && (
+          {st.auto && (
             <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
               Non è questo
             </button>

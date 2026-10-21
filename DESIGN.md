@@ -62,6 +62,9 @@ Foto in alto a tutta larghezza, nome grande, "Città · distanza", "Categoria ·
 - Salva: foglio dal basso con "📌 Voglio andarci / ✓ Ci sono stato", nota, raccolte, "Fatto".
 - Primo accesso: barra di avanzamento, una domanda per schermata, pillole grandi, subito un risultato vero ("magia"). Nessun paywall.
 
+### Salvati — mockup C "Card bianche" vestito in stile A (scelto da Lorenzo, PR #87)
+`src/components/salvati-lista.tsx`. Cosa principale: **ritrovare un posto**. Fondo carta `#f8f6f2`, titolo serif "I tuoi posti" (Newsreader) con sopra "N posti · città vere"; icone Cerca / Mappa / + (Aggiungi). Filtri "Tutti N / Da provare N / Ci sono stato N" (conteggi veri); raccolte come cerchi (le storie), prima "Stasera", ultima "Nuova"; lista in una card bianca, per vicinanza se la posizione è già permessa, nomi in serif, badge di stato solo se lo stato c'è, "Reel Instagram" se c'è un reel collegato (`contenuti_locali`), altrimenti il verdetto in cache. Città, tipo, voto e prezzo nel foglio "Filtri"; la mappa dei salvati (carosello di prima) a un tocco, con "Vedi la lista" per tornare. Nessuna foto: emoji su fondi caldi.
+
 ### Barra in basso
 Assistente · Salvati · **Mappa** (cerchio teal al centro) · Amici · Profilo. Etichette di una parola.
 

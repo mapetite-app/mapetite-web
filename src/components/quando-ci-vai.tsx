@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { oggiRoma, sabatoDi } from "@/lib/stasera";
 import { trackFeature } from "@/lib/track";
@@ -14,6 +14,23 @@ export default function QuandoCiVai({ userId, placeId }: { userId: string; place
   const [scelta, setScelta] = useState<Scelta | null>(null);
   const [busy, setBusy] = useState(false);
   const [errore, setErrore] = useState(false);
+  // Dopo una ricarica la scelta già fatta si rilegge dal salvato (dal collaudo del 21/10: tornava vuota).
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const client = await browserClient();
+        const { data } = await client.from("saved_places").select("piano_al").eq("user_id", userId).eq("place_id", placeId).maybeSingle();
+        const giorno = (data as { piano_al?: string | null } | null)?.piano_al ?? null;
+        if (!alive || !giorno) return;
+        const oggi = oggiRoma();
+        setScelta((cur) => cur ?? (giorno === oggi ? "stasera" : giorno === sabatoDi(oggi) ? "weekend" : null));
+      } catch {
+        // lettura non riuscita: si parte senza scelta, come prima
+      }
+    })();
+    return () => { alive = false; };
+  }, [userId, placeId]);
 
   const scegli = async (s: Scelta) => {
     const next = scelta === s ? null : s;

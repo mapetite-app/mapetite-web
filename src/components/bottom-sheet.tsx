@@ -75,6 +75,8 @@ export interface BottomSheetProps {
   // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro"): dove mettere la pillola "N posti"
   // sotto la barra in alto, al posto dell'intestazione sopra le card. null = lista di prima.
   pillSlot?: HTMLElement | null;
+  // Cosa ha capito l'AI, in breve, accanto a "12 posti" nella pillola.
+  capito?: string[];
 }
 
 export type ListDetails = {
@@ -83,6 +85,7 @@ export type ListDetails = {
   verdict: string | null;
   matchReason: string | null;
   perTe?: string | null;
+  requisiti?: { r: string; prova: string }[] | null;
   goFor: string[] | null;
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
@@ -224,7 +227,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [] }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -474,10 +477,33 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
 
   // "Ho capito", locali messi da parte, Affina e Condividi: dietro "⋯" (lista di prima) o dietro la
   // pillola "N posti" (lista nuova). Nella lista nuova ci stanno anche i filtri rapidi.
+  // Quante card hanno ogni requisito confermato dalle recensioni (chiave B: l'AI che si vede).
+  // Solo numeri veri dalle risposte dell'AI: niente se nessun requisito è confermato.
+  const conferme = (() => {
+    // "autentica"/"autentico" e "trattoria autentica"/"autentica" sono lo stesso requisito (l'AI li scrive a gruppi).
+    const chiave = (r: string) => r.split(" ").map((w) => w.replace(/[aeio]$/, "")).join(" ");
+    const n = new Map<string, { label: string; ids: Set<string> }>();
+    for (const p of places) {
+      for (const { r } of details?.[p.id]?.requisiti ?? []) {
+        const k = chiave(r);
+        const k2 = [...n.keys()].find((x) => x === k || x.endsWith(` ${k}`) || k.endsWith(` ${x}`)) ?? k;
+        const cur = n.get(k2) ?? { label: r, ids: new Set<string>() };
+        if (r.length < cur.label.length) cur.label = r;
+        cur.ids.add(p.id);
+        n.set(k2, cur);
+      }
+    }
+    return [...n.values()].map((v): [string, number] => [v.label, v.ids.size]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  })();
   const optionsPanel = title ? (
     <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
       {understood.length > 0 && (
         <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
+      )}
+      {conferme.length > 0 && !loadingVerdicts && (
+        <p data-testid="conferme-recensioni" className="mt-1 text-xs font-sans text-text">
+          <span aria-hidden className="text-success">✓ </span>Dalle recensioni: {conferme.map(([r, c], k) => `${r} ${k === 0 ? `in ${c} ${c === 1 ? "posto" : "posti"} su ${places.length}` : `in ${c}`}`.replace(/ /g, "\u00a0")).join(" · ")}
+        </p>
       )}
       {/* Mappa del gusto (sprint 25/10): quali gusti del profilo hanno cambiato l'ordine. */}
       {(setAside?.per_te?.length ?? 0) > 0 && (
@@ -546,12 +572,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           data-testid="opzioni-ricerca"
           aria-expanded={headerOpen}
           onClick={() => setHeaderOpen((v) => !v)}
-          className={`flex min-h-11 items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
+          className={`flex min-h-11 max-w-[calc(100vw-5.5rem)] items-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold shadow-float active:scale-95 ${headerOpen ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
           <span data-testid="titolo-risposta" className="sr-only">{title}</span>
           {/* Mentre arrivano i verdetti la pillola resta "12 posti" (niente salti di larghezza): basta il puntino. */}
           {loadingVerdicts && <span data-testid="verdetti-in-arrivo" aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
-          <span data-testid="conteggio-risultati">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          {!loadingVerdicts && (
+            <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+          )}
+          <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
+          {capito.length > 0 && !headerOpen && (
+            <span data-testid="capito-pillola" className="min-w-0 truncate font-sans font-normal text-text">
+              {capito.map((u) => <span key={u}><span aria-hidden className="mx-1.5 text-text-muted">·</span>{u.toLowerCase()}</span>)}
+            </span>
+          )}
           <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>
           {(quick.size > 0 || nearestFirst) && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
         </button>
@@ -650,6 +685,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const corte = goFor.filter((c) => c.length <= 20);
               const chips = corte.length >= 2 && corte[0].length + corte[1].length <= 30 ? corte.slice(0, 2) : (corte.length > 0 ? corte : goFor).slice(0, 1);
               const similar = similarTo?.(place.id) ?? null;
+              // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
+              const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
                 <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
@@ -703,7 +740,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         </span>
                       </span>
                       <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
-                      {(d?.openNow != null || similar) && (
+                      {(d?.openNow != null || similar || req.length > 0) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
                             <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
@@ -714,6 +751,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           )}
                           {similar && (
                             <span data-testid="simile-a" className="truncate text-xs font-sans font-semibold text-accent">✨ Come {similar}, che hai salvato</span>
+                          )}
+                          {req.length > 0 && (
+                            <span data-testid="requisiti-card" className="truncate text-xs font-sans font-semibold text-white/90" title="Confermato dalle recensioni">
+                              <span className="sr-only">Confermato dalle recensioni: </span>
+                              {req.map((r, k) => <span key={r}>{k > 0 ? " · " : ""}<span aria-hidden className="text-[#7be0a8]">✓</span> {r}</span>)}
+                            </span>
                           )}
                         </span>
                       )}
