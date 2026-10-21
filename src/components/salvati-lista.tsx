@@ -131,7 +131,7 @@ export default function SalvatiLista({
     <section
       data-testid="salvati-lista"
       aria-label="I tuoi posti"
-      className={`absolute inset-0 z-30 overflow-y-auto overscroll-contain ${PAPER} pb-[calc(var(--nav-height-mobile)+1.5rem)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
+      className={`absolute inset-0 z-30 overflow-y-auto overscroll-contain ${PAPER} pb-[calc(var(--nav-height-mobile)+7rem)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
     >
       <div className="mx-auto max-w-md px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
         <p data-testid="salvati-lista-sopra" className="truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{kicker}</p>
