@@ -427,7 +427,7 @@ export async function getSynthesis(
                 if (typeof x !== "string" || x.length > 30 || hasEnglish(x)) continue;
                 const r = requisitoDellaRichiesta(x, query);
                 if (!r || conf.some((c) => c.r === r)) continue;
-                const prova = provaRequisito(r, recensioni);
+                const prova = provaRequisito(r, recensioni, pl?.name ?? "");
                 if (prova) conf.push({ r, prova });
                 if (conf.length >= 3) break;
               }

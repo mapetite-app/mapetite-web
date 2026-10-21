@@ -160,6 +160,11 @@ export default function VenueSheet({
   // passando a un altro con "‹ ›" non si apre lì.
   // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
   const [provaAperta, setProvaAperta] = useState<string | null>(null);
+  // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
+  useEffect(() => {
+    if (!provaAperta) return;
+    document.querySelector("[data-testid=prova-recensione]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [provaAperta]);
   const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
   const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
   const setVisitAskedAt = (at: number | null) => setVisitAsked(at == null ? null : { id: venue.id, at });
@@ -724,7 +729,7 @@ export default function VenueSheet({
                 ))}
               </div>
               {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
-                <p data-testid="prova-recensione" ref={(el) => { el?.scrollIntoView({ block: "center", behavior: "smooth" }); }} className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
                   <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>

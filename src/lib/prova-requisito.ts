@@ -14,25 +14,31 @@ function normalizza(t: string): string {
   return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-// Negazioni vicine alla parola ("niente terrazza", "per niente romantico", "non c'è vista"): non è una prova.
-const NEGAZIONE = /\b(non|niente|nessun[oa]?|senza|manca|mancava|mai)\b/;
+// Frasi con una negazione, un dubbio o un confronto OVUNQUE ("purtroppo non è stata utilizzabile",
+// "niente di straordinario", "poco romantico", "rispetto a molti rooftop"): non sono una prova.
+// Meglio perdere una prova buona che mostrarne una che dice il contrario (terzo collaudo, 22/10).
+const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspettav\w*|rispetto|altri|invece|tranne|nonostante)\b/;
+// "vista" verbo ("l'ho vista", "è stata vista"): non è la vista del locale.
+const VISTA_VERBO = /\b(l'?ho|ho|hai|abbiamo|avevo|stata|stato|l')\s*vist/;
 
 // Recensioni con il voto (Google): la prova si cerca prima nelle 5 e 4 stelle, mai in quelle da 1-2
 // (collaudo del 22/10: "✓ rooftop" mostrava la frase di una recensione da 1 stella).
-export function provaRequisito(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined): string | null {
+export function provaRequisito(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): string | null {
   const parole = normalizza(requisito).split(/\s+/).filter((w) => w.length >= 3 && !VUOTE.has(w));
   // "non turistico": una frase che contiene "turistico" direbbe spesso il contrario.
   if (parole.length === 0 || parole[0] === "non") return null;
   const radici = parole.map(radice).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // La parola è nel nome del locale ("Terrazza Palestro", "The Vista Rooftop"): le recensioni la usano
+  // per chiamare il posto, non per confermarlo. Niente prova (il nome lo dice già da solo).
+  const nome = normalizza(nomeLocale);
+  if (nome && radici.some((x) => new RegExp(`\\b${x}`).test(nome))) return null;
   const ordinate = [...(recensioni ?? [])].filter((r) => r.rating == null || r.rating >= 3).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
   for (const r of ordinate) {
     const frasi = r.text.split(/(?<=[.!?…])\s+|\n+/);
     for (const f of frasi) {
       const n = normalizza(f);
       if (!radici.every((x) => new RegExp(`\\b${x}`).test(n))) continue;
-      // Negazione nelle 4 parole prima della parola trovata: si salta la frase.
-      const prima = n.slice(0, n.search(new RegExp(`\\b${radici[0]}`))).split(/\s+/).slice(-5).join(" ");
-      if (NEGAZIONE.test(prima)) continue;
+      if (DUBBIO.test(n) || VISTA_VERBO.test(n)) continue;
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
       if (pulita.length < 12) continue;
       if (pulita.length <= MAX) return pulita;
