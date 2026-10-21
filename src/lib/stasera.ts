@@ -22,7 +22,29 @@ export type SavedSpot = {
   googlePlaceId: string | null;
   tags: string[];
   note: string | null;
+  // "Quando ci vai?" (proposta 17): giorno scelto dall'utente, AAAA-MM-GG, o null.
+  pianoAl?: string | null;
 };
+
+// Giorno di Roma come AAAA-MM-GG.
+const romeDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
+export function oggiRoma(now = new Date()): string {
+  return romeDay.format(now);
+}
+const addDays = (day: string, n: number) => {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+// "Nel weekend": il sabato di questa settimana (sabato e domenica: quello di oggi o di ieri).
+export function sabatoDi(day: string): string {
+  const dow = new Date(`${day}T12:00:00Z`).getUTCDay(); // 0 domenica … 6 sabato
+  return dow === 0 ? addDays(day, -1) : addDays(day, 6 - dow);
+}
+// In programma: il giorno scelto o quello dopo ("Stasera" vale fino a domani, il weekend sab-dom).
+export function inProgramma(s: SavedSpot, oggi: string): boolean {
+  return !!s.pianoAl && (s.pianoAl === oggi || addDays(s.pianoAl, 1) === oggi);
+}
 
 export type Choices = {
   occasion: string | null; // una raccolta dell'utente, null = Qualsiasi
@@ -66,8 +88,10 @@ export function matches(s: SavedSpot, c: Choices): boolean {
   return true;
 }
 
-// Livello: prima i "Voglio andarci", poi i salvati senza stato, poi i già visitati.
-function tier(s: SavedSpot): number {
+// Livello: prima quelli in programma oggi ("Quando ci vai?"), poi i "Voglio andarci", poi i
+// salvati senza stato, poi i già visitati.
+function tier(s: SavedSpot, oggi: string): number {
+  if (inProgramma(s, oggi) && !s.tags.includes(STATE_DONE)) return 3;
   if (s.tags.includes(STATE_WANT)) return 2;
   if (s.tags.includes(STATE_DONE)) return 0;
   return 1;
@@ -82,6 +106,7 @@ export function pickThree(
   skip: Set<string> = new Set(),
   n = 3,
   random: () => number = Math.random,
+  oggi: string = oggiRoma(),
 ): SavedSpot[] {
   const pool = spots
     .filter((s) => matches(s, c) && !skip.has(s.id))
@@ -89,7 +114,7 @@ export function pickThree(
       const near = c.near && s.lat != null && s.lng != null
         ? 1 - Math.min(1, distanceMeters(c.near, { lat: s.lat, lng: s.lng }) / NEAR_RADIUS_M)
         : 0;
-      return { s, base: tier(s) * 10 + near * 3 + random() * 2, kind: getCategoryEmoji(s.category, s.name) };
+      return { s, base: tier(s, oggi) * 10 + near * 3 + random() * 2, kind: getCategoryEmoji(s.category, s.name) };
     });
   const picked: SavedSpot[] = [];
   const kinds = new Set<string>();

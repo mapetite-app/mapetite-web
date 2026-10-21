@@ -18,6 +18,8 @@ import {
   directionsUrl,
   matches,
   pickThree,
+  inProgramma,
+  oggiRoma,
   type Choices,
   type SavedSpot,
 } from "@/lib/stasera";
@@ -31,7 +33,7 @@ async function loadSaved(userId: string): Promise<{ spots: SavedSpot[]; verdicts
   const supabase = createClient();
   const { data, error } = await supabase
     .from("saved_places")
-    .select("tags, note, places(id, name, category, address, lat, lng, google_place_id)")
+    .select("tags, note, piano_al, places(id, name, category, address, lat, lng, google_place_id)")
     .eq("user_id", userId);
   if (error) throw error;
   const spots: SavedSpot[] = [];
@@ -51,6 +53,7 @@ async function loadSaved(userId: string): Promise<{ spots: SavedSpot[]; verdicts
       googlePlaceId: p.google_place_id ?? null,
       tags: ((row.tags as string[] | null) ?? []).filter((t) => typeof t === "string"),
       note: (row.note as string | null)?.trim() || null,
+      pianoAl: typeof row.piano_al === "string" ? row.piano_al : null,
     });
   }
   const verdicts: Record<string, string> = {};
@@ -93,6 +96,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
   const where = [categoryLabel(spot.category), city, dist ? `a ${dist}` : null].filter(Boolean).join(" · ");
   const want = spot.tags.includes(STATE_WANT);
   const done = spot.tags.includes(STATE_DONE);
+  const planned = !done && inProgramma(spot, oggiRoma());
   // Raccolte = tag scritti dall'utente: niente stati né "Com'era?" (👍/👎 non sono raccolte).
   const raccolte = spot.tags.filter((t) => !isStateTag(t) && t.trim());
   const mapHref = spot.lat != null && spot.lng != null ? `/mappa?salvato=${spot.id}` : "/mappa?vista=salvati";
@@ -107,12 +111,12 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
         <div className="min-w-0 flex-1">
           <h2 className="font-title text-lg font-semibold leading-snug text-brand">{spot.name}</h2>
           {where && <p className="mt-0.5 text-sm text-text-muted">{where}</p>}
-          {(want || done) && (
+          {(planned || want || done) && (
             <span
               data-testid="stasera-stato"
-              className={`mt-1.5 inline-block rounded-pill px-2.5 py-0.5 font-display text-xs font-semibold ${want ? "bg-accent text-white" : "bg-surface text-text-muted"}`}
+              className={`mt-1.5 inline-block rounded-pill px-2.5 py-0.5 font-display text-xs font-semibold ${planned || want ? "bg-accent text-white" : "bg-surface text-text-muted"}`}
             >
-              {want ? "📌 Voglio andarci" : "✓ Ci sono stato"}
+              {planned ? "📅 Avevi detto: ci vado" : want ? "📌 Voglio andarci" : "✓ Ci sono stato"}
             </span>
           )}
         </div>

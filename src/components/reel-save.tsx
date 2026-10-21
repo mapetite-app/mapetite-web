@@ -14,6 +14,7 @@ import { confidentMatch, stessoLocale } from "@/lib/reel-match";
 import { screenshotForUpload } from "@/lib/screenshot-upload";
 import { trackFeature } from "@/lib/track";
 import PlacePhoto from "@/components/place-photo";
+import QuandoCiVai from "@/components/quando-ci-vai";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 // "Salva dal reel" in un gesto (sprint 25/10, chiave di volta A). Dal link condiviso o incollato:
@@ -404,6 +405,7 @@ function PlaceRow({
         <p className="mt-1 font-display text-xl font-semibold text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
         <VerdettoSubito place={st.top} />
+        {auto && !st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} bg-brand text-white`}>

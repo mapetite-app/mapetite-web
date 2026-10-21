@@ -2444,6 +2444,23 @@ else {
     ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");
     await lp.getByTestId("reel-verdetto").waitFor({ timeout: 4000 }).catch(() => {});
     ok(await lp.getByTestId("reel-verdetto").getByText("Caffè da banco serio, cornetti sfornati la mattina.").isVisible() && verdCalls.length === 1 && verdCalls[0]?.googlePlaceId === "GBR1", "salva dal reel: nel '✓ Salvato' compare subito il verdetto Mapetite (una chiamata)");
+    // "Quando ci vai?" (proposta 17): un tocco scrive il giorno nel salvato, un altro lo toglie.
+    { const wq = lwrites.length;
+      await lp.getByTestId("quando-stasera").click();
+      await lp.getByTestId("quando-detto").waitFor({ timeout: 3000 }).catch(() => {});
+      const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
+      const pq = lwrites.slice(wq).find((w) => w.m === "PATCH");
+      ok(pq?.body?.piano_al === oggi && pq.url.includes("place_id=eq.00000000-0000-0000-0000-000000000201") && await lp.getByTestId("quando-stasera").getAttribute("aria-pressed") === "true", `quando ci vai: 'Stasera' segna oggi nel salvato (${JSON.stringify(pq?.body)})`);
+      await lp.getByTestId("quando-weekend").click();
+      await lp.waitForTimeout(300);
+      const pw = lwrites.slice(wq).filter((w) => w.m === "PATCH").at(-1);
+      const dow = new Date(`${oggi}T12:00:00Z`).getUTCDay();
+      const sab = new Date(`${oggi}T12:00:00Z`); sab.setUTCDate(sab.getUTCDate() + (dow === 0 ? -1 : 6 - dow));
+      ok(pw?.body?.piano_al === sab.toISOString().slice(0, 10), `quando ci vai: 'Nel weekend' segna il sabato (${pw?.body?.piano_al})`);
+      await lp.getByTestId("quando-weekend").click();
+      await lp.waitForTimeout(300);
+      ok(lwrites.slice(wq).filter((w) => w.m === "PATCH").at(-1)?.body?.piano_al === null && !(await lp.getByTestId("quando-detto").isVisible()), "quando ci vai: toccato di nuovo, il giorno si toglie");
+      await lp.getByTestId("reel-salvato").screenshot({ path: `${OUT}/33b-reel-salvato-quando.png` }); }
     await lp.screenshot({ path: `${OUT}/33-condividi-screenshot.png`, caret: "initial" });
 
     // "Non è questo": si toglie dai salvati e si sceglie tra gli altri risultati già arrivati.
@@ -7407,6 +7424,25 @@ else {
     await c.close();
   }
 }
+
+// "Quando ci vai?" (proposta 17): il salvato segnato per oggi va primo in "Stasera dove andiamo?".
+{ const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
+  const row = (i, name, tags, piano) => ({ tags, note: null, piano_al: piano, places: { id: `00000000-0000-0000-0000-00000000090${i}`, name, category: "ristorante", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, google_place_id: `GS${i}` } });
+  const rows = [row(1, "Osteria Uno", ["Da provare"], null), row(2, "Trattoria Due", ["Da provare"], null), row(3, "Pizzeria Tre", ["Da provare"], null), row(4, "Bistrot Quattro", [], oggi), row(5, "Enoteca Cinque", ["Da provare"], "2020-01-04")];
+  await c.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: rows }));
+  await c.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  const st = await c.newPage();
+  st.on("pageerror", (e) => errors.push(e.message));
+  await st.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+  await st.getByTestId("stasera-proponi").click();
+  await st.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+  const first = st.getByTestId("stasera-proposta").first();
+  ok((await first.getAttribute("data-id")) === "00000000-0000-0000-0000-000000000904" && (await first.getByTestId("stasera-stato").textContent()) === "📅 Avevi detto: ci vado", "stasera: il salvato segnato 'Stasera' è il primo, con 'Avevi detto: ci vado'");
+  ok(!(await st.locator("[data-testid=stasera-proposta][data-id='00000000-0000-0000-0000-000000000905']").getByText("Avevi detto").count()), "stasera: un giorno passato da tempo non conta più");
+  await st.screenshot({ path: `${OUT}/90-stasera-in-programma.png` });
+  await c.close(); }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
 await browser.close();
