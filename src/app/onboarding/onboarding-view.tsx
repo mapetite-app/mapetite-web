@@ -2,21 +2,15 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
-import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
+import { DIETE, SCOPERTE, TIPI, capito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
-
-const SERIF = "font-[family-name:var(--font-newsreader)]";
-// "Ecco cosa ho capito di te" sul mockup A (frase da amico): bocciata 2 volte dal collaudo del 23/10
-// ("e altri 1", "Correggi" sotto i tasti con i profili ricchi, tocco su un tipo senza uscita). Spenta:
-// resta la lista di prima finché un collaudo nuovo non la approva.
-const CAPITO_A = false;
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -145,9 +139,9 @@ function Chip({
   );
 }
 
-function Gruppo({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
+function Gruppo({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div id={id} className="mb-6 scroll-mt-24">
+    <div className="mb-6">
       <h2 className="mb-2.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</h2>
       {children}
     </div>
@@ -292,16 +286,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const skipStep = () => setStep((s) => Math.min(s + 1, TOTAL - 1));
 
   const saltaCls = "-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline";
-  // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 ("Scelto dai tuoi 👍") e ha
-  // lasciato: vale come scelta. Una mai mostrata non entra nella sintesi.
-  const gustoVisto = { ...gusto, scoperta: scopertaOra };
-  const righe = capito(gustoVisto, {
-    citta: chosenCity,
-    priceRange,
-    diete,
-    occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
-  });
-  const frase = fraseCapito(gustoVisto, {
+  const righe = capito(gusto, {
     citta: chosenCity,
     priceRange,
     diete,
@@ -310,22 +295,6 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
-  // "Non è così? Correggi": le righe del profilo una per una (chiuse: la frase basta).
-  const [correggi, setCorreggi] = useState(false);
-  // Toccando una parola della frase si torna alla domanda che la cambia, non solo al passo (collaudo 23/10).
-  const [vaiA, setVaiA] = useState<string | null>(null);
-  useEffect(() => {
-    if (!vaiA) return;
-    const id = requestAnimationFrame(() => {
-      const el = document.getElementById(`domanda-${vaiA}`);
-      const det = el?.closest("details");
-      if (det) det.open = true;
-      el?.scrollIntoView({ block: "start" });
-      setVaiA(null);
-    });
-    return () => cancelAnimationFrame(id);
-  }, [vaiA, step]);
-  const cambia = (k: string) => { setStep(PASSO_DI[k] ?? 0); setVaiA(k); };
   // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
   const [via, setVia] = useState<"su" | "giu" | null>(null);
 
@@ -380,29 +349,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
       {/* Contenuto */}
       <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-56 pt-4">
-        {step === PASSO_TIPI ? (
-          // Mockup A "valuta" (21/10): titolo in serif e una riga sola; la card fa il resto.
-          <>
-            <h1 className={`${SERIF} mb-1 text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414]`}>{config.title}</h1>
-            <p className="mb-5 text-[15px] font-sans text-text-muted">{config.subtitle}</p>
-          </>
-        ) : step === PASSO_CAPITO && CAPITO_A ? (
-          // Mockup A (21/10): titolo in serif grande, come una pagina di rivista; la frase sotto fa il resto.
-          <>
-            <p className="mb-3 flex items-center gap-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
-              <Sparkles size={12} className="text-accent" aria-hidden /> La tua mappa del gusto
-            </p>
-            <h1 className={`${SERIF} mb-4 text-[36px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414] min-[380px]:mb-6 min-[380px]:text-[40px]`}>Ecco cosa ho capito di te</h1>
-          </>
-        ) : (
-          <>
-            <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
-            <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
-            <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
-          </>
-        )}
-        {/* Non sulla card dei tipi né sulla frase finale: toglieva spazio e copriva i tasti a 360px (collaudo 23/10). */}
-        {ripreso && step !== PASSO_TIPI && step < PASSO_CAPITO && (
+        <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
+        <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
+        <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
+        {ripreso && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
@@ -483,17 +433,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           <div data-testid="benvenuto-tipi">
             {corrente ? (
               <>
-
-                {/* La pila (mockup A): le prossime due card si intravedono dietro, un po' ruotate. */}
-                <div className="relative">
-                {TIPI.filter((t) => !visti.includes(t.id) && t.id !== corrente.id).slice(0, 2).map((t, i) => (
-                  <div
-                    key={t.id}
-                    aria-hidden
-                    className="absolute inset-0 rounded-[1.75rem] shadow-card"
-                    style={{ background: `linear-gradient(160deg, ${t.sfondo})`, transform: i === 0 ? "rotate(4deg) translate(10px, 6px)" : "rotate(-4deg) translate(-10px, 8px)", opacity: 0.9 }}
-                  />
-                ))}
+                <p data-testid="tipi-contatore" className="mb-2 text-xs font-sans text-text-muted">{visti.length + 1} di {TIPI.length}</p>
                 <div
                   data-testid="tipo-card"
                   key={corrente.id}
@@ -508,7 +448,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex min-h-[clamp(14rem,36svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
+                  className="relative flex min-h-[20rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -520,34 +460,25 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
-                  {/* Contatore dei tipi dentro la card: sopra c'è già "2 di 4" dei passi (collaudo 23/10). */}
-                  <span data-testid="tipi-contatore" className="absolute left-5 top-5 z-10 rounded-pill bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold">{visti.length + 1} di {TIPI.length}</span>
-                  {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
-                  <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
-                  <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
-                  {/* L'emoji occupa lo spazio libero sopra il testo (non più in posizione fissa: a 360px copriva titolo ed etichetta, collaudo 23/10). */}
-                  <span aria-hidden className="relative flex min-h-[5.5rem] flex-1 items-center justify-center pb-2 text-[4.75rem] leading-none drop-shadow-lg min-[380px]:text-[5.5rem]">{corrente.emoji}</span>
-                  <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
-                  <span className="relative mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-pill bg-white/85 px-3 py-1 font-display text-[13px] font-semibold text-[#141414]">
-                    {corrente.famoso ? "Molto noto" : <><Sparkles size={12} className="text-accent" aria-hidden /> Chicca di quartiere</>}
+                  <span aria-hidden className="absolute right-4 top-3 text-[5.5rem] leading-none drop-shadow">{corrente.emoji}</span>
+                  <span className="mb-2 w-fit rounded-pill bg-black/25 px-2.5 py-0.5 text-[11px] font-display font-semibold uppercase tracking-wider">
+                    {corrente.famoso ? "Molto noto" : "Poco noto"}
                   </span>
-                  <h2 className={`${SERIF} relative text-[30px] font-medium leading-[1.08]`}>{corrente.titolo}</h2>
-                  <p className="relative mt-1.5 text-sm font-sans text-white/90">{corrente.riga}</p>
+                  <h2 className="font-title text-2xl font-semibold leading-tight">{corrente.titolo}</h2>
+                  <p className="mt-1 text-sm font-sans text-white/90">{corrente.riga}</p>
                 </div>
-                </div>
-                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
-                <div className="mt-7 flex items-center justify-between px-3">
-                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
-                    <span aria-hidden>👎</span>
+                <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <button type="button" data-testid="tipo-giu" onClick={() => vota(corrente.id, "giu")} className="min-h-14 rounded-pill border-2 border-border bg-white font-display text-base font-semibold text-brand active:scale-95">
+                    👎 No
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
-                    Non lo conosco
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 px-2 text-sm font-display font-semibold text-text-muted">
+                    Non so
                   </button>
-                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
-                    <span aria-hidden>👍</span>
+                  <button type="button" data-testid="tipo-su" onClick={() => vota(corrente.id, "su")} className="min-h-14 rounded-pill bg-accent font-display text-base font-semibold text-white active:scale-95">
+                    👍 Sì
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted max-[379px]:hidden">← trascina la card, oppure tocca →</p>
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted">← trascina la card, oppure tocca →</p>
                 {visti.length > 0 && (
                   <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
                     ↶ Torna al precedente
@@ -556,7 +487,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </>
             ) : (
               <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
-                Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
+                Fatto: {su.length} {su.length === 1 ? "ti piace" : "ti piacciono"}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
               </p>
             )}
           </div>
@@ -564,7 +495,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_COME && (
           <div data-testid="benvenuto-come">
-            <Gruppo title="Famosi o chicche?" id="domanda-scoperta">
+            <Gruppo title="Famosi o chicche?">
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Famosi o chicche?">
                 {SCOPERTE.map((sc) => {
                   const on = scopertaOra === sc.value;
@@ -585,7 +516,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </div>
               {!scoperta && dedotta && <p className="mt-1.5 text-xs font-sans text-text-muted">Scelto dai tuoi 👍: cambialo se non è così.</p>}
             </Gruppo>
-            <Gruppo title="A tavola" id="domanda-diete">
+            <Gruppo title="A tavola">
               <div className="flex flex-wrap gap-2">
                 {DIETE.map((d) => (
                   <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
@@ -597,14 +528,14 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 Occasioni e spesa <span className="text-xs font-sans font-normal text-text-muted">facoltativo</span>
               </summary>
               <div className="pt-2">
-              <Gruppo title="Occasioni" id="domanda-occasioni">
+              <Gruppo title="Occasioni">
               <div className="flex flex-wrap gap-2">
                 {OCCASIONS.map((item) => (
                   <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
                 ))}
               </div>
               </Gruppo>
-              <Gruppo title="Spesa tipica" id="domanda-spesa">
+              <Gruppo title="Spesa tipica">
               <div className="grid grid-cols-4 gap-2">
                 {PRICE_RANGES.map((item) => {
                   const on = priceRange === item.value;
@@ -633,51 +564,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
-            {!CAPITO_A ? (righe.length === 0 && (
-              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
-                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
-              </p>
-            )) : frase.length > 0 ? (
-              <>
-                {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
-                    Toccarne una porta alla domanda che la cambia. */}
-                <p data-testid="capito-frase" className={`${SERIF} text-[21px] leading-[1.42] text-[#141414] min-[380px]:text-[24px]`}>
-                  {frase.map((f, i) => (
-                    <span key={i}>
-                      {i > 0 && " "}
-                      {f.map((x, j) => x.k ? (
-                        <span
-                          key={j}
-                          role="button"
-                          tabIndex={0}
-                          data-testid="capito-parola"
-                          aria-label={`${x.t}: cambia`}
-                          onClick={() => cambia(x.k!)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!); } }}
-                          // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
-                          className="cursor-pointer bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
-                        >
-                          {x.t}
-                        </span>
-                      ) : <span key={j}>{x.t}</span>)}
-                    </span>
-                  ))}
-                </p>
-                <p className="mt-6 flex items-center gap-2 text-[15px] font-sans text-text-muted">
-                  Non è così?
-                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="min-h-11 font-display font-semibold text-brand">
-                    Correggi
-                  </button>
-                </p>
-              </>
-            ) : (
-              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
-                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
-              </p>
-            )}
-            {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
-            {(correggi || !CAPITO_A) && righe.length > 0 && (
-              <ul className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
+            {righe.length > 0 ? (
+              <ul className="overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righe.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
                     <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
@@ -688,8 +576,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   </li>
                 ))}
               </ul>
+            ) : (
+              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
+                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
+              </p>
             )}
-            <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            <p className="mt-3 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
           </div>
         )}
       </div>
@@ -719,12 +611,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 data-testid="benvenuto-fine"
                 onClick={() => finish(null)}
                 disabled={!!submitting}
-                className={CAPITO_A
-                  ? "flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-4 font-display text-[17px] font-semibold text-white shadow-float transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-                  : "w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"}
+                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
               >
-                {/* Mockup A: "Apri la mia mappa →" (la mappa parte già sui posti per te). */}
-                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : CAPITO_A ? <>Apri la mia mappa <ArrowRight size={18} aria-hidden /></> : "✨ Mostrami i posti per me"}
+                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
               </button>
               {/* I posti già salvati altrove (Google Maps, il link di un reel): dopo la sintesi, non al posto suo. */}
               <button
