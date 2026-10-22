@@ -1033,7 +1033,7 @@ ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.g
   const caps = await page.getByTestId("scheda-categoria").evaluate((el) => getComputedStyle(el).textTransform);
   ok(k.join(" · ") === "Bar · €€ · Roma" && caps === "uppercase", `scheda (mockup A): riga di categoria in maiuscoletto tipo · prezzo · città (${k.join(" · ")})`);
   const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
-  ok(parts.length === 2 && parts[0] === "Aperto ora" && /^[\d,]+ (m|km)$/.test(parts[1]), `scheda (mockup A): UNA riga aperto · distanza (${parts.join(" · ")})`); }
+  ok(parts.length === 3 && /^★ \d,\d$/.test(parts[0]) && parts[1] === "Aperto ora" && /^[\d,]+ (m|km)$/.test(parts[2]), `scheda (mockup A): UNA riga voto · aperto · distanza (${parts.join(" · ")})`); }
 ok(await page.getByText("Aperto ora").last().isVisible(), "scheda B: pill 'Aperto ora'");
 // Barra azioni stile Places (piano 6.2): Prenota / Percorso / Salva; Chiama e Sito nella riga dei contatti.
 for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid=prenota-scheda]"], ["Indicazioni", "a[aria-label^='Indicazioni']"], ["Salva", "button:text-is('Salva')"]]) {
