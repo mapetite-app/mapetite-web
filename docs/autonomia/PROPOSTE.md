@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 22/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta, senza ricerche nuove: i documenti del giorno li ha già aggiornati la sessione delle 00:07)
+
+### 20. "Solo quelli con la prova": un tocco sulla pillola tiene solo i posti con ✓ su tutti i requisiti
+- **Problema:** `PROBLEMI.md`, 10. Con 20 risultati, chi ha chiesto "terrazza romantica" vuole vedere subito quali la terrazza ce l'hanno *di sicuro*.
+- **Cosa fa:** nella pillola "✨ 20 posti · terrazza · romantico" compare "✓ 6 con la prova": un tocco e restano solo quelli con la frase di recensione per ogni requisito; un altro tocco li rimette tutti.
+- **Da dove nasce:** Places e Mapstr filtrano per etichette scelte dall'utente, Google per attributi dichiarati; nessuno filtra per "le recensioni lo dicono, ecco la frase".
+- **Valore per l'utente:** nella demo, "meglio 4 giusti che 20 approssimativi" (TEST-RICERCHE) diventa un tocco.
+- **Valore per il ristoratore:** capire quale caratteristica, detta dai clienti, lo fa restare in lista (pannello, dopo).
+- **Sforzo:** S. I ✓ arrivano già con le card, nessun dato nuovo.
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (chiave B).
+
+### 21. Il ✓ anche dai salvati: "Nei tuoi posti con terrazza"
+- **Problema:** VISIONE, "ritrova": nei salvati si cerca per parola ma non si sa se la parola è vera.
+- **Cosa fa:** cercando nei salvati "terrazza", i posti la cui recensione salvata lo conferma mostrano "✓ terrazza" con la frase, come nei risultati.
+- **Da dove nasce:** Mapstr e Corner cercano solo nei tag messi a mano; noi usiamo le recensioni già salvate con il verdetto.
+- **Valore per l'utente:** ritrova il posto giusto tra i suoi in 2 secondi, con la prova.
+- **Valore per il ristoratore:** nessuno diretto; più ritorni da chi l'ha già salvato.
+- **Sforzo:** S/M (dipende da quante recensioni restano salvate per locale: da verificare, niente foto o contenuti Google oltre a ciò che i termini consentono).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, dopo la 20 (verificare prima i termini Google sul testo delle recensioni salvate).
+
 ## 22/10/2026 (notte, sessione 00:07, CEO che chiude — solo chiavi di volta)
 
 ### 18. "Come lo sai?": la frase della recensione dietro ogni ✓
