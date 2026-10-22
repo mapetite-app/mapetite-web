@@ -141,9 +141,9 @@ function Chip({
   );
 }
 
-function Gruppo({ title, children }: { title: string; children: React.ReactNode }) {
+function Gruppo({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
+    <div id={id} className="mb-6 scroll-mt-24">
       <h2 className="mb-2.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</h2>
       {children}
     </div>
@@ -305,6 +305,20 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
   // "Non è così? Correggi": le righe del profilo una per una (chiuse: la frase basta).
   const [correggi, setCorreggi] = useState(false);
+  // Toccando una parola della frase si torna alla domanda che la cambia, non solo al passo (collaudo 23/10).
+  const [vaiA, setVaiA] = useState<string | null>(null);
+  useEffect(() => {
+    if (!vaiA) return;
+    const id = requestAnimationFrame(() => {
+      const el = document.getElementById(`domanda-${vaiA}`);
+      const det = el?.closest("details");
+      if (det) det.open = true;
+      el?.scrollIntoView({ block: "start" });
+      setVaiA(null);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [vaiA, step]);
+  const cambia = (k: string) => { setStep(PASSO_DI[k] ?? 0); setVaiA(k); };
   // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
   const [via, setVia] = useState<"su" | "giu" | null>(null);
 
@@ -371,7 +385,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <p className="mb-3 flex items-center gap-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
               <Sparkles size={12} className="text-accent" aria-hidden /> La tua mappa del gusto
             </p>
-            <h1 className={`${SERIF} mb-6 text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414]`}>Ecco cosa ho capito di te</h1>
+            <h1 className={`${SERIF} mb-4 text-[36px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414] min-[380px]:mb-6 min-[380px]:text-[40px]`}>Ecco cosa ho capito di te</h1>
           </>
         ) : (
           <>
@@ -380,7 +394,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
           </>
         )}
-        {ripreso && (
+        {/* All'ultimo passo l'avviso toglierebbe spazio alla frase: lì basta la frase (collaudo 23/10). */}
+        {ripreso && step < PASSO_CAPITO && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
@@ -539,7 +554,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_COME && (
           <div data-testid="benvenuto-come">
-            <Gruppo title="Famosi o chicche?">
+            <Gruppo title="Famosi o chicche?" id="domanda-scoperta">
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Famosi o chicche?">
                 {SCOPERTE.map((sc) => {
                   const on = scopertaOra === sc.value;
@@ -560,7 +575,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </div>
               {!scoperta && dedotta && <p className="mt-1.5 text-xs font-sans text-text-muted">Scelto dai tuoi 👍: cambialo se non è così.</p>}
             </Gruppo>
-            <Gruppo title="A tavola">
+            <Gruppo title="A tavola" id="domanda-diete">
               <div className="flex flex-wrap gap-2">
                 {DIETE.map((d) => (
                   <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
@@ -572,14 +587,14 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 Occasioni e spesa <span className="text-xs font-sans font-normal text-text-muted">facoltativo</span>
               </summary>
               <div className="pt-2">
-              <Gruppo title="Occasioni">
+              <Gruppo title="Occasioni" id="domanda-occasioni">
               <div className="flex flex-wrap gap-2">
                 {OCCASIONS.map((item) => (
                   <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
                 ))}
               </div>
               </Gruppo>
-              <Gruppo title="Spesa tipica">
+              <Gruppo title="Spesa tipica" id="domanda-spesa">
               <div className="grid grid-cols-4 gap-2">
                 {PRICE_RANGES.map((item) => {
                   const on = priceRange === item.value;
@@ -612,7 +627,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               <>
                 {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
                     Toccarne una porta alla domanda che la cambia. */}
-                <p data-testid="capito-frase" className={`${SERIF} text-[24px] leading-[1.42] text-[#141414]`}>
+                <p data-testid="capito-frase" className={`${SERIF} text-[21px] leading-[1.42] text-[#141414] min-[380px]:text-[24px]`}>
                   {frase.map((f, i) => (
                     <span key={i}>
                       {i > 0 && " "}
@@ -622,8 +637,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                           role="button"
                           tabIndex={0}
                           data-testid="capito-parola"
-                          onClick={() => setStep(PASSO_DI[x.k!] ?? 0)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStep(PASSO_DI[x.k!] ?? 0); } }}
+                          aria-label={`${x.t}: cambia`}
+                          onClick={() => cambia(x.k!)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!); } }}
                           // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
                           className="cursor-pointer bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
                         >

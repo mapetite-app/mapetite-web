@@ -18,7 +18,7 @@ export default function DragToClose({ onClose, className, children }: { onClose:
     <div
       ref={ref}
       data-testid="scheda-trascinabile"
-      className={className}
+      className={`relative ${className}`}
       style={{ transform: dy > 0 ? `translateY(${dy}px)` : undefined, transition: dragging ? "none" : "transform 200ms ease-out" }}
       onClick={(e) => e.stopPropagation()}
       onTouchStart={(e) => {
@@ -43,7 +43,8 @@ export default function DragToClose({ onClose, className, children }: { onClose:
       }}
     >
       {/* maniglia: fa capire che si può trascinare */}
-      <div aria-hidden className="pointer-events-none sticky top-0 z-20 -mb-4 flex h-4 justify-center pt-1.5 lg:hidden">
+      {/* Assoluta, non "sticky": scorrendo restava ferma sopra nome e testo (collaudo 23/10). */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-4 justify-center pt-1.5 lg:hidden">
         <span className="h-1 w-10 rounded-pill bg-black/20" />
       </div>
       {children}

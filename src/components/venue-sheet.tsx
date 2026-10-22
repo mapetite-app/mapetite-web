@@ -501,7 +501,9 @@ export default function VenueSheet({
     const matchReasonBelow = perTeText != null && matchReasonText != null;
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
     const firstReview = selectedReviews?.find((r) => r.text?.trim())?.text.trim() ?? null;
-    const googleLine = venue.editorialSummary?.trim() || (firstReview ? `“${firstReview}”` : null);
+    const googleLine = venue.editorialSummary?.trim() || firstReview;
+    // La frase è di Google o di una persona che ha scritto una recensione su Google: lo si dice (collaudo 23/10).
+    const googleLabel = venue.editorialSummary?.trim() ? "Da Google" : "Da una recensione su Google";
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
       && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
@@ -519,9 +521,10 @@ export default function VenueSheet({
     const tabs = [
       ["info", "Info"],
       ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
-      ["panoramica", "In breve"],
+      // "In breve" solo se ha qualcosa da dire (collaudo 23/10: vuota per i locali senza verdetto).
+      ...(hasOverview || !hasReviewsTab ? [["panoramica", "In breve"]] : []),
     ] as [SchedaTab, string][];
-    const activeTab: SchedaTab = tab === "recensioni" && !hasReviewsTab ? "info" : tab;
+    const activeTab: SchedaTab = (tab === "recensioni" && !hasReviewsTab) || (tab === "panoramica" && !tabs.some(([t]) => t === "panoramica")) ? "info" : tab;
     const menuItem =
       "flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-sans text-text active:bg-bg";
     // Tasti tondi sopra la foto (mockup A): bianchi, 44px per il dito.
@@ -579,7 +582,14 @@ export default function VenueSheet({
     const kindLine = [categoryLabel(category), priceLabel, cityFromAddress(address)].filter(Boolean) as string[];
     const distance = origin ? distanceLabel(origin, { lat, lng }) : null;
     // Nomi lunghi su due righe al massimo, senza spingere il verdetto sotto la barra.
-    const nameSize = name.length > 34 ? "text-[28px]" : name.length > 22 ? "text-[32px]" : "text-[40px]";
+    // I nomi Google con la pubblicità dentro ("Trattoria Dal Cordaro (Roma) - Vino e Cucina romana dal 1922"):
+    // in vista solo la parte prima di " - ", " | " o "(" (il nome intero resta in Info e nel titolo).
+    // A 360px un nome su 3 righe spingeva "Orari, contatti, recensioni" sotto la barra (collaudo 23/10).
+    const nomeBreve = (() => {
+      const m = name.split(/\s+[-–—|]\s+|\s*\(/)[0].trim();
+      return m.length >= 3 && m.length < name.length ? m : name;
+    })();
+    const nameSize = nomeBreve.length > 30 ? "text-[24px]" : nomeBreve.length > 16 ? "text-[30px]" : "text-[40px]";
     const openDetails = () => {
       const next = !detailsOpen;
       setDetailsOpen(next);
@@ -600,7 +610,7 @@ export default function VenueSheet({
           directionsUrl={directionsUrl}
           onDirections={() => signal("percorso", "carosello")}
           // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10).
-          heightClass="h-48 min-[380px]:h-56"
+          heightClass="h-48 min-[380px]:h-56 [@media(max-height:760px)]:h-40"
           fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
           overlay={
             <>
@@ -642,8 +652,8 @@ export default function VenueSheet({
               {kindLine.join(" · ")}
             </p>
           )}
-          <h2 className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
-            {name}
+          <h2 title={nomeBreve !== name ? name : undefined} className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
+            {nomeBreve}
             {infoLocale && (
               <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-1 align-middle text-brand">
                 <title>Verificato dal titolare</title>
@@ -656,28 +666,29 @@ export default function VenueSheet({
             <p data-testid="scheda-fatti" className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] font-sans text-[#4b5058]">
               {/* Il voto Google in vista, come in Places (collaudo 22/10); il numero di recensioni resta in Info. */}
               {rating != null && (
-                <>
-                  <span data-testid="voto-scheda" className="font-semibold text-[#141414]"><span aria-hidden className="text-accent">★</span> {rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
-                  {(aperto != null || distance) && <span aria-hidden>·</span>}
-                </>
+                <span data-testid="voto-scheda" className="whitespace-nowrap font-semibold text-[#141414]"><span aria-hidden className="text-accent">★</span> {rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               )}
+              {/* Ogni "·" sta attaccato a ciò che segue (whitespace-nowrap): mai un puntino orfano a fine riga. */}
               {aperto != null && (
-                <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
-                  <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
-                  {aperto ? "Aperto ora" : "Chiuso ora"}
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  {rating != null && <span aria-hidden className="mr-1 font-normal text-[#4b5058]">·</span>}
+                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
+                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                    {aperto ? "Aperto ora" : "Chiuso ora"}
+                  </span>
                 </span>
               )}
               {distance && (
-                <>
-                  {aperto != null && <span aria-hidden>·</span>}
+                <span className="whitespace-nowrap">
+                  {(aperto != null || rating != null) && <span aria-hidden className="mr-2.5">·</span>}
                   <span>{distance}</span>
-                </>
+                </span>
               )}
               {(riapre || chiude) && (
-                <>
-                  <span aria-hidden>·</span>
+                <span className="whitespace-nowrap">
+                  <span aria-hidden className="mr-2.5">·</span>
                   <span data-testid={riapre ? "riapre" : "chiude"}>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `fino ${chiude}`}</span>
-                </>
+                </span>
               )}
             </p>
           )}
@@ -707,7 +718,7 @@ export default function VenueSheet({
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
               </p>
-              <p className={`${SERIF} mt-2 text-[22px] italic leading-[1.24] tracking-[-0.005em] text-[#141414]`}>{headline}</p>
+              <p className={`${SERIF} mt-2 text-[20px] italic leading-[1.24] tracking-[-0.005em] text-[#141414] min-[380px]:text-[22px]`}>{headline}</p>
             </section>
           ) : verdettoInArrivo ? (
             <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
@@ -721,7 +732,7 @@ export default function VenueSheet({
             <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
               {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
                   in corsivo grande si confondeva con il verdetto Mapetite). */}
-              <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Da Google</p>
+              <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">{googleLabel}</p>
               <p className="mt-1.5 line-clamp-3 font-sans text-[15px] leading-[1.45] text-text-muted">{googleLine}</p>
             </section>
           ) : null}

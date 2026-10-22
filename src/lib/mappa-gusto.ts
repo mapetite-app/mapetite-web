@@ -161,32 +161,73 @@ export type PezzoFrase = { t: string; k?: string };
 
 const elenco = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
 
-export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): PezzoFrase[][] {
+// Preposizione giusta per ogni zona ("al Pigneto", "ai Navigli", "all'Isola", "in centro"): il collaudo
+// del 23/10 ha trovato "Esci a Navigli e Isola". Le zone non elencate prendono "a".
+const PREP: Record<string, [string, string?]> = {
+  Pigneto: ["al "], Ostiense: ["all'"], Garbatella: ["alla "], Esquilino: ["all'"], "Centro Storico": ["in ", "centro"],
+  Parioli: ["ai "], Navigli: ["ai "], Isola: ["all'"], "Paolo Sarpi": ["in zona "], Tortona: ["in zona "],
+};
+const OCCASIONE: Record<string, string> = {
+  cena_romantica: "le cene romantiche", pranzo_veloce: "i pranzi veloci", aperitivo: "l'aperitivo", cena_amici: "le cene con gli amici",
+  pranzo_lavoro: "i pranzi di lavoro", colazione_brunch: "colazione e brunch", dopocena: "il dopocena", occasione_speciale: "le occasioni speciali",
+};
+const maiuscola = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+// Elenco evidenziato "A, B e altri 2": nessuna scelta sparisce senza dirlo (collaudo del 23/10).
+function evidenziati(xs: PezzoFrase[], max: number): PezzoFrase[] {
+  const vis = xs.slice(0, max);
+  const resto = xs.length - vis.length;
+  const out: PezzoFrase[] = [];
+  vis.forEach((x, i) => {
+    if (i > 0) out.push({ t: i === vis.length - 1 && resto === 0 ? " e " : ", " });
+    out.push(x);
+  });
+  if (resto > 0) out.push({ t: ` e altri ${resto}` });
+  return out;
+}
+
+export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }): PezzoFrase[][] {
   const frasi: PezzoFrase[][] = [];
-  const su = m.su.map((id) => PLURALE[id]).filter(Boolean).slice(0, 3);
-  if (su.length) frasi.push([{ t: "Ami " }, ...su.flatMap((x, i) => [...(i === 0 ? [] : [{ t: i === su.length - 1 ? " e " : ", " }]), { t: x, k: "su" }]), { t: "." }]);
-  // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e Pigneto, spendi il giusto e…").
-  const dove = m.zone.length ? elenco(m.zone.slice(0, 3)) : extra.citta;
-  const scoperta = m.scoperta ?? scopertaDedotta(m.su);
+  const su = m.su.map((id) => PLURALE[id]).filter(Boolean);
+  if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((t) => ({ t, k: "su" })), 3), { t: "." }]);
+  // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
+  // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
-  if (dove) parti.push([{ t: "esci a " }, { t: dove, k: "zone" }]);
+  if (m.zone.length) {
+    const z = m.zone.slice(0, 4).flatMap((nome, i, a) => {
+      const [prep, testo] = PREP[nome] ?? ["a "];
+      return [...(i === 0 ? [] : [{ t: i === a.length - 1 ? " e " : ", " }]), { t: prep }, { t: testo ?? nome, k: "zone" }];
+    });
+    parti.push([{ t: "esci " }, ...z]);
+  } else if (extra.citta) {
+    parti.push([{ t: "esci a " }, { t: extra.citta.trim().split(/\s+/).map(maiuscola).join(" "), k: "zone" }]);
+  }
   if (extra.priceRange && SPESA[extra.priceRange]) parti.push([{ t: SPESA[extra.priceRange], k: "spesa" }]);
-  if (scoperta === "chicche") parti.push([{ t: "giri alla larga dai posti turistici", k: "scoperta" }]);
-  else if (scoperta === "famosi") parti.push([{ t: "non ti spaventano i posti famosi", k: "scoperta" }]);
+  if (m.scoperta === "chicche") parti.push([{ t: "giri alla larga dai posti turistici", k: "scoperta" }]);
+  else if (m.scoperta === "famosi") parti.push([{ t: "non ti spaventano i posti famosi", k: "scoperta" }]);
+  // Più zone ("a Monti e al Pigneto"): frase a sé, se no le "e" si accavallano ("in centro e ai Parioli e non ti…").
+  if (m.zone.length > 1 && parti.length > 1) {
+    const z = parti.shift()!;
+    z[0] = { ...z[0], t: maiuscola(z[0].t) };
+    frasi.push([...z, { t: "." }]);
+  }
   if (parti.length) {
     const f = parti.flatMap((p, i) => [...(i === 0 ? [] : [{ t: i === parti.length - 1 ? " e " : ", " }]), ...p]);
-    f[0] = { ...f[0], t: f[0].t.charAt(0).toUpperCase() + f[0].t.slice(1) };
+    f[0] = { ...f[0], t: maiuscola(f[0].t) };
     frasi.push([...f, { t: "." }]);
   }
-  if (extra.occasions.length) frasi.push([{ t: "Le tue uscite preferite: " }, ...extra.occasions.slice(0, 3).flatMap((o, i, a) => [...(i === 0 ? [] : [{ t: i === a.length - 1 ? " e " : ", " }]), { t: o.label.toLowerCase().replace(" / ", " o "), k: "occasioni" }]), { t: "." }]);
-  const giu = m.giu.map((id) => PLURALE[id]).filter(Boolean).slice(0, 2);
-  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...giu.flatMap((x, i) => [...(i === 0 ? [] : [{ t: " e " }]), { t: x, k: "giu" }]), { t: "." }]);
+  const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
+  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3), { t: "." }]);
+  const giu = m.giu.map((id) => PLURALE[id]).filter(Boolean);
+  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((t) => ({ t, k: "giu" })), 2), { t: "." }]);
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
   if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" });
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }]);
+  // Profilo corto: una mezza frase vera invece di una pagina vuota.
+  if (frasi.length > 0 && frasi.length < 3) frasi.push([{ t: "Il resto lo imparo da quello che salvi e cerchi." }]);
   return frasi;
 }
 

@@ -101,7 +101,7 @@ export default function PlacePhoto({
         className={className}
       />
       {credit && (
-        <span className={`${creditClassName} rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white`}>Foto: {credit}</span>
+        <span className={`${creditClassName} max-w-[55%] truncate rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white`}>Foto: {credit}</span>
       )}
     </>
   );
