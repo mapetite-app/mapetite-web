@@ -5,12 +5,16 @@
 // casi.json: [{ "r": "terrazza", "frase": "…", "atteso": false, "nome": "Da Mario" (facoltativo), "voto": 5 (facoltativo),
 //   "recensione": "testo intero, se la frase è un pezzo di una recensione più lunga" (facoltativo) }]
 // In produzione arrivano all'AI al massimo 3 requisiti per locale e 12 locali per ricerca: qui i casi
-// vanno a gruppi di 12, come una ricerca piena.
+// vanno a gruppi di 12, come una ricerca piena. SEME=n cambia il mescolamento.
 import { readFileSync } from "fs";
 const { requisitiProvati } = await import("../src/lib/prova-requisito.ts");
 const { confermaProve } = await import("../src/lib/conferma-prove.ts");
 
-const casi = JSON.parse(readFileSync(process.argv[2], "utf8"));
+// Casi mescolati (seme fisso, ripetibile): in un gruppo stanno frasi vere e trabocchetti insieme, come
+// in una ricerca vera (secondo collaudo del 23/10: in ordine di file il giudizio era più facile).
+let seme = Number(process.env.SEME ?? 7);
+const caso = () => ((seme = (seme * 1103515245 + 12345) % 2147483648) / 2147483648);
+const casi = JSON.parse(readFileSync(process.argv[2], "utf8")).map((c) => [caso(), c]).sort((a, b) => a[0] - b[0]).map(([, c]) => c);
 
 // 1. Regole, come nel primo tempo della ricerca: la richiesta nomina il requisito.
 const conCandidato = casi.map((c, i) => {

@@ -19,7 +19,7 @@ function normalizza(t: string): string {
 // Meglio perdere una prova buona che mostrarne una che dice il contrario (terzo collaudo, 22/10).
 // Quinto collaudo (22/10 mattina): anche attese deluse ("doveva essere", "speravamo"), chiusure, confronti
 // ("più bella quella accanto"), ironia ("romantico come una mensa").
-const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspett\w*|rispetto|altri|altro|invece|tranne|nonostante|nulla|pero|ma|troppo|lent\w*|pecca|turistic\w*|chius\w*|riservat\w*|solo|dovev\w*|volev\w*|sper\w*|cercav\w*|pensav\w*|sarebbe|vorrebbe|ne|neanche|nemmeno|neppure|come|piu|meno|meglio|accanto|fronte|rovinat\w*|completo|sedicente|spaccia\w*|inagibil\w*|eufemism\w*|promess\w*|realta|direi|chiamarl\w*|definisc\w*)\b/;
+const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspett\w*|rispetto|altri|altro|invece|tranne|nonostante|nulla|pero|ma|troppo|lent\w*|pecca|turistic\w*|chius\w*|riservat\w*|solo|dovev\w*|volev\w*|sper\w*|cercav\w*|pensav\w*|sarebbe|vorrebbe|ne|neanche|nemmeno|neppure|come|piu|meno|meglio|accanto|fronte|rovinat\w*|completo|sedicente|spaccia\w*|inagibil\w*|eufemism\w*|promess\w*|realta|direi|chiamarl\w*|definisc\w*|prenotate|chiedete|richiest\w*|consiglio di)\b/;
 // La frase deve anche DIRE che è bello: un giudizio positivo, non solo nominare la cosa
 // ("In inverno la terrazza è chiusa", "Vestitevi eleganti" non sono una prova).
 const POSITIVO = /\b(bell\w*|splendid\w*|stupend\w*|perfett\w*|ottim\w*|meraviglios\w*|mozzafiato|suggestiv\w*|incantevol\w*|magic\w*|fantastic\w*|spettacolar\w*|favolos\w*|deliziosa|delizioso|eccezional\w*|piacevol\w*|raffinat\w*|curat\w*|accoglient\w*|ideale|consigliat\w*|molto|davvero|super|top)\b/;
@@ -59,8 +59,9 @@ export function provaConContesto(requisito: string, recensioni: { text: string; 
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
       if (pulita.length < 25) continue;
       // La recensione attorno alla frase (prima e soprattutto dopo: lì stanno i "peccato che…").
-      const at0 = Math.max(0, r.text.indexOf(f.trim()) - 200);
-      const contesto = r.text.slice(at0, at0 + 700);
+      // 450 caratteri: il contesto viaggia firmato fino al telefono e torna (non si mostra).
+      const at0 = Math.max(0, r.text.indexOf(f.trim()) - 100);
+      const contesto = r.text.slice(at0, at0 + 450);
       if (pulita.length <= MAX) return { prova: pulita, contesto };
       // Frase lunga: si taglia attorno alla parola trovata, con i puntini.
       const at = Math.max(0, normalizza(pulita).search(parola(radici[0])) - 50);
@@ -92,7 +93,8 @@ export function requisitoDellaRichiesta(requisito: string, richiesta: string, zo
 
 // Requisito confermato e la frase di recensione Google che lo prova (copiata, mai riscritta).
 export type Requisito = { r: string; prova: string };
-// Candidato per la conferma dell'AI: anche la recensione intera (mai mandata al telefono).
+// Candidato per la conferma dell'AI: anche il pezzo di recensione attorno alla frase (viaggia firmato
+// con i dati del secondo tempo, il telefono non lo mostra).
 export type Candidato = Requisito & { contesto: string };
 
 // "✓ terrazza" sulle card (chiave B). Spento il 22/10 notte dopo due bocciature; riacceso il 22/10
@@ -100,7 +102,10 @@ export type Candidato = Requisito & { contesto: string };
 // regole trovano la frase (copiata, mai riscritta) nel primo tempo, sulle 5 recensioni intere con il
 // voto; il ✓ compare solo se l'AI dei verdetti conferma che la frase dice davvero di sì (ironia,
 // confronti, attese deluse: le regole da sole non reggono). L'AI sceglie, non scrive.
-export const REQUISITI_ACCESI = true;
+// 23/10 notte: doppia chiave bocciata 2 volte (5 falsi su 65, poi 1 su 77: «Prenotate il tavolo
+// panoramico…»), corretta dopo; spenta in produzione finché un collaudo nuovo non dà 0 falsi.
+// In sviluppo si accende con REQUISITI_PROVA=1 per i collaudi.
+export const REQUISITI_ACCESI = process.env.REQUISITI_PROVA === "1";
 
 // Requisiti della ricerca ("romantico", "terrazza") confermati da una frase delle recensioni di
 // QUESTO locale. Massimo 3; un requisito senza frase che lo provi non compare.

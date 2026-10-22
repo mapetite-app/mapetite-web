@@ -78,10 +78,12 @@ export function HomePillole({ momento, cittaProfilo }: { momento: Momento; citta
 }
 
 // Classifiche della città (lato telefono: la città può venire dalla posizione). Ogni riga è una ricerca.
-export function HomeClassifiche({ momento, cittaProfilo }: { momento: Momento; cittaProfilo: string | null }) {
+// L'ora arriva dal server, come il momento: con l'orologio del telefono, a cavallo del cambio di
+// settimana la rotazione cambiava tra server e telefono (errore di idratazione visto il 23/10).
+export function HomeClassifiche({ momento, cittaProfilo, adesso }: { momento: Momento; cittaProfilo: string | null; adesso: number }) {
   const citta = useCitta(cittaProfilo);
   const dove = CITTA_CLASSIFICHE.includes(citta) ? citta : "Roma";
-  const [now] = useState(() => new Date());
+  const [now] = useState(() => new Date(adesso));
   const top = classifiche(dove, momento, now);
   return (
     <section data-testid="home-classifiche" className="mt-8">

@@ -150,7 +150,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
           </section>
         )}
 
-        <HomeClassifiche momento={ora.momento} cittaProfilo={cittaProfilo} />
+        <HomeClassifiche momento={ora.momento} cittaProfilo={cittaProfilo} adesso={now.getTime()} />
 
         <p className="mt-6 flex justify-center text-xs font-sans text-text-muted">
           <IntroAgain />
