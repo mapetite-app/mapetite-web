@@ -7,6 +7,7 @@ import { getEnrichmentForPlaces } from "@/lib/enrichment";
 import { coherentLevel } from "@/lib/match-coherence";
 import { exclusionNotAsked, wantsOffTheBeatenPath } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
+import type { Requisito } from "@/lib/prova-requisito";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
 // (l'SDK ne concede 10 minuti): una risposta a freddo per 12 locali richiede ~15 s.
@@ -64,6 +65,8 @@ export type PlaceSynthesis = {
   // Quanto è adatto alla richiesta (giudizio di Haiku sulle recensioni). Serve all'ordine:
   // "basso" in fondo, "alto" in cima. Nel dubbio "medio".
   match: MatchLevel;
+  // "✓ terrazza" confermati: frasi copiate dalle recensioni (primo tempo), scelte qui dall'AI.
+  requisiti?: Requisito[];
 };
 export type MatchLevel = "alto" | "medio" | "basso";
 
@@ -111,13 +114,14 @@ Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è a
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
 
 Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
-Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
+Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso","prove_ok":string[]}]
 - id identico a quello ricevuto
 - matchReason: una frase di MASSIMO 22 parole, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Parla di COME risponde a ciò che la richiesta chiede (tipo di locale, zona, occasione, atmosfera, caratteristiche): non elencare piatti, servizio o qualità generali del locale se la richiesta non li nomina, perché li dice già il verdetto mostrato accanto (niente doppioni). Non ripetere le parole della richiesta come conferma generica ("ideale per una trattoria a Trastevere"): dì il dato concreto delle recensioni che lo conferma. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
 - per_te: DEFAULT stringa vuota "". Solo se ti sono forniti i gusti dell'utente E il locale si lega concretamente a uno di essi (categoria, recensioni o descrizione lo mostrano): MASSIMO 6 parole, in seconda persona, che dicono quale gusto soddisfa. Esempi: "il tipo di trattoria che ami", "niente carne, come preferisci", "cucina giapponese, la tua preferita". VIETATO ripetere la richiesta, VIETATO dire poco noto, famoso o zona, VIETATO inventare gusti non forniti. Senza gusti forniti o senza legame concreto: "".
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta: i GUSTI dell'utente non rendono MAI fit false (un tipo di posto che non ama o un cibo che evita può abbassare match, mai fit).
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
+- prove_ok: DEFAULT []. Alcuni locali hanno "prove": coppie {r: requisito, frase: frase copiata da una recensione}. Metti in prove_ok il valore r SOLO se la frase, letta da sola e alla lettera, afferma in modo chiaro e POSITIVO che QUESTO locale ha OGGI quella caratteristica (esempio: r "terrazza", frase «Cena in terrazza al tramonto, bellissima» → sì). NON metterlo se la frase è ironica o sarcastica, negativa anche solo in parte, un confronto con altri posti, un'attesa delusa, parla di una chiusura, del passato o di una stagione in cui non c'è, è una domanda o un consiglio, usa la parola con un altro significato (vista = vedere, "terrazza" di un altro edificio, nome di un piatto) o parla di un altro locale. Nel dubbio NON metterlo. Copia r identico, mai parole nuove.
 - Richieste "non turistico", "autentico", "dove vanno i locali", "nascosto", "poco conosciuto": è un requisito ESPLICITO di atmosfera. Se le recensioni descrivono il locale come turistico (turisti, menù turistico, "trappola per turisti", clientela quasi solo straniera, buttadentro), match è "basso" e matchReason lo dice; se più recensioni lo dicono chiaramente, fit è false. Se le recensioni parlano di clientela del quartiere, romani/milanesi, posto di famiglia, match può essere "alto".`;
 
 function costOf(inputTokens: number, outputTokens: number): number {
@@ -299,7 +303,8 @@ export async function getSynthesis(
   query: string,
   userId: string | null = null,
   // Solo il verdetto (salvati senza verdetto): niente "perché" legato a una richiesta che non c'è.
-  opts: { soloVerdetto?: boolean } = {},
+  // "✓ terrazza" candidati per locale (frasi copiate dalle recensioni): l'AI dice quali confermano davvero.
+  opts: { soloVerdetto?: boolean; prove?: Record<string, Requisito[]> } = {},
 ): Promise<Record<string, PlaceSynthesis>> {
   // 1. Limita ai primi SYNTHESIS_LIMIT locali.
   const targets = places.slice(0, SYNTHESIS_LIMIT);
@@ -319,8 +324,10 @@ export async function getSynthesis(
     perTes: Map<string, string>;
     fits: Map<string, { fit: boolean; fitReason: string }>;
     levels: Map<string, MatchLevel>;
+    requisiti: Map<string, Requisito[]>;
     cost: number;
   }> => {
+    const requisiti = new Map<string, Requisito[]>();
     const matchReasons = new Map<string, string>();
     const perTes = new Map<string, string>();
     const fits = new Map<string, { fit: boolean; fitReason: string }>();
@@ -362,6 +369,7 @@ export async function getSynthesis(
             reviewTexts: (p.reviewTexts ?? [])
               .slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS)
               .map((r) => r.slice(0, REVIEW_CHAR_LIMIT)),
+            ...(opts.prove?.[p.id]?.length ? { prove: opts.prove[p.id].map(({ r, prova }) => ({ r, frase: prova })) } : {}),
           }));
 
           const message = await anthropic.messages.create({
@@ -407,6 +415,13 @@ export async function getSynthesis(
             if (hasTaste && typeof o.per_te === "string" && o.per_te.trim() && chiesto(o.per_te)) {
               perTes.set(o.id, o.per_te.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[,;:.]+$/, ""));
             }
+            // Solo requisiti tra quelli inviati: la frase resta quella copiata dalla recensione.
+            const candidati = opts.prove?.[o.id] ?? [];
+            if (candidati.length > 0 && Array.isArray(o.prove_ok)) {
+              const ok = candidati.filter((c) => (o.prove_ok as unknown[]).includes(c.r));
+              if (ok.length > 0) requisiti.set(o.id, ok);
+              if (ok.length < candidati.length) console.log(`[prova-requisito] scartate dall'AI id=${o.id} ${JSON.stringify(candidati.filter((c) => !ok.includes(c)).map((c) => `${c.r}: ${c.prova.slice(0, 80)}`))}`);
+            }
             if (o.match === "alto" || o.match === "medio" || o.match === "basso") levels.set(o.id, coherentLevel(o.match, typeof o.matchReason === "string" ? o.matchReason : undefined));
             if (typeof o.fit === "boolean") {
               const fitReason = typeof o.fit_reason === "string" ? o.fit_reason.trim().slice(0, 200) : "";
@@ -439,11 +454,11 @@ export async function getSynthesis(
     } catch (err) {
       console.error("[haiku-synthesis] matchReason call exception:", err);
     }
-    return { matchReasons, perTes, fits, levels, cost };
+    return { matchReasons, perTes, fits, levels, requisiti, cost };
   };
   // Fetch lanciata ORA: prosegue mentre sotto gira la pipeline synthesis.
   const matchReasonPromise = opts.soloVerdetto
-    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), cost: 0 })
+    ? Promise.resolve({ matchReasons: new Map<string, string>(), perTes: new Map<string, string>(), fits: new Map<string, { fit: boolean; fitReason: string }>(), levels: new Map<string, MatchLevel>(), requisiti: new Map<string, Requisito[]>(), cost: 0 })
     : matchReasonWork();
 
   // 2. Legge la cache.
@@ -612,7 +627,7 @@ export async function getSynthesis(
 
   // 6. matchReason: attende la fetch lanciata in parallelo a inizio funzione.
   //    Girava mentre sopra completavano cache read + synthesis + upsert.
-  const { matchReasons, perTes, fits, levels, cost: matchReasonCost } = await matchReasonPromise;
+  const { matchReasons, perTes, fits, levels, requisiti, cost: matchReasonCost } = await matchReasonPromise;
   totalCost += matchReasonCost;
 
   console.log(
@@ -640,6 +655,7 @@ export async function getSynthesis(
       fit: fits.get(id)?.fit ?? true,
       fitReason: fits.get(id)?.fitReason ?? "",
       match: levels.get(id) ?? "medio",
+      ...(requisiti.has(id) ? { requisiti: requisiti.get(id) } : {}),
     };
     if (fits.get(id)?.fit === false) {
       const name = targets.find((p) => p.id === id)?.name ?? id;

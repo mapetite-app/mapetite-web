@@ -85,10 +85,11 @@ export function requisitoDellaRichiesta(requisito: string, richiesta: string, zo
 export type Requisito = { r: string; prova: string };
 
 // "✓ terrazza" sulle card (chiave B). Spento il 22/10 notte dopo due bocciature; riacceso il 22/10
-// mattina (poi di nuovo spento: terza bocciatura sui casi avversari, regole rafforzate sotto): la prova ora si cerca nel primo tempo della ricerca, sulle 5 recensioni intere con il voto
-// (prima: 3 recensioni tagliate a 300 caratteri e senza voto, quindi anche quelle da 1 stella), e per
-// i requisiti capiti dalla ricerca invece che per quelli scelti dall'AI. Niente AI: zero costi, subito.
-export const REQUISITI_ACCESI = false;
+// mattina (poi di nuovo spento: terza bocciatura sui casi avversari). Dal 23/10 doppia chiave: queste
+// regole trovano la frase (copiata, mai riscritta) nel primo tempo, sulle 5 recensioni intere con il
+// voto; il ✓ compare solo se l'AI dei verdetti conferma che la frase dice davvero di sì (ironia,
+// confronti, attese deluse: le regole da sole non reggono). L'AI sceglie, non scrive.
+export const REQUISITI_ACCESI = true;
 
 // Requisiti della ricerca ("romantico", "terrazza") confermati da una frase delle recensioni di
 // QUESTO locale. Massimo 3; un requisito senza frase che lo provi non compare.
