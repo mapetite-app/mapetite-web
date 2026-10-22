@@ -1,6 +1,7 @@
 // Ricerche di prova (docs/autonomia/TEST-RICERCHE.md) con Google e Haiku veri, nello stesso
 // percorso del telefono: primo tempo (dati Google) + verdetti a gruppi + riordino per "alto/basso".
 // Avvio: GOOGLE_FIXTURES=scripts/fixtures ANTHROPIC_API_KEY=$MAPETITE_ANTHROPIC_KEY npm run dev
+// Solo risposte salvate, mai Google vero: aggiungi GOOGLE_FIXTURES_ONLY=1 all'avvio.
 // poi:   node scripts/ricerche-vere.mjs [numeri separati da virgola]   (es. 3,6)
 // Con GOOGLE_FIXTURES la seconda volta la risposta Google si legge dal disco: nessuna quota consumata.
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";

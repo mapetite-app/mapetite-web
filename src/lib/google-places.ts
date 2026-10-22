@@ -192,6 +192,8 @@ export async function searchGooglePlaces(
     : null;
   const fixture = fixturePath ? await (await import("node:fs/promises")).readFile(fixturePath, "utf8").catch(() => null) : null;
   if (fixturePath) console.log(`[google-fixture] ${fixture ? "letta" : "nuova"} ${fixturePath}`);
+  // GOOGLE_FIXTURES_ONLY=1: solo risposte salvate, mai Google vero (collaudi senza consumare quota).
+  if (fixturePath && !fixture && process.env.GOOGLE_FIXTURES_ONLY === "1") throw new Error(`Google Places error 429: nessuna risposta salvata per questa richiesta (GOOGLE_FIXTURES_ONLY)`);
 
   const googleResponse = fixture ? new Response(fixture) : await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
