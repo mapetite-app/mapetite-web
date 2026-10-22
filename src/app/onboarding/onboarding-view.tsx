@@ -359,7 +359,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
       {/* Contenuto */}
       <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-56 pt-4">
-        {step === PASSO_CAPITO ? (
+        {step === PASSO_TIPI ? (
+          // Mockup A "valuta" (21/10): titolo in serif e una riga sola; la card fa il resto.
+          <>
+            <h1 className={`${SERIF} mb-1 text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414]`}>{config.title}</h1>
+            <p className="mb-5 text-[15px] font-sans text-text-muted">{config.subtitle}</p>
+          </>
+        ) : step === PASSO_CAPITO ? (
           // Mockup A (21/10): titolo in serif grande, come una pagina di rivista; la frase sotto fa il resto.
           <>
             <p className="mb-3 flex items-center gap-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
@@ -456,6 +462,16 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             {corrente ? (
               <>
                 <p data-testid="tipi-contatore" className="mb-2 text-xs font-sans text-text-muted">{visti.length + 1} di {TIPI.length}</p>
+                {/* La pila (mockup A): le prossime due card si intravedono dietro, un po' ruotate. */}
+                <div className="relative">
+                {TIPI.filter((t) => !visti.includes(t.id) && t.id !== corrente.id).slice(0, 2).map((t, i) => (
+                  <div
+                    key={t.id}
+                    aria-hidden
+                    className="absolute inset-0 rounded-[1.75rem] shadow-card"
+                    style={{ background: `linear-gradient(160deg, ${t.sfondo})`, transform: i === 0 ? "rotate(4deg) translate(10px, 6px)" : "rotate(-4deg) translate(-10px, 8px)", opacity: 0.9 }}
+                  />
+                ))}
                 <div
                   data-testid="tipo-card"
                   key={corrente.id}
@@ -470,7 +486,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex min-h-[20rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
+                  className="relative flex min-h-[clamp(14rem,36svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -482,22 +498,28 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
-                  <span aria-hidden className="absolute right-4 top-3 text-[5.5rem] leading-none drop-shadow">{corrente.emoji}</span>
-                  <span className="mb-2 w-fit rounded-pill bg-black/25 px-2.5 py-0.5 text-[11px] font-display font-semibold uppercase tracking-wider">
-                    {corrente.famoso ? "Molto noto" : "Poco noto"}
+                  {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
+                  <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
+                  <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
+                  <span aria-hidden className="absolute left-1/2 top-[30%] -translate-x-1/2 -translate-y-1/2 text-[5.5rem] leading-none drop-shadow-lg">{corrente.emoji}</span>
+                  <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
+                  <span className="relative mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-pill bg-white/85 px-3 py-1 font-display text-[13px] font-semibold text-[#141414]">
+                    {corrente.famoso ? "Molto noto" : <><Sparkles size={12} className="text-accent" aria-hidden /> Chicca di quartiere</>}
                   </span>
-                  <h2 className="font-title text-2xl font-semibold leading-tight">{corrente.titolo}</h2>
-                  <p className="mt-1 text-sm font-sans text-white/90">{corrente.riga}</p>
+                  <h2 className={`${SERIF} relative text-[30px] font-medium leading-[1.08]`}>{corrente.titolo}</h2>
+                  <p className="relative mt-1.5 text-sm font-sans text-white/90">{corrente.riga}</p>
                 </div>
-                <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <button type="button" data-testid="tipo-giu" onClick={() => vota(corrente.id, "giu")} className="min-h-14 rounded-pill border-2 border-border bg-white font-display text-base font-semibold text-brand active:scale-95">
-                    👎 No
+                </div>
+                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
+                <div className="mt-7 flex items-center justify-between px-3">
+                  <button type="button" data-testid="tipo-giu" aria-label="No" onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
+                    <span aria-hidden>👎</span>
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 px-2 text-sm font-display font-semibold text-text-muted">
-                    Non so
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
+                    Non lo conosco
                   </button>
-                  <button type="button" data-testid="tipo-su" onClick={() => vota(corrente.id, "su")} className="min-h-14 rounded-pill bg-accent font-display text-base font-semibold text-white active:scale-95">
-                    👍 Sì
+                  <button type="button" data-testid="tipo-su" aria-label="Sì" onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
+                    <span aria-hidden>👍</span>
                   </button>
                 </div>
                 <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted">← trascina la card, oppure tocca →</p>
