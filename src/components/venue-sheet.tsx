@@ -375,9 +375,10 @@ export default function VenueSheet({
 
   // "Le tue note": stato, Com'era, classifica, tag e nota del salvato. withStatus=false quando
   // "Voglio andarci / Ci sono stato" stanno già nella riga delle azioni (scheda B).
-  const personalBlock = (withStatus: boolean, editorial = false) => (
-    <div data-testid="tue-note" className={editorial ? "mx-[22px] mt-4 border-t border-[#e3ddd2] pt-3.5" : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
-        <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
+  // senzaFiletto: subito sotto il verdetto, che ha già il suo filetto (collaudo 22/10: doppio filetto nei salvati).
+  const personalBlock = (withStatus: boolean, editorial = false, senzaFiletto = false) => (
+    <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e3ddd2] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
+        <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
         {withStatus && onVisitStatus && (
@@ -597,7 +598,8 @@ export default function VenueSheet({
           lng={lng}
           directionsUrl={directionsUrl}
           onDirections={() => signal("percorso", "carosello")}
-          heightClass="h-56"
+          // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10).
+          heightClass="h-48 min-[380px]:h-56"
           fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
           overlay={
             <>
@@ -649,8 +651,15 @@ export default function VenueSheet({
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
           {/* UNA riga: "● Aperto ora · 650 m · fino alle 01:00" (orari Google se ci sono, mai inventati). */}
-          {(aperto != null || distance) && (
+          {(aperto != null || distance || rating != null) && (
             <p data-testid="scheda-fatti" className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] font-sans text-[#4b5058]">
+              {/* Il voto Google in vista, come in Places (collaudo 22/10); il numero di recensioni resta in Info. */}
+              {rating != null && (
+                <>
+                  <span data-testid="voto-scheda" className="font-semibold text-[#141414]"><span aria-hidden className="text-accent">★</span> {rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                  {(aperto != null || distance) && <span aria-hidden>·</span>}
+                </>
+              )}
               {aperto != null && (
                 <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
                   <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
@@ -758,7 +767,7 @@ export default function VenueSheet({
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

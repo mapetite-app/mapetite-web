@@ -44,7 +44,7 @@ export default function DragToClose({ onClose, className, children }: { onClose:
     >
       {/* maniglia: fa capire che si può trascinare */}
       <div aria-hidden className="pointer-events-none sticky top-0 z-20 -mb-4 flex h-4 justify-center pt-1.5 lg:hidden">
-        <span className="h-1 w-10 rounded-pill bg-white/80 shadow-card" />
+        <span className="h-1 w-10 rounded-pill bg-black/20" />
       </div>
       {children}
     </div>

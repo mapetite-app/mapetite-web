@@ -3166,9 +3166,9 @@ export default function MapView({
             };
             return (
               <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
-                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
+                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
                 <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
-                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
+                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
               </div>
             );
           })()}
