@@ -501,7 +501,14 @@ export default function VenueSheet({
     const matchReasonBelow = perTeText != null && matchReasonText != null;
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
     const firstReview = selectedReviews?.find((r) => r.text?.trim())?.text.trim() ?? null;
-    const googleLine = venue.editorialSummary?.trim() || firstReview;
+    // Recensione lunga: si taglia a fine frase (entro ~200 caratteri), così il "…" non finisce dopo un punto.
+    const aFineFrase = (t: string) => {
+      if (t.length <= 200) return t;
+      const cut = t.slice(0, 200);
+      const fine = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+      return fine > 60 ? cut.slice(0, fine + 1) : `${cut.replace(/\s\S*$/, "")}…`;
+    };
+    const googleLine = venue.editorialSummary?.trim() || (firstReview ? aFineFrase(firstReview) : null);
     // La frase è di Google o di una persona che ha scritto una recensione su Google: lo si dice (collaudo 23/10).
     const googleLabel = venue.editorialSummary?.trim() ? "Da Google" : "Da una recensione su Google";
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
@@ -668,26 +675,27 @@ export default function VenueSheet({
               {rating != null && (
                 <span data-testid="voto-scheda" className="whitespace-nowrap font-semibold text-[#141414]"><span aria-hidden className="text-accent">★</span> {rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               )}
-              {/* Ogni "·" sta attaccato a ciò che segue (whitespace-nowrap): mai un puntino orfano a fine riga. */}
+              {/* Stato e orario in un blocco solo che non va a capo ("● Chiuso · apre domani alle 12:30"), con
+                  il "·" davanti: a capo va il blocco intero, mai un puntino da solo (collaudi del 23/10). */}
               {aperto != null && (
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                   {rating != null && <span aria-hidden className="mr-1 font-normal text-[#4b5058]">·</span>}
                   <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
                     <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
-                    {aperto ? "Aperto ora" : "Chiuso ora"}
+                    {riapre || chiude ? (aperto ? "Aperto" : "Chiuso") : aperto ? "Aperto ora" : "Chiuso ora"}
                   </span>
+                  {(riapre || chiude) && (
+                    <>
+                      <span aria-hidden className="mx-1">·</span>
+                      <span data-testid={riapre ? "riapre" : "chiude"}>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `fino ${chiude}`}</span>
+                    </>
+                  )}
                 </span>
               )}
               {distance && (
                 <span className="whitespace-nowrap">
                   {(aperto != null || rating != null) && <span aria-hidden className="mr-2.5">·</span>}
                   <span>{distance}</span>
-                </span>
-              )}
-              {(riapre || chiude) && (
-                <span className="whitespace-nowrap">
-                  <span aria-hidden className="mr-2.5">·</span>
-                  <span data-testid={riapre ? "riapre" : "chiude"}>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `fino ${chiude}`}</span>
                 </span>
               )}
             </p>
@@ -888,7 +896,8 @@ export default function VenueSheet({
                     <span className="text-xs font-sans font-normal text-text-muted">Recensioni da Google</span>
                   </h3>
                   <ul className="mt-1 divide-y divide-border">
-                    {selectedReviews!.map((review, i) => (
+                    {/* La recensione già in vista sotto il nome ("Da una recensione su Google") non si ripete (collaudo 23/10). */}
+                    {selectedReviews!.filter((r) => venue.editorialSummary?.trim() || headline != null || verdettoInArrivo || r.text?.trim() !== firstReview).map((review, i) => (
                       <li key={i} className="flex gap-2 py-2.5">
                         <Quote size={14} className="mt-1 shrink-0 text-text-muted" aria-hidden />
                         <p className="font-sans text-sm leading-relaxed text-text">{review.text}</p>

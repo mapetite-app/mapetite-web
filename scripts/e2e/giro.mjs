@@ -1215,7 +1215,7 @@ await shot("15-scheda-b");
   ok(taChiesti.length >= 2, "confronto: la scheda chiede Tripadvisor al nostro server, mai direttamente al sito");
   { const r = ((await page.getByTestId("riapre").textContent().catch(() => "")) ?? "");
     const st = ((await page.getByTestId("stato-apertura").textContent().catch(() => "")) ?? "");
-    ok(st === "Chiuso ora" && /^apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso ora · … · apre alle …' nella riga dei fatti (${st} · ${r})`);
+    ok(st === "Chiuso" && /^apre (alle|domani alle) \d{2}:\d{2}$/.test(r), `scheda: locale chiuso con orari → 'Chiuso · apre alle …' in un blocco solo nella riga dei fatti (${st} · ${r})`);
     ok((((await page.getByTestId("scheda-fatti").textContent()) ?? "").match(/Chiuso/g) ?? []).length === 1, "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
     await page.getByTestId("aperto-da-poco").waitFor({ timeout: 5000 }).catch(() => {});
     ok(((await page.getByTestId("aperto-da-poco").textContent().catch(() => "")) ?? "").includes("Aperto da 3 mesi"), "scheda: locale verificato aperto da 3 mesi → '🆕 Aperto da 3 mesi' tra i segnali");
