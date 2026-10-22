@@ -8,6 +8,10 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 ## Aperte
 
+**Istruzioni passo passo con i link: `ISTRUZIONI-LORENZO.md` (22/10).**
+
+0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
+
 1. **Accesso con Google in un tocco (sprint, chiave 0) — APERTA.** Il pulsante "Continua con Google" è già pronto e compare da solo quando Google è acceso su Supabase.
    - Su console.cloud.google.com → API e servizi → Credenziali → "Crea credenziali" → "ID client OAuth", tipo "Applicazione web".
    - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
