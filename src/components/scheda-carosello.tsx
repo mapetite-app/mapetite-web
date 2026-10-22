@@ -29,6 +29,7 @@ export default function SchedaCarosello({
   onDirections,
   fallback,
   overlay,
+  heightClass = "h-56",
 }: {
   photoRefs: string[];
   name: string;
@@ -39,6 +40,7 @@ export default function SchedaCarosello({
   onDirections: () => void;
   fallback: ReactNode;
   overlay?: ReactNode; // chiudi / condividi sopra la foto
+  heightClass?: string; // altezza della striscia (mockup A: più alta)
 }) {
   const [index, setIndex] = useState(0);
   const [mapBroken, setMapBroken] = useState(false);
@@ -52,7 +54,7 @@ export default function SchedaCarosello({
   return (
     <div className="relative" data-testid="scheda-carosello">
       <div
-        className="flex h-56 snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`flex ${heightClass} snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
         onScroll={(e) => {
           const el = e.currentTarget;
           const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
@@ -73,7 +75,7 @@ export default function SchedaCarosello({
                 className="h-full w-full object-cover"
                 fallback={fallback}
                 credit={i === 0 ? credit : null}
-                creditClassName="absolute bottom-7 right-3"
+                creditClassName="absolute bottom-3 left-3"
               />
             ) : (
               fallback
@@ -107,26 +109,26 @@ export default function SchedaCarosello({
           </a>
         )}
       </div>
+      {/* Velo scuro in alto (mockup A): i tasti tondi restano leggibili anche su foto chiare. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-card bg-gradient-to-b from-black/30 to-transparent" />
+      {/* "1 / 2" in basso a destra (mockup A): un tocco porta alla pagina dopo (l'ultima torna alla prima). */}
       {slides > 1 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
-          <div className="pointer-events-auto flex items-center gap-0.5 rounded-pill bg-black/35 px-1.5 backdrop-blur" data-testid="carosello-puntini">
-            {Array.from({ length: slides }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={i === mapIndex ? "Mostra dove si trova" : `Foto ${i + 1}`}
-                aria-current={i === index}
-                onClick={(e) => {
-                  const strip = e.currentTarget.closest("[data-testid=scheda-carosello]")?.firstElementChild as HTMLElement | null;
-                  if (i === mapIndex) setMapWanted(true);
-                  strip?.scrollTo({ left: i * strip.clientWidth, behavior: "smooth" });
-                }}
-                className="flex h-6 items-center px-0.5"
-              >
-                <span aria-hidden className={`block h-1.5 rounded-full transition-all ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/60"}`} />
-              </button>
-            ))}
-          </div>
+        <div className="absolute bottom-1 right-2" data-testid="carosello-puntini">
+          <button
+            type="button"
+            aria-label={index + 1 === mapIndex ? "Mostra dove si trova" : index + 1 >= slides ? "Torna alla prima foto" : `Foto ${index + 2}`}
+            onClick={(e) => {
+              const strip = e.currentTarget.closest("[data-testid=scheda-carosello]")?.firstElementChild as HTMLElement | null;
+              const next = (index + 1) % slides;
+              if (next === mapIndex) setMapWanted(true);
+              strip?.scrollTo({ left: next * strip.clientWidth, behavior: "smooth" });
+            }}
+            className="flex min-h-11 min-w-11 items-center justify-center px-1"
+          >
+            <span data-testid="carosello-contatore" className="rounded-pill bg-black/45 px-2.5 py-1 font-display text-[11.5px] font-medium text-white backdrop-blur">
+              {index + 1} / {slides}
+            </span>
+          </button>
         </div>
       )}
       {overlay}

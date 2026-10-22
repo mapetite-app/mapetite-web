@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -27,10 +27,14 @@ import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orar
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
 
-// Riquadri della barra azioni flottante (scheda B, come Places): stessa misura per tutti e tre.
+// Riquadri della barra azioni teal (mockup A "Editoriale", 21/10): icona e parola su una riga, 50px.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
 export const ACTION_TILE =
-  "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-xs font-display font-semibold text-white transition-transform active:scale-95";
+  "flex h-[50px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[15px] px-2 text-[14.5px] font-display font-semibold text-white transition-transform active:scale-95";
+// Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
+// fondo carta caldo come la home nuova.
+const SERIF = "font-[family-name:var(--font-newsreader)]";
+const PAPER = "bg-[#f8f6f2]";
 const TILE = `${ACTION_TILE} bg-white/10`;
 
 type SchedaTab = "panoramica" | "recensioni" | "info";
@@ -62,6 +66,12 @@ export type Venue = {
   photoRef?: string | null;
   orari?: Orari | null;
   photoAuthor?: string | null;
+  // "Per te" dai gusti (mappa del gusto): scritto dall'AI solo con i gusti veri (vedi haiku-synthesis).
+  perTe?: string | null;
+  // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).
+  requisiti?: { r: string; prova: string }[] | null;
+  // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
+  editorialSummary?: string | null;
 };
 
 type VenueSheetProps = {
@@ -148,6 +158,13 @@ export default function VenueSheet({
   const friendsKey = venue.id;
   // Tocco su "✓ Ci sono stato" in questa scheda (per il foglio del diario): legato al locale, così
   // passando a un altro con "‹ ›" non si apre lì.
+  // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
+  const [provaAperta, setProvaAperta] = useState<string | null>(null);
+  // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
+  useEffect(() => {
+    if (!provaAperta) return;
+    document.querySelector("[data-testid=prova-recensione]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [provaAperta]);
   const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
   const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
   const setVisitAskedAt = (at: number | null) => setVisitAsked(at == null ? null : { id: venue.id, at });
@@ -170,8 +187,10 @@ export default function VenueSheet({
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(autoBook);
   // Scheda B: sezione aperta e menu "Altro".
-  const [tab, setTab] = useState<SchedaTab>("panoramica");
+  const [tab, setTab] = useState<SchedaTab>("info");
   const [menuOpen, setMenuOpen] = useState(false);
+  // Mockup A: "Orari, contatti, recensioni ›" apre il resto della scheda.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
@@ -356,8 +375,8 @@ export default function VenueSheet({
 
   // "Le tue note": stato, Com'era, classifica, tag e nota del salvato. withStatus=false quando
   // "Voglio andarci / Ci sono stato" stanno già nella riga delle azioni (scheda B).
-  const personalBlock = (withStatus: boolean) => (
-    <div className="mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4">
+  const personalBlock = (withStatus: boolean, editorial = false) => (
+    <div data-testid="tue-note" className={editorial ? "mx-[22px] mt-4 border-t border-[#e3ddd2] pt-3.5" : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
         <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">
           Le tue note
         </p>
@@ -461,10 +480,11 @@ export default function VenueSheet({
       </div>
   );
 
-  // ── Scheda B (predefinita, stile Places), riordinata il 16/10 su richiesta di Lorenzo:
-  // "stesse cose, schermo più pulito". In vista senza toccare nulla: foto, nome, una riga di
-  // fatti, il verdetto Mapetite e una riga di azioni a icone uguali. Il resto sta in tre schede
-  // (Panoramica · Recensioni · Info) e le azioni secondarie nel menu "Altro".
+  // ── Scheda B (predefinita): mockup A "Editoriale" scelto da Lorenzo (PR #87, 21/10).
+  // Foto in alto, categoria in maiuscoletto, nome grande in serif, una riga "Aperto ora · 650 m ·
+  // fino alle 01:00", poi IL VERDETTO MAPETITE in corsivo tra due filetti, come una citazione di
+  // rivista (la cosa principale della pagina), "Per te" e "Orari, contatti, recensioni ›" che apre
+  // tutto il resto (niente tolto: un tocco più in là). Azioni fisse in basso: Prenota · Percorso · Salva.
   if (variant === "b") {
     const copyAddress = async () => {
       if (!address) return;
@@ -473,8 +493,16 @@ export default function VenueSheet({
     // Il verdetto in vista: la frase editoriale; se manca, la sintesi (mai testo inventato).
     const headline = verdictText ?? (synthesis?.trim() || null);
     const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "";
+    // "Per te": prima il perché dai gusti (mappa del gusto, scritto dall'AI solo con i gusti veri),
+    // altrimenti il perché per questa ricerca. Se ci sono tutti e due, il secondo va in "In breve".
+    const perTeText = venue.perTe?.trim() || null;
+    const perTeLine = perTeText ?? matchReasonText;
+    const matchReasonBelow = perTeText != null && matchReasonText != null;
+    // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
+    const firstReview = selectedReviews?.find((r) => r.text?.trim())?.text.trim() ?? null;
+    const googleLine = venue.editorialSummary?.trim() || (firstReview ? `“${firstReview}”` : null);
     const hasOverview =
-      showSynthesisBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
+      showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
     // Orari Google della ricerca (i salvati non li hanno): oggi in Info, "apre alle 19:00" se chiuso.
     const adesso = new Date();
@@ -485,23 +513,28 @@ export default function VenueSheet({
     const riapre = aperto === false ? prossimaApertura(venue.orari, adesso) : null;
     const chiude = aperto === true ? prossimaChiusura(venue.orari, adesso) : null;
     const tabs = [
-      ["panoramica", "Panoramica"],
-      ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
       ["info", "Info"],
+      ...(hasReviewsTab ? [["recensioni", "Recensioni"]] : []),
+      ["panoramica", "In breve"],
     ] as [SchedaTab, string][];
-    const activeTab: SchedaTab = tab === "recensioni" && !hasReviewsTab ? "panoramica" : tab;
-    const statusTiles: { tag: "Da provare" | "Già visitato"; label: string; emoji: string }[] = [
-      { tag: "Da provare", label: "Voglio andarci", emoji: "📌" },
-      { tag: "Già visitato", label: "Ci sono stato", emoji: "✓" },
-    ];
+    const activeTab: SchedaTab = tab === "recensioni" && !hasReviewsTab ? "info" : tab;
     const menuItem =
       "flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-sans text-text active:bg-bg";
-    const ICON_BTN = "flex h-11 w-11 items-center justify-center rounded-full border active:scale-95";
-    const iconBtn = `${ICON_BTN} border-border bg-white text-brand`;
+    // Tasti tondi sopra la foto (mockup A): bianchi, 44px per il dito.
+    const ROUND = "flex h-11 w-11 items-center justify-center rounded-full shadow-card active:scale-95";
+    const roundBtn = `${ROUND} bg-white/90 text-text backdrop-blur`;
+    // "Ci sono stato" per un locale non ancora salvato: nel menu Altro (regola 17/10: niente doppioni
+    // accanto a Salva nella barra). Apre Salva con lo stato già scelto.
+    const quickVisit = !isSaved && onQuickSave ? onQuickSave : null;
     const altroMenu = (
       <>
                 <button type="button" aria-label="Chiudi il menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
                 <div role="menu" data-testid="altro-menu" className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-card border border-border bg-surface py-1 shadow-float">
+                  {quickVisit && saveSlot && (
+                    <button role="menuitem" type="button" data-testid="altro-ci-sono-stato" onClick={() => { setMenuOpen(false); quickVisit("Già visitato"); }} className={menuItem}>
+                      <Check size={18} className="shrink-0 text-brand" aria-hidden /> Ci sono stato
+                    </button>
+                  )}
                   {isSaved && isUuid(venue.id) && (
                     <Link
                       role="menuitem"
@@ -537,15 +570,22 @@ export default function VenueSheet({
                 </div>
               </>
     );
-    const facts = [
-      categoryLabel(category),
-      rating != null ? `★ ${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : null,
-      priceLabel,
-      origin ? distanceLabel(origin, { lat, lng }) : null,
-    ].filter(Boolean) as string[];
+    // Riga di categoria in maiuscoletto: tipo · prezzo · città (solo dati veri).
+    const kindLine = [categoryLabel(category), priceLabel, cityFromAddress(address)].filter(Boolean) as string[];
+    const distance = origin ? distanceLabel(origin, { lat, lng }) : null;
+    // Nomi lunghi su due righe al massimo, senza spingere il verdetto sotto la barra.
+    const nameSize = name.length > 34 ? "text-[28px]" : name.length > 22 ? "text-[32px]" : "text-[40px]";
+    const openDetails = () => {
+      const next = !detailsOpen;
+      setDetailsOpen(next);
+      if (next) {
+        trackFeature("scheda_dettagli");
+        requestAnimationFrame(() => document.getElementById(`scheda-dettagli-${venue.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    };
 
     return (
-      <div className="relative flex flex-col rounded-card bg-surface shadow-float">
+      <div className={`relative flex flex-col rounded-card ${PAPER} shadow-float`}>
         <SchedaCarosello
           photoRefs={venue.photoRef ? [venue.photoRef] : []}
           name={name}
@@ -554,81 +594,83 @@ export default function VenueSheet({
           lng={lng}
           directionsUrl={directionsUrl}
           onDirections={() => signal("percorso", "carosello")}
+          heightClass="h-56"
           fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
           overlay={
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Chiudi"
-              className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur"
-            >
-              <X size={20} />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Chiudi"
+                className={`absolute left-4 top-4 ${roundBtn}`}
+              >
+                <X size={19} aria-hidden />
+              </button>
+              {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}
+              <div className="absolute right-4 top-4 flex gap-2" data-testid="azioni-scheda">
+                {shareOn && (
+                  <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={roundBtn}>
+                    <Share size={18} aria-hidden />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  data-testid="altro-apri"
+                  aria-label="Altro"
+                  aria-expanded={menuOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setMenuOpen((o) => !o)}
+                  className={menuOpen ? `${ROUND} bg-brand text-white` : roundBtn}
+                >
+                  <Ellipsis size={19} aria-hidden />
+                </button>
+                {menuOpen && altroMenu}
+              </div>
+            </>
           }
         />
 
-        {/* Nome e UNA riga di fatti: tipo · voto · prezzo · distanza · aperto. */}
-        <div className="px-5 pt-4">
-          {/* Semplificare (Lorenzo 17/10): Condividi e Altro come icone accanto al nome, non più una riga di riquadri. */}
-          <div className="flex items-start gap-2">
-            {/* Nomi lunghi ("La Tavernetta 29 da Tony e Andrea") su 2 righe, non 3: il verdetto resta in vista. */}
-            <h2 className={`min-w-0 flex-1 font-title font-semibold leading-tight text-text ${name.length > 24 ? "text-[1.4rem] in-data-[titoli=serif]:text-[1.8rem]" : "text-[1.75rem] in-data-[titoli=serif]:text-[2.2rem]"}`}>
-              {name}
-              {infoLocale && (
-                <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-0.5 align-middle text-brand">
-                  <title>Verificato dal titolare</title>
-                </BadgeCheck>
-              )}
-            </h2>
-            <div className="relative flex shrink-0 gap-2 pt-0.5" data-testid="azioni-scheda">
-              {shareOn && (
-                <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={iconBtn}>
-                  <Share2 size={18} aria-hidden />
-                </button>
-              )}
-              <button
-                type="button"
-                data-testid="altro-apri"
-                aria-label="Altro"
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-                onClick={() => setMenuOpen((o) => !o)}
-                className={menuOpen ? `${ICON_BTN} border-brand bg-brand text-white` : iconBtn}
-              >
-                <Ellipsis size={18} aria-hidden />
-              </button>
-              {menuOpen && altroMenu}
-            </div>
-          </div>
-          {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
-          <p data-testid="scheda-fatti" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px] font-sans text-text-muted">
-            {facts.map((f, i) => (
-              <span key={f} className="inline-flex items-center gap-1.5">
-                {i > 0 && <span aria-hidden>·</span>}
-                <span className={i === 0 ? "text-text" : ""}>{f}</span>
-              </span>
-            ))}
-            {aperto != null && !riapre && !chiude && (
-              <span className="inline-flex items-center gap-1.5">
-                {facts.length > 0 && <span aria-hidden>·</span>}
-                <span aria-hidden className={`h-2 w-2 rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
-                <span className={aperto ? "text-success" : "text-error"}>{aperto ? "Aperto ora" : "Chiuso ora"}</span>
-              </span>
+        <div className="px-[22px] pt-[22px]">
+          {kindLine.length > 0 && (
+            <p data-testid="scheda-categoria" className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+              {kindLine.join(" · ")}
+            </p>
+          )}
+          <h2 className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
+            {name}
+            {infoLocale && (
+              <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-1 align-middle text-brand">
+                <title>Verificato dal titolare</title>
+              </BadgeCheck>
             )}
-          </p>
-          {/* Come Places: con gli orari Google, "Chiuso ora · apre alle 19:00" o "Aperto ora · chiude alle 23:00",
-              su una riga sua. */}
-          {(riapre || chiude) && (
-            <p data-testid={riapre ? "riapre" : "chiude"} className="mt-1 flex items-center gap-1.5 text-[14px] font-sans text-text-muted">
-              <span aria-hidden className={`h-2 w-2 rounded-full ${riapre ? "bg-error" : "bg-success"}`} />
-              <span className={riapre ? "text-error" : "text-success"}>{riapre ? "Chiuso ora" : "Aperto ora"}</span>
-              <span aria-hidden>·</span>
-              <span>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `chiude ${chiude}`}</span>
+          </h2>
+          {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {/* UNA riga: "● Aperto ora · 650 m · fino alle 01:00" (orari Google se ci sono, mai inventati). */}
+          {(aperto != null || distance) && (
+            <p data-testid="scheda-fatti" className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] font-sans text-[#4b5058]">
+              {aperto != null && (
+                <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
+                  <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                  {aperto ? "Aperto ora" : "Chiuso ora"}
+                </span>
+              )}
+              {distance && (
+                <>
+                  {aperto != null && <span aria-hidden>·</span>}
+                  <span>{distance}</span>
+                </>
+              )}
+              {(riapre || chiude) && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span data-testid={riapre ? "riapre" : "chiude"}>{riapre ? `apre ${riapre.replace(/^oggi /, "")}` : `fino ${chiude}`}</span>
+                </>
+              )}
             </p>
           )}
           {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
               Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
-          <div data-testid="segnali-scheda" className="mt-2 flex flex-wrap items-center gap-1.5 empty:hidden">
+          <div data-testid="segnali-scheda" className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
             {gem && (
               <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
                 💎 Poco conosciuto
@@ -636,201 +678,253 @@ export default function VenueSheet({
             )}
             {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
             <AperturaPillola info={infoLocale} />
-            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10).
-                Prima di "c'è posto": è corta e sta accanto a 💎, così i segnali restano su 2 righe. */}
+            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
             <PostoPillola info={infoLocale} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
             <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
           </div>
-        </div>
 
-        {/* Il verdetto Mapetite: sempre in vista, senza toccare nulla. */}
-        {(headline != null || matchReasonText != null) && (
-          <div data-testid="verdetto-box" className="mx-5 mt-4 rounded-card bg-brand p-4 shadow-card">
-            <p data-testid="verdetto-scheda" className="text-[11px] font-display font-semibold uppercase tracking-wide text-accent">
-              Il verdetto Mapetite
-            </p>
-            {headline && (
-              <p className="mt-1.5 font-display text-lg font-semibold leading-snug text-white">{headline}</p>
-            )}
-            {matchReasonText && (
-              <p className={`${headline ? "mt-2.5 border-t border-white/15 pt-2.5" : "mt-1.5"} font-sans text-sm leading-relaxed text-white/85`}>
-                <span className="font-display font-semibold text-accent">✦ Per te: </span>
-                {matchReasonText}
+          {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
+              Se manca: "lo sto scrivendo" mentre arriva, altrimenti la frase di Google dichiarata come tale. */}
+          {headline != null ? (
+            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+              <p data-testid="verdetto-scheda" className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
+                <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
+                Il verdetto Mapetite
               </p>
-            )}
-          </div>
-        )}
-        {headline == null && matchReasonText == null && verdettoInArrivo && (
-          <div data-testid="verdetto-in-arrivo" className="mx-5 mt-4 rounded-card bg-brand p-4 shadow-card">
-            <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-accent">Il verdetto Mapetite</p>
-            <p className="mt-1.5 animate-pulse font-sans text-sm text-white/80">Lo sto scrivendo dalle recensioni…</p>
-          </div>
-        )}
+              <p className={`${SERIF} mt-2 text-[22px] italic leading-[1.24] tracking-[-0.005em] text-[#141414]`}>{headline}</p>
+            </section>
+          ) : verdettoInArrivo ? (
+            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+              <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
+                <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
+                Il verdetto Mapetite
+              </p>
+              <p className={`${SERIF} mt-2 animate-pulse text-[20px] italic leading-[1.24] text-text-muted`}>Lo sto scrivendo dalle recensioni…</p>
+            </section>
+          ) : googleLine ? (
+            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+              <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Da Google</p>
+              <p className={`${SERIF} mt-2 line-clamp-4 text-[20px] italic leading-[1.24] text-[#141414]`}>{googleLine}</p>
+            </section>
+          ) : null}
 
-        {/* Stato del salvato: una scelta sola (salvare sta già nella barra in basso). Locale non salvato
-            senza barra (scheda dall'assistente): le due scelte rapide aprono Salva. */}
-        {((isSaved && onVisitStatus) || (!isSaved && onQuickSave && !saveSlot)) && (
-          <div className="mx-5 mt-4 flex rounded-pill bg-bg p-1" data-testid={isSaved ? "stato-salvato" : "stato-rapido"}>
-            {statusTiles.map(({ tag, label, emoji: e }) => {
-              const on = isSaved && (personalTags?.includes(tag) ?? false);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  aria-pressed={isSaved ? on : undefined}
-                  aria-label={`${e} ${label}`}
-                  onClick={() => {
-                    if (!isSaved) { onQuickSave?.(tag); return; }
-                    // Diario (4.4): appena segnato "Ci sono stato", il foglio "Com'è andata?".
-                    if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
-                    onVisitStatus?.(tag);
-                  }}
-                  className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-[14px] font-display font-semibold active:scale-95 ${on ? "bg-surface text-brand shadow-card" : "text-text-muted"}`}
-                >
-                  <span aria-hidden>{e}</span>
-                  <span>{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Tre schede brevi al posto della lunga colonna di riquadri. */}
-        <div role="tablist" aria-label="Sezioni della scheda" className="mx-5 mt-5 flex border-b border-border" data-testid="scheda-tabs">
-          {tabs.map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`scheda-tab-${id}`}
-              data-testid={`scheda-tab-${id}`}
-              aria-selected={activeTab === id}
-              aria-controls={`scheda-pannello-${id}`}
-              onClick={() => setTab(id)}
-              className={`-mb-px min-h-11 flex-1 border-b-2 text-sm font-display font-semibold ${activeTab === id ? "border-brand text-brand" : "border-transparent text-text-muted"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Panoramica: chi ci è stato, le tue note, in breve. */}
-        <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
-          {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} />}
-          {showPersonalBlock && personalBlock(false)}
-          {hasOverview && (
-            <div className="mx-5 mt-4">
-              <h3 className="font-display text-base font-semibold text-brand">In breve</h3>
-              {showSynthesisBelow && (
-                <p className="mt-1.5 font-sans text-[15px] leading-relaxed text-text">{synthesis}</p>
-              )}
-              {(goForChips.length > 0 || hasTags) && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {goForChips.map((chip) => (
-                    <span key={`g-${chip}`} className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
-                      <Check size={12} className="shrink-0" aria-hidden />
-                      {chip}
-                    </span>
-                  ))}
-                  {tags?.filter((t) => !goForChips.some((g) => g.toLowerCase() === t.trim().toLowerCase())).map((tag) => (
-                    <span key={`t-${tag}`} className="rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {dontExpectChips.length > 0 && (
-                <p className="mt-3 text-sm font-sans text-text-muted">
-                  <span className="font-display font-semibold">Meno adatto se: </span>
-                  {dontExpectChips.join(" · ")}
+          {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
+          {(venue.requisiti?.length ?? 0) > 0 && (
+            <div data-testid="requisiti-scheda" className="mt-3.5">
+              <div className="flex flex-wrap gap-2">
+                {venue.requisiti!.map(({ r }) => (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-expanded={provaAperta === r}
+                    onClick={() => setProvaAperta((x) => (x === r ? null : r))}
+                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e3ddd2] bg-white text-brand"}`}
+                  >
+                    <span aria-hidden className={provaAperta === r ? "text-white" : "text-success"}>✓</span>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
+                <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
               )}
             </div>
           )}
-          {/* Senza la scheda Recensioni il confronto con le altre fonti resta qui, dopo In breve. */}
-          {!hasReviewsTab && confronto()}
+
+          {/* "Per te · …" in corallo: solo il perché già scritto, mai inventato. "Per te" solo se viene dai
+              gusti; il perché della ricerca si chiama "Perché qui" (non parla della persona). */}
+          {perTeLine && (
+            <p data-testid="per-te-scheda" className="mt-3.5 flex items-center gap-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+              <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
+                <Sparkles size={15} />
+              </span>
+              <span className="min-w-0">
+                <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
+              </span>
+            </p>
+          )}
         </div>
 
-        {/* Recensioni: Google e community Mapetite, mai mescolate. */}
-        {hasReviewsTab && (
-          <div role="tabpanel" id="scheda-pannello-recensioni" aria-labelledby="scheda-tab-recensioni" hidden={activeTab !== "recensioni"} data-testid="pannello-recensioni">
-            {/* Semplificare (20/10): "A confronto" in cima alle Recensioni, come il riepilogo dei voti di
-                Google Maps; la Panoramica resta verdetto + In breve. La riga Mapetite porta alla community. */}
-            {confronto(communitySlot ? () => document.querySelector("[data-testid=community-scheda]")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined)}
-            {hasReviews && (
-              <div className="mx-5 mt-4">
-                <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
-                  Cosa dicono
-                  <span className="text-xs font-sans font-normal text-text-muted">Recensioni da Google</span>
-                </h3>
-                <ul className="mt-1 divide-y divide-border">
-                  {selectedReviews!.map((review, i) => (
-                    <li key={i} className="flex gap-2 py-2.5">
-                      <Quote size={14} className="mt-1 shrink-0 text-text-muted" aria-hidden />
-                      <p className="font-sans text-sm leading-relaxed text-text">{review.text}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {communitySlot && (
-              <div className="mx-5 mt-4" data-testid="community-scheda">
-                <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
-                  Dalla community Mapetite
-                  <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
-                </h3>
-                <div className="mt-2">{communitySlot}</div>
-              </div>
-            )}
+        {/* Chi dei tuoi amici c'è stato: passaparola vero, solo tra chi segui. */}
+        {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
+
+        {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
+        {showPersonalBlock && personalBlock(true, true)}
+
+        {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
+        {!isSaved && onQuickSave && !saveSlot && (
+          <div className="mx-[22px] mt-4 flex rounded-pill bg-bg p-1" data-testid="stato-rapido">
+            {([["Da provare", "Voglio andarci", "📌"], ["Già visitato", "Ci sono stato", "✓"]] as const).map(([tag, label, e]) => (
+              <button
+                key={tag}
+                type="button"
+                aria-label={`${e} ${label}`}
+                onClick={() => onQuickSave(tag)}
+                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-[14px] font-display font-semibold text-text-muted active:scale-95"
+              >
+                <span aria-hidden>{e}</span>
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
         )}
 
-        {/* Info: indirizzo (si copia), contatti che non stanno già nella barra, Google Maps. */}
-        <div role="tabpanel" id="scheda-pannello-info" aria-labelledby="scheda-tab-info" hidden={activeTab !== "info"} data-testid="pannello-info">
-          <div className="mx-5 mt-4" data-testid="scheda-info">
-            <h3 className="font-display text-base font-semibold text-brand">Indirizzo e contatti</h3>
-            <div className="mt-1 flex flex-col divide-y divide-border">
-              {address && (
-                <button type="button" data-testid="copia-indirizzo" onClick={copyAddress} className="flex min-h-12 items-center gap-3 text-left text-sm font-sans text-text">
-                  <MapPin size={18} className="shrink-0 text-brand" aria-hidden />
-                  <span className="min-w-0 flex-1">{displayAddress(address)}</span>
-                  <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
-                </button>
+        {/* "Orari, contatti, recensioni ›": tutto il resto, un tocco più in là. */}
+        <button
+          type="button"
+          data-testid="scheda-altro-info"
+          aria-expanded={detailsOpen}
+          aria-controls={`scheda-dettagli-${venue.id}`}
+          onClick={openDetails}
+          className="mx-[22px] mt-4 flex min-h-12 items-center justify-between border-t border-[#e3ddd2] pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058]"
+        >
+          Orari, contatti, recensioni
+          <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
+        </button>
+
+        <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
+          {/* Tre sezioni brevi: Info · Recensioni · In breve. */}
+          <div role="tablist" aria-label="Sezioni della scheda" className="mx-[22px] mt-1 flex border-b border-[#e3ddd2]" data-testid="scheda-tabs">
+            {tabs.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`scheda-tab-${id}`}
+                data-testid={`scheda-tab-${id}`}
+                aria-selected={activeTab === id}
+                aria-controls={`scheda-pannello-${id}`}
+                onClick={() => setTab(id)}
+                className={`-mb-px min-h-11 flex-1 border-b-2 text-sm font-display font-semibold ${activeTab === id ? "border-brand text-brand" : "border-transparent text-text-muted"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* In breve: sintesi, punti forti, tag. */}
+          <div role="tabpanel" id="scheda-pannello-panoramica" aria-labelledby="scheda-tab-panoramica" hidden={activeTab !== "panoramica"} data-testid="pannello-panoramica">
+            {hasOverview && (
+              <div className="mx-[22px] mt-4">
+                {showSynthesisBelow && (
+                  <p className="font-sans text-[15px] leading-relaxed text-text">{synthesis}</p>
+                )}
+                {matchReasonBelow && (
+                  <p className="mt-2 font-sans text-[15px] leading-relaxed text-text">
+                    <span className="font-display font-semibold text-accent">Per la tua ricerca: </span>
+                    {matchReasonText}
+                  </p>
+                )}
+                {(goForChips.length > 0 || hasTags) && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {goForChips.map((chip) => (
+                      <span key={`g-${chip}`} className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
+                        <Check size={12} className="shrink-0" aria-hidden />
+                        {chip}
+                      </span>
+                    ))}
+                    {tags?.filter((t) => !goForChips.some((g) => g.toLowerCase() === t.trim().toLowerCase())).map((tag) => (
+                      <span key={`t-${tag}`} className="rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {dontExpectChips.length > 0 && (
+                  <p className="mt-3 text-sm font-sans text-text-muted">
+                    <span className="font-display font-semibold">Meno adatto se: </span>
+                    {dontExpectChips.join(" · ")}
+                  </p>
+                )}
+              </div>
+            )}
+            {/* Senza la scheda Recensioni il confronto con le altre fonti resta qui, dopo In breve. */}
+            {!hasReviewsTab && confronto()}
+          </div>
+
+          {/* Recensioni: Google e community Mapetite, mai mescolate. */}
+          {hasReviewsTab && (
+            <div role="tabpanel" id="scheda-pannello-recensioni" aria-labelledby="scheda-tab-recensioni" hidden={activeTab !== "recensioni"} data-testid="pannello-recensioni">
+              {/* "A confronto" in cima alle Recensioni, come il riepilogo dei voti di Google Maps.
+                  La riga Mapetite porta alla community. */}
+              {confronto(communitySlot ? () => document.querySelector("[data-testid=community-scheda]")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined)}
+              {hasReviews && (
+                <div className="mx-[22px] mt-4">
+                  <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+                    Cosa dicono
+                    <span className="text-xs font-sans font-normal text-text-muted">Recensioni da Google</span>
+                  </h3>
+                  <ul className="mt-1 divide-y divide-border">
+                    {selectedReviews!.map((review, i) => (
+                      <li key={i} className="flex gap-2 py-2.5">
+                        <Quote size={14} className="mt-1 shrink-0 text-text-muted" aria-hidden />
+                        <p className="font-sans text-sm leading-relaxed text-text">{review.text}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              {placeLine && (
-                <p data-testid="citta-distanza" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
-                  <Navigation size={18} className="shrink-0 text-brand" aria-hidden />
-                  {placeLine}
-                </p>
+              {communitySlot && (
+                <div className="mx-[22px] mt-4" data-testid="community-scheda">
+                  <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+                    Dalla community Mapetite
+                    <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
+                  </h3>
+                  <div className="mt-2">{communitySlot}</div>
+                </div>
               )}
-              {oggi && (
-                <p data-testid="orari-oggi" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text">
-                  <Clock size={18} className="shrink-0 text-brand" aria-hidden />
-                  <span><span className="font-display font-semibold">Oggi</span> {oggi}</span>
-                </p>
-              )}
-              {userRatingCount != null && rating != null && (
-                <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
-                  <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
-                  {`${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} su Google · ${userRatingCount.toLocaleString("it-IT")} recensioni`}
-                </p>
-              )}
-              {telHref && !inBar("chiama") && (
-                <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
-                  <Phone size={18} className="shrink-0" aria-hidden /> Chiama
+            </div>
+          )}
+
+          {/* Info: orari, indirizzo (si copia), contatti che non stanno già nella barra, Google Maps. */}
+          <div role="tabpanel" id="scheda-pannello-info" aria-labelledby="scheda-tab-info" hidden={activeTab !== "info"} data-testid="pannello-info">
+            <div className="mx-[22px] mt-2" data-testid="scheda-info">
+              <div className="flex flex-col divide-y divide-border">
+                {oggi && (
+                  <p data-testid="orari-oggi" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text">
+                    <Clock size={18} className="shrink-0 text-brand" aria-hidden />
+                    <span><span className="font-display font-semibold">Oggi</span> {oggi}</span>
+                  </p>
+                )}
+                {address && (
+                  <button type="button" data-testid="copia-indirizzo" onClick={copyAddress} className="flex min-h-12 items-center gap-3 text-left text-sm font-sans text-text">
+                    <MapPin size={18} className="shrink-0 text-brand" aria-hidden />
+                    <span className="min-w-0 flex-1">{displayAddress(address)}</span>
+                    <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
+                  </button>
+                )}
+                {placeLine && (
+                  <p data-testid="citta-distanza" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
+                    <Navigation size={18} className="shrink-0 text-brand" aria-hidden />
+                    {placeLine}
+                  </p>
+                )}
+                {userRatingCount != null && rating != null && (
+                  <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
+                    <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
+                    {`${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} su Google · ${userRatingCount.toLocaleString("it-IT")} recensioni`}
+                  </p>
+                )}
+                {telHref && !inBar("chiama") && (
+                  <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
+                    <Phone size={18} className="shrink-0" aria-hidden /> Chiama
+                  </a>
+                )}
+                {websiteUri != null && !inBar("sito") && (
+                  <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
+                    <Globe size={18} className="shrink-0" aria-hidden /> Sito
+                  </a>
+                )}
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-accent">
+                  <ExternalLink size={18} className="shrink-0" aria-hidden /> {oggi ? "Tutti gli orari e le foto su Google Maps →" : "Orari e foto su Google Maps →"}
                 </a>
-              )}
-              {websiteUri != null && !inBar("sito") && (
-                <a href={websiteUri} onClick={() => signal("sito")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
-                  <Globe size={18} className="shrink-0" aria-hidden /> Sito
-                </a>
-              )}
-              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-accent">
-                <ExternalLink size={18} className="shrink-0" aria-hidden /> {oggi ? "Tutti gli orari e le foto su Google Maps →" : "Orari e foto su Google Maps →"}
-              </a>
+              </div>
             </div>
           </div>
         </div>
@@ -845,30 +939,29 @@ export default function VenueSheet({
           />
         )}
 
-        {/* Barra scura a tre riquadri, staccata dal fondo (come Places): Prenota / Percorso / Salva,
-            oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
+        {/* Barra teal arrotondata, staccata dal fondo (mockup A): Prenota (corallo, più larga) / Percorso /
+            Salva, oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
             dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone). */}
         <div
           data-testid="barra-azioni"
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
-          {/* Bordo chiaro: sopra il riquadro scuro del verdetto la barra si fondeva con il testo sotto (18/10). */}
-          <div className="flex w-full max-w-[22rem] items-stretch gap-1.5 rounded-[1.25rem] bg-brand p-1.5 shadow-float ring-[3px] ring-surface">
+          <div className="flex w-full items-center gap-2 rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
             {lead === "prenota" && (
-              <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`}>
-                <CalendarCheck size={18} aria-hidden />
+              <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`} style={{ flexGrow: 1.4 }}>
+                <CalendarCheck size={17} aria-hidden />
                 Prenota
               </button>
             )}
             {(lead === "chiama" || extra === "chiama") && telHref && (
               <a href={telHref} onClick={() => signal("chiama", "barra")} aria-label={`Chiama ${name}`} className={`${TILE} ${extra === "chiama" ? "order-last" : ""}`}>
-                <Phone size={18} aria-hidden />
+                <Phone size={17} aria-hidden />
                 Chiama
               </a>
             )}
             {(lead === "sito" || extra === "sito") && websiteUri != null && (
               <a href={websiteUri} onClick={() => signal("sito", "barra")} target="_blank" rel="noopener noreferrer" aria-label={`Sito di ${name}`} className={`${TILE} ${extra === "sito" ? "order-last" : ""}`}>
-                <Globe size={18} aria-hidden />
+                <Globe size={17} aria-hidden />
                 Sito
               </a>
             )}
@@ -879,7 +972,7 @@ export default function VenueSheet({
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
               className={TILE}
             >
-              {walk != null ? <Footprints size={18} aria-hidden /> : <Navigation size={18} aria-hidden />}
+              {walk != null ? <Footprints size={17} aria-hidden className="shrink-0" /> : <Navigation size={17} aria-hidden className="shrink-0" />}
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
             </a>
             {saveSlot}
