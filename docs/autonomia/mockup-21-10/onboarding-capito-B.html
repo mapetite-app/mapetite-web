@@ -1,0 +1,46 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:#0b1719;color:#fff}
+.map{position:absolute;left:0;right:0;top:0;height:420px}
+.mf{position:absolute;left:0;right:0;top:250px;height:175px;background:linear-gradient(180deg,rgba(11,23,25,0),#0b1719)}
+.mf2{position:absolute;left:0;right:0;top:0;height:200px;background:linear-gradient(180deg,#0b1719 25%,rgba(11,23,25,0))}
+h1{position:absolute;top:84px;left:20px;right:20px;font-family:var(--display);font-weight:600;font-size:30px;letter-spacing:-.02em;line-height:1.12}
+h1 .s{color:var(--accent)}
+.zone{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(90,190,195,.35),rgba(90,190,195,0) 70%)}
+.zl{position:absolute;font-size:11px;font-weight:600;letter-spacing:.12em;color:#9fd3d6;font-family:var(--display)}
+.np{position:absolute;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--display);font-weight:600;font-size:13px;display:grid;place-items:center;box-shadow:0 0 0 5px rgba(255,107,74,.2),0 0 18px rgba(255,107,74,.6)}
+.chips{position:absolute;top:404px;left:16px;right:16px;display:flex;flex-wrap:wrap;gap:8px}
+.chips span{padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);font-size:13px;font-weight:500}
+.sec{position:absolute;top:494px;left:20px;font-family:var(--display);font-weight:600;font-size:17px}
+.list{position:absolute;top:526px;left:16px;right:16px}
+.it{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.it .n{width:22px;font-family:var(--display);font-weight:600;color:var(--accent);font-size:15px}
+.it .ph,.it .crop{width:46px;height:46px;border-radius:50%;--es:22px;flex:none}
+.it b{display:block;font-family:var(--display);font-weight:600;font-size:15px}
+.it span{font-size:12.5px;color:rgba(255,255,255,.6)}
+.cta{position:absolute;left:16px;right:16px;bottom:40px;height:58px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--display);font-weight:600;font-size:16.5px;box-shadow:0 10px 30px rgba(255,107,74,.4)}
+</style></head><body><div class="screen">
+<div class="map" data-map="dark" data-seed="5" data-river=".22"></div>
+<div class="zone" style="left:170px;top:190px;width:150px;height:110px"></div>
+<div class="zone" style="left:260px;top:280px;width:140px;height:100px"></div>
+<div class="zone" style="left:20px;top:300px;width:140px;height:100px"></div>
+<div class="mf"></div><div class="mf2"></div>
+<div class="zl" style="left:214px;top:232px">MONTI</div>
+<div class="zl" style="left:298px;top:322px">PIGNETO</div>
+<div class="zl" style="left:48px;top:342px">TESTACCIO</div>
+<div class="np" style="left:250px;top:200px">1</div>
+<div class="np" style="left:330px;top:290px">2</div>
+<div class="np" style="left:110px;top:318px">3</div>
+<div class="np" style="left:196px;top:262px">4</div>
+<div class="np" style="left:290px;top:350px">5</div>
+<div data-sb="dark"></div>
+<h1>Ecco cosa ho<br>capito di te <span class="s">✦</span></h1>
+<div class="chips"><span>🍷 Vino naturale</span><span>🍝 Osterie</span><span>€€</span><span>🤫 Posti tranquilli</span></div>
+<div class="sec">5 posti per te</div>
+<div class="list">
+ <div class="it"><span class="n">1</span><div class="ph ph-trat" data-e="🍝"></div><div><b>Osteria del Cardo</b><span>Monti · piccola, di quartiere</span></div></div>
+ <div class="it"><span class="n">2</span><div class="ph ph-wine" data-e="🍷"></div><div><b>Vineria Ombretta</b><span>Pigneto · vino naturale</span></div></div>
+ <div class="it" style="border:0"><span class="n">3</span><div class="ph ph-trat" data-e="🍲"></div><div><b>Trattoria Sora Nella</b><span>Testaccio · senza turisti</span></div></div>
+</div>
+<div class="cta">Iniziamo<i data-i="arrow"></i></div>
+<div class="home-ind l"></div>
+</div><script src="base.js"></script></body></html>

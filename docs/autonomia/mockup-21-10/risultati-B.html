@@ -1,0 +1,68 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.map{position:absolute;inset:0}
+.search{position:absolute;top:54px;left:16px;right:72px;height:52px;background:#fff;border-radius:26px;box-shadow:0 6px 20px rgba(0,0,0,.10);display:flex;align-items:center;gap:10px;padding:0 16px;font-family:var(--display);font-size:15.5px;font-weight:500;color:var(--brand);white-space:nowrap}
+.search .x{margin-left:auto;color:#8a8f98;font-size:18px}
+.flt{position:absolute;top:54px;right:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.10);display:grid;place-items:center;color:var(--brand);font-size:22px}
+.got{position:absolute;top:116px;left:16px;background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.08);display:flex;gap:7px;align-items:center;color:var(--text)}
+.got b{font-weight:600;color:var(--brand)}
+.got .sep{color:#c4c4c4}
+.pin{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px}
+.pin .ph,.pin .crop{width:52px;height:52px;border-radius:50%;border:3px solid var(--brand);box-shadow:0 4px 10px rgba(0,0,0,.18);--es:24px}
+.pin span{white-space:nowrap;background:#fff;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:600;font-family:var(--display);color:var(--brand);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.pin.on .crop{width:72px;height:72px;border:3px solid var(--accent)}
+.pin.on span{color:var(--accent)}
+.car{position:absolute;left:0;right:0;bottom:96px;height:372px}
+.card{position:absolute;top:0;width:310px;height:372px;left:40px;border-radius:24px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.28)}
+.card.side{width:290px;height:340px;top:16px;opacity:.95}
+.card{background:#0f1a1c}.card .crop{position:absolute;left:0;right:0;top:0;height:240px}
+.card .g{position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,26,28,0) 22%,rgba(15,26,28,.7) 48%,#0f1a1c 66%)}
+.card .in{position:absolute;left:18px;right:18px;bottom:16px;color:#fff}
+.sv{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);display:grid;place-items:center;color:#fff;font-size:18px;background:rgba(0,0,0,.18);z-index:3}
+.nm{font-family:var(--display);font-weight:600;font-size:27px;line-height:1.08;letter-spacing:-.01em;margin:6px 0 9px}
+.meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(255,255,255,.8)}
+.vd{margin-top:11px;font-size:14px;line-height:1.38;display:flex;gap:7px}
+.pt{margin-top:7px;font-size:13px;color:#ffb3a1;display:flex;gap:7px;font-weight:500}
+.chips{display:flex;gap:6px;margin-top:11px}
+.chips span{border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:500}
+.cnt{position:absolute;right:18px;top:20px;font-size:12px;color:rgba(255,255,255,.75);font-weight:500;z-index:3;display:none}
+.of{text-align:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,.6)}
+
+.search,.flt,.got{background:rgba(22,48,51,.72);backdrop-filter:blur(18px);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.10)}
+.got b{color:#fff}.got{color:rgba(255,255,255,.8)}
+.flt{color:#fff}
+.pin .crop{border-color:#2f6a70;box-shadow:0 0 0 4px rgba(47,106,112,.25)}
+.pin.on .crop{border-color:var(--accent);box-shadow:0 0 0 6px rgba(255,107,74,.25),0 0 30px rgba(255,107,74,.55)}
+.pin span{background:rgba(15,36,39,.85);color:#fff;border:1px solid rgba(255,255,255,.1)}
+.pin.on span{background:var(--accent);color:#fff}
+.card{background:#0b1719;border:1px solid rgba(255,255,255,.08)}
+.card .g{background:linear-gradient(180deg,rgba(11,23,25,0) 22%,rgba(11,23,25,.7) 48%,#0b1719 66%)}
+.why{margin-top:10px;background:rgba(255,107,74,.13);border:1px solid rgba(255,107,74,.35);border-radius:12px;padding:8px 11px;font-size:12.5px;color:#fff;display:flex;gap:8px;align-items:center}
+.why b{color:#ffb3a1;font-weight:600}
+.chips span{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+</style></head><body><div class="screen">
+<div class="map" data-map="dark" data-seed="11" data-river=".1" data-labels="TRASTEVERE,18,370"></div>
+<div data-sb="dark"></div>
+<div class="search"><i data-i="spark" class="spark"></i>Rooftop romantico per due<span class="x"><i data-i="x"></i></span></div>
+<div class="flt"><i data-i="filter"></i></div>
+<div class="got"><b>12 posti</b></div>
+<div class="pin on" style="left:150px;top:180px"><div data-crop="pin1"></div><span>Terrazza Gianicolo</span></div>
+<div class="pin" style="left:300px;top:150px"><div data-crop="pin2"></div><span>Altana Monti</span></div>
+<div class="pin" style="left:40px;top:250px"><div data-crop="pin3"></div><span>Salotto 42</span></div>
+<div class="pin" style="left:282px;top:262px"><div data-crop="pin4"></div><span>Belvedere Celio</span></div>
+<div class="car">
+ <div class="card side" style="left:-262px"><div data-crop="roof-left"></div><div class="g"></div></div>
+ <div class="card side" style="left:362px"><div data-crop="roof-right"></div><div class="g"></div></div>
+ <div class="card"><div data-crop="roof-main"></div><div class="g"></div>
+  <div class="sv"><i data-i="bookmark"></i></div>
+  <div class="in">
+   <div class="caps" style="color:rgba(255,255,255,.75)">Rooftop bar · €€€</div>
+   <div class="nm">Terrazza Gianicolo</div>
+   <div class="meta"><span class="ok-pill">Aperto ora</span>650 m da te</div>
+   <div class="vd"><i data-i="spark" class="spark" style="margin-top:3px"></i><span>Tramonto sulle cupole, tavoli lontani tra loro.</span></div>
+   <div class="why"><i data-i="spark" class="spark"></i><span><b>Perché per te</b> · Come Altana Monti, che hai salvato</span></div>
+   <div class="chips"><span>Vista cupole</span><span>Tavoli per due</span></div>
+   <div class="of">1 di 12</div>
+  </div></div>
+</div>
+<div data-tabs="Mappa" data-mode="dark"></div><div class="home-ind l"></div>
+</div><script src="base.js"></script></body></html>
