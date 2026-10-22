@@ -146,6 +146,50 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
   return out;
 }
 
+// "Ecco cosa ho capito di te" (mockup A del 21/10): il profilo in una frase da amico, con le parole
+// chiave evidenziate. Solo ciò che la persona ha scelto, mai dedotto o inventato. Pezzi: testo normale
+// o evidenziato (k = la riga di capito() che lo corregge).
+const PLURALE: Record<string, string> = {
+  trattoria: "le trattorie di quartiere", storica: "le osterie storiche", pizza: "le pizzerie napoletane",
+  speakeasy: "i cocktail bar nascosti", enoteca: "le enoteche di vini naturali", bistrot: "i bistrot creativi",
+  gourmet: "i ristoranti gourmet", rooftop: "i rooftop con vista", mondo: "la cucina dal mondo", brunch: "il brunch",
+};
+const SPESA: Record<string, string> = { "€": "spendi poco", "€€": "spendi il giusto", "€€€": "non badi troppo al conto", "€€€€": "ti concedi l'alta cucina" };
+const EVITA: Record<string, string> = { celiaco: "il glutine", "no-lattosio": "il lattosio", "no-pesce": "il pesce", "no-carne": "la carne" };
+
+export type PezzoFrase = { t: string; k?: string };
+
+const elenco = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
+
+export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): PezzoFrase[][] {
+  const frasi: PezzoFrase[][] = [];
+  const su = m.su.map((id) => PLURALE[id]).filter(Boolean).slice(0, 3);
+  if (su.length) frasi.push([{ t: "Ami " }, ...su.flatMap((x, i) => [...(i === 0 ? [] : [{ t: i === su.length - 1 ? " e " : ", " }]), { t: x, k: "su" }]), { t: "." }]);
+  // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e Pigneto, spendi il giusto e…").
+  const dove = m.zone.length ? elenco(m.zone.slice(0, 3)) : extra.citta;
+  const scoperta = m.scoperta ?? scopertaDedotta(m.su);
+  const parti: PezzoFrase[][] = [];
+  if (dove) parti.push([{ t: "esci a " }, { t: dove, k: "zone" }]);
+  if (extra.priceRange && SPESA[extra.priceRange]) parti.push([{ t: SPESA[extra.priceRange], k: "spesa" }]);
+  if (scoperta === "chicche") parti.push([{ t: "giri alla larga dai posti turistici", k: "scoperta" }]);
+  else if (scoperta === "famosi") parti.push([{ t: "non ti spaventano i posti famosi", k: "scoperta" }]);
+  if (parti.length) {
+    const f = parti.flatMap((p, i) => [...(i === 0 ? [] : [{ t: i === parti.length - 1 ? " e " : ", " }]), ...p]);
+    f[0] = { ...f[0], t: f[0].t.charAt(0).toUpperCase() + f[0].t.slice(1) };
+    frasi.push([...f, { t: "." }]);
+  }
+  if (extra.occasions.length) frasi.push([{ t: "Le tue uscite preferite: " }, ...extra.occasions.slice(0, 3).flatMap((o, i, a) => [...(i === 0 ? [] : [{ t: i === a.length - 1 ? " e " : ", " }]), { t: o.label.toLowerCase().replace(" / ", " o "), k: "occasioni" }]), { t: "." }]);
+  const giu = m.giu.map((id) => PLURALE[id]).filter(Boolean).slice(0, 2);
+  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...giu.flatMap((x, i) => [...(i === 0 ? [] : [{ t: " e " }]), { t: x, k: "giu" }]), { t: "." }]);
+  const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
+  const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
+  const d: PezzoFrase[] = [];
+  if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" });
+  if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
+  if (d.length) frasi.push([...d, { t: "." }]);
+  return frasi;
+}
+
 /** Per l'AI dei verdetti: il profilo in parole, senza id interni. */
 // Senza le zone: l'AI non sa dove sono i locali (niente indirizzi nel prompt) e con le zone scriveva
 // "quello che cerchi a Monteverde" anche per posti altrove. Le zone le usa già la ricerca.

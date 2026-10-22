@@ -2,15 +2,17 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, Sparkles } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
-import { DIETE, SCOPERTE, TIPI, capito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
+import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
+
+const SERIF = "font-[family-name:var(--font-newsreader)]";
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -292,9 +294,17 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     diete,
     occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
   });
+  const frase = fraseCapito(gusto, {
+    citta: chosenCity,
+    priceRange,
+    diete,
+    occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
+  });
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
+  // "Non è così? Correggi": le righe del profilo una per una (chiuse: la frase basta).
+  const [correggi, setCorreggi] = useState(false);
   // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
   const [via, setVia] = useState<"su" | "giu" | null>(null);
 
@@ -349,9 +359,21 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
       {/* Contenuto */}
       <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-56 pt-4">
-        <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
-        <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
-        <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
+        {step === PASSO_CAPITO ? (
+          // Mockup A (21/10): titolo in serif grande, come una pagina di rivista; la frase sotto fa il resto.
+          <>
+            <p className="mb-3 flex items-center gap-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
+              <Sparkles size={12} className="text-accent" aria-hidden /> La tua mappa del gusto
+            </p>
+            <h1 className={`${SERIF} mb-6 text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414]`}>Ecco cosa ho capito di te</h1>
+          </>
+        ) : (
+          <>
+            <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
+            <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
+            <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
+          </>
+        )}
         {ripreso && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
@@ -564,8 +586,46 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
-            {righe.length > 0 ? (
-              <ul className="overflow-hidden rounded-card border border-border bg-white shadow-card">
+            {frase.length > 0 ? (
+              <>
+                {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
+                    Toccarne una porta alla domanda che la cambia. */}
+                <p data-testid="capito-frase" className={`${SERIF} text-[24px] leading-[1.42] text-[#141414]`}>
+                  {frase.map((f, i) => (
+                    <span key={i}>
+                      {i > 0 && " "}
+                      {f.map((x, j) => x.k ? (
+                        <span
+                          key={j}
+                          role="button"
+                          tabIndex={0}
+                          data-testid="capito-parola"
+                          onClick={() => setStep(PASSO_DI[x.k!] ?? 0)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStep(PASSO_DI[x.k!] ?? 0); } }}
+                          // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
+                          className="cursor-pointer bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+                        >
+                          {x.t}
+                        </span>
+                      ) : <span key={j}>{x.t}</span>)}
+                    </span>
+                  ))}
+                </p>
+                <p className="mt-6 flex items-center gap-2 text-[15px] font-sans text-text-muted">
+                  Non è così?
+                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="min-h-11 font-display font-semibold text-brand">
+                    Correggi
+                  </button>
+                </p>
+              </>
+            ) : (
+              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
+                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
+              </p>
+            )}
+            {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
+            {correggi && righe.length > 0 && (
+              <ul className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righe.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
                     <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
@@ -576,12 +636,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
-                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
-              </p>
             )}
-            <p className="mt-3 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
           </div>
         )}
       </div>
@@ -611,9 +667,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 data-testid="benvenuto-fine"
                 onClick={() => finish(null)}
                 disabled={!!submitting}
-                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-4 font-display text-[17px] font-semibold text-white shadow-float transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
               >
-                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
+                {/* Mockup A: "Apri la mia mappa →" (la mappa parte già sui posti per te). */}
+                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : <>Apri la mia mappa <ArrowRight size={18} aria-hidden /></>}
               </button>
               {/* I posti già salvati altrove (Google Maps, il link di un reel): dopo la sintesi, non al posto suo. */}
               <button
