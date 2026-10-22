@@ -5933,10 +5933,12 @@ else {
   // 4) "Ecco cosa ho capito", con i posti per te o prima l'import
   await ip.getByRole("button", { name: "Continua" }).click();
   // Mockup A (23/10): una frase da amico con le parole chiave evidenziate; le righe dietro "Correggi".
-  { const f = ((await ip.getByTestId("capito-frase").textContent()) ?? "").replace(/\s+/g, " ");
+  // Spenta con CAPITO_A in onboarding-view.tsx: i controlli della frase valgono solo quando è accesa.
+  const capitoA = (await ip.getByTestId("capito-frase").count()) > 0;
+  if (capitoA) { const f = ((await ip.getByTestId("capito-frase").textContent()) ?? "").replace(/\s+/g, " ");
     const serif = await ip.locator("h1").evaluate((h) => /newsreader/i.test(getComputedStyle(h).fontFamily));
     ok(serif && (await ip.getByTestId("capito-riga").count()) === 0 && f.includes("Ami le trattorie di quartiere") && f.includes("Esci a Monti") && f.includes("giri alla larga dai posti turistici") && f.includes("Eviti il pesce") && f.includes("aperitivo"), `primo accesso (mockup A): 'Ecco cosa ho capito di te' in una frase, titolo serif, righe nascoste (${f.slice(0, 200)})`); }
-  await ip.getByTestId("capito-correggi").click();
+  if (capitoA) await ip.getByTestId("capito-correggi").click();
   { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
   ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
@@ -5947,7 +5949,7 @@ else {
     const ob = await ip.getByTestId("benvenuto-importa-si").boundingBox();
     ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`); }
   await ip.setViewportSize({ width: 390, height: 844 });
-  { await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
+  if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia");
     await ip.getByRole("button", { name: "Continua" }).click();
     await ip.getByTestId("capito-correggi").click(); }
@@ -7314,11 +7316,11 @@ else {
   ok(bozza?.su?.includes("pizza") && bozza?.giu?.length === 2 && bozza?.city === "Milano" && bozza?.step === 3, `risposte conservate: tipi votati, città e passo restano sul telefono (${JSON.stringify(bozza && { su: bozza.su, city: bozza.city, step: bozza.step })})`);
   await vctx.clearCookies({ name: "e2e_anonimo" });
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
-  await vp.getByTestId("capito-frase").waitFor({ timeout: 5000 }).catch(() => {});
+  await vp.getByTestId("benvenuto-capito").waitFor({ timeout: 5000 }).catch(() => {});
   // All'ultimo passo niente avviso "Ho ritrovato le risposte": lo spazio è della frase (collaudo 23/10).
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && (await vp.getByTestId("benvenuto-ripreso").count()) === 0 && await vp.getByTestId("capito-frase").isVisible(), "risposte conservate: dopo l'accesso si riparte dall'ultimo passo, con la frase");
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && (await vp.getByTestId("benvenuto-ripreso").count()) === 0 && await vp.getByTestId("benvenuto-capito").isVisible(), "risposte conservate: dopo l'accesso si riparte dall'ultimo passo");
   await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
-  ok(((await vp.getByTestId("capito-frase").textContent()) ?? "").includes("le pizzerie napoletane"), "risposte conservate: i tipi votati ci sono ancora");
+  ok(((await vp.getByTestId("benvenuto-capito").textContent()) ?? "").toLowerCase().includes("pizzeri"), "risposte conservate: i tipi votati ci sono ancora");
   await vp.getByTestId("benvenuto-fine").click();
   await vp.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
   ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria napoletana a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);

@@ -127,13 +127,17 @@ const altri = (n: number, shown: number) => (n > shown ? ` e ${n - shown === 1 ?
 /** "Ecco cosa ho capito di te": righe brevi, solo da quello che la persona ha detto. */
 export function capito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
   const out: { chiave: string; emoji: string; testo: string }[] = [];
-  const dove = m.zone.length ? m.zone.join(", ") : extra.citta;
-  if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto a ${dove}` });
+  // Stesse preposizioni della frase ("al Pigneto", "ai Navigli"): collaudo del 23/10.
+  const dove = m.zone.length
+    ? elenco(m.zone.map((z) => { const [prep, t] = PREP[z] ?? ["a "]; return `${prep}${t ?? z}`; }))
+    : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
+  if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2)}` });
-  const scoperta = m.scoperta ?? scopertaDedotta(m.su);
+  // Solo la scelta fatta davvero (niente dedotto dai 👍).
+  const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
   if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}` });
@@ -169,12 +173,12 @@ const PREP: Record<string, [string, string?]> = {
 };
 const OCCASIONE: Record<string, string> = {
   cena_romantica: "le cene romantiche", pranzo_veloce: "i pranzi veloci", aperitivo: "l'aperitivo", cena_amici: "le cene con gli amici",
-  pranzo_lavoro: "i pranzi di lavoro", colazione_brunch: "colazione e brunch", dopocena: "il dopocena", occasione_speciale: "le occasioni speciali",
+  pranzo_lavoro: "i pranzi di lavoro", colazione_brunch: "la colazione o il brunch", dopocena: "il dopocena", occasione_speciale: "le occasioni speciali",
 };
 const maiuscola = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Elenco evidenziato "A, B e altri 2": nessuna scelta sparisce senza dirlo (collaudo del 23/10).
-function evidenziati(xs: PezzoFrase[], max: number): PezzoFrase[] {
+function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["un altro", "altri"]): PezzoFrase[] {
   const vis = xs.slice(0, max);
   const resto = xs.length - vis.length;
   const out: PezzoFrase[] = [];
@@ -182,14 +186,15 @@ function evidenziati(xs: PezzoFrase[], max: number): PezzoFrase[] {
     if (i > 0) out.push({ t: i === vis.length - 1 && resto === 0 ? " e " : ", " });
     out.push(x);
   });
-  if (resto > 0) out.push({ t: ` e altri ${resto}` });
+  // "e un altro tipo di posto", "e altri 2 tipi di posto": mai "e altri 1" (collaudo del 23/10).
+  if (resto > 0) out.push({ t: resto === 1 ? ` e ${cosa[0]}` : ` e ${cosa[1].replace("N", String(resto))}` });
   return out;
 }
 
 export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }): PezzoFrase[][] {
   const frasi: PezzoFrase[][] = [];
   const su = m.su.map((id) => PLURALE[id]).filter(Boolean);
-  if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((t) => ({ t, k: "su" })), 3), { t: "." }]);
+  if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((t) => ({ t, k: "su" })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }]);
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
@@ -217,9 +222,9 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
     frasi.push([...f, { t: "." }]);
   }
   const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
-  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3), { t: "." }]);
+  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }]);
   const giu = m.giu.map((id) => PLURALE[id]).filter(Boolean);
-  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((t) => ({ t, k: "giu" })), 2), { t: "." }]);
+  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((t) => ({ t, k: "giu" })), 2, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }]);
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];

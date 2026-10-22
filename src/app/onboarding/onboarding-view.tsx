@@ -13,6 +13,10 @@ import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
+// "Ecco cosa ho capito di te" sul mockup A (frase da amico): bocciata 2 volte dal collaudo del 23/10
+// ("e altri 1", "Correggi" sotto i tasti con i profili ricchi, tocco su un tipo senza uscita). Spenta:
+// resta la lista di prima finché un collaudo nuovo non la approva.
+const CAPITO_A = false;
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -288,13 +292,16 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const skipStep = () => setStep((s) => Math.min(s + 1, TOTAL - 1));
 
   const saltaCls = "-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline";
-  const righe = capito(gusto, {
+  // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 ("Scelto dai tuoi 👍") e ha
+  // lasciato: vale come scelta. Una mai mostrata non entra nella sintesi.
+  const gustoVisto = { ...gusto, scoperta: scopertaOra };
+  const righe = capito(gustoVisto, {
     citta: chosenCity,
     priceRange,
     diete,
     occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
   });
-  const frase = fraseCapito(gusto, {
+  const frase = fraseCapito(gustoVisto, {
     citta: chosenCity,
     priceRange,
     diete,
@@ -379,7 +386,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <h1 className={`${SERIF} mb-1 text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-[#141414]`}>{config.title}</h1>
             <p className="mb-5 text-[15px] font-sans text-text-muted">{config.subtitle}</p>
           </>
-        ) : step === PASSO_CAPITO ? (
+        ) : step === PASSO_CAPITO && CAPITO_A ? (
           // Mockup A (21/10): titolo in serif grande, come una pagina di rivista; la frase sotto fa il resto.
           <>
             <p className="mb-3 flex items-center gap-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
@@ -394,8 +401,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
           </>
         )}
-        {/* All'ultimo passo l'avviso toglierebbe spazio alla frase: lì basta la frase (collaudo 23/10). */}
-        {ripreso && step < PASSO_CAPITO && (
+        {/* Non sulla card dei tipi né sulla frase finale: toglieva spazio e copriva i tasti a 360px (collaudo 23/10). */}
+        {ripreso && step !== PASSO_TIPI && step < PASSO_CAPITO && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
@@ -476,7 +483,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           <div data-testid="benvenuto-tipi">
             {corrente ? (
               <>
-                <p data-testid="tipi-contatore" className="mb-2 text-xs font-sans text-text-muted">{visti.length + 1} di {TIPI.length}</p>
+
                 {/* La pila (mockup A): le prossime due card si intravedono dietro, un po' ruotate. */}
                 <div className="relative">
                 {TIPI.filter((t) => !visti.includes(t.id) && t.id !== corrente.id).slice(0, 2).map((t, i) => (
@@ -513,10 +520,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
+                  {/* Contatore dei tipi dentro la card: sopra c'è già "2 di 4" dei passi (collaudo 23/10). */}
+                  <span data-testid="tipi-contatore" className="absolute left-5 top-5 z-10 rounded-pill bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold">{visti.length + 1} di {TIPI.length}</span>
                   {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
                   <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
                   <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
-                  <span aria-hidden className="absolute left-1/2 top-[30%] -translate-x-1/2 -translate-y-1/2 text-[5.5rem] leading-none drop-shadow-lg">{corrente.emoji}</span>
+                  {/* L'emoji occupa lo spazio libero sopra il testo (non più in posizione fissa: a 360px copriva titolo ed etichetta, collaudo 23/10). */}
+                  <span aria-hidden className="relative flex min-h-[5.5rem] flex-1 items-center justify-center pb-2 text-[4.75rem] leading-none drop-shadow-lg min-[380px]:text-[5.5rem]">{corrente.emoji}</span>
                   <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
                   <span className="relative mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-pill bg-white/85 px-3 py-1 font-display text-[13px] font-semibold text-[#141414]">
                     {corrente.famoso ? "Molto noto" : <><Sparkles size={12} className="text-accent" aria-hidden /> Chicca di quartiere</>}
@@ -527,17 +537,17 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 </div>
                 {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
                 <div className="mt-7 flex items-center justify-between px-3">
-                  <button type="button" data-testid="tipo-giu" aria-label="No" onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
+                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
                   <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
                     Non lo conosco
                   </button>
-                  <button type="button" data-testid="tipo-su" aria-label="Sì" onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
+                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted">← trascina la card, oppure tocca →</p>
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted max-[379px]:hidden">← trascina la card, oppure tocca →</p>
                 {visti.length > 0 && (
                   <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
                     ↶ Torna al precedente
@@ -546,7 +556,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </>
             ) : (
               <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
-                Fatto: {su.length} {su.length === 1 ? "ti piace" : "ti piacciono"}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
+                Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
               </p>
             )}
           </div>
@@ -623,7 +633,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
-            {frase.length > 0 ? (
+            {!CAPITO_A ? (righe.length === 0 && (
+              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
+                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
+              </p>
+            )) : frase.length > 0 ? (
               <>
                 {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
                     Toccarne una porta alla domanda che la cambia. */}
@@ -662,7 +676,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </p>
             )}
             {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
-            {correggi && righe.length > 0 && (
+            {(correggi || !CAPITO_A) && righe.length > 0 && (
               <ul className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righe.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
@@ -705,10 +719,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 data-testid="benvenuto-fine"
                 onClick={() => finish(null)}
                 disabled={!!submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-4 font-display text-[17px] font-semibold text-white shadow-float transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                className={CAPITO_A
+                  ? "flex w-full items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-4 font-display text-[17px] font-semibold text-white shadow-float transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                  : "w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"}
               >
                 {/* Mockup A: "Apri la mia mappa →" (la mappa parte già sui posti per te). */}
-                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : <>Apri la mia mappa <ArrowRight size={18} aria-hidden /></>}
+                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : CAPITO_A ? <>Apri la mia mappa <ArrowRight size={18} aria-hidden /></> : "✨ Mostrami i posti per me"}
               </button>
               {/* I posti già salvati altrove (Google Maps, il link di un reel): dopo la sintesi, non al posto suo. */}
               <button
