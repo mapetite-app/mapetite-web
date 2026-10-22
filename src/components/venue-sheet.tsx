@@ -501,6 +501,9 @@ export default function VenueSheet({
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
     const firstReview = selectedReviews?.find((r) => r.text?.trim())?.text.trim() ?? null;
     const googleLine = venue.editorialSummary?.trim() || (firstReview ? `“${firstReview}”` : null);
+    // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
+    const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
+      && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -775,14 +778,15 @@ export default function VenueSheet({
           </div>
         )}
 
-        {/* "Orari, contatti, recensioni ›": tutto il resto, un tocco più in là. */}
+        {/* "Orari, contatti, recensioni ›": tutto il resto, un tocco più in là. Subito sotto il verdetto
+            il filetto c'è già (quello sotto il verdetto): niente secondo filetto con il vuoto in mezzo (collaudo 22/10). */}
         <button
           type="button"
           data-testid="scheda-altro-info"
           aria-expanded={detailsOpen}
           aria-controls={`scheda-dettagli-${venue.id}`}
           onClick={openDetails}
-          className="mx-[22px] mt-4 flex min-h-12 items-center justify-between border-t border-[#e3ddd2] pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058]"
+          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e3ddd2]"}`}
         >
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
@@ -872,9 +876,8 @@ export default function VenueSheet({
               )}
               {communitySlot && (
                 <div className="mx-[22px] mt-4" data-testid="community-scheda">
-                  <h3 className="flex items-baseline justify-between font-display text-base font-semibold text-brand">
+                  <h3 className="font-display text-base font-semibold text-brand">
                     Dalla community Mapetite
-                    <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
                   </h3>
                   <div className="mt-2">{communitySlot}</div>
                 </div>
