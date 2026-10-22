@@ -31,7 +31,7 @@ Da sistemare (minori, dal collaudo della mappa del gusto): "Rifalla" somma le cu
 3. **Notte 22→23:** ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga), con ricerche vere prima/dopo su TEST-RICERCHE.
 4. **Venerdì notte, sabato 24 e domenica 25:** le 4 schermate rifatte sui mockup scelti; collaudo ≥ 8,5; giro da utente vero in produzione; copione demo di 3 minuti.
 In pausa fino al 26/10: proposta 7 (ranking "Aperto da poco"), proposte 6, 9, 12, tutto il lato ristoratori.
-**In corso adesso:** nessuna sessione.
+**In corso adesso:** sessione 22/10 05:06 (branch `claude/great-cannon-k3v59k`): ✓ requisiti ricollaudati e riaccesi se passano; scheda A ricollaudata (revert del rinvio).
 **Fatto nella notte del 22/10 (00:07–, branch `claude/great-cannon-46wh07`):**
 - **(B) Ricerca con l'AI che si vede:** in produzione la pillola "✨ 12 posti · rooftop · romantico" (mockup A). **I "✓ terrazza" sulle card sono SPENTI** (`REQUISITI_ACCESI = false` in `src/lib/haiku-synthesis.ts`): bocciati 2 volte (prima "romantico" senza prove, poi prove sbagliate su parole simili come "roma"/"romantica", città e lamentele). Corretti dopo la seconda bocciatura e pronti: la prossima sessione li fa ricollaudare sui dati in `scripts/fixtures` e li riaccende se passano. Costo da accesi: +0,6 s sui verdetti, zero Google.
 - **(C) Salvati sul mockup C in stile A:** "I tuoi posti", filtri Tutti/Da provare/Ci sono stato, raccolte a cerchi, lista per vicinanza con stato, reel e verdetto. Approvata (9).
