@@ -632,7 +632,7 @@ ESEMPI (input → output atteso):
       perTe: s?.perTe || null,
       // "✓ terrazza": la frase di una recensione da 4-5 stelle, cercata qui sulle 5 recensioni intere
       // (il secondo tempo ne riceve solo 3 tagliate e senza voto). Subito, senza aspettare l'AI.
-      requisiti: REQUISITI_ACCESI && source === "world" ? requisitiProvati(filtri.parole_chiave, query, reviewItems ?? reviewTexts?.map((text) => ({ text })), p.name) : null,
+      requisiti: REQUISITI_ACCESI && source === "world" ? requisitiProvati(filtri.parole_chiave, query, reviewItems, p.name, filtri.zona ?? null) : null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
