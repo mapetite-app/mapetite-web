@@ -18,6 +18,7 @@ import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { signCatalogEntry } from "@/lib/catalog-sig";
+import { REQUISITI_ACCESI, requisitiProvati } from "@/lib/prova-requisito";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -629,7 +630,9 @@ ESEMPI (input → output atteso):
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
       perTe: s?.perTe || null,
-      requisiti: s?.requisiti?.length ? s.requisiti : null,
+      // "✓ terrazza": la frase di una recensione da 4-5 stelle, cercata qui sulle 5 recensioni intere
+      // (il secondo tempo ne riceve solo 3 tagliate e senza voto). Subito, senza aspettare l'AI.
+      requisiti: REQUISITI_ACCESI && source === "world" ? requisitiProvati(filtri.parole_chiave, query, reviewItems ?? reviewTexts?.map((text) => ({ text })), p.name) : null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),

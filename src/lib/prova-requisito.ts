@@ -71,3 +71,26 @@ export function requisitoDellaRichiesta(requisito: string, richiesta: string): s
   const tutte = parole.every((w) => VUOTE.has(w) || w === "non" || new RegExp(`\\b${radice(normalizza(w)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[a-z]{0,3}\\b`).test(q));
   return tutte ? parole.join(" ") : null;
 }
+
+// Requisito confermato e la frase di recensione Google che lo prova (copiata, mai riscritta).
+export type Requisito = { r: string; prova: string };
+
+// "✓ terrazza" sulle card (chiave B). Spento il 22/10 notte dopo due bocciature; riacceso il 22/10
+// mattina: la prova ora si cerca nel primo tempo della ricerca, sulle 5 recensioni intere con il voto
+// (prima: 3 recensioni tagliate a 300 caratteri e senza voto, quindi anche quelle da 1 stella), e per
+// i requisiti capiti dalla ricerca invece che per quelli scelti dall'AI. Niente AI: zero costi, subito.
+export const REQUISITI_ACCESI = true;
+
+// Requisiti della ricerca ("romantico", "terrazza") confermati da una frase delle recensioni di
+// QUESTO locale. Massimo 3; un requisito senza frase che lo provi non compare.
+export function requisitiProvati(paroleChiave: string[], richiesta: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): Requisito[] {
+  const out: Requisito[] = [];
+  for (const k of paroleChiave) {
+    const r = requisitoDellaRichiesta(k, richiesta);
+    if (!r || out.some((x) => x.r === r)) continue;
+    const prova = provaRequisito(r, recensioni, nomeLocale);
+    if (prova) out.push({ r, prova });
+    if (out.length >= 3) break;
+  }
+  return out;
+}

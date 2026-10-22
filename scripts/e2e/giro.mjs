@@ -23,7 +23,8 @@ const mk = (id, name, lat, lng, extra = {}) => ({
   firma: `firma-${id}`, ...extra,
 });
 const PLACES = [
-  mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R." }),
+  // "✓ rooftop": dal 22/10 mattina arriva con il primo tempo (la prova si cerca sulle recensioni intere), non con i verdetti.
+  mk("P1", "Terrazza Uno", 41.9, 12.49, { photoAuthor: "Maria R.", requisiti: [{ r: "rooftop", prova: "Rooftop bellissimo sopra i tetti." }, { r: "romantico", prova: "Serata molto romantica." }] }),
   mk("P2", "Pub Fuori Tema", 41.901, 12.492),
   mk("P3", "Rooftop Tre", 41.902, 12.494, { openNow: false, rating: 4.7, userRatingCount: 180, category: "cocktail_bar" }),
 ];
@@ -39,7 +40,7 @@ const SEARCH_FAST = {
 };
 const SYNTH = {
   dettagli: {
-    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza.", requisiti: [{ r: "rooftop", prova: "Rooftop bellissimo sopra i tetti." }, { r: "romantico", prova: "Serata molto romantica." }] },
+    P1: { synthesis: "Terrazza con vista.", tags: ["vivace"], verdict: "Vista vera sui tetti di Roma.", goFor: ["tramonto"], dontExpect: [], matchReason: "Ha una vera terrazza." },
     P3: { synthesis: "Rooftop curato.", tags: [], verdict: "Cocktail curati sul tetto.", goFor: ["cocktail"], dontExpect: [], matchReason: "È su un rooftop." },
   },
   esclusi: ["P2"],
