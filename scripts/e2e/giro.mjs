@@ -3409,7 +3409,9 @@ else {
     await qp.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
     await qp.getByRole("button", { name: "Locale successivo" }).click();
     await qp.waitForTimeout(400);
-    ok(await qp.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTop === 0) && await qp.locator("h2", { hasText: nomi[1] }).isVisible(), "360px scheda: '›' apre il locale successivo dall'inizio (nome visibile)");
+    ok(await qp.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTop === 0) && await qp.locator("h2", { hasText: "Panfuwa" }).isVisible(), "360px scheda: '›' apre il locale successivo dall'inizio (nome visibile)");
+    // 23/10: nella scheda il nome Google con la pubblicità si accorcia alla parte prima di " | " o " - ".
+    ok(((await qp.locator("h2", { hasText: "Panfuwa" }).first().textContent()) ?? "").trim() === "Panfuwa", "360px scheda: 'Panfuwa | Brunch & Café - Milano Isola' diventa 'Panfuwa' nella scheda");
     await qp.keyboard.press("Escape");
     await qp.unroute("**/api/search"); await qp.unroute("**/api/search/synthesis"); await qp.unroute("**/api/places/add"); await qp.unroute("**/rest/v1/saved_places**");
   }
