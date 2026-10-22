@@ -54,8 +54,11 @@ for (const [n, query, [lat, lng]] of CASI) {
   console.log("   capito:", JSON.stringify(fast.filtri_usati), "| da parte:", JSON.stringify(fast.da_parte ?? {}));
   for (const p of risultati.slice(0, 7)) {
     const d = dettagli[p.id] ?? {};
+    // "✓" candidati delle regole (primo tempo) che l'AI ha scartato: per il collaudo della doppia chiave.
+    const cand = (fast.sintesi_pendente?.places ?? []).find((x) => x.id === p.id)?.prove ?? [];
+    const scartati = cand.filter((c) => !(d.requisiti ?? []).some((x) => x.r === c.r));
     console.log(`- [${livelli[p.id] ?? "?"}] ${p.name} | ${p.category} | ${p.rating} (${p.userRatingCount}) | ${(p.address ?? "").slice(0, 35)}`);
-    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}${d.requisiti?.length ? `\n     ✓ ${d.requisiti.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}`);
+    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}${d.requisiti?.length ? `\n     ✓ ${d.requisiti.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}${scartati.length ? `\n     ✗ scartati dall'AI: ${scartati.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}`);
   }
   if (tolti.length) console.log("   esclusi:", tolti.map((p) => p.name).join(", "));
 }

@@ -18,7 +18,7 @@ import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { signCatalogEntry } from "@/lib/catalog-sig";
-import { REQUISITI_ACCESI, requisitiProvati, type Requisito } from "@/lib/prova-requisito";
+import { REQUISITI_ACCESI, requisitiProvati, type Candidato } from "@/lib/prova-requisito";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -402,7 +402,7 @@ export async function POST(request: Request) {
     // "✓ terrazza" candidati: la frase di una recensione da 4-5 stelle che nomina il requisito
     // (regole in src/lib/prova-requisito.ts). Non si mostrano da soli: l'AI dei verdetti conferma
     // quali dicono davvero di sì (terza bocciatura del 22/10: le sole regole non reggono l'ironia).
-    const prove: Record<string, Requisito[]> = {};
+    const prove: Record<string, Candidato[]> = {};
     if (REQUISITI_ACCESI) {
       for (const p of risultati) {
         const c = requisitiProvati(filtri.parole_chiave, query, p.reviewItems, p.name, filtri.zona ?? null);

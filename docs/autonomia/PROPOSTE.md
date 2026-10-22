@@ -16,6 +16,22 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 23/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
+
+### 22. "✓ terrazza · 3 recensioni su 5": quanto è sicura la prova
+- **Problema:** un ✓ con una sola frase vale come uno detto da tutti. Chi sceglie per un anniversario vuole sapere se la terrazza c'è sempre o l'ha vista uno solo.
+- **Cosa fa:** nella scheda, sotto la frase, "detto in 3 recensioni su 5" (conteggio delle frasi che passano la doppia chiave).
+- **Da chi nasce:** Google Ask Maps e OpenTable rispondono senza dire da quante fonti; noi lo contiamo.
+- **Valore utente:** fiducia, in un colpo d'occhio. **B2B:** il ristoratore vede quali caratteristiche i clienti confermano di più (dato per la pagina verificata, dopo il 26/10).
+- **Sforzo:** S. **Costo:** zero Google; l'AI riceve fino a 3 frasi per requisito invece di 1 (~+5% di token nella chiamata del perché).
+
+### 23. Dal reel alla prova: "Il reel dice terrazza: confermato"
+- **Problema:** chi salva da un reel si fida del creator; la didascalia promette ("vista pazzesca") ma nessuno controlla (chiave A + B).
+- **Cosa fa:** nel "✓ Salvato" dal reel, se la didascalia nomina un requisito (terrazza, vista, romantico) e le recensioni lo confermano con la doppia chiave, una riga "Il reel dice vista: confermato da una recensione". Se non lo conferma nessuno, niente (mai "falso").
+- **Da chi nasce:** Corner e Mapstr salvano il pin del reel senza giudizio; noi lo verifichiamo.
+- **Valore utente:** sa subito se il reel era vero. **B2B:** il locale vede quali promesse dei creator i clienti confermano.
+- **Sforzo:** S/M. **Costo:** zero Google se la ricerca che riconosce il locale porta già le recensioni (da verificare nel codice prima di costruirla; altrimenti 1 dettaglio Google in più a salvataggio, da segnalare), una frase in più nella chiamata AI.
+
 ## 22/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta, senza ricerche nuove: i documenti del giorno li ha già aggiornati la sessione delle 00:07)
 
 ### 20. "Solo quelli con la prova": un tocco sulla pillola tiene solo i posti con ✓ su tutti i requisiti

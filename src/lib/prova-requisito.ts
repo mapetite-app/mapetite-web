@@ -29,6 +29,12 @@ const VISTA_VERBO = /\b(l'?ho|ho|hai|abbiamo|avevo|stata|stato|l')\s*vist/;
 // Recensioni con il voto (Google): la prova si cerca prima nelle 5 e 4 stelle, mai in quelle da 1-2
 // (collaudo del 22/10: "✓ rooftop" mostrava la frase di una recensione da 1 stella).
 export function provaRequisito(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): string | null {
+  return provaConContesto(requisito, recensioni, nomeLocale)?.prova ?? null;
+}
+
+// Come provaRequisito, con la recensione intera da cui viene la frase (per la conferma dell'AI:
+// una smentita nella frase dopo, "Peccato che l'abbiano chiusa", deve poterla vedere).
+export function provaConContesto(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): { prova: string; contesto: string } | null {
   const parole = normalizza(requisito).split(/\s+/).filter((w) => w.length >= 3 && !VUOTE.has(w));
   // "non turistico": una frase che contiene "turistico" direbbe spesso il contrario.
   if (parole.length === 0 || parole[0] === "non") return null;
@@ -52,11 +58,14 @@ export function provaRequisito(requisito: string, recensioni: { text: string; ra
       if (DUBBIO.test(n) || VISTA_VERBO.test(n) || n.includes("?") || !POSITIVO.test(n)) continue;
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
       if (pulita.length < 25) continue;
-      if (pulita.length <= MAX) return pulita;
+      // La recensione attorno alla frase (prima e soprattutto dopo: lì stanno i "peccato che…").
+      const at0 = Math.max(0, r.text.indexOf(f.trim()) - 200);
+      const contesto = r.text.slice(at0, at0 + 700);
+      if (pulita.length <= MAX) return { prova: pulita, contesto };
       // Frase lunga: si taglia attorno alla parola trovata, con i puntini.
       const at = Math.max(0, normalizza(pulita).search(parola(radici[0])) - 50);
       const pezzo = pulita.slice(at, at + MAX).replace(at > 0 ? /^\S*\s/ : /^$/, "").replace(/\s\S*$/, "");
-      return `${at > 0 ? "…" : ""}${pezzo}…`;
+      return { prova: `${at > 0 ? "…" : ""}${pezzo}…`, contesto };
     }
   }
   return null;
@@ -83,6 +92,8 @@ export function requisitoDellaRichiesta(requisito: string, richiesta: string, zo
 
 // Requisito confermato e la frase di recensione Google che lo prova (copiata, mai riscritta).
 export type Requisito = { r: string; prova: string };
+// Candidato per la conferma dell'AI: anche la recensione intera (mai mandata al telefono).
+export type Candidato = Requisito & { contesto: string };
 
 // "✓ terrazza" sulle card (chiave B). Spento il 22/10 notte dopo due bocciature; riacceso il 22/10
 // mattina (poi di nuovo spento: terza bocciatura sui casi avversari). Dal 23/10 doppia chiave: queste
@@ -93,13 +104,13 @@ export const REQUISITI_ACCESI = true;
 
 // Requisiti della ricerca ("romantico", "terrazza") confermati da una frase delle recensioni di
 // QUESTO locale. Massimo 3; un requisito senza frase che lo provi non compare.
-export function requisitiProvati(paroleChiave: string[], richiesta: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = "", zona: string | null = null): Requisito[] {
-  const out: Requisito[] = [];
+export function requisitiProvati(paroleChiave: string[], richiesta: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = "", zona: string | null = null): Candidato[] {
+  const out: Candidato[] = [];
   for (const k of paroleChiave) {
     const r = requisitoDellaRichiesta(k, richiesta, zona);
     if (!r || out.some((x) => x.r === r)) continue;
-    const prova = provaRequisito(r, recensioni, nomeLocale);
-    if (prova) out.push({ r, prova });
+    const p = provaConContesto(r, recensioni, nomeLocale);
+    if (p) out.push({ r, ...p });
     if (out.length >= 3) break;
   }
   return out;

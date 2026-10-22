@@ -87,6 +87,11 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Beli:** prenotazioni Resy dentro l'app ("Reserve Now"), punteggio previsto per te ("Rec Score") e degli amici ("Friend Score") ([Resy](https://blog.resy.com/?p=93063), [Food Network](https://www.foodnetwork.com/fn-dish/news/beli-app-trend)). Data del lancio Resy: dato non trovato. **Da prendere:** il punteggio "per te" come numero. **Dove vinciamo:** Beli chiede di confrontare ogni posto con gli altri; noi lo deduciamo dai gesti (salvati, 👍/👎 del primo accesso). Ultimo controllo: 22/10/2026.
 - **"I'm Hungry" (iPhone):** descrivi voglia e atmosfera, riassume cosa dicono le recensioni rispetto alla tua frase; una ricerca gratis al giorno ([App Store](https://apps.apple.com/us/app/id6754869741)). Numeri: dato non trovato. Ultimo controllo: 22/10/2026.
 
+### Controllo del 23/10 notte (CEO che chiude, regola dello sprint: solo chiavi di volta)
+- **Corner:** nessuna versione nuova dopo la 5.16.0 del 26/09/2026 ([appshunter](https://appshunter.io/ios/app/1668282277)). Ultimo controllo: 23/10/2026.
+- **Mapstr:** nessuna novità di ottobre trovata. Il sito presenta una mappa unica con "raccomandazioni personalizzate dalla nostra IA" e le ultime aperture ([mapstr.com](https://mapstr.com/mapstore/fr/article/article_all-in-map_fr_1), pagina senza data). **Dove vinciamo:** non dice *perché* un posto è consigliato né da cosa; noi "✓ terrazza" con la frase della recensione. Ultimo controllo: 23/10/2026.
+- **Chi chiede consigli all'AI:** nell'indagine BrightLocal 2026 (1.002 adulti USA) il 45% ha usato ChatGPT o altre AI per consigli su attività locali, contro il 6% dell'anno prima; ChatGPT 31%, AI Mode di Google 23% ([BrightLocal](https://www.brightlocal.com/research/local-consumer-review-survey/)). Quanto si fidano: le fonti secondarie danno numeri diversi (42%, 63%, 64%), dato non confermato sulla fonte primaria. **Per noi:** la ricerca con l'AI è già un'abitudine; vince chi mostra la prova. Ultimo controllo: 23/10/2026.
+
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager

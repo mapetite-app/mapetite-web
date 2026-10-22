@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import type { PlaceResult } from "@/lib/google-places";
 import { REVIEW_CHAR_LIMIT, REVIEWS_PER_PLACE_FOR_SYNTHESIS, SYNTHESIS_LIMIT } from "@/lib/haiku-synthesis";
-import type { Requisito } from "@/lib/prova-requisito";
+import type { Candidato } from "@/lib/prova-requisito";
 
 // Ricerca in due tempi: la prima risposta porta solo i dati Google; la seconda
 // chiamata (verdetti) riceve dal client gli stessi dati. Per evitare che il client
@@ -14,10 +14,10 @@ export type SynthesisInput = Pick<
 > & {
   // "✓ terrazza" candidati (frase copiata da una recensione da 4-5 stelle): l'AI del secondo tempo
   // dice quali affermano davvero il requisito. Firmati con il resto: il client non può aggiungerne.
-  prove?: Requisito[];
+  prove?: Candidato[];
 };
 
-export function buildSynthesisInput(places: PlaceResult[], prove: Record<string, Requisito[]> = {}): SynthesisInput[] {
+export function buildSynthesisInput(places: PlaceResult[], prove: Record<string, Candidato[]> = {}): SynthesisInput[] {
   return places.slice(0, SYNTHESIS_LIMIT).map((p) => ({
     id: p.id,
     name: p.name,

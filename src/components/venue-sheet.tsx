@@ -550,7 +550,8 @@ export default function VenueSheet({
                       <UsersRound size={18} className="shrink-0 text-brand" aria-hidden /> Proponi in una lista di gruppo
                     </Link>
                   )}
-                  {canEdit && (
+                  {/* "Modifica tag e nota" qui solo se la scheda non mostra già "Modifica" sotto "Le tue note" (niente doppioni, collaudo del 22/10). */}
+                  {canEdit && !showPersonalBlock && (
                     <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); onEdit(); }} className={menuItem}>
                       <Pencil size={18} className="shrink-0 text-brand" aria-hidden /> Modifica tag e nota
                     </button>
@@ -718,8 +719,10 @@ export default function VenueSheet({
             </section>
           ) : googleLine ? (
             <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+              {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
+                  in corsivo grande si confondeva con il verdetto Mapetite). */}
               <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Da Google</p>
-              <p className={`${SERIF} mt-2 line-clamp-4 text-[20px] italic leading-[1.24] text-[#141414]`}>{googleLine}</p>
+              <p className="mt-1.5 line-clamp-3 font-sans text-[15px] leading-[1.45] text-text-muted">{googleLine}</p>
             </section>
           ) : null}
 
