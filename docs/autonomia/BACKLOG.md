@@ -31,7 +31,7 @@ Da sistemare (minori, dal collaudo della mappa del gusto): "Rifalla" somma le cu
 3. **Notte 22→23:** ricerca con l'AI che si vede (vincoli, velocità, confronto in una riga), con ricerche vere prima/dopo su TEST-RICERCHE.
 4. **Venerdì notte, sabato 24 e domenica 25:** le 4 schermate rifatte sui mockup scelti; collaudo ≥ 8,5; giro da utente vero in produzione; copione demo di 3 minuti.
 In pausa fino al 26/10: proposta 7 (ranking "Aperto da poco"), proposte 6, 9, 12, tutto il lato ristoratori.
-**In corso adesso:** nessuna sessione (venerdì 23/10, dalle 00:06, branch `claude/great-cannon-yithw1`, PR #94: finita alle 02:20).
+**In corso adesso:** venerdì 23/10 dalle 05:06, branch `claude/great-cannon-xufaad` (riparte dalla PR #94): scheda A terzo collaudo e merge se ≥ 8,5; primo accesso corretto e ricollaudato; CEO che chiude.
 **Fatto nella notte del 23/10 (00:06–, branch `claude/great-cannon-yithw1`, PR #94, contiene la #93). NON unita: tutte le voci visibili bocciate due volte dal collaudo.**
 - **Credito Anthropic finito (01:00):** in produzione niente "perché" e niente verdetti per i locali nuovi (prova: 0 su 12). Avvisato Lorenzo, voce 00 in `DA-FARE-LORENZO.md`.
 - **✓ requisiti a doppia chiave, SPENTI** (`REQUISITI_PROVA=1` solo in sviluppo). Regole + chiamata AI dedicata (temperatura 0, recensione attorno alla frase, risposta scomposta, due giri diversi). Collaudo 1: 5 falsi su 65 → rifatta; collaudo 2 (103 frasi nuove): 0 su 77 in ordine, 1 su 77 mescolati («Prenotate il tavolo panoramico…») → corretta (consigli esclusi, indici ricontrollati, scadenza 7 s). Strumento `scripts/prova-requisiti.mjs` (stessa funzione della produzione, `SEME=n`).
