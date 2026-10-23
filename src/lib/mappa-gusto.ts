@@ -149,7 +149,7 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
-  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}${altri(extra.occasions.length, 3)}` });
+  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}${altri(extra.occasions.length, 3, ["motivo", "motivi"])}` });
   if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
   // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
   // Vegano e vegetariano insieme: basta "vegano" (come nella frase).
