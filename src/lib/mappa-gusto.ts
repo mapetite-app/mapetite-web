@@ -75,14 +75,22 @@ export function pulisciMappa(raw: unknown, zoneNote: (z: string) => boolean): Ma
 
 export const dieteValide = (raw: unknown): string[] => soloNoti(raw, (x) => DIETE.some((d) => d.id === x), DIETE.length);
 
-/** Famosi o chicche, dedotto dai 👍: chi ama più i posti poco noti preferisce le chicche. */
-export function scopertaDedotta(su: string[]): Scoperta | null {
+/** Famosi o chicche, dedotto dai 👍: si confronta quanto piacciono i tipi poco noti e quelli famosi
+ *  tra quelli visti, non quanti sono (con tutti 👍 venivano "le chicche" solo perché ce ne sono di più:
+ *  collaudo 23/10). Senza `visti` vale l'elenco intero. Differenza piccola → "un po' tutto". */
+export function scopertaDedotta(su: string[], visti?: string[]): Scoperta | null {
   const tipi = su.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (tipi.length === 0) return null;
   const famosi = tipi.filter((t) => t.famoso).length;
   const chicche = tipi.length - famosi;
-  if (chicche >= famosi + 1) return "chicche";
-  if (famosi > chicche) return "famosi";
+  const visto = visti ? visti.map(tipoDa).filter((t): t is TipoPosto => t != null) : TIPI;
+  const famVisti = visto.filter((t) => t.famoso).length;
+  const chiVisti = visto.length - famVisti;
+  // Visto un solo genere: vince quello.
+  if (famVisti === 0 || chiVisti === 0) return chicche > famosi ? "chicche" : famosi > chicche ? "famosi" : "misto";
+  const d = chicche / chiVisti - famosi / famVisti;
+  if (d >= 0.25) return "chicche";
+  if (d <= -0.25) return "famosi";
   return "misto";
 }
 
@@ -193,7 +201,7 @@ function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["u
 
 // Al massimo `max` frasi (collaudo del 23/10: con i profili ricchi "Correggi" finiva sotto i tasti).
 // Si tengono le più importanti (gusti, dove, diete), nell'ordine di lettura; il resto sta dietro "Correggi".
-const PRIORITA: Record<string, number> = { su: 0, dove: 1, diete: 2, giu: 3, occasioni: 4 };
+const PRIORITA: Record<string, number> = { su: 0, dove: 1, diete: 2, stile: 3, giu: 4, occasioni: 5 };
 export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }, max = Infinity): PezzoFrase[][] {
   const tutte: { f: PezzoFrase[]; p: string }[] = [];
   const frasi = { push: (f: PezzoFrase[], p = "dove") => tutte.push({ f, p }) };
@@ -215,18 +223,16 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
   if (extra.priceRange && SPESA[extra.priceRange]) parti.push([{ t: SPESA[extra.priceRange], k: "spesa" }]);
   if (m.scoperta === "chicche") parti.push([{ t: "giri alla larga dai posti turistici", k: "scoperta" }]);
   else if (m.scoperta === "famosi") parti.push([{ t: "non ti spaventano i posti famosi", k: "scoperta" }]);
-  // Più zone ("a Monti e al Pigneto"): staccate dal resto con il punto e virgola, se no le "e" si accavallano
-  // ("in centro e ai Parioli e non ti…"). Una frase sola: le frasi in vista sono al massimo 3 (collaudo 23/10).
+  // Più zone ("a Monti e al Pigneto") e altro da dire: due frasi, se no le "e" si accavallano ("in centro
+  // e ai Parioli e non ti…"). Prima c'era il punto e virgola, che sembrava scritto da una macchina (collaudo 23/10).
   const staccaZone = m.zone.length > 1 && parti.length > 1;
-  if (parti.length) {
-    const resto = staccaZone ? parti.slice(1) : parti;
-    const f = [
-      ...(staccaZone ? [...parti[0], { t: "; " }] : []),
-      ...resto.flatMap((p, i) => [...(i === 0 ? [] : [{ t: i === resto.length - 1 ? " e " : ", " }]), ...p]),
-    ];
+  const unisci = (ps: PezzoFrase[][], p: string) => {
+    const f = ps.flatMap((x, i) => [...(i === 0 ? [] : [{ t: i === ps.length - 1 ? " e " : ", " }]), ...x]);
     f[0] = { ...f[0], t: maiuscola(f[0].t) };
-    frasi.push([...f, { t: "." }]);
-  }
+    frasi.push([...f, { t: "." }], p);
+  };
+  if (staccaZone) { unisci([parti[0]], "dove"); unisci(parti.slice(1), "stile"); }
+  else if (parti.length) unisci(parti, "dove");
   const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
   if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }], "occasioni");
   const giu = m.giu.filter((id) => PLURALE[id]);
