@@ -14,7 +14,7 @@ Bilancio della settimana, scritto dalla prima sessione del sabato (regola del te
 - **Pannello `/admin/numeri`** con "Google oggi" e "AI: ok": i problemi si vedono senza aprire i log.
 
 ### Cosa non ha funzionato
-1. **Da mercoledì 22 alle 01:50 nessun merge.** Tre sessioni di fila: tutto bocciato due volte, con voti tra 7,8 e 8,4. Ogni revisore nuovo trova difetti nuovi e diversi, quindi una schermata grande non arriva mai a 8,5. Per Lorenzo la produzione è ferma da tre giorni, a due giorni dalla scadenza.
+1. **Da giovedì 22 alle 01:50 nessun merge.** Tre sessioni di fila: tutto bocciato due volte, con voti tra 7,8 e 8,4. Ogni revisore nuovo trova difetti nuovi e diversi, quindi una schermata grande non arriva mai a 8,5. Per Lorenzo la produzione è ferma da tre giorni, a due giorni dalla scadenza.
 2. **Il credito Anthropic è a zero da giovedì 22 alle 08:07.** Il verdetto Mapetite, cioè il differenziatore, non compare sui locali nuovi da 40 ore. Lo si è visto solo 17 ore dopo, perché non c'era un avviso: ora c'è, nel pannello.
 3. **Il lavoro si ripete.** Quando il container si riavvia, la cartella delle risposte salvate (`scripts/fixtures`) sparisce. Stanotte sono servite di nuovo 3 ricerche Google vere per ricrearla.
 4. **gstack non si installa** (permessi dell'ambiente). I ruoli si applicano a mano.
