@@ -1047,7 +1047,7 @@ await apriDettagli(page);
 ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "true" && await page.getByTestId("scheda-tab-info").getAttribute("aria-selected") === "true", "scheda: 'Orari, contatti, recensioni ›' apre il resto, su Info");
 await page.getByTestId("scheda-tab-info").click();
 ok(await page.getByTestId("scheda-info").locator("a[href^='tel:']").isVisible() && await page.getByTestId("scheda-info").locator("a[aria-label^='Sito di']").isVisible(), "scheda B: Chiama e Sito nella sezione Info");
-ok(await page.getByText("4,5 su Google · 812 recensioni").isVisible() && (await page.getByTestId("scheda-info").getByText(/^Roma · \d+ m$/).count()) === 0, "scheda B, Info: voto con numero di recensioni, niente doppione 'Roma · distanza' (sta sotto il nome)");
+ok(!((await page.getByTestId("scheda-info").textContent()) ?? "").includes("su Google ·") && (await page.getByTestId("scheda-info").getByText(/^Roma · \d+ m$/).count()) === 0, "scheda B, Info: niente terzo voto Google né doppione 'Roma · distanza' (stanno sotto il nome e in Recensioni)");
 await page.getByTestId("scheda-tab-panoramica").click();
 ok((await page.getByLabel(/^Condividi Terrazza/).count()) === 1, "scheda B: un solo pulsante Condividi (tondo, sulla foto)");
 await shot("15-scheda-b");

@@ -583,7 +583,8 @@ export default function VenueSheet({
     );
     // Riga di categoria in maiuscoletto: tipo · prezzo · città (solo dati veri).
     const kindLine = [categoryLabel(category), priceLabel, cityFromAddress(address)].filter(Boolean) as string[];
-    const distance = origin ? distanceLabel(origin, { lat, lng }) : null;
+    // Distanza solo dalla posizione vera: dal centro della mappa "250 m" si leggeva come "da te" (collaudo 23/10).
+    const distance = userPos ? distanceLabel(userPos, { lat, lng }) : null;
     // Nomi lunghi su due righe al massimo, senza spingere il verdetto sotto la barra.
     // I nomi Google con la pubblicità dentro ("Trattoria Dal Cordaro (Roma) - Vino e Cucina romana dal 1922"):
     // in vista solo la parte prima di " - ", " | " o "(" (il nome intero resta in Info e nel titolo).
@@ -612,8 +613,9 @@ export default function VenueSheet({
           lng={lng}
           directionsUrl={directionsUrl}
           onDirections={() => signal("percorso", "carosello")}
-          // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10).
-          heightClass="h-48 min-[380px]:h-56 [@media(max-height:760px)]:h-40"
+          // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10);
+          // a 375×667 (iPhone SE) ancora più bassa: con la pillola e un verdetto su 3 righe finiva sotto (collaudo 23/10).
+          heightClass="h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"
           fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
           overlay={
             <>
@@ -917,6 +919,13 @@ export default function VenueSheet({
           <div role="tabpanel" id="scheda-pannello-info" aria-labelledby="scheda-tab-info" hidden={activeTab !== "info"} data-testid="pannello-info">
             <div className="mx-[22px] mt-2" data-testid="scheda-info">
               <div className="flex flex-col divide-y divide-border">
+                {/* Il nome intero di Google, quando sotto la foto c'è quello accorciato. */}
+                {nomeBreve !== name && (
+                  <p data-testid="nome-intero" className="flex min-h-11 items-center gap-3 py-2 text-sm font-sans text-text">
+                    <Store size={18} className="shrink-0 text-brand" aria-hidden />
+                    <span className="min-w-0 flex-1">{name}</span>
+                  </p>
+                )}
                 {oggi && (
                   <p data-testid="orari-oggi" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text">
                     <Clock size={18} className="shrink-0 text-brand" aria-hidden />
@@ -931,12 +940,7 @@ export default function VenueSheet({
                   </button>
                 )}
                 {/* Città e distanza stanno già sotto il nome: qui niente doppione (collaudo 23/10). */}
-                {userRatingCount != null && rating != null && (
-                  <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
-                    <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
-                    {`${rating.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} su Google · ${userRatingCount.toLocaleString("it-IT")} recensioni`}
-                  </p>
-                )}
+                {/* Il voto Google sta già sotto il nome e in Recensioni ("A confronto"): qui niente terza volta (collaudo 23/10). */}
                 {telHref && !inBar("chiama") && (
                   <a href={telHref} onClick={() => signal("chiama")} aria-label={`Chiama ${name}`} className="flex min-h-12 items-center gap-3 text-sm font-display font-semibold text-brand">
                     <Phone size={18} className="shrink-0" aria-hidden /> Chiama

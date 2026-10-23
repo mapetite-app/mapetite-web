@@ -112,7 +112,8 @@ export default function SchedaCarosello({
       {/* Velo scuro in alto (mockup A): i tasti tondi restano leggibili anche su foto chiare. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-card bg-gradient-to-b from-black/30 to-transparent" />
       {/* "1 / 2" in basso a destra (mockup A): un tocco porta alla pagina dopo (l'ultima torna alla prima). */}
-      {slides > 1 && (
+      {/* Senza foto (emoji al posto della foto) il contatore non dice niente: la mappa resta a uno scorrimento (collaudo 23/10). */}
+      {slides > 1 && photoRefs.length > 0 && (
         <div className="absolute bottom-1 right-2" data-testid="carosello-puntini">
           <button
             type="button"
