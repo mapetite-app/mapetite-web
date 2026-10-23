@@ -241,8 +241,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Per i lettori di schermo: l'esito del voto e la card dopo (aria-live, collaudo 23/10).
   const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
-    setSu((p) => (voto === "su" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
-    setGiu((p) => (voto === "giu" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
+    // Rivotando lo stesso tipo resta al suo posto (in testa alla frase), non scivola in fondo dietro "e altri N".
+    setSu((p) => (voto === "su" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
+    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
     const dopo = [...visti.filter((x) => x !== id), id];
     setVisti(dopo);
     // Finiti i dieci: si passa da soli alla schermata dopo (o si torna alla frase, se si correggeva da lì).
