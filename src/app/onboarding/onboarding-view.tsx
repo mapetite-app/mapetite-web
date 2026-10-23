@@ -235,7 +235,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
-  const dedotta = scopertaDedotta(su, visti);
+  // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
+  const dedotta = scopertaDedotta(su, [...su, ...giu]);
   const scopertaOra = scoperta ?? dedotta;
   const scopertaVista = maxVisto >= PASSO_SCOPERTA;
   // Il tipo di posto da valutare adesso: quello riaperto dalla frase, se c'è; se no il primo non ancora visto.
@@ -370,9 +371,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
             {step + 1} di {TOTAL}
           </span>
-          {/* Solo nella prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
-              Dopo, ogni domanda ha il suo "Salta" in basso: niente doppioni. */}
-          {step === 0 && (
+          {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
+              dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
+              in un tocco (collaudo del 24/10). Dopo, ogni domanda ha il suo "Salta" in basso. */}
+          {step === 0 && !tornaFrase && maxVisto === 0 && (
             <form action={skipOnboarding} className="-mr-2 shrink-0">
               {next && <input type="hidden" name="next" value={next} />}
               <button type="submit" data-testid="onboarding-salta" onClick={clearDraft} className="min-h-11 px-2 text-[15px] font-display font-semibold text-text-muted">
@@ -396,7 +398,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
         )}
         {step === PASSO_CAPITO && <div className="mb-4 min-[380px]:mb-5" />}
         {/* Non sulla card dei tipi né sulla frase finale: toglieva spazio e copriva i tasti a 360px (collaudo 23/10). */}
-        {ripreso && step !== PASSO_TIPI && step < PASSO_CAPITO && (
+        {ripreso && step === initial?.step && step !== PASSO_TIPI && step < PASSO_CAPITO && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-2 mb-5 rounded-btn bg-[#e8efee] px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
@@ -663,7 +665,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               <ul data-testid="capito-righe" className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righeAltre.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
-                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
+                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave, r.chiave === "giu" ? giu[0] : undefined)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
                       <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
                       <ChevronRight aria-label="Cambia" size={18} className="shrink-0 text-text-muted" />

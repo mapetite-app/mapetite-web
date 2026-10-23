@@ -130,7 +130,8 @@ export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
 }
 
 // "e altri 3": senza, chi votava 6 tipi ne vedeva 3 e pensava che gli altri non fossero stati capiti.
-const altri = (n: number, shown: number) => (n > shown ? ` e ${n - shown === 1 ? "un altro" : `altri ${n - shown}`}` : "");
+const altri = (n: number, shown: number, cosa?: [string, string]) => (n > shown ? ` e ${n - shown === 1 ? `un altro${cosa ? ` ${cosa[0]}` : ""}` : `altri ${n - shown}${cosa ? ` ${cosa[1]}` : ""}`}` : "");
+const TIPO_POSTO: [string, string] = ["tipo di posto", "tipi di posto"];
 
 /** "Ecco cosa ho capito di te": righe brevi, solo da quello che la persona ha detto. */
 export function capito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
@@ -141,19 +142,20 @@ export function capito(m: MappaGusto, extra: { citta: string | null; priceRange:
     : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3)}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2)}` });
+  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2, TIPO_POSTO)}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
-  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}` });
+  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}${altri(extra.occasions.length, 3)}` });
   if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
   // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
-  const mangi = extra.diete.filter((id) => id === "vegetariano" || id === "vegano").map((id) => (id === "vegano" ? "vegano" : "vegetariano"));
+  // Vegano e vegetariano insieme: basta "vegano" (come nella frase).
+  const mangi = extra.diete.includes("vegano") ? ["vegano"] : extra.diete.includes("vegetariano") ? ["vegetariano"] : [];
   const eviti = extra.diete.filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => DIETE.find((d) => d.id === id)?.label.toLowerCase().replace(/^(niente|senza) /, "")).filter(Boolean);
-  const frasi = [mangi.length ? `mangi ${mangi.join(" e ")}` : null, eviti.length ? `eviti ${eviti.join(", ")}` : null].filter(Boolean).join("; ");
+  const frasi = [mangi.length ? `sei ${mangi.join(" e ")}` : null, eviti.length ? `eviti ${eviti.join(", ")}` : null].filter(Boolean).join("; ");
   if (frasi) out.push({ chiave: "diete", emoji: "🍽️", testo: frasi.charAt(0).toUpperCase() + frasi.slice(1) });
   return out;
 }
@@ -240,7 +242,7 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
-  if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" });
+  if (mangi) d.push({ t: "Sei " }, { t: mangi, k: "diete" });
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }], "diete");
   const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));
