@@ -401,7 +401,7 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
         </p>
       )}
       {/* Stato dell'AI (proposta 24): rosso se dopo l'ultimo verdetto sono arrivate 3 ricerche o più. */}
-      {!errore && !fake && (
+      {!errore && (
         <p data-testid="numeri-ai" className={`mt-2 rounded-card px-3 py-2 text-sm font-sans ${ai.ferma ? "bg-accent-light text-text" : "bg-surface text-text-muted"}`}>
           <span className="font-display font-semibold text-text">{ai.ferma ? "AI forse ferma" : "AI: ok"}</span>
           {ultimoVerdetto ? ` · ultimo verdetto ${ora(ultimoVerdetto)}` : " · nessun verdetto in archivio"}
