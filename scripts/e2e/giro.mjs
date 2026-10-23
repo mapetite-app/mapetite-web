@@ -2379,7 +2379,8 @@ else {
   await sheet.waitFor({ timeout: 3000 });
   ok((await sheet.getByRole("button", { name: "📌 Voglio andarci" }).getAttribute("aria-pressed")) === "true", "salva B: 'Voglio andarci' già scelto");
   const sb = await sheet.getByRole("button", { name: "Fatto" }).boundingBox();
-  { const ab = await sheet.getByRole("button", { name: "Annulla" }).boundingBox(); ok(!!sb && !!ab && ab.y + ab.height <= 844 - 56, "salva B: 'Fatto' e 'Annulla' visibili sopra la barra in basso"); }
+  { const ab = await sheet.getByRole("button", { name: "Annulla" }).boundingBox(); const navVisibile = await v.evaluate(() => { const n = document.querySelector("nav.fixed"); return !!n && getComputedStyle(n).display !== "none"; });
+    ok(!!sb && !!ab && ab.y + ab.height <= 844 - (navVisibile ? 56 : 0), "salva B: 'Fatto' e 'Annulla' visibili sopra la barra in basso (o in fondo, con la barra dell'app nascosta)"); }
   ok(await sheet.locator("textarea").evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), "salva B: la nota non fa zoomare l'iPhone (testo ≥ 16px)");
   await v.screenshot({ path: `${OUT}/23-salva-foglio.png`, caret: "initial" });
   await sheet.getByRole("button", { name: "✓ Ci sono stato" }).click();
@@ -3203,7 +3204,7 @@ else {
     ok(labels.length === 3 && labels[0] === "Prenota" && /^\d+ min$/.test(labels[1]) && labels[2] === "Salva", `scheda: barra Prenota / minuti a piedi / Salva per un ristorante (${labels.join(" / ")})`); }
   const barCheck = async (pg) => pg.getByTestId("barra-azioni").evaluate((el) => {
     const tiles = [...el.querySelectorAll("a, button")].map((t) => t.getBoundingClientRect());
-    const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+    const nav = (() => { const n = document.querySelector("nav.fixed"); return n && getComputedStyle(n).display !== "none" ? n.getBoundingClientRect().top : innerHeight; })();
     const ws = tiles.map((t) => t.width);
     // Mockup A (21/10): Prenota, se c'è, è più larga; gli altri riquadri sono uguali tra loro.
     const pre = el.querySelector("[data-testid=prenota-scheda]")?.getBoundingClientRect().width ?? null;
@@ -3386,7 +3387,7 @@ else {
       ok(chiusa <= 48 && aperta && dentro, `360px: pillola dei risultati compatta (${chiusa}px), un tocco apre le opzioni dentro lo schermo`); }
     await qp.waitForTimeout(300);
     { const m = await qp.locator("ul.snap-x li[data-id=L1]").evaluate((li) => {
-        const card = li.getBoundingClientRect(); const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+        const card = li.getBoundingClientRect(); const nav = (() => { const n = document.querySelector("nav.fixed"); return n && getComputedStyle(n).display !== "none" ? n.getBoundingClientRect().top : innerHeight; })();
         const v = li.querySelector("[data-testid=etichetta-verdetto]")?.nextElementSibling; const lh = v ? parseFloat(getComputedStyle(v).lineHeight) : 0;
         const fuori = [...li.querySelectorAll("span")].filter((s) => { const r = s.getBoundingClientRect(); return r.width > 0 && (r.right > card.right + 1 || r.bottom > card.bottom + 1); }).length;
         return { verdetto: v ? Math.round(v.getBoundingClientRect().height / lh) : 99, fuori, sopraNav: card.bottom <= nav + 1, alta: Math.round(card.height) };
@@ -3401,7 +3402,7 @@ else {
     await qp.waitForTimeout(300);
     { const r = await qp.evaluate(() => {
         const a = document.querySelector("a[aria-label^='Indicazioni']"); const bar = a?.parentElement?.getBoundingClientRect();
-        const nav = document.querySelector("nav.fixed")?.getBoundingClientRect().top ?? innerHeight;
+        const nav = (() => { const n = document.querySelector("nav.fixed"); return n && getComputedStyle(n).display !== "none" ? n.getBoundingClientRect().top : innerHeight; })();
         const t = document.querySelector("[data-testid=salvato-avviso]")?.getBoundingClientRect();
         const btns = a ? [...a.parentElement.children].map((e) => e.getBoundingClientRect()) : [];
         return { dentro: !!bar && bar.bottom <= nav + 1 && bar.top >= 0 && btns.every((b) => b.left >= 0 && b.right <= innerWidth && b.height >= 40), toast: t ? t.bottom <= (bar?.top ?? 0) + 1 : null };
