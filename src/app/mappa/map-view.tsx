@@ -1134,6 +1134,13 @@ export default function MapView({
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+  // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
+  const schedaAperta = selected != null;
+  useEffect(() => {
+    if (!schedaAperta) return;
+    document.documentElement.dataset.schedaAperta = "1";
+    return () => { delete document.documentElement.dataset.schedaAperta; };
+  }, [schedaAperta]);
   const hadSelected = useRef(false);
   useEffect(() => {
     if (selected) { hadSelected.current = true; return; }

@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, Copy, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
+import { X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -189,6 +189,7 @@ export default function VenueSheet({
   // Scheda B: sezione aperta e menu "Altro".
   const [tab, setTab] = useState<SchedaTab>("info");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settimanaOpen, setSettimanaOpen] = useState(false);
   // Mockup A: "Orari, contatti, recensioni ›" apre il resto della scheda.
   const [detailsOpen, setDetailsOpen] = useState(false);
   const share = async () => {
@@ -562,14 +563,7 @@ export default function VenueSheet({
                       <Pencil size={18} className="shrink-0 text-brand" aria-hidden /> Modifica tag e nota
                     </button>
                   )}
-                  {address && (
-                    <button role="menuitem" type="button" data-testid="altro-copia-indirizzo" onClick={() => { void copyAddress(); setMenuOpen(false); }} className={menuItem}>
-                      <Copy size={18} className="shrink-0 text-brand" aria-hidden /> Copia indirizzo
-                    </button>
-                  )}
-                  <a role="menuitem" href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className={menuItem}>
-                    <ExternalLink size={18} className="shrink-0 text-brand" aria-hidden /> Apri su Google Maps
-                  </a>
+                  {/* Copia indirizzo e Google Maps stanno in Info: qui niente doppioni (collaudo 23/10). */}
                   <Link
                     role="menuitem"
                     href={isUuid(venue.id) ? `/per-i-ristoratori/rivendica?locale=${venue.id}` : "/per-i-ristoratori/rivendica"}
@@ -739,7 +733,7 @@ export default function VenueSheet({
               {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
                   in corsivo grande si confondeva con il verdetto Mapetite). */}
               <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">{googleLabel}</p>
-              <p className="mt-1.5 line-clamp-3 font-sans text-[15px] leading-[1.45] text-text-muted">{googleLine}</p>
+              <p className="mt-1.5 line-clamp-3 font-sans text-[15px] leading-[1.45] text-text/80">{googleLine}</p>
             </section>
           ) : null}
 
@@ -927,10 +921,28 @@ export default function VenueSheet({
                   </p>
                 )}
                 {oggi && (
-                  <p data-testid="orari-oggi" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text">
-                    <Clock size={18} className="shrink-0 text-brand" aria-hidden />
-                    <span><span className="font-display font-semibold">Oggi</span> {oggi}</span>
-                  </p>
+                  // Un tocco su "Oggi" apre gli orari di tutta la settimana, da Google (collaudo 23/10: "Info dice poco").
+                  <div>
+                    <button type="button" data-testid="orari-settimana-apri" aria-expanded={settimanaOpen} onClick={() => setSettimanaOpen((v) => !v)} className="flex min-h-11 w-full items-center gap-3 text-left text-sm font-sans text-text">
+                      <Clock size={18} className="shrink-0 text-brand" aria-hidden />
+                      <span data-testid="orari-oggi" className="min-w-0 flex-1"><span className="font-display font-semibold">Oggi</span> {oggi}</span>
+                      <ChevronRight size={16} aria-hidden className={`shrink-0 text-text-muted transition-transform ${settimanaOpen ? "rotate-90" : ""}`} />
+                    </button>
+                    {settimanaOpen && (
+                      <ul data-testid="orari-settimana" className="mb-2 ml-[30px] space-y-1 text-sm font-sans text-text-muted">
+                        {Array.from({ length: 7 }, (_, i) => {
+                          const d = new Date(adesso.getFullYear(), adesso.getMonth(), adesso.getDate() + i, 12);
+                          const giorno = d.toLocaleDateString("it-IT", { weekday: "long" });
+                          return (
+                            <li key={i} className="flex justify-between gap-3">
+                              <span className={i === 0 ? "font-display font-semibold text-text" : ""}>{giorno.charAt(0).toUpperCase() + giorno.slice(1)}</span>
+                              <span className="text-right">{orariDelGiorno(venue.orari, d)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 )}
                 {address && (
                   <button type="button" data-testid="copia-indirizzo" onClick={copyAddress} className="flex min-h-12 items-center gap-3 text-left text-sm font-sans text-text">

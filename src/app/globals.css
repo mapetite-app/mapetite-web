@@ -58,6 +58,15 @@
   }
 }
 
+/* Scheda del locale aperta sul telefono: la barra dell'app si nasconde, la scheda ha tutto lo spazio
+   (come Places; collaudo 23/10). La barra Prenota/Percorso/Salva scende al fondo da sola. */
+html[data-scheda-aperta] {
+  --nav-height-mobile: env(safe-area-inset-bottom, 0px);
+}
+html[data-scheda-aperta] [data-app-nav] {
+  display: none;
+}
+
 /* Su desktop la nav è in alto: nessun ingombro dal fondo, offset azzerato. */
 @media (min-width: 768px) {
   :root {
