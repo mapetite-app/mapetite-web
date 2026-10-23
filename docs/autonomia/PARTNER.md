@@ -29,6 +29,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Avete un programma partner o un'API per chi porta prenotazioni? Mi bastano 20 minuti per mostrarvi l'app dal telefono.
   > Grazie,
   > Lorenzo, founder di Mapetite
+- **Aggiunto il 23/10 (proposta 25):** chiedere anche la **lettura delle disponibilità di oggi** (tavoli liberi per fascia oraria) per mostrare "🟢 tavolo alle 21" sulle card della ricerca "stasera", come fa Places con "Table Tonight" ([Time Out](https://www.timeout.com/newyork/news/the-founder-of-dating-app-raya-has-a-new-way-to-score-last-minute-restaurant-reservations-010626)). Frase da aggiungere alla bozza: "Ci interessa anche leggere le disponibilità della serata, per mandare clienti sui tavoli liberati dalle disdette dell'ultima ora." Decisione: Lorenzo (proposta 25).
 
 ## Zucchetti (Zucchetti Horeca, Pienissimo Pro)
 - **Chi è:** grande gruppo italiano di software; per la ristorazione fa cassa, sala e, con Pienissimo Pro, marketing e prenotazioni.

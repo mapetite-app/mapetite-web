@@ -41,6 +41,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - omaggio del locale a chi torna (proposta 12);
    - serata di pre-apertura con utenti scelti per gusto (proposta 9);
    - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3).
+   - "stasera c'è posto" dai sistemi di prenotazione: prepariamo la richiesta a TheFork e Zenchef per Roberto? (proposta 25).
 
 ## Fatte
 
