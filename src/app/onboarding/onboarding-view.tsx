@@ -332,6 +332,18 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
   // "Non è così? Correggi": le righe del profilo una per una (chiuse: la frase basta).
   const [correggi, setCorreggi] = useState(false);
+  // Aperte le righe, si portano in vista dopo il disegno: sopra i tasti in basso, ma mai sotto la barra in alto
+  // (scrollIntoView non teneva conto delle due barre fisse: collaudo 23/10).
+  useEffect(() => {
+    if (!correggi) return;
+    const el = document.querySelector("[data-testid=capito-righe]");
+    const fondo = document.querySelector("[data-testid=benvenuto-fine]")?.closest(".fixed")?.getBoundingClientRect().top ?? window.innerHeight;
+    const cima = document.querySelector("[data-testid=benvenuto] > .sticky")?.getBoundingClientRect().bottom ?? 0;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const giu = Math.min(r.bottom + 12 - fondo, r.top - cima - 12);
+    if (giu > 0) window.scrollBy({ top: giu, behavior: "smooth" });
+  }, [correggi]);
   // Toccando una parola della frase si torna alla domanda che la cambia, non solo al passo (collaudo 23/10).
   const [vaiA, setVaiA] = useState<string | null>(null);
   useEffect(() => {
@@ -696,7 +708,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!, x.id); } }}
                           // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
                           // Area di tocco invisibile più alta della riga (≥ 44px, collaudo 23/10): la parola resta com'è.
-                          className="relative cursor-pointer after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+                          className="relative cursor-pointer after:absolute after:inset-x-0 after:-inset-y-3 after:content-[''] bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
                         >
                           {x.t}
                         </span>
@@ -707,11 +719,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 <p className="mt-6 flex flex-wrap items-center gap-x-2 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mt-3">
                   Non è così? Tocca una parola per cambiarla.
                   {righeAltre.length > 0 && (
-                    <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => {
-                      setCorreggi((v) => !v);
-                      // Le righe si aprono sopra i tasti in basso: si portano in vista (scroll-mt: non sotto la barra in alto).
-                      requestAnimationFrame(() => document.querySelector("[data-testid=capito-righe]")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-                    }} className="min-h-11 font-display font-semibold text-brand">
+                    <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="min-h-11 font-display font-semibold text-brand">
                       Il resto ({righeAltre.length})
                     </button>
                   )}
@@ -724,7 +732,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             )}
             {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
             {(correggi || !CAPITO_A) && righeAltre.length > 0 && (
-              <ul data-testid="capito-righe" className="mt-1 scroll-mb-48 scroll-mt-28 overflow-hidden rounded-card border border-border bg-white shadow-card">
+              <ul data-testid="capito-righe" className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righeAltre.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
                     <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
