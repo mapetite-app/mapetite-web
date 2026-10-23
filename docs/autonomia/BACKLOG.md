@@ -138,6 +138,8 @@ Fatto il 19/10 (PR #81). Collaudo indipendente: voto design 5/10 prima → 7,5/1
 12. **"Grazie di essere tornato" (omaggio del locale a chi torna) — DA DECIDERE LORENZO.** "Lasciamo ai locali verificati offrire un omaggio a chi torna (nessun denaro, solo da mostrare al tavolo)?"
 9. **Serata di pre-apertura per chi ama il genere — DA DECIDERE LORENZO.** "Proponiamo ai primi ristoratori verificati una serata di pre-apertura gratuita con utenti scelti per gusto?"
 3. **"Cliente di parola" — DA DECIDERE LORENZO.** "Possiamo salvare le prenotazioni sul server e mostrare al locale, solo con il consenso dell'utente, quante volte si è presentato?" Sforzo L.
+27. **"Altri come questo" dalla scheda di un posto amato — PRONTA, dopo il 26/10 (proposta 27, 24/10).** Ricerca dai tratti del verdetto, nella stessa città, con "Come <posto>: …" e la prova. 1 ricerca Google per tocco.
+26. **"Verdetto in arrivo" e recupero notturno dei verdetti mancanti — PRONTA, dopo la ricarica del credito (proposta 26, 24/10).** Fino a 25 verdetti a notte per i locali cercati o salvati mentre l'AI era ferma; zero Google.
 25. **"Stasera c'è posto" vero dai sistemi di prenotazione (come Table Tonight di Places) — DA DECIDERE LORENZO (23/10).** "Prepariamo per Roberto la bozza di richiesta di accesso alle disponibilità a TheFork e Zenchef?" Sforzo L, serve un accordo. Primo passo: bozza in `PARTNER.md`.
 24. **"AI: ok" nel pannello — FATTA (23/10 mattina).** Riga in `/admin/numeri` con l'ora dell'ultimo verdetto; "AI forse ferma" dopo 3 ricerche senza verdetti nuovi.
 13. **Tutte le slide del carosello in un colpo — FATTA (21/10 mattina, branch `claude/great-cannon-5w74d3`).** Condividi di Android e "Carica lo screenshot" leggono fino a 5 immagini; locali uniti senza doppioni.

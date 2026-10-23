@@ -53,6 +53,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 - **Cosa ci darebbe:** contatti con ristoratori per interviste e pilota; credibilità verso investitori; dati di settore.
 - **Cosa ci guadagna:** uno strumento senza commissioni da offrire ai soci (Fipe ha contestato gli aumenti di TheFork: [CorCom](https://www.corrierecomunicazioni.it/digital-economy/the-fork-le-commissioni-salgono-del-126-fipe-aumenti-ingiustificati/)); dati anonimi su cosa cercano i clienti.
 - **API o programma partner:** non pertinente. Ci sono le sedi territoriali (Roma, Milano) e le convenzioni per i soci.
+- **Novità (24/10):** dal 19/2/2026 Fipe ha un accordo con Quandoo (quasi 6.000 ristoranti in Italia) per la prenotazione online dei soci contro i no-show ([Teleborsa](https://www.teleborsa.it/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)). **Quindi** non proponiamoci come sistema di prenotazione, ma come chi porta clienti che hanno già salvato il locale: la bozza sotto va letta così.
 - **Email (bozza):**
   > Oggetto: Un'app italiana senza commissioni per riempire i tavoli: possiamo parlarne?
   >

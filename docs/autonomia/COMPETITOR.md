@@ -96,6 +96,14 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Places (Raya):** "Table Tonight" raccoglie in una vista sola i tavoli liberi per oggi da più sistemi di prenotazione ([Time Out New York](https://www.timeout.com/newyork/news/the-founder-of-dating-app-raya-has-a-new-way-to-score-last-minute-restaurant-reservations-010626); data dell'articolo non chiara, l'indirizzo fa pensare a gennaio 2026). Le note dell'App Store dicono solo "correzioni" ([App Store](https://apps.apple.com/it/app/id6446208302)). **Da prendere:** la domanda "dove trovo posto stasera" risolta in un tocco. **Dove possiamo vincere:** Places mostra il tavolo libero, non se il posto è giusto per te; noi abbiamo il verdetto e i gusti. Senza accordi con i sistemi di prenotazione oggi possiamo solo "🌙 c'è posto · dice il locale". Proposta 25. Ultimo controllo: 23/10/2026.
 - **TheFork:** "Chiedi a TheFork" (ricerca a parole o a voce) e app dentro ChatGPT per cercare e prenotare in chat ([Aranzulla](https://www.aranzulla.it/thefork-come-trovare-il-ristorante-perfetto-con-lintelligenza-artificiale-1952510.html), [Techprincess](https://techprincess.it/thefork-chatgpt-prenotazioni-ristoranti-conversazione-ai/amp/)). Novità di ottobre 2026: nessuna trovata. **Dove vinciamo:** TheFork cerca solo tra i suoi locali affiliati e non dice perché un posto è adatto; noi su tutti i locali di Google, con la prova dalle recensioni. Ultimo controllo: 23/10/2026.
 
+### Controllo del 24/10 notte (CEO che chiude, 8 ricerche)
+- **Mapstr:** "Mapstr Matching" consiglia posti incrociando i tuoi salvati e i tag con quelli della community, con un gesto "alla Tinder"; l'AI riassume le recensioni e l'atmosfera. Tutto solo con l'abbonamento Mapstr Plus ([TourMaG](https://www.tourmag.com/Mapstr-de-l-IA-mais-pourquoi-faire_a124504.html), senza data; [mapstr.com](https://mapstr.com/fonctionnalites/mapstr-matching-artificial-intelligence)). **Da prendere:** il consiglio che parte da *un* posto che ami. **Dove vinciamo:** Mapstr non dice perché un posto ti somiglia, e lo fa pagare; noi lo spieghiamo con la prova delle recensioni, gratis (proposta 27). Ultimo controllo: 24/10/2026.
+- **TheFork Feed:** dal 15/7/2025 in 11 paesi, Italia compresa: i posti provati da amici (dalla rubrica), creator e influencer, con liste ([ItaliaOggi](https://www.italiaoggi.it/marketing-e-media/marketing/thefork-da-app-a-vero-e-proprio-social-network-g99oik87)). Circa 2 milioni di "segui"; l'Italia è il paese più attivo ([Ecoseven](https://www.ecoseven.net/lavoro/thefork-tra-recensioni-e-passaparola-ecco-come-gli-italiani-scelgono-il-ristorante/)). **Dove vinciamo:** il feed di TheFork mostra solo i suoi affiliati e parte dalla prenotazione; noi da quello che salvi ovunque (reel, Maps). Ultimo controllo: 24/10/2026.
+- **Quandoo in Italia:** accordo con Fipe-Confcommercio (19/2/2026) per portare la prenotazione online ai soci contro i no-show. Quandoo è usato da quasi 6.000 ristoranti in Italia ([Teleborsa](https://www.teleborsa.it/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)). **Per noi:** Fipe ha già un partner per le prenotazioni. Verso Fipe ci presentiamo come domanda qualificata (chi ha già salvato il locale), non come un altro gestionale. Ultimo controllo: 24/10/2026.
+- **Corner:** nessuna versione dopo la 5.16.0 del 26/09/2026; raccolta totale di 7,5 milioni di dollari e Serie A in preparazione ([Hakky](https://book.st-hakky.com/news/social-map-startup-corner-raises-75-mill)). Ultimo controllo: 24/10/2026.
+- **Beli:** più di 120 milioni di voti su 2 milioni di locali in oltre 50.000 città ([Boston Globe, 4/8/2026](https://www.bostonglobe.com/2026/08/04/lifestyle/beli-restaurant-rating-app/)). Nessun cambio al sistema di classifica trovato. Ultimo controllo: 24/10/2026.
+- **Albo, BestieBite:** nessuna ricerca nuova stanotte (sprint: max 10 ricerche, le altre sopra).
+
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager
@@ -134,8 +142,8 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 
 ### Quandoo
 - **Cosa fa:** piattaforma di prenotazione online per ristoranti (concorrente di TheFork in alcuni paesi europei).
-- **Numeri e presenza in Italia:** dato non trovato (nessuna ricerca dedicata il 19/10).
-- Ultimo controllo: 19/10/2026 (da verificare)
+- **Numeri e presenza in Italia:** quasi 6.000 ristoranti in Italia; dal 19/2/2026 partner di Fipe-Confcommercio per le prenotazioni online dei soci ([Teleborsa](https://www.teleborsa.it/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)).
+- Ultimo controllo: 24/10/2026
 
 ### Cooperto
 - **Cosa fa:** prenotazioni e garanzia per i ristoranti italiani (citato in `RICERCA-RISTORATORI.md`, righe 1 e 3). Ha pubblicato un'analisi di 500.000 prenotazioni (gen–set 2025): il 51,5% arriva quando il locale è chiuso ([Panorama](https://www.panorama.it/attualita/economia/prenotazioni-online-e-cancellazioni-lampo-otto-ristoranti-su-dieci-rischiano-di-perdere-la-meta-dei-clienti)).

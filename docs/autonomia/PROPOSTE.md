@@ -16,6 +16,26 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 24/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
+
+### 26. "Verdetto in arrivo": nessun locale resta senza verdetto quando l'AI si ferma
+- **Problema:** `PROBLEMI.md`, 11. Dal 22/10 alle 08:07 a oggi nessun verdetto nuovo: i locali cercati in quelle ore restano "Da Google" anche quando l'AI torna, finché qualcuno non li riapre.
+- **Cosa fa:** quando l'AI non risponde, il locale entra in una coda (tabella `place_synthesis` con verdetto vuoto e "da fare"). Al ritorno dell'AI un lavoro notturno scrive i verdetti mancanti per i locali cercati o salvati, fino a 25 a notte. Sulla card, invece di "Da Google", compare "Verdetto in arrivo" solo se il locale è in coda.
+- **Da dove nasce:** nessun competitor ha un verdetto scritto per ogni locale. Noi lo promettiamo "sempre" (VISIONE), quindi dobbiamo recuperare i buchi da soli.
+- **Valore per l'utente:** riapri un salvato e il verdetto c'è, anche se l'hai salvato mentre l'AI era ferma.
+- **Valore per il ristoratore:** la sua scheda non resta senza spiegazione per giorni.
+- **Sforzo:** S. **Costo:** nessuna chiamata Google (si usano le recensioni già salvate nell'arricchimento); Haiku circa 25 verdetti a notte, gli stessi che si sarebbero spesi comunque.
+- **Stato proposto:** PRONTA (dopo la ricarica del credito).
+
+### 27. "Altri come questo": dal posto che ami, i 5 che gli somigliano davvero
+- **Problema:** `PROBLEMI.md`, 9 e VISIONE ("fatti suggerire"). Chi ha un posto del cuore non sa come trovarne altri simili senza ripartire da zero.
+- **Cosa fa:** nella scheda di un salvato con 👍 o "Ci sono stato", un tasto "Altri come questo". La ricerca parte dai tratti del verdetto (per esempio "trattoria romana · cucina di quartiere · prezzi onesti"), nella stessa città. Ogni risultato ha la riga "Come Da Cesare: …" con la frase della recensione che lo prova. I posti di massa vanno in fondo, come nella ricerca.
+- **Da dove nasce:** "Mapstr Matching" consiglia posti dai tuoi salvati, ma non dice perché e lo fa pagare (Mapstr Plus, [TourMaG](https://www.tourmag.com/Mapstr-de-l-IA-mais-pourquoi-faire_a124504.html)). Noi lo spieghiamo con la prova, gratis.
+- **Valore per l'utente:** dal posto che ama a 5 posti nuovi, in un tocco, senza scrivere niente.
+- **Valore per il ristoratore:** clienti che arrivano perché amano locali come il suo, cioè la domanda più qualificata che esista. È la base di un futuro "sei simile a…" nel pannello.
+- **Sforzo:** S (riusa la ricerca a parole e i tratti del verdetto). **Costo:** 1 ricerca Google per tocco, come una ricerca normale; Haiku come una ricerca.
+- **Stato proposto:** PRONTA, dopo il 26/10 (fuori dalle chiavi di volta dello sprint).
+
 ## 23/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta)
 
 ### 24. "AI: ok" nel pannello e avviso prima che finisca il credito
