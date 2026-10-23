@@ -135,7 +135,7 @@ function Chip({
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
       className={[
-        "inline-flex min-h-10 items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-display font-semibold transition-colors",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-display font-semibold transition-colors",
         selected ? "bg-brand text-white" : "border border-border bg-surface text-brand hover:border-brand",
       ].join(" ")}
     >
@@ -162,7 +162,12 @@ export type DalProfilo = { city: string | null; occasions: string[]; priceRange:
 
 export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
-  const draft = parseDraft(raw);
+  // La bozza si legge una volta sola, all'apertura: le risposte salvate mentre si risponde non devono
+  // far ripartire la schermata con "Ho ritrovato le risposte" (collaudo 23/10: lo vedeva chi entrava la prima volta).
+  const client = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const [aperta, setAperta] = useState<{ raw: string | null } | null>(null);
+  if (client && aperta === null) setAperta({ raw });
+  const draft = parseDraft(aperta?.raw ?? null);
   const base: Draft | null = dalProfilo
     ? {
         // Cucine e atmosfere scelte in /me/preferenze: si tengono (prima "Rifalla" le sovrascriveva).
@@ -238,6 +243,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const gusto = { v: 1 as const, zone, su, giu, scoperta };
 
   const [tornaCapito, setTornaCapito] = useState(false);
+  // Toccata nella frase una zona, la dieta, la spesa o un'occasione: "Continua" riporta alla frase (collaudo 23/10).
+  const [tornaFrase, setTornaFrase] = useState(false);
   // Per i lettori di schermo: l'esito del voto e la card dopo (aria-live, collaudo 23/10).
   const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
@@ -316,11 +323,27 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     diete,
     occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
   }, 3);
+  // Dietro "Correggi" solo ciò che la frase non dice già (prima ripeteva la frase con parole diverse, collaudo 23/10):
+  // quello che è nella frase si cambia toccando la parola.
+  const nellaFrase = new Set(frase.flat().map((x) => x.k).filter(Boolean) as string[]);
+  const righeAltre = CAPITO_A ? righe.filter((r) => !nellaFrase.has(r.chiave)) : righe;
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
   // "Non è così? Correggi": le righe del profilo una per una (chiuse: la frase basta).
   const [correggi, setCorreggi] = useState(false);
+  // Aperte le righe, si portano in vista dopo il disegno: sopra i tasti in basso, ma mai sotto la barra in alto
+  // (scrollIntoView non teneva conto delle due barre fisse: collaudo 23/10).
+  useEffect(() => {
+    if (!correggi) return;
+    const el = document.querySelector("[data-testid=capito-righe]");
+    const fondo = document.querySelector("[data-testid=benvenuto-fine]")?.closest(".fixed")?.getBoundingClientRect().top ?? window.innerHeight;
+    const cima = document.querySelector("[data-testid=benvenuto] > .sticky")?.getBoundingClientRect().bottom ?? 0;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const giu = Math.min(r.bottom + 12 - fondo, r.top - cima - 12);
+    if (giu > 0) window.scrollBy({ top: giu, behavior: "smooth" });
+  }, [correggi]);
   // Toccando una parola della frase si torna alla domanda che la cambia, non solo al passo (collaudo 23/10).
   const [vaiA, setVaiA] = useState<string | null>(null);
   useEffect(() => {
@@ -339,6 +362,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const cambia = (k: string, id?: string) => {
     if (id) { setTornaCapito(true); return riapri(id); }
     if (k === "su" || k === "giu") setTornaCapito(true);
+    else setTornaFrase(true);
     setStep(PASSO_DI[k] ?? 0);
     setVaiA(k);
   };
@@ -524,7 +548,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex h-[clamp(15rem,38svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
+                  // Più alta sui telefoni alti (a 390×844 restavano ~250px vuoti sotto), uguale sui bassi (iPhone SE).
+                  className="relative flex h-[clamp(15rem,42svh,22rem)] [@media(max-height:700px)]:h-[clamp(15rem,38svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -532,12 +557,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   }}
                 >
                   {drag && Math.abs(drag.dx) > 30 && (
-                    <span aria-hidden className={`absolute right-4 top-4 z-10 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "bg-accent" : "bg-black/50"}`}>
+                    // Dal lato opposto alla direzione (come Tinder): spostando a destra non esce dallo schermo (collaudo 23/10).
+                    <span aria-hidden data-testid="tipo-cartellino" className={`absolute top-4 z-20 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "left-4 bg-accent" : "right-4 bg-black/50"}`}>
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
                   {/* Contatore dei tipi dentro la card: sopra c'è già "2 di 4" dei passi (collaudo 23/10). */}
-                  <span data-testid="tipi-contatore" className="absolute left-5 top-5 z-10 rounded-pill bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold">{visti.length + 1} di {TIPI.length}</span>
+                  <span data-testid="tipi-contatore" className={`absolute left-5 top-5 z-10 rounded-pill ${drag && Math.abs(drag.dx) > 30 ? "opacity-0" : ""} bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold`}>{visti.length + 1} di {TIPI.length}</span>
                   {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
                   <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
                   <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
@@ -563,7 +589,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted max-[379px]:hidden [@media(max-height:700px)]:hidden">← trascina la card, oppure tocca →</p>
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted [@media(max-height:700px)]:hidden">← trascina la card, oppure tocca →</p>
                 <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {visti.length + 1} di {TIPI.length}: {corrente.titolo}.</p>
                 {visti.length > 0 && (
                   <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent [@media(max-height:700px)]:mt-0">
@@ -681,7 +707,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                           onClick={() => cambia(x.k!, x.id)}
                           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!, x.id); } }}
                           // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
-                          className="cursor-pointer bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+                          // Area di tocco invisibile più alta della riga (≥ 44px, collaudo 23/10): la parola resta com'è.
+                          className="relative cursor-pointer after:absolute after:inset-x-0 after:-inset-y-3 after:content-[''] bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
                         >
                           {x.t}
                         </span>
@@ -689,15 +716,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     </span>
                   ))}
                 </p>
-                <p className="mt-6 flex items-center gap-2 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mt-3">
-                  Non è così?
-                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => {
-                    setCorreggi((v) => !v);
-                    // Le righe si aprono sopra i tasti in basso: si portano in vista.
-                    requestAnimationFrame(() => document.querySelector("[data-testid=capito-righe]")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-                  }} className="min-h-11 font-display font-semibold text-brand">
-                    Correggi
-                  </button>
+                <p className="mt-6 flex flex-wrap items-center gap-x-2 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mt-3">
+                  Non è così? Tocca una parola per cambiarla.
+                  {righeAltre.length > 0 && (
+                    <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="min-h-11 font-display font-semibold text-brand">
+                      Il resto ({righeAltre.length})
+                    </button>
+                  )}
                 </p>
               </>
             ) : (
@@ -706,9 +731,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </p>
             )}
             {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
-            {(correggi || !CAPITO_A) && righe.length > 0 && (
-              <ul data-testid="capito-righe" className="mt-1 scroll-mb-48 overflow-hidden rounded-card border border-border bg-white shadow-card">
-                {righe.map((r, i) => (
+            {(correggi || !CAPITO_A) && righeAltre.length > 0 && (
+              <ul data-testid="capito-righe" className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
+                {righeAltre.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
                     <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
@@ -719,7 +744,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 ))}
               </ul>
             )}
-            <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            {/* Senza risposte non c'è niente di cui "tenere conto": la frase si contraddiceva (collaudo 23/10). */}
+            {(CAPITO_A ? frase.length > 0 : righe.length > 0) && (
+              <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            )}
           </div>
         )}
       </div>
@@ -736,7 +764,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             ) : (
               <button
                 type="button"
-                onClick={() => setStep((s) => s + 1)}
+                data-testid={tornaFrase ? "torna-frase" : undefined}
+                onClick={() => {
+                  if (tornaFrase) { setTornaFrase(false); setStep(PASSO_CAPITO); return; }
+                  setStep((s) => s + 1);
+                }}
                 className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
               >
                 Continua

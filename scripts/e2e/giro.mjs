@@ -5914,6 +5914,9 @@ else {
   await ip.getByRole("button", { name: "Monti", exact: true }).click();
   ok(await ip.getByTestId("benvenuto-zone").isVisible() && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true" && (await ip.getByRole("button", { name: "Isola", exact: true }).count()) === 0, "primo accesso: scelta Roma, le zone di Roma (non quelle di Milano)");
   await ip.screenshot({ path: `${OUT}/benvenuto-1-citta-zone.png`, caret: "initial" });
+  // Chi entra la prima volta non vede mai "Ho ritrovato le risposte" (la bozza salvata mentre risponde non conta: collaudo 23/10).
+  await ip.waitForTimeout(300);
+  ok((await ip.getByTestId("benvenuto-ripreso").count()) === 0, "primo accesso: alla prima volta niente 'Ho ritrovato le risposte' dopo il tocco su una zona");
   // 2) dieci tipi di posto 👍/👎
   await ip.getByRole("button", { name: "Continua" }).click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 4" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
@@ -5925,6 +5928,10 @@ else {
   // Scorrimento col dito: a destra è un 👍.
   { const cb = await ip.getByTestId("tipo-card").boundingBox();
     await ip.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2); await ip.mouse.down();
+    await ip.mouse.move(cb.x + cb.width / 2 + 60, cb.y + cb.height / 2, { steps: 3 });
+    // Il cartellino "👍 Sì" sta dal lato opposto (a sinistra, dentro lo schermo), il contatore si nasconde (collaudo 23/10).
+    { const t = await ip.getByTestId("tipo-cartellino").boundingBox(); const c = await ip.getByTestId("tipo-card").boundingBox();
+      ok(!!t && t.x >= 0 && t.x + t.width <= 390 && t.x < c.x + c.width / 2, `primo accesso: trascinando a destra '👍 Sì' resta dentro lo schermo, a sinistra (${Math.round(t?.x ?? -1)})`); }
     await ip.mouse.move(cb.x + cb.width / 2 + 160, cb.y + cb.height / 2, { steps: 6 }); await ip.mouse.up();
     // La card vola via (180 ms), poi arriva la prossima.
     await ip.waitForFunction(() => document.querySelector('[data-testid="tipi-contatore"]')?.textContent === "2 di 10", null, { timeout: 2000 }).catch(() => {});
@@ -5950,8 +5957,11 @@ else {
     const c = await ip.getByTestId("capito-correggi").boundingBox();
     const top = await ip.getByTestId("benvenuto-fine").evaluate((b) => b.closest(".fixed").getBoundingClientRect().top);
     ok(c && c.y + c.height <= top, `primo accesso (mockup A): 'Correggi' sopra i tasti in basso (${Math.round((c?.y ?? 0) + (c?.height ?? 0))} ≤ ${Math.round(top)})`); }
-  if (capitoA) await ip.getByTestId("capito-correggi").click();
-  { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
+  if (capitoA) { await ip.getByTestId("capito-correggi").click();
+    // Dietro "Il resto" solo ciò che la frase non dice (prima ripeteva zone, gusti e diete con altre parole: collaudo 23/10).
+    const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
+  else { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
   ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
@@ -5969,9 +5979,10 @@ else {
     await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia");
     await ip.getByRole("button", { name: "Continua" }).click();
-    if ((await ip.getByTestId("capito-correggi").getAttribute("aria-expanded")) !== "true") await ip.getByTestId("capito-correggi").click(); }
-  await ip.getByTestId("capito-riga").first().click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 4" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando una riga si torna a cambiarla, con le scelte conservate");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, 'Continua' riporta alla frase (non al passo dopo)");
+    await ip.getByTestId("capito-parola").filter({ hasText: "Monti" }).click(); }
+  else await ip.getByTestId("capito-riga").first().click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 4" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando la zona si torna a cambiarla, con le scelte conservate");
   for (let k = 0; k < 3; k++) await ip.getByRole("button", { name: "Continua" }).click().catch(() => {});
   await ip.getByTestId("benvenuto-importa-si").click();
   await ip.waitForURL(/\/importa\?da=benvenuto/, { timeout: 8000 }).then(() => ok(true, "primo accesso: 'Prima porta qui i tuoi posti' apre l'import"), () => ok(false, `primo accesso: 'Prima porta qui i tuoi posti' apre l'import (${ip.url()})`));
@@ -7314,6 +7325,7 @@ else {
   await vp.getByRole("button", { name: "Continua" }).click();
   ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: all'ultimo passo niente 'Salta'");
   ok(await vp.getByTestId("capito-vuoto").isVisible(), "primo accesso: senza risposte, 'Ecco cosa ho capito' dice che imparerà dall'uso (niente di inventato)");
+  ok((await vp.getByText("tengono conto di questo").count()) === 0, "primo accesso: senza risposte niente 'Da ora ricerca… tengono conto di questo' (si contraddiceva)");
 
   // 2. Accesso scaduto mentre si risponde: si passa dal login e, tornati, le risposte ci sono ancora.
   await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto")); // il passo 1 sopra ha lasciato la sua bozza
