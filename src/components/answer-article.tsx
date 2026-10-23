@@ -118,7 +118,7 @@ export default function AnswerArticle({
                   <button type="button" onClick={() => onSelect(place)} className="flex w-full items-center gap-2 text-left">
                     <span className="text-xl leading-none" aria-hidden>{getCategoryEmoji(place.category, place.name)}</span>
                     <span className="font-title text-lg in-data-[titoli=serif]:text-xl font-semibold leading-snug text-brand">{place.name}</span>
-                    {gemsOn && isGem(place.rating, d?.userRatingCount) && (
+                    {gemsOn && isGem(place.rating, d?.userRatingCount, place.name) && (
                       <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-semibold text-accent">💎 Poco conosciuto</span>
                     )}
                   </button>

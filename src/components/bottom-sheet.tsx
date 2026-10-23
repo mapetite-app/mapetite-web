@@ -31,6 +31,9 @@ export interface BottomSheetProps {
   variant?: "a" | "b";
   // Punto da cui calcolare la distanza mostrata sulle card (posizione dell'utente o centro mappa).
   origin?: { lat: number; lng: number } | null;
+  // Punto da cui si MOSTRA la distanza sulle card: solo la posizione vera del telefono. Dal centro della
+  // mappa "650 m" si leggeva come "da te" (collaudo 23/10). Se manca, vale `origin`.
+  distanceOrigin?: { lat: number; lng: number } | null;
   // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
   quick?: ReadonlySet<QuickFilter>;
   onToggleQuick?: (f: QuickFilter) => void;
@@ -103,8 +106,8 @@ export function googleLine(d: ListDetails | undefined): string | null {
   return review ? `“${review}”` : null;
 }
 
-function prettyCategory(c: string | null): string | null {
-  return categoryLabel(c);
+function prettyCategory(c: string | null, name?: string | null): string | null {
+  return categoryLabel(c, name);
 }
 
 function priceLabel(level: number | null): string | null {
@@ -119,7 +122,7 @@ function formatCount(n: number | null): string | null {
 // Riga di metadati: categoria · ★ voto (n) · prezzo · [città] · distanza.
 export function metaLine(place: Place, d: ListDetails | undefined, origin: { lat: number; lng: number } | null = null, withCity = false): string {
   const parts: string[] = [];
-  const cat = prettyCategory(place.category);
+  const cat = prettyCategory(place.category, place.name);
   if (cat) parts.push(cat);
   if (place.rating != null) {
     const n = formatCount(d?.userRatingCount ?? null);
@@ -155,7 +158,7 @@ export function coverGradient(category: string | null, name = ""): string {
 // Senza il numero di recensioni: resta nella scheda; sulla card il "poco conosciuto" lo dice il 💎.
 export function cardFacts(place: Place, origin: { lat: number; lng: number } | null = null, withCity = false): string {
   const parts: string[] = [];
-  const cat = prettyCategory(place.category);
+  const cat = prettyCategory(place.category, place.name);
   if (cat) parts.push(cat);
   if (place.rating != null) parts.push(`★ ${place.rating.toFixed(1).replace(".", ",")}`);
   const price = priceLabel(place.priceLevel);
@@ -227,7 +230,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [] }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -245,6 +248,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // ("Aperto ora" nasconderebbe tutto).
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
+  const shownFrom = distanceOrigin === undefined ? origin : distanceOrigin;
   const nearestOn = nearest === undefined && origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
@@ -674,11 +678,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
-            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount);
+            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
               const i = places.indexOf(place);
-              const cat = prettyCategory(place.category);
-              const facts = cardFacts({ ...place, category: null }, origin, showCity);
+              const cat = prettyCategory(place.category, place.name);
+              const facts = cardFacts({ ...place, category: null }, shownFrom, showCity);
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
               // Chip intere: prima quelle brevi (le frasi lunghe venivano tagliate), due solo se ci stanno insieme.
               const goFor = d?.goFor ?? [];
@@ -844,7 +848,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     )}
                     <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
-                      <span className="truncate">{cardFacts(place, origin, showCity)}</span>
+                      <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
                         <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
                       )}
@@ -977,7 +981,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
-                    <span className="truncate">{metaLine(place, details?.[place.id], origin, showCity)}</span>
+                    <span className="truncate">{metaLine(place, details?.[place.id], shownFrom, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
                         Aperto ora
@@ -988,7 +992,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         Chiuso ora
                       </span>
                     )}
-                    {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount) && (
+                    {gemsOn && isGem(place.rating, details?.[place.id]?.userRatingCount, place.name) && (
                       <span data-testid="gemma" className="shrink-0 rounded-pill bg-accent-light px-1.5 py-0.5 text-[10px] font-display font-semibold text-accent">
                         💎 Poco conosciuto
                       </span>

@@ -103,6 +103,27 @@ type VenueSheetProps = {
   onBookingClosed?: () => void;
 };
 
+// "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
+// le cui parole (tolta la desinenza) stanno già tutte in una precedente, o viceversa, è un doppione.
+const PAROLE_VUOTE = new Set(["esperienza", "atmosfera", "ambiente", "locale", "posto", "molto", "davvero", "della", "dello", "delle", "degli"]);
+function radici(t: string): Set<string> {
+  return new Set(t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z]+/)
+    .filter((w) => w.length >= 4 && !PAROLE_VUOTE.has(w)).map((w) => w.replace(/[aeio]$/, "")));
+}
+function senzaDoppioni(etichette: string[]): string[] {
+  const viste: Set<string>[] = [];
+  const out: string[] = [];
+  const dentro = (a: Set<string>, b: Set<string>) => a.size > 0 && [...a].every((x) => b.has(x));
+  for (const e of etichette) {
+    const r = radici(e);
+    if (r.size > 0 && viste.some((v) => dentro(r, v) || dentro(v, r))) continue;
+    if (out.some((o) => o.toLowerCase() === e.trim().toLowerCase())) continue;
+    viste.push(r);
+    out.push(e.trim());
+  }
+  return out;
+}
+
 export default function VenueSheet({
   venue,
   isSaved,
@@ -182,7 +203,7 @@ export default function VenueSheet({
   // Scheda completa su Google Maps (orari, foto, tutte le recensioni): con il Place ID se c'è.
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}${googlePlaceId ? `&query_place_id=${encodeURIComponent(googlePlaceId)}` : ""}`;
   const shareOn = useBeta("condividi");
-  const gem = useOptIn("gemme") && isGem(rating, userRatingCount);
+  const gem = useOptIn("gemme") && isGem(rating, userRatingCount, name);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(autoBook);
@@ -224,9 +245,9 @@ export default function VenueSheet({
     matchReason != null && matchReason.trim() !== "" ? matchReason.trim() : null;
   const verdictText =
     verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
-  const goForChips = Array.isArray(goFor)
+  const goForChips = senzaDoppioni(Array.isArray(goFor)
     ? goFor.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
-    : [];
+    : []);
   const dontExpectChips = Array.isArray(dontExpect)
     ? dontExpect.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
     : [];
@@ -576,7 +597,7 @@ export default function VenueSheet({
               </>
     );
     // Riga di categoria in maiuscoletto: tipo · prezzo · città (solo dati veri).
-    const kindLine = [categoryLabel(category), priceLabel, cityFromAddress(address)].filter(Boolean) as string[];
+    const kindLine = [categoryLabel(category, name), priceLabel, cityFromAddress(address)].filter(Boolean) as string[];
     // Distanza solo dalla posizione vera: dal centro della mappa "250 m" si leggeva come "da te" (collaudo 23/10).
     const distance = userPos ? distanceLabel(userPos, { lat, lng }) : null;
     // Nomi lunghi su due righe al massimo, senza spingere il verdetto sotto la barra.
@@ -737,6 +758,20 @@ export default function VenueSheet({
             </section>
           ) : null}
 
+          {/* "Per te · …" in corallo: solo il perché già scritto, mai inventato. "Per te" solo se viene dai
+              gusti; il perché della ricerca si chiama "Perché qui" (non parla della persona). Subito sotto il verdetto,
+              prima dei ✓: è la ragione per cui Mapetite è diversa e deve stare nella prima schermata (collaudo 23/10). */}
+          {perTeLine && (
+            <p data-testid="per-te-scheda" className="mt-3.5 flex items-center gap-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+              <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
+                <Sparkles size={15} />
+              </span>
+              <span className="min-w-0">
+                <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
+              </span>
+            </p>
+          )}
+
           {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
           {(venue.requisiti?.length ?? 0) > 0 && (
             <div data-testid="requisiti-scheda" className="mt-3.5">
@@ -761,19 +796,6 @@ export default function VenueSheet({
                 </p>
               )}
             </div>
-          )}
-
-          {/* "Per te · …" in corallo: solo il perché già scritto, mai inventato. "Per te" solo se viene dai
-              gusti; il perché della ricerca si chiama "Perché qui" (non parla della persona). */}
-          {perTeLine && (
-            <p data-testid="per-te-scheda" className="mt-3.5 flex items-center gap-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-              <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
-                <Sparkles size={15} />
-              </span>
-              <span className="min-w-0">
-                <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
-              </span>
-            </p>
           )}
         </div>
 
@@ -856,7 +878,7 @@ export default function VenueSheet({
                         {chip}
                       </span>
                     ))}
-                    {tags?.filter((t) => !goForChips.some((g) => g.toLowerCase() === t.trim().toLowerCase())).map((tag) => (
+                    {senzaDoppioni([...goForChips, ...(tags ?? [])]).slice(goForChips.length).map((tag) => (
                       <span key={`t-${tag}`} className="rounded-pill border border-border px-2.5 py-1 text-xs font-display font-medium text-text-muted">
                         {tag}
                       </span>
@@ -1087,9 +1109,9 @@ export default function VenueSheet({
           </p>
         )}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-sans text-text-muted">
-          {categoryLabel(category) && (
+          {categoryLabel(category, name) && (
             <>
-              <span className="text-text">{categoryLabel(category)}</span>
+              <span className="text-text">{categoryLabel(category, name)}</span>
               {rating != null && <span aria-hidden>·</span>}
             </>
           )}

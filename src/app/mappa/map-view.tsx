@@ -3420,6 +3420,7 @@ export default function MapView({
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
+          distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
           nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
           quick={quickFilters}
@@ -3498,7 +3499,7 @@ export default function MapView({
           })()}
           details={venueDetails}
           loadingVerdicts={loadingVerdicts}
-          origin={userPos ?? searchOrigin}
+          origin={userPos /* distanza solo dalla posizione vera (collaudo 23/10) */}
           isSaved={isPlaceSaved}
           onSave={(place) => { void quickSave(place); }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}

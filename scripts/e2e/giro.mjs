@@ -233,7 +233,8 @@ await shot("03-lista-verdetti");
 }
 await apriOpzioni(page);
 ok(await page.getByTestId("ho-capito").evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight + 1), "lista: 'Ho capito' si legge per intero (non tagliato)");
-ok(await page.getByText(/\d+ m|\d,\d km/).first().isVisible(), "card: distanza mostrata (m / km)");
+// Senza la posizione vera niente distanza sulle card (dal centro della mappa sembrava "da te": collaudo 23/10); con la posizione, nel blocco "Scheda A, difetti del quarto collaudo".
+ok((await page.locator("ul.snap-x").getByText(/\b\d+ m\b|\d,\d km/).count()) === 0, "card: senza la posizione vera niente distanza (m / km)");
 ok((await page.locator("ul img").count()) >= 1 && (await page.locator("ul img").count()) <= 6, `foto: ${await page.locator("ul img").count()} foto nelle card (massimo 6)`);
 ok(await page.locator("ul img").first().evaluate((i) => i.complete && i.naturalWidth > 0), "foto: la prima card ha la foto caricata");
 await page.waitForTimeout(1200);
@@ -492,25 +493,28 @@ await page.getByText("Terrazza Uno").first().waitFor({ timeout: 5000 });
 ok((await page.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "?beta=off: i filtri rapidi spariscono");
 
 // 5e. "Gemme" (accese di default dal 14/10, ?beta=-gemme per spegnerle): badge sui locali amati ma poco recensiti
+// Dal 24/10 niente 💎 sui nomi da rooftop o d'albergo (src/lib/gem.ts): qui il locale con 4,7 e 180 recensioni si chiama "Bar Tre".
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.map((x) => (x.id === "P3" ? { ...x, name: "Bar Tre" } : x)) } }));
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
-await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
-ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("gemma").count()) === 1, "gemme: accese di default");
+await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
+ok((await page.locator("li", { hasText: "Bar Tre" }).getByTestId("gemma").count()) === 1, "gemme: accese di default");
 await page.goto(`${BASE}/mappa?beta=-gemme`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
-await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) === 0, "gemme: si spengono con ?beta=-gemme");
 await page.goto(`${BASE}/mappa?beta=gemme`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
-await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
-ok((await page.locator("li", { hasText: "Rooftop Tre" }).getByTestId("gemma").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("gemma").count()) === 0, "?beta=gemme: badge solo sul locale con 4,7 e 180 recensioni (non su quello con 812)");
+await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
+ok((await page.locator("li", { hasText: "Bar Tre" }).getByTestId("gemma").count()) === 1 && (await page.locator("li", { hasText: "Terrazza Uno" }).getByTestId("gemma").count()) === 0, "?beta=gemme: badge solo sul locale con 4,7 e 180 recensioni (non su quello con 812)");
 await page.locator("ul.snap-x").evaluate((ul) => ul.scrollTo({ left: ul.scrollWidth, behavior: "instant" }));
 await page.waitForTimeout(500);
 await shot("09b-beta-gemme");
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
-await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
+await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) >= 1, "gemme: restano accese su questo telefono");
+await page.unroute("**/api/search");
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
@@ -7648,6 +7652,54 @@ else {
   await c.close(); }
 
 ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ": " + (process.env.E2E_DEBUG ? errors.join("\n") : errors.slice(0, 3).join(" | ")) : ""}`);
+// Scheda A, difetti del quarto collaudo (24/10): tipo dal nome ("Trattoria", non "PESCE"), niente 💎 sui rooftop
+// d'albergo, "In breve" senza etichette quasi uguali, "Per te" sopra i ✓, distanza sulle card solo dalla posizione vera.
+{
+  const mkT = (id, name, extra = {}) => mk(id, name, 41.893, 12.468, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.7, userRatingCount: 259, ...extra });
+  const RIS = [
+    mkT("Q1", "Trattoria da Lucia", { category: "seafood_restaurant", rating: 4.6, userRatingCount: 300 }),
+    mkT("Q2", "8th Floor Rooftop"),
+    mkT("Q3", "Osteria Piccola", { rating: 4.8, userRatingCount: 120 }),
+  ];
+  const SY = { dettagli: {
+    Q1: { synthesis: "Trattoria di quartiere.", tags: ["intimo", "romano"], verdict: "I romani ci tornano per la gricia.", goFor: ["esperienza intima", "cucina romana", "carciofi"], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami", requisiti: [{ r: "trattoria", prova: "Vera trattoria romana." }] },
+    Q2: { synthesis: "x", tags: [], verdict: "Terrazza d'albergo con vista.", goFor: ["vista"], dontExpect: [], matchReason: "È su un rooftop." },
+    Q3: { synthesis: "x", tags: [], verdict: "Piccola e vera.", goFor: [], dontExpect: [], matchReason: null },
+  }, esclusi: [] };
+  for (const pos of [false, true]) {
+    const c = await browser.newContext({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 1, ...(pos ? { geolocation: { latitude: 41.89, longitude: 12.47 }, permissions: ["geolocation"] } : { permissions: [] }) });
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>' }));
+    for (const t of ["saved_places", "place_synthesis", "profiles"]) await c.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+    await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["trattoria"], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: [], token: "x" } } }));
+    await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
+    const p = await c.newPage();
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    // Senza "at": con un link condiviso la posizione non si legge (src/app/mappa/map-view.tsx), qui serve quella già permessa.
+    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}`, { waitUntil: "networkidle" });
+    await p.getByText("I romani ci tornano per la gricia.").first().waitFor({ timeout: 8000 });
+    if (pos) await p.waitForTimeout(1500);
+    const card = (id) => p.locator(`li[data-id=${id}]`).first().innerText().catch(() => "");
+    const q1 = await card("Q1");
+    if (!pos) {
+      ok(/TRATTORIA|Trattoria/.test(q1) && !/PESCE|Pesce/.test(q1), "card: 'Trattoria da Lucia' (tipo Google seafood) si presenta come Trattoria, non 'Pesce'");
+      ok(!/\d+ m\b|\d,\d km/.test(q1), `card: senza la posizione vera niente distanza dal centro della mappa (${q1.replace(/\s+/g, " ").slice(0, 80)})`);
+      ok(!/Poco conosciuto/.test(await card("Q2")) && /Poco conosciuto/.test(await card("Q3")), "card: niente 💎 sul rooftop d'albergo con 259 recensioni; sì sull'osteria con 120");
+      await p.locator("li[data-id=Q1] [data-testid=card-risultato]").first().click();
+      await p.locator("h2", { hasText: "Trattoria da Lucia" }).waitFor({ timeout: 6000 });
+      ok(((await p.getByTestId("scheda-categoria").textContent()) ?? "").startsWith("Trattoria"), "scheda: categoria 'Trattoria' dal nome del locale");
+      const y = await p.evaluate(() => ({ perTe: document.querySelector("[data-testid=per-te-scheda]")?.getBoundingClientRect(), req: document.querySelector("[data-testid=requisiti-scheda]")?.getBoundingClientRect() }));
+      ok(y.perTe && y.req && y.perTe.top < y.req.top && y.perTe.bottom < 667 - 70, `scheda a 375×667: 'Per te' sotto il verdetto, prima dei ✓, nella prima schermata (${Math.round(y.perTe?.bottom ?? 0)} px)`);
+      await p.getByTestId("scheda-altro-info").click();
+      await p.getByTestId("scheda-tab-panoramica").click();
+      const chips = (await p.getByTestId("pannello-panoramica").innerText()).replace(/\s+/g, " ");
+      ok(/esperienza intima/.test(chips) && !/\bintimo\b/.test(chips) && /cucina romana/.test(chips) && !/\bromano\b/.test(chips), `In breve: niente etichette quasi uguali ('intimo' con 'esperienza intima') (${chips.slice(0, 120)})`);
+    } else {
+      ok(/\d+ m\b|\d,\d km/.test(q1), `card: con la posizione vera la distanza c'è (${q1.replace(/\s+/g, " ").slice(0, 80)})`);
+    }
+    await c.close();
+  }
+}
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

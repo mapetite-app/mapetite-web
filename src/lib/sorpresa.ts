@@ -129,7 +129,7 @@ export function pickCandidates(results: SurprisePlace[], savedGoogleIds: Set<str
   const isMass = massPredicate(located);
   const pool = located.filter((p) => !savedGoogleIds.has(p.id) && !isMass(p) && (p.userRatingCount ?? 0) < MASS_MIN_COUNT);
   const scored = pool.map((p, i) => {
-    const gem = isGem(p.rating, p.userRatingCount);
+    const gem = isGem(p.rating, p.userRatingCount, p.name);
     const s = (gem ? 2 : 0) + (p.openNow === true ? 1 : p.openNow === false ? -3 : 0);
     const why = [reason, gem ? "💎 Poco conosciuto" : null, p.openNow === true ? "Aperto ora" : null].filter(Boolean).join(" · ");
     return { c: { place: p, why, gem }, s, i };
