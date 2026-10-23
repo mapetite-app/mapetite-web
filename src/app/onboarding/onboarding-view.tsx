@@ -693,7 +693,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => {
                     setCorreggi((v) => !v);
                     // Le righe si aprono sopra i tasti in basso: si portano in vista.
-                    requestAnimationFrame(() => document.querySelector("[data-testid=capito-righe]")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+                    requestAnimationFrame(() => document.querySelector("[data-testid=capito-righe]")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
                   }} className="min-h-11 font-display font-semibold text-brand">
                     Correggi
                   </button>
