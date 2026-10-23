@@ -3636,6 +3636,8 @@ else {
   await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
   ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
   ok(/Google oggi: 1 su 50/.test((await tp.getByTestId("numeri-google").textContent()) ?? ""), `pannello: quota Google di oggi (${await tp.getByTestId("numeri-google").textContent()})`);
+  // Proposta 24: stato dell'AI. Con gli eventi finti nessun verdetto in archivio: la riga c'è e lo dice.
+  ok(/nessun verdetto in archivio/.test((await tp.getByTestId("numeri-ai").textContent()) ?? ""), `pannello: riga sullo stato dell'AI (${await tp.getByTestId("numeri-ai").textContent()})`);
   ok((await tp.getByTestId("numeri-imbuto").textContent())?.includes("Scheda aperta dai risultati"), "pannello: imbuto ricerca → scheda → azione");
   ok((await tp.getByTestId("numeri-errori").textContent())?.includes("Cannot read properties of undefined"), "pannello: errori con la pagina");
   ok((await tp.getByTestId("numeri-ritorni").textContent())?.includes("1 su 1"), "pannello: ritorni dopo 1/3/7 giorni");

@@ -13,6 +13,8 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 00. **Ricarica il credito Anthropic (Haiku) — APERTA, URGENTE (23/10, 01:00).** L'API risponde "credit balance is too low": in produzione l'AI non scrive più né verdetti per i locali nuovi né i "perché" (prova delle 01:00: 0 "perché" su 12, verdetto solo sui 10 già in memoria). La ricerca funziona ancora, ma senza AI non si capisce perché Mapetite è diversa.
    - console.anthropic.com → Plans & Billing → acquista credito (prepagato, senza ricarica automatica).
    - Come si verifica: le sessioni lo vedono da sole (il verdetto torna sui locali nuovi).
+   - **23/10 alle 05:08: ancora a zero** (stesso errore). L'ultimo verdetto nuovo in produzione è delle 08:07 del 22/10. Da oggi `/admin/numeri` mostra "AI: ok" o "AI forse ferma" con l'ora dell'ultimo verdetto.
+   - Consiglio: imposta anche un avviso di spesa nella console (Limits), così te ne accorgi prima che finisca.
 
 0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
 
