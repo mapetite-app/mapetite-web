@@ -55,8 +55,23 @@ const LABELS: Record<string, string> = {
   meal_takeaway: "Da asporto",
 };
 
-export function categoryLabel(category: string | null | undefined): string | null {
+// Il nome del locale dice già che cos'è ("Trattoria da Lucia", che Google segna come seafood_restaurant):
+// sopra il nome "PESCE" si leggeva come un errore (collaudo 23/10). Vale solo contro un tipo Google
+// generico o di cucina (ristorante di qualcosa); mai contro bar, caffè o pasticceria. Solo dal nome, dato Google.
+const DAL_NOME: [RegExp, string][] = [
+  [/\btrattoria\b/i, "Trattoria"],
+  [/\b(?:osteria|hostaria|ostaria)\b/i, "Osteria"],
+  [/\bpizzeria\b/i, "Pizzeria"],
+  [/\btaverna\b/i, "Taverna"],
+  [/\bbraceria\b/i, "Braceria"],
+];
+
+export function categoryLabel(category: string | null | undefined, name?: string | null): string | null {
   if (!category) return null;
+  if (name && /(?:^|_)restaurant$/.test(category.toLowerCase())) {
+    const dalNome = DAL_NOME.find(([re]) => re.test(name));
+    if (dalNome) return dalNome[1];
+  }
   const known = LABELS[category.toLowerCase()];
   if (known) return known;
   // Tipo di Google non in elenco: mai in inglese sulla card ("Dessert restaurant").
