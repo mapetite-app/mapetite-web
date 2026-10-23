@@ -5939,7 +5939,10 @@ else {
   const capitoA = (await ip.getByTestId("capito-frase").count()) > 0;
   if (capitoA) { const f = ((await ip.getByTestId("capito-frase").textContent()) ?? "").replace(/\s+/g, " ");
     const serif = await ip.locator("h1").evaluate((h) => /newsreader/i.test(getComputedStyle(h).fontFamily));
-    ok(serif && (await ip.getByTestId("capito-riga").count()) === 0 && f.includes("Ami le trattorie di quartiere") && f.includes("Esci a Monti") && f.includes("giri alla larga dai posti turistici") && f.includes("Eviti il pesce") && f.includes("aperitivo"), `primo accesso (mockup A): 'Ecco cosa ho capito di te' in una frase, titolo serif, righe nascoste (${f.slice(0, 200)})`); }
+    ok(serif && (await ip.getByTestId("capito-riga").count()) === 0 && f.includes("Ami le trattorie di quartiere") && f.includes("Esci a Monti") && f.includes("giri alla larga dai posti turistici") && f.includes("Eviti il pesce") && !f.includes("aperitivo") && (f.match(/\./g) ?? []).length <= 3, `primo accesso (mockup A): 'Ecco cosa ho capito di te' in 3 frasi al massimo (gusti, dove, diete; occasioni dietro 'Correggi'), titolo serif, righe nascoste (${f.slice(0, 200)})`);
+    const c = await ip.getByTestId("capito-correggi").boundingBox();
+    const top = await ip.getByTestId("benvenuto-fine").evaluate((b) => b.closest(".fixed").getBoundingClientRect().top);
+    ok(c && c.y + c.height <= top, `primo accesso (mockup A): 'Correggi' sopra i tasti in basso (${Math.round((c?.y ?? 0) + (c?.height ?? 0))} ≤ ${Math.round(top)})`); }
   if (capitoA) await ip.getByTestId("capito-correggi").click();
   { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
@@ -5951,10 +5954,15 @@ else {
     const ob = await ip.getByTestId("benvenuto-importa-si").boundingBox();
     ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`); }
   await ip.setViewportSize({ width: 390, height: 844 });
-  if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
+  if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click();
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 4" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
+    await ip.getByTestId("tipo-su").click();
+    await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
+    await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia");
     await ip.getByRole("button", { name: "Continua" }).click();
-    await ip.getByTestId("capito-correggi").click(); }
+    if ((await ip.getByTestId("capito-correggi").getAttribute("aria-expanded")) !== "true") await ip.getByTestId("capito-correggi").click(); }
   await ip.getByTestId("capito-riga").first().click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 4" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando una riga si torna a cambiarla, con le scelte conservate");
   for (let k = 0; k < 3; k++) await ip.getByRole("button", { name: "Continua" }).click().catch(() => {});
@@ -5984,8 +5992,8 @@ else {
   await ip.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Milano", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
-  await ip.getByTestId("onboarding-salta").click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: 'Salta' al passo 2 va al passo 3");
+  await ip.getByRole("button", { name: "Basta così, continua" }).click();
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 4", "primo accesso: 'Basta così, continua' al passo 2 va al passo 3");
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("tipo-giu").click();
   await ip.getByTestId("tipo-giu").click();
@@ -7293,8 +7301,9 @@ else {
   // 1. Ultimo passo del primo accesso: niente "Salta" in alto; senza risposte nessuna sintesi inventata.
   await vp.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
   await vp.getByRole("button", { name: "Continua" }).click();
-  ok(await vp.getByTestId("onboarding-salta").isVisible(), "primo accesso: 'Salta' resta al passo 2");
-  await vp.getByTestId("onboarding-salta").click();
+  // Al passo 2 un solo modo di andare avanti: "Basta così, continua" in basso (niente "Salta" doppio, collaudo 23/10).
+  ok((await vp.getByTestId("onboarding-salta").count()) === 0 && await vp.getByRole("button", { name: "Basta così, continua" }).isVisible(), "primo accesso: al passo 2 solo 'Basta così, continua', niente 'Salta' doppio");
+  await vp.getByRole("button", { name: "Basta così, continua" }).click();
   await vp.getByRole("button", { name: "Continua" }).click();
   ok((await vp.getByTestId("benvenuto-passo").textContent()) === "4 di 4" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: all'ultimo passo niente 'Salta'");
   ok(await vp.getByTestId("capito-vuoto").isVisible(), "primo accesso: senza risposte, 'Ecco cosa ho capito' dice che imparerà dall'uso (niente di inventato)");

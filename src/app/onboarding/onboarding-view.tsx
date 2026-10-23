@@ -14,9 +14,9 @@ import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 // "Ecco cosa ho capito di te" sul mockup A (frase da amico): bocciata 2 volte dal collaudo del 23/10
-// ("e altri 1", "Correggi" sotto i tasti con i profili ricchi, tocco su un tipo senza uscita). Spenta:
-// resta la lista di prima finché un collaudo nuovo non la approva.
-const CAPITO_A = false;
+// ("e altri 1", "Correggi" sotto i tasti con i profili ricchi, tocco su un tipo senza uscita), corretta
+// la mattina del 23/10 (al massimo 3 frasi, tocco su un tipo che riapre quella card). Per spegnerla: false.
+const CAPITO_A = true;
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -237,13 +237,21 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const corrente = TIPI.find((t) => !visti.includes(t.id)) ?? null;
   const gusto = { v: 1 as const, zone, su, giu, scoperta };
 
+  const [tornaCapito, setTornaCapito] = useState(false);
+  // Per i lettori di schermo: l'esito del voto e la card dopo (aria-live, collaudo 23/10).
+  const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
     setSu((p) => (voto === "su" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
     setGiu((p) => (voto === "giu" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
     const dopo = [...visti.filter((x) => x !== id), id];
     setVisti(dopo);
-    // Finiti i dieci: si passa da soli alla schermata dopo.
-    if (dopo.length >= TIPI.length) setTimeout(() => setStep(PASSO_COME), 250);
+    // Finiti i dieci: si passa da soli alla schermata dopo (o si torna alla frase, se si correggeva da lì).
+    if (dopo.length >= TIPI.length) {
+      const dove = tornaCapito ? PASSO_CAPITO : PASSO_COME;
+      setTornaCapito(false);
+      setTimeout(() => setStep(dove), 250);
+    }
+    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
   };
   const annullaUltimo = () => {
     const ultimo = visti[visti.length - 1];
@@ -306,7 +314,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     priceRange,
     diete,
     occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
-  });
+  }, 3);
   const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
@@ -325,12 +333,19 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     });
     return () => cancelAnimationFrame(id);
   }, [vaiA, step]);
-  const cambia = (k: string) => { setStep(PASSO_DI[k] ?? 0); setVaiA(k); };
+  // Tornati a correggere i tipi dalla frase: rivotata la card si torna alla frase, non al passo 3.
+  const riapri = (id: string) => { setVisti((p) => p.filter((x) => x !== id)); setStep(PASSO_TIPI); };
+  const cambia = (k: string, id?: string) => {
+    if (id) { setTornaCapito(true); return riapri(id); }
+    if (k === "su" || k === "giu") setTornaCapito(true);
+    setStep(PASSO_DI[k] ?? 0);
+    setVaiA(k);
+  };
   // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
   const [via, setVia] = useState<"su" | "giu" | null>(null);
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg" data-testid="benvenuto" data-passo={step + 1}>
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-bg" data-testid="benvenuto" data-passo={step + 1}>
       {/* Barra di avanzamento */}
       <div className="sticky top-0 z-10 bg-bg px-6 pb-3 pt-5">
         <div className="mx-auto max-w-lg">
@@ -350,7 +365,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             {/* Prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
                 Dalla seconda: salta solo quella schermata. Le ultime due hanno già il loro
                 "Lo faccio dopo" / "Mostrami": niente doppioni in alto, lo spazio resta. */}
-            {step >= PASSO_CAPITO ? (
+            {step >= PASSO_CAPITO || step === PASSO_TIPI ? (
               <span aria-hidden className="-mr-2 min-h-11 w-12" />
             ) : step === 0 ? (
               <form action={skipOnboarding}>
@@ -508,7 +523,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex min-h-[clamp(14rem,36svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
+                  className="relative flex h-[clamp(15rem,38svh,19rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -516,7 +531,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   }}
                 >
                   {drag && Math.abs(drag.dx) > 30 && (
-                    <span aria-hidden className={`absolute left-4 top-4 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "bg-accent" : "bg-black/50"}`}>
+                    <span aria-hidden className={`absolute right-4 top-4 z-10 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "bg-accent" : "bg-black/50"}`}>
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
@@ -526,7 +541,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
                   <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
                   {/* L'emoji occupa lo spazio libero sopra il testo (non più in posizione fissa: a 360px copriva titolo ed etichetta, collaudo 23/10). */}
-                  <span aria-hidden className="relative flex min-h-[5.5rem] flex-1 items-center justify-center pb-2 text-[4.75rem] leading-none drop-shadow-lg min-[380px]:text-[5.5rem]">{corrente.emoji}</span>
+                  <span aria-hidden className="relative flex min-h-0 flex-1 items-center justify-center pb-2 text-[4.25rem] leading-none drop-shadow-lg min-[380px]:text-[5.5rem]">{corrente.emoji}</span>
                   <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
                   <span className="relative mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-pill bg-white/85 px-3 py-1 font-display text-[13px] font-semibold text-[#141414]">
                     {corrente.famoso ? "Molto noto" : <><Sparkles size={12} className="text-accent" aria-hidden /> Chicca di quartiere</>}
@@ -536,7 +551,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 </div>
                 </div>
                 {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
-                <div className="mt-7 flex items-center justify-between px-3">
+                <div className="mt-7 flex items-center justify-between px-3 [@media(max-height:700px)]:mt-4">
                   <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
@@ -547,17 +562,27 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted max-[379px]:hidden">← trascina la card, oppure tocca →</p>
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted max-[379px]:hidden [@media(max-height:700px)]:hidden">← trascina la card, oppure tocca →</p>
+                <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {visti.length + 1} di {TIPI.length}: {corrente.titolo}.</p>
                 {visti.length > 0 && (
-                  <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
+                  <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent [@media(max-height:700px)]:mt-0">
                     ↶ Torna al precedente
                   </button>
                 )}
               </>
             ) : (
-              <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
-                Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
-              </p>
+              <div data-testid="tipi-finiti">
+                <p className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
+                  Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. Tocca un posto per cambiarlo, oppure <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">rifai tutto</button>.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {TIPI.map((t) => (
+                    <button key={t.id} type="button" data-testid="tipo-riapri" onClick={() => riapri(t.id)} aria-label={`Cambia: ${t.titolo}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-surface px-3 text-sm font-sans text-text">
+                      <span aria-hidden>{t.emoji}</span> {t.titolo} <span aria-hidden>{su.includes(t.id) ? "👍" : giu.includes(t.id) ? "👎" : "·"}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -652,8 +677,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                           tabIndex={0}
                           data-testid="capito-parola"
                           aria-label={`${x.t}: cambia`}
-                          onClick={() => cambia(x.k!)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!); } }}
+                          onClick={() => cambia(x.k!, x.id)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!, x.id); } }}
                           // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
                           className="cursor-pointer bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
                         >
@@ -663,9 +688,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     </span>
                   ))}
                 </p>
-                <p className="mt-6 flex items-center gap-2 text-[15px] font-sans text-text-muted">
+                <p className="mt-6 flex items-center gap-2 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mt-3">
                   Non è così?
-                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="min-h-11 font-display font-semibold text-brand">
+                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => {
+                    setCorreggi((v) => !v);
+                    // Le righe si aprono sopra i tasti in basso: si portano in vista.
+                    requestAnimationFrame(() => document.querySelector("[data-testid=capito-righe]")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+                  }} className="min-h-11 font-display font-semibold text-brand">
                     Correggi
                   </button>
                 </p>
@@ -677,10 +706,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             )}
             {/* Le righe da correggere una per una: un tocco più in là, dietro "Correggi". */}
             {(correggi || !CAPITO_A) && righe.length > 0 && (
-              <ul className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
+              <ul data-testid="capito-righe" className="mt-1 scroll-mb-48 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righe.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
-                    <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
+                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
                       <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
                       <ChevronRight aria-label="Cambia" size={18} className="shrink-0 text-text-muted" />

@@ -161,7 +161,7 @@ const PLURALE: Record<string, string> = {
 const SPESA: Record<string, string> = { "€": "spendi poco", "€€": "spendi il giusto", "€€€": "non badi troppo al conto", "€€€€": "ti concedi l'alta cucina" };
 const EVITA: Record<string, string> = { celiaco: "il glutine", "no-lattosio": "il lattosio", "no-pesce": "il pesce", "no-carne": "la carne" };
 
-export type PezzoFrase = { t: string; k?: string };
+export type PezzoFrase = { t: string; k?: string; id?: string };
 
 const elenco = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
 
@@ -191,10 +191,15 @@ function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["u
   return out;
 }
 
-export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }): PezzoFrase[][] {
-  const frasi: PezzoFrase[][] = [];
-  const su = m.su.map((id) => PLURALE[id]).filter(Boolean);
-  if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((t) => ({ t, k: "su" })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }]);
+// Al massimo `max` frasi (collaudo del 23/10: con i profili ricchi "Correggi" finiva sotto i tasti).
+// Si tengono le più importanti (gusti, dove, diete), nell'ordine di lettura; il resto sta dietro "Correggi".
+const PRIORITA: Record<string, number> = { su: 0, dove: 1, diete: 2, giu: 3, occasioni: 4 };
+export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }, max = Infinity): PezzoFrase[][] {
+  const tutte: { f: PezzoFrase[]; p: string }[] = [];
+  const frasi = { push: (f: PezzoFrase[], p = "dove") => tutte.push({ f, p }) };
+  const su = m.su.filter((id) => PLURALE[id]);
+  // Ogni tipo porta il suo id: toccandolo si riapre proprio quella card.
+  if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
@@ -210,30 +215,33 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
   if (extra.priceRange && SPESA[extra.priceRange]) parti.push([{ t: SPESA[extra.priceRange], k: "spesa" }]);
   if (m.scoperta === "chicche") parti.push([{ t: "giri alla larga dai posti turistici", k: "scoperta" }]);
   else if (m.scoperta === "famosi") parti.push([{ t: "non ti spaventano i posti famosi", k: "scoperta" }]);
-  // Più zone ("a Monti e al Pigneto"): frase a sé, se no le "e" si accavallano ("in centro e ai Parioli e non ti…").
-  if (m.zone.length > 1 && parti.length > 1) {
-    const z = parti.shift()!;
-    z[0] = { ...z[0], t: maiuscola(z[0].t) };
-    frasi.push([...z, { t: "." }]);
-  }
+  // Più zone ("a Monti e al Pigneto"): staccate dal resto con il punto e virgola, se no le "e" si accavallano
+  // ("in centro e ai Parioli e non ti…"). Una frase sola: le frasi in vista sono al massimo 3 (collaudo 23/10).
+  const staccaZone = m.zone.length > 1 && parti.length > 1;
   if (parti.length) {
-    const f = parti.flatMap((p, i) => [...(i === 0 ? [] : [{ t: i === parti.length - 1 ? " e " : ", " }]), ...p]);
+    const resto = staccaZone ? parti.slice(1) : parti;
+    const f = [
+      ...(staccaZone ? [...parti[0], { t: "; " }] : []),
+      ...resto.flatMap((p, i) => [...(i === 0 ? [] : [{ t: i === resto.length - 1 ? " e " : ", " }]), ...p]),
+    ];
     f[0] = { ...f[0], t: maiuscola(f[0].t) };
     frasi.push([...f, { t: "." }]);
   }
   const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
-  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }]);
-  const giu = m.giu.map((id) => PLURALE[id]).filter(Boolean);
-  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((t) => ({ t, k: "giu" })), 2, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }]);
+  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }], "occasioni");
+  const giu = m.giu.filter((id) => PLURALE[id]);
+  if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((id) => ({ t: PLURALE[id], k: "giu", id })), 2, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "giu");
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
   if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" });
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
-  if (d.length) frasi.push([...d, { t: "." }]);
+  if (d.length) frasi.push([...d, { t: "." }], "diete");
+  const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));
+  const out = tutte.filter((_, i) => scelte.has(i)).map((x) => x.f);
   // Profilo corto: una mezza frase vera invece di una pagina vuota.
-  if (frasi.length > 0 && frasi.length < 3) frasi.push([{ t: "Il resto lo imparo da quello che salvi e cerchi." }]);
-  return frasi;
+  if (out.length > 0 && tutte.length < 3) out.push([{ t: "Il resto lo imparo da quello che salvi e cerchi." }]);
+  return out;
 }
 
 /** Per l'AI dei verdetti: il profilo in parole, senza id interni. */
