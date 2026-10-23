@@ -47,3 +47,4 @@ tmp-takeout/
 
 # Documenti di business (pitch, business plan): MAI su GitHub, il repository è pubblico
 docs/business/
+.claude/worktrees/
