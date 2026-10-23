@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 23/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta)
+
+### 24. "AI: ok" nel pannello e avviso prima che finisca il credito
+- **Problema:** `PROBLEMI.md`, 11. Il 23/10 il credito dell'AI è finito di notte e nessuno se n'è accorto finché una sessione non ha provato a mano.
+- **Cosa fa:** in `/admin/numeri` una riga "AI: ok · ultimo verdetto alle 21:40" oppure "AI ferma da 01:00 (credito finito)", letta dagli errori già registrati nei log del server; la sessione notturna la controlla per prima e, se è rossa, lo scrive in cima alla PR.
+- **Da dove nasce:** nessun competitor lo mostra (è interno); serve a tenere la promessa "verdetto sempre" di VISIONE.
+- **Valore per l'utente:** il verdetto non sparisce per giorni senza che nessuno lo sappia. **Valore per il ristoratore:** indiretto (la sua scheda resta spiegata).
+- **Sforzo:** S. **Costo:** zero Google, zero AI (legge un evento già scritto).
+- **Stato proposto:** PRONTA.
+
+### 25. "Stasera c'è posto" vero, dai sistemi di prenotazione (come Table Tonight di Places)
+- **Problema:** `PROBLEMI.md`, 1 e 2. Il venerdì alle 19 chi ha scelto il posto giusto scopre che è pieno; il ristoratore ha tavoli liberati da disdette che nessuno vede.
+- **Cosa fa:** sulle card della ricerca "stasera", un segno "🟢 tavolo alle 21" preso dal sistema di prenotazione del locale; un tocco e si prenota lì. Mai cambia l'ordine dei risultati (il posto giusto resta primo anche se pieno).
+- **Da dove nasce:** Places "Table Tonight" raccoglie i tavoli di oggi da più piattaforme ([Time Out](https://www.timeout.com/newyork/news/the-founder-of-dating-app-raya-has-a-new-way-to-score-last-minute-restaurant-reservations-010626)); noi lo uniamo al verdetto e ai gusti, cosa che Places non fa.
+- **Valore per l'utente:** dalla scelta alla prenotazione senza telefonate. **Valore per il ristoratore:** riempie i tavoli delle disdette dell'ultima ora (no-show medio 12,8%: `PROBLEMI.md`, 1); pagherebbe per prenotazione arrivata, non per "esserci".
+- **Sforzo:** L (servono accordi o API dei sistemi: TheFork, Zenchef/CoverManager, vedi `PARTNER.md`). **Costo:** zero Google; dipende dall'accordo.
+- **Stato proposto:** DA DECIDERE LORENZO — "Prepariamo per Roberto la bozza di richiesta di accesso alle disponibilità a TheFork e Zenchef?"
+
 ## 23/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
 
 ### 22. "✓ terrazza · 3 recensioni su 5": quanto è sicura la prova

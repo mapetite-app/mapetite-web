@@ -418,3 +418,13 @@ export function computeNumeri(rows: EventRow[], giorni: number, now: number = Da
     senzaTracciamento: !rows.some((r) => NUOVI_TIPI.includes(r.type)),
   };
 }
+
+// Stato dell'AI (proposta 24, 23/10: il credito era finito di notte e nessuno lo sapeva).
+// Nessuna chiamata in più: confronta l'ultimo verdetto scritto (place_synthesis.generated_at)
+// con le ricerche arrivate dopo. Se dopo l'ultimo verdetto ci sono almeno 3 ricerche, l'AI è
+// probabilmente ferma (credito o chiave): un indizio, non una prova, e la riga lo dice così.
+export function statoAi(ultimoVerdetto: string | null, rows: EventRow[]): { ferma: boolean; ricercheDopo: number } {
+  const da = ultimoVerdetto ? new Date(ultimoVerdetto).getTime() : 0;
+  const ricercheDopo = rows.filter((r) => r.type === "ricerca" && new Date(r.created_at).getTime() > da).length;
+  return { ferma: ricercheDopo >= 3, ricercheDopo };
+}

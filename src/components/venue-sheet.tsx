@@ -267,7 +267,6 @@ export default function VenueSheet({
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
   const emoji = getCategoryEmoji(category, name);
-  // Riga di contesto della variante B (sezione Info): "Roma · 600 m".
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
     <ConfrontoFonti
@@ -283,9 +282,6 @@ export default function VenueSheet({
       onMapetite={onMapetite}
     />
   );
-  const placeLine = [cityFromAddress(address), origin ? distanceLabel(origin, { lat, lng }) : null]
-    .filter(Boolean)
-    .join(" · ");
 
   // Il riquadro scuro "Il verdetto Mapetite" (piace a Lorenzo, 12/10): uguale nelle due schede.
   const verdictCard = hasVerdictBlock ? (
@@ -934,12 +930,7 @@ export default function VenueSheet({
                     <span className="shrink-0 font-display font-semibold text-brand">{addressCopied ? "✓ Copiato" : "Copia"}</span>
                   </button>
                 )}
-                {placeLine && (
-                  <p data-testid="citta-distanza" className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
-                    <Navigation size={18} className="shrink-0 text-brand" aria-hidden />
-                    {placeLine}
-                  </p>
-                )}
+                {/* Città e distanza stanno già sotto il nome: qui niente doppione (collaudo 23/10). */}
                 {userRatingCount != null && rating != null && (
                   <p className="flex min-h-11 items-center gap-3 text-sm font-sans text-text-muted">
                     <span aria-hidden className="w-[18px] shrink-0 text-center text-star">★</span>
