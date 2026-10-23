@@ -7629,7 +7629,8 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
     const p = await c.newPage();
     await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
-    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}&at=41.89,12.47`, { waitUntil: "networkidle" });
+    // Senza "at": con un link condiviso la posizione non si legge (src/app/mappa/map-view.tsx), qui serve quella già permessa.
+    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}`, { waitUntil: "networkidle" });
     await p.getByText("I romani ci tornano per la gricia.").first().waitFor({ timeout: 8000 });
     if (pos) await p.waitForTimeout(1500);
     const card = (id) => p.locator(`li[data-id=${id}]`).first().innerText().catch(() => "");
