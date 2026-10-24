@@ -239,6 +239,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const dedotta = scopertaDedotta(su, [...su, ...giu]);
   const scopertaOra = scoperta ?? dedotta;
   const scopertaVista = maxVisto >= PASSO_SCOPERTA;
+  // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
+  // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).
+  const fissaScoperta = () => { if (step === PASSO_SCOPERTA && scoperta == null && dedotta) setScoperta(dedotta); };
   // Il tipo di posto da valutare adesso: quello riaperto dalla frase, se c'è; se no il primo non ancora visto.
   const [riaperta, setRiaperta] = useState<string | null>(null);
   const corrente = (riaperta ? TIPI.find((t) => t.id === riaperta) : null) ?? TIPI.find((t) => !visti.includes(t.id)) ?? null;
@@ -351,7 +354,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => (tornaFrase ? tornaAllaFrase() : setStep((s) => s - 1))}
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s - 1); }}
             disabled={step === 0}
             aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
             className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
@@ -374,7 +377,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
               in un tocco (collaudo del 24/10). Dopo, ogni domanda ha il suo "Salta" in basso. */}
-          {step === 0 && !tornaFrase && maxVisto === 0 && (
+          {step === 0 && !tornaFrase && maxVisto === 0 && !ripreso && (
             <form action={skipOnboarding} className="-mr-2 shrink-0">
               {next && <input type="hidden" name="next" value={next} />}
               <button type="submit" data-testid="onboarding-salta" onClick={clearDraft} className="min-h-11 px-2 text-[15px] font-display font-semibold text-text-muted">
@@ -708,7 +711,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <button
               type="button"
               data-testid={tornaFrase ? "torna-frase" : "benvenuto-avanti"}
-              onClick={() => (tornaFrase ? tornaAllaFrase() : setStep((s) => s + 1))}
+              onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s + 1); }}
               disabled={step === 0 && !risposto}
               className={risposto || step === 0 || step === PASSO_DIETE || tornaFrase ? TASTO_PIENO : TASTO_VUOTO}
             >
