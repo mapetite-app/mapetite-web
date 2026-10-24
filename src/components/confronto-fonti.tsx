@@ -17,6 +17,7 @@ import {
   tripadvisorSearchUrl,
   votoIt,
 } from "@/lib/confronto";
+import { migliaia } from "@/lib/numero";
 
 // "A confronto" (richiesta di Lorenzo, 17/10): il locale visto da Mapetite, Google, Tripadvisor,
 // Guida Michelin e TheFork, in poche righe come Places. Mai un numero inventato: Google dai dati
@@ -76,7 +77,7 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
 
   const googleValue =
     rating != null
-      ? `★ ${votoIt(rating)}${userRatingCount != null ? ` · ${userRatingCount.toLocaleString("it-IT")} recensioni` : ""}`
+      ? `★ ${votoIt(rating)}${userRatingCount != null ? ` · ${migliaia(userRatingCount)} recensioni` : ""}`
       : null;
   // Senza voti della community la riga diceva solo "Il verdetto è qui sopra": un doppione (Semplificare, 18/10).
   const showMapetite = media != null;
@@ -133,7 +134,7 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
             {googleValue ? (
               <>
                 <span className="font-display font-semibold"><span className="text-star">★</span> {votoIt(rating!)}</span>
-                {userRatingCount != null && <span className="text-text-muted"> · {userRatingCount.toLocaleString("it-IT")} recensioni</span>}
+                {userRatingCount != null && <span className="text-text-muted"> · {migliaia(userRatingCount)} recensioni</span>}
               </>
             ) : (
               <span className="text-text-muted">Apri su Google Maps</span>
@@ -161,7 +162,7 @@ export default function ConfrontoFonti({ venueId, name, address, category, lat, 
                 <span className="font-display font-semibold">{votoIt(taDato.rating)}</span>
               ) : null}
               {taDato.numReviews != null && (
-                <span className="whitespace-nowrap text-text-muted">{taDato.numReviews.toLocaleString("it-IT")} recensioni</span>
+                <span className="whitespace-nowrap text-text-muted">{migliaia(taDato.numReviews)} recensioni</span>
               )}
             </span>
             <ExternalLink size={15} className="shrink-0 text-text-muted" aria-hidden />
