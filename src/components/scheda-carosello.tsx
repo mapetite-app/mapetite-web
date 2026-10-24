@@ -104,7 +104,7 @@ export default function SchedaCarosello({
               />
             )}
             <span className="absolute left-3 bottom-7 rounded-pill bg-white/90 px-3 py-1 text-xs font-display font-semibold text-brand shadow-card">
-              Dove si trova · Percorso →
+              📍 Dove si trova
             </span>
           </a>
         )}

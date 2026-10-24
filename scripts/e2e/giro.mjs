@@ -1227,7 +1227,7 @@ await shot("15-scheda-b");
     ok((await page.getByTestId("posto-stasera").count()) === 0 && await page.locator("h2", { hasText: "Trattoria Senza Voto" }).getByTestId("verificato-scheda").isVisible(), "scheda: verificato senza serate → spunta, nessuna pillola 'c'è posto'");
     await page.getByTestId("scheda-tab-info").click();
     const o = ((await page.getByTestId("orari-oggi").textContent().catch(() => "")) ?? "");
-    ok(/^Oggi (\d{2}:\d{2}–\d{2}:\d{2}|Chiuso)$/.test(o.trim()), `scheda, Info: orari di oggi da Google (${o})`);
+    ok(/^(Oggi|Stanotte) (\d{2}:\d{2}–\d{2}:\d{2}|Chiuso)$/.test(o.trim()), `scheda, Info: orari di oggi da Google (${o})`);
     await page.getByTestId("orari-settimana-apri").click();
     ok((await page.getByTestId("orari-settimana").locator("li").count()) === 7, "scheda, Info: un tocco su 'Oggi' apre gli orari dei 7 giorni");
     ok(await page.evaluate(() => document.documentElement.dataset.schedaAperta === "1" && getComputedStyle(document.querySelector("[data-app-nav]")).display === "none"), "scheda aperta: la barra dell'app si nasconde (scheda a tutto spazio, come Places)"); }

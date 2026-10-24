@@ -213,6 +213,20 @@ export default function VenueSheet({
   const [settimanaOpen, setSettimanaOpen] = useState(false);
   // Mockup A: "Orari, contatti, recensioni ›" apre il resto della scheda.
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Foto che si abbassa finché "Orari, contatti, recensioni" non sta sopra la barra Prenota/Percorso/Salva:
+  // con verdetto lungo, "Per te" e ✓ le altezze fisse per schermo non bastavano (iPhone SE, collaudo 24/10).
+  // Si misura dopo ogni render (il verdetto arriva dopo), solo a scheda ferma in cima; si riparte a ogni locale.
+  const [fotoBassa, setFotoBassa] = useState<{ id: string; livello: number }>({ id: venue.id, livello: 0 });
+  const livelloFoto = fotoBassa.id === venue.id ? fotoBassa.livello : 0;
+  useEffect(() => {
+    if (livelloFoto >= 2 || detailsOpen) return;
+    const raf = requestAnimationFrame(() => {
+      const riga = document.querySelector("[data-testid=scheda-altro-info]")?.getBoundingClientRect();
+      const barra = document.querySelector("[data-testid=barra-azioni]")?.getBoundingClientRect();
+      if (riga && barra && riga.height > 0 && riga.bottom > barra.top) setFotoBassa({ id: venue.id, livello: livelloFoto + 1 });
+    });
+    return () => cancelAnimationFrame(raf);
+  });
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
@@ -538,6 +552,9 @@ export default function VenueSheet({
     // Orari Google della ricerca (i salvati non li hanno): oggi in Info, "apre alle 19:00" se chiuso.
     const adesso = new Date();
     const oggi = orariDelGiorno(venue.orari, adesso);
+    // Dopo mezzanotte "oggi" sono gli orari di ieri sera ancora in corso: si chiamano "Stanotte", così non
+    // contraddicono la riga di oggi in grassetto nella settimana (collaudo 24/10).
+    const stanotte = oggi != null && oggi !== orariDelGiorno(venue.orari, new Date(adesso.getFullYear(), adesso.getMonth(), adesso.getDate(), 12));
     // Con gli orari, aperto/chiuso si calcola adesso (la scheda può restare aperta a lungo);
     // senza, vale quello che Google ha detto alla ricerca.
     const aperto = apertoIl(venue.orari, adesso) ?? openNow;
@@ -630,7 +647,7 @@ export default function VenueSheet({
           onDirections={() => signal("percorso", "carosello")}
           // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10);
           // a 375×667 (iPhone SE) ancora più bassa: con la pillola e un verdetto su 3 righe finiva sotto (collaudo 23/10).
-          heightClass="h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"
+          heightClass={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"}
           fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
           overlay={
             <>
@@ -947,7 +964,7 @@ export default function VenueSheet({
                   <div>
                     <button type="button" data-testid="orari-settimana-apri" aria-expanded={settimanaOpen} onClick={() => setSettimanaOpen((v) => !v)} className="flex min-h-11 w-full items-center gap-3 text-left text-sm font-sans text-text">
                       <Clock size={18} className="shrink-0 text-brand" aria-hidden />
-                      <span data-testid="orari-oggi" className="min-w-0 flex-1"><span className="font-display font-semibold">Oggi</span> {oggi}</span>
+                      <span data-testid="orari-oggi" className="min-w-0 flex-1"><span className="font-display font-semibold">{stanotte ? "Stanotte" : "Oggi"}</span> {oggi}</span>
                       <ChevronRight size={16} aria-hidden className={`shrink-0 text-text-muted transition-transform ${settimanaOpen ? "rotate-90" : ""}`} />
                     </button>
                     {settimanaOpen && (

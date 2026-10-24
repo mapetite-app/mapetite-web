@@ -9,9 +9,14 @@ const GEM_MIN_REVIEWS = 20;
 // Rooftop, roof garden e locali d'albergo sono mete da cartolina, non chicche di quartiere: pochi voti
 // lì vogliono dire "aperto da poco" o "frequentato da ospiti di passaggio", non "segreto ben custodito".
 // Solo dal nome del locale (dato Google), nessuna ipotesi.
-const META_DA_CARTOLINA = /\b(?:hotel|albergo|resort|rooftop|roof(?:\s?(?:garden|terrace|top|bar))?|sky\s?bar|terrazza panoramica)\b/i;
+// Gli alberghi mai; i rooftop solo se davvero piccoli: un rooftop di quartiere con 105 recensioni
+// gestito dalla titolare resta una chicca (secondo collaudo del 24/10, VISIONE).
+const ALBERGO = /\b(?:hotel|albergo|resort)\b/i;
+const META_DA_CARTOLINA = /\b(?:rooftop|roof(?:\s?(?:garden|terrace|top|bar))?|sky\s?bar|terrazza panoramica)\b/i;
+const ROOFTOP_MAX_REVIEWS = 150;
 
 export function isGem(rating: number | null | undefined, reviews: number | null | undefined, name?: string | null): boolean {
-  if (name && META_DA_CARTOLINA.test(name)) return false;
+  if (name && ALBERGO.test(name)) return false;
+  if (name && META_DA_CARTOLINA.test(name) && (reviews ?? 0) > ROOFTOP_MAX_REVIEWS) return false;
   return rating != null && reviews != null && rating >= GEM_MIN_RATING && reviews >= GEM_MIN_REVIEWS && reviews <= GEM_MAX_REVIEWS;
 }
