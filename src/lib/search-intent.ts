@@ -80,7 +80,26 @@ export async function extractSearchIntent(query: string): Promise<SearchIntent |
     console.log(`[search-intent] dalla memoria: "${key.slice(0, 60)}"`);
     return hit.value;
   }
+  // Solo in sviluppo con GOOGLE_FIXTURES: anche l'intento si salva su disco, così la stessa frase
+  // riporta alla stessa richiesta Google salvata (senza, l'AI la riscriveva un po' diversa a ogni
+  // riavvio e GOOGLE_FIXTURES_ONLY non trovava più la risposta: 23/10).
+  const fixtureDir = process.env.NODE_ENV === "development" ? process.env.GOOGLE_FIXTURES : undefined;
+  const fixturePath = fixtureDir
+    ? `${fixtureDir}/intent-${(await import("node:crypto")).createHash("sha1").update(key).digest("hex").slice(0, 16)}.json`
+    : null;
+  if (fixturePath) {
+    const saved = await (await import("node:fs/promises")).readFile(fixturePath, "utf8").catch(() => null);
+    if (saved) return JSON.parse(saved) as SearchIntent;
+  }
   const value = askIntent(query);
+  if (fixturePath) {
+    value.then(async (v) => {
+      if (!v) return;
+      const fs = await import("node:fs/promises");
+      await fs.mkdir(fixtureDir!, { recursive: true });
+      await fs.writeFile(fixturePath, JSON.stringify(v));
+    }).catch(() => {});
+  }
   intentCache.set(key, { at: Date.now(), value });
   if (intentCache.size > INTENT_MAX) intentCache.delete(intentCache.keys().next().value!);
   // Un fallimento (null) non resta in memoria: la prossima volta si riprova.

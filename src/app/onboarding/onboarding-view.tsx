@@ -2,15 +2,17 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
-import { DIETE, SCOPERTE, TIPI, capito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
+import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
+
+const SERIF = "font-[family-name:var(--font-newsreader)]";
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -90,25 +92,38 @@ function parseDraft(raw: string | null): Draft | null {
 }
 
 // Primo accesso dopo la registrazione: la "mappa del gusto" (sprint 25/10, LORENZO.md).
-// 1) città e zone, 2) dieci tipi di posto 👍/👎, 3) occasioni, spesa, diete, famosi o chicche,
-// 4) "porta qui i tuoi posti" (Google Maps o il link di un reel), 5) "Ecco cosa ho capito di te"
-// e subito i posti per te. Tutto saltabile: chi vuole provare subito l'app non deve rispondere.
-
+// Una domanda per schermata, come Albo (collaudo 23/10: il vecchio passo 3 ne aveva quattro insieme):
+// città e zone, dieci tipi di posto 👍/👎, famosi o chicche, cosa eviti a tavola, occasioni, spesa,
+// poi "Ecco cosa ho capito di te" e subito i posti per te. Tutto saltabile.
+// Un solo stile in tutti i passi (mockup A): titolo serif, scelta segnata in teal, tasto principale teal.
 const STEPS = [
-  { kicker: "DOVE ESCI", title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
-  { kicker: "I TUOI GUSTI", title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
-  { kicker: "COME ESCI", title: "Famosi o chicche?", subtitle: "E cosa eviti: lo terrò sempre presente." },
-  { kicker: "IL TUO PROFILO", title: "Ecco cosa ho capito", subtitle: "Tocca una riga per cambiarla." },
+  { title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
+  { title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
+  { title: "Famosi o chicche?", subtitle: "Scegli quello che ti somiglia di più." },
+  { title: "Come mangi?", subtitle: "Diete e cose che eviti: le terrò sempre presenti." },
+  { title: "Per cosa esci di solito?", subtitle: "Anche più di una risposta." },
+  { title: "Quanto spendi di solito?", subtitle: "A persona, per una cena." },
+  { title: "Ecco cosa ho capito di te", subtitle: "" },
 ] as const;
 const TOTAL = STEPS.length;
 const PASSO_TIPI = 1;
-const PASSO_COME = 2;
-const PASSO_CAPITO = 3;
+const PASSO_SCOPERTA = 2;
+const PASSO_DIETE = 3;
+const PASSO_OCCASIONI = 4;
+const PASSO_SPESA = 5;
+const PASSO_CAPITO = 6;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
   { value: "Milano", emoji: "🏙️" },
 ];
+
+// Scelta segnata: lo stesso aspetto per card, pillole e prezzi (collaudo 23/10: erano due stili diversi).
+const SCELTA_ON = "border-brand bg-[#e8efee]";
+const SCELTA_OFF = "border-border bg-white";
+const TASTO = "flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-6 font-display text-[17px] font-semibold transition-opacity active:scale-[0.98] disabled:opacity-40";
+const TASTO_PIENO = `${TASTO} bg-brand text-white shadow-float hover:opacity-90`;
+const TASTO_VUOTO = `${TASTO} border-2 border-brand bg-transparent text-brand`;
 
 function toggle(arr: string[], value: string): string[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
@@ -128,23 +143,12 @@ function Chip({
       type="button"
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
-      className={[
-        "inline-flex min-h-10 items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-display font-semibold transition-colors",
-        selected ? "bg-brand text-white" : "border border-border bg-surface text-brand hover:border-brand",
-      ].join(" ")}
+      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold text-brand transition-colors ${selected ? SCELTA_ON : SCELTA_OFF}`}
     >
-      <span aria-hidden>{item.emoji}</span>
+      {item.emoji && <span aria-hidden>{item.emoji}</span>}
       <span>{item.label}</span>
+      {selected && <Check size={16} strokeWidth={3} aria-hidden />}
     </button>
-  );
-}
-
-function Gruppo({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-6">
-      <h2 className="mb-2.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</h2>
-      {children}
-    </div>
   );
 }
 
@@ -156,7 +160,12 @@ export type DalProfilo = { city: string | null; occasions: string[]; priceRange:
 
 export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
-  const draft = parseDraft(raw);
+  // La bozza si legge una volta sola, all'apertura: le risposte salvate mentre si risponde non devono
+  // far ripartire la schermata con "Ho ritrovato le risposte" (collaudo 23/10: lo vedeva chi entrava la prima volta).
+  const client = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const [aperta, setAperta] = useState<{ raw: string | null } | null>(null);
+  if (client && aperta === null) setAperta({ raw });
+  const draft = parseDraft(aperta?.raw ?? null);
   const base: Draft | null = dalProfilo
     ? {
         // Cucine e atmosfere scelte in /me/preferenze: si tengono (prima "Rifalla" le sovrascriveva).
@@ -189,8 +198,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [visti, setVisti] = useState<string[]>(initial?.visti ?? []);
   const [scoperta, setScoperta] = useState<Scoperta | null>(initial?.scoperta ?? null);
   const [diete, setDiete] = useState<string[]>(initial?.diete ?? []);
-  // Diete mandate solo se la persona è passata da "Come esci": saltandolo restano quelle di prima.
-  const [vistoCome, setVistoCome] = useState((initial?.step ?? 0) >= PASSO_COME);
+  // Il passo più avanti visto: le diete si mandano solo se la persona ha visto la loro domanda
+  // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
+  const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,8 +220,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
-  // Arrivati a "Come esci" una volta, le diete contano (aggiornamento durante il render, non in un effetto).
-  if (step >= PASSO_COME && !vistoCome) setVistoCome(true);
+  // Aggiornamento durante il render, non in un effetto.
+  if (step > maxVisto) setMaxVisto(step);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
   useEffect(() => {
@@ -225,19 +235,36 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
-  const dedotta = scopertaDedotta(su);
+  // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
+  const dedotta = scopertaDedotta(su, [...su, ...giu]);
   const scopertaOra = scoperta ?? dedotta;
-  // Il tipo di posto da valutare adesso (il primo non ancora visto).
-  const corrente = TIPI.find((t) => !visti.includes(t.id)) ?? null;
-  const gusto = { v: 1 as const, zone, su, giu, scoperta };
+  const scopertaVista = maxVisto >= PASSO_SCOPERTA;
+  // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
+  // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).
+  const fissaScoperta = () => { if (step === PASSO_SCOPERTA && scoperta == null && dedotta) setScoperta(dedotta); };
+  // Il tipo di posto da valutare adesso: quello riaperto dalla frase, se c'è; se no il primo non ancora visto.
+  const [riaperta, setRiaperta] = useState<string | null>(null);
+  const corrente = (riaperta ? TIPI.find((t) => t.id === riaperta) : null) ?? TIPI.find((t) => !visti.includes(t.id)) ?? null;
+  // Al server la scelta vista al passo 3, anche se era quella proposta dai 👍 (prima si perdeva).
+  const gusto = { v: 1 as const, zone, su, giu, scoperta: scopertaVista ? scopertaOra : scoperta };
 
+  // Arrivati a correggere dalla frase: ogni passo ha "Torna alla frase" (collaudo 23/10: "Continua" portava avanti).
+  const [tornaFrase, setTornaFrase] = useState(false);
+  const tornaAllaFrase = () => { setTornaFrase(false); setRiaperta(null); setStep(PASSO_CAPITO); };
+  // Per i lettori di schermo: l'esito del voto e la card dopo (aria-live, collaudo 23/10).
+  const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
-    setSu((p) => (voto === "su" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
-    setGiu((p) => (voto === "giu" ? [...p.filter((x) => x !== id), id] : p.filter((x) => x !== id)));
-    const dopo = [...visti.filter((x) => x !== id), id];
+    // Rivotando lo stesso tipo resta al suo posto (in testa alla frase), non scivola in fondo dietro "e altri N".
+    setSu((p) => (voto === "su" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
+    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
+    const dopo = visti.includes(id) ? visti : [...visti, id];
     setVisti(dopo);
-    // Finiti i dieci: si passa da soli alla schermata dopo.
-    if (dopo.length >= TIPI.length) setTimeout(() => setStep(PASSO_COME), 250);
+    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
+    // Card riaperta dalla frase: rivotata, si torna sempre alla frase (prima solo se si erano votate tutte e dieci).
+    // Riaperta dall'elenco "Fatto: …" del passo stesso: si torna all'elenco.
+    if (riaperta === id) { if (tornaFrase) setTimeout(tornaAllaFrase, 250); else setRiaperta(null); return; }
+    // Finiti i dieci: si passa da soli alla schermata dopo (o si torna alla frase, se si correggeva da lì).
+    if (dopo.length >= TIPI.length) setTimeout(() => (tornaFrase ? tornaAllaFrase() : setStep(PASSO_SCOPERTA)), 250);
   };
   const annullaUltimo = () => {
     const ultimo = visti[visti.length - 1];
@@ -260,7 +287,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: vistoCome ? diete : undefined });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -282,78 +309,100 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     }
   };
 
-  // "Salta" dalla seconda schermata in poi: si salta solo quella, le risposte date restano.
-  const skipStep = () => setStep((s) => Math.min(s + 1, TOTAL - 1));
-
-  const saltaCls = "-mr-2 min-h-11 inline-flex items-center px-2 text-sm font-display font-semibold text-text-muted underline-offset-2 hover:underline";
-  const righe = capito(gusto, {
-    citta: chosenCity,
-    priceRange,
-    diete,
-    occasions: OCCASIONS.filter((o) => occasions.includes(o.value)),
-  });
-  const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_COME, occasioni: PASSO_COME, spesa: PASSO_COME, diete: PASSO_COME };
+  // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 e ha lasciato vale come
+  // scelta. Una mai mostrata non entra nella sintesi.
+  const gustoVisto = { ...gusto, scoperta: scopertaVista ? scopertaOra : scoperta };
+  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)) };
+  const righe = capito(gustoVisto, extra);
+  const frase = fraseCapito(gustoVisto, extra, 3);
+  // Dietro "Altro" solo ciò che la frase non dice già: quello che è nella frase si cambia toccando la parola.
+  const nellaFrase = new Set(frase.flat().map((x) => x.k).filter(Boolean) as string[]);
+  const righeAltre = righe.filter((r) => !nellaFrase.has(r.chiave));
+  const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_SCOPERTA, occasioni: PASSO_OCCASIONI, spesa: PASSO_SPESA, diete: PASSO_DIETE };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
+  // "Altro": le righe del profilo che la frase non dice (chiuse: la frase basta).
+  const [correggi, setCorreggi] = useState(false);
+  // Aperte le righe, si portano in vista dopo il disegno: sopra i tasti in basso, ma mai sotto la barra in alto.
+  useEffect(() => {
+    if (!correggi) return;
+    const el = document.querySelector("[data-testid=capito-righe]");
+    const fondo = document.querySelector("[data-testid=benvenuto-fine]")?.closest(".fixed")?.getBoundingClientRect().top ?? window.innerHeight;
+    const cima = document.querySelector("[data-testid=benvenuto] > .sticky")?.getBoundingClientRect().bottom ?? 0;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const giu = Math.min(r.bottom + 12 - fondo, r.top - cima - 12);
+    if (giu > 0) window.scrollBy({ top: giu, behavior: "smooth" });
+  }, [correggi]);
+  // Toccando una parola della frase si torna alla domanda che la cambia; poi "Torna alla frase".
+  const cambia = (k: string, id?: string) => {
+    setTornaFrase(true);
+    if (id) { setRiaperta(id); setStep(PASSO_TIPI); return; }
+    setStep(PASSO_DI[k] ?? 0);
+  };
   // Card lasciata andare oltre la soglia: vola fuori dal lato giusto, poi arriva la prossima (come Beli).
   const [via, setVia] = useState<"su" | "giu" | null>(null);
 
+  // Il tasto in basso dei passi a una domanda: "Torna alla frase" se si correggeva da lì, "Continua" con
+  // una risposta, "Salta" senza (prima "Continua" e "Salta" insieme facevano la stessa cosa: collaudo 23/10).
+  const risposto = step === 0 ? !!chosenCity : step === PASSO_SCOPERTA ? !!scopertaOra : step === PASSO_DIETE ? diete.length > 0 : step === PASSO_OCCASIONI ? occasions.length > 0 : step === PASSO_SPESA ? !!priceRange : true;
+
   return (
-    <div className="flex min-h-screen flex-col bg-bg" data-testid="benvenuto" data-passo={step + 1}>
-      {/* Barra di avanzamento */}
-      <div className="sticky top-0 z-10 bg-bg px-6 pb-3 pt-5">
-        <div className="mx-auto max-w-lg">
-          <div className="mb-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setStep((s) => s - 1)}
-              disabled={step === 0}
-              aria-label="Indietro"
-              className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-brand disabled:opacity-0"
-            >
-              <ArrowLeft size={22} aria-hidden />
-            </button>
-            <span className="text-xs font-sans text-text-muted" data-testid="benvenuto-passo">
-              {step + 1} di {TOTAL}
-            </span>
-            {/* Prima schermata: "Salta" salta tutto (i gusti si danno dopo in "I tuoi gusti").
-                Dalla seconda: salta solo quella schermata. Le ultime due hanno già il loro
-                "Lo faccio dopo" / "Mostrami": niente doppioni in alto, lo spazio resta. */}
-            {step >= PASSO_CAPITO ? (
-              <span aria-hidden className="-mr-2 min-h-11 w-12" />
-            ) : step === 0 ? (
-              <form action={skipOnboarding}>
-                {next && <input type="hidden" name="next" value={next} />}
-                <button type="submit" data-testid="onboarding-salta" onClick={clearDraft} className={saltaCls}>
-                  Salta
-                </button>
-              </form>
-            ) : (
-              <button type="button" data-testid="onboarding-salta" onClick={skipStep} disabled={!!submitting} className={saltaCls}>
-                Salta
-              </button>
-            )}
-          </div>
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-[#f8f6f2]" data-testid="benvenuto" data-passo={step + 1}>
+      {/* Barra di avanzamento (mockup A): freccia, barra teal, "2 di 7". */}
+      <div className="sticky top-0 z-10 bg-[#f8f6f2] px-6 pb-2 pt-4">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s - 1); }}
+            disabled={step === 0}
+            aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
+            className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
+          >
+            <ArrowLeft size={22} aria-hidden />
+          </button>
           <div
-            className="h-1.5 w-full overflow-hidden rounded-pill bg-accent-light"
+            className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e9e4da]"
             role="progressbar"
             aria-valuemin={1}
             aria-valuemax={TOTAL}
             aria-valuenow={step + 1}
             aria-label="Avanzamento"
           >
-            <div className="h-full rounded-pill bg-accent transition-all duration-300" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-pill bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
+          <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
+            {step + 1} di {TOTAL}
+          </span>
+          {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
+              dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
+              in un tocco (collaudo del 24/10). Dopo, ogni domanda ha il suo "Salta" in basso. */}
+          {step === 0 && !tornaFrase && maxVisto === 0 && !ripreso && (
+            <form action={skipOnboarding} className="-mr-2 shrink-0">
+              {next && <input type="hidden" name="next" value={next} />}
+              <button type="submit" data-testid="onboarding-salta" onClick={clearDraft} className="min-h-11 px-2 text-[15px] font-display font-semibold text-text-muted">
+                Salta
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
       {/* Contenuto */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-56 pt-4">
-        <p className="mb-2 text-xs font-display font-semibold tracking-widest text-accent">{config.kicker}</p>
-        <h1 className="mb-1 font-title text-[1.75rem] font-semibold leading-tight text-brand">{config.title}</h1>
-        <p className="mb-6 text-sm font-sans text-text-muted">{config.subtitle}</p>
-        {ripreso && (
-          <p data-testid="benvenuto-ripreso" role="status" className="-mt-3 mb-5 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-brand">
+      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-48 pt-3">
+        {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
+        <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
+          {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
+        </h1>
+        {config.subtitle && (
+          <p className="mb-5 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mb-3">
+            {step === PASSO_SCOPERTA && !scoperta && dedotta ? "L'ho scelto dai tuoi 👍: cambialo se non è così." : config.subtitle}
+          </p>
+        )}
+        {step === PASSO_CAPITO && <div className="mb-4 min-[380px]:mb-5" />}
+        {/* Non sulla card dei tipi né sulla frase finale: toglieva spazio e copriva i tasti a 360px (collaudo 23/10). */}
+        {ripreso && step === initial?.step && step !== PASSO_TIPI && step < PASSO_CAPITO && (
+          <p data-testid="benvenuto-ripreso" role="status" className="-mt-2 mb-5 rounded-btn bg-[#e8efee] px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
         )}
@@ -372,31 +421,24 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setCity(on ? null : c.value);
                     setZone([]);
                   }}
-                  className={[
-                    "flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors",
-                    on ? "border-accent bg-accent-light" : "border-border bg-surface",
-                  ].join(" ")}
+                  className={`flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
-                  <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">{c.emoji}</span>
+                  <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-2xl">{c.emoji}</span>
                   <span className="flex-1 font-display text-lg font-semibold text-brand">{c.value}</span>
-                  {on && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">✓</span>}
+                  {on && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
                 </button>
               );
             })}
-            <div
-              className={[
-                "rounded-card border-2 px-4 py-3 transition-colors",
-                otherOpen ? "border-accent bg-accent-light" : "border-border bg-surface",
-              ].join(" ")}
-            >
+            <div className={`rounded-card border-2 px-4 py-2.5 transition-colors ${otherOpen ? SCELTA_ON : SCELTA_OFF}`}>
               <button
                 type="button"
                 aria-pressed={otherOpen}
                 onClick={() => { setOtherOpen((o) => !o); setZone([]); }}
-                className="flex min-h-10 w-full items-center gap-4 text-left"
+                className="flex min-h-11 w-full items-center gap-4 text-left"
               >
-                <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl shadow-card">📍</span>
+                <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-2xl">📍</span>
                 <span className="flex-1 font-display text-lg font-semibold text-brand">Un&apos;altra città</span>
+                {otherOpen && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
               </button>
               {otherOpen && (
                 <input
@@ -412,13 +454,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               )}
             </div>
             {zoneCitta.length > 0 && (
-              <div data-testid="benvenuto-zone" className="rounded-card bg-surface px-4 py-3">
-                <p className="mb-2 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Le tue zone (fino a 3)</p>
+              <div data-testid="benvenuto-zone" className="mt-2">
+                <p className="mb-2.5 text-[15px] font-sans text-text-muted">Le tue zone, fino a 3 <span className="text-text-muted/80">(facoltativo)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {zoneCitta.map((z) => (
                     <Chip
                       key={z.nome}
-                      item={{ value: z.nome, label: z.nome, emoji: "📍" }}
+                      item={{ value: z.nome, label: z.nome, emoji: "" }}
                       selected={zone.includes(z.nome)}
                       onToggle={(v) => setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length >= 3 ? p : [...p, v]))}
                     />
@@ -433,7 +475,16 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           <div data-testid="benvenuto-tipi">
             {corrente ? (
               <>
-                <p data-testid="tipi-contatore" className="mb-2 text-xs font-sans text-text-muted">{visti.length + 1} di {TIPI.length}</p>
+                {/* La pila (mockup A): le prossime due card si intravedono dietro, un po' ruotate. */}
+                <div className="relative">
+                {!riaperta && TIPI.filter((t) => !visti.includes(t.id) && t.id !== corrente.id).slice(0, 2).map((t, i) => (
+                  <div
+                    key={t.id}
+                    aria-hidden
+                    className="absolute inset-0 rounded-[1.75rem] shadow-card"
+                    style={{ background: `linear-gradient(160deg, ${t.sfondo})`, transform: i === 0 ? "rotate(4deg) translate(10px, 6px)" : "rotate(-4deg) translate(-10px, 8px)", opacity: 0.9 }}
+                  />
+                ))}
                 <div
                   data-testid="tipo-card"
                   key={corrente.id}
@@ -448,7 +499,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setDrag(null);
                   }}
                   onPointerCancel={() => setDrag(null)}
-                  className="relative flex min-h-[20rem] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.5rem] p-5 text-white shadow-float"
+                  // Alta quasi metà schermo anche sui telefoni bassi: a 360×740 più bassa l'emoji finiva sul contatore.
+                  className="relative flex h-[clamp(15rem,44svh,23rem)] touch-pan-y select-none flex-col justify-end overflow-hidden rounded-[1.75rem] p-6 text-white shadow-float"
                   style={{
                     background: `linear-gradient(160deg, ${corrente.sfondo})`,
                     transform: via ? `translateX(${via === "su" ? 130 : -130}%) rotate(${via === "su" ? 14 : -14}deg)` : drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 25}deg)` : undefined,
@@ -456,119 +508,167 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   }}
                 >
                   {drag && Math.abs(drag.dx) > 30 && (
-                    <span aria-hidden className={`absolute left-4 top-4 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "bg-accent" : "bg-black/50"}`}>
+                    // Dal lato opposto alla direzione (come Tinder): spostando a destra non esce dallo schermo (collaudo 23/10).
+                    <span aria-hidden data-testid="tipo-cartellino" className={`absolute top-4 z-20 rounded-pill px-3 py-1 font-display text-sm font-bold ${drag.dx > 0 ? "left-4 bg-accent" : "right-4 bg-black/50"}`}>
                       {drag.dx > 0 ? "👍 Sì" : "👎 No"}
                     </span>
                   )}
-                  <span aria-hidden className="absolute right-4 top-3 text-[5.5rem] leading-none drop-shadow">{corrente.emoji}</span>
-                  <span className="mb-2 w-fit rounded-pill bg-black/25 px-2.5 py-0.5 text-[11px] font-display font-semibold uppercase tracking-wider">
-                    {corrente.famoso ? "Molto noto" : "Poco noto"}
+                  {/* Contatore dei tipi dentro la card; riaperta dalla frase dice "Cambia" (prima "10 di 10": collaudo 23/10). */}
+                  <span data-testid="tipi-contatore" className={`absolute left-5 top-5 z-10 rounded-pill ${drag && Math.abs(drag.dx) > 30 ? "opacity-0" : ""} bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold`}>{riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}</span>
+                  {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
+                  <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
+                  <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
+                  <span aria-hidden className="relative flex min-h-0 flex-1 items-center justify-center pb-2 text-[4.25rem] leading-none drop-shadow-lg min-[380px]:text-[5.5rem]">{corrente.emoji}</span>
+                  <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
+                  <span className="relative mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-pill bg-white/85 px-3 py-1 font-display text-[13px] font-semibold text-[#141414]">
+                    {corrente.famoso ? "Molto noto" : <><span className="text-accent" aria-hidden>✦</span> Chicca di quartiere</>}
                   </span>
-                  <h2 className="font-title text-2xl font-semibold leading-tight">{corrente.titolo}</h2>
-                  <p className="mt-1 text-sm font-sans text-white/90">{corrente.riga}</p>
+                  <h2 className={`${SERIF} relative text-[30px] font-medium leading-[1.08]`}>{corrente.titolo}</h2>
+                  <p className="relative mt-1.5 text-sm font-sans text-white/90">{corrente.riga}</p>
                 </div>
-                <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <button type="button" data-testid="tipo-giu" onClick={() => vota(corrente.id, "giu")} className="min-h-14 rounded-pill border-2 border-border bg-white font-display text-base font-semibold text-brand active:scale-95">
-                    👎 No
+                </div>
+                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
+                <div className="mt-8 flex items-center justify-between px-3 [@media(max-height:760px)]:mt-6">
+                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
+                    <span aria-hidden>👎</span>
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 px-2 text-sm font-display font-semibold text-text-muted">
-                    Non so
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
+                    Non lo conosco
                   </button>
-                  <button type="button" data-testid="tipo-su" onClick={() => vota(corrente.id, "su")} className="min-h-14 rounded-pill bg-accent font-display text-base font-semibold text-white active:scale-95">
-                    👍 Sì
+                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
+                    <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted">← trascina la card, oppure tocca →</p>
-                {visti.length > 0 && (
-                  <button type="button" onClick={annullaUltimo} className="mx-auto mt-2 flex min-h-11 items-center text-sm font-display font-semibold text-accent">
-                    ↶ Torna al precedente
-                  </button>
-                )}
+                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted [@media(max-height:760px)]:hidden">← trascina la card, oppure tocca →</p>
+                <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}: {corrente.titolo}.</p>
               </>
             ) : (
-              <p data-testid="tipi-finiti" className="rounded-card bg-accent-light px-4 py-3 text-sm font-sans text-brand">
-                Fatto: {su.length} {su.length === 1 ? "ti piace" : "ti piacciono"}, {giu.length} no. <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="font-display font-semibold text-accent">Rifai</button>
-              </p>
+              <div data-testid="tipi-finiti">
+                <p className="rounded-card bg-[#e8efee] px-4 py-3 text-sm font-sans text-brand">
+                  Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. Tocca un posto per cambiarlo, oppure <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="min-h-11 font-display font-semibold text-brand underline underline-offset-2">rifai tutto</button>.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {TIPI.map((t) => (
+                    <button key={t.id} type="button" data-testid="tipo-riapri" onClick={() => setRiaperta(t.id)} aria-label={`Cambia: ${t.titolo}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-border bg-white px-3 text-sm font-sans text-text">
+                      <span aria-hidden>{t.emoji}</span> {t.titolo} <span aria-hidden>{su.includes(t.id) ? "👍" : giu.includes(t.id) ? "👎" : "·"}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {step === PASSO_COME && (
-          <div data-testid="benvenuto-come">
-            <Gruppo title="Famosi o chicche?">
-              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Famosi o chicche?">
-                {SCOPERTE.map((sc) => {
-                  const on = scopertaOra === sc.value;
-                  return (
-                    <button
-                      key={sc.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => setScoperta(sc.value)}
-                      className={["flex min-h-16 flex-col items-center justify-center rounded-btn border-2 px-1.5 py-2 text-center", on ? "border-accent bg-accent-light" : "border-border bg-surface"].join(" ")}
-                    >
-                      <span className="font-display text-sm font-semibold text-brand">{sc.label}</span>
-                      <span className="mt-0.5 text-[11px] leading-tight font-sans text-text-muted">{sc.riga}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {!scoperta && dedotta && <p className="mt-1.5 text-xs font-sans text-text-muted">Scelto dai tuoi 👍: cambialo se non è così.</p>}
-            </Gruppo>
-            <Gruppo title="A tavola">
-              <div className="flex flex-wrap gap-2">
-                {DIETE.map((d) => (
-                  <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
-                ))}
-              </div>
-            </Gruppo>
-            <details data-testid="come-altro" className="group rounded-card border border-border bg-surface px-4 py-2" open={occasions.length > 0 || priceRange != null}>
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
-                Occasioni e spesa <span className="text-xs font-sans font-normal text-text-muted">facoltativo</span>
-              </summary>
-              <div className="pt-2">
-              <Gruppo title="Occasioni">
-              <div className="flex flex-wrap gap-2">
-                {OCCASIONS.map((item) => (
-                  <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
-                ))}
-              </div>
-              </Gruppo>
-              <Gruppo title="Spesa tipica">
-              <div className="grid grid-cols-4 gap-2">
-                {PRICE_RANGES.map((item) => {
-                  const on = priceRange === item.value;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setPriceRange(on ? null : item.value)}
-                      className={[
-                        "flex min-h-14 flex-col items-center justify-center rounded-btn border-2 px-1 py-1.5 transition-colors",
-                        on ? "border-accent bg-accent-light" : "border-border bg-surface",
-                      ].join(" ")}
-                    >
-                      <span className="font-display text-base font-bold text-brand">{item.value}</span>
-                      <span className="text-[11px] leading-tight font-sans text-text-muted">{item.description}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              </Gruppo>
-              </div>
-            </details>
+        {step === PASSO_SCOPERTA && (
+          <div className="flex flex-col gap-3" role="radiogroup" aria-label="Famosi o chicche?" data-testid="benvenuto-scoperta">
+            {SCOPERTE.map((sc) => {
+              const on = scopertaOra === sc.value;
+              return (
+                <button
+                  key={sc.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setScoperta(sc.value)}
+                  className={`flex min-h-[4.5rem] w-full items-center gap-4 rounded-card border-2 px-4 py-3 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
+                >
+                  <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-2xl">{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍽️"}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-lg font-semibold text-brand">{sc.label}</span>
+                    <span className="block text-sm font-sans text-text-muted">{sc.riga}</span>
+                  </span>
+                  {on && <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {step === PASSO_DIETE && (
+          <div className="flex flex-wrap gap-2" data-testid="benvenuto-diete">
+            {DIETE.map((d) => (
+              <Chip key={d.id} item={{ value: d.id, label: d.label, emoji: d.emoji }} selected={diete.includes(d.id)} onToggle={(v) => setDiete((p) => toggle(p, v))} />
+            ))}
+          </div>
+        )}
+
+        {step === PASSO_OCCASIONI && (
+          <div className="flex flex-wrap gap-2" data-testid="benvenuto-occasioni">
+            {OCCASIONS.map((item) => (
+              <Chip key={item.value} item={item} selected={occasions.includes(item.value)} onToggle={(v) => setOccasions((p) => toggle(p, v))} />
+            ))}
+          </div>
+        )}
+
+        {step === PASSO_SPESA && (
+          <div className="grid grid-cols-2 gap-3" data-testid="benvenuto-spesa">
+            {PRICE_RANGES.map((item) => {
+              const on = priceRange === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setPriceRange(on ? null : item.value)}
+                  className={`relative flex min-h-20 flex-col items-center justify-center rounded-card border-2 px-2 py-2 transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
+                >
+                  <span className="font-display text-xl font-bold text-brand">{item.value}</span>
+                  <span className="text-sm font-sans text-text-muted">{item.description}</span>
+                  {on && <span aria-hidden className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white"><Check size={12} strokeWidth={3} /></span>}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
-            {righe.length > 0 ? (
-              <ul className="overflow-hidden rounded-card border border-border bg-white shadow-card">
-                {righe.map((r, i) => (
+            {frase.length > 0 ? (
+              <>
+                {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
+                    Toccarne una porta alla domanda che la cambia. */}
+                <p data-testid="capito-frase" className={`${SERIF} text-[21px] leading-[1.42] text-[#141414] min-[380px]:text-[24px]`}>
+                  {frase.map((f, i) => (
+                    <span key={i}>
+                      {i > 0 && " "}
+                      {f.map((x, j) => x.k ? (
+                        <span
+                          key={j}
+                          role="button"
+                          tabIndex={0}
+                          data-testid="capito-parola"
+                          aria-label={`${x.t}: cambia`}
+                          onClick={() => cambia(x.k!, x.id)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cambia(x.k!, x.id); } }}
+                          // Uno span, non un <button>: il bottone non va a capo dentro la riga e spezzava la frase.
+                          // Area di tocco invisibile più alta della riga (≥ 44px, collaudo 23/10): la parola resta com'è.
+                          className="relative cursor-pointer after:absolute after:inset-x-0 after:-inset-y-3 after:content-[''] bg-[linear-gradient(transparent_62%,rgba(255,107,74,0.28)_62%)] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+                        >
+                          {x.t}
+                        </span>
+                      ) : <span key={j}>{x.t}</span>)}
+                    </span>
+                  ))}
+                </p>
+                <p className="mt-6 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mt-3">Non è così? Tocca una parola per cambiarla.</p>
+                {righeAltre.length > 0 && (
+                  <button type="button" data-testid="capito-correggi" aria-expanded={correggi} onClick={() => setCorreggi((v) => !v)} className="-ml-1 mt-1 flex min-h-11 items-center gap-1 px-1 text-left text-[15px] font-display font-semibold text-brand">
+                    Il resto del profilo
+                    <ChevronRight size={16} aria-hidden className={`shrink-0 transition-transform ${correggi ? "rotate-90" : ""}`} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <p data-testid="capito-vuoto" className={`${SERIF} text-[21px] leading-[1.42] text-[#141414] min-[380px]:text-[24px]`}>
+                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi rifarla quando vuoi da &quot;I tuoi gusti&quot;.
+              </p>
+            )}
+            {/* Le righe da correggere una per una: un tocco più in là, dietro "Altro". */}
+            {correggi && righeAltre.length > 0 && (
+              <ul data-testid="capito-righe" className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
+                {righeAltre.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
-                    <button type="button" data-testid="capito-riga" onClick={() => setStep(PASSO_DI[r.chiave] ?? 0)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
+                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave, r.chiave === "giu" ? giu[0] : undefined)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
                       <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
                       <ChevronRight aria-label="Cambia" size={18} className="shrink-0 text-text-muted" />
@@ -576,44 +676,53 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p data-testid="capito-vuoto" className="rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">
-                Non mi hai detto ancora niente: imparo da quello che salvi e cerchi. Puoi sempre cambiare tutto in &quot;I tuoi gusti&quot;.
-              </p>
             )}
-            <p className="mt-3 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            {/* Senza risposte non c'è niente di cui "tenere conto": la frase si contraddiceva (collaudo 23/10). */}
+            {frase.length > 0 && (
+              <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
+            )}
           </div>
         )}
       </div>
 
-      {/* Pulsanti in basso */}
-      {/* Senza la barra in basso (primo accesso a schermo intero): i pulsanti stanno sul fondo dello schermo. */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-bg px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-float">
+      {/* Pulsanti in basso, fissi sul fondo dello schermo (primo accesso a schermo intero, senza la barra dell'app). */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#f8f6f2]/95 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
-          {step < PASSO_CAPITO ? (
-            step === PASSO_TIPI && corrente ? (
-              <button type="button" onClick={() => setStep(PASSO_COME)} className="flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand">
-                Basta così, continua
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setStep((s) => s + 1)}
-                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
-              >
-                Continua
-              </button>
-            )
+          {step === PASSO_TIPI ? (
+            // "Torna al precedente" qui sotto e non sotto i tasti: a 360×740 finiva mezzo coperto (collaudo 23/10).
+            // Con una card riaperta dalla frase non c'è: annullava un'altra card.
+            <div className="flex items-center justify-between gap-3">
+              {visti.length > 0 && !riaperta && corrente ? (
+                <button type="button" data-testid="tipo-indietro" onClick={annullaUltimo} className="flex min-h-12 items-center whitespace-nowrap px-1 font-display text-[15px] font-semibold text-text-muted">
+                  ↶ Precedente
+                </button>
+              ) : <span />}
+              {tornaFrase ? (
+                <button type="button" data-testid="torna-frase" onClick={tornaAllaFrase} className="flex min-h-12 items-center gap-1 px-1 font-display text-[15px] font-semibold text-brand">
+                  Torna alla frase <ArrowRight size={16} aria-hidden />
+                </button>
+              ) : (
+                <button type="button" data-testid="tipi-basta" onClick={() => setStep(PASSO_SCOPERTA)} className="flex min-h-12 items-center gap-1 whitespace-nowrap px-1 font-display text-[15px] font-semibold text-brand">
+                  {corrente ? "Basta così" : "Continua"} <ArrowRight size={16} aria-hidden />
+                </button>
+              )}
+            </div>
+          ) : step < PASSO_CAPITO ? (
+            <button
+              type="button"
+              data-testid={tornaFrase ? "torna-frase" : "benvenuto-avanti"}
+              onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s + 1); }}
+              disabled={step === 0 && !risposto}
+              className={risposto || step === 0 || step === PASSO_DIETE || tornaFrase ? TASTO_PIENO : TASTO_VUOTO}
+            >
+              {/* "Come mangi?" senza scelte è una risposta: "Mangio di tutto", non "Salta". */}
+              {tornaFrase ? "Torna alla frase" : risposto || step === 0 ? "Continua" : step === PASSO_DIETE ? "Mangio di tutto" : "Salta"}
+            </button>
           ) : (
             <>
-              <button
-                type="button"
-                data-testid="benvenuto-fine"
-                onClick={() => finish(null)}
-                disabled={!!submitting}
-                className="w-full rounded-pill bg-accent px-6 py-3.5 font-display font-semibold text-white transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-              >
-                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : "✨ Mostrami i posti per me"}
+              <button type="button" data-testid="benvenuto-fine" onClick={() => finish(null)} disabled={!!submitting} className={TASTO_PIENO}>
+                {/* Mockup A: "Apri la mia mappa →" (la mappa parte già sui posti per te). */}
+                {submitting === "mappa" ? (next ? "Salvo i tuoi gusti…" : "Cerco i posti per te…") : next ? "Salva e continua" : <>Apri la mia mappa <ArrowRight size={18} aria-hidden /></>}
               </button>
               {/* I posti già salvati altrove (Google Maps, il link di un reel): dopo la sintesi, non al posto suo. */}
               <button
@@ -621,9 +730,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 data-testid="benvenuto-importa-si"
                 onClick={() => finish("importa")}
                 disabled={!!submitting}
-                className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand disabled:opacity-60"
+                className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-[15px] font-semibold text-brand disabled:opacity-60"
               >
-                {submitting === "importa" ? "Un attimo…" : "📍 Prima porta qui i tuoi posti salvati"}
+                {submitting === "importa" ? "Un attimo…" : "Prima porta qui i tuoi posti salvati"}
               </button>
             </>
           )}

@@ -26,6 +26,7 @@ import {
   type SavedForTaste,
   type SurpriseMemory,
 } from "@/lib/sorpresa";
+import { migliaia } from "@/lib/numero";
 
 const WANT_TAG = "Da provare";
 const VERDICT_TRIES = 2;
@@ -411,7 +412,7 @@ function SurpriseCard({
   const emoji = getCategoryEmoji(p.category, p.name);
   const dist = center && p.lat != null && p.lng != null ? distanceLabel(center, { lat: p.lat, lng: p.lng }) : null;
   const where = [categoryLabel(p.category), cityFromAddress(p.address), dist ? `a ${dist}` : null].filter(Boolean).join(" · ");
-  const rating = p.rating != null ? `★ ${p.rating.toFixed(1).replace(".", ",")}${p.userRatingCount != null ? ` · ${p.userRatingCount.toLocaleString("it-IT")} recensioni` : ""}` : null;
+  const rating = p.rating != null ? `★ ${p.rating.toFixed(1).replace(".", ",")}${p.userRatingCount != null ? ` · ${migliaia(p.userRatingCount)} recensioni` : ""}` : null;
   const price = p.priceLevel != null && p.priceLevel > 0 ? "€".repeat(p.priceLevel) : null;
   const summary = p.editorialSummary?.trim() || null;
   const review = p.selectedReviews?.find((r) => typeof r?.text === "string" && r.text.trim())?.text.trim() ?? null;

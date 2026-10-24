@@ -153,7 +153,7 @@ async function markPocoConosciuto(id: string, input: NewPlace): Promise<void> {
   try {
     const { error } = await createAdminClient()
       .from("places")
-      .update({ poco_conosciuto: isGem(input.rating, input.userRatingCount) })
+      .update({ poco_conosciuto: isGem(input.rating, input.userRatingCount, input.name) })
       .eq("id", id);
     if (error && error.code !== "42703" && error.code !== "PGRST204") console.error("[places-store] poco_conosciuto:", error.message);
   } catch {

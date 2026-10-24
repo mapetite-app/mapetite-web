@@ -18,6 +18,7 @@ import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
 import { buildSynthesisInput, signSynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { signCatalogEntry } from "@/lib/catalog-sig";
+import { REQUISITI_ACCESI, requisitiProvati, type Candidato } from "@/lib/prova-requisito";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -398,10 +399,21 @@ export async function POST(request: Request) {
       risultati = risultati.slice(0, SYNTHESIS_LIMIT);
     }
 
+    // "✓ terrazza" candidati: la frase di una recensione da 4-5 stelle che nomina il requisito
+    // (regole in src/lib/prova-requisito.ts). Non si mostrano da soli: l'AI dei verdetti conferma
+    // quali dicono davvero di sì (terza bocciatura del 22/10: le sole regole non reggono l'ironia).
+    const prove: Record<string, Candidato[]> = {};
+    if (REQUISITI_ACCESI) {
+      for (const p of risultati) {
+        const c = requisitiProvati(filtri.parole_chiave, query, p.reviewItems, p.name, filtri.zona ?? null);
+        if (c.length > 0) prove[p.id] = c;
+      }
+    }
+
     if (risultati.length > 0 && fastPhase) {
       // Primo tempo: niente Haiku. Il client chiede i verdetti con i dati firmati.
       try {
-        synthInput = buildSynthesisInput(risultati);
+        synthInput = buildSynthesisInput(risultati, prove);
         synthToken = signSynthesisInput(query.trim(), synthInput);
         // Verdetti a gruppi chiesti in parallelo: prima le 2 card che si vedono (pronte in ~3-4 s),
         // poi le altre. Stesse chiamate Haiku di prima, solo divise diversamente.
@@ -422,7 +434,7 @@ export async function POST(request: Request) {
         // Ricerca con i filtri (verdetti subito, senza primo tempo): conta nel tetto AI come
         // /api/search/synthesis. Oltre il tetto restano i dati Google, senza errori.
         if (!allowAi("verdetti", aiKey)) throw new Error("tetto AI raggiunto: verdetti saltati");
-        sintesi = await getSynthesis(risultati, query.trim(), authUser?.id ?? null);
+        sintesi = await getSynthesis(risultati, query.trim(), authUser?.id ?? null, { prove });
         // Esclusione dei locali che chiaramente non rispettano la richiesta
         // (approvata da Lorenzo il 10/10). Se Haiku li scarta tutti, non si esclude nulla.
         esclusi = risultati.filter((p) => sintesi[p.id]?.fit === false).map((p) => p.id);
@@ -629,6 +641,8 @@ ESEMPI (input → output atteso):
       dontExpect: s?.dontExpect ?? null,
       matchReason: s?.matchReason || null,
       perTe: s?.perTe || null,
+      // "✓ terrazza": solo quelli confermati dall'AI (ricerca con i filtri, verdetti subito); nel
+      // primo tempo arrivano con i verdetti, da /api/search/synthesis.
       requisiti: s?.requisiti?.length ? s.requisiti : null,
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.

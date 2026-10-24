@@ -88,6 +88,7 @@ function NavBarInner({ userId, vista, search }: { userId: string | null; vista: 
       <nav
         aria-label="Navigazione principale"
         data-testid="barra"
+        data-app-nav
         className="fixed bottom-0 left-0 right-0 z-50 transform-gpu border-t border-border/70 bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <ul className="mx-auto grid h-16 max-w-lg grid-cols-5">

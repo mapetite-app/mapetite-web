@@ -1,6 +1,7 @@
 // Ricerche di prova (docs/autonomia/TEST-RICERCHE.md) con Google e Haiku veri, nello stesso
 // percorso del telefono: primo tempo (dati Google) + verdetti a gruppi + riordino per "alto/basso".
 // Avvio: GOOGLE_FIXTURES=scripts/fixtures ANTHROPIC_API_KEY=$MAPETITE_ANTHROPIC_KEY npm run dev
+// Solo risposte salvate, mai Google vero: aggiungi GOOGLE_FIXTURES_ONLY=1 all'avvio.
 // poi:   node scripts/ricerche-vere.mjs [numeri separati da virgola]   (es. 3,6)
 // Con GOOGLE_FIXTURES la seconda volta la risposta Google si legge dal disco: nessuna quota consumata.
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
@@ -53,8 +54,11 @@ for (const [n, query, [lat, lng]] of CASI) {
   console.log("   capito:", JSON.stringify(fast.filtri_usati), "| da parte:", JSON.stringify(fast.da_parte ?? {}));
   for (const p of risultati.slice(0, 7)) {
     const d = dettagli[p.id] ?? {};
+    // "✓" candidati delle regole (primo tempo) che l'AI ha scartato: per il collaudo della doppia chiave.
+    const cand = (fast.sintesi_pendente?.places ?? []).find((x) => x.id === p.id)?.prove ?? [];
+    const scartati = cand.filter((c) => !(d.requisiti ?? []).some((x) => x.r === c.r));
     console.log(`- [${livelli[p.id] ?? "?"}] ${p.name} | ${p.category} | ${p.rating} (${p.userRatingCount}) | ${(p.address ?? "").slice(0, 35)}`);
-    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}${d.requisiti?.length ? `\n     ✓ ${d.requisiti.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}`);
+    console.log(`     V: ${d.verdict ?? "—"}\n     M: ${d.matchReason ?? "—"}${d.requisiti?.length ? `\n     ✓ ${d.requisiti.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}${scartati.length ? `\n     ✗ scartati dall'AI: ${scartati.map((x) => `${x.r} «${x.prova}»`).join(" | ")}` : ""}`);
   }
   if (tolti.length) console.log("   esclusi:", tolti.map((p) => p.name).join(", "));
 }

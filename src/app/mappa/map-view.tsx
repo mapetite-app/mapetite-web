@@ -1134,6 +1134,13 @@ export default function MapView({
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
     return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+  // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
+  const schedaAperta = selected != null;
+  useEffect(() => {
+    if (!schedaAperta) return;
+    document.documentElement.dataset.schedaAperta = "1";
+    return () => { delete document.documentElement.dataset.schedaAperta; };
+  }, [schedaAperta]);
   const hadSelected = useRef(false);
   useEffect(() => {
     if (selected) { hadSelected.current = true; return; }
@@ -3166,14 +3173,14 @@ export default function MapView({
             };
             return (
               <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
-                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
+                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
                 <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
-                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
+                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
               </div>
             );
           })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none">
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none">
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -3413,6 +3420,7 @@ export default function MapView({
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
+          distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
           nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
           quick={quickFilters}
@@ -3491,7 +3499,7 @@ export default function MapView({
           })()}
           details={venueDetails}
           loadingVerdicts={loadingVerdicts}
-          origin={userPos ?? searchOrigin}
+          origin={userPos /* distanza solo dalla posizione vera (collaudo 23/10) */}
           isSaved={isPlaceSaved}
           onSave={(place) => { void quickSave(place); }}
           onSelect={(place) => dispatch({ type: "OPEN_VENUE", placeId: place.id })}

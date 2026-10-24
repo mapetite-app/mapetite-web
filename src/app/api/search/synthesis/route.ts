@@ -54,7 +54,8 @@ export async function POST(request: Request) {
 
   let sintesi: Awaited<ReturnType<typeof getSynthesis>> = {};
   try {
-    sintesi = await getSynthesis(stubs, query.trim(), user?.id ?? null);
+    const prove = Object.fromEntries(places.filter((p) => p.prove?.length).map((p) => [p.id, p.prove!]));
+    sintesi = await getSynthesis(stubs, query.trim(), user?.id ?? null, { prove });
   } catch (err) {
     console.error("[search/synthesis] errore Haiku:", err);
   }
@@ -75,7 +76,8 @@ export async function POST(request: Request) {
       dontExpect: s.dontExpect,
       matchReason: s.matchReason || null,
       perTe: s.perTe || null,
-      requisiti: s.requisiti.length > 0 ? s.requisiti : null,
+      // "✓ terrazza" confermati dall'AI tra le frasi firmate dal primo tempo (mai scritte dall'AI).
+      ...(s.requisiti?.length ? { requisiti: s.requisiti } : {}),
     };
   }
   // Quanto ogni locale è adatto alla richiesta secondo Haiku: il telefono mette in cima gli "alto"

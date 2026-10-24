@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
-import { computeNumeri, googleOggi, QUOTA_GOOGLE, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
+import { computeNumeri, googleOggi, statoAi, QUOTA_GOOGLE, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
 
 // Pannello di Lorenzo (PIANO-25-OTTOBRE.md 7.5): i tester usano Mapetite? Tornano? Cosa usano?
 // Solo per gli indirizzi in src/lib/admin.ts, per tutti gli altri 404. Legge `events` con la
@@ -25,6 +25,16 @@ async function e2eRows(): Promise<EventRow[] | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     return Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// Ultimo verdetto scritto dall'AI (proposta 24): per sapere se l'AI si è fermata.
+async function loadUltimoVerdetto(): Promise<string | null> {
+  try {
+    const { data } = await createAdminClient().from("place_synthesis").select("generated_at").order("generated_at", { ascending: false }).limit(1).maybeSingle();
+    return (data?.generated_at as string | undefined) ?? null;
   } catch {
     return null;
   }
@@ -371,11 +381,13 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
 
   const sp = await searchParams;
   const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 7;
-  const [{ rows, troncato, errore }, emails] = fake
-    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>()]
-    : await Promise.all([loadRows(), loadEmails()]);
+  const [{ rows, troncato, errore }, emails, ultimoVerdetto] = fake
+    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null]
+    : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto()]);
   const n = computeNumeri(rows, giorni, undefined, emails);
   const google = googleOggi(rows);
+  const ai = statoAi(ultimoVerdetto, rows);
+  const ora = (iso: string) => new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome", weekday: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-12 pt-6">
@@ -386,6 +398,14 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
       {!errore && (
         <p data-testid="numeri-google" className={`mt-3 rounded-card px-3 py-2 text-sm font-sans ${google >= QUOTA_GOOGLE * 0.8 ? "bg-accent-light text-text" : "bg-surface text-text-muted"}`}>
           <span className="font-display font-semibold text-text">Google oggi: {google} su {QUOTA_GOOGLE}</span> ricerche · ripartono alle 9:00
+        </p>
+      )}
+      {/* Stato dell'AI (proposta 24): rosso se dopo l'ultimo verdetto sono arrivate 3 ricerche o più. */}
+      {!errore && (
+        <p data-testid="numeri-ai" className={`mt-2 rounded-card px-3 py-2 text-sm font-sans ${ai.ferma ? "bg-accent-light text-text" : "bg-surface text-text-muted"}`}>
+          <span className="font-display font-semibold text-text">{ai.ferma ? "AI forse ferma" : "AI: ok"}</span>
+          {ultimoVerdetto ? ` · ultimo verdetto ${ora(ultimoVerdetto)}` : " · nessun verdetto in archivio"}
+          {ai.ferma && ` · ${ai.ricercheDopo} ricerche dopo, senza verdetti nuovi: controlla il credito su console.anthropic.com`}
         </p>
       )}
       <nav aria-label="Periodo" className="mt-4 flex gap-2">

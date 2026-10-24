@@ -324,7 +324,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             </button>
           )}
         </>
-      ) : !mine ? (
+      ) : !mine && !(userId != null && c.placeId == null) ? (
+        // Chi non può ancora scrivere ha già "Salva il locale per lasciare la tua recensione": niente seconda frase (collaudo 23/10).
         <p data-testid="community-vuota" className="mt-2 text-sm font-sans text-text-muted">Ancora nessuna recensione: sii il primo a dire com&apos;era.</p>
       ) : null}
 

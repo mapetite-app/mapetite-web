@@ -8,6 +8,17 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 ## Aperte
 
+**Istruzioni passo passo con i link: `ISTRUZIONI-LORENZO.md` (22/10).**
+
+00. **Ricarica il credito Anthropic (Haiku) — APERTA, URGENTE (23/10, 01:00).** L'API risponde "credit balance is too low": in produzione l'AI non scrive più né verdetti per i locali nuovi né i "perché" (prova delle 01:00: 0 "perché" su 12, verdetto solo sui 10 già in memoria). La ricerca funziona ancora, ma senza AI non si capisce perché Mapetite è diversa.
+   - console.anthropic.com → Plans & Billing → acquista credito (prepagato, senza ricarica automatica).
+   - Come si verifica: le sessioni lo vedono da sole (il verdetto torna sui locali nuovi).
+   - **24/10 alle 00:10: ancora a zero** (stesso errore; notifica mandata).
+   - **23/10 alle 05:08: ancora a zero** (stesso errore). L'ultimo verdetto nuovo in produzione è delle 08:07 del 22/10. Da oggi `/admin/numeri` mostra "AI: ok" o "AI forse ferma" con l'ora dell'ultimo verdetto.
+   - Consiglio: imposta anche un avviso di spesa nella console (Limits), così te ne accorgi prima che finisca.
+
+0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
+
 1. **Accesso con Google in un tocco (sprint, chiave 0) — APERTA.** Il pulsante "Continua con Google" è già pronto e compare da solo quando Google è acceso su Supabase.
    - Su console.cloud.google.com → API e servizi → Credenziali → "Crea credenziali" → "ID client OAuth", tipo "Applicazione web".
    - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
@@ -31,6 +42,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - omaggio del locale a chi torna (proposta 12);
    - serata di pre-apertura con utenti scelti per gusto (proposta 9);
    - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3).
+   - "stasera c'è posto" dai sistemi di prenotazione: prepariamo la richiesta a TheFork e Zenchef per Roberto? (proposta 25).
 
 ## Fatte
 

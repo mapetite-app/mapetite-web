@@ -17,13 +17,24 @@ function normalizza(t: string): string {
 // Frasi con una negazione, un dubbio o un confronto OVUNQUE ("purtroppo non è stata utilizzabile",
 // "niente di straordinario", "poco romantico", "rispetto a molti rooftop"): non sono una prova.
 // Meglio perdere una prova buona che mostrarne una che dice il contrario (terzo collaudo, 22/10).
-const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspett\w*|rispetto|altri|invece|tranne|nonostante|nulla|pero|ma|troppo|lent\w*|pecca|turistic\w*)\b/;
+// Quinto collaudo (22/10 mattina): anche attese deluse ("doveva essere", "speravamo"), chiusure, confronti
+// ("più bella quella accanto"), ironia ("romantico come una mensa").
+const DUBBIO = /\b(non|niente|nessun[oa]?|senza|manca\w*|mai|purtroppo|peccato|poco|forse|inesistente|granche|deludent\w*|delusion\w*|aspett\w*|rispetto|altri|altro|invece|tranne|nonostante|nulla|pero|ma|troppo|lent\w*|pecca|turistic\w*|chius\w*|riservat\w*|solo|dovev\w*|volev\w*|sper\w*|cercav\w*|pensav\w*|sarebbe|vorrebbe|ne|neanche|nemmeno|neppure|come|piu|meno|meglio|accanto|fronte|rovinat\w*|completo|sedicente|spaccia\w*|inagibil\w*|eufemism\w*|promess\w*|realta|direi|chiamarl\w*|definisc\w*|prenotate|chiedete|richiest\w*|consiglio di)\b/;
+// La frase deve anche DIRE che è bello: un giudizio positivo, non solo nominare la cosa
+// ("In inverno la terrazza è chiusa", "Vestitevi eleganti" non sono una prova).
+const POSITIVO = /\b(bell\w*|splendid\w*|stupend\w*|perfett\w*|ottim\w*|meraviglios\w*|mozzafiato|suggestiv\w*|incantevol\w*|magic\w*|fantastic\w*|spettacolar\w*|favolos\w*|deliziosa|delizioso|eccezional\w*|piacevol\w*|raffinat\w*|curat\w*|accoglient\w*|ideale|consigliat\w*|molto|davvero|super|top)\b/;
 // "vista" verbo ("l'ho vista", "è stata vista"): non è la vista del locale.
 const VISTA_VERBO = /\b(l'?ho|ho|hai|abbiamo|avevo|stata|stato|l')\s*vist/;
 
 // Recensioni con il voto (Google): la prova si cerca prima nelle 5 e 4 stelle, mai in quelle da 1-2
 // (collaudo del 22/10: "✓ rooftop" mostrava la frase di una recensione da 1 stella).
 export function provaRequisito(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): string | null {
+  return provaConContesto(requisito, recensioni, nomeLocale)?.prova ?? null;
+}
+
+// Come provaRequisito, con la recensione intera da cui viene la frase (per la conferma dell'AI:
+// una smentita nella frase dopo, "Peccato che l'abbiano chiusa", deve poterla vedere).
+export function provaConContesto(requisito: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = ""): { prova: string; contesto: string } | null {
   const parole = normalizza(requisito).split(/\s+/).filter((w) => w.length >= 3 && !VUOTE.has(w));
   // "non turistico": una frase che contiene "turistico" direbbe spesso il contrario.
   if (parole.length === 0 || parole[0] === "non") return null;
@@ -34,8 +45,9 @@ export function provaRequisito(requisito: string, recensioni: { text: string; ra
   // La parola è nel nome del locale ("Terrazza Palestro", "The Vista Rooftop"): le recensioni la usano
   // per chiamare il posto, non per confermarlo. Niente prova (il nome lo dice già da solo).
   const nome = normalizza(nomeLocale);
-  if (nome && radici.some((x) => parola(x).test(nome))) return null;
-  const ordinate = [...(recensioni ?? [])].filter((r) => r.rating == null || r.rating >= 4).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
+  // Nel nome anche attaccata a cifre ("Terrazza12"): \b non separa lettere e cifre.
+  if (nome && radici.some((x) => new RegExp(`\\b${x}[a-z]{0,3}(?![a-z])`).test(nome))) return null;
+  const ordinate = [...(recensioni ?? [])].filter((r) => r.rating != null && r.rating >= 4).sort((a, b) => (b.rating ?? 3) - (a.rating ?? 3));
   for (const r of ordinate) {
     const frasi = r.text.split(/(?<=[.!?…])\s+|\n+/);
     for (const f of frasi) {
@@ -43,14 +55,18 @@ export function provaRequisito(requisito: string, recensioni: { text: string; ra
       if (!radici.every((x) => parola(x).test(n))) continue;
       // "vista" che non è il panorama: "cucina a vista", "pietra a vista", "visto il luogo", "vista la location".
       if (radici.includes("vist") && (/\ba vista\b|\bvisto\b|\bvista (la|il|l'|i|le)\b/.test(n) || !/\bvist[ae]\b/.test(n))) continue;
-      if (DUBBIO.test(n) || VISTA_VERBO.test(n)) continue;
+      if (DUBBIO.test(n) || VISTA_VERBO.test(n) || n.includes("?") || !POSITIVO.test(n)) continue;
       const pulita = f.trim().replace(/^[«"“]+|[»"”]+$/g, "");
-      if (pulita.length < 12) continue;
-      if (pulita.length <= MAX) return pulita;
+      if (pulita.length < 25) continue;
+      // La recensione attorno alla frase (prima e soprattutto dopo: lì stanno i "peccato che…").
+      // 450 caratteri: il contesto viaggia firmato fino al telefono e torna (non si mostra).
+      const at0 = Math.max(0, r.text.indexOf(f.trim()) - 100);
+      const contesto = r.text.slice(at0, at0 + 450);
+      if (pulita.length <= MAX) return { prova: pulita, contesto };
       // Frase lunga: si taglia attorno alla parola trovata, con i puntini.
       const at = Math.max(0, normalizza(pulita).search(parola(radici[0])) - 50);
       const pezzo = pulita.slice(at, at + MAX).replace(at > 0 ? /^\S*\s/ : /^$/, "").replace(/\s\S*$/, "");
-      return `${at > 0 ? "…" : ""}${pezzo}…`;
+      return { prova: `${at > 0 ? "…" : ""}${pezzo}…`, contesto };
     }
   }
   return null;
@@ -61,13 +77,46 @@ const TIPI = /^(ristorant|trattori|osteri|pizzeri|enotec|bar|pub|caff|bistrot|lo
 
 // Etichetta pulita del requisito: solo parole scritte nella richiesta (stessa radice), senza il tipo
 // di locale. null se ne resta fuori anche una (l'AI aggiungeva "vista" o "cucina romana" non chiesti).
-export function requisitoDellaRichiesta(requisito: string, richiesta: string): string | null {
+export function requisitoDellaRichiesta(requisito: string, richiesta: string, zona: string | null = null): string | null {
   const q = normalizza(richiesta);
   const parole = requisito.trim().toLowerCase().split(/\s+/).filter((w) => !TIPI.test(normalizza(w)));
   if (parole.length === 0 || parole.length > 2) return null;
+  // La zona capita dalla ricerca ("ristorante romantico trastevere"): non è un requisito da confermare.
+  const zonaParole = new Set(normalizza(zona ?? "").split(/[\s,']+/).filter((w) => w.length >= 3));
+  if (parole.some((w) => zonaParole.has(normalizza(w)) || /^(centro|storico)$/.test(normalizza(w)))) return null;
   // Città e zone non sono requisiti da confermare ("a Milano", "sui Navigli", "a Trastevere", "Roma").
   const esc = (w: string) => normalizza(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (parole.some((w) => /^(roma|milano|romana|romano|milanese)$/.test(normalizza(w)) || new RegExp(`\\b(a|in|sui|sul|ai|al|nel|nei|zona|vicino)\\s+${esc(w)}\\b`).test(q))) return null;
   const tutte = parole.every((w) => VUOTE.has(w) || w === "non" || new RegExp(`\\b${radice(normalizza(w)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[a-z]{0,3}\\b`).test(q));
   return tutte ? parole.join(" ") : null;
+}
+
+// Requisito confermato e la frase di recensione Google che lo prova (copiata, mai riscritta).
+export type Requisito = { r: string; prova: string };
+// Candidato per la conferma dell'AI: anche il pezzo di recensione attorno alla frase (viaggia firmato
+// con i dati del secondo tempo, il telefono non lo mostra).
+export type Candidato = Requisito & { contesto: string };
+
+// "✓ terrazza" sulle card (chiave B). Spento il 22/10 notte dopo due bocciature; riacceso il 22/10
+// mattina (poi di nuovo spento: terza bocciatura sui casi avversari). Dal 23/10 doppia chiave: queste
+// regole trovano la frase (copiata, mai riscritta) nel primo tempo, sulle 5 recensioni intere con il
+// voto; il ✓ compare solo se l'AI dei verdetti conferma che la frase dice davvero di sì (ironia,
+// confronti, attese deluse: le regole da sole non reggono). L'AI sceglie, non scrive.
+// 23/10 notte: doppia chiave bocciata 2 volte (5 falsi su 65, poi 1 su 77: «Prenotate il tavolo
+// panoramico…»), corretta dopo; spenta in produzione finché un collaudo nuovo non dà 0 falsi.
+// In sviluppo si accende con REQUISITI_PROVA=1 per i collaudi.
+export const REQUISITI_ACCESI = process.env.REQUISITI_PROVA === "1";
+
+// Requisiti della ricerca ("romantico", "terrazza") confermati da una frase delle recensioni di
+// QUESTO locale. Massimo 3; un requisito senza frase che lo provi non compare.
+export function requisitiProvati(paroleChiave: string[], richiesta: string, recensioni: { text: string; rating?: number | null }[] | null | undefined, nomeLocale = "", zona: string | null = null): Candidato[] {
+  const out: Candidato[] = [];
+  for (const k of paroleChiave) {
+    const r = requisitoDellaRichiesta(k, richiesta, zona);
+    if (!r || out.some((x) => x.r === r)) continue;
+    const p = provaConContesto(r, recensioni, nomeLocale);
+    if (p) out.push({ r, ...p });
+    if (out.length >= 3) break;
+  }
+  return out;
 }

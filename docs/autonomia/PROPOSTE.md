@@ -16,6 +16,82 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 24/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
+
+### 26. "Verdetto in arrivo": nessun locale resta senza verdetto quando l'AI si ferma
+- **Problema:** `PROBLEMI.md`, 11. Dal 22/10 alle 08:07 a oggi nessun verdetto nuovo: i locali cercati in quelle ore restano "Da Google" anche quando l'AI torna, finché qualcuno non li riapre.
+- **Cosa fa:** quando l'AI non risponde, il locale entra in una coda (tabella `place_synthesis` con verdetto vuoto e "da fare"). Al ritorno dell'AI un lavoro notturno scrive i verdetti mancanti per i locali cercati o salvati, fino a 25 a notte. Sulla card, invece di "Da Google", compare "Verdetto in arrivo" solo se il locale è in coda.
+- **Da dove nasce:** nessun competitor ha un verdetto scritto per ogni locale. Noi lo promettiamo "sempre" (VISIONE), quindi dobbiamo recuperare i buchi da soli.
+- **Valore per l'utente:** riapri un salvato e il verdetto c'è, anche se l'hai salvato mentre l'AI era ferma.
+- **Valore per il ristoratore:** la sua scheda non resta senza spiegazione per giorni.
+- **Sforzo:** S. **Costo:** nessuna chiamata Google (si usano le recensioni già salvate nell'arricchimento); Haiku circa 25 verdetti a notte, gli stessi che si sarebbero spesi comunque.
+- **Stato proposto:** PRONTA (dopo la ricarica del credito).
+
+### 27. "Altri come questo": dal posto che ami, i 5 che gli somigliano davvero
+- **Problema:** `PROBLEMI.md`, 9 e VISIONE ("fatti suggerire"). Chi ha un posto del cuore non sa come trovarne altri simili senza ripartire da zero.
+- **Cosa fa:** nella scheda di un salvato con 👍 o "Ci sono stato", un tasto "Altri come questo". La ricerca parte dai tratti del verdetto (per esempio "trattoria romana · cucina di quartiere · prezzi onesti"), nella stessa città. Ogni risultato ha la riga "Come Da Cesare: …" con la frase della recensione che lo prova. I posti di massa vanno in fondo, come nella ricerca.
+- **Da dove nasce:** "Mapstr Matching" consiglia posti dai tuoi salvati, ma non dice perché e lo fa pagare (Mapstr Plus, [TourMaG](https://www.tourmag.com/Mapstr-de-l-IA-mais-pourquoi-faire_a124504.html)). Noi lo spieghiamo con la prova, gratis.
+- **Valore per l'utente:** dal posto che ama a 5 posti nuovi, in un tocco, senza scrivere niente.
+- **Valore per il ristoratore:** clienti che arrivano perché amano locali come il suo, cioè la domanda più qualificata che esista. È la base di un futuro "sei simile a…" nel pannello.
+- **Sforzo:** S (riusa la ricerca a parole e i tratti del verdetto). **Costo:** 1 ricerca Google per tocco, come una ricerca normale; Haiku come una ricerca.
+- **Stato proposto:** PRONTA, dopo il 26/10 (fuori dalle chiavi di volta dello sprint).
+
+## 23/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta)
+
+### 24. "AI: ok" nel pannello e avviso prima che finisca il credito
+- **Problema:** `PROBLEMI.md`, 11. Il 23/10 il credito dell'AI è finito di notte e nessuno se n'è accorto finché una sessione non ha provato a mano.
+- **Cosa fa:** in `/admin/numeri` una riga "AI: ok · ultimo verdetto alle 21:40" oppure "AI ferma da 01:00 (credito finito)", letta dagli errori già registrati nei log del server; la sessione notturna la controlla per prima e, se è rossa, lo scrive in cima alla PR.
+- **Da dove nasce:** nessun competitor lo mostra (è interno); serve a tenere la promessa "verdetto sempre" di VISIONE.
+- **Valore per l'utente:** il verdetto non sparisce per giorni senza che nessuno lo sappia. **Valore per il ristoratore:** indiretto (la sua scheda resta spiegata).
+- **Sforzo:** S. **Costo:** zero Google, zero AI (legge un evento già scritto).
+- **Stato proposto:** PRONTA.
+
+### 25. "Stasera c'è posto" vero, dai sistemi di prenotazione (come Table Tonight di Places)
+- **Problema:** `PROBLEMI.md`, 1 e 2. Il venerdì alle 19 chi ha scelto il posto giusto scopre che è pieno; il ristoratore ha tavoli liberati da disdette che nessuno vede.
+- **Cosa fa:** sulle card della ricerca "stasera", un segno "🟢 tavolo alle 21" preso dal sistema di prenotazione del locale; un tocco e si prenota lì. Mai cambia l'ordine dei risultati (il posto giusto resta primo anche se pieno).
+- **Da dove nasce:** Places "Table Tonight" raccoglie i tavoli di oggi da più piattaforme ([Time Out](https://www.timeout.com/newyork/news/the-founder-of-dating-app-raya-has-a-new-way-to-score-last-minute-restaurant-reservations-010626)); noi lo uniamo al verdetto e ai gusti, cosa che Places non fa.
+- **Valore per l'utente:** dalla scelta alla prenotazione senza telefonate. **Valore per il ristoratore:** riempie i tavoli delle disdette dell'ultima ora (no-show medio 12,8%: `PROBLEMI.md`, 1); pagherebbe per prenotazione arrivata, non per "esserci".
+- **Sforzo:** L (servono accordi o API dei sistemi: TheFork, Zenchef/CoverManager, vedi `PARTNER.md`). **Costo:** zero Google; dipende dall'accordo.
+- **Stato proposto:** DA DECIDERE LORENZO — "Prepariamo per Roberto la bozza di richiesta di accesso alle disponibilità a TheFork e Zenchef?"
+
+## 23/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
+
+### 22. "✓ terrazza · 3 recensioni su 5": quanto è sicura la prova
+- **Problema:** un ✓ con una sola frase vale come uno detto da tutti. Chi sceglie per un anniversario vuole sapere se la terrazza c'è sempre o l'ha vista uno solo.
+- **Cosa fa:** nella scheda, sotto la frase, "detto in 3 recensioni su 5" (conteggio delle frasi che passano la doppia chiave).
+- **Da chi nasce:** Google Ask Maps e OpenTable rispondono senza dire da quante fonti; noi lo contiamo.
+- **Valore utente:** fiducia, in un colpo d'occhio. **B2B:** il ristoratore vede quali caratteristiche i clienti confermano di più (dato per la pagina verificata, dopo il 26/10).
+- **Sforzo:** S. **Costo:** zero Google; l'AI riceve fino a 3 frasi per requisito invece di 1 (~+5% di token nella chiamata del perché).
+
+### 23. Dal reel alla prova: "Il reel dice terrazza: confermato"
+- **Problema:** chi salva da un reel si fida del creator; la didascalia promette ("vista pazzesca") ma nessuno controlla (chiave A + B).
+- **Cosa fa:** nel "✓ Salvato" dal reel, se la didascalia nomina un requisito (terrazza, vista, romantico) e le recensioni lo confermano con la doppia chiave, una riga "Il reel dice vista: confermato da una recensione". Se non lo conferma nessuno, niente (mai "falso").
+- **Da chi nasce:** Corner e Mapstr salvano il pin del reel senza giudizio; noi lo verifichiamo.
+- **Valore utente:** sa subito se il reel era vero. **B2B:** il locale vede quali promesse dei creator i clienti confermano.
+- **Sforzo:** S/M. **Costo:** zero Google se la ricerca che riconosce il locale porta già le recensioni (da verificare nel codice prima di costruirla; altrimenti 1 dettaglio Google in più a salvataggio, da segnalare), una frase in più nella chiamata AI.
+
+## 22/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta, senza ricerche nuove: i documenti del giorno li ha già aggiornati la sessione delle 00:07)
+
+### 20. "Solo quelli con la prova": un tocco sulla pillola tiene solo i posti con ✓ su tutti i requisiti
+- **Problema:** `PROBLEMI.md`, 10. Con 20 risultati, chi ha chiesto "terrazza romantica" vuole vedere subito quali la terrazza ce l'hanno *di sicuro*.
+- **Cosa fa:** nella pillola "✨ 20 posti · terrazza · romantico" compare "✓ 6 con la prova": un tocco e restano solo quelli con la frase di recensione per ogni requisito; un altro tocco li rimette tutti.
+- **Da dove nasce:** Places e Mapstr filtrano per etichette scelte dall'utente, Google per attributi dichiarati; nessuno filtra per "le recensioni lo dicono, ecco la frase".
+- **Valore per l'utente:** nella demo, "meglio 4 giusti che 20 approssimativi" (TEST-RICERCHE) diventa un tocco.
+- **Valore per il ristoratore:** capire quale caratteristica, detta dai clienti, lo fa restare in lista (pannello, dopo).
+- **Sforzo:** S. I ✓ arrivano già con le card, nessun dato nuovo.
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (chiave B).
+
+### 21. Il ✓ anche dai salvati: "Nei tuoi posti con terrazza"
+- **Problema:** VISIONE, "ritrova": nei salvati si cerca per parola ma non si sa se la parola è vera.
+- **Cosa fa:** cercando nei salvati "terrazza", i posti la cui recensione salvata lo conferma mostrano "✓ terrazza" con la frase, come nei risultati.
+- **Da dove nasce:** Mapstr e Corner cercano solo nei tag messi a mano; noi usiamo le recensioni già salvate con il verdetto.
+- **Valore per l'utente:** ritrova il posto giusto tra i suoi in 2 secondi, con la prova.
+- **Valore per il ristoratore:** nessuno diretto; più ritorni da chi l'ha già salvato.
+- **Sforzo:** S/M (dipende da quante recensioni restano salvate per locale: da verificare, niente foto o contenuti Google oltre a ciò che i termini consentono).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, dopo la 20 (verificare prima i termini Google sul testo delle recensioni salvate).
+
 ## 22/10/2026 (notte, sessione 00:07, CEO che chiude — solo chiavi di volta)
 
 ### 18. "Come lo sai?": la frase della recensione dietro ogni ✓
