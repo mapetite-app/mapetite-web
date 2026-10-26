@@ -197,7 +197,11 @@ function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["u
     out.push(x);
   });
   // "e un altro tipo di posto", "e altri 2 tipi di posto": mai "e altri 1" (collaudo del 23/10).
-  if (resto > 0) out.push({ t: resto === 1 ? ` e ${cosa[0]}` : ` e ${cosa[1].replace("N", String(resto))}` });
+  // Toccabile come le altre parole (collaudo del 24/10): porta alla domanda, dove si vedono tutti.
+  if (resto > 0) {
+    out.push({ t: " e " });
+    out.push({ t: resto === 1 ? cosa[0] : cosa[1].replace("N", String(resto)), k: xs[0]?.k });
+  }
   return out;
 }
 

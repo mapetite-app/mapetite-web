@@ -6002,7 +6002,7 @@ else {
   if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
     // Card riaperta: niente "10 di 10" né "↶ Precedente" (annullava un'altra card), ma "Torna alla frase" (collaudo 23/10).
-    ok((await ip.getByTestId("tipi-contatore").textContent()) === "Cambia la risposta" && (await ip.getByTestId("tipo-indietro").count()) === 0 && await ip.getByTestId("torna-frase").isVisible(), `primo accesso: card riaperta dalla frase con 'Torna alla frase', senza contatore né 'Precedente' (${await ip.getByTestId("tipi-contatore").textContent()})`);
+    ok(/^Cambia la risposta · prima (👍|👎)$/.test((await ip.getByTestId("tipi-contatore").textContent()) ?? "") && (await ip.getByTestId("tipo-indietro").count()) === 0 && await ip.getByTestId("torna-frase").isVisible(), `primo accesso: card riaperta dalla frase con 'Torna alla frase', senza contatore né 'Precedente' (${await ip.getByTestId("tipi-contatore").textContent()})`);
     await ip.getByTestId("tipo-su").click();
     await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
@@ -6010,6 +6010,13 @@ else {
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7" && ((await ip.getByTestId("torna-frase").textContent()) ?? "").includes("Torna alla frase"), "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia, con 'Torna alla frase'");
     await ip.getByTestId("torna-frase").click();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, si torna alla frase (non al passo dopo)");
+    // "e altri N tipi di posto" si tocca come le altre parole (collaudo 24/10): porta all'elenco dei tipi.
+    { const altri = ip.getByTestId("capito-parola").filter({ hasText: /^altr[oi] / });
+      if (await altri.count()) { await altri.first().click();
+        ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: 'e altri N tipi di posto' si tocca e porta ai tipi, con 'Torna alla frase'");
+        if (await ip.getByTestId("tipi-rifai").count()) { await ip.getByTestId("tipi-rifai").click();
+          ok((await ip.getByTestId("tipi-rifai").textContent())?.includes("Sicuro?") && await ip.getByTestId("tipi-finiti").isVisible(), "primo accesso: 'Rifai tutti e dieci' chiede conferma prima di cancellare (collaudo 24/10)"); }
+        await ip.getByTestId("torna-frase").click(); } }
     // Un tipo toccato nella frase quando non si sono votate tutte le card: c'è sempre l'uscita (collaudo 23/10).
     await ip.getByTestId("capito-parola").filter({ hasText: "Monti" }).click(); }
   else await ip.getByTestId("capito-riga").first().click();
