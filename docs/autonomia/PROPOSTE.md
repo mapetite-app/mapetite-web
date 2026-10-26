@@ -16,6 +16,25 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 26/10/2026 (notte, sessione 04:06, CEO che chiude — ultimo giorno dello sprint, solo chiavi di volta)
+
+### 28. "Ci sono stato" che vale come prova (risposta alla Legge 34/2026 sulle recensioni false)
+- **Problema:** `PROBLEMI.md`, 12. Recensioni false e ricatti con recensioni negative; la Legge 34/2026 chiede di verificare che chi recensisce sia stato davvero nel locale.
+- **Cosa fa:** quando segni "✓ Ci sono stato", l'app guarda (solo se la posizione è già permessa, sul telefono, senza salvarla) se nelle ultime 3 ore eri entro 150 m dal locale: la visita diventa "✓ visita vista dal telefono". Nella scheda, le opinioni della community mostrano quante vengono da visite viste così. Nessun dato di posizione esce dal telefono: si salva solo sì/no.
+- **Da dove nasce:** Beli e Corner contano le visite dichiarate; TripAdvisor e Google non verificano la presenza. Noi possiamo farlo senza GPS continuo, solo nel momento del tocco.
+- **Valore per l'utente:** opinioni della community di cui ci si può fidare.
+- **Valore per il ristoratore:** opinioni che non si possono comprare né usare per ricattarlo; nel pannello futuro "N visite vere da Mapetite questo mese" (piano Growth).
+- **Sforzo:** M (colonna sì/no sulla visita, controllo sul telefono, etichetta in scheda). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, **dopo lo sprint** (dal 27/10): non è una chiave di volta.
+
+### 29. Senza AI, il verdetto dalle recensioni in una riga onesta
+- **Problema:** `PROBLEMI.md`, 11. Con il credito Anthropic a zero (dal 22/10) i locali nuovi mostrano una citazione tagliata di una recensione al posto del verdetto: alla demo sembra un buco.
+- **Cosa fa:** quando l'AI non risponde, la card mostra "Da Google: " + la frase più informativa di una recensione con 5 stelle *e* quella di una con 3 o meno, se c'è ("piace: … · non convince: …"), sempre tra virgolette e attribuita. Nessun testo scritto da noi: solo scelta di frasi vere.
+- **Da dove nasce:** Places mostra estratti di recensioni; nessuno mette a fianco il pro e il contro. È la forma più vicina al verdetto che si può fare senza inventare.
+- **Valore per l'utente / ristoratore:** il verdetto "sempre" regge anche quando l'AI cade; il locale non viene mostrato muto.
+- **Sforzo:** S. **Costo:** zero (recensioni già nella risposta Google).
+- **Stato proposto:** PRONTA (chiave B, verdetto sempre).
+
 ## 24/10/2026 (notte, sessione 00:06, CEO che chiude — solo chiavi di volta)
 
 ### 26. "Verdetto in arrivo": nessun locale resta senza verdetto quando l'AI si ferma

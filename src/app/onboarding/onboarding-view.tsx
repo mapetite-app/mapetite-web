@@ -212,7 +212,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [partenza] = useState(draftJson);
   useEffect(() => {
     const d = JSON.parse(draftJson) as Draft;
-    if (vuota(d) || (!ripreso && draftJson === partenza)) return;
+    // Tolta l'ultima risposta (Roma scelta e poi tolta): la bozza vecchia va via, altrimenti tornava con la ricarica (collaudo 26/10).
+    if (vuota(d)) { if (draftJson !== partenza || ripreso) clearDraft(); return; }
+    if (!ripreso && draftJson === partenza) return;
     saveDraft(d);
   }, [draftJson, partenza, ripreso]);
 
@@ -222,6 +224,16 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   }, [step]);
   // Aggiornamento durante il render, non in un effetto.
   if (step > maxVisto) setMaxVisto(step);
+  // "Ho ritrovato le risposte" solo all'arrivo: tornando al passo ripreso non ricompare (collaudo del 24/10).
+  const [lasciato, setLasciato] = useState(false);
+  if (!lasciato && step !== (initial?.step ?? 0)) setLasciato(true);
+  // "Rifai tutto" chiede conferma: un tocco solo cancellava dieci risposte (collaudo del 24/10).
+  const [confermaRifai, setConfermaRifai] = useState(false);
+  useEffect(() => {
+    if (!confermaRifai) return;
+    const t = setTimeout(() => setConfermaRifai(false), 4000);
+    return () => clearTimeout(t);
+  }, [confermaRifai]);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
   useEffect(() => {
@@ -238,15 +250,19 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
   const dedotta = scopertaDedotta(su, [...su, ...giu]);
   const scopertaOra = scoperta ?? dedotta;
-  const scopertaVista = maxVisto >= PASSO_SCOPERTA;
   // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
   // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).
   const fissaScoperta = () => { if (step === PASSO_SCOPERTA && scoperta == null && dedotta) setScoperta(dedotta); };
   // Il tipo di posto da valutare adesso: quello riaperto dalla frase, se c'è; se no il primo non ancora visto.
   const [riaperta, setRiaperta] = useState<string | null>(null);
   const corrente = (riaperta ? TIPI.find((t) => t.id === riaperta) : null) ?? TIPI.find((t) => !visti.includes(t.id)) ?? null;
+  // Card riaperta per cambiarla: si vede cosa avevi risposto (collaudo del 24/10).
+  const prima = riaperta ? (su.includes(riaperta) ? "👍" : giu.includes(riaperta) ? "👎" : null) : null;
   // Al server la scelta vista al passo 3, anche se era quella proposta dai 👍 (prima si perdeva).
-  const gusto = { v: 1 as const, zone, su, giu, scoperta: scopertaVista ? scopertaOra : scoperta };
+  // Al server solo la scelta vista: quella del passo 3 o la proposta dei 👍 fissata lasciandolo (fissaScoperta).
+  // Prima con `scopertaVista` passava anche una proposta calcolata dopo, da 👍 dati correggendo dalla frase,
+  // e la frase diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo 26/10).
+  const gusto = { v: 1 as const, zone, su, giu, scoperta };
 
   // Arrivati a correggere dalla frase: ogni passo ha "Torna alla frase" (collaudo 23/10: "Continua" portava avanti).
   const [tornaFrase, setTornaFrase] = useState(false);
@@ -255,8 +271,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
     // Rivotando lo stesso tipo resta al suo posto (in testa alla frase), non scivola in fondo dietro "e altri N".
-    setSu((p) => (voto === "su" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
-    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
+    // Una card cambiata (era 👎, ora 👍) va in testa: in fondo finiva dietro "e un altro tipo di posto" (collaudo 26/10).
+    const cambiata = riaperta === id && (voto === "su" ? giu.includes(id) : voto === "giu" ? su.includes(id) : false);
+    setSu((p) => (voto === "su" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
+    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
     const dopo = visti.includes(id) ? visti : [...visti, id];
     setVisti(dopo);
     setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
@@ -311,7 +329,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 e ha lasciato vale come
   // scelta. Una mai mostrata non entra nella sintesi.
-  const gustoVisto = { ...gusto, scoperta: scopertaVista ? scopertaOra : scoperta };
+  const gustoVisto = gusto;
   const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
@@ -337,6 +355,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Toccando una parola della frase si torna alla domanda che la cambia; poi "Torna alla frase".
   const cambia = (k: string, id?: string) => {
     setTornaFrase(true);
+    setEsito("");
     if (id) { setRiaperta(id); setStep(PASSO_TIPI); return; }
     setStep(PASSO_DI[k] ?? 0);
   };
@@ -401,7 +420,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
         )}
         {step === PASSO_CAPITO && <div className="mb-4 min-[380px]:mb-5" />}
         {/* Non sulla card dei tipi né sulla frase finale: toglieva spazio e copriva i tasti a 360px (collaudo 23/10). */}
-        {ripreso && step === initial?.step && step !== PASSO_TIPI && step < PASSO_CAPITO && (
+        {ripreso && !lasciato && step === initial?.step && step !== PASSO_TIPI && step < PASSO_CAPITO && (
           <p data-testid="benvenuto-ripreso" role="status" className="-mt-2 mb-5 rounded-btn bg-[#e8efee] px-3 py-2 text-sm font-sans text-brand">
             Ho ritrovato le risposte che avevi già dato: puoi continuare da qui.
           </p>
@@ -514,7 +533,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     </span>
                   )}
                   {/* Contatore dei tipi dentro la card; riaperta dalla frase dice "Cambia" (prima "10 di 10": collaudo 23/10). */}
-                  <span data-testid="tipi-contatore" className={`absolute left-5 top-5 z-10 rounded-pill ${drag && Math.abs(drag.dx) > 30 ? "opacity-0" : ""} bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold`}>{riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}</span>
+                  <span data-testid="tipi-contatore" className={`absolute left-5 top-5 z-10 rounded-pill ${drag && Math.abs(drag.dx) > 30 ? "opacity-0" : ""} bg-black/30 px-2.5 py-0.5 font-display text-xs font-semibold`}>{riaperta ? `Cambia la risposta${prima ? ` · prima ${prima}` : ""}` : `${visti.length + 1} di ${TIPI.length}`}</span>
                   {/* Luci calde sfocate e l'emoji al centro, come nel mockup: niente foto inventate. */}
                   <span aria-hidden className="pointer-events-none absolute left-6 top-10 h-20 w-20 rounded-full bg-[#ffd9a0]/35 blur-2xl" />
                   <span aria-hidden className="pointer-events-none absolute right-8 top-6 h-16 w-16 rounded-full bg-[#ffd9a0]/30 blur-2xl" />
@@ -544,16 +563,26 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </>
             ) : (
               <div data-testid="tipi-finiti">
-                <p className="rounded-card bg-[#e8efee] px-4 py-3 text-sm font-sans text-brand">
-                  Fatto: {su.length === 0 ? "nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no. Tocca un posto per cambiarlo, oppure <button type="button" onClick={() => { setVisti([]); setSu([]); setGiu([]); }} className="min-h-11 font-display font-semibold text-brand underline underline-offset-2">rifai tutto</button>.
+                {/* Stesso stile dei titoli e delle scelte degli altri passi (collaudo del 24/10: sembrava un avviso). */}
+                <p className="font-display text-lg font-semibold text-brand">
+                  {su.length + giu.length === 0 ? "Non ne conosci nessuno" : <>{su.length === 0 ? "Nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no</>}
                 </p>
+                <p className="mt-0.5 text-[15px] font-sans text-text-muted">Tocca un posto per cambiare la risposta.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {TIPI.map((t) => (
-                    <button key={t.id} type="button" data-testid="tipo-riapri" onClick={() => setRiaperta(t.id)} aria-label={`Cambia: ${t.titolo}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-border bg-white px-3 text-sm font-sans text-text">
+                    <button key={t.id} type="button" data-testid="tipo-riapri" onClick={() => { setEsito(""); setRiaperta(t.id); }} aria-label={`Cambia: ${t.titolo}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-border bg-white px-3 text-sm font-sans text-text">
                       <span aria-hidden>{t.emoji}</span> {t.titolo} <span aria-hidden>{su.includes(t.id) ? "👍" : giu.includes(t.id) ? "👎" : "·"}</span>
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  data-testid="tipi-rifai"
+                  onClick={() => { if (!confermaRifai) { setConfermaRifai(true); return; } setConfermaRifai(false); setVisti([]); setSu([]); setGiu([]); }}
+                  className={`mt-4 flex min-h-11 items-center px-1 font-display text-[15px] font-semibold ${confermaRifai ? "text-accent" : "text-text-muted"}`}
+                >
+                  {confermaRifai ? "Sicuro? Tocca ancora per ricominciare" : "↺ Rifai tutti e dieci"}
+                </button>
               </div>
             )}
           </div>
@@ -668,7 +697,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               <ul data-testid="capito-righe" className="mt-1 overflow-hidden rounded-card border border-border bg-white shadow-card">
                 {righeAltre.map((r, i) => (
                   <li key={r.chiave} className={i > 0 ? "border-t border-border" : ""}>
-                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave, r.chiave === "giu" ? giu[0] : undefined)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
+                    <button type="button" data-testid="capito-riga" onClick={() => cambia(r.chiave)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface">
                       <span aria-hidden className="text-xl">{r.emoji}</span>
                       <span className="min-w-0 flex-1 text-[15px] font-sans leading-snug text-text">{r.testo}</span>
                       <ChevronRight aria-label="Cambia" size={18} className="shrink-0 text-text-muted" />
@@ -702,7 +731,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   Torna alla frase <ArrowRight size={16} aria-hidden />
                 </button>
               ) : (
-                <button type="button" data-testid="tipi-basta" onClick={() => setStep(PASSO_SCOPERTA)} className="flex min-h-12 items-center gap-1 whitespace-nowrap px-1 font-display text-[15px] font-semibold text-brand">
+                <button type="button" data-testid="tipi-basta" onClick={() => { setRiaperta(null); setStep(PASSO_SCOPERTA); }} className="flex min-h-12 items-center gap-1 whitespace-nowrap px-1 font-display text-[15px] font-semibold text-brand">
                   {corrente ? "Basta così" : "Continua"} <ArrowRight size={16} aria-hidden />
                 </button>
               )}

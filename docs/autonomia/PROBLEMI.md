@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 21/10/2026 (mattina).
+Ultimo aggiornamento: 26/10/2026 (notte).
 
 ---
 
@@ -156,4 +156,11 @@ Ultimo aggiornamento: 21/10/2026 (mattina).
 - **OGGI nell'app:** l'app non si rompe: i verdetti già scritti restano (archivio), la scheda mostra "Da Google" (descrizione di Google o una frase di recensione, con l'etichetta della fonte), mai testo inventato. Manca: sapere *subito* che il credito sta finendo. Proposta 24 (S): stato dell'AI nel pannello `/admin/numeri` e avviso automatico.
 - **DAVVERO, in futuro:** budget mensile dell'AI con soglia di avviso nella console Anthropic (Lorenzo); verdetti scritti una volta e conservati (già così: costano solo la prima volta), così l'archivio cresce e la dipendenza cala con l'uso; un secondo fornitore di riserva solo se il costo resta nel budget (decisione di Lorenzo).
 - **Primo passo:** ricaricare il credito (Lorenzo, `DA-FARE-LORENZO.md`); proposta 24 (team, S). **Chi lo fa:** Lorenzo (credito, soglia), team (pannello e avviso).
+
+## 12. Recensioni false e ricatti: il ristoratore non si difende, il cliente non si fida — 26/10 notte
+- **Chi lo ha:** entrambi.
+- **Quanto pesa:** secondo uno studio Fipe-Confcommercio citato da Unione Sarda (2026), le recensioni incidono sul fatturato fino al 30%; nel 2024 l'8,6% delle recensioni sulle grandi piattaforme è risultato falso (Gambero Rosso, giugno 2025, fonte secondaria). Casi di ricatto documentati a Cagliari (Unione Sarda, 2026) e a Roma, Ripa 12 (Linkiesta, giugno 2025). Dal 7/4/2026 la **Legge 34/2026** fissa quando una recensione è valida: limiti di tempo, verifica della presenza reale dell'autore nel locale, divieto di compravendita (Unione Sarda). Fonti: https://www.unionesarda.it/info-aziende/boom-recensioni-false-un-danno-per-ristoratori-e-clienti-r4uirdbj · https://www.gamberorosso.it/notizie/attualita/recensioni-negative-ristoranti-impatti-dati/ · https://www.linkiesta.it/2025/06/a-che-punto-sono-le-norme-italiane-contro-le-false-recensioni-online/
+- **OGGI nell'app:** il verdetto si scrive solo da recensioni Google e non inventa (già così); "✓ Ci sono stato" diventa una visita vista dal telefono nel momento del tocco (proposta 28, M); la community mostra quante opinioni vengono da visite viste.
+- **DAVVERO, in futuro:** conferma della visita dal locale (prenotazione o conto pagato) tramite gestionali di cassa e prenotazione; la legge rende questo dato prezioso per il ristoratore. Serve un parere legale sulla legge prima di dire "conforme".
+- **Primo passo:** proposta 28 dopo lo sprint (team). Lettura del testo della Legge 34/2026 e parere di un legale: Lorenzo/Roberto.
 
