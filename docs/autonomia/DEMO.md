@@ -1,5 +1,17 @@
 # Demo di Mapetite in 5 minuti (telefono in mano, per investitori)
 
+## Copione di 3 minuti (sprint, 26/10) — quello da usare dal vivo
+Le 4 chiavi di volta in fila: primo accesso, salva dal reel, ricerca con l'AI, scheda. Il copione lungo (5 minuti, 18/10) resta sotto per le domande.
+**Prima (2 minuti):** credito Anthropic attivo (in `/admin/numeri` deve esserci "AI: ok"; senza, la ricerca funziona ma i verdetti dei posti nuovi non arrivano); link di un TikTok di un ristorante negli appunti; posizione già permessa.
+
+1. **0:00 — "Ecco cosa ho capito di te" (40 s).** Account nuovo → il primo accesso: Roma e una zona, 4–5 card 👍/👎 dei tipi di posto, "Chicche", poi "Continua" fino alla frase. Tocca una parola sottolineata per mostrare che si corregge. Dì: "In 30 secondi l'app sa cosa ti piace. Nessun questionario."
+2. **0:40 — "Mostrami i posti per me" (30 s).** Parte la prima ricerca già fatta sui tuoi gusti: card con **"Il verdetto Mapetite"** e "Per te". Dì: "Non i più famosi: quelli giusti per te."
+3. **1:10 — Salva dal reel (40 s).** Salvati → **+** → **"Incolla un link"** → incolla il TikTok. Compare il locale riconosciuto con la foto: "✓ Salvato". Tocca **"Quando ci vai?" → Nel weekend**. Dì: "Un gesto. Il reel non si perde più."
+4. **1:50 — Ricerca con l'AI (40 s).** Mappa → barra in alto: "trattoria autentica non turistica a Trastevere". Mostra la pillola con cosa ha capito e i ✓ dei requisiti; apri **"Ho messo da parte"**: "Google qui metterebbe primi i posti con diecimila recensioni. Noi li mettiamo in fondo, e diciamo perché."
+5. **2:30 — Scheda e "Ci sono stato" (30 s).** Tocca una card: scheda a tutto schermo con foto, verdetto in alto, "Orari, contatti, recensioni". Tocca **"✓ Ci sono stato"**. Torna in Salvati: il posto è lì. Chiudi: "Raccogli, ritrova, scegli. Tutto in un'app."
+
+**Se qualcosa va storto:** senza rete o con la quota Google finita, cerca tra i salvati (Salvati → cerca); senza AI i posti già visti hanno comunque il verdetto, i nuovi mostrano una frase vera di una recensione.
+
 Aggiornata il 18/10 (prima il 16/10, voce 9.2). Ogni passo è controllato nel codice: i testi tra virgolette sono quelli dei pulsanti dell'app.
 Il filo del discorso è la visione: **raccogli, organizza, ritrova, scegli**, e il differenziatore: **posti non mainstream, adatti ai gusti di chi cerca**.
 

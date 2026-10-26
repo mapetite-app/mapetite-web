@@ -104,6 +104,11 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Beli:** più di 120 milioni di voti su 2 milioni di locali in oltre 50.000 città ([Boston Globe, 4/8/2026](https://www.bostonglobe.com/2026/08/04/lifestyle/beli-restaurant-rating-app/)). Nessun cambio al sistema di classifica trovato. Ultimo controllo: 24/10/2026.
 - **Albo, BestieBite:** nessuna ricerca nuova stanotte (sprint: max 10 ricerche, le altre sopra).
 
+### Controllo del 26/10 notte (CEO che chiude, 2 ricerche)
+- **Beli:** una critica di design di settembre 2026 (Pratt, https://ixd.prattsi.org/2026/09/a-design-critique-of-beli-restaurant-discovery-and-social-platform/) conferma il cuore: aggiungi un posto, tre reazioni, poi confronti a coppie per la classifica; difetto notato: confronti tra posti di tipo diverso che confondono. Da prendere: le tre reazioni rapide (le abbiamo nel primo accesso). Dove facciamo meglio: noi votiamo **tipi di posto**, non confronti a coppie, e la frase "Ecco cosa ho capito di te" si corregge toccando le parole.
+- **App "a scorrimento" nuove (Flavr, What Should I Eat AI, FoodieSwipe, marzo 2026, dalle schede degli store):** card da far scorrere a destra/sinistra per cucina, quartiere, "vibe". Conferma che il gesto 👍/👎 è ormai atteso; nessuna lega il voto a una ricerca che rispetta i vincoli: il nostro vantaggio resta lì.
+- **Nessuna novità trovata** su Corner e Mapstr in questa ricerca (servirebbero i changelog).
+
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager
