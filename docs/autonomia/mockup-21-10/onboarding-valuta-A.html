@@ -1,0 +1,38 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:var(--paper)}
+.pr{position:absolute;top:62px;left:16px;right:16px;display:flex;align-items:center;gap:14px}
+.pr .bk{font-size:22px;color:var(--text)}
+.pr .bar{flex:1;height:4px;border-radius:2px;background:#e6dfd3;overflow:hidden}
+.pr .bar i{display:block;width:42%;height:100%;background:var(--brand);border-radius:2px}
+.pr .n{font-size:13px;color:var(--muted);font-weight:500}
+.q{position:absolute;top:104px;left:22px;right:22px}
+.q h1{font-family:var(--serif);font-weight:400;font-size:38px;letter-spacing:-.02em;line-height:1.02}
+.q p{font-size:14.5px;color:var(--muted);margin-top:8px}
+.stack{position:absolute;top:214px;left:30px;right:30px;height:430px}
+.cd{position:absolute;inset:0;border-radius:26px;overflow:hidden;box-shadow:0 18px 40px rgba(40,25,10,.18)}
+.cd.b1{transform:rotate(4deg) translate(10px,8px);opacity:.6}
+.cd.b2{transform:rotate(-3deg) translate(-8px,6px);opacity:.8}
+.cd.top{--es:120px}
+.cd.top::after{top:40%}
+.cd .g{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 50%,rgba(0,0,0,.72));z-index:2}
+.cd .t{position:absolute;left:20px;right:20px;bottom:20px;color:#fff;z-index:3}
+.cd .tag{display:inline-flex;gap:6px;align-items:center;background:rgba(255,255,255,.92);color:var(--brand);padding:5px 10px;border-radius:999px;font-size:11.5px;font-weight:600;font-family:var(--display)}
+.cd .t b{display:block;font-family:var(--serif);font-weight:500;font-size:32px;letter-spacing:-.015em;margin-top:10px;line-height:1.02}
+.cd .t span{font-size:13.5px;opacity:.85}
+.act{position:absolute;left:0;right:0;bottom:56px;display:flex;justify-content:center;align-items:center;gap:26px}
+.act .bt{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font-size:32px;box-shadow:0 10px 24px rgba(0,0,0,.12)}
+.act .no{background:#fff;border:1px solid #e6dfd3}
+.act .si{background:var(--accent);box-shadow:0 12px 26px rgba(255,107,74,.4)}
+.act .sk{font-size:13.5px;color:var(--muted);font-weight:500;width:88px;text-align:center}
+</style></head><body><div class="screen">
+<div data-sb=""></div>
+<div class="pr"><i data-i="back" class="bk"></i><div class="bar"><i></i></div><span class="n">4 di 10</span></div>
+<div class="q"><h1>Ti piacerebbe?</h1><p>Valuta 10 posti veri: impariamo i tuoi gusti.</p></div>
+<div class="stack">
+ <div class="cd b1 ph ph-cocktail" data-e=""></div>
+ <div class="cd b2 ph ph-pizza" data-e=""></div>
+ <div class="cd top ph ph-wine" data-e="🍷"><div class="g"></div><div class="t"><span class="tag"><i data-i="spark" class="spark"></i>Chicca di quartiere</span><b>Vineria Ombretta</b><span>Pigneto · Vineria · €€</span></div></div>
+</div>
+<div class="act"><div class="bt no">👎</div><div class="sk">Non lo conosco</div><div class="bt si">👍</div></div>
+<div class="home-ind"></div>
+</div><script src="base.js"></script></body></html>
