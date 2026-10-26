@@ -212,7 +212,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [partenza] = useState(draftJson);
   useEffect(() => {
     const d = JSON.parse(draftJson) as Draft;
-    if (vuota(d) || (!ripreso && draftJson === partenza)) return;
+    // Tolta l'ultima risposta (Roma scelta e poi tolta): la bozza vecchia va via, altrimenti tornava con la ricarica (collaudo 26/10).
+    if (vuota(d)) { if (draftJson !== partenza || ripreso) clearDraft(); return; }
+    if (!ripreso && draftJson === partenza) return;
     saveDraft(d);
   }, [draftJson, partenza, ripreso]);
 
@@ -248,7 +250,6 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
   const dedotta = scopertaDedotta(su, [...su, ...giu]);
   const scopertaOra = scoperta ?? dedotta;
-  const scopertaVista = maxVisto >= PASSO_SCOPERTA;
   // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
   // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).
   const fissaScoperta = () => { if (step === PASSO_SCOPERTA && scoperta == null && dedotta) setScoperta(dedotta); };
@@ -258,7 +259,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Card riaperta per cambiarla: si vede cosa avevi risposto (collaudo del 24/10).
   const prima = riaperta ? (su.includes(riaperta) ? "👍" : giu.includes(riaperta) ? "👎" : null) : null;
   // Al server la scelta vista al passo 3, anche se era quella proposta dai 👍 (prima si perdeva).
-  const gusto = { v: 1 as const, zone, su, giu, scoperta: scopertaVista ? scopertaOra : scoperta };
+  // Al server solo la scelta vista: quella del passo 3 o la proposta dei 👍 fissata lasciandolo (fissaScoperta).
+  // Prima con `scopertaVista` passava anche una proposta calcolata dopo, da 👍 dati correggendo dalla frase,
+  // e la frase diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo 26/10).
+  const gusto = { v: 1 as const, zone, su, giu, scoperta };
 
   // Arrivati a correggere dalla frase: ogni passo ha "Torna alla frase" (collaudo 23/10: "Continua" portava avanti).
   const [tornaFrase, setTornaFrase] = useState(false);
@@ -267,8 +271,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [esito, setEsito] = useState("");
   const vota = (id: string, voto: "su" | "giu" | "boh") => {
     // Rivotando lo stesso tipo resta al suo posto (in testa alla frase), non scivola in fondo dietro "e altri N".
-    setSu((p) => (voto === "su" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
-    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : [...p, id]) : p.filter((x) => x !== id)));
+    // Una card cambiata (era 👎, ora 👍) va in testa: in fondo finiva dietro "e un altro tipo di posto" (collaudo 26/10).
+    const cambiata = riaperta === id && (voto === "su" ? giu.includes(id) : voto === "giu" ? su.includes(id) : false);
+    setSu((p) => (voto === "su" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
+    setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
     const dopo = visti.includes(id) ? visti : [...visti, id];
     setVisti(dopo);
     setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
@@ -323,7 +329,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 e ha lasciato vale come
   // scelta. Una mai mostrata non entra nella sintesi.
-  const gustoVisto = { ...gusto, scoperta: scopertaVista ? scopertaOra : scoperta };
+  const gustoVisto = gusto;
   const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
@@ -559,7 +565,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               <div data-testid="tipi-finiti">
                 {/* Stesso stile dei titoli e delle scelte degli altri passi (collaudo del 24/10: sembrava un avviso). */}
                 <p className="font-display text-lg font-semibold text-brand">
-                  {su.length === 0 ? "Nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no
+                  {su.length + giu.length === 0 ? "Non ne conosci nessuno" : <>{su.length === 0 ? "Nessuno ti piace" : `${su.length} ${su.length === 1 ? "ti piace" : "ti piacciono"}`}, {giu.length} no</>}
                 </p>
                 <p className="mt-0.5 text-[15px] font-sans text-text-muted">Tocca un posto per cambiare la risposta.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -725,7 +731,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   Torna alla frase <ArrowRight size={16} aria-hidden />
                 </button>
               ) : (
-                <button type="button" data-testid="tipi-basta" onClick={() => setStep(PASSO_SCOPERTA)} className="flex min-h-12 items-center gap-1 whitespace-nowrap px-1 font-display text-[15px] font-semibold text-brand">
+                <button type="button" data-testid="tipi-basta" onClick={() => { setRiaperta(null); setStep(PASSO_SCOPERTA); }} className="flex min-h-12 items-center gap-1 whitespace-nowrap px-1 font-display text-[15px] font-semibold text-brand">
                   {corrente ? "Basta così" : "Continua"} <ArrowRight size={16} aria-hidden />
                 </button>
               )}

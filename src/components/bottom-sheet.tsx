@@ -1,5 +1,6 @@
 "use client";
 
+import { fraseDaRecensioni } from "@/lib/frase-recensione";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -102,7 +103,8 @@ export type ListDetails = {
 export function googleLine(d: ListDetails | undefined): string | null {
   if (!d) return null;
   if (d.editorialSummary) return d.editorialSummary;
-  const review = d.selectedReviews?.find((r) => r.rating == null || r.rating >= 4)?.text;
+  // Una frase intera e concreta (proposta 29); se nessuna va bene, l'inizio della prima recensione positiva come prima.
+  const review = fraseDaRecensioni(d.selectedReviews) ?? d.selectedReviews?.find((r) => r.rating == null || r.rating >= 4)?.text;
   return review ? `“${review}”` : null;
 }
 
