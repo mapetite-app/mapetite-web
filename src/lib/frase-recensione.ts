@@ -8,8 +8,10 @@ const VUOTA = /^(?:ottim|buon|bell|super|top|consigliat|bravissim|tutto\s+(?:ott
 // Parole concrete: piatti, ambiente, servizio, prezzo. Una frase che ne ha almeno una vince.
 const CONCRETA = /\b(?:carbonara|amatriciana|gricia|cacio|pasta|pizz|carciof|suppl|fritt|tiramis|vino|vini|cocktail|carne|pesce|dolc|antipast|piatt|menu|menù|porzion|prezz|conto|terrazz|tavol|sala|cortile|giardino|vista|atmosfer|ambiente|servizio|personale|cameri|propriet|titolar|signora|nonna|cuoc|chef|forno|pane|fresch|casalin|tradizional|romana|romano)\w*/i;
 
-// Recensione in inglese (Google non sempre la traduce): solo se non c'è altro.
+// Recensione in inglese (Google non sempre la traduce): mai, resta la riga di prima.
 const INGLESE = /\b(?:the|and|was|with|were|we|our|very|food)\b/i;
+// Critiche dentro una recensione positiva ("Purtroppo il servizio era lento"): non sono una lode (collaudo 26/10).
+const CRITICA = /\b(?:purtroppo|peccato|però|pero'|unic[ao]\s+pecca|lent[oiae]|car[oiae]\b|salat[oiae]|freddo|fredda|maleducat|scortes|deludent|delusion|non\s+(?:torner|ci\s+torner|lo\s+consiglio|consiglio|era|erano|è|sono|vale)|mai\s+più|sporc|rumoros|attes[ao]\s+lunga|esagerat|pensavo\s+di\s+più|mi\s+aspettavo)/i;
 const MIN = 30;
 const MAX = 120;
 
@@ -26,10 +28,13 @@ export function fraseDaRecensioni(reviews: { text?: string | null; rating?: numb
   let best: { f: string; score: number } | null = null;
   reviews.forEach((r, i) => {
     if (!r.text || (r.rating != null && r.rating < 4)) return;
-    for (const f of frasi(r.text)) {
-      if (f.length < MIN || f.length > MAX || VUOTA.test(f)) continue;
+    for (const grezza of frasi(r.text)) {
+      // Emoji o simboli rimasti attaccati dalla frase prima ("Grazie! 🙏 Cenato in due…").
+      const f = grezza.replace(/^[^\p{L}\p{N}"“«]+/u, "");
+      // Un pezzo che finisce con "…" è tagliato (recensione accorciata o puntini): non è una frase intera.
+      if (f.length < MIN || f.length > MAX || f.endsWith("…") || VUOTA.test(f) || CRITICA.test(f) || INGLESE.test(f)) continue;
       // Concreta prima di tutto; poi vicina a 80 caratteri (sta in due righe della card); a pari merito la recensione prima.
-      const score = (CONCRETA.test(f) ? 100 : 0) - (INGLESE.test(f) ? 300 : 0) - Math.abs(80 - f.length) / 4 - i;
+      const score = (CONCRETA.test(f) ? 100 : 0) - Math.abs(80 - f.length) / 4 - i;
       if (!best || score > best.score) best = { f, score };
     }
   });

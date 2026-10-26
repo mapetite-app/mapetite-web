@@ -3481,7 +3481,9 @@ else {
   { let fr = null; try { fr = await import(new URL("../../src/lib/frase-recensione.ts", import.meta.url).href); } catch (e) { ok(false, `frase: modulo importabile (${e.message})`); }
     if (fr) { const f = fr.fraseDaRecensioni([{ rating: 5, text: "Ottimo! Consigliatissimo. We loved the food and the staff was very kind to us." }, { rating: 5, text: "Un luogo dove ti senti in famiglia... la carbonara è cremosa e le porzioni sono generose. Torneremo!" }, { rating: 2, text: "Servizio lentissimo e piatti freddi, una delusione totale." }]);
       ok(f === "La carbonara è cremosa e le porzioni sono generose.", `frase dalle recensioni: intera, concreta, in italiano, da una recensione positiva (${f})`);
-      ok(fr.fraseDaRecensioni([{ rating: 5, text: "Top!" }]) === null && fr.fraseDaRecensioni(null) === null, "frase dalle recensioni: niente frase se c'è solo una lode vuota"); } }
+      ok(fr.fraseDaRecensioni([{ rating: 5, text: "Top!" }]) === null && fr.fraseDaRecensioni(null) === null, "frase dalle recensioni: niente frase se c'è solo una lode vuota");
+      const g = fr.fraseDaRecensioni([{ rating: 4, text: "Bel posto davvero. Purtroppo il servizio era lento e il conto molto salato per quello che offrono." }, { rating: 5, text: "Grazie! 🙏 Cenato in due, con due primi e un dolce della casa. Il servizio è stato veloce e la carbonara buonissima, cremosa al punto e…" }]);
+      ok(g === "Cenato in due, con due primi e un dolce della casa.", `frase dalle recensioni: mai una critica, mai un pezzo tagliato con '…', niente emoji in testa (${g})`); } }
   try { nm = await import(new URL("../../src/lib/numeri.ts", import.meta.url).href); } catch (e) { ok(false, `numeri: modulo src/lib/numeri.ts importabile (${e.message})`); }
   if (nm) {
     const now = Date.parse("2026-10-15T12:00:00Z");
