@@ -35,6 +35,8 @@ export async function GET(request: Request) {
     const thumb = str(o.thumbnail_url, 1000);
     const ig = source === "Instagram" ? instagramCaption(o) : null;
     if (ig && !ig.title) console.warn(`[oembed] Instagram senza didascalia campi=${Object.keys(o).join(",")}`);
+    // TEMPORANEO (29/10): forma dell'html di Meta, per leggere la didascalia. Da togliere.
+    if (ig) console.warn(`[oembed-html] ${String(o.html).replace(/style="[^"]*"/g, "").slice(0, 3000)}`);
     return NextResponse.json(
       {
         titolo: str(ig ? ig.title : o.title, 200),
