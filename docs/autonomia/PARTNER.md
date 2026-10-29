@@ -2,7 +2,7 @@
 
 Per ogni partner: chi è, quanti locali raggiunge (con fonte), cosa ci darebbe, cosa ci guadagna lui, se ha un'API o un programma partner pubblico, e una bozza di email pronta per Lorenzo o Roberto.
 **Nessuno è stato contattato.** Le email sono bozze: le manda Lorenzo o Roberto, quando vogliono.
-Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 20/10/2026.
+Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 29/10/2026.
 
 ## Ordine consigliato
 1. **Zenchef/CoverManager** e **Zucchetti**: risolvono il no-show vero (la prenotazione entra nell'agenda del locale) e non sono concorrenti sul cliente finale.
@@ -13,6 +13,32 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 6. **Deliveroo/Glovo**: non pertinenti (non facciamo consegne, `RICERCA-RISTORATORI.md` riga 5).
 
 ---
+
+## Bozza per Roberto: "Stasera c'è posto" (proposta 25, decisa da Lorenzo il 29/10)
+**Nessun contatto è stato fatto.** Sono due bozze pronte: le manda Roberto (o Lorenzo) quando vuole. Ordine consigliato: prima Zenchef/CoverManager (nessuna commissione, non è un concorrente sul cliente), TheFork solo dopo.
+**Cosa chiediamo, in una riga:** leggere i tavoli liberi di stasera (fascia oraria e numero di persone) dei locali che lo vogliono, e mandare lì la prenotazione dall'app.
+**Cosa vede l'utente, se dicono sì:** sulle card della ricerca "stasera" un segno "🟢 tavolo alle 21"; un tocco e prenota nel loro sistema. L'ordine dei risultati non cambia mai (il posto giusto resta primo anche se è pieno: regola di `VISIONE.md`).
+**Cosa offriamo noi:** clienti che hanno già salvato il locale (domanda qualificata), tavoli delle disdette dell'ultima ora riempiti, nessuna commissione da parte nostra nella fase pilota.
+**Domande da fare (servono per decidere):** 1) avete un'API o un programma partner per leggere le disponibilità? 2) a quali condizioni (costo, commissione al locale, contratto)? 3) serve il consenso del singolo locale? 4) un pilota con 5–10 locali a Roma è possibile?
+
+- **Bozza a Zenchef/CoverManager:**
+  > Oggetto: Tavoli liberi di stasera: un pilota a Roma con Mapetite
+  >
+  > Buongiorno,
+  > sono Roberto, di Mapetite: un'app italiana (Roma e Milano) dove le persone salvano i locali visti sui social e li ritrovano quando devono scegliere. Ogni locale ha un verdetto scritto dalle recensioni vere.
+  > Molti nostri utenti cercano "dove andiamo stasera" tra posti che hanno già salvato. Vorremmo mostrare, solo per i vostri locali che lo desiderano, i tavoli ancora liberi della serata e mandare la prenotazione direttamente nella loro agenda: è il modo più semplice per riempire i tavoli lasciati dalle disdette dell'ultima ora.
+  > Avete un'API o un programma partner per leggere le disponibilità e ricevere prenotazioni? Ci piacerebbe partire con un pilota di 5–10 ristoranti a Roma. Bastano 20 minuti per mostrarvi l'app dal telefono.
+  > Grazie,
+  > Roberto, Mapetite
+
+- **Bozza a TheFork (dopo Zenchef):**
+  > Oggetto: Mapetite: clienti già decisi per i tavoli liberi di stasera
+  >
+  > Buongiorno,
+  > sono Roberto, di Mapetite, app italiana per salvare e ritrovare bar e ristoranti a Roma e Milano. I nostri utenti arrivano al momento della prenotazione avendo già scelto il locale.
+  > Vorremmo capire se è possibile mostrare nella nostra app le disponibilità della serata dei ristoranti TheFork e far partire la prenotazione verso di voi, e a quali condizioni per noi e per i locali.
+  > Grazie,
+  > Roberto, Mapetite
 
 ## Zenchef + CoverManager
 - **Chi è:** gruppo europeo di gestionali per prenotazioni, proprietà del fondo PSG Equity; fusione del luglio 2025.

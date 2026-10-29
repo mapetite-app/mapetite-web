@@ -7,7 +7,7 @@ import { cityFromAddress, displayAddress } from "@/lib/city";
 import { saveSearchPlace, rememberPendingLink, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 import { rememberFirme } from "@/lib/catalog-firme";
 import { addReel } from "@/lib/community-write";
-import { findReelLink, reelSourceOf, type ReelSource } from "@/lib/reel";
+import { findReelLink, instagramEmbedUrl, reelSourceOf, type ReelSource } from "@/lib/reel";
 import { findVideoLink } from "@/lib/video-caption";
 import { findSocialLink, placeHintFromText } from "@/lib/social-link";
 import { confidentMatch, stessoLocale } from "@/lib/reel-match";
@@ -104,6 +104,11 @@ export default function ReelSave({
   const [error, setError] = useState<string | null>(null);
   // Lettura chiesta con un tocco qui (screenshot, nome scritto): vale come il gesto del Condividi.
   const [daTocco, setDaTocco] = useState(false);
+  // Reel Instagram incorporato (embed ufficiale di Meta) per leggere nome e posizione senza uscire
+  // dall'app: Meta non dà la didascalia alle altre app (oEmbed senza token provato il 29/10), ma il
+  // post si può mostrare. Si carica solo su richiesta: pesa e parla con Instagram.
+  const embed = source === "Instagram" && reelUrl ? instagramEmbedUrl(reelUrl) : null;
+  const [showEmbed, setShowEmbed] = useState(false);
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -212,6 +217,27 @@ export default function ReelSave({
             📸 Carica lo screenshot
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} aria-label="Screenshot del reel" />
+          {embed && !showEmbed && (
+            <button
+              type="button"
+              onClick={() => { setShowEmbed(true); trackFeature("reel_salva", { stato: "guarda_reel", fonte: "Instagram" }); }}
+              data-testid="reel-guarda"
+              className="min-h-11 w-full rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
+            >
+              ▶ Guarda il reel qui e scrivi il nome
+            </button>
+          )}
+          {embed && showEmbed && (
+            <iframe
+              src={embed}
+              title="Reel di Instagram"
+              data-testid="reel-embed"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              className="h-[480px] w-full rounded-card border border-border bg-white"
+            />
+          )}
           <form
             className="flex gap-2"
             onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { setDaTocco(true); read({ caption: draft.trim().slice(0, 2000) }); } }}
