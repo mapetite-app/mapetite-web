@@ -26,7 +26,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
    - Copia ID client e chiave segreta in Supabase (stessa pagina) e accendi Google.
    - Come si verifica: in /login compare "Continua con Google". Le sessioni lo controllano anche da sole con l'API di gestione Supabase (`external_google_enabled`; il 21/10 alle 23:00 era ancora spento).
-2. **Quota Google a 100 al giorno fino al 26/10 — APERTA (da controllare).** La regola dello sprint vale solo se la console Google mostra davvero 100.
+2. **Quota Google — FATTA il 29/10** (screenshot di Lorenzo: SearchText, GetPlace, SearchNearby e Autocomplete a 50 al giorno; foto a 100, sotto il tetto di 200). Era: "Quota Google a 100 al giorno fino al 26/10". La regola dello sprint vale solo se la console Google mostra davvero 100.
    - Controlla su console.cloud.google.com → API e servizi → Places API (New) → Quote.
    - Dimmi il numero che vedi.
    - Dal 27/10 si torna a 50.
