@@ -38,10 +38,10 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - Crea un'app gratuita su developers.facebook.com con il tuo account e aggiungi il prodotto "oEmbed".
    - Mandami ID dell'app e "client token" (Impostazioni → Avanzate), oppure mettili su Vercel come `META_OEMBED_TOKEN` nel formato `IDAPP|CLIENTTOKEN`.
    - Il codice per usarla lo aggiunge il team quando la chiave c'è.
-5. **Voti veri di Tripadvisor nella scheda — APERTA, facoltativa.** Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
+5. **Voti veri di Tripadvisor nella scheda — RIMANDATA il 29/10** (piano "Discover": primi 1.000 locali gratis, poi 0,015 $ a locale; è un servizio a pagamento nuovo e i voti Tripadvisor premiano i posti più recensiti: per ora no, se ne riparla con i ristoratori). Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
 6. **Decisioni (29/10, risposte di Lorenzo in chat):**
    - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6) — **SÌ** (FATTA la decisione, si costruisce);
-   - omaggio del locale a chi torna (proposta 12) — **APERTA**: Lorenzo non ha capito la domanda, rispiegata in chat il 29/10;
+   - omaggio del locale a chi torna (proposta 12) — **SÌ** (29/10, dopo la spiegazione in chat);
    - serata di pre-apertura con utenti scelti per gusto (proposta 9) — **SÌ** (si progetta; contattare i locali resta a Lorenzo/Roberto);
    - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3) — **SÌ**;
    - "stasera c'è posto": bozza di richiesta a TheFork e Zenchef per Roberto (proposta 25) — **SÌ** (il team prepara la bozza, nessun contatto).
