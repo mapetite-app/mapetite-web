@@ -27,10 +27,14 @@ export async function GET(request: Request) {
     let res = await fetch(OEMBED[source](full), { signal: AbortSignal.timeout(5000), next: { revalidate: DAY } });
     // Come per la didascalia: se la forma /video/ non va, si prova il link così com'era.
     if (!res.ok && full !== url) res = await fetch(OEMBED[source](url), { signal: AbortSignal.timeout(5000), next: { revalidate: DAY } });
-    if (!res.ok) return NextResponse.json(VUOTA, { headers: { "Cache-Control": "public, max-age=3600" } });
+    if (!res.ok) {
+      if (source === "Instagram") console.warn(`[oembed] Instagram ${res.status} meta=${(await res.text().catch(() => "")).slice(0, 300)}`);
+      return NextResponse.json(VUOTA, { headers: { "Cache-Control": "public, max-age=3600" } });
+    }
     const o = ((await res.json()) ?? {}) as Record<string, unknown>;
     const thumb = str(o.thumbnail_url, 1000);
     const ig = source === "Instagram" ? instagramCaption(o) : null;
+    if (ig && !ig.title) console.warn(`[oembed] Instagram senza didascalia campi=${Object.keys(o).join(",")}`);
     return NextResponse.json(
       {
         titolo: str(ig ? ig.title : o.title, 200),
@@ -40,7 +44,8 @@ export async function GET(request: Request) {
       },
       { headers: { "Cache-Control": `public, max-age=${DAY}` } },
     );
-  } catch {
+  } catch (e) {
+    if (source === "Instagram") console.warn("[oembed] Instagram non raggiungibile", e);
     return NextResponse.json(VUOTA);
   }
 }
