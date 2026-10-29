@@ -19,7 +19,9 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
 
-1. **Accesso con Google in un tocco (sprint, chiave 0) — APERTA.** Il pulsante "Continua con Google" è già pronto e compare da solo quando Google è acceso su Supabase.
+1. **Accesso con Google in un tocco — FATTA il 29/10, in modalità "Test".** Google acceso su Supabase (verificato con l'API di gestione: `external_google_enabled` vero), Lorenzo ha provato e funziona. Per ora entrano solo gli account aggiunti come "Utenti di prova" (fino a 100).
+1b. **Pubblicare l'app su Google ("Pubblica app") — APERTA, non urgente (29/10).** Il pulsante in Google Auth Platform → Pubblico non si può premere. Finché resta in Test, ogni tester va aggiunto a mano in Pubblico → "Utenti di prova" → "+ Add users". Da guardare insieme quando si apre a tutti (serve uno screenshot della scritta sotto il pulsante).
+1-vecchia. **Accesso con Google in un tocco (sprint, chiave 0) — FATTA il 29/10 (vedi sopra).** Il pulsante "Continua con Google" è già pronto e compare da solo quando Google è acceso su Supabase.
    - Su console.cloud.google.com → API e servizi → Credenziali → "Crea credenziali" → "ID client OAuth", tipo "Applicazione web".
    - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
    - Copia ID client e chiave segreta in Supabase (stessa pagina) e accendi Google.
