@@ -10,7 +10,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 **Istruzioni passo passo con i link: `ISTRUZIONI-LORENZO.md` (22/10).**
 
-00. **Ricarica il credito Anthropic (Haiku) — APERTA, URGENTE (23/10, 01:00).** L'API risponde "credit balance is too low": in produzione l'AI non scrive più né verdetti per i locali nuovi né i "perché" (prova delle 01:00: 0 "perché" su 12, verdetto solo sui 10 già in memoria). La ricerca funziona ancora, ma senza AI non si capisce perché Mapetite è diversa.
+00. **Ricarica il credito Anthropic (Haiku) — FATTA il 29/10** (verificato: primo verdetto nuovo in produzione alle 14:45 del 29/10, chiave di prova ok). Era aperta dal 23/10, 01:00. L'API risponde "credit balance is too low": in produzione l'AI non scrive più né verdetti per i locali nuovi né i "perché" (prova delle 01:00: 0 "perché" su 12, verdetto solo sui 10 già in memoria). La ricerca funziona ancora, ma senza AI non si capisce perché Mapetite è diversa.
    - console.anthropic.com → Plans & Billing → acquista credito (prepagato, senza ricarica automatica).
    - Come si verifica: le sessioni lo vedono da sole (il verdetto torna sui locali nuovi).
    - **24/10 alle 00:10: ancora a zero** (stesso errore; notifica mandata).
