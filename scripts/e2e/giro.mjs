@@ -1453,7 +1453,8 @@ ok(await page.getByRole("link", { name: "Accedi" }).isVisible(), "profilo da dis
 
 // 8-bis. Ritorno dopo l'accesso: login, registrazione e onboarding portano con sé `next`.
 {
-  const hiddenNext = () => page.locator('form input[type=hidden][name=next]').evaluateAll((els) => els.map((e) => e.value));
+  // Con Google acceso su Supabase (29/10) ci sono due moduli, email e "Continua con Google": tutti e due portano `next`.
+  const hiddenNext = () => page.locator('form input[type=hidden][name=next]').evaluateAll((els) => [...new Set(els.map((e) => e.value))]);
   await page.goto(`${BASE}/login?next=${encodeURIComponent("/locali/abc?salva=1")}`, { waitUntil: "networkidle" });
   ok(JSON.stringify(await hiddenNext()) === '["/locali/abc?salva=1"]', "login con next: campo nascosto con il percorso di ritorno");
   ok(await page.getByTestId("auth-ritorno").textContent() === "Poi torni al locale che stavi guardando, pronto da salvare.", "login con next: spiega che dopo si torna al locale");
@@ -2949,7 +2950,7 @@ else {
   ok(await pp.getByRole("link", { name: "Entra" }).first().getAttribute("href") === `/login?next=${encodeURIComponent(`/locali/${LOC_ID}`)}`, "pagina pubblica da disconnessi: 'Entra' nella barra riporta al locale");
   await pp.getByRole("link", { name: "📌 Salva in Mapetite" }).click();
   await pp.waitForURL((u) => u.pathname === "/signup" && u.searchParams.get("next") === `/locali/${LOC_ID}?salva=1`, { timeout: 5000 }).then(() => ok(true, "pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account con il ritorno al locale"), () => ok(false, `pagina pubblica da disconnessi: 'Salva in Mapetite' porta a Crea un account con il ritorno al locale (${pp.url()})`));
-  ok(JSON.stringify(await pp.locator("form input[type=hidden][name=next]").evaluateAll((els) => els.map((e) => e.value))) === JSON.stringify([`/locali/${LOC_ID}?salva=1`]) && await pp.getByTestId("auth-ritorno").isVisible(), "registrazione dal locale: next nel modulo e frase 'poi torni al locale'");
+  ok(JSON.stringify(await pp.locator("form input[type=hidden][name=next]").evaluateAll((els) => [...new Set(els.map((e) => e.value))])) === JSON.stringify([`/locali/${LOC_ID}?salva=1`]) && await pp.getByTestId("auth-ritorno").isVisible(), "registrazione dal locale: next nel modulo e frase 'poi torni al locale'");
   // Con la foto nel link condiviso il ritorno la conserva.
   await pp.goto(`${BASE}/locali/${LOC_ID}?foto=places/GVICOLO/photos/AbC_1`, { waitUntil: "networkidle" });
   ok(await pp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href") === `/signup?next=${encodeURIComponent(`/locali/${LOC_ID}?salva=1&foto=${encodeURIComponent("places/GVICOLO/photos/AbC_1")}`)}`, "pagina pubblica da disconnessi: il ritorno conserva la foto del locale");
