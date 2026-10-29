@@ -5546,7 +5546,7 @@ else {
     await d.waitForTimeout(800);
     { const vp = dPatches.find((x) => x.body && "visita_vista_al" in x.body);
       ok(vp?.id === pid("06") && Object.keys(vp.body).join() === "visita_vista_al" && Math.abs(Date.parse(vp.body.visita_vista_al) - Date.now()) < 120_000 && !JSON.stringify(dPatches).includes("41.88"), `visita vista: vicino al locale si salva solo l'ora, mai la posizione (${JSON.stringify(vp)})`);
-      ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("✓ vista") || (await d.getByTestId("diario-scheda-data").textContent().catch(() => "")).includes("Quando ci sei stato?"), "visita vista: la scheda la segna (· ✓ vista accanto alla data, quando c'è)"); }
+      ok((await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: senza la data della visita (foglio saltato) '📍 sul posto' non compare: il segno vale solo accanto al giorno visto"); }
     dPatches = dPatches.filter((x) => !(x.body && "visita_vista_al" in x.body));
     ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
     // "↻ Ci sono tornato" (PROPOSTE.md 8): seconda visita con la data di oggi, titolo "2ª volta", poi "· 2 volte"
@@ -5564,7 +5564,7 @@ else {
     { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`);
       ok(typeof tp?.body.visita_vista_al === "string", "visita vista: 'Ci sono tornato' sul posto salva la prova insieme alla visita"); }
     ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
-    ok(await d.getByTestId("diario-scheda-vista").isVisible().catch(() => false), "visita vista: dopo 'Ci sono tornato' sul posto, '· ✓ vista' accanto alla data");
+    ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("📍 sul posto") && (await d.getByTestId("diario-scheda-vista").getAttribute("title"))?.includes("vicino al locale"), "visita vista: dopo 'Ci sono tornato' oggi sul posto, '· 📍 sul posto' accanto alla data, con la spiegazione");
     ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });

@@ -71,7 +71,8 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
     if (tornato != null) {
       // "Ci sono tornato": la visita si conta solo qui, salvando il foglio ("Salta" non scrive niente).
       const date = v.date ?? dayKey(new Date());
-      const vista = (await vistaTornato.current?.catch(() => false)) ? new Date().toISOString() : null;
+      // La prova vale solo per una visita di oggi (il telefono non ha visto i giorni passati).
+      const vista = date === dayKey(new Date()) && (await vistaTornato.current?.catch(() => false)) ? new Date().toISOString() : null;
       vistaTornato.current = null;
       let res = await saveVisit(userId, place.id, { visite: tornato, visited_at: date, ...(vista ? { visita_vista_al: vista } : {}) });
       // Colonna della prova non ancora creata: si salva la visita senza.
@@ -109,6 +110,8 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
 
   if (!stato) return null;
   const today = dayKey(new Date());
+  // "📍 sul posto" solo se il giorno della prova è il giorno della visita segnata (dal collaudo del 30/10).
+  const sulPosto = !!stato.vista && !!stato.date && dayKey(new Date(stato.vista)) === stato.date;
   return (
     <>
       <div data-testid="diario-scheda" className="mt-3 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -116,7 +119,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
           <button type="button" data-testid="diario-scheda-data" onClick={() => setOpen("modifica")} className="min-h-10 text-left font-sans text-text">
             <span aria-hidden>📅 </span>
             {stato.date
-              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span>{stato.visite != null && stato.visite >= 2 && <span data-testid="diario-scheda-volte"> · {stato.visite} volte</span>}{stato.vista && <span data-testid="diario-scheda-vista" className="text-brand"> · ✓ vista</span>} · <span className="font-display font-semibold text-accent">Cambia</span></>
+              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span>{stato.visite != null && stato.visite >= 2 && <span data-testid="diario-scheda-volte"> · {stato.visite} volte</span>}{sulPosto && <span data-testid="diario-scheda-vista" className="text-brand" title="Il telefono era vicino al locale quando l'hai segnato" aria-label="sul posto: il telefono era vicino al locale quando l'hai segnato"> · 📍 sul posto</span>} · <span className="font-display font-semibold text-accent">Cambia</span></>
               : <span className="font-display font-semibold text-accent">Quando ci sei stato?</span>}
           </button>
         )}
