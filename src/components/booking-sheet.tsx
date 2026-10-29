@@ -7,11 +7,13 @@ import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle } from "lucide
 import {
   addBooking,
   bookingMessage,
+  clienteDiParola,
   dateKey,
   dayLabel,
   lastBookingFor,
   loadBookings,
   missingDetails,
+  subscribeBookings,
   telHref,
   whatsappNumber,
   type BookingDetails,
@@ -107,7 +109,10 @@ export default function BookingSheet({
     return () => { alive = false; };
   }, [place.id]);
   const volta = visite >= POSTO_FISSO ? visite + 1 : null;
-  const message = custom ?? bookingMessage(details, name, undefined, dicoVolta ? volta : null);
+  // "Cliente di parola" (PROPOSTE.md 3): dalle prenotazioni di questo telefono, spento finché l'utente non lo accende.
+  const parola = useSyncExternalStore(subscribeBookings, () => clienteDiParola(loadBookings()), () => null);
+  const [dicoParola, setDicoParola] = useState(false);
+  const message = custom ?? bookingMessage(details, name, undefined, dicoVolta ? volta : null, dicoParola ? parola : null);
   const missing = missingDetails(details);
   const wa = whatsappNumber(place.phone);
   const today = new Date();
@@ -358,6 +363,12 @@ export default function BookingSheet({
               <label data-testid="prenota-volta" className="mt-3 flex min-h-11 items-center gap-3 text-sm font-sans text-text">
                 <input type="checkbox" checked={dicoVolta} onChange={(e) => setDicoVolta(e.target.checked)} className="h-5 w-5 accent-brand" />
                 Scrivi che è la tua {volta}ª volta
+              </label>
+            )}
+            {parola && custom == null && (
+              <label data-testid="prenota-parola" className="mt-2 flex min-h-11 items-center gap-3 text-sm font-sans text-text">
+                <input type="checkbox" checked={dicoParola} onChange={(e) => { setDicoParola(e.target.checked); if (e.target.checked) trackFeature("cliente_di_parola", { stato: "acceso", risultati: parola }); }} className="h-5 w-5 accent-brand" />
+                Scrivi che sei di parola ({parola} prenotazioni, mai mancate)
               </label>
             )}
 
