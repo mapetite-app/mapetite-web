@@ -3318,7 +3318,7 @@ else {
   { const prima = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
     await s.getByTestId("prenota-parola").locator("input").check().catch(() => {});
     const dopo = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
-    ok((await s.getByTestId("prenota-parola").textContent().catch(() => "")).includes("3 prenotazioni, mai mancate") && !prima.includes("Con Mapetite") && dopo.includes("Con Mapetite ho prenotato 3 volte: sempre presente o disdetto in tempo."), `cliente di parola: con 3 prenotazioni concluse bene la riga c'è solo se la accendi (${dopo})`); }
+    ok((await s.getByTestId("prenota-parola").textContent().catch(() => "")).includes("Scrivi che sei di parola (3 su 3)") && !prima.includes("Con Mapetite") && dopo.includes("Con Mapetite ho già prenotato 3 tavoli, anche altrove: sempre presente o disdetto in tempo."), `cliente di parola: con 3 prenotazioni concluse bene la riga c'è solo se la accendi (${dopo})`); }
   await s.getByTestId("foglio-prenota").screenshot({ path: `${OUT}/62d-prenota-parola.png` });
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   await parolaApri([pb("1", { outcome: "bene" }), pb("2", { outcome: "bene" }), pb("3", { outcome: "bene" }), pb("5", { outcome: "non-andato" })]);
@@ -3743,8 +3743,9 @@ else {
       ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "male" })]) === null, "cliente di parola: sotto 3 prenotazioni concluse niente riga");
       ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "male" }), b({ outcome: "non-andato", disdetta: inTempo }), b({})]) === 3, "cliente di parola: presenze + disdetta in tempo = 3 (quelle aperte non contano)");
       ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato", disdetta: tardi })]) === null, "cliente di parola: una disdetta dopo l'ora del tavolo azzera la riga");
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato", date: null, disdetta: inTempo })]) === null, "cliente di parola: una disdetta senza giorno conta come mancata (prudente)");
       ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato" })]) === null, "cliente di parola: un 'Non ci sono andato' azzera la riga");
-      ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho prenotato 4 volte: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
+      ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho già prenotato 4 tavoli, anche altrove: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
     }
     const now = new Date(2026, 9, 15, 18, 0); // giovedì 15/10, ore 18
     const r = bk.parseBooking("prenotami domani alle 21 per 2 con terrazza a Roma", now);

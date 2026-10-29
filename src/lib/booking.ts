@@ -192,7 +192,7 @@ export function bookingMessage(b: BookingDetails, name: string | null, now: Date
   if (b.special) parts.push(`, ${b.special} se possibile`);
   parts.push(". È disponibile?");
   if (volta && volta >= 2) parts.push(` Sarà la mia ${volta}ª volta da voi.`);
-  if (parola && parola >= PAROLA_MIN) parts.push(` Con Mapetite ho prenotato ${parola} volte: sempre presente o disdetto in tempo.`);
+  if (parola && parola >= PAROLA_MIN) parts.push(` Con Mapetite ho già prenotato ${parola} tavoli, anche altrove: sempre presente o disdetto in tempo.`);
   const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
   return `${parts.join("")} ${sign}`;
 }

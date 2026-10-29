@@ -368,7 +368,7 @@ export default function BookingSheet({
             {parola && custom == null && (
               <label data-testid="prenota-parola" className="mt-2 flex min-h-11 items-center gap-3 text-sm font-sans text-text">
                 <input type="checkbox" checked={dicoParola} onChange={(e) => { setDicoParola(e.target.checked); if (e.target.checked) trackFeature("cliente_di_parola", { stato: "acceso", risultati: parola }); }} className="h-5 w-5 accent-brand" />
-                Scrivi che sei di parola ({parola} prenotazioni, mai mancate)
+                Scrivi che sei di parola ({parola} su {parola})
               </label>
             )}
 

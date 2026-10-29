@@ -226,6 +226,13 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Sforzo:** M (omaggio nel pannello, riga in scheda, controllo antiabuso). **Rischio:** "Ci sono tornato" si segna da soli: va legato a una prenotazione o a una prova.
 - **Costo Google/Haiku:** zero.
 - **Stato proposto:** **DA DECIDERE LORENZO.** "Lasciamo ai locali verificati offrire un omaggio a chi torna (nessun denaro, solo da mostrare al tavolo)?"
+- **Decisione di Lorenzo (29/10): SÌ. Progetto del team (29/10 notte), da costruire nelle prossime sessioni:**
+  1. **Nel pannello del locale verificato** (`/per-i-ristoratori`, dopo "Rivendica"): "Omaggio a chi torna" con un solo campo di testo breve ("un caffè", "il dolce", max 40 caratteri), da quante visite (2 o 3) e un interruttore acceso/spento. Niente sconti in denaro né percentuali: quelli sono pagamenti e restano a Lorenzo.
+  2. **Per l'utente:** nella scheda, se ha segnato quel locale 2+ volte **con una prova** (prenotazione fatta da Mapetite con esito "Mi è piaciuto/Non fa per me", o "Ci sono stato" segnato sul posto, proposta 28), compare "🎁 Il locale ti offre un caffè: mostralo al tavolo". Si mostra una schermata con nome, data di oggi e un codice di 4 lettere che cambia ogni giorno (contro lo screenshot girato agli amici).
+  3. **Antiabuso:** un omaggio per persona per locale ogni 30 giorni; "Ci sono tornato" senza prova non conta.
+  4. **Dati:** tabella `omaggi` (locale, testo, soglia, acceso) e `omaggi_usati` (utente, locale, giorno); RLS: il titolare scrive solo il suo locale.
+  5. **Nel pannello:** "Omaggi mostrati questo mese" accanto a "↻ tornati": la fedeltà misurata che il locale pagherebbe.
+  - **Sforzo:** M. **Costo:** zero. **Prima di accenderlo:** almeno un locale verificato che lo voglia (contatto: Lorenzo/Roberto).
 
 ## 20/10/2026 (seconda sessione della notte, CEO che chiude)
 
@@ -257,6 +264,13 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Sforzo:** L (inviti, posti limitati, rapporto diretto con i locali).
 - **Costo Google/Haiku:** zero.
 - **Stato proposto:** DA DECIDERE LORENZO: "Proponiamo ai primi ristoratori verificati una serata di pre-apertura gratuita con utenti scelti per gusto?"
+- **Decisione di Lorenzo (29/10): SÌ, si progetta; i contatti con i locali restano a Lorenzo/Roberto. Progetto del team (29/10 notte):**
+  1. **Chi invitare (per gusto, non per popolarità):** persone con 3+ salvati dello stesso tipo nella zona del locale (es. "trattoria" a Monti) e "mappa del gusto" compatibile (cucina, spesa, diete). Mai in base a quanti follower o recensioni hanno: Mapstr lo dà a chi paga (`COMPETITOR.md`, 29/10), noi a chi ha il gusto giusto.
+  2. **Come arriva l'invito:** avviso push (proposta 6, già costruita) e una card in home "Sei tra i 15 invitati alla pre-apertura di …": data, ora, posti, "Partecipo / No grazie". Posti limitati, primo che conferma.
+  3. **Dopo la serata:** "Com'è andata?" come per le prenotazioni; le opinioni restano dentro Mapetite con l'etichetta "pre-apertura" (trasparenza, Legge 34/2026 sulle recensioni: `PROBLEMI.md`, 12).
+  4. **Per il locale:** nel pannello quanti hanno confermato e quanti sono tornati dopo l'apertura. Gratis per i primi locali; un eventuale prezzo è "DA DECIDERE LORENZO".
+  5. **Privacy:** al locale arrivano solo nome di battesimo e numero di persone, mai i salvati né i gusti.
+  - **Sforzo:** L (inviti, posti, card in home, pannello). **Costo:** zero. **Primo passo:** Lorenzo o Roberto trovano un locale in apertura a Roma; il team costruisce gli inviti quando c'è una data vera.
 
 ## 20/10/2026 (notte, CEO che chiude)
 
