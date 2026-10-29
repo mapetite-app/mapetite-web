@@ -2732,6 +2732,8 @@ if (!fakeUser) {
     const b = r.request().postDataJSON();
     capBodies.push(b);
     if (b?.link?.includes("/video/999")) return r.fulfill({ status: 422, json: { error: "Non riesco a leggere questo video." } });
+    // Instagram: ABC123 e XYZ come un post che Meta non fa leggere; gli altri si leggono (oEmbed senza token).
+    if (b?.link?.includes("instagram.com") && /ABC123|XYZ/.test(b.link)) return r.fulfill({ status: 422, json: { error: "Instagram non mi fa leggere questo post." } });
     if (b?.caption) return r.fulfill({ json: { nome: "Pizzeria Bella", citta: "Roma", categoria: "pizzeria", luoghi: [{ nome: "Pizzeria Bella", citta: "Roma", categoria: "pizzeria" }] } });
     return r.fulfill({ json: { ...OF, luoghi: [OF] } });
   });
@@ -2745,7 +2747,7 @@ if (!fakeUser) {
   const wI = mWrites.length;
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   await gcard.getByTestId("reel-trovato").waitFor({ timeout: 5000 }).catch(() => {});
-  ok(capBodies.at(-1)?.caption === "Pizzeria Bella a Roma" && mSearch.length === sI + 1 && mSearch.at(-1)?.query === "Pizzeria Bella Roma", "instagram: il nome scritto col link va all'AI e parte UNA ricerca Google");
+  ok(capBodies.at(-2)?.link?.includes("instagram.com/reel/ABC123") && capBodies.at(-1)?.caption === "Pizzeria Bella a Roma" && mSearch.length === sI + 1 && mSearch.at(-1)?.query === "Pizzeria Bella Roma", "instagram: post non leggibile → il nome scritto col link va all'AI e parte UNA ricerca Google");
   ok(await gcard.getByTestId("reel-trovato").getByText("È questo?").isVisible() && !mWrites.slice(wI).some((w) => w.m === "POST") && mFromLink.length === 0, "instagram: il nome trovato non combacia → 'È questo?', niente salvataggio da solo né errore Google Maps");
   await gcard.getByTestId("reel-trovato").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${DOCS_SHOTS}/instagram.png`, caret: "initial" });
@@ -2753,11 +2755,22 @@ if (!fakeUser) {
   await gcard.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
   ok(mAdd.at(-1)?.googlePlaceId === "GM1" && mReels.some((x) => x.m === "POST" && x.body?.url === "https://www.instagram.com/reel/ABC123" && x.body?.fonte === "Instagram"), "instagram: 'Sì, salva' salva il locale e collega il reel (link pulito)");
 
-  // Instagram senza testo: un solo passo, screenshot o nome; nessuna lettura AI prima del tocco.
+  // Instagram leggibile dal link (oEmbed di Meta senza token, 29/10): si legge da solo e si salva se combacia.
+  await mp.evaluate(() => sessionStorage.clear());
+  const ci = capBodies.length;
+  await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/reel/DfCeqhroyiN/?igsh=abc&srtk=x")}`, { waitUntil: "networkidle" });
+  await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(capBodies.length === ci + 1 && capBodies.at(-1)?.link?.startsWith("https://www.instagram.com/reel/DfCeqhroyiN") && await mp.getByTestId("reel-salvato").getByText("Osteria dei Fratelli, Milano").isVisible() && !(await mp.getByTestId("reel-chiedi").isVisible()), "condividi instagram: il reel si legge dal link, senza screenshot, e il locale si salva da solo");
+  await mp.screenshot({ path: `${OUT}/39b-reel-instagram-letto.png`, caret: "initial" });
+
+  // Instagram che Meta non fa leggere, senza testo: un solo passo, screenshot o nome.
+  await mp.evaluate(() => sessionStorage.clear());
+  const cx = capBodies.length;
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
-  const c0 = capBodies.length;
   const chiedi = mp.getByTestId("reel-chiedi");
-  ok(await chiedi.isVisible() && await chiedi.getByText("Instagram non lascia leggere i reel alle altre app.", { exact: false }).isVisible() && await mp.getByTestId("reel-screenshot").isVisible() && capBodies.length === c0, "condividi instagram: 'Carica lo screenshot' o il nome, senza chiamate");
+  await chiedi.waitFor({ timeout: 5000 }).catch(() => {});
+  const c0 = capBodies.length;
+  ok(await chiedi.isVisible() && await chiedi.getByText("Instagram non mi fa leggere questo post.", { exact: false }).isVisible() && await mp.getByTestId("reel-screenshot").isVisible() && c0 === cx + 1 && capBodies.at(-1)?.link?.includes("/p/XYZ"), "condividi instagram non leggibile: una sola lettura del link, poi 'Carica lo screenshot' o il nome");
   await mp.screenshot({ path: `${OUT}/39-reel-instagram.png`, caret: "initial" });
   await mp.getByLabel("Screenshot del reel").setInputFiles({ name: "reel.png", mimeType: "image/png", buffer: Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489", "hex") });
   await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});

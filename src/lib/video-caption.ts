@@ -1,14 +1,50 @@
-// Didascalia di un video TikTok o YouTube (Shorts) dai loro oEmbed ufficiali e gratuiti: è il servizio
-// che le piattaforme offrono per incorporare i video altrove, non uno scraping della pagina.
-// Instagram non c'è: il suo oEmbed richiede un'app Meta con token (si resta sullo screenshot).
+// Didascalia di un video TikTok, YouTube (Shorts) o Instagram dai loro oEmbed ufficiali e gratuiti: è il
+// servizio che le piattaforme offrono per incorporare i post altrove, non uno scraping della pagina.
+// Instagram (29/10): dal 15/6/2026 l'oEmbed di Meta si usa senza app né token (max 1.000 richieste/ora,
+// https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Se Meta
+// non risponde o non dà la didascalia, si torna allo screenshot come prima.
 // La didascalia poi va a Haiku (src/lib/import-caption.ts), come il testo di uno screenshot.
 
-export type VideoSource = "TikTok" | "YouTube";
+export type VideoSource = "TikTok" | "YouTube" | "Instagram";
 
 const OEMBED: Record<VideoSource, (url: string) => string> = {
   TikTok: (url) => `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`,
   YouTube: (url) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`,
+  Instagram: (url) => `https://graph.facebook.com/v25.0/instagram_oembed?omitscript=true&url=${encodeURIComponent(url)}`,
 };
+
+// Link Instagram che l'oEmbed accetta: https://www.instagram.com/reel/ID/ senza parametri (?igsh=, srtk, exln…).
+export function instagramOembedUrl(url: string): string {
+  const u = new URL(url);
+  const m = u.pathname.match(/^\/(?:[A-Za-z0-9._]+\/)?(reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);
+  if (!m) return url;
+  return `https://www.instagram.com/${m[1] === "reels" ? "reel" : m[1]}/${m[2]}/`;
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
+function decodeHtml(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&([a-z#0-9]+);/gi, (m, n: string) => ENTITIES[n.toLowerCase()] ?? m);
+}
+const textOf = (html: string) => decodeHtml(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")).replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
+
+// Didascalia e autore dall'oEmbed di Instagram. Meta non dà sempre "title": la didascalia sta nel
+// codice da incorporare (i <p> del blockquote), accanto a "Un post condiviso da Nome (@profilo)".
+// Il profilo spesso è quello del locale: va all'AI come indizio, mai salvato.
+export function instagramCaption(o: Record<string, unknown>): { title: string; author: string } {
+  const html = typeof o.html === "string" ? o.html.replace(/<script[\s\S]*?<\/script>/gi, "") : "";
+  const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => textOf(m[1])).filter(Boolean);
+  const shared = /^(a post shared by|un post condiviso da|view this post on instagram|visualizza questo post su instagram)/i;
+  const byLine = paragraphs.find((p) => shared.test(p)) ?? "";
+  const caption = paragraphs.filter((p) => !shared.test(p)).join("\n");
+  const title = typeof o.title === "string" && o.title.trim() ? o.title.trim() : caption;
+  const author = typeof o.author_name === "string" && o.author_name.trim()
+    ? o.author_name.trim()
+    : byLine.replace(shared, "").replace(/\s+(on|il)\s+\S.*$/i, "").trim();
+  return { title, author };
+}
 
 // Solo link di video veri: niente altri indirizzi verso cui far fare richieste al server.
 export function videoSourceOf(raw: string): VideoSource | null {
@@ -23,12 +59,13 @@ export function videoSourceOf(raw: string): VideoSource | null {
   if (host === "tiktok.com" || host === "vm.tiktok.com" || host === "vt.tiktok.com") return "TikTok";
   if (host === "youtube.com" && u.pathname.startsWith("/shorts/")) return "YouTube";
   if (host === "youtu.be" && u.pathname.length > 1) return "YouTube";
+  if ((host === "instagram.com" || host === "instagr.am") && /^\/(?:[A-Za-z0-9._]+\/)?(reel|reels|p|tv)\/[A-Za-z0-9_-]+/.test(u.pathname)) return "Instagram";
   return null;
 }
 
 const LINK_RE = /https?:\/\/[^\s<>"']+/g;
 
-// Primo link TikTok/YouTube nel testo condiviso ("Guarda questo video su TikTok https://vm.tiktok.com/…").
+// Primo link TikTok/YouTube/Instagram nel testo condiviso ("Guarda questo video su TikTok https://vm.tiktok.com/…").
 export function findVideoLink(text: string): string | null {
   for (const m of text.matchAll(LINK_RE)) {
     const url = m[0].replace(/[),.;!?]+$/, "");
@@ -85,21 +122,24 @@ export async function fetchVideoCaption(url: string): Promise<string | null> {
   const source = videoSourceOf(url);
   if (!source) return null;
   try {
-    const full = source === "TikTok" ? tiktokOembedUrl(await resolveShortTikTok(url)) : url;
+    const full = source === "TikTok" ? tiktokOembedUrl(await resolveShortTikTok(url)) : source === "Instagram" ? instagramOembedUrl(url) : url;
     let res = await fetch(OEMBED[source](full), { signal: AbortSignal.timeout(6000), cache: "no-store" });
     // Post a foto: se la forma /video/ non va, si prova l'indirizzo così com'era.
     if (!res.ok && source === "TikTok" && full !== url) res = await fetch(OEMBED[source](url), { signal: AbortSignal.timeout(6000), cache: "no-store" });
     if (!res.ok) {
       // Nei log di Vercel: forma del link (senza parametri) e risposta, per capire i casi che non si leggono.
-      console.warn(`[video-caption] oEmbed ${source} ${res.status} link=${url.split("?")[0]} provato=${full}`);
+      // Instagram: la risposta di Meta (errore e codice, mai dati dell'utente) dice se serve di nuovo un token.
+      const why = source === "Instagram" ? ` meta=${(await res.text().catch(() => "")).slice(0, 200)}` : "";
+      console.warn(`[video-caption] oEmbed ${source} ${res.status} link=${url.split("?")[0]} provato=${full}${why}`);
       return null;
     }
     const data: unknown = await res.json();
     const o = (data ?? {}) as Record<string, unknown>;
-    const title = typeof o.title === "string" ? o.title.trim() : "";
-    const author = typeof o.author_name === "string" ? o.author_name.trim() : "";
+    const ig = source === "Instagram" ? instagramCaption(o) : null;
+    const title = ig ? ig.title : typeof o.title === "string" ? o.title.trim() : "";
+    const author = ig ? ig.author : typeof o.author_name === "string" ? o.author_name.trim() : "";
     if (!title) {
-      console.warn(`[video-caption] oEmbed ${source} senza didascalia link=${url.split("?")[0]}`);
+      console.warn(`[video-caption] oEmbed ${source} senza didascalia link=${url.split("?")[0]} campi=${Object.keys(o).join(",")}`);
       return null;
     }
     return `Didascalia del video ${source}: ${title.slice(0, 1500)}${author ? `\nAutore: ${author.slice(0, 100)}` : ""}`;

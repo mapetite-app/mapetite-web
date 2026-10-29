@@ -8,6 +8,7 @@ import { isStateTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath } from "@/lib/raccolte";
 import { extractAllLinks, KIND_LABEL, saveLabel, type FoundLink } from "@/lib/multi-link";
 import { trackFeature } from "@/lib/track";
+import { videoSourceOf } from "@/lib/video-caption";
 
 // "Incolla più link" (piano 3.2, stile "Aggiungi qualsiasi cosa" di Albo): si incolla un testo con
 // tanti link (la chat di WhatsApp con sé stessi, una nota), si vede lo stato di ciascuno e si
@@ -143,7 +144,8 @@ export default function MultiLinkCard({
     seen.current = new Set();
     const initial: Item[] = links.map((l) => {
       if (l.kind === "maps") return { ...l, stato: "attesa" };
-      if (l.kind === "instagram") return { ...l, stato: "da_confermare", motivo: "Instagram non lascia leggere il post: usa uno screenshot." };
+      if (l.kind === "instagram" && !videoSourceOf(l.url)) return { ...l, stato: "da_confermare", motivo: "Questo link di Instagram non è un post: usa uno screenshot." };
+      if (l.kind === "instagram") return { ...l, stato: "da_confermare", motivo: "Leggo la descrizione del post quando lo tocchi." };
       if (l.kind === "tiktok" || l.kind === "youtube") return { ...l, stato: "da_confermare", motivo: "Leggo la descrizione del video quando lo tocchi." };
       return { ...l, stato: "non_riconosciuto", motivo: "Non è un link di Google Maps, Instagram, TikTok o YouTube." };
     });
@@ -398,8 +400,8 @@ function Row({
           {it.kind === "maps" && (
             <button type="button" onClick={onConfirm} disabled={busy} className={pill} data-testid="multi-conferma">Riconosci</button>
           )}
-          {(it.kind === "tiktok" || it.kind === "youtube") && (
-            <button type="button" onClick={onReadVideo} disabled={busy} className={pill}>✨ Trova dal video</button>
+          {(it.kind === "tiktok" || it.kind === "youtube" || (it.kind === "instagram" && videoSourceOf(it.url))) && (
+            <button type="button" onClick={onReadVideo} disabled={busy} className={pill}>✨ Trova dal {it.kind === "instagram" ? "post" : "video"}</button>
           )}
           {it.kind === "instagram" && (
             <button type="button" onClick={onScreenshot} disabled={busy} className={pill}>Carica uno screenshot</button>

@@ -10,11 +10,11 @@ export async function POST(request: Request) {
   const image: unknown = body?.image;
   const link: unknown = body?.link;
 
-  // Link di un video TikTok o YouTube: si legge la didascalia dall'oEmbed ufficiale e la si passa
+  // Link di un video TikTok, YouTube o di un post Instagram: si legge la didascalia dall'oEmbed ufficiale e la si passa
   // all'AI come il testo di uno screenshot. Solo con l'accesso (serve per salvare) e nel tetto AI.
   if (typeof link === "string" && link.trim() !== "") {
     if (link.length > 500 || !videoSourceOf(link)) {
-      return NextResponse.json({ error: "Questo link non è un video di TikTok o YouTube." }, { status: 400 });
+      return NextResponse.json({ error: "Questo link non è un video di TikTok, YouTube o Instagram." }, { status: 400 });
     }
     const devUser = process.env.NODE_ENV === "development" ? process.env.E2E_FAKE_USER ?? null : null;
     const { data: { user } } = await (await createClient()).auth.getUser();
@@ -26,7 +26,9 @@ export async function POST(request: Request) {
     const text = await fetchVideoCaption(link.trim());
     if (!text) {
       return NextResponse.json(
-        { error: "Non riesco a leggere questo video (forse è privato o rimosso): fai uno screenshot e caricalo qui sotto." },
+        { error: videoSourceOf(link) === "Instagram"
+          ? "Instagram non mi fa leggere questo post: fai uno screenshot e caricalo qui sotto."
+          : "Non riesco a leggere questo video (forse è privato o rimosso): fai uno screenshot e caricalo qui sotto." },
         { status: 422 },
       );
     }

@@ -18,9 +18,9 @@ import QuandoCiVai from "@/components/quando-ci-vai";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 // "Salva dal reel" in un gesto (sprint 25/10, chiave di volta A). Dal link condiviso o incollato:
-//  - TikTok/YouTube: si legge da soli la didascalia (oEmbed ufficiale) → l'AI trova i locali;
-//  - Instagram (non leggibile senza un'app Meta) o video illeggibile: UN solo passo, screenshot o
-//    nome/didascalia scritti a mano;
+//  - TikTok/YouTube/Instagram: si legge da soli la didascalia (oEmbed ufficiale) → l'AI trova i locali;
+//  - post illeggibile (privato, Meta che non risponde): il nome scritto accanto al link, se c'è,
+//    altrimenti UN solo passo, screenshot o nome/didascalia scritti a mano;
 //  - il primo locale si cerca su Google (1 ricerca) e, se combacia di sicuro, si salva da solo con
 //    "Non è questo" per annullare; altrimenti "È questo?". Gli altri locali del reel: un tocco ciascuno.
 // Il link del reel resta collegato al locale ("Visto su …" nella scheda). Mai locali inventati:
@@ -135,8 +135,12 @@ export default function ReelSave({
       })
       .catch((e) => {
         setReading(false);
-        // Video privato o rimosso: si passa allo screenshot invece di fermarsi.
-        if (!Array.isArray(body) && "link" in body) askFor("Non riesco a leggere questo video.");
+        // Video privato o rimosso: il nome scritto accanto al link, poi lo screenshot, invece di fermarsi.
+        if (!Array.isArray(body) && "link" in body) {
+          const hint = placeHintFromText(text);
+          if (hint) { read({ caption: hint }); return; }
+          askFor(source === "Instagram" ? "Instagram non mi fa leggere questo post." : "Non riesco a leggere questo video.");
+        }
         else setError(errorText(e));
       });
   };
@@ -148,11 +152,11 @@ export default function ReelSave({
     const t = window.setTimeout(() => {
       if (Array.isArray(hit) && hit.length > 0) { setLuoghi(hit); return; }
       if (video) { read({ link: video }); return; }
-      // Instagram con un nome nel testo condiviso ("Pizzeria Bella a Roma 🍕 https://…"): lo legge l'AI.
+      // Link senza post leggibile ma con un nome nel testo ("Pizzeria Bella a Roma 🍕 https://…"): lo legge l'AI.
       const hint = placeHintFromText(text);
       if (hint) { read({ caption: hint }); return; }
       askFor(source === "Instagram"
-        ? "Instagram non lascia leggere i reel alle altre app."
+        ? "Da questo link di Instagram non posso leggere un post."
         : "Da questo link non posso leggere il video.");
     }, 0);
     // In sviluppo React monta due volte: annullato il primo giro, il secondo deve ripartire.
