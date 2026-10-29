@@ -5528,26 +5528,18 @@ else {
     const dateP = dPatches.find((x) => x.body && "visited_at" in x.body);
     const likeP = dPatches.filter((x) => x.body?.tags).pop();
     ok(dateP?.body.visited_at === oggi && dateP.id === pid("06") && likeP?.body.tags.includes("Mi è piaciuto") && likeP.body.tags.includes("Già visitato"), `scheda → diario: data di oggi e 👍 salvati (${JSON.stringify(dPatches)})`);
-    ok(!dPatches.some((x) => x.body && "visita_vista_al" in x.body) && (await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: senza permesso di posizione niente prova e nessuna richiesta di permesso");
     ok((await d.getByTestId("diario-scheda-data").textContent()).includes("Ci sei stato oggi") && (await d.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).getAttribute("aria-pressed")) === "true", "scheda → diario: la scheda mostra 'Ci sei stato oggi' e il 👍");
     ok((await d.getByTestId("diario-scheda-link").getAttribute("href")) === "/profilo/diario", "scheda → diario: link 'Il tuo diario'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55-scheda-diario.png`, caret: "initial" });
     ok(dEvents.some((e) => e.type === "funzione" && e.props?.nome === "diario" && e.props?.fonte === "scheda"), "scheda → diario: registrato (fonte 'scheda')");
-    // Salta: chiude senza scrivere la data. Qui con il permesso di posizione già dato e il telefono a
-    // ~40 m dal locale (Forno Sei, 41.88, 12.48): la visita è "vista" (PROPOSTE 28), si salva solo l'ora.
+    // Salta: chiude senza scrivere la data
     dPatches = [];
-    await dctx.grantPermissions(["geolocation"], { origin: BASE });
-    await dctx.setGeolocation({ latitude: 41.8803, longitude: 12.4803, accuracy: 20 });
     await d.goto(`${BASE}/mappa?salvato=${pid("06")}`, { waitUntil: "networkidle" });
     await d.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).catch(() => {});
     await d.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
-    await d.waitForTimeout(800);
-    { const vp = dPatches.find((x) => x.body && "visita_vista_al" in x.body);
-      ok(vp?.id === pid("06") && Object.keys(vp.body).join() === "visita_vista_al" && Math.abs(Date.parse(vp.body.visita_vista_al) - Date.now()) < 120_000 && !JSON.stringify(dPatches).includes("41.88"), `visita vista: vicino al locale si salva solo l'ora, mai la posizione (${JSON.stringify(vp)})`);
-      ok((await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: senza la data della visita (foglio saltato) '📍 sul posto' non compare: il segno vale solo accanto al giorno visto"); }
-    dPatches = dPatches.filter((x) => !(x.body && "visita_vista_al" in x.body));
+    await d.waitForTimeout(500);
     ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
     // "↻ Ci sono tornato" (PROPOSTE.md 8): seconda visita con la data di oggi, titolo "2ª volta", poi "· 2 volte"
     dPatches = [];
@@ -5556,15 +5548,13 @@ else {
     ok((await d.getByTestId("diario-foglio").textContent().catch(() => "")).includes("Ci sei tornato · 2ª volta"), "posti fissi: 'Ci sono tornato' apre il foglio '↻ Ci sei tornato · 2ª volta'");
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await d.waitForTimeout(400);
-    ok(!dPatches.some((x) => x.body && ("visite" in x.body || "visita_vista_al" in x.body)), `posti fissi: 'Salta' non conta la visita e non scrive la prova (${JSON.stringify(dPatches)})`);
+    ok(!dPatches.some((x) => x.body && "visite" in x.body), `posti fissi: 'Salta' non conta la visita (${JSON.stringify(dPatches)})`);
     await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
     await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
     await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
     await d.waitForTimeout(400);
-    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`);
-      ok(typeof tp?.body.visita_vista_al === "string", "visita vista: 'Ci sono tornato' sul posto salva la prova insieme alla visita"); }
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`); }
     ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
-    ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("📍 sul posto") && (await d.getByTestId("diario-scheda-vista").getAttribute("title"))?.includes("vicino al locale"), "visita vista: dopo 'Ci sono tornato' oggi sul posto, '· 📍 sul posto' accanto alla data, con la spiegazione");
     ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });

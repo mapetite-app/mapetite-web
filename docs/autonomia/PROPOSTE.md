@@ -44,6 +44,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** opinioni che non si possono comprare né usare per ricattarlo; nel pannello futuro "N visite vere da Mapetite questo mese" (piano Growth).
 - **Sforzo:** M (colonna sì/no sulla visita, controllo sul telefono, etichetta in scheda). **Costo Google/Haiku:** zero.
 - **Stato proposto:** PRONTA, **dopo lo sprint** (dal 27/10): non è una chiave di volta.
+- **COSTRUITA il 30/10 notte ma BOCCIATA due volte dal collaudo (design), non unita; si riprende alla sessione dopo.** Era: "📍 sul posto" nella scheda accanto al giorno della visita, solo l'ora sul server (`saved_places.visita_vista_al`). Manca: il conteggio nelle opinioni della community (serve una vista aggregata sul server) e l'uso come prova per l'omaggio (12).
 
 ### 29. Senza AI, il verdetto dalle recensioni in una riga onesta
 - **Problema:** `PROBLEMI.md`, 11. Con il credito Anthropic a zero (dal 22/10) i locali nuovi mostrano una citazione tagliata di una recensione al posto del verdetto: alla demo sembra un buco.
