@@ -17,7 +17,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - **23/10 alle 05:08: ancora a zero** (stesso errore). L'ultimo verdetto nuovo in produzione è delle 08:07 del 22/10. Da oggi `/admin/numeri` mostra "AI: ok" o "AI forse ferma" con l'ora dell'ultimo verdetto.
    - Consiglio: imposta anche un avviso di spesa nella console (Limits), così te ne accorgi prima che finisca.
 
-0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
+0. **Una sola attività programmata — FATTA il 29/10** (Lorenzo: testo di `PROMPT-UNICO.md` aggiornato con "DOPO LO SPRINT", attività riattivata, orari corretti per l'ora italiana; la prima sessione della notte conferma). Era aperta dal 22/10. Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
 
 1. **Accesso con Google in un tocco — FATTA il 29/10, in modalità "Test".** Google acceso su Supabase (verificato con l'API di gestione: `external_google_enabled` vero), Lorenzo ha provato e funziona. Per ora entrano solo gli account aggiunti come "Utenti di prova" (fino a 100).
 1b. **Pubblicare l'app su Google ("Pubblica app") — APERTA, non urgente (29/10).** Il pulsante in Google Auth Platform → Pubblico non si può premere. Finché resta in Test, ogni tester va aggiunto a mano in Pubblico → "Utenti di prova" → "+ Add users". Da guardare insieme quando si apre a tutti (serve uno screenshot della scritta sotto il pulsante).
