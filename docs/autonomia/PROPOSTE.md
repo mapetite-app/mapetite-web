@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 29/10/2026 (notte, sessione 22:08, CEO che chiude)
+
+### 30. Importa i salvati di Instagram dal file di Meta
+- **Problema:** `PROBLEMI.md`, 13. Anni di reel salvati su Instagram che nessuno riapre; Instagram non li fa leggere alle altre app.
+- **Cosa fa:** in Importa, "Hai i salvati di Instagram?": la persona scarica i propri dati da Instagram (Centro gestione account → Le tue informazioni → Scarica, solo "Salvati") e carica il file. Mapetite elenca gli autori dei post salvati e le raccolte ("Roma food"); gli account che sono locali (nome come "trattoriadamario") si riconoscono con un tocco ciascuno, gli altri restano come "creator da cui salvi".
+- **Da dove nasce:** nessun concorrente lo fa (Corner legge un link alla volta; Mapstr importa da Google Maps). È la "Raccogli" di VISIONE: "importando in blocco quello che hai già accumulato altrove".
+- **Valore per l'utente:** in due minuti ritrova i posti di anni di reel. **Valore per il ristoratore:** sapere quante persone lo avevano salvato su Instagram (domanda già esistente).
+- **Sforzo:** M (lettura del file nel telefono, nessun invio del file al server; riconoscimento a tocco come "Incolla più link"). **Costo:** zero Google finché non si tocca; 1 ricerca per locale confermato, nel tetto dell'import.
+- **Stato proposto:** PRONTA.
+
+### 31. "Domani sei da Mario: confermi?" (promemoria con risposta, contro il no-show)
+- **Problema:** `PROBLEMI.md`, 1 (no-show 12,8%, 5–20% dei ricavi possibili, [Linkiesta 3/2026](https://www.linkiesta.it/2026/03/perche-devi-disdire-la-prenotazione-a-un-ristorante-se-sai-che-non-ci-andrai/)).
+- **Cosa fa:** il giorno prima della prenotazione salvata, un avviso push: "Confermo" o "Non vado più" (messaggio pronto per il locale, come oggi nel promemoria). Usa gli avvisi push della proposta 6 (decisa da Lorenzo il 29/10).
+- **Da dove nasce:** TheFork e i gestionali mandano promemoria solo per le prenotazioni fatte da loro; noi anche per quelle fatte al telefono e salvate in Mapetite.
+- **Valore per l'utente:** non dimentica e disdice in un tocco anche a locale chiuso. **Valore per il ristoratore:** tavoli liberati in tempo; dato "clienti di parola" (proposta 3).
+- **Sforzo:** M, dopo la proposta 6. **Costo:** zero (push del browser gratuite).
+- **Stato proposto:** PRONTA (dopo la 6).
+
 ## 26/10/2026 (notte, sessione 04:06, CEO che chiude — ultimo giorno dello sprint, solo chiavi di volta)
 
 ### 28. "Ci sono stato" che vale come prova (risposta alla Legge 34/2026 sulle recensioni false)

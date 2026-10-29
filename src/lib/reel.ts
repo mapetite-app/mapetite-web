@@ -48,6 +48,14 @@ export function cleanReelUrl(raw: string): string | null {
   return out.length <= REEL_MAX_LEN ? out : null;
 }
 
+/** Pagina "embed" ufficiale di un post Instagram (quella che usa embed.js di Meta), con la didascalia. */
+export function instagramEmbedUrl(raw: string): string | null {
+  const clean = cleanReelUrl(raw);
+  if (!clean || reelSourceOf(clean) !== "Instagram") return null;
+  const m = new URL(clean).pathname.match(/^\/(reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? `https://www.instagram.com/${m[1] === "reels" ? "reel" : m[1]}/${m[2]}/embed/captioned/` : null;
+}
+
 /** Primo link di un reel nel testo condiviso o incollato ("Guarda questo reel https://…"). */
 export function findReelLink(text: string): string | null {
   for (const m of text.matchAll(LINK_RE)) {

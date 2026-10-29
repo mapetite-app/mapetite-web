@@ -2759,6 +2759,16 @@ if (!fakeUser) {
   const chiedi = mp.getByTestId("reel-chiedi");
   ok(await chiedi.isVisible() && await chiedi.getByText("Instagram non lascia leggere i reel alle altre app.", { exact: false }).isVisible() && await mp.getByTestId("reel-screenshot").isVisible() && capBodies.length === c0, "condividi instagram: 'Carica lo screenshot' o il nome, senza chiamate");
   await mp.screenshot({ path: `${OUT}/39-reel-instagram.png`, caret: "initial" });
+  // "Guarda il reel qui": l'embed ufficiale di Instagram si carica solo dopo il tocco (finto, nessuna rete).
+  const igAsked = [];
+  await mctx.route("https://www.instagram.com/**", (r) => { igAsked.push(r.request().url()); return r.fulfill({ contentType: "text/html", body: "<p>Trattoria da Mario, Roma</p>" }); });
+  ok(igAsked.length === 0 && (await mp.getByTestId("reel-embed").count()) === 0, "condividi instagram: nessuna richiesta a Instagram prima del tocco");
+  await mp.getByTestId("reel-guarda").click();
+  await mp.getByTestId("reel-embed").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await mp.getByTestId("reel-embed").getAttribute("src") === "https://www.instagram.com/p/XYZ/embed/captioned/" && await mp.getByTestId("reel-testo").isVisible() && !(await mp.getByTestId("reel-guarda").isVisible()), "condividi instagram: 'Guarda il reel qui' mostra l'embed ufficiale sopra 'scrivi il nome'");
+  await mp.getByTestId("reel-embed").scrollIntoViewIfNeeded();
+  await mp.screenshot({ path: `${OUT}/39b-reel-instagram-embed.png`, caret: "initial" });
+  await mctx.unroute("https://www.instagram.com/**");
   await mp.getByLabel("Screenshot del reel").setInputFiles({ name: "reel.png", mimeType: "image/png", buffer: Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489", "hex") });
   await mp.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
   ok(capBodies.length === c0 + 1 && typeof capBodies.at(-1)?.image === "string" && await mp.getByTestId("reel-salvato").getByText("Osteria dei Fratelli, Milano").isVisible(), "condividi instagram: dallo screenshot legge il locale, lo trova e lo salva da solo");

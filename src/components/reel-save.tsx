@@ -7,7 +7,7 @@ import { cityFromAddress, displayAddress } from "@/lib/city";
 import { saveSearchPlace, rememberPendingLink, type LinkOutcome, type SearchPlace } from "@/lib/save-from-link";
 import { rememberFirme } from "@/lib/catalog-firme";
 import { addReel } from "@/lib/community-write";
-import { findReelLink, reelSourceOf, type ReelSource } from "@/lib/reel";
+import { findReelLink, instagramEmbedUrl, reelSourceOf, type ReelSource } from "@/lib/reel";
 import { findVideoLink } from "@/lib/video-caption";
 import { findSocialLink, placeHintFromText } from "@/lib/social-link";
 import { confidentMatch, stessoLocale } from "@/lib/reel-match";
@@ -104,8 +104,14 @@ export default function ReelSave({
   const [error, setError] = useState<string | null>(null);
   // Lettura chiesta con un tocco qui (screenshot, nome scritto): vale come il gesto del Condividi.
   const [daTocco, setDaTocco] = useState(false);
+  // Reel Instagram incorporato (embed ufficiale di Meta) per leggere nome e posizione senza uscire
+  // dall'app: Meta non dà la didascalia alle altre app (oEmbed senza token provato il 29/10), ma il
+  // post si può mostrare. Si carica solo su richiesta: pesa e parla con Instagram.
+  const embed = source === "Instagram" && reelUrl ? instagramEmbedUrl(reelUrl) : null;
+  const [showEmbed, setShowEmbed] = useState(false);
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const askFor = (why: string) => { setReading(false); setAsk(why); };
 
@@ -219,15 +225,36 @@ export default function ReelSave({
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Oppure scrivi il nome"
+              ref={nameRef}
+              placeholder={showEmbed ? "Scrivi il nome che vedi" : "Oppure scrivi il nome"}
               aria-label="Nome del locale o didascalia del reel"
               data-testid="reel-testo"
-              className="min-h-11 min-w-0 flex-1 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
+              className="min-h-11 min-w-0 flex-1 scroll-mt-20 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
             />
             <button type="submit" disabled={!draft.trim()} className="min-h-11 shrink-0 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-50">
               Trova
             </button>
           </form>
+          {embed && !showEmbed && (
+            <button
+              type="button"
+              onClick={() => { setShowEmbed(true); nameRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); trackFeature("reel_salva", { stato: "guarda_reel", fonte: "Instagram" }); }}
+              data-testid="reel-guarda"
+              className="min-h-11 w-full rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
+            >
+              ▶ Guarda il reel
+            </button>
+          )}
+          {embed && showEmbed && (
+            <iframe
+              src={embed}
+              title="Reel di Instagram"
+              data-testid="reel-embed"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              className="h-[55vh] w-full rounded-card border border-border bg-white"
+            />
+          )}
         </div>
       )}
 
@@ -511,7 +538,7 @@ function PlaceRow({
           aria-label="Nome del locale e città"
           placeholder="Nome del locale e città"
           data-testid="reel-cerca-mano"
-          className="min-h-11 min-w-0 flex-1 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
+          className="min-h-11 min-w-0 flex-1 scroll-mt-20 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
         />
         <button type="submit" disabled={!manual.trim()} className={`${btn} shrink-0 border border-border bg-white text-brand`}>
           Cerca
