@@ -4,6 +4,8 @@ import { ChevronRight, LogOut, MessageCircle } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
 import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
 import EliminaAccount from "@/components/elimina-account";
+import AvvisiPush from "@/components/avvisi-push";
+import { spegniPerUscita } from "@/lib/push-client";
 
 // Fondo del profilo: "Dai un feedback" ed "Esci" (prima erano nella barra in basso, piano 6.4).
 // Da non collegati c'è solo il feedback. Sotto, discreto, "Elimina il mio account" (solo da collegati).
@@ -25,8 +27,9 @@ export default function ProfiloAccount({ loggedIn }: { loggedIn: boolean }) {
           </span>
           <ChevronRight aria-hidden className="h-4 w-4 text-text-muted" />
         </a>
+        {loggedIn && <AvvisiPush forma="riga" contesto="profilo" />}
         {loggedIn && (
-          <form action={logout} className="border-t border-border">
+          <form action={async () => { await spegniPerUscita(); await logout(); }} className="border-t border-border">
             <button type="submit" className={`${row} text-error`}>
               <LogOut aria-hidden className="h-5 w-5" strokeWidth={1.75} />
               <span className="flex-1">Esci</span>

@@ -47,6 +47,9 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - "stasera c'è posto": bozza di richiesta a TheFork e Zenchef per Roberto (proposta 25) — **SÌ** (il team prepara la bozza, nessun contatto).
 7. **Instagram letto dal link — CHIUSA il 29/10 notte (provato: Meta non dà la didascalia senza un'app approvata; resta lo screenshot, più "Guarda il reel qui" dentro l'app). Niente da fare per te.** Testo di prima — CAMBIATA il 29/10: dal 15/6/2026 Meta permette l'oEmbed di Instagram senza app né chiave (https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Non serve più l'app Meta: lo costruisce il team. A Lorenzo servono solo 2–3 link di reel Instagram di locali per la prova. Prova di Lorenzo del 29/10: incollando un link Instagram "non funziona" (oggi l'app chiede lo screenshot).
 
+8. **Accendere gli avvisi push (proposta 6) — APERTA dal 29/10 notte, 1 minuto.** Il codice è in produzione ma resta nascosto finché su Vercel non ci sono 4 variabili nuove (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`). Non cambiano nessuna chiave esistente e non costano niente. Basta che tu risponda in chat **"aggiungi tu le chiavi degli avvisi"**: la sessione dopo le genera e le mette su Vercel con il token, senza scriverle da nessuna parte. Passi a mano in `ISTRUZIONI-LORENZO.md`, punto "Avvisi push".
+   - Come si verifica: dopo "Quando ci vai? → Stasera" compare "🔔 Avvisami quel giorno"; nel profilo c'è l'interruttore "Avvisi".
+
 ## Fatte
 
 - **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.
