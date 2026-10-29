@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { oggiRoma, sabatoDi } from "@/lib/stasera";
 import { trackFeature } from "@/lib/track";
+import AvvisiPush from "@/components/avvisi-push";
 
 // "Quando ci vai?" appena salvato (proposta 17, PROBLEMI.md n. 9: si salva e non si va mai).
 // Un tocco mette un giorno nel salvato (saved_places.piano_al): quel giorno il locale va in cima a
-// "Stasera dove andiamo?". Toccato di nuovo, il giorno si toglie. Nessuna notifica, nessun costo.
+// "Stasera dove andiamo?". Toccato di nuovo, il giorno si toglie. Nessun costo. Dal 29/10, scelto il
+// giorno, "Avvisami quel giorno" (avvisi push, proposta 6): l'avviso parte dal cron del pomeriggio.
 type Scelta = "stasera" | "weekend";
 
 export default function QuandoCiVai({ userId, placeId }: { userId: string; placeId: string }) {
@@ -72,6 +74,7 @@ export default function QuandoCiVai({ userId, placeId }: { userId: string; place
         {chip("weekend", "Nel weekend")}
       </div>
       {scelta && <p className="mt-2 text-xs text-text-muted" data-testid="quando-detto">Te lo ripropongo in cima a «Stasera dove andiamo?».</p>}
+      {scelta && <AvvisiPush forma="invito" contesto="quando_ci_vai" />}
       {errore && <p className="mt-2 text-xs text-error">Non sono riuscito a segnarlo: riprova.</p>}
     </div>
   );

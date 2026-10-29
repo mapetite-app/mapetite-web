@@ -2569,6 +2569,7 @@ else {
       await lp.getByTestId("quando-detto").waitFor({ timeout: 3000 }).catch(() => {});
       const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
       const pq = lwrites.slice(wq).find((w) => w.m === "PATCH");
+      ok((await lp.getByTestId("avvisi-invito").count()) === 0, "avvisi: senza chiavi VAPID sul server nessun invito agli avvisi");
       ok(pq?.body?.piano_al === oggi && pq.url.includes("place_id=eq.00000000-0000-0000-0000-000000000201") && await lp.getByTestId("quando-stasera").getAttribute("aria-pressed") === "true", `quando ci vai: 'Stasera' segna oggi nel salvato (${JSON.stringify(pq?.body)})`);
       await lp.getByTestId("quando-weekend").click();
       await lp.waitForTimeout(300);
@@ -5227,6 +5228,66 @@ else {
     }
     await bctx.close();
   }
+  // Avvisi push (proposta 6): "Avvisami quel giorno" sotto "Quando ci vai?" e l'interruttore nel profilo.
+  // Servizio push finto (il browser di prova non ha un servizio push): nessuna rete esterna.
+  {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await actx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await actx.route("**/events.mapbox.com/**", (r) => r.fulfill({ status: 204, body: "" }));
+    await actx.route("**/api/push/chiave", (r) => r.fulfill({ json: { key: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" } }));
+    const iscr = [];
+    await actx.route("**/api/push/iscrizione", (r) => { iscr.push({ m: r.request().method(), body: r.request().postDataJSON() }); return r.fulfill({ json: { ok: true } }); });
+    await actx.route("**/rest/v1/saved_places**", (r) => { const m = r.request().method(); return r.fulfill({ status: m === "POST" ? 201 : 200, json: m === "GET" ? [] : [] }); });
+    await actx.route("**/api/places/search", (r) => r.fulfill({ json: { results: [{ id: "GBR1", name: "Bar Rossi", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, category: "bar", rating: 4.6, priceLevel: 2 }] } }));
+    await actx.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "00000000-0000-0000-0000-000000000201", name: "Bar Rossi" } } }));
+    await actx.route("**/api/places/verdetto", (r) => r.fulfill({ status: 429, json: { error: "limite" } }));
+    await actx.addInitScript(() => {
+      let sub = null;
+      const pm = {
+        getSubscription: async () => sub,
+        subscribe: async (o) => { window.__pushKey = o.applicationServerKey?.length ?? 0; sub = { endpoint: "https://push.example.test/abc", toJSON: () => ({ endpoint: "https://push.example.test/abc", keys: { p256dh: "p256dh-finta", auth: "auth-finta" } }), unsubscribe: async () => { sub = null; return true; } }; return sub; },
+      };
+      const reg = { pushManager: pm };
+      let registrato = false;
+      Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register: async (u) => { window.__swUrl = u; registrato = true; return reg; }, getRegistration: async () => (registrato ? reg : undefined), ready: Promise.resolve(reg) } });
+      window.PushManager = window.PushManager || function () {};
+      let perm = "default";
+      window.Notification = Object.assign(function () {}, { get permission() { return perm; }, requestPermission: async () => { perm = "granted"; return perm; } });
+    });
+    const ap = await actx.newPage();
+    ap.on("pageerror", (e) => errors.push(e.message));
+    await ap.goto(`${BASE}/importa/condividi/immagine?nome=Bar+Rossi&citta=Roma`, { waitUntil: "networkidle" });
+    await ap.getByTestId("reel-conferma").click({ timeout: 6000 }).catch(() => {});
+    const quando = ap.getByTestId("quando-stasera");
+    await quando.waitFor({ timeout: 6000 }).catch(() => {});
+    if (await quando.isVisible()) {
+      ok((await ap.getByTestId("avvisi-accendi").count()) === 0, "avvisi: l'invito compare solo dopo aver scelto il giorno");
+      await quando.click();
+      await ap.getByTestId("avvisi-accendi").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await ap.getByTestId("avvisi-accendi").isVisible() && (await ap.evaluate(() => window.__swUrl ?? null)) === null, "avvisi: scelto 'Stasera' compare 'Avvisami quel giorno', senza registrare niente prima del tocco");
+      await ap.getByTestId("avvisi-accendi").click();
+      await ap.getByTestId("avvisi-acceso").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(iscr.at(-1)?.m === "POST" && iscr.at(-1)?.body?.endpoint === "https://push.example.test/abc" && iscr.at(-1)?.body?.keys?.auth === "auth-finta" && (await ap.evaluate(() => [window.__swUrl, window.__pushKey]))?.join() === "/sw.js,65", `avvisi: il tocco registra /sw.js, si iscrive con la chiave del server e salva l'iscrizione (${JSON.stringify(iscr.at(-1))})`);
+      ok(await ap.getByTestId("avvisi-acceso").getByText("Te lo ricordo quel giorno nel pomeriggio.").isVisible(), "avvisi: dopo il sì, 'Te lo ricordo quel giorno nel pomeriggio.'");
+      await ap.getByTestId("quando-ci-vai").screenshot({ path: `${OUT}/33c-avvisi-invito.png` });
+    } else {
+      ok(false, "avvisi: 'Quando ci vai?' non è comparso nella pagina dell'esito dello screenshot");
+    }
+    await actx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+    await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    const riga = ap.getByTestId("avvisi-riga").getByRole("switch");
+    await riga.waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await riga.isVisible() && (await riga.getAttribute("aria-checked")) === "false", "avvisi: nel profilo l'interruttore 'Avvisi' (spento in una pagina nuova senza iscrizione)");
+    await riga.click();
+    await ap.waitForTimeout(400);
+    ok((await riga.getAttribute("aria-checked")) === "true" && iscr.filter((x) => x.m === "POST").length === 2, "avvisi: dal profilo si accendono con un tocco");
+    await riga.click();
+    await ap.waitForTimeout(400);
+    ok((await riga.getAttribute("aria-checked")) === "false" && iscr.at(-1)?.m === "DELETE" && iscr.at(-1)?.body?.endpoint === "https://push.example.test/abc", "avvisi: e si spengono, togliendo l'iscrizione dal server");
+    await ap.getByTestId("profilo-account").screenshot({ path: `${OUT}/96-avvisi-profilo.png` });
+    await actx.close();
+  }
+
   // Da non collegati: "Entra" al posto di Profilo, con ritorno alla pagina; Amici e Profilo mostrano un invito, non un errore.
   const gctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
   await gctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
