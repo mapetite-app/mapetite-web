@@ -34,17 +34,18 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - Installa l'app dalla home del telefono.
    - Fai il giro: salva da un reel, cerca, apri la scheda, segna "Ci sono stato".
    - Scrivi in una PR cosa non va. Da qui si prova solo un telefono simulato.
-4. **Reel di Instagram letti dal link — APERTA, facoltativa.** Senza, Instagram funziona con lo screenshot.
+4. **Reel di Instagram letti dal link — SUPERATA il 29/10 (vedi voce 7: non serve più l'app Meta).** Senza, Instagram funziona con lo screenshot.
    - Crea un'app gratuita su developers.facebook.com con il tuo account e aggiungi il prodotto "oEmbed".
    - Mandami ID dell'app e "client token" (Impostazioni → Avanzate), oppure mettili su Vercel come `META_OEMBED_TOKEN` nel formato `IDAPP|CLIENTTOKEN`.
    - Il codice per usarla lo aggiunge il team quando la chiave c'è.
 5. **Voti veri di Tripadvisor nella scheda — APERTA, facoltativa.** Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
-6. **Decisioni in sospeso — APERTE, una riga ciascuna** (dettagli in `BACKLOG.md`):
-   - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6);
-   - omaggio del locale a chi torna (proposta 12);
-   - serata di pre-apertura con utenti scelti per gusto (proposta 9);
-   - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3).
-   - "stasera c'è posto" dai sistemi di prenotazione: prepariamo la richiesta a TheFork e Zenchef per Roberto? (proposta 25).
+6. **Decisioni (29/10, risposte di Lorenzo in chat):**
+   - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6) — **SÌ** (FATTA la decisione, si costruisce);
+   - omaggio del locale a chi torna (proposta 12) — **APERTA**: Lorenzo non ha capito la domanda, rispiegata in chat il 29/10;
+   - serata di pre-apertura con utenti scelti per gusto (proposta 9) — **SÌ** (si progetta; contattare i locali resta a Lorenzo/Roberto);
+   - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3) — **SÌ**;
+   - "stasera c'è posto": bozza di richiesta a TheFork e Zenchef per Roberto (proposta 25) — **SÌ** (il team prepara la bozza, nessun contatto).
+7. **Instagram letto dal link — CAMBIATA il 29/10:** dal 15/6/2026 Meta permette l'oEmbed di Instagram senza app né chiave (https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Non serve più l'app Meta: lo costruisce il team. A Lorenzo servono solo 2–3 link di reel Instagram di locali per la prova. Prova di Lorenzo del 29/10: incollando un link Instagram "non funziona" (oggi l'app chiede lo screenshot).
 
 ## Fatte
 
