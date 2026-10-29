@@ -32,7 +32,8 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Da prendere:** tag liberi (fatto: "+ Nuovo tag"); import da file (fatto: Google Takeout); link condiviso che si apre senza app (in parte: raccolte condivise).
 - **Migliorabile:** generalista, nessuna AI, nessun aiuto nel momento della scelta, grafica meno curata (giudizio di Lorenzo, `RIFERIMENTI-DESIGN.md`). Noi: verdetto e "perché fa per te" su ogni posto.
 - Numeri: dato non trovato.
-- Ultimo controllo: 19/10/2026
+- **Novità (29/10):** da luglio 2026 gli abbonati Mapstr+ hanno accesso a serate private di pre-apertura ("soft openings") dei locali nuovi, con sconti sul conto o un dolce offerto ([Tendance Hôtellerie, 31/7/2026](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)). Il "Premium" è diventato "Mapstr CLUB", con il podio dei posti più aggiunti in zona ([mapstr.com](https://mapstr.com/mapstore/en/article/article_mapstr_club), pagina senza data). **Per noi:** conferma la proposta 9 (serata di pre-apertura), ma Mapstr la dà a chi paga; noi la diamo a chi ha il gusto giusto, gratis. Il "podio dei più aggiunti" è esattamente il ranking per popolarità da non copiare (VISIONE).
+- Ultimo controllo: 29/10/2026
 
 ### BestieBite (Bestie Bite) — italiano, di Roma
 - **Cosa fa:** recensioni dei ristoranti in brevi video; punti, missioni, livelli e cashback per chi carica video e invita amici; filtri per dieta, cucina e occasione; mappa dei posti vicini. ([App Store](https://apps.apple.com/app/id6444921443))

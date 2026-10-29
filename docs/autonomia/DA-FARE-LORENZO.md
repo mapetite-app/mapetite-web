@@ -45,7 +45,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - serata di pre-apertura con utenti scelti per gusto (proposta 9) — **SÌ** (si progetta; contattare i locali resta a Lorenzo/Roberto);
    - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3) — **SÌ**;
    - "stasera c'è posto": bozza di richiesta a TheFork e Zenchef per Roberto (proposta 25) — **SÌ** (il team prepara la bozza, nessun contatto).
-7. **Instagram letto dal link — CAMBIATA il 29/10:** dal 15/6/2026 Meta permette l'oEmbed di Instagram senza app né chiave (https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Non serve più l'app Meta: lo costruisce il team. A Lorenzo servono solo 2–3 link di reel Instagram di locali per la prova. Prova di Lorenzo del 29/10: incollando un link Instagram "non funziona" (oggi l'app chiede lo screenshot).
+7. **Instagram letto dal link — CHIUSA il 29/10 notte (provato: Meta non dà la didascalia senza un'app approvata; resta lo screenshot, più "Guarda il reel qui" dentro l'app). Niente da fare per te.** Testo di prima — CAMBIATA il 29/10: dal 15/6/2026 Meta permette l'oEmbed di Instagram senza app né chiave (https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Non serve più l'app Meta: lo costruisce il team. A Lorenzo servono solo 2–3 link di reel Instagram di locali per la prova. Prova di Lorenzo del 29/10: incollando un link Instagram "non funziona" (oggi l'app chiede lo screenshot).
 
 ## Fatte
 

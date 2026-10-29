@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 26/10/2026 (notte).
+Ultimo aggiornamento: 29/10/2026 (notte).
 
 ---
 
@@ -164,3 +164,9 @@ Ultimo aggiornamento: 26/10/2026 (notte).
 - **DAVVERO, in futuro:** conferma della visita dal locale (prenotazione o conto pagato) tramite gestionali di cassa e prenotazione; la legge rende questo dato prezioso per il ristoratore. Serve un parere legale sulla legge prima di dire "conforme".
 - **Primo passo:** proposta 28 dopo lo sprint (team). Lettura del testo della Legge 34/2026 e parere di un legale: Lorenzo/Roberto.
 
+## 13. Il reel visto su Instagram non entra nelle altre app (il ricordo si perde lì) — 29/10 notte
+- **Chi lo ha:** il cliente (vede il locale in un reel, vuole salvarlo, deve fare uno screenshot o scrivere il nome); di riflesso il ristoratore (il reel che ha pagato o ricevuto da un creator non diventa una visita).
+- **Quanto pesa:** Meta ha tolto dall'oEmbed di Instagram autore e miniatura ([blog Meta, 8/4/2025](https://developers.facebook.com/blog/post/2025/04/08/oembed-updates/); [Iframely](https://iframely.com/updates/193071-facebook-and-instagram-oembed-thumbnail-deprecation)); dal 15/6/2026 l'oEmbed non chiede più il token (1.000 richieste/ora), ma **prova nostra del 29/10** sui due reel di Lorenzo: uno risponde "Media Not Found", l'altro restituisce solo il riquadro "View this post on Instagram", senza didascalia né autore. Quante persone abbandonano il salvataggio allo screenshot: dato non trovato (da misurare con l'evento `reel_salva` già registrato: "letto" contro "illeggibile").
+- **OGGI nell'app:** screenshot (anche 5 slide insieme) o nome scritto; da stanotte "Guarda il reel qui": il post ufficiale incorporato dentro Mapetite, per leggere nome e posizione e scriverlo senza uscire dall'app. TikTok e YouTube si leggono già da soli.
+- **DAVVERO, in futuro:** l'esportazione dei propri dati di Instagram (file `saved_posts.json` con i link e gli autori dei post salvati, [guida](https://contextbolt.com/blog/instagram-saved-posts/), fonte secondaria): sono dati dell'utente, si possono importare (proposta 30). Un accordo con Meta non è realistico ora.
+- **Primo passo:** proposta 30 (team, M). Misurare quanti reel Instagram finiscono "illeggibili" nel pannello (team).
