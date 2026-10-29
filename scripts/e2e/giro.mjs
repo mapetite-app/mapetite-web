@@ -5245,7 +5245,7 @@ else {
       let sub = null;
       const pm = {
         getSubscription: async () => sub,
-        subscribe: async (o) => { window.__pushKey = o.applicationServerKey?.length ?? 0; sub = { endpoint: "https://push.example.test/abc", toJSON: () => ({ endpoint: "https://push.example.test/abc", keys: { p256dh: "p256dh-finta", auth: "auth-finta" } }), unsubscribe: async () => { sub = null; return true; } }; return sub; },
+        subscribe: async (o) => { window.__pushKey = o.applicationServerKey?.length ?? 0; sub = { endpoint: "https://fcm.googleapis.com/fcm/send/abc", toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: { p256dh: "p256dh-finta", auth: "auth-finta" } }), unsubscribe: async () => { sub = null; return true; } }; return sub; },
       };
       const reg = { pushManager: pm };
       let registrato = false;
@@ -5267,7 +5267,7 @@ else {
       ok(await ap.getByTestId("avvisi-accendi").isVisible() && (await ap.evaluate(() => window.__swUrl ?? null)) === null, "avvisi: scelto 'Stasera' compare 'Avvisami quel giorno', senza registrare niente prima del tocco");
       await ap.getByTestId("avvisi-accendi").click();
       await ap.getByTestId("avvisi-acceso").waitFor({ timeout: 3000 }).catch(() => {});
-      ok(iscr.at(-1)?.m === "POST" && iscr.at(-1)?.body?.endpoint === "https://push.example.test/abc" && iscr.at(-1)?.body?.keys?.auth === "auth-finta" && (await ap.evaluate(() => [window.__swUrl, window.__pushKey]))?.join() === "/sw.js,65", `avvisi: il tocco registra /sw.js, si iscrive con la chiave del server e salva l'iscrizione (${JSON.stringify(iscr.at(-1))})`);
+      ok(iscr.at(-1)?.m === "POST" && iscr.at(-1)?.body?.endpoint === "https://fcm.googleapis.com/fcm/send/abc" && iscr.at(-1)?.body?.keys?.auth === "auth-finta" && (await ap.evaluate(() => [window.__swUrl, window.__pushKey]))?.join() === "/sw.js,65", `avvisi: il tocco registra /sw.js, si iscrive con la chiave del server e salva l'iscrizione (${JSON.stringify(iscr.at(-1))})`);
       ok(await ap.getByTestId("avvisi-acceso").getByText("Te lo ricordo quel giorno nel pomeriggio.").isVisible(), "avvisi: dopo il sì, 'Te lo ricordo quel giorno nel pomeriggio.'");
       await ap.getByTestId("quando-ci-vai").screenshot({ path: `${OUT}/33c-avvisi-invito.png` });
     } else {
@@ -5283,7 +5283,7 @@ else {
     ok((await riga.getAttribute("aria-checked")) === "true" && iscr.filter((x) => x.m === "POST").length === 2, "avvisi: dal profilo si accendono con un tocco");
     await riga.click();
     await ap.waitForTimeout(400);
-    ok((await riga.getAttribute("aria-checked")) === "false" && iscr.at(-1)?.m === "DELETE" && iscr.at(-1)?.body?.endpoint === "https://push.example.test/abc", "avvisi: e si spengono, togliendo l'iscrizione dal server");
+    ok((await riga.getAttribute("aria-checked")) === "false" && iscr.at(-1)?.m === "DELETE" && iscr.at(-1)?.body?.endpoint === "https://fcm.googleapis.com/fcm/send/abc", "avvisi: e si spengono, togliendo l'iscrizione dal server");
     await ap.getByTestId("profilo-account").screenshot({ path: `${OUT}/96-avvisi-profilo.png` });
     await actx.close();
   }

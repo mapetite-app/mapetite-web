@@ -57,14 +57,15 @@ export default function AvvisiPush({ forma, contesto }: { forma: "invito" | "rig
 
   if (forma === "invito") {
     if (stato === "acceso" && !appenaAcceso) return null;
-    if (stato === "negato") return null;
+    // Permesso negato: il pulsante sparisce, ma il perché si legge (dal collaudo del 29/10).
+    if (stato === "negato" && !errore) return null;
     return (
       <div className="mt-2" data-testid="avvisi-invito">
         {stato === "acceso" ? (
           <p className="text-xs text-text-muted" data-testid="avvisi-acceso">🔔 Te lo ricordo quel giorno nel pomeriggio.</p>
         ) : stato === "ios_da_installare" ? (
           <p className="text-xs text-text-muted">🔔 Per gli avvisi su iPhone aggiungi Mapetite alla schermata Home (Condividi → Aggiungi alla schermata Home).</p>
-        ) : (
+        ) : stato === "negato" ? null : (
           <button type="button" onClick={accendi} disabled={busy} data-testid="avvisi-accendi" className="inline-flex min-h-11 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-60">
             <Bell aria-hidden className="h-4 w-4" strokeWidth={2} /> Avvisami quel giorno
           </button>

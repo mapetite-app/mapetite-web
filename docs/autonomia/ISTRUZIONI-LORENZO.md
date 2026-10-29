@@ -83,3 +83,22 @@ Senza questa chiave Instagram funziona già con lo screenshot.
 - **Serata di pre-apertura** con utenti scelti per gusto (proposta 9).
 - **"Cliente di parola":** prenotazioni salvate sul server e mostrate al locale, con il consenso dell'utente (proposta 3).
 Dettagli in `docs/autonomia/PROPOSTE.md`.
+
+---
+
+## Avvisi push (29/10/2026, 1 minuto)
+Gli avvisi ("Stasera: Trattoria da Mario", il giorno che hai scelto con "Quando ci vai?") sono già nell'app, ma restano nascosti finché su Vercel non ci sono le loro chiavi. Sono gratuite e non toccano niente di quello che c'è.
+
+**Modo veloce (consigliato):** scrivimi in chat "aggiungi tu le chiavi degli avvisi". La sessione dopo le crea e le mette su Vercel da sola.
+
+**A mano, dal computer:**
+1. Nel progetto, da terminale: `npx web-push generate-vapid-keys` (stampa una Public Key e una Private Key).
+2. Vercel → progetto mapetite-web → Settings → Environment Variables, per Production e Preview:
+   - `VAPID_PUBLIC_KEY` = la Public Key
+   - `VAPID_PRIVATE_KEY` = la Private Key
+   - `VAPID_SUBJECT` = `mailto:founder.mapetite@gmail.com`
+   - `CRON_SECRET` = una frase lunga a caso (protegge l'invio del pomeriggio)
+3. Rifai il deploy (Deployments → l'ultimo → Redeploy).
+
+**Come sai che è fatto:** salva un locale, tocca "Stasera": sotto compare "🔔 Avvisami quel giorno". Su iPhone serve l'app aggiunta alla schermata Home.
+

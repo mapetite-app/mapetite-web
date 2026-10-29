@@ -40,6 +40,11 @@ function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+/** Prima di "Esci": il telefono non riceve più gli avvisi di questo account (telefono condiviso). */
+export async function spegniPerUscita(): Promise<void> {
+  await Promise.race([spegniPush().catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
+}
+
 /** Chiede il permesso, si iscrive e salva l'iscrizione sul server. Lancia un errore leggibile. */
 export async function accendiPush(): Promise<void> {
   const key = await chiavePubblica();
@@ -57,6 +62,7 @@ export async function accendiPush(): Promise<void> {
 }
 
 export async function spegniPush(): Promise<void> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   const reg = await navigator.serviceWorker.getRegistration("/");
   const sub = reg ? await reg.pushManager.getSubscription() : null;
   if (!sub) return;
