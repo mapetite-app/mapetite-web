@@ -17,7 +17,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - **23/10 alle 05:08: ancora a zero** (stesso errore). L'ultimo verdetto nuovo in produzione è delle 08:07 del 22/10. Da oggi `/admin/numeri` mostra "AI: ok" o "AI forse ferma" con l'ora dell'ultimo verdetto.
    - Consiglio: imposta anche un avviso di spesa nella console (Limits), così te ne accorgi prima che finisca.
 
-0. **Una sola attività programmata — APERTA (22/10).** Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
+0. **Una sola attività programmata — FATTA il 29/10** (Lorenzo: testo di `PROMPT-UNICO.md` aggiornato con "DOPO LO SPRINT", attività riattivata, orari corretti per l'ora italiana; la prima sessione della notte conferma). Era aperta dal 22/10. Metti in pausa quella del fine settimana e sostituisci il testo di quella dei feriali con `PROMPT-UNICO.md`, orari `5 3,10,14,18,22 * * *`. Così non partono mai due chat sulla stessa cosa.
 
 1. **Accesso con Google in un tocco — FATTA il 29/10, in modalità "Test".** Google acceso su Supabase (verificato con l'API di gestione: `external_google_enabled` vero), Lorenzo ha provato e funziona. Per ora entrano solo gli account aggiunti come "Utenti di prova" (fino a 100).
 1b. **Pubblicare l'app su Google ("Pubblica app") — APERTA, non urgente (29/10).** Il pulsante in Google Auth Platform → Pubblico non si può premere. Finché resta in Test, ogni tester va aggiunto a mano in Pubblico → "Utenti di prova" → "+ Add users". Da guardare insieme quando si apre a tutti (serve uno screenshot della scritta sotto il pulsante).
@@ -26,7 +26,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - In "URI di reindirizzamento autorizzati" metti l'indirizzo che mostra Supabase in Authentication → Providers → Google ("Callback URL").
    - Copia ID client e chiave segreta in Supabase (stessa pagina) e accendi Google.
    - Come si verifica: in /login compare "Continua con Google". Le sessioni lo controllano anche da sole con l'API di gestione Supabase (`external_google_enabled`; il 21/10 alle 23:00 era ancora spento).
-2. **Quota Google a 100 al giorno fino al 26/10 — APERTA (da controllare).** La regola dello sprint vale solo se la console Google mostra davvero 100.
+2. **Quota Google — FATTA il 29/10** (screenshot di Lorenzo: SearchText, GetPlace, SearchNearby e Autocomplete a 50 al giorno; foto a 100, sotto il tetto di 200). Era: "Quota Google a 100 al giorno fino al 26/10". La regola dello sprint vale solo se la console Google mostra davvero 100.
    - Controlla su console.cloud.google.com → API e servizi → Places API (New) → Quote.
    - Dimmi il numero che vedi.
    - Dal 27/10 si torna a 50.
@@ -34,17 +34,18 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - Installa l'app dalla home del telefono.
    - Fai il giro: salva da un reel, cerca, apri la scheda, segna "Ci sono stato".
    - Scrivi in una PR cosa non va. Da qui si prova solo un telefono simulato.
-4. **Reel di Instagram letti dal link — APERTA, facoltativa.** Senza, Instagram funziona con lo screenshot.
+4. **Reel di Instagram letti dal link — SUPERATA il 29/10 (vedi voce 7: non serve più l'app Meta).** Senza, Instagram funziona con lo screenshot.
    - Crea un'app gratuita su developers.facebook.com con il tuo account e aggiungi il prodotto "oEmbed".
    - Mandami ID dell'app e "client token" (Impostazioni → Avanzate), oppure mettili su Vercel come `META_OEMBED_TOKEN` nel formato `IDAPP|CLIENTTOKEN`.
    - Il codice per usarla lo aggiunge il team quando la chiave c'è.
-5. **Voti veri di Tripadvisor nella scheda — APERTA, facoltativa.** Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
-6. **Decisioni in sospeso — APERTE, una riga ciascuna** (dettagli in `BACKLOG.md`):
-   - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6);
-   - omaggio del locale a chi torna (proposta 12);
-   - serata di pre-apertura con utenti scelti per gusto (proposta 9);
-   - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3).
-   - "stasera c'è posto" dai sistemi di prenotazione: prepariamo la richiesta a TheFork e Zenchef per Roberto? (proposta 25).
+5. **Voti veri di Tripadvisor nella scheda — RIMANDATA il 29/10** (piano "Discover": primi 1.000 locali gratis, poi 0,015 $ a locale; è un servizio a pagamento nuovo e i voti Tripadvisor premiano i posti più recensiti: per ora no, se ne riparla con i ristoratori). Chiave ufficiale gratuita su tripadvisor.com/developers, da mettere su Vercel come `TRIPADVISOR_API_KEY`. Senza, resta solo il link di ricerca.
+6. **Decisioni (29/10, risposte di Lorenzo in chat):**
+   - avvisi push gratuiti come "si è liberato un tavolo" (proposta 6) — **SÌ** (FATTA la decisione, si costruisce);
+   - omaggio del locale a chi torna (proposta 12) — **SÌ** (29/10, dopo la spiegazione in chat);
+   - serata di pre-apertura con utenti scelti per gusto (proposta 9) — **SÌ** (si progetta; contattare i locali resta a Lorenzo/Roberto);
+   - "cliente di parola": prenotazioni salvate sul server e mostrate al locale, con consenso (proposta 3) — **SÌ**;
+   - "stasera c'è posto": bozza di richiesta a TheFork e Zenchef per Roberto (proposta 25) — **SÌ** (il team prepara la bozza, nessun contatto).
+7. **Instagram letto dal link — CAMBIATA il 29/10:** dal 15/6/2026 Meta permette l'oEmbed di Instagram senza app né chiave (https://developers.facebook.com/blog/post/2026/06/15/tokenless-access-to-meta-oembed-apis/). Non serve più l'app Meta: lo costruisce il team. A Lorenzo servono solo 2–3 link di reel Instagram di locali per la prova. Prova di Lorenzo del 29/10: incollando un link Instagram "non funziona" (oggi l'app chiede lo screenshot).
 
 ## Fatte
 

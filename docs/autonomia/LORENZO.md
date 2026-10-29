@@ -3,7 +3,10 @@
 Questo file sostituisce Lorenzo quando lavori da solo (sessioni notturne programmate). Prima leggi `VISIONE.md`: cosa costruiamo e perché.
 Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola più prudente.
 
-## SPRINT FINO AL 25/10 (Lorenzo, 20/10) — prevale su tutto il resto di questo file
+## Dopo lo sprint (dal 27/10) — vale questo
+Lo sprint qui sotto è **finito il 26/10** e non prevale più. Restano: asticella di qualità (in produzione solo con voto design ≥ 8,5 del revisore separato), giro da utente vero sulla produzione a fine sessione, copione demo di 3 minuti (`DEMO.md`). Priorità: in cima a `BACKLOG.md` (decisioni di Lorenzo del 29/10). Ricerche Google: quota 50 al giorno, di cui 10 per le sessioni. Le proposte nuove e il lato ristoratori tornano ammessi.
+
+## SPRINT DAL 20 AL 26/10 (Lorenzo, 20/10) — FINITO, tenuto come storia
 Lorenzo, 20/10: "poche implementazioni, non vedo il valore aggiunto del team". Fino al 26/10 compreso:
 - **Solo chiavi di volta**, in quest'ordine di valore: (0) **primo accesso con la "mappa del gusto"** (zone, 10 locali veri 👍/👎 tra famosi e chicche, occasioni/budget/diete, incolla un reel o importa da Google Maps, "Ecco cosa ho capito di te" e subito 5 posti per te) collegato a ricerca, verdetto, filtri predefiniti e ordine dei risultati; **accesso con Google** in un tocco; (A) **salva da un reel in un gesto**, infallibile; (B) **ricerca con l'AI che si vede**: veloce, rispetta tutti i vincoli, verdetto sempre, "perché proprio per te" dai gusti e dai salvati; (C) **grafica** delle 4 schermate principali (home, risultati, scheda, salvati) rifatte per intero sui mockup scelti da Lorenzo.
 - **Stop** a funzioni B2B, partner, proposte nuove e ricerche sui competitor. Il CEO che chiude aggiorna i documenti una volta al giorno in 10 minuti e non propone voci fuori dalle chiavi di volta.

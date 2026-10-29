@@ -41,7 +41,7 @@ CHIAVI NELL'AMBIENTE: MAPETITE_ANTHROPIC_KEY è la chiave Haiku per i test: avvi
 
 TEAM VIRTUALE gstack (attivo dal 18/10/2026): per ogni voce indossi in sequenza i ruoli CEO, ingegnere capo, designer, staff engineer, collaudatore, performance. Regole complete in docs/autonomia/LORENZO.md, sezione "Team gstack": installazione, cosa non usare mai (ship, land-and-deploy, setup-deploy, canary, codex, setup-gbrain, modalità team), browser solo su localhost e Vercel di Mapetite.
 
-SPRINT FINO AL 26/10 (Lorenzo, 20/10): vale la prima sezione di docs/autonomia/LORENZO.md (solo chiavi di volta; CEO che chiude: documenti una volta al giorno in 10 minuti, nessuna proposta fuori dalle chiavi di volta).
+DOPO LO SPRINT (dal 27/10): lo sprint del 20–26/10 è finito. Priorità: quelle in cima a docs/autonomia/BACKLOG.md (decisioni di Lorenzo del 29/10: prima Instagram letto dal link, poi le proposte 3, 6, 12, 25 e 9, poi il primo accesso nuovo). In produzione solo con voto design almeno 8,5 del revisore separato. Ricerche Google vere per le sessioni: massimo 10 al giorno (quota 50).
 
 CICLO DI OGNI SESSIONE
 1. CEO APRE: leggi l'ultima PR e il suo esito. Per ogni voce fatta scrivi in PR "VALIDATA" o "DA RIVEDERE: <motivo>" rispetto a VISIONE.md (le DA RIVEDERE tornano nel BACKLOG come PRONTA). Leggi i commenti di Lorenzo sulle PR aperte e chiuse di recente: hanno la priorità. Scegli la voce da fare e mettila in cima al BACKLOG.
