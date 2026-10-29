@@ -6,7 +6,7 @@ import { isMissingVisitedAt } from "@/lib/diario";
 // Scrittura del diario su saved_places (una sola riga, dell'utente). Se la colonna visited_at
 // non esiste ancora (migrazione 20261015_diario non applicata) riprova senza la data: voto e
 // nota si salvano comunque. Esito: "ok", "senza-data" (salvato tutto tranne la data) o "errore".
-export type VisitPatch = { tags?: string[]; note?: string | null; visited_at?: string | null; visite?: number };
+export type VisitPatch = { tags?: string[]; note?: string | null; visited_at?: string | null; visite?: number; visita_vista_al?: string };
 
 export async function saveVisit(userId: string, placeId: string, patch: VisitPatch): Promise<"ok" | "senza-data" | "errore"> {
   const client = await browserClient().catch(() => null);
