@@ -111,6 +111,7 @@ export default function ReelSave({
   const [showEmbed, setShowEmbed] = useState(false);
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const askFor = (why: string) => { setReading(false); setAsk(why); };
 
@@ -217,27 +218,6 @@ export default function ReelSave({
             📸 Carica lo screenshot
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFile} aria-label="Screenshot del reel" />
-          {embed && !showEmbed && (
-            <button
-              type="button"
-              onClick={() => { setShowEmbed(true); trackFeature("reel_salva", { stato: "guarda_reel", fonte: "Instagram" }); }}
-              data-testid="reel-guarda"
-              className="min-h-11 w-full rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
-            >
-              ▶ Guarda il reel qui e scrivi il nome
-            </button>
-          )}
-          {embed && showEmbed && (
-            <iframe
-              src={embed}
-              title="Reel di Instagram"
-              data-testid="reel-embed"
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-              className="h-[480px] w-full rounded-card border border-border bg-white"
-            />
-          )}
           <form
             className="flex gap-2"
             onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { setDaTocco(true); read({ caption: draft.trim().slice(0, 2000) }); } }}
@@ -245,15 +225,36 @@ export default function ReelSave({
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Oppure scrivi il nome"
+              ref={nameRef}
+              placeholder={showEmbed ? "Scrivi il nome che vedi" : "Oppure scrivi il nome"}
               aria-label="Nome del locale o didascalia del reel"
               data-testid="reel-testo"
-              className="min-h-11 min-w-0 flex-1 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
+              className="min-h-11 min-w-0 flex-1 scroll-mt-20 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
             />
             <button type="submit" disabled={!draft.trim()} className="min-h-11 shrink-0 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand disabled:opacity-50">
               Trova
             </button>
           </form>
+          {embed && !showEmbed && (
+            <button
+              type="button"
+              onClick={() => { setShowEmbed(true); nameRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); trackFeature("reel_salva", { stato: "guarda_reel", fonte: "Instagram" }); }}
+              data-testid="reel-guarda"
+              className="min-h-11 w-full rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand"
+            >
+              ▶ Guarda il reel
+            </button>
+          )}
+          {embed && showEmbed && (
+            <iframe
+              src={embed}
+              title="Reel di Instagram"
+              data-testid="reel-embed"
+              referrerPolicy="strict-origin-when-cross-origin"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              className="h-[55vh] w-full rounded-card border border-border bg-white"
+            />
+          )}
         </div>
       )}
 
@@ -537,7 +538,7 @@ function PlaceRow({
           aria-label="Nome del locale e città"
           placeholder="Nome del locale e città"
           data-testid="reel-cerca-mano"
-          className="min-h-11 min-w-0 flex-1 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
+          className="min-h-11 min-w-0 flex-1 scroll-mt-20 rounded-pill border border-border bg-white px-4 text-base text-text focus:border-brand focus:outline-none"
         />
         <button type="submit" disabled={!manual.trim()} className={`${btn} shrink-0 border border-border bg-white text-brand`}>
           Cerca
