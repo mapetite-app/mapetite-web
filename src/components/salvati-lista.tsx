@@ -142,7 +142,8 @@ export default function SalvatiLista({
   const domanda = searching && sembraDomanda(query);
   // La risposta vale solo per la domanda scritta adesso.
   const attuale = domanda && risposta?.q === query.trim() ? risposta : null;
-  const soloRisposta = domanda && list.length === 0;
+  // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
+  const soloRisposta = domanda && list.length === 0 && activeTag === null && activeCity === null;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   const stateOn = activeTag === WANT || activeTag === DONE;
   const pills: { label: string; n: number; on: boolean; tag: string | null }[] = [

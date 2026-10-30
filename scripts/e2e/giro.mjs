@@ -1620,7 +1620,7 @@ else {
       // Dal collaudo del 30/10: dopo un errore la stessa domanda si riprova ("Riprova"), e lo schermo mostra solo la risposta.
       { let n = 0;
         await p.route("**/api/salvati/chiedi", (r) => { n++; return n === 1 ? r.fulfill({ status: 503, json: { error: "In questo momento non posso rispondere." } }) : r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000003", perche: "Hai scritto: brunch domenica." }] } }); });
-        await L.getByLabel("Cerca nei tuoi posti").fill("brunch con mia sorella domenica");
+        await L.getByLabel("Cerca nei tuoi posti").fill("sushi da asporto stasera");
         await L.getByTestId("chiedi-salvati-vai").click();
         const er = L.getByTestId("chiedi-salvati-errore");
         ok(await er.waitFor({ timeout: 3000 }).then(() => true, () => false) && (await L.getByTestId("salvati-stato").count()) === 0, "chiedi ai tuoi posti: errore con il messaggio del server, senza pillole e raccolte intorno");

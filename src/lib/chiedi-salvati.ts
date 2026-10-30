@@ -37,7 +37,7 @@ export function pulisciDomanda(d: unknown): string | null {
 /** Una domanda vera (non un nome da cercare): almeno 3 parole, o un punto di domanda. */
 export function sembraDomanda(q: string): boolean {
   const t = q.trim();
-  return t.includes("?") || t.split(/\s+/).filter(Boolean).length >= 3;
+  return t.length >= 3 && (t.includes("?") || t.split(/\s+/).filter(Boolean).length >= 3);
 }
 
 export function buildPrompt(domanda: string, posti: PostoSalvato[]): string {

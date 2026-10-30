@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.places);
   if (rows.length === 0) return NextResponse.json({ scelti: [] });
 
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "In questo momento non posso rispondere: usa la ricerca per nome." }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "Non posso rispondere adesso: riprova più tardi." }, { status: 503 });
   if (!allowAi("chiedi", clientKey(request, userId))) {
     return NextResponse.json({ error: "Hai fatto tante domande in poco tempo: riprova tra qualche minuto." }, { status: 429 });
   }
