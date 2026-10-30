@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
 //   recenti       ricerche recenti (solo su questo telefono) nella card iniziale
 //   barra         campo "Chiedi all'AI" + pulsante "Filtri" sempre in cima alla mappa (dal 11/10, scelta di Lorenzo)
 //   suggerimenti  frasi d'esempio sotto la barra al posto della card in basso (dal 12/10, Lorenzo: "una sola barra")
-export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "suggerimenti";
+export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "suggerimenti" | "salvati-ricerca";
 
 // Funzioni in prova: si accendono con ?beta=nome e si spengono con ?beta=-nome (la scelta resta su
 // quel telefono; ?beta=off le spegne tutte). Quelle in DEFAULT_ON sono già accese per tutti.

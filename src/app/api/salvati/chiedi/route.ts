@@ -5,11 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { isStateTag } from "@/lib/tags";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseScelte, pulisciDomanda, type PostoSalvato } from "@/lib/chiedi-salvati";
+import { MAX_POSTI, MAX_TOKENS, MIN_POSTI_RICERCA, buildPrompt, estimateCostUsd, parseScelte, pulisciDomanda, type PostoSalvato } from "@/lib/chiedi-salvati";
 
 // "Chiedi ai tuoi posti" (PROPOSTE.md 33). Body: { domanda }. Legge solo i salvati della persona
 // (sessione, RLS) e verdetto/sintesi già in memoria; una chiamata Haiku, nessuna chiamata Google.
 // Risponde { scelti: [{ id, perche }] } con id = UUID dei salvati. Senza AI: 503, la lista resta.
+// { da: "ricerca" }: la stessa scelta accanto a una ricerca nel mondo ("Dai tuoi salvati" sopra i
+// risultati); tetto a parte e niente chiamata con meno di MIN_POSTI_RICERCA salvati.
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 1, timeout: 15_000 });
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -23,6 +25,7 @@ type Row = {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const domanda = pulisciDomanda(body?.domanda);
+  const daRicerca = body?.da === "ricerca";
   if (!domanda) return NextResponse.json({ error: "Scrivi cosa cerchi." }, { status: 400 });
 
   const supabase = await createClient();
@@ -42,10 +45,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non riesco a leggere i tuoi posti: riprova." }, { status: 502 });
   }
   const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.places);
-  if (rows.length === 0) return NextResponse.json({ scelti: [] });
+  if (rows.length < (daRicerca ? MIN_POSTI_RICERCA : 1)) return NextResponse.json({ scelti: [] });
 
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "Non posso rispondere adesso: riprova più tardi." }, { status: 503 });
-  if (!allowAi("chiedi", clientKey(request, userId))) {
+  if (!allowAi(daRicerca ? "chiedi-ricerca" : "chiedi", clientKey(request, userId))) {
     return NextResponse.json({ error: "Hai fatto tante domande in poco tempo: riprova tra qualche minuto." }, { status: 429 });
   }
 
@@ -82,7 +85,7 @@ export async function POST(request: Request) {
     const { input_tokens, output_tokens } = message.usage;
     const text = message.content.map((c) => (c.type === "text" ? c.text : "")).join("");
     const scelti = parseScelte(text, posti);
-    console.log(`[chiedi-salvati] posti=${posti.length} scelti=${scelti.length} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
+    console.log(`[chiedi-salvati]${daRicerca ? " da=ricerca" : ""} posti=${posti.length} scelti=${scelti.length} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
     return NextResponse.json({ scelti });
   } catch (err) {
     console.error("[chiedi-salvati] chiamata Haiku fallita:", err);
