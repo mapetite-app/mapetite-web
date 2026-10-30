@@ -81,9 +81,13 @@ export default function OmaggioRitorno({ placeId, iniziale, verificato, demo, co
         )}
       </p>
       {salvato && !cambiato && (
-        <div data-testid="omaggio-codice-oggi" className="mt-3 flex items-center gap-3 rounded-card border border-border bg-white px-3 py-2">
-          <p className="min-w-0 flex-1 text-xs font-sans text-text-muted">Codice di oggi: chi te lo mostra al tavolo ha diritto all&apos;omaggio. Mostrati negli ultimi 30 giorni: <strong className="font-display text-text">{mostrati}</strong></p>
-          {codice && <p className="font-mono text-xl font-bold tracking-[0.2em] text-brand">{codice}</p>}
+        <div data-testid="omaggio-codice-oggi" className="mt-3 rounded-card border border-border bg-white px-3 py-2">
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 text-sm font-display font-semibold text-text">Codice di oggi</p>
+            {codice && <p data-testid="omaggio-codice-valore" className="font-mono text-xl font-bold tracking-[0.2em] text-brand">{codice}</p>}
+          </div>
+          <p className="mt-0.5 text-xs font-sans text-text-muted">Chi lo mostra al tavolo ha diritto all&apos;omaggio.</p>
+          <p data-testid="omaggio-mostrati" className="mt-1 text-xs font-sans text-text-muted">Mostrati negli ultimi 30 giorni: <strong className="font-display text-text">{mostrati}</strong></p>
         </div>
       )}
     </div>

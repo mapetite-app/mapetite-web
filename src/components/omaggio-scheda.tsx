@@ -71,13 +71,14 @@ export default function OmaggioScheda({ place, visite, coords }: { place: { id: 
 
   return (
     <>
-      <div data-testid="omaggio-scheda" className="mt-2 rounded-card bg-accent-light px-3 py-2">
+      {/* Discreto (collaudo del 30/10): bordo e pulsante a contorno, la cosa principale della scheda resta sopra. */}
+      <div data-testid="omaggio-scheda" className="mt-2 rounded-card border border-border bg-white px-3 py-2">
         <div className="flex items-center gap-2">
           <p className="min-w-0 flex-1 font-sans text-sm text-text">
             <span aria-hidden>🎁 </span>Il locale ti offre <strong className="font-semibold">{omaggio.testo}</strong>
           </p>
-          <button type="button" data-testid="omaggio-mostra" onClick={mostra} disabled={stato === "cerco"} className="min-h-10 shrink-0 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white active:scale-95 disabled:opacity-60">
-            {stato === "cerco" ? "Controllo…" : "Mostralo al tavolo"}
+          <button type="button" data-testid="omaggio-mostra" aria-label="Mostralo al tavolo" onClick={mostra} disabled={stato === "cerco"} className="min-h-10 shrink-0 rounded-pill border border-accent px-3 text-sm font-display font-semibold text-accent active:scale-95 disabled:opacity-60">
+            {stato === "cerco" ? "Controllo…" : "Mostralo"}
           </button>
         </div>
         {(stato === "lontano" || stato === "senza" || avviso) && (

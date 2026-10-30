@@ -4987,13 +4987,14 @@ else {
     { const om = rp.getByTestId("pannello-omaggio");
       await om.getByTestId("omaggio-testo").fill("10% di sconto");
       ok(await om.getByTestId("omaggio-salva").isDisabled() && await om.getByText("senza sconti né euro").isVisible(), "omaggio pannello: uno sconto in denaro non si può salvare");
+      for (const t of ["sconti sul dolce", "un caffè scontato", "metà prezzo sul vino", "10 per cento", "5 eur"]) { await om.getByTestId("omaggio-testo").fill(t); ok(await om.getByTestId("omaggio-salva").isDisabled(), `omaggio pannello: '${t}' non si può salvare`); }
       const soldi = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, omaggio: { testo: "5 euro", soglia: 2 } } });
       await om.getByTestId("omaggio-testo").fill("un caffè");
       await om.getByRole("button", { name: "3ª visita" }).click();
       await om.getByTestId("omaggio-salva").click();
       await om.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
       const j3 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
-      const codice = ((await om.getByTestId("omaggio-codice-oggi").textContent().catch(() => "")) ?? "").match(/[A-Z]{4}$/)?.[0];
+      const codice = ((await om.getByTestId("omaggio-codice-valore").textContent().catch(() => "")) ?? "").match(/^[A-Z]{4}$/)?.[0];
       ok(soldi.status() === 400 && j3.omaggio?.testo === "un caffè" && j3.omaggio?.soglia === 3 && JSON.stringify(j3.giorni) === "[5]" && !!codice && ((await om.getByTestId("omaggio-anteprima").textContent()) ?? "").includes("🎁 Il locale ti offre un caffè"), `omaggio pannello: salvato e riletto dalla scheda, serate intatte, codice di oggi (${JSON.stringify(j3)} / ${soldi.status()} / ${codice})`);
       await om.scrollIntoViewIfNeeded().catch(() => {});
       await rp.screenshot({ path: `${OUT}/71b-pannello-omaggio.png`, caret: "initial" });
@@ -5591,8 +5592,8 @@ else {
     { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`);
       ok(typeof tp?.body.visita_vista_al === "string", "visita vista: 'Ci sono tornato' sul posto salva la prova insieme alla visita"); }
     ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
-    ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("Sul posto: il telefono era vicino al locale"), "visita vista: dopo 'Ci sono tornato' oggi sul posto, riga '📍 Sul posto' con la spiegazione già scritta");
-    { const box = await d.getByTestId("diario-scheda-data").boundingBox(); ok(box && box.height <= 44, `visita vista: a 390 px 'Ci sei stato oggi · 2 volte · Cambia' resta su una riga (${box?.height})`); }
+    ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("Sul posto: segnato vicino al locale"), "visita vista: dopo 'Ci sono tornato' oggi sul posto, riga '📍 Sul posto' con la spiegazione già scritta");
+    { const box = await d.getByTestId("diario-scheda").boundingBox(); ok(box && box.height <= 44, `visita vista: a 390 px 'Ci sei stato oggi · 2 volte · Cambia' e 'Diario' restano su una riga (${box?.height})`); }
     ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });

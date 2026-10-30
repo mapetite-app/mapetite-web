@@ -8,7 +8,7 @@ export const OMAGGIO_MAX = 40;
 export const OMAGGIO_OGNI_GIORNI = 30;
 
 // Parole che trasformerebbero l'omaggio in uno sconto in denaro: non si accettano.
-const DENARO = /[%€$]|\bsconto\b|\beuro\b|\bgratis il conto\b/i;
+const DENARO = /[%€$£]|scont|euro|prezzo|per ?cento|metà|conto|buono da|\d+ ?(?:eur|e)\b/i;
 
 /** Testo e soglia puliti, o null (omaggio spento / non valido). */
 export function pulisciOmaggio(testo: unknown, soglia: unknown): Omaggio | null {

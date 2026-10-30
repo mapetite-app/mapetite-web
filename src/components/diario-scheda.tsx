@@ -115,30 +115,31 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
   const sulPosto = !!stato.vista && !!stato.date && dayKey(new Date(stato.vista)) === stato.date;
   return (
     <>
-      <div data-testid="diario-scheda" className="mt-3 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      {/* Data e "Diario" sempre sulla stessa riga (collaudo del 30/10: a 390 px "Diario" andava a capo da solo). */}
+      <div data-testid="diario-scheda" className="mt-3 flex min-h-11 items-center gap-3 text-sm">
         {stato.colonna && (
-          <button type="button" data-testid="diario-scheda-data" onClick={() => setOpen("modifica")} className="min-h-10 text-left font-sans text-text">
+          <button type="button" data-testid="diario-scheda-data" onClick={() => setOpen("modifica")} className="min-h-10 min-w-0 flex-1 text-left font-sans text-text">
             <span aria-hidden>📅 </span>
             {stato.date
-              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span>{stato.visite != null && stato.visite >= 2 && <span data-testid="diario-scheda-volte"> · {stato.visite} volte</span>} · <span className="font-display font-semibold text-accent">Cambia</span></>
+              ? <>Ci sei stato <span className="font-semibold">{whenLabel(stato.date)}</span>{stato.visite != null && stato.visite >= 2 && <span data-testid="diario-scheda-volte"> · {stato.visite} volte</span>} · <span className="whitespace-nowrap font-display font-semibold text-accent">Cambia</span></>
               : <span className="font-display font-semibold text-accent">Quando ci sei stato?</span>}
           </button>
         )}
-        {/* Non lo stesso giorno della visita già segnata: due tocchi non fanno due visite. */}
-        {stato.visite != null && stato.date !== today && (
-          <button type="button" data-testid="diario-scheda-tornato" onClick={torna} className="min-h-10 font-display font-semibold text-brand">
-            ↻ Ci sono tornato
-          </button>
-        )}
-        <Link href="/profilo/diario" data-testid="diario-scheda-link" className="ml-auto inline-flex min-h-10 items-center font-display font-semibold text-brand">
-          📔 Diario →
+        <Link href="/profilo/diario" data-testid="diario-scheda-link" aria-label="Il tuo diario" className="ml-auto inline-flex min-h-10 shrink-0 items-center font-display font-semibold text-brand">
+          📔 Diario
         </Link>
       </div>
-      {/* Riga a parte, con la spiegazione già scritta: a 390 px "Cambia" resta sulla riga della data (collaudo del 30/10). */}
+      {/* Riga a parte, con la spiegazione già scritta (collaudo del 30/10). */}
       {sulPosto && (
         <p data-testid="diario-scheda-vista" className="-mt-1 font-sans text-xs text-text-muted">
-          <span aria-hidden>📍 </span>Sul posto: il telefono era vicino al locale quando l&apos;hai segnato
+          <span aria-hidden>📍 </span>Sul posto: segnato vicino al locale
         </p>
+      )}
+      {/* Non lo stesso giorno della visita già segnata: due tocchi non fanno due visite. */}
+      {stato.visite != null && stato.date !== today && (
+        <button type="button" data-testid="diario-scheda-tornato" onClick={torna} className="min-h-10 text-sm font-display font-semibold text-brand">
+          ↻ Ci sono tornato
+        </button>
       )}
       <OmaggioScheda place={place} visite={stato.visite} coords={coords} />
       {open && (
