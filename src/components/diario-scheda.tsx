@@ -47,11 +47,15 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
     return () => { alive = false; };
   }, [userId, place.id]);
 
-  // Visita vista dal telefono: si guarda la posizione una volta, nel momento del tocco.
-  // "Ci sono tornato": la posizione si guarda al tocco, ma la prova si scrive solo salvando il foglio.
+  // Visita vista dal telefono: si guarda la posizione una volta, nel momento del tocco, ma la prova
+  // si scrive solo quando il foglio si chiude con la visita di oggi (collaudo del 30/10: scegliendo
+  // "Ieri" la prova di oggi non deve restare). "Ci sono tornato" la scrive insieme alla visita.
   const vistaTornato = useRef<Promise<boolean> | null>(null);
-  const guardaVisita = async () => {
-    if (!(await visitaVistaQui(coords))) return false;
+  const vistaPrima = useRef<Promise<boolean> | null>(null);
+  const scriviVista = async (data: string | null) => {
+    const p = vistaPrima.current;
+    vistaPrima.current = null;
+    if (!p || data !== dayKey(new Date()) || !(await p.catch(() => false))) return false;
     const ora = new Date().toISOString();
     if ((await saveVisit(userId, place.id, { visita_vista_al: ora })) !== "ok") return false;
     setStato((s) => (s ? { ...s, vista: ora } : s));
@@ -64,7 +68,8 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
   useEffect(() => {
     if (!stato || askedAt == null || Date.now() - askedAt > 60_000) return;
     ctx?.consume();
-    setTimeout(() => { void guardaVisita(); setOpen("nuova"); }, 0);
+    vistaPrima.current = visitaVistaQui(coords);
+    setTimeout(() => setOpen("nuova"), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stato, askedAt, ctx]);
 
@@ -88,6 +93,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
       if (res === "errore") return false;
       setStato((s) => (s ? { ...s, colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
     }
+    if (tornato == null) void scriviVista(v.date ?? stato?.date ?? null);
     if (ctx && v.voto !== ctx.voto) ctx.setVoto(v.voto);
     trackFeature("diario", { fonte: tornato != null ? "tornato" : "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
     setOpen(null);
@@ -104,6 +110,8 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
 
   const close = () => {
     vistaTornato.current = null;
+    // "Salta" dopo "Ci sono stato": la visita resta quella di oggi, la prova vale.
+    if (tornato == null) void scriviVista(stato?.date ?? null);
     if (open === "nuova") trackFeature("diario", { fonte: "scheda", stato: "saltato" });
     setOpen(null);
     setTornato(null);

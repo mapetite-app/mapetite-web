@@ -9,19 +9,31 @@ import { fraseApertura } from "@/lib/aperto-dal";
 // non compare niente (nemmeno uno spazio vuoto). Dati da /api/ristoratore/serate.
 // Il badge "Verificato" non sta qui: la scheda lo mette come spunta accanto al nome (Semplificare,
 // 20/10), la pagina pubblica del locale ha il suo.
-export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null };
+export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: { testo?: unknown; soglia?: unknown } | null };
+
+// Una sola richiesta per locale anche se la scheda la chiede da più punti (pillole e omaggio):
+// la risposta resta in memoria 60 secondi, poi si rilegge (il titolare può averla cambiata).
+const cache = new Map<string, { at: number; p: Promise<InfoLocale | null> }>();
+
+export function leggiInfoLocale(venueId: string): Promise<InfoLocale | null> {
+  const c = cache.get(venueId);
+  if (c && Date.now() - c.at < 60_000) return c.p;
+  const p = fetch(`/api/ristoratore/serate?id=${encodeURIComponent(venueId)}`)
+    .then((r) => (r.ok ? (r.json() as Promise<InfoLocale>) : null))
+    .then((j) => (j?.verificato ? j : null))
+    .catch(() => { cache.delete(venueId); return null; /* senza rete: niente riga */ });
+  cache.set(venueId, { at: Date.now(), p });
+  return p;
+}
 
 /** Info del titolare per un locale (UUID o Place ID Google); null finché non arriva o se non è verificato. */
 export function useInfoLocale(venueId: string): InfoLocale | null {
   const [info, setInfo] = useState<{ id: string; info: InfoLocale | null } | null>(null);
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    fetch(`/api/ristoratore/serate?id=${encodeURIComponent(venueId)}`, { signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: InfoLocale | null) => setInfo({ id: venueId, info: j?.verificato ? j : null }))
-      .catch(() => { /* senza rete: niente riga */ });
-    return () => ctrl.abort();
+    let vivo = true;
+    leggiInfoLocale(venueId).then((j) => { if (vivo) setInfo({ id: venueId, info: j }); });
+    return () => { vivo = false; };
   }, [venueId]);
 
   // Scheda passata a un altro locale: niente dati del precedente.
