@@ -5,10 +5,10 @@
 //  - nessuna chiamata Google: l'AI vede solo nome, tipo, città, raccolte, nota della persona e
 //    verdetto/sintesi già in memoria (place_synthesis);
 //  - il "perché" deve venire da quei dati: mai caratteristiche inventate;
-//  - ogni numero che non era nella richiesta si scarta; al massimo MAX_SCELTI posti;
+//  - si tengono solo numeri della lista inviata, senza doppioni; al massimo MAX_SCELTI posti;
 //  - nel dubbio nessuno: meglio "nessuno dei tuoi posti" che uno sbagliato.
 
-export const MAX_POSTI = 80; // i più recenti: ~80 righe brevi stanno in ~4k token
+export const MAX_POSTI = 80; // i più recenti. Caso peggiore (80 con nota, verdetto e sintesi): ~12k token, ~1,2 centesimi
 export const MAX_SCELTI = 3;
 export const MAX_TOKENS = 400;
 export const MAX_DOMANDA = 160;

@@ -1617,6 +1617,16 @@ else {
       await L.getByTestId("chiedi-salvati-vai").click();
       ok(await L.getByTestId("chiedi-salvati-nessuno").waitFor({ timeout: 3000 }).then(() => true, () => false) && (await L.getByRole("link", { name: "Cercane uno nuovo" }).getAttribute("href")).startsWith("/assistente?q="), "chiedi ai tuoi posti: nessuno adatto → 'Cercane uno nuovo' apre la ricerca");
       await p.unroute("**/api/salvati/chiedi");
+      // Dal collaudo del 30/10: dopo un errore la stessa domanda si riprova ("Riprova"), e lo schermo mostra solo la risposta.
+      { let n = 0;
+        await p.route("**/api/salvati/chiedi", (r) => { n++; return n === 1 ? r.fulfill({ status: 503, json: { error: "In questo momento non posso rispondere." } }) : r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000003", perche: "Hai scritto: brunch domenica." }] } }); });
+        await L.getByLabel("Cerca nei tuoi posti").fill("brunch con mia sorella domenica");
+        await L.getByTestId("chiedi-salvati-vai").click();
+        const er = L.getByTestId("chiedi-salvati-errore");
+        ok(await er.waitFor({ timeout: 3000 }).then(() => true, () => false) && (await L.getByTestId("salvati-stato").count()) === 0, "chiedi ai tuoi posti: errore con il messaggio del server, senza pillole e raccolte intorno");
+        await er.getByRole("button", { name: "Riprova" }).click();
+        ok(await L.getByTestId("chiedi-salvati-posto").first().waitFor({ timeout: 3000 }).then(() => true, () => false) && n === 2, `chiedi ai tuoi posti: 'Riprova' rifà la stessa domanda (${n} chiamate)`);
+        await p.unroute("**/api/salvati/chiedi"); }
       await L.getByLabel("Cerca nei tuoi posti").fill("sushi"); }
     await L.getByRole("button", { name: "Mostra tutti" }).click();
     ok((await righe.count()) === 3, "salvati lista: 'Mostra tutti' azzera la ricerca");

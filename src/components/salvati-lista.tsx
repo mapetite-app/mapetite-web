@@ -11,7 +11,7 @@ import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { STATE_TAGS } from "@/lib/tags";
 import { collectionColor, summarizeCollections } from "@/lib/raccolte";
-import { sembraDomanda } from "@/lib/chiedi-salvati";
+import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
@@ -89,7 +89,7 @@ export default function SalvatiLista({
   const [risposta, setRisposta] = useState<Risposta | null>(null);
   const chiedi = async () => {
     const q = query.trim();
-    if (!sembraDomanda(q) || risposta?.q === q) return;
+    if (!sembraDomanda(q) || (risposta?.q === q && risposta.stato !== "errore")) return;
     setRisposta({ q, stato: "cerco", scelti: [] });
     try {
       const r = await fetch("/api/salvati/chiedi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domanda: q }) });
@@ -142,6 +142,7 @@ export default function SalvatiLista({
   const domanda = searching && sembraDomanda(query);
   // La risposta vale solo per la domanda scritta adesso.
   const attuale = domanda && risposta?.q === query.trim() ? risposta : null;
+  const soloRisposta = domanda && list.length === 0;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   const stateOn = activeTag === WANT || activeTag === DONE;
   const pills: { label: string; n: number; on: boolean; tag: string | null }[] = [
@@ -183,7 +184,7 @@ export default function SalvatiLista({
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               enterKeyHint="search"
-              placeholder="Nome, zona, o chiedi: dove porto mia madre?"
+              placeholder="Nome, zona o una domanda…"
               aria-label="Cerca nei tuoi posti"
               className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
             />
@@ -198,16 +199,22 @@ export default function SalvatiLista({
         {domanda && (
           <section data-testid="chiedi-salvati" aria-live="polite" className="mt-3">
             {!attuale ? (
-              <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className="flex min-h-11 w-full items-center gap-2 rounded-pill bg-accent px-4 text-left text-sm font-display font-semibold text-white active:scale-[0.98]">
+              // Con risultati per nome (es. "Da Enzo al 29") il pulsante resta secondario: non copre la lista.
+              <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className={`flex min-h-11 w-full items-center gap-2 rounded-pill px-4 text-left text-sm font-display font-semibold active:scale-[0.98] ${list.length === 0 || query.includes("?") ? "bg-accent text-white" : "border border-[#ddd5c8] bg-white text-accent"}`}>
                 <Sparkles size={16} aria-hidden className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate">Chiedi ai tuoi posti</span>
               </button>
             ) : attuale.stato === "cerco" ? (
               <p data-testid="chiedi-salvati-cerco" className="flex min-h-11 items-center gap-2 px-1 text-sm text-text-muted">
-                <Sparkles size={16} aria-hidden className="animate-pulse text-accent" /> Guardo tra i tuoi {all.length} posti…
+                <Sparkles size={16} aria-hidden className="animate-pulse text-accent" /> Guardo tra i tuoi {Math.min(all.length, MAX_POSTI)} posti…
               </p>
             ) : attuale.stato === "errore" ? (
-              <p data-testid="chiedi-salvati-errore" className="px-1 py-2 text-sm text-text-muted">{attuale.msg}</p>
+              <div data-testid="chiedi-salvati-errore" className={`rounded-card border ${LINE} bg-white p-4`}>
+                <p className="text-sm text-text">{attuale.msg}</p>
+                <button type="button" onClick={() => void chiedi()} className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95">
+                  Riprova
+                </button>
+              </div>
             ) : scelti.length === 0 ? (
               <div data-testid="chiedi-salvati-nessuno" className={`rounded-card border ${LINE} bg-white p-4`}>
                 <p className="text-sm text-text">Tra i tuoi posti nessuno fa al caso.</p>
@@ -240,6 +247,8 @@ export default function SalvatiLista({
           </section>
         )}
 
+        {/* Con una domanda e niente trovato per nome: solo la risposta (una cosa per schermata). */}
+        {!soloRisposta && (<>
         <div role="group" aria-label="Stato" data-testid="salvati-stato" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
           {pills.map((p) => (
             <button
@@ -317,7 +326,7 @@ export default function SalvatiLista({
           </div>
         </div>
 
-        {list.length === 0 && domanda ? null : list.length === 0 ? (
+        {list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
             <p className={`${SERIF} text-xl font-medium text-text`}>Nessun posto qui</p>
             <p className="mt-1 text-sm text-text-muted">Cambia la ricerca o i filtri.</p>
@@ -373,6 +382,7 @@ export default function SalvatiLista({
             })}
           </ul>
         )}
+        </>)}
       </div>
     </section>
   );
