@@ -1445,6 +1445,15 @@ const covered = await page.evaluate(() => {
   return b.contains(top) ? "ok" : "coperto";
 });
 ok(covered === "ok", `onboarding: pulsante Continua raggiungibile (${covered})`);
+// B2 (collaudo del 26/10): Roma scelta e poi tolta non torna con la ricarica.
+{ const roma = page.getByRole("button", { name: /Roma/ }).first();
+  await roma.click().catch(() => {});
+  await page.waitForTimeout(300);
+  await roma.click().catch(() => {});
+  await page.waitForTimeout(300);
+  await page.reload({ waitUntil: "networkidle" });
+  const bozza = await page.evaluate(() => { try { return localStorage.getItem("mapetite.benvenuto"); } catch { return "errore"; } });
+  ok(bozza === null && (await page.getByRole("button", { name: /Roma/ }).first().getAttribute("aria-pressed")) !== "true", `primo accesso nuovo: Roma scelta e tolta non torna dopo la ricarica (B2: ${bozza})`); }
 await page.getByTestId("onboarding-salta").click();
 await page.waitForURL(/\/mappa/, { timeout: 5000 }).then(() => ok(true, "onboarding: 'Salta' porta subito alla mappa"), () => ok(false, "onboarding: 'Salta' porta subito alla mappa"));
 await shot("08-onboarding");
@@ -7642,7 +7651,13 @@ else {
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");
-    ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI"); }
+    ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI");
+    // Collaudo del 26/10, B1 e B3.
+    { const v2 = mg.pulisciMappa({ v: 2, su: ["trattoria", "enoteca"], giu: [], zone: [], scoperta: null }, () => true);
+      ok(v2.v === 2 && mg.scopertaPer(v2) === null && mg.gustoPerAI(v2)?.preferisce === null && !mg.queryPerTe(v2, "Roma").includes("turistic"), `primo accesso nuovo: senza scelta niente 'chicche' dedotte dai 👍 (B1: ${mg.queryPerTe(v2, "Roma")})`);
+      ok(mg.scopertaPer({ v: 1, su: ["trattoria", "enoteca"], scoperta: null }) === "chicche", "primo accesso vecchio: la scelta si deduce ancora dai 👍 (lì la proposta si vede)");
+      const fr = mg.fraseCapito({ v: 2, zone: ["Monti", "Pigneto"], su: ["trattoria"], giu: [], scoperta: "chicche" }, { citta: "Roma", priceRange: null, diete: ["no-pesce"], occasions: [] }, 3).map((x) => x.map((y) => y.t).join("")).join(" ");
+      ok(fr.includes("giri alla larga dai posti turistici"), `primo accesso nuovo: con più zone e una dieta 'chicche' resta nella frase principale (B3: ${fr})`); } }
   { const ms = await import(new URL("../../src/lib/mainstream.ts", import.meta.url).href);
     const P = (name, n, r = 4.5) => ({ name, userRatingCount: n, rating: r });
     const lista = [P("Roscioli Salumeria", 12000), P("Osteria Due", 800), P("Trattoria Tre", 600), P("Da Quattro", 900), P("Cinque", 700)];

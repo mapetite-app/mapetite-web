@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
 import { completeOnboarding, skipOnboarding } from "./actions";
@@ -210,13 +210,17 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const draftJson = JSON.stringify(draftNow);
   // Le risposte prese dal profilo ("Rifalla") diventano bozza solo quando la persona cambia qualcosa.
   const [partenza] = useState(draftJson);
+  // C'è una bozza sul telefono (ripresa o scritta in questa visita)? Serve a cancellarla quando si toglie
+  // l'ultima risposta: Roma scelta e poi tolta tornava con la ricarica, perché la bozza vuota era uguale
+  // alla partenza e non si cancellava (collaudo del 26/10, B2).
+  const bozzaScritta = useRef(ripreso);
   useEffect(() => {
     const d = JSON.parse(draftJson) as Draft;
-    // Tolta l'ultima risposta (Roma scelta e poi tolta): la bozza vecchia va via, altrimenti tornava con la ricarica (collaudo 26/10).
-    if (vuota(d)) { if (draftJson !== partenza || ripreso) clearDraft(); return; }
-    if (!ripreso && draftJson === partenza) return;
+    if (vuota(d)) { if (bozzaScritta.current) { clearDraft(); bozzaScritta.current = false; } return; }
+    if (!bozzaScritta.current && draftJson === partenza) return;
     saveDraft(d);
-  }, [draftJson, partenza, ripreso]);
+    bozzaScritta.current = true;
+  }, [draftJson, partenza]);
 
   // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
   useEffect(() => {
@@ -262,7 +266,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Al server solo la scelta vista: quella del passo 3 o la proposta dei 👍 fissata lasciandolo (fissaScoperta).
   // Prima con `scopertaVista` passava anche una proposta calcolata dopo, da 👍 dati correggendo dalla frase,
   // e la frase diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo 26/10).
-  const gusto = { v: 1 as const, zone, su, giu, scoperta };
+  // v: 2: "Famosi o chicche?" qui è una domanda vista; senza risposta il server non deduce niente (B1).
+  const gusto = { v: 2 as const, zone, su, giu, scoperta };
 
   // Arrivati a correggere dalla frase: ogni passo ha "Torna alla frase" (collaudo 23/10: "Continua" portava avanti).
   const [tornaFrase, setTornaFrase] = useState(false);

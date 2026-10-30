@@ -1,4 +1,4 @@
-import { scopertaDedotta, tipoDa, type MappaGusto, type TipoPosto } from "@/lib/mappa-gusto";
+import { scopertaPer, tipoDa, type MappaGusto, type TipoPosto } from "@/lib/mappa-gusto";
 
 // Home (Lorenzo 21/10: "più fica e utile, con classifiche o proposte in base alle ricerche precedenti").
 // Tutto qui sono RICERCHE pronte, non locali: un tocco apre /mappa?q=… e i posti veri arrivano da Google
@@ -80,7 +80,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
   const { gusto, recenti, citta, momento } = input;
   const out: Proposta[] = [];
   const add = (p: Proposta) => { if (!out.some((x) => x.q.toLowerCase() === p.q.toLowerCase())) out.push(p); };
-  const scoperta = gusto ? gusto.scoperta ?? scopertaDedotta(gusto.su) : null;
+  const scoperta = gusto ? scopertaPer(gusto) : null;
   // Un tipo di posto una volta sola: "trattorie a Monti" dalla ricerca non torna uguale dal gusto.
   const usati = new Set<string>();
 
