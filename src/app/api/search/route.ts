@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
 import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
-import { pulisciMappa, scopertaDedotta } from "@/lib/mappa-gusto";
+import { pulisciMappa, scopertaPer } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
 import { requiredAttributes, type WeekTime } from "@/lib/filter-options";
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         ({ data, error }) => {
           if (error || !data) return null;
           const m = pulisciMappa((data as { gusto?: unknown }).gusto, () => true);
-          return { chicche: (m.scoperta ?? scopertaDedotta(m.su)) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
+          return { chicche: scopertaPer(m) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
         },
         () => null,
       )

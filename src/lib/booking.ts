@@ -242,6 +242,7 @@ export type BookingRequest = BookingDetails & {
   riapre?: number | null;  // richiesta mandata a locale chiuso: quando riapre (ms), per "ti hanno risposto?"
   dismissedRisposta?: boolean;
   disdetta?: number | null; // "Non vado più" toccato (ms): distingue la disdetta dal "Non ci sono andato" (dal 29/10)
+  piattaforma?: string | null; // "Prenota su TheFork" (via "sito"): il nome della piattaforma (dal 30/10)
 };
 
 const KEY = "mapetite.prenotazioni";

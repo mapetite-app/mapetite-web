@@ -53,8 +53,11 @@ export const SCOPERTE: { value: Scoperta; label: string; riga: string }[] = [
   { value: "famosi", label: "I posti famosi", riga: "Quelli di cui parlano tutti" },
 ];
 
+// v: 2 = salvata dal primo accesso nuovo, dove "Famosi o chicche?" è una domanda vista: se manca la
+// risposta la persona non ha scelto e non si deduce niente dai 👍 (collaudo del 26/10, B1). v: 1 = primo
+// accesso vecchio, dove la scelta poteva mancare e si deduce (lì la proposta dai 👍 si vede).
 export type MappaGusto = {
-  v: 1;
+  v: 1 | 2;
   zone: string[];
   su: string[];
   giu: string[];
@@ -70,7 +73,12 @@ export function pulisciMappa(raw: unknown, zoneNote: (z: string) => boolean): Ma
   const su = soloNoti(o.su, (x) => TIPO.has(x), TIPI.length);
   const giu = soloNoti(o.giu, (x) => TIPO.has(x) && !su.includes(x), TIPI.length);
   const scoperta = SCOPERTE.some((s) => s.value === o.scoperta) ? (o.scoperta as Scoperta) : null;
-  return { v: 1, zone: soloNoti(o.zone, zoneNote, 4), su, giu, scoperta };
+  return { v: o.v === 2 ? 2 : 1, zone: soloNoti(o.zone, zoneNote, 4), su, giu, scoperta };
+}
+
+/** Famosi o chicche per ricerca, verdetti e home: la scelta fatta, oppure (solo profili vecchi) quella dedotta dai 👍. */
+export function scopertaPer(m: Pick<MappaGusto, "v" | "su" | "scoperta">): Scoperta | null {
+  return m.scoperta ?? (m.v === 2 ? null : scopertaDedotta(m.su));
 }
 
 export const dieteValide = (raw: unknown): string[] => soloNoti(raw, (x) => DIETE.some((d) => d.id === x), DIETE.length);
@@ -116,7 +124,7 @@ export function gustiDaTipi(su: string[], scelti: { occasions: string[]; priceRa
 
 /** La prima ricerca "5 posti per te": il tipo piaciuto più adatto, la zona, e "fuori dai giri turistici" per chi ama le chicche. */
 export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
-  const scoperta = m.scoperta ?? scopertaDedotta(m.su);
+  const scoperta = scopertaPer(m);
   const tipi = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
   // Per chi ama le chicche si parte da un tipo "chicca"; per chi ama i famosi da uno famoso.
   const primo = (scoperta === "chicche" ? tipi.find((t) => !t.famoso) : scoperta === "famosi" ? tipi.find((t) => t.famoso) : null) ?? tipi[0];
@@ -207,7 +215,8 @@ function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["u
 
 // Al massimo `max` frasi (collaudo del 23/10: con i profili ricchi "Correggi" finiva sotto i tasti).
 // Si tengono le più importanti (gusti, dove, diete), nell'ordine di lettura; il resto sta dietro "Correggi".
-const PRIORITA: Record<string, number> = { su: 0, dove: 1, diete: 2, stile: 3, giu: 4, occasioni: 5 };
+// "Famosi o chicche" prima delle zone (collaudo del 26/10, B3: con più zone e una dieta finiva solo dietro "Correggi").
+const PRIORITA: Record<string, number> = { su: 0, stile: 1, diete: 2, dove: 3, giu: 4, occasioni: 5 };
 export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }, max = Infinity): PezzoFrase[][] {
   const tutte: { f: PezzoFrase[]; p: string }[] = [];
   const frasi = { push: (f: PezzoFrase[], p = "dove") => tutte.push({ f, p }) };
@@ -238,7 +247,7 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
     frasi.push([...f, { t: "." }], p);
   };
   if (staccaZone) { unisci([parti[0]], "dove"); unisci(parti.slice(1), "stile"); }
-  else if (parti.length) unisci(parti, "dove");
+  else if (parti.length) unisci(parti, m.scoperta ? "stile" : "dove");
   const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
   if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }], "occasioni");
   const giu = m.giu.filter((id) => PLURALE[id]);
@@ -260,7 +269,7 @@ export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceR
 // Senza le zone: l'AI non sa dove sono i locali (niente indirizzi nel prompt) e con le zone scriveva
 // "quello che cerchi a Monteverde" anche per posti altrove. Le zone le usa già la ricerca.
 export function gustoPerAI(m: MappaGusto): { tipi_che_piacciono: string[]; tipi_che_non_piacciono: string[]; preferisce: string | null } | null {
-  const scoperta = m.scoperta ?? scopertaDedotta(m.su);
+  const scoperta = scopertaPer(m);
   const piace = m.su.map((id) => tipoDa(id)?.titolo).filter((x): x is string => !!x);
   const no = m.giu.map((id) => tipoDa(id)?.titolo).filter((x): x is string => !!x);
   if (!piace.length && !no.length && !scoperta) return null;

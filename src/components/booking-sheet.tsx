@@ -24,6 +24,22 @@ import { apertoIl, dataOra, prossimaApertura, prossimaAperturaData, type Orari }
 import UtileFeedback from "@/components/utile-feedback";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { POSTO_FISSO, visiteDi } from "@/lib/diario";
+import type { Canale } from "@/lib/canale-prenotazione";
+
+// "Prenota su TheFork": bocciato due volte dal collaudo il 30/10 (regola del team: niente produzione).
+// Spento per tutti finché un revisore nuovo non lo approva; si prova con ?beta=prenota.
+const PIATTAFORMA_PER_TUTTI = false;
+// ?beta=prenota una volta lo accende su quel telefono (resta anche cambiando pagina).
+function piattaformaAccesa(): boolean {
+  if (PIATTAFORMA_PER_TUTTI) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URLSearchParams(window.location.search).get("beta") === "prenota") localStorage.setItem("mapetite.beta.prenota", "1");
+    return localStorage.getItem("mapetite.beta.prenota") === "1";
+  } catch {
+    return false;
+  }
+}
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
 // (WhatsApp solo se il numero è un cellulare, chiamata, sito), con il messaggio già scritto.
@@ -86,6 +102,19 @@ export default function BookingSheet({
   // Messaggio modificato a mano: non si riscrive più quando cambiano giorno/ora/persone.
   const [custom, setCustom] = useState<string | null>(null);
   const [done, setDone] = useState<BookingRequest | null>(null);
+  // Modulo di prenotazione del locale (TheFork, Quandoo…) trovato sul suo sito: un tocco e ci sei.
+  const [canale, setCanale] = useState<{ sito: string; canale: Canale | null } | null>(null);
+  useEffect(() => {
+    const sito = place.websiteUri;
+    if (!sito || !piattaformaAccesa()) return;
+    const ctrl = new AbortController();
+    fetch(`/api/prenota/canale?u=${encodeURIComponent(sito)}`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setCanale({ sito, canale: j?.canale && typeof j.canale.url === "string" ? j.canale : null }))
+      .catch(() => { /* senza rete resta "Prenota dal sito" */ });
+    return () => ctrl.abort();
+  }, [place.websiteUri]);
+  const modulo = canale && canale.sito === place.websiteUri ? canale.canale : null;
   const [copied, setCopied] = useState(false);
   // Due passi chiari: 1) quando e quanti, 2) messaggio e invio. Con i dati già completi
   // (dalla conversazione o dalla scheda) si parte dal passo 2: un tocco e si scrive al locale.
@@ -129,7 +158,7 @@ export default function BookingSheet({
   const quando = details.date && details.time ? dataOra(details.date, details.time) : null;
   const aperti = chiusoScelto && quando && onAlternative ? alternative.filter((a) => a.id !== place.id && apertoIl(a.orari, quando) === true).slice(0, 2) : [];
 
-  const record = (via: BookingRequest["via"]) => {
+  const record = (via: BookingRequest["via"], piattaforma: string | null = null) => {
     if (name.trim()) rememberName(name);
     const req = addBooking({
       ...details,
@@ -139,12 +168,13 @@ export default function BookingSheet({
       lng: place.lng,
       via,
       phone: place.phone ?? null,
+      piattaforma,
       // Locale chiuso adesso (dati Google): alla riapertura il promemoria chiede se hanno risposto.
       riapre: place.openNow === false && (via === "whatsapp" || via === "copiato") ? prossimaAperturaData(place.orari, new Date())?.getTime() ?? null : null,
     });
     // Segnali esistenti (src/lib/track.ts): sito e chiama, con "da: prenota" per distinguerli.
     const where = place.lat != null && place.lng != null ? { id: place.id, lat: place.lat, lng: place.lng } : { id: place.id };
-    if (via === "sito") track("sito", where, { fonte: "prenota" });
+    if (via === "sito") track("sito", where, { fonte: "prenota", ...(piattaforma ? { contesto: piattaforma } : {}) });
     else if (via === "telefono" || via === "whatsapp") track("chiama", where, { fonte: "prenota", contesto: via });
     setDone(req);
   };
@@ -153,7 +183,7 @@ export default function BookingSheet({
   };
 
   if (!mounted) return null;
-  const viaLabel = done?.via === "whatsapp" ? "su WhatsApp" : done?.via === "telefono" ? "per telefono" : done?.via === "sito" ? "dal sito" : "con il messaggio copiato";
+  const viaLabel = done?.via === "whatsapp" ? "su WhatsApp" : done?.via === "telefono" ? "per telefono" : done?.via === "sito" ? (done.piattaforma ? `su ${done.piattaforma}` : "dal sito") : "con il messaggio copiato";
   const disabled = missing.length > 0;
   const btn = "flex min-h-12 w-full items-center justify-center gap-2 rounded-pill px-4 text-[15px] font-display font-semibold active:scale-[0.98]";
 
@@ -421,7 +451,21 @@ export default function BookingSheet({
                   <Phone size={18} /> Chiama {place.phone}
                 </a>
               )}
-              {place.websiteUri && (
+              {/* Il modulo vero della piattaforma (tavoli liberi) prende il posto di "dal sito", nello stesso
+                  punto: arrivando dopo non sposta i pulsanti sopra (collaudo del 30/10). */}
+              {modulo && (
+                <a
+                  data-testid="prenota-piattaforma"
+                  href={modulo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => record("sito", modulo.nome)}
+                  className={`${btn} ${wa || place.phone ? "border border-brand bg-white text-brand" : "bg-brand text-white"}`}
+                >
+                  <Globe size={18} /> Prenota su {modulo.nome}
+                </a>
+              )}
+              {place.websiteUri && !modulo && (
                 <a
                   data-testid="prenota-sito"
                   href={place.websiteUri}
@@ -441,7 +485,9 @@ export default function BookingSheet({
               >
                 <Copy size={16} /> {copied ? "Messaggio copiato" : "Copia il messaggio"}
               </button>
-              {place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
+              {modulo ? (
+                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì (giorno e ora li scegli di nuovo).</p>
+              ) : place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
               {!place.phone && !place.websiteUri && (
                 <p className="text-center text-xs font-sans text-text-muted">Google non ha telefono né sito di questo locale: copia il messaggio e mandalo come preferisci.</p>
               )}

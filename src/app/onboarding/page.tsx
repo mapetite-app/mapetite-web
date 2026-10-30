@@ -1,10 +1,10 @@
 import OnboardingView, { type DalProfilo } from "./onboarding-view";
 import OnboardingVecchio from "./onboarding-view-vecchia";
 
-// Primo accesso nuovo (mockup A, 7 passi): bocciato due volte dal collaudo il 24/10, quindi in produzione
-// resta quello di prima (onboarding-view-vecchia.tsx, identico a main del 22/10). Si prova con ?primo=a;
-// per accenderlo per tutti: true qui e cancellare il file vecchio.
-const PRIMO_ACCESSO_NUOVO = false;
+// Primo accesso nuovo (mockup A, 7 passi): bocciato due volte il 24/10, corretto e approvato dal collaudo il
+// 30/10 (8,5), acceso per tutti. Quello di prima (onboarding-view-vecchia.tsx) resta per tornare indietro
+// in un attimo (false qui) e si vede con ?primo=vecchio; si cancella quando Lorenzo conferma.
+const PRIMO_ACCESSO_NUOVO = true;
 import { dieteValide, pulisciMappa } from "@/lib/mappa-gusto";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -45,6 +45,7 @@ export default async function OnboardingPage({
       if (raw) dalProfilo = JSON.parse(decodeURIComponent(raw)) as DalProfilo;
     } catch { /* cookie non valido: si parte vuoti */ }
   }
-  const nuovo = PRIMO_ACCESSO_NUOVO || (Array.isArray(params.primo) ? params.primo[0] : params.primo) === "a";
+  const primo = Array.isArray(params.primo) ? params.primo[0] : params.primo;
+  const nuovo = primo === "vecchio" ? false : PRIMO_ACCESSO_NUOVO || primo === "a";
   return nuovo ? <OnboardingView next={next} dalProfilo={dalProfilo} /> : <OnboardingVecchio next={next} dalProfilo={dalProfilo} />;
 }

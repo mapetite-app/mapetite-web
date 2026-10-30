@@ -1445,6 +1445,15 @@ const covered = await page.evaluate(() => {
   return b.contains(top) ? "ok" : "coperto";
 });
 ok(covered === "ok", `onboarding: pulsante Continua raggiungibile (${covered})`);
+// B2 (collaudo del 26/10): Roma scelta e poi tolta non torna con la ricarica.
+{ const roma = page.getByRole("button", { name: /Roma/ }).first();
+  await roma.click().catch(() => {});
+  await page.waitForTimeout(300);
+  await roma.click().catch(() => {});
+  await page.waitForTimeout(300);
+  await page.reload({ waitUntil: "networkidle" });
+  const bozza = await page.evaluate(() => { try { return localStorage.getItem("mapetite.benvenuto"); } catch { return "errore"; } });
+  ok(bozza === null && (await page.getByRole("button", { name: /Roma/ }).first().getAttribute("aria-pressed")) !== "true", `primo accesso nuovo: Roma scelta e tolta non torna dopo la ricarica (B2: ${bozza})`); }
 await page.getByTestId("onboarding-salta").click();
 await page.waitForURL(/\/mappa/, { timeout: 5000 }).then(() => ok(true, "onboarding: 'Salta' porta subito alla mappa"), () => ok(false, "onboarding: 'Salta' porta subito alla mappa"));
 await shot("08-onboarding");
@@ -3947,6 +3956,40 @@ else {
   ok((await ap.getByTestId("prenota-vedi-prenotazioni").getAttribute("href")) === "/prenotazioni", "prenota: dopo l'invio, link 'Vedi le mie prenotazioni'");
   await ashot("53-prenota-richiesta");
   await ap.getByRole("button", { name: "Fatto" }).click();
+
+  // "Prenota su TheFork" (Lorenzo, 30/10): il sito del locale usa il modulo di TheFork → un tocco e ci sei.
+  await actx.route("**/api/prenota/canale**", (r) => r.fulfill({ json: { canale: { piattaforma: "thefork", nome: "TheFork", url: "https://www.thefork.it/ristorante/terrazza-uno-r123" } } }));
+  await actx.route("https://www.thefork.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<title>TheFork</title>" }));
+  await ap.evaluate(() => localStorage.setItem("mapetite.beta.prenota", "1")); // spento per tutti: si prova con ?beta=prenota
+  await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
+  await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+  await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
+  { const bottoni = await ap.getByTestId("foglio-prenota").locator("a[data-testid^=prenota-]").evaluateAll((els) => els.map((e) => e.dataset.testid));
+    ok(bottoni.join() === "prenota-whatsapp,prenota-chiama,prenota-piattaforma" && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && (await ap.getByTestId("prenota-piattaforma-nota").textContent()).includes("vedi i tavoli liberi"), `prenota su piattaforma: 'Prenota su TheFork' al posto di 'dal sito', nello stesso punto (${bottoni.join(", ")})`); }
+  await ashot("53b-prenota-thefork");
+  { const [pop] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-piattaforma").click()]);
+    ok(pop.url().startsWith("https://www.thefork.it/ristorante/terrazza-uno-r123"), `prenota su piattaforma: apre il modulo di TheFork (${pop.url()})`);
+    await pop.close(); }
+  await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 }).catch(() => {});
+  { const sv = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+    const ultima = sv[sv.length - 1];
+    ok(ultima?.via === "sito" && ultima.piattaforma === "TheFork" && (await ap.getByTestId("prenota-fatto").textContent()).includes("su TheFork"), `prenota su piattaforma: richiesta salvata 'su TheFork' (${JSON.stringify(ultima)})`);
+    ok(aEvents.some((e) => e.type === "sito" && e.props?.fonte === "prenota" && e.props?.contesto === "TheFork"), "prenota su piattaforma: segnale 'sito' da prenota con la piattaforma"); }
+  await ap.getByRole("button", { name: "Fatto" }).click();
+  await actx.unroute("**/api/prenota/canale**");
+  await actx.unroute("https://www.thefork.it/**");
+  await ap.evaluate(() => localStorage.removeItem("mapetite.beta.prenota"));
+  // Funzioni pure: riconosce i moduli veri, non le pagine generiche; risolve i link relativi.
+  { const cp = await import(new URL("../../src/lib/canale-prenotazione.ts", import.meta.url).href);
+    ok(cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345")?.nome === "TheFork" && cp.canaleDaUrl("https://www.thefork.it/")?.nome === undefined && cp.canaleDaUrl("https://bookings.zenchef.com/results?rid=123")?.nome === "Zenchef" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234")?.nome === "Quandoo" && cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345?cc=18980")?.nome === "TheFork" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234?aid=7")?.nome === "Quandoo" && cp.canaleDaUrl("https://evilthefork.it/ristorante/x-r1") === null && cp.canaleDaUrl("javascript:alert(1)") === null && ["https://www.thefork.it/blog/restaurant-week", "https://www.thefork.it/thefork-awards/ristorante-dell-anno", "https://www.thefork.com/restaurants", "https://www.opentable.it/restaurants/rome", "https://www.quandoo.it/places-in-rome"].every((u) => cp.canaleDaUrl(u) === null), "prenota su piattaforma: riconosce i moduli di TheFork, Zenchef, Quandoo e non le home o i domini finti");
+    const html = '<a href="/menu">Menu</a><a href="https://www.instagram.com/x">IG</a><iframe src="https://widget.thefork.com/it/0f1e2d3c-aaaa-bbbb-cccc-123456789abc?step=date"></iframe>';
+    ok(cp.trovaCanale(html, "https://www.trattoria.it/")?.url === "https://widget.thefork.com/it/0f1e2d3c-aaaa-bbbb-cccc-123456789abc?step=date" && cp.trovaCanale('<a href="/prenota">Prenota</a>', "https://www.trattoria.it/") === null && cp.trovaCanale('<a href="https://www.thefork.it/ristorante/a-r1">a</a><a href="https://www.thefork.it/ristorante/b-r2">b</a>', "https://www.trattoria.it/") === null, "prenota su piattaforma: trova il modulo incorporato nella pagina del locale; niente se non c'è o se i link portano a locali diversi");
+    const r1 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://127.0.0.1:3000/")}`)).json();
+    const r2 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://169.254.169.254/latest/meta-data")}`)).json();
+    const r3 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("https://www.thefork.it/ristorante/da-enzo-r12345")}`)).json();
+    const r4 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://[::ffff:7f00:1]:3000/")}`)).json();
+    ok(r4.canale === null, "prenota su piattaforma: niente indirizzi IPv6 scritti per esteso (::ffff:7f00:1 = 127.0.0.1)");
+    ok(r1.canale === null && r2.canale === null && r3.canale?.nome === "TheFork", `prenota su piattaforma: il server non legge indirizzi interni; un sito che è già TheFork si riconosce senza leggerlo (${JSON.stringify([r1, r2, r3])})`); }
 
   // Seguiti senza nuove ricerche
   await ap.getByTestId("assistente-seguiti").getByRole("button", { name: "Più economici" }).click();
@@ -7642,7 +7685,13 @@ else {
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");
-    ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI"); }
+    ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI");
+    // Collaudo del 26/10, B1 e B3.
+    { const v2 = mg.pulisciMappa({ v: 2, su: ["trattoria", "enoteca"], giu: [], zone: [], scoperta: null }, () => true);
+      ok(v2.v === 2 && mg.scopertaPer(v2) === null && mg.gustoPerAI(v2)?.preferisce === null && !mg.queryPerTe(v2, "Roma").includes("turistic"), `primo accesso nuovo: senza scelta niente 'chicche' dedotte dai 👍 (B1: ${mg.queryPerTe(v2, "Roma")})`);
+      ok(mg.scopertaPer({ v: 1, su: ["trattoria", "enoteca"], scoperta: null }) === "chicche", "primo accesso vecchio: la scelta si deduce ancora dai 👍 (lì la proposta si vede)");
+      const fr = mg.fraseCapito({ v: 2, zone: ["Monti", "Pigneto"], su: ["trattoria"], giu: [], scoperta: "chicche" }, { citta: "Roma", priceRange: null, diete: ["no-pesce"], occasions: [] }, 3).map((x) => x.map((y) => y.t).join("")).join(" ");
+      ok(/giri alla larga dai posti turistici/i.test(fr), `primo accesso nuovo: con più zone e una dieta 'chicche' resta nella frase principale (B3: ${fr})`); } }
   { const ms = await import(new URL("../../src/lib/mainstream.ts", import.meta.url).href);
     const P = (name, n, r = 4.5) => ({ name, userRatingCount: n, rating: r });
     const lista = [P("Roscioli Salumeria", 12000), P("Osteria Due", 800), P("Trattoria Tre", 600), P("Da Quattro", 900), P("Cinque", 700)];
