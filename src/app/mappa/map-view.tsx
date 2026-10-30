@@ -1226,16 +1226,6 @@ export default function MapView({
     });
   })();
 
-  // Dalla home (/mappa?q=…) la ricerca parte prima che i salvati siano letti: si chiede appena arrivano.
-  const aiSearchId = aiSearch?.id ?? null;
-  const aiSearchQuery = aiSearch?.query ?? null;
-  useEffect(() => {
-    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
-    if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
-    chiestoPer.current = aiSearchId;
-    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
-  }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
   // Un locale e' salvato se il suo UUID canonico e' in savedIds.
   const isPlaceSaved = (id: string): boolean => {
@@ -1849,6 +1839,17 @@ export default function MapView({
       // rete: niente riga, la ricerca resta com'è
     }
   };
+
+  // Dalla home (/mappa?q=…) la ricerca parte prima che i salvati siano letti: si chiede appena arrivano.
+  const aiSearchId = aiSearch?.id ?? null;
+  const aiSearchQuery = aiSearch?.query ?? null;
+  useEffect(() => {
+    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
+    if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
+    chiestoPer.current = aiSearchId;
+    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
+  }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
