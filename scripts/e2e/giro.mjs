@@ -3964,7 +3964,7 @@ else {
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
   { const bottoni = await ap.getByTestId("foglio-prenota").locator("a[data-testid^=prenota-]").evaluateAll((els) => els.map((e) => e.dataset.testid));
-    ok(bottoni[0] === "prenota-piattaforma" && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && (await ap.getByTestId("prenota-sito").count()) === 0 && (await ap.getByTestId("prenota-piattaforma-nota").textContent()).includes("scegli lì il tavolo libero"), `prenota su piattaforma: 'Prenota su TheFork' per primo, al posto di 'dal sito' (${bottoni.join(", ")})`); }
+    ok(bottoni.join() === "prenota-whatsapp,prenota-chiama,prenota-piattaforma" && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && (await ap.getByTestId("prenota-piattaforma-nota").textContent()).includes("vedi i tavoli liberi"), `prenota su piattaforma: 'Prenota su TheFork' al posto di 'dal sito', nello stesso punto (${bottoni.join(", ")})`); }
   await ashot("53b-prenota-thefork");
   { const [pop] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-piattaforma").click()]);
     ok(pop.url().startsWith("https://www.thefork.it/ristorante/terrazza-uno-r123"), `prenota su piattaforma: apre il modulo di TheFork (${pop.url()})`);
@@ -3979,12 +3979,14 @@ else {
   await actx.unroute("https://www.thefork.it/**");
   // Funzioni pure: riconosce i moduli veri, non le pagine generiche; risolve i link relativi.
   { const cp = await import(new URL("../../src/lib/canale-prenotazione.ts", import.meta.url).href);
-    ok(cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345")?.nome === "TheFork" && cp.canaleDaUrl("https://www.thefork.it/")?.nome === undefined && cp.canaleDaUrl("https://bookings.zenchef.com/results?rid=123")?.nome === "Zenchef" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234")?.nome === "Quandoo" && cp.canaleDaUrl("https://evilthefork.it/ristorante/x") === null && cp.canaleDaUrl("javascript:alert(1)") === null, "prenota su piattaforma: riconosce i moduli di TheFork, Zenchef, Quandoo e non le home o i domini finti");
+    ok(cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345")?.nome === "TheFork" && cp.canaleDaUrl("https://www.thefork.it/")?.nome === undefined && cp.canaleDaUrl("https://bookings.zenchef.com/results?rid=123")?.nome === "Zenchef" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234")?.nome === "Quandoo" && cp.canaleDaUrl("https://evilthefork.it/ristorante/x-r1") === null && cp.canaleDaUrl("javascript:alert(1)") === null && ["https://www.thefork.it/blog/restaurant-week", "https://www.thefork.it/thefork-awards/ristorante-dell-anno", "https://www.thefork.com/restaurants", "https://www.opentable.it/restaurants/rome", "https://www.quandoo.it/places-in-rome"].every((u) => cp.canaleDaUrl(u) === null), "prenota su piattaforma: riconosce i moduli di TheFork, Zenchef, Quandoo e non le home o i domini finti");
     const html = '<a href="/menu">Menu</a><a href="https://www.instagram.com/x">IG</a><iframe src="https://widget.thefork.com/it/0f1e2d3c-aaaa-bbbb-cccc-123456789abc?step=date"></iframe>';
-    ok(cp.trovaCanale(html, "https://www.trattoria.it/")?.url === "https://widget.thefork.com/it/0f1e2d3c-aaaa-bbbb-cccc-123456789abc?step=date" && cp.trovaCanale('<a href="/prenota">Prenota</a>', "https://www.trattoria.it/") === null, "prenota su piattaforma: trova il modulo incorporato nella pagina del locale, niente se non c'è");
+    ok(cp.trovaCanale(html, "https://www.trattoria.it/")?.url === "https://widget.thefork.com/it/0f1e2d3c-aaaa-bbbb-cccc-123456789abc?step=date" && cp.trovaCanale('<a href="/prenota">Prenota</a>', "https://www.trattoria.it/") === null && cp.trovaCanale('<a href="https://www.thefork.it/ristorante/a-r1">a</a><a href="https://www.thefork.it/ristorante/b-r2">b</a>', "https://www.trattoria.it/") === null, "prenota su piattaforma: trova il modulo incorporato nella pagina del locale; niente se non c'è o se i link portano a locali diversi");
     const r1 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://127.0.0.1:3000/")}`)).json();
     const r2 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://169.254.169.254/latest/meta-data")}`)).json();
     const r3 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("https://www.thefork.it/ristorante/da-enzo-r12345")}`)).json();
+    const r4 = await (await fetch(`${BASE}/api/prenota/canale?u=${encodeURIComponent("http://[::ffff:7f00:1]:3000/")}`)).json();
+    ok(r4.canale === null, "prenota su piattaforma: niente indirizzi IPv6 scritti per esteso (::ffff:7f00:1 = 127.0.0.1)");
     ok(r1.canale === null && r2.canale === null && r3.canale?.nome === "TheFork", `prenota su piattaforma: il server non legge indirizzi interni; un sito che è già TheFork si riconosce senza leggerlo (${JSON.stringify([r1, r2, r3])})`); }
 
   // Seguiti senza nuove ricerche

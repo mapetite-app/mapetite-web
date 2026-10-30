@@ -414,19 +414,6 @@ export default function BookingSheet({
             )}
 
             <div className={`mt-3 flex flex-col gap-2 ${disabled ? "pointer-events-none opacity-40" : ""}`} aria-disabled={disabled}>
-              {/* La via più diretta quando c'è: il modulo vero della piattaforma, con i tavoli liberi. */}
-              {modulo && (
-                <a
-                  data-testid="prenota-piattaforma"
-                  href={modulo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => { void copy(); record("sito", modulo.nome); }}
-                  className={`${btn} bg-brand text-white`}
-                >
-                  <Globe size={18} /> Prenota su {modulo.nome}
-                </a>
-              )}
               {wa && (
                 <a
                   data-testid="prenota-whatsapp"
@@ -434,7 +421,7 @@ export default function BookingSheet({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => record("whatsapp")}
-                  className={`${btn} ${modulo ? "border border-[#1f8f4e] bg-white text-[#1f8f4e]" : "bg-[#1f8f4e] text-white"}`}
+                  className={`${btn} bg-[#1f8f4e] text-white`}
                 >
                   <MessageCircle size={18} /> Invia su WhatsApp
                 </a>
@@ -444,9 +431,23 @@ export default function BookingSheet({
                   data-testid="prenota-chiama"
                   href={telHref(place.phone)}
                   onClick={() => record("telefono")}
-                  className={`${btn} ${wa || modulo ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
+                  className={`${btn} ${wa ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
                 >
                   <Phone size={18} /> Chiama {place.phone}
+                </a>
+              )}
+              {/* Il modulo vero della piattaforma (tavoli liberi) prende il posto di "dal sito", nello stesso
+                  punto: arrivando dopo non sposta i pulsanti sopra (collaudo del 30/10). */}
+              {modulo && (
+                <a
+                  data-testid="prenota-piattaforma"
+                  href={modulo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => record("sito", modulo.nome)}
+                  className={`${btn} ${wa || place.phone ? "border border-brand bg-white text-brand" : "bg-brand text-white"}`}
+                >
+                  <Globe size={18} /> Prenota su {modulo.nome}
                 </a>
               )}
               {place.websiteUri && !modulo && (
@@ -470,7 +471,7 @@ export default function BookingSheet({
                 <Copy size={16} /> {copied ? "Messaggio copiato" : "Copia il messaggio"}
               </button>
               {modulo ? (
-                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Il modulo di {modulo.nome} che usa il locale: scegli lì il tavolo libero e conferma.</p>
+                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì (giorno e ora li scegli di nuovo).</p>
               ) : place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
               {!place.phone && !place.websiteUri && (
                 <p className="text-center text-xs font-sans text-text-muted">Google non ha telefono né sito di questo locale: copia il messaggio e mandalo come preferisci.</p>

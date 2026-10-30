@@ -17,16 +17,16 @@ export const PIATTAFORME: Piattaforma[] = [
   { id: "resy", nome: "Resy", host: /^(?:[a-z0-9-]+\.)?resy\.com$/ },
 ];
 
-// Pagine che sono un modulo di prenotazione o la scheda del locale sulla piattaforma (dove si prenota),
-// non le home né i link "scarica l'app" o "lavora con noi".
+// Solo la pagina del locale sulla piattaforma o il suo modulo incorporato, con il percorso ancorato
+// all'inizio: niente blog, premi, elenchi di città o home (collaudo del 30/10).
 const PERCORSO_OK: Record<string, RegExp> = {
-  thefork: /\/(?:ristorante|restaurant|restaurante|widget|module|[a-z]{2}\/[0-9a-f-]{8,})/i,
-  quandoo: /\/(?:place|widget|booking|reserv)/i,
-  zenchef: /./,
-  covermanager: /\/(?:reserve|reserva|reservation|module)/i,
-  opentable: /\/(?:r\/|restref|booking|restaurant)/i,
-  sevenrooms: /\/(?:reservations|explore)/i,
-  resy: /\/(?:cities\/|venues?)/i,
+  thefork: /^\/(?:[a-z]{2}\/)?(?:ristorante|restaurant|restaurante|restaurang)\/[^/]+-r\d+\/?$|^\/(?:[a-z]{2}\/)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  quandoo: /^\/(?:[a-z]{2}\/)?place\/[^/]+-\d+\/?$/i,
+  zenchef: /^\/results\/?\?(?:.*&)?rid=\d+/i,
+  covermanager: /^\/(?:[a-z]{2}\/)?(?:reserve|reserva|reservation)\/(?:module_restaurant\/)?[^/]+/i,
+  opentable: /^\/r\/[^/]+\/?$|^\/restref\/client\/?\?(?:.*&)?rid=\d+/i,
+  sevenrooms: /^\/reservations\/[^/?]+/i,
+  resy: /^\/cities\/[^/]+\/venues\/[^/?]+/i,
 };
 
 export type Canale = { piattaforma: string; nome: string; url: string };
@@ -44,14 +44,21 @@ export function canaleDaUrl(raw: string): Canale | null {
   return { piattaforma: p.id, nome: p.nome, url: u.toString() };
 }
 
-/** Nella pagina del locale, il primo link o modulo incorporato di una piattaforma di prenotazione. */
+/** Nella pagina del locale, il modulo di prenotazione di una piattaforma. Prima i moduli incorporati
+ *  (iframe, script: sono per forza del locale); poi i link, ma solo se portano tutti allo stesso posto:
+ *  con due locali diversi (un "provate anche…") non si sa quale sia il suo, quindi niente. */
 export function trovaCanale(html: string, base: string): Canale | null {
-  const re = /(?:href|src|data-src|data-url)\s*=\s*["']([^"'<>\s]{8,600})["']/gi;
+  const incorporati: Canale[] = [];
+  const link: Canale[] = [];
+  const re = /<(iframe|script|a|link|div|button)\b[^>]*?\b(?:href|src|data-src|data-url)\s*=\s*["']([^"'<>\s]{8,600})["']/gi;
   for (let m = re.exec(html), i = 0; m && i < 5000; m = re.exec(html), i++) {
     let abs: string;
-    try { abs = new URL(m[1].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
+    try { abs = new URL(m[2].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
     const c = canaleDaUrl(abs);
-    if (c) return c;
+    if (!c) continue;
+    (m[1].toLowerCase() === "iframe" || m[1].toLowerCase() === "script" ? incorporati : link).push(c);
   }
-  return null;
+  if (incorporati.length) return incorporati[0];
+  const diversi = new Set(link.map((c) => c.url.replace(/[?#].*$/, "").replace(/\/$/, "")));
+  return diversi.size === 1 ? link[0] : null;
 }
