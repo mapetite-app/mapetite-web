@@ -93,7 +93,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
       if (res === "errore") return false;
       setStato((s) => (s ? { ...s, colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
     }
-    if (tornato == null) void scriviVista(v.date ?? stato?.date ?? null);
+    if (tornato == null) void scriviVista(v.date ?? stato?.date ?? dayKey(new Date()));
     if (ctx && v.voto !== ctx.voto) ctx.setVoto(v.voto);
     trackFeature("diario", { fonte: tornato != null ? "tornato" : "scheda", stato: mode === "nuova" ? "nuova" : "modifica", voto: v.voto ?? "nessuno" });
     setOpen(null);
@@ -111,7 +111,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
   const close = () => {
     vistaTornato.current = null;
     // "Salta" dopo "Ci sono stato": la visita resta quella di oggi, la prova vale.
-    if (tornato == null) void scriviVista(stato?.date ?? null);
+    if (tornato == null) void scriviVista(stato?.date ?? dayKey(new Date()));
     if (open === "nuova") trackFeature("diario", { fonte: "scheda", stato: "saltato" });
     setOpen(null);
     setTornato(null);
