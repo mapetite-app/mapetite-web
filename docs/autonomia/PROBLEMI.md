@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 29/10/2026 (notte).
+Ultimo aggiornamento: 30/10/2026 (notte).
 
 ---
 
@@ -170,3 +170,10 @@ Ultimo aggiornamento: 29/10/2026 (notte).
 - **OGGI nell'app:** screenshot (anche 5 slide insieme) o nome scritto; da stanotte "Guarda il reel qui": il post ufficiale incorporato dentro Mapetite, per leggere nome e posizione e scriverlo senza uscire dall'app. TikTok e YouTube si leggono già da soli.
 - **DAVVERO, in futuro:** l'esportazione dei propri dati di Instagram (file `saved_posts.json` con i link e gli autori dei post salvati, [guida](https://contextbolt.com/blog/instagram-saved-posts/), fonte secondaria): sono dati dell'utente, si possono importare (proposta 30). Un accordo con Meta non è realistico ora.
 - **Primo passo:** proposta 30 (team, M). Misurare quanti reel Instagram finiscono "illeggibili" nel pannello (team).
+
+## 14. Meno personale nei locali: nessuno ha tempo per un altro strumento — 30/10 notte
+- **Chi lo ha:** il ristoratore; di riflesso il cliente (servizio più lento, nessuno risponde al telefono).
+- **Quanto pesa:** Rapporto Ristorazione Fipe 2026 (presentato il 9/4/2026): imprese −1%, **dipendenti −10,3%**, consumi intorno ai 100 miliardi ma ancora −5,4% sul pre-Covid; ristoranti −0,4% sul 2024 ([Teleborsa](https://www.teleborsa.it/News/2026/04/09/ristorazione-consumi-a-quota-100-miliardi-di-euro-in-calo-imprese-e-lavoratori-dipendenti-139.html)). Quanti clienti tornano abitualmente negli stessi locali: solo un sondaggio vecchio (9 su 100, Plateform, probabilmente 2022, citato da [Dire](https://www.dire.it/17-10-2022/811513-il-2021-e-stato-lanno-dei-record-negativi-per-la-ristorazione-nel-2022-ce-la-ripartenza-ma-non-per-tutti/)); dato 2026 non trovato.
+- **OGGI nell'app:** gli strumenti del pannello chiedono un minuto e poi vanno da soli: serate tranquille (7 tocchi), omaggio a chi torna (una riga di testo, da stanotte), codice del giorno già pronto per il personale. Nessuna tessera, nessun POS, nessuna formazione.
+- **DAVVERO, in futuro:** il pannello che arriva da solo (un avviso alla settimana sul telefono del titolare, proposta 32) e il collegamento ai gestionali che il locale usa già, così niente si inserisce due volte.
+- **Primo passo:** proposta 32 (team, M). Chiedere a 3 titolari quanto tempo alla settimana dedicano ai gestionali (Lorenzo/Roberto, domanda per `RICERCA-RISTORATORI.md`).
