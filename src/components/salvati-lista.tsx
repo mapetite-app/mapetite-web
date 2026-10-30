@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Map as MapIcon, Plus, Search, SlidersHorizontal, SquarePlay, X } from "lucide-react";
+import { Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -11,6 +11,8 @@ import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { STATE_TAGS } from "@/lib/tags";
 import { collectionColor, summarizeCollections } from "@/lib/raccolte";
+import { sembraDomanda } from "@/lib/chiedi-salvati";
+import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87): fondo carta, titolo in serif, filtri di stato con i conteggi veri, raccolte come
@@ -81,6 +83,24 @@ export default function SalvatiLista({
   hideOnDesktop?: boolean;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
+  // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
+  type Risposta = { q: string; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
+  const [risposta, setRisposta] = useState<Risposta | null>(null);
+  const chiedi = async () => {
+    const q = query.trim();
+    if (!sembraDomanda(q) || risposta?.q === q) return;
+    setRisposta({ q, stato: "cerco", scelti: [] });
+    try {
+      const r = await fetch("/api/salvati/chiedi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domanda: q }) });
+      const j = await r.json().catch(() => ({}));
+      const scelti = r.ok && Array.isArray(j.scelti) ? (j.scelti as { id: string; perche: string }[]) : [];
+      setRisposta((cur) => (cur?.q !== q ? cur : r.ok ? { q, stato: "ok", scelti } : { q, stato: "errore", scelti: [], msg: typeof j.error === "string" ? j.error : "Non sono riuscito a rispondere: riprova." }));
+      trackFeature("chiedi_salvati", { stato: r.ok ? (scelti.length ? "trovati" : "nessuno") : "errore", n: scelti.length });
+    } catch {
+      setRisposta((cur) => (cur?.q !== q ? cur : { q, stato: "errore", scelti: [], msg: "Sei offline: riprova tra poco." }));
+    }
+  };
   // Reel e video collegati ai salvati (contenuti_locali, solo i propri): da dove arriva il posto.
   // Una lettura su Supabase, nessuna chiamata Google. Senza tabella o rete: niente etichetta.
   const [reels, setReels] = useState<Record<string, string>>({});
@@ -119,6 +139,10 @@ export default function SalvatiLista({
     [shown, origin],
   );
   const searching = searchOpen || query !== "";
+  const domanda = searching && sembraDomanda(query);
+  // La risposta vale solo per la domanda scritta adesso.
+  const attuale = domanda && risposta?.q === query.trim() ? risposta : null;
+  const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   const stateOn = activeTag === WANT || activeTag === DONE;
   const pills: { label: string; n: number; on: boolean; tag: string | null }[] = [
     { label: "Tutti", n: all.length, on: !stateOn && !collections.some((c) => c.name === activeTag), tag: null },
@@ -151,14 +175,15 @@ export default function SalvatiLista({
         </header>
 
         {searching && (
-          <div className="mt-4 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
+          <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-4 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
             <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
             <input
               type="search"
               autoFocus={query === ""}
               value={query}
               onChange={(e) => onQuery(e.target.value)}
-              placeholder="Nome, zona, tipo, nota…"
+              enterKeyHint="search"
+              placeholder="Nome, zona, o chiedi: dove porto mia madre?"
               aria-label="Cerca nei tuoi posti"
               className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
             />
@@ -167,7 +192,52 @@ export default function SalvatiLista({
                 <X size={16} aria-hidden />
               </button>
             )}
-          </div>
+          </form>
+        )}
+
+        {domanda && (
+          <section data-testid="chiedi-salvati" aria-live="polite" className="mt-3">
+            {!attuale ? (
+              <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className="flex min-h-11 w-full items-center gap-2 rounded-pill bg-accent px-4 text-left text-sm font-display font-semibold text-white active:scale-[0.98]">
+                <Sparkles size={16} aria-hidden className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">Chiedi ai tuoi posti</span>
+              </button>
+            ) : attuale.stato === "cerco" ? (
+              <p data-testid="chiedi-salvati-cerco" className="flex min-h-11 items-center gap-2 px-1 text-sm text-text-muted">
+                <Sparkles size={16} aria-hidden className="animate-pulse text-accent" /> Guardo tra i tuoi {all.length} posti…
+              </p>
+            ) : attuale.stato === "errore" ? (
+              <p data-testid="chiedi-salvati-errore" className="px-1 py-2 text-sm text-text-muted">{attuale.msg}</p>
+            ) : scelti.length === 0 ? (
+              <div data-testid="chiedi-salvati-nessuno" className={`rounded-card border ${LINE} bg-white p-4`}>
+                <p className="text-sm text-text">Tra i tuoi posti nessuno fa al caso.</p>
+                <Link href={`/assistente?q=${encodeURIComponent(query.trim())}`} className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95">
+                  Cercane uno nuovo
+                </Link>
+              </div>
+            ) : (
+              <>
+                <h2 className="flex items-center gap-1.5 px-1 font-display text-xs font-semibold uppercase tracking-[0.12em] text-accent">
+                  <Sparkles size={13} aria-hidden /> Tra i tuoi posti
+                </h2>
+                <ul data-testid="chiedi-salvati-scelti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+                  {scelti.map((s, i) => (
+                    <li key={s.id} className={i > 0 ? `border-t ${LINE}` : ""}>
+                      <button type="button" data-testid="chiedi-salvati-posto" onClick={() => onOpen(s.place, scelti.map((x) => x.id))} className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-black/[0.03]">
+                        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[22px]" style={{ background: toneFor(categoryLabel(s.place.category) ?? s.place.category ?? s.place.name) }}>
+                          {getCategoryEmoji(s.place.category, s.place.name)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={`${SERIF} block truncate text-[18px] font-medium leading-tight text-text`}>{s.place.name}</span>
+                          <span className="mt-0.5 block text-[13px] leading-snug text-text-muted">{s.perche}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
         )}
 
         <div role="group" aria-label="Stato" data-testid="salvati-stato" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
@@ -247,7 +317,7 @@ export default function SalvatiLista({
           </div>
         </div>
 
-        {list.length === 0 ? (
+        {list.length === 0 && domanda ? null : list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
             <p className={`${SERIF} text-xl font-medium text-text`}>Nessun posto qui</p>
             <p className="mt-1 text-sm text-text-muted">Cambia la ricerca o i filtri.</p>

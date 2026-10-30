@@ -1598,6 +1598,26 @@ else {
     ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano"), "salvati lista: 'Cerca' trova anche dalla nota ('brunch' → Caffè Milano)");
     await L.getByLabel("Cerca nei tuoi posti").fill("sushi");
     ok(await L.getByTestId("salvati-lista-vuota").isVisible(), "salvati lista: nessun risultato, messaggio e 'Mostra tutti'");
+    // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati (risposta simulata).
+    { let chiesto = null;
+      await p.route("**/api/salvati/chiedi", async (r) => { chiesto = r.request().postDataJSON(); await new Promise((res) => setTimeout(res, 300)); r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000001", perche: "Hai scritto: tavolo sulla terrazza." }, { id: "estraneo", perche: "Non è tuo" }] } }); });
+      ok((await L.getByTestId("chiedi-salvati").count()) === 0, "chiedi ai tuoi posti: una parola sola ('sushi') non diventa una domanda");
+      await L.getByLabel("Cerca nei tuoi posti").fill("dove porto mia madre a cena?");
+      ok(await L.getByTestId("chiedi-salvati-vai").isVisible() && (await L.getByTestId("salvati-lista-vuota").count()) === 0, "chiedi ai tuoi posti: con una domanda compare 'Chiedi ai tuoi posti' al posto di 'Nessun posto qui'");
+      await L.getByLabel("Cerca nei tuoi posti").press("Enter");
+      ok(await L.getByTestId("chiedi-salvati-cerco").isVisible({ timeout: 1000 }).catch(() => false), "chiedi ai tuoi posti: Invio fa partire la domanda, 'Guardo tra i tuoi 3 posti…'");
+      await L.getByTestId("chiedi-salvati-scelti").waitFor({ timeout: 4000 }).catch(() => {});
+      const sc = L.getByTestId("chiedi-salvati-posto");
+      ok(chiesto?.domanda === "dove porto mia madre a cena?" && (await sc.count()) === 1 && (await sc.first().textContent()).includes("Terrazza Uno") && (await sc.first().textContent()).includes("tavolo sulla terrazza"), `chiedi ai tuoi posti: solo i salvati veri, con il perché (${await sc.count()})`);
+      await p.screenshot({ path: `${OUT}/11g-chiedi-salvati.png`, caret: "initial" });
+      await L.getByLabel("Cerca nei tuoi posti").fill("dove porto mia madre a pranzo?");
+      ok(await L.getByTestId("chiedi-salvati-vai").isVisible() && (await sc.count()) === 0, "chiedi ai tuoi posti: cambiata la domanda, la risposta vecchia sparisce");
+      await p.unroute("**/api/salvati/chiedi");
+      await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [] } }));
+      await L.getByTestId("chiedi-salvati-vai").click();
+      ok(await L.getByTestId("chiedi-salvati-nessuno").waitFor({ timeout: 3000 }).then(() => true, () => false) && (await L.getByRole("link", { name: "Cercane uno nuovo" }).getAttribute("href")).startsWith("/assistente?q="), "chiedi ai tuoi posti: nessuno adatto → 'Cercane uno nuovo' apre la ricerca");
+      await p.unroute("**/api/salvati/chiedi");
+      await L.getByLabel("Cerca nei tuoi posti").fill("sushi"); }
     await L.getByRole("button", { name: "Mostra tutti" }).click();
     ok((await righe.count()) === 3, "salvati lista: 'Mostra tutti' azzera la ricerca");
     await L.getByTestId("salvati-lista-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
@@ -4895,6 +4915,16 @@ else {
         ok(ad.fraseApertura("2026-07", oggi) === "Aperto da 3 mesi" && ad.fraseApertura("2026-09-01", oggi) === "Aperto da 1 mese" && ad.fraseApertura("2026-10", oggi) === "Appena aperto", "aperto da poco: 'Aperto da 3 mesi', '1 mese', 'Appena aperto'");
         ok(ad.fraseApertura("2025-10", oggi) === null && ad.fraseApertura("2026-11", oggi) === null && ad.fraseApertura("2026-13", oggi) === null && ad.fraseApertura(null, oggi) === null && ad.fraseApertura("ciao", oggi) === null, "aperto da poco: niente oltre 12 mesi, nel futuro, mese sbagliato o dato assente");
         ok(ad.fraseApertura("2025-11", oggi) === "Aperto da 11 mesi" && ad.pulisciApertoDal("2026-07-01") === "2026-07", "aperto da poco: 11 mesi ancora sì; data del database letta come mese");
+      } }
+    { let cs = null;
+      try { cs = await import(new URL("../../src/lib/chiedi-salvati.ts", import.meta.url).href); } catch (e) { ok(false, `chiedi ai tuoi posti: modulo importabile (${e.message})`); }
+      if (cs) {
+        const posti = [{ id: "A", name: "Uno" }, { id: "B", name: "Due" }].map((x) => ({ category: null, city: null, raccolte: [], note: null, verdict: null, synthesis: null, ...x }));
+        const r = cs.parseScelte('ecco {"scelti":[{"n":2,"perche":"Lo dice la tua nota."},{"n":2,"perche":"doppio"},{"n":9,"perche":"inventato"},{"n":1,"perche":""}]}', posti);
+        ok(r.length === 1 && r[0].id === "B" && cs.parseScelte("niente", posti).length === 0, `chiedi ai tuoi posti: tiene solo numeri della richiesta, senza doppioni né perché vuoti (${JSON.stringify(r)})`);
+        ok(cs.sembraDomanda("dove porto mia madre") && cs.sembraDomanda("sushi?") && !cs.sembraDomanda("osteria due") && cs.pulisciDomanda("  ") === null, "chiedi ai tuoi posti: domanda = 3 parole o un punto di domanda");
+        const pr = cs.buildPrompt("cena romantica", posti);
+        ok(pr.includes("SOLO tra i suoi salvati") && pr.includes("Non inventare") && pr.includes("2 | Due"), "chiedi ai tuoi posti: il prompt vieta di inventare e numera i salvati");
       } }
     try { se = await import(new URL("../../src/lib/serate.ts", import.meta.url).href); } catch (e) { ok(false, `serate: modulo src/lib/serate.ts importabile (${e.message})`); }
     if (se) {
