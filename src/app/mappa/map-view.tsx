@@ -957,6 +957,8 @@ export default function MapView({
   const salvatiRicercaOn = useBeta("salvati-ricerca");
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
+  // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
+  const ricercaMondo = useRef<number | null>(null);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
   const shareOn = useBeta("condividi");
@@ -1228,7 +1230,7 @@ export default function MapView({
   const aiSearchId = aiSearch?.id ?? null;
   const aiSearchQuery = aiSearch?.query ?? null;
   useEffect(() => {
-    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId) return;
+    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
     if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
     chiestoPer.current = aiSearchId;
     void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
@@ -1854,6 +1856,7 @@ export default function MapView({
     // o i filtri ha un numero vecchio e si scarta.
     const ticket = ++searchSeq.current;
     setDalSalvati(null);
+    ricercaMondo.current = view === "all" ? ticket : null;
     if (view === "all" && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);

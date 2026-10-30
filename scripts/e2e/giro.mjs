@@ -1621,6 +1621,14 @@ else {
       await p.route("**/api/salvati/chiedi", (r) => { n++; return r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: "L'hai messa in 'amici'." }] } }); });
       await p.goto(`${BASE}/mappa?q=${encodeURIComponent("cena con amici a Roma")}&at=41.9,12.49`, { waitUntil: "networkidle" });
       ok(await ds.waitFor({ timeout: 8000 }).then(() => true, () => false) && n === 1, `dai tuoi salvati: anche arrivando dalla home (?q=), una domanda sola (${n})`);
+      // "Sorprendimi" (/mappa?sorpresa=…) non è una domanda: nessuna chiamata all'AI.
+      n = 0;
+      await p.goto(`${BASE}/sorprendimi`, { waitUntil: "networkidle" });
+      const apri = p.getByTestId("sorpresa-apri").first();
+      if (await apri.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await apri.click(); await p.waitForURL(/\/mappa/, { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(1500);
+        ok(n === 0, `dai tuoi salvati: 'Sorprendimi' non chiede ai salvati (${n} chiamate)`);
+      } else console.log("SKIP  dai tuoi salvati: Sorprendimi senza 'Apri scheda' in questo contesto");
       await p.unroute("**/api/salvati/chiedi"); }
     await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ status: 503, json: { error: "Non posso rispondere adesso." } }));
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
