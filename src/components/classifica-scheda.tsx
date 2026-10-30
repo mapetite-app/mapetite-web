@@ -18,13 +18,13 @@ type Loaded =
 
 const VISITED = "Già visitato";
 
-type SchedaPlace = { id: string; name: string; category: string | null; address: string | null }; // id = UUID Supabase
+type SchedaPlace = { id: string; name: string; category: string | null; address: string | null; lat?: number | null; lng?: number | null }; // id = UUID Supabase
 
 // Blocco "Ci sono stato" della scheda: il diario (data della visita, 4.4) e la classifica (4.3).
 export default function ClassificaScheda({ userId, place }: { userId: string; place: SchedaPlace }) {
   return (
     <>
-      <DiarioScheda userId={userId} place={place} />
+      <DiarioScheda userId={userId} place={place} coords={place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : null} />
       <Classifica userId={userId} place={place} />
     </>
   );

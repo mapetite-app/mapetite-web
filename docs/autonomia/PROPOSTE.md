@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 30/10/2026 (notte, sessione 03:06, CEO che chiude)
+
+### 32. "La tua settimana" sul telefono del titolare (il pannello che arriva da solo)
+- **Problema:** `PROBLEMI.md`, 14 (dipendenti −10,3% nel 2025, Fipe): il titolare non apre un pannello in più.
+- **Cosa fa:** il lunedì mattina, un avviso push al titolare verificato: "Settimana scorsa: 14 ti hanno salvato, 3 sono tornati, 2 omaggi mostrati". Un tocco apre il pannello. Usa gli avvisi push (proposta 6) e i numeri che il pannello calcola già.
+- **Da dove nasce:** TheFork Manager e i gestionali mandano report per mail pieni di numeri; nessuno parla della domanda *prima* della prenotazione.
+- **Valore per l'utente:** nessuno diretto. **Valore per il ristoratore:** vede ogni settimana che Mapetite gli porta gente (base per il piano a pagamento).
+- **Sforzo:** M (iscrizione push dal pannello, calcolo settimanale nel cron esistente). **Costo:** zero.
+- **Stato proposto:** PRONTA (dopo che Lorenzo accende gli avvisi, DA-FARE 8).
+
+### 33. "Chiedi ai tuoi salvati" (la ricerca a parole dentro i posti che hai già scelto)
+- **Problema:** VISIONE, "Ritrova": nel momento della scelta, in pochi secondi. Ask Maps di Google usa già i salvati per personalizzare (`COMPETITOR.md`, 30/10) e arriverà in Italia.
+- **Cosa fa:** nella pagina dei salvati, una riga "Chiedi ai tuoi posti": "dove porto mia madre domenica a pranzo?". L'AI sceglie solo tra i salvati (nessuna ricerca Google), con il perché dalle recensioni già lette e dalle tue note.
+- **Da dove nasce:** Corner cerca per atmosfera tra i posti della sua mappa, non tra i tuoi; Mapstr solo con filtri. Nessuno usa le tue note.
+- **Valore per l'utente:** decide tra i posti che ha già raccolto, che è il motivo per cui li ha salvati. **Valore per il ristoratore:** chi lo aveva salvato ci va davvero (il dato "salvato → visita").
+- **Sforzo:** M. **Costo:** zero Google; un Haiku per domanda (circa 2–3k token, sotto un decimo di centesimo).
+- **Stato proposto:** PRONTA.
+
 ## 29/10/2026 (notte, sessione 22:08, CEO che chiude)
 
 ### 30. Importa i salvati di Instagram dal file di Meta
@@ -44,7 +62,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** opinioni che non si possono comprare né usare per ricattarlo; nel pannello futuro "N visite vere da Mapetite questo mese" (piano Growth).
 - **Sforzo:** M (colonna sì/no sulla visita, controllo sul telefono, etichetta in scheda). **Costo Google/Haiku:** zero.
 - **Stato proposto:** PRONTA, **dopo lo sprint** (dal 27/10): non è una chiave di volta.
-- **COSTRUITA il 30/10 notte ma BOCCIATA due volte dal collaudo (design), non unita; si riprende alla sessione dopo.** Era: "📍 sul posto" nella scheda accanto al giorno della visita, solo l'ora sul server (`saved_places.visita_vista_al`). Manca: il conteggio nelle opinioni della community (serve una vista aggregata sul server) e l'uso come prova per l'omaggio (12).
+- **RIFATTA il 30/10 notte (sessione 03:06):** "📍 Sul posto: il telefono era vicino al locale quando l'hai segnato" su una riga a parte, spiegazione già scritta; controlli nuovi per telefono lontano e "tornato" con data passata. Prima: **COSTRUITA il 30/10 notte ma BOCCIATA due volte dal collaudo (design), non unita.** Era: "📍 sul posto" nella scheda accanto al giorno della visita, solo l'ora sul server (`saved_places.visita_vista_al`). Manca: il conteggio nelle opinioni della community (serve una vista aggregata sul server) e l'uso come prova per l'omaggio (12).
 
 ### 29. Senza AI, il verdetto dalle recensioni in una riga onesta
 - **Problema:** `PROBLEMI.md`, 11. Con il credito Anthropic a zero (dal 22/10) i locali nuovi mostrano una citazione tagliata di una recensione al posto del verdetto: alla demo sembra un buco.
@@ -234,6 +252,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
   4. **Dati:** tabella `omaggi` (locale, testo, soglia, acceso) e `omaggi_usati` (utente, locale, giorno); RLS: il titolare scrive solo il suo locale.
   5. **Nel pannello:** "Omaggi mostrati questo mese" accanto a "↻ tornati": la fedeltà misurata che il locale pagherebbe.
   - **Sforzo:** M. **Costo:** zero. **Prima di accenderlo:** almeno un locale verificato che lo voglia (contatto: Lorenzo/Roberto).
+  - **COSTRUITA il 30/10 notte (sessione 03:06).** Scelte del team rispetto al progetto: la prova è la posizione **nel momento in cui si mostra l'omaggio al tavolo** (il telefono deve essere entro 150 m dal locale; può chiedere il permesso, solo dopo il tocco), non le visite passate: così vale anche per chi ha segnato le visite prima di "📍 sul posto". Il codice di 4 lettere è uguale per tutti i clienti del locale quel giorno, così il personale lo legge nel pannello. Colonne `places.omaggio_testo` / `omaggio_soglia` invece di una tabella `omaggi` (come le serate tranquille); `omaggi_usati` per il limite di 30 giorni. Parole come "sconto", "euro", "%" non si possono salvare.
 
 ## 20/10/2026 (seconda sessione della notte, CEO che chiude)
 
