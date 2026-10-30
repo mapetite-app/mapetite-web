@@ -93,7 +93,7 @@ export default function OmaggioScheda({ place, visite, coords }: { place: { id: 
           <p className="mt-4 font-display text-sm font-semibold uppercase tracking-wider text-white/70">Grazie di essere tornato</p>
           <h2 className="mt-2 font-title text-3xl font-semibold leading-tight">{schermata.testo.charAt(0).toUpperCase() + schermata.testo.slice(1)}</h2>
           <p className="mt-1 font-sans text-base text-white/90">offerto da {place.name} · {schermata.volta}ª visita</p>
-          <p data-testid="omaggio-codice" aria-label={`Codice di oggi: ${schermata.codice.split("").join(" ")}`} className="mt-8 rounded-card bg-white px-6 py-3 font-mono text-4xl font-bold tracking-[0.3em] text-brand">{schermata.codice}</p>
+          <p data-testid="omaggio-codice" aria-label={`Codice di oggi: ${schermata.codice.split("").join(" ")}`} className="mt-8 rounded-card bg-white py-3 pl-[calc(1.5rem+0.3em)] pr-6 font-mono text-4xl font-bold tracking-[0.3em] text-brand">{schermata.codice}</p>
           <p className="mt-3 font-sans text-sm text-white/80">Oggi, {giornoLeggibile(schermata.giorno)} · il personale ha lo stesso codice</p>
           <button type="button" data-testid="omaggio-chiudi" onClick={() => setSchermata(null)} className="mt-10 min-h-11 rounded-pill border border-white/60 px-6 font-display font-semibold text-white active:scale-95">
             Chiudi
