@@ -1579,6 +1579,7 @@ else {
     ok((await ds.textContent()).includes("Osteria Due") && !(await ds.textContent()).includes("Caffè Milano") && !(await ds.textContent()).includes("e un altro"), `dai tuoi salvati: un solo salvato, vicino a dove si cerca e non già tra i risultati (Terrazza Uno è la prima card) (${(await ds.textContent()).trim()})`);
     { const b = await p.getByTestId("dai-salvati-apri").boundingBox(); const c = await p.getByTestId("card-risultato").first().boundingBox();
       ok(!!b && !!c && b.height >= 44 && b.y + b.height <= c.y && b.x >= 0 && b.x + b.width <= 390, `dai tuoi salvati: una riga sopra le card, toccabile (alta ${Math.round(b?.height ?? 0)} px)`); }
+    ok(((await p.getByTestId("dai-salvati-perche").textContent()) ?? "").includes("osteria romana"), "dai tuoi salvati: con un salvato solo il perché è già sotto il nome");
     await p.screenshot({ path: `${OUT}/11h-dai-salvati.png`, caret: "initial" });
     await p.getByTestId("dai-salvati-apri").click();
     await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
@@ -1597,8 +1598,30 @@ else {
     const righeDs = p.getByTestId("dai-salvati-posto");
     ok((await righeDs.count()) === 2 && (await righeDs.first().textContent()).includes("tavolo sulla terrazza"), "dai tuoi salvati: un tocco apre le righe con il perché");
     await p.screenshot({ path: `${OUT}/11i-dai-salvati-aperto.png`, caret: "initial" });
+    // Dal collaudo del 30/10 notte: nome lungo e perché lunghi. "e altri 2" resta in vista, il perché sta in 2 righe.
+    await p.unroute("**/api/salvati/chiedi");
+    { const lungo = "Un perché molto lungo che continua a parlare della nota scritta, delle raccolte e del verdetto per più righe di fila.";
+      await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: lungo }, { id: "00000000-0000-4000-8000-000000000001", perche: lungo }] } }));
+      const nomeVero = rows[1].places.name;
+      rows[1].places.name = "Osteria Due con un nome lunghissimo da trattoria di quartiere";
+      await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+      await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+      await p.keyboard.press("Enter");
+      await ds.waitFor({ timeout: 6000 }).catch(() => {});
+      ok(await p.getByText("e un altro", { exact: true }).isVisible().catch(() => false), "dai tuoi salvati: con un nome lungo 'e un altro' resta in vista");
+      await p.getByTestId("dai-salvati-apri").click();
+      const hs = await p.getByTestId("dai-salvati-posto").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      const box = await ds.boundingBox();
+      ok(hs.length === 2 && hs.every((h) => h <= 64) && !!box && box.x + box.width <= 390, `dai tuoi salvati: perché lunghi in 2 righe al massimo (${hs.map(Math.round).join(", ")} px), dentro lo schermo`);
+      rows[1].places.name = nomeVero; }
     await p.unroute("**/api/search");
     await p.unroute("**/api/salvati/chiedi");
+    // Dalla home: /mappa?q=… parte prima che i salvati siano letti; la domanda ai salvati parte appena arrivano.
+    { let n = 0;
+      await p.route("**/api/salvati/chiedi", (r) => { n++; return r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: "L'hai messa in 'amici'." }] } }); });
+      await p.goto(`${BASE}/mappa?q=${encodeURIComponent("cena con amici a Roma")}&at=41.9,12.49`, { waitUntil: "networkidle" });
+      ok(await ds.waitFor({ timeout: 8000 }).then(() => true, () => false) && n === 1, `dai tuoi salvati: anche arrivando dalla home (?q=), una domanda sola (${n})`);
+      await p.unroute("**/api/salvati/chiedi"); }
     await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ status: 503, json: { error: "Non posso rispondere adesso." } }));
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");

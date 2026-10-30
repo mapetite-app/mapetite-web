@@ -955,6 +955,8 @@ export default function MapView({
   // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
   const [dalSalvati, setDalSalvati] = useState<{ ticket: number; at: { lat: number; lng: number }; scelti: { id: string; perche: string }[] } | null>(null);
   const salvatiRicercaOn = useBeta("salvati-ricerca");
+  // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
+  const chiestoPer = useRef<number | null>(null);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
   const shareOn = useBeta("condividi");
@@ -1204,12 +1206,13 @@ export default function MapView({
   };
 
   // Salvati scelti per questa ricerca: senza doppioni con i risultati (lì c'è già "📌 Salvato") e solo
-  // vicino a dove si cerca (entro DAL_SALVATI_METERS da un risultato, o dal punto della ricerca):
+  // vicino a dove si cerca (entro DAL_SALVATI_METERS da un risultato):
   // "trattoria autentica" con la mappa su Roma non deve proporre la trattoria salvata a Milano.
   const dalSalvatiVisti: { place: Place; perche: string }[] = (() => {
     if (!dalSalvati || aiSearch?.id !== dalSalvati.ticket || view !== "all" || clusterPlaces !== null) return [];
     const inLista = new Set(aiSearch.risultati.map((p) => resolveUuid(p.id)).filter(Boolean));
-    const centri = aiSearch.risultati.length > 0 ? aiSearch.risultati : [dalSalvati.at];
+    // Senza risultati non si sa dove si cerca davvero ("a Milano" con la mappa su Roma): nessuna riga.
+    const centri = aiSearch.risultati;
     return dalSalvati.scelti.flatMap((s) => {
       const place = savedPlaces.find((p) => p.id === s.id);
       if (!place || inLista.has(place.id)) return [];
@@ -1220,6 +1223,17 @@ export default function MapView({
       return [{ place, perche: s.perche }];
     });
   })();
+
+  // Dalla home (/mappa?q=…) la ricerca parte prima che i salvati siano letti: si chiede appena arrivano.
+  const aiSearchId = aiSearch?.id ?? null;
+  const aiSearchQuery = aiSearch?.query ?? null;
+  useEffect(() => {
+    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId) return;
+    if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
+    chiestoPer.current = aiSearchId;
+    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
+  }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
   // Un locale e' salvato se il suo UUID canonico e' in savedIds.
   const isPlaceSaved = (id: string): boolean => {
@@ -1840,7 +1854,7 @@ export default function MapView({
     // o i filtri ha un numero vecchio e si scarta.
     const ticket = ++searchSeq.current;
     setDalSalvati(null);
-    if (view === "all" && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) void chiediSalvati(q, ticket, at);
+    if (view === "all" && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);

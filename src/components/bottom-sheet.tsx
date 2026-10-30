@@ -104,26 +104,32 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       <span aria-hidden className="text-xl">{getCategoryEmoji(it.place.category, it.place.name)}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-display font-semibold text-text">{it.place.name}</span>
-        <span className="block line-clamp-2 text-xs font-sans leading-4 text-text-muted">{it.perche}</span>
+        <span className="line-clamp-2 text-xs font-sans leading-4 text-text-muted">{it.perche}</span>
       </span>
     </button>
   );
   return (
-    <div data-testid="dai-salvati" className={`pointer-events-auto ${inline ? "mb-2 rounded-card border border-border bg-white" : "mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface shadow-float md:max-w-xl lg:mx-5 lg:shadow-none"}`}>
+    <div data-testid="dai-salvati" className={`pointer-events-auto ${inline ? "mb-2 rounded-card border border-border bg-white" : "mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface shadow-float lg:mx-5 lg:max-w-[calc(100%-2.5rem)] lg:shadow-none"}`}>
       <button
         type="button"
         data-testid="dai-salvati-apri"
         aria-expanded={many ? open : undefined}
         onClick={() => { if (many) setOpen((v) => !v); else onOpen(first.place); }}
-        className="flex min-h-11 w-full min-w-0 items-center gap-1.5 px-3.5 text-left text-sm active:scale-[0.99]"
+        className="flex min-h-11 w-full min-w-0 items-center gap-1.5 px-3.5 py-1 text-left text-sm active:scale-[0.99]"
       >
         <span aria-hidden>📌</span>
-        <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
-        <span className="min-w-0 truncate font-sans text-text">
-          <span aria-hidden className="mx-1 text-text-muted">·</span>
-          {many ? `${first.place.name} e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}` : first.place.name}
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline">
+            <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
+            <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
+            <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
+            {/* "e altri 2" resta sempre in vista: con un nome lungo si taglia il nome, non il numero. */}
+            {many && <span className="shrink-0 whitespace-pre font-sans text-text">{` e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}`}</span>}
+          </span>
+          {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
+          {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
         </span>
-        <span aria-hidden className={`ml-auto shrink-0 pl-1 text-text-muted transition-transform ${many && open ? "rotate-90" : ""}`}>›</span>
+        <span aria-hidden className={`shrink-0 pl-1 text-text-muted transition-transform ${many && open ? "rotate-90" : ""}`}>›</span>
       </button>
       {many && open && <div className="border-t border-border px-1.5 pb-1.5 pt-1">{items.map(row)}</div>}
     </div>
