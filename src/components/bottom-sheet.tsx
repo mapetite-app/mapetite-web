@@ -81,6 +81,59 @@ export interface BottomSheetProps {
   pillSlot?: HTMLElement | null;
   // Cosa ha capito l'AI, in breve, accanto a "12 posti" nella pillola.
   capito?: string[];
+  // "Dai tuoi salvati": fino a 3 salvati scelti dall'AI per la stessa frase, con il perché.
+  fromSaved?: { place: Place; perche: string }[];
+  onOpenSaved?: (place: Place) => void;
+}
+
+// Una riga sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la sua
+// scheda; con due o tre si aprono le righe con il perché, preso solo dai dati della persona.
+function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Place; perche: string }[]; onOpen: (place: Place) => void; inline?: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  const first = items[0];
+  const many = items.length > 1;
+  const row = (it: { place: Place; perche: string }) => (
+    <button
+      key={it.place.id}
+      type="button"
+      data-testid="dai-salvati-posto"
+      onClick={() => onOpen(it.place)}
+      className="flex min-h-12 w-full items-center gap-2.5 rounded-btn px-1.5 py-1.5 text-left active:bg-brand-light"
+    >
+      <span aria-hidden className="text-xl">{getCategoryEmoji(it.place.category, it.place.name)}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-display font-semibold text-text">{it.place.name}</span>
+        <span className="line-clamp-2 text-xs font-sans leading-4 text-text-muted">{it.perche}</span>
+      </span>
+    </button>
+  );
+  return (
+    <div data-testid="dai-salvati" className={`pointer-events-auto ${inline ? "mb-2 rounded-card border border-border bg-white" : "mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface shadow-float lg:mx-5 lg:max-w-[calc(100%-2.5rem)] lg:shadow-none"}`}>
+      <button
+        type="button"
+        data-testid="dai-salvati-apri"
+        aria-expanded={many ? open : undefined}
+        onClick={() => { if (many) setOpen((v) => !v); else onOpen(first.place); }}
+        className="flex min-h-11 w-full min-w-0 items-center gap-1.5 px-3.5 py-1 text-left text-sm active:scale-[0.99]"
+      >
+        <span aria-hidden>📌</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline">
+            <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
+            <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
+            <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
+            {/* "e altri 2" resta sempre in vista: con un nome lungo si taglia il nome, non il numero. */}
+            {many && <span className="shrink-0 whitespace-pre font-sans text-text">{` e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}`}</span>}
+          </span>
+          {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
+          {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
+        </span>
+        <span aria-hidden className={`shrink-0 pl-1 text-text-muted transition-transform ${many && open ? "rotate-90" : ""}`}>›</span>
+      </button>
+      {many && open && <div className="border-t border-border px-1.5 pb-1.5 pt-1">{items.map(row)}</div>}
+    </div>
+  );
 }
 
 export type ListDetails = {
@@ -232,7 +285,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -670,6 +723,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {title && headerOpen && optionsPanel}
         </div>}
         {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
+        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} />}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
@@ -958,6 +1012,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           </button>
         </div>
         {(quickFiltersOn || nearestOn) && <div className="px-1 pb-2">{quickChips}</div>}
+        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} inline />}
         {places.length === 0 && allPlaces.length > 0 && (
           <p className="px-2 py-6 text-center text-sm text-text-muted">{NO_MATCH}</p>
         )}

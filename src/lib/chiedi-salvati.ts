@@ -12,6 +12,8 @@ export const MAX_POSTI = 80; // i più recenti. Caso peggiore (80 con nota, verd
 export const MAX_SCELTI = 3;
 export const MAX_TOKENS = 400;
 export const MAX_DOMANDA = 160;
+// Accanto a una ricerca nel mondo: con meno salvati la risposta è quasi sempre "nessuno", si risparmia la chiamata.
+export const MIN_POSTI_RICERCA = 3;
 
 export type PostoSalvato = {
   id: string; // UUID Supabase: non va all'AI (si usano numeri brevi)

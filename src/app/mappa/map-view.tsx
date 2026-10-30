@@ -428,6 +428,8 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 const SIMILAR_MAX_METERS = 15_000;
 // "Sei vicino a un locale che volevi provare": entro ~10 minuti a piedi.
 const NEARBY_SAVED_METERS = 800;
+// "Dai tuoi salvati" sopra i risultati: un salvato conta solo se è a meno di 20 km da dove si cerca.
+const DAL_SALVATI_METERS = 20_000;
 // Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
 function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
   return places
@@ -949,6 +951,14 @@ export default function MapView({
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [aiSearching, setAiSearching] = useState(false);
+  // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie fino a 3
+  // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
+  const [dalSalvati, setDalSalvati] = useState<{ ticket: number; at: { lat: number; lng: number }; scelti: { id: string; perche: string }[] } | null>(null);
+  const salvatiRicercaOn = useBeta("salvati-ricerca");
+  // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
+  const chiestoPer = useRef<number | null>(null);
+  // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
+  const ricercaMondo = useRef<number | null>(null);
   // Schermata di benvenuto: sparisce alla prima interazione.
   const recentOn = useBeta("recenti");
   const shareOn = useBeta("condividi");
@@ -1196,6 +1206,26 @@ export default function MapView({
     if (isUuid) return id;
     return placeUuids[id] ?? null;
   };
+
+  // Salvati scelti per questa ricerca: senza doppioni con i risultati (lì c'è già "📌 Salvato") e solo
+  // vicino a dove si cerca (entro DAL_SALVATI_METERS da un risultato):
+  // "trattoria autentica" con la mappa su Roma non deve proporre la trattoria salvata a Milano.
+  const dalSalvatiVisti: { place: Place; perche: string }[] = (() => {
+    if (!dalSalvati || aiSearch?.id !== dalSalvati.ticket || view !== "all" || clusterPlaces !== null) return [];
+    const inLista = new Set(aiSearch.risultati.map((p) => resolveUuid(p.id)).filter(Boolean));
+    // Senza risultati non si sa dove si cerca davvero ("a Milano" con la mappa su Roma): nessuna riga.
+    const centri = aiSearch.risultati;
+    return dalSalvati.scelti.flatMap((s) => {
+      const place = savedPlaces.find((p) => p.id === s.id);
+      if (!place || inLista.has(place.id)) return [];
+      // Ponte id Google → UUID non ancora pronto: stesso nome a due passi = stesso locale.
+      const nome = place.name.toLocaleLowerCase("it");
+      if (aiSearch.risultati.some((r) => r.name.toLocaleLowerCase("it") === nome && distanceMeters(r, place) < 200)) return [];
+      if (!centri.some((c) => distanceMeters(c, place) <= DAL_SALVATI_METERS)) return [];
+      return [{ place, perche: s.perche }];
+    });
+  })();
+
 
   // Un locale e' salvato se il suo UUID canonico e' in savedIds.
   const isPlaceSaved = (id: string): boolean => {
@@ -1503,6 +1533,7 @@ export default function MapView({
   // un cambio di scheda o i filtri, i risultati vecchi ricomparivano qualche secondo dopo.
   const clearAiSearch = () => {
     searchSeq.current++;
+    setDalSalvati(null);
     setLoadingVerdicts(false);
     setAiSearching(false);
     setAiSearch(null);
@@ -1792,11 +1823,42 @@ export default function MapView({
     return () => clearTimeout(t);
   }, [aiQuery, view]);
 
+  // Nessuna chiamata Google; ogni errore (429, 503, rete) lascia solo i risultati, senza messaggi.
+  const chiediSalvati = async (q: string, ticket: number, at: { lat: number; lng: number }) => {
+    try {
+      const res = await fetch("/api/salvati/chiedi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domanda: q, da: "ricerca" }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (searchSeq.current !== ticket || !Array.isArray(data?.scelti)) return;
+      setDalSalvati({ ticket, at, scelti: data.scelti });
+    } catch {
+      // rete: niente riga, la ricerca resta com'è
+    }
+  };
+
+  // Dalla home (/mappa?q=…) la ricerca parte prima che i salvati siano letti: si chiede appena arrivano.
+  const aiSearchId = aiSearch?.id ?? null;
+  const aiSearchQuery = aiSearch?.query ?? null;
+  useEffect(() => {
+    if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
+    if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
+    chiestoPer.current = aiSearchId;
+    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
+  }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
+
   const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
     // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
     // o i filtri ha un numero vecchio e si scarta.
     const ticket = ++searchSeq.current;
+    setDalSalvati(null);
+    ricercaMondo.current = view === "all" ? ticket : null;
+    if (view === "all" && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);
@@ -3482,6 +3544,14 @@ export default function MapView({
             dispatch({ type: "OPEN_VENUE", placeId: place.id });
             const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
+          }}
+          fromSaved={dalSalvatiVisti}
+          onOpenSaved={(place) => {
+            trackFeature("dai_tuoi_salvati");
+            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
+            dispatch({ type: "OPEN_VENUE", placeId: place.id });
+            const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+            if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 16) });
           }}
           onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />

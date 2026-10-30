@@ -1568,6 +1568,79 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie tra i salvati
+  // in parallelo; restano solo quelli veri e vicini a dove si cerca (Caffè Milano no: si cerca a Roma).
+  { const chiesti = [];
+    await p.route("**/api/salvati/chiedi", async (r) => { chiesti.push(r.request().postDataJSON()); r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: "L'hai messa in 'amici': osteria romana." }, { id: "00000000-0000-4000-8000-000000000003", perche: "Hai scritto: brunch domenica." }, { id: "00000000-0000-4000-8000-000000000001", perche: "Hai scritto: tavolo sulla terrazza." }, { id: "estraneo", perche: "Non è tuo" }] } }); });
+    await p.getByLabel("Cosa cerchi?").fill("Rooftop romantico per due a Roma");
+    await p.keyboard.press("Enter");
+    const ds = p.getByTestId("dai-salvati");
+    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && chiesti[0]?.domanda === "Rooftop romantico per due a Roma" && chiesti[0]?.da === "ricerca", `dai tuoi salvati: la stessa frase va anche ai salvati (${JSON.stringify(chiesti[0] ?? null)})`);
+    ok((await ds.textContent()).includes("Osteria Due") && !(await ds.textContent()).includes("Caffè Milano") && !(await ds.textContent()).includes("e un altro"), `dai tuoi salvati: un solo salvato, vicino a dove si cerca e non già tra i risultati (Terrazza Uno è la prima card) (${(await ds.textContent()).trim()})`);
+    { const b = await p.getByTestId("dai-salvati-apri").boundingBox(); const c = await p.getByTestId("card-risultato").first().boundingBox();
+      ok(!!b && !!c && b.height >= 44 && b.y + b.height <= c.y && b.x >= 0 && b.x + b.width <= 390, `dai tuoi salvati: una riga sopra le card, toccabile (alta ${Math.round(b?.height ?? 0)} px)`); }
+    ok(((await p.getByTestId("dai-salvati-perche").textContent()) ?? "").includes("osteria romana"), "dai tuoi salvati: con un salvato solo il perché è già sotto il nome");
+    await p.screenshot({ path: `${OUT}/11h-dai-salvati.png`, caret: "initial" });
+    await p.getByTestId("dai-salvati-apri").click();
+    await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
+    ok(await p.getByTestId("scheda-pannello").getByText("Osteria Due").first().isVisible(), "dai tuoi salvati: con un salvato solo il tocco apre la sua scheda");
+    await p.getByTestId("scheda-pannello").getByRole("button", { name: "Chiudi", exact: true }).first().click();
+    ok(await ds.waitFor({ timeout: 3000 }).then(() => true, () => false) && await p.getByTestId("card-risultato").first().isVisible(), "dai tuoi salvati: chiusa la scheda si torna ai risultati, con la riga ancora lì");
+    await p.unroute("**/api/salvati/chiedi");
+    await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000001", perche: "Hai scritto: tavolo sulla terrazza." }, { id: "00000000-0000-4000-8000-000000000002", perche: "L'hai messa in 'amici'." }] } }));
+    // Risultati senza Terrazza Uno: i due salvati restano entrambi.
+    await p.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: SEARCH_FAST.risultati.filter((x) => x.id === "P3") } }));
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+    await p.keyboard.press("Enter");
+    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await ds.textContent()).includes("Terrazza Uno e un altro") && (await p.getByTestId("dai-salvati-posto").count()) === 0, "dai tuoi salvati: con due salvati una riga 'Terrazza Uno e un altro', chiusa");
+    await p.getByTestId("dai-salvati-apri").click();
+    const righeDs = p.getByTestId("dai-salvati-posto");
+    ok((await righeDs.count()) === 2 && (await righeDs.first().textContent()).includes("tavolo sulla terrazza"), "dai tuoi salvati: un tocco apre le righe con il perché");
+    await p.screenshot({ path: `${OUT}/11i-dai-salvati-aperto.png`, caret: "initial" });
+    // Dal collaudo del 30/10 notte: nome lungo e perché lunghi. "e altri 2" resta in vista, il perché sta in 2 righe.
+    await p.unroute("**/api/salvati/chiedi");
+    { const lungo = "Un perché molto lungo che continua a parlare della nota scritta, delle raccolte e del verdetto per più righe di fila.";
+      await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: lungo }, { id: "00000000-0000-4000-8000-000000000001", perche: lungo }] } }));
+      const nomeVero = rows[1].places.name;
+      rows[1].places.name = "Osteria Due con un nome lunghissimo da trattoria di quartiere";
+      await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+      await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+      await p.keyboard.press("Enter");
+      await ds.waitFor({ timeout: 6000 }).catch(() => {});
+      ok(await p.getByText("e un altro", { exact: true }).isVisible().catch(() => false), "dai tuoi salvati: con un nome lungo 'e un altro' resta in vista");
+      await p.getByTestId("dai-salvati-apri").click();
+      const hs = await p.getByTestId("dai-salvati-posto").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      const box = await ds.boundingBox();
+      ok(hs.length === 2 && hs.every((h) => h <= 64) && !!box && box.x + box.width <= 390, `dai tuoi salvati: perché lunghi in 2 righe al massimo (${hs.map(Math.round).join(", ")} px), dentro lo schermo`);
+      rows[1].places.name = nomeVero; }
+    await p.unroute("**/api/search");
+    await p.unroute("**/api/salvati/chiedi");
+    // Dalla home: /mappa?q=… parte prima che i salvati siano letti; la domanda ai salvati parte appena arrivano.
+    { let n = 0;
+      await p.route("**/api/salvati/chiedi", (r) => { n++; return r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000002", perche: "L'hai messa in 'amici'." }] } }); });
+      await p.goto(`${BASE}/mappa?q=${encodeURIComponent("cena con amici a Roma")}&at=41.9,12.49`, { waitUntil: "networkidle" });
+      ok(await ds.waitFor({ timeout: 8000 }).then(() => true, () => false) && n === 1, `dai tuoi salvati: anche arrivando dalla home (?q=), una domanda sola (${n})`);
+      // "Sorprendimi" (/mappa?sorpresa=…) non è una domanda: nessuna chiamata all'AI.
+      n = 0;
+      await p.goto(`${BASE}/sorprendimi`, { waitUntil: "networkidle" });
+      const apri = p.getByTestId("sorpresa-apri").first();
+      if (await apri.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await apri.click(); await p.waitForURL(/\/mappa/, { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(1500);
+        ok(n === 0, `dai tuoi salvati: 'Sorprendimi' non chiede ai salvati (${n} chiamate)`);
+      } else console.log("SKIP  dai tuoi salvati: Sorprendimi senza 'Apri scheda' in questo contesto");
+      await p.unroute("**/api/salvati/chiedi"); }
+    await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ status: 503, json: { error: "Non posso rispondere adesso." } }));
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+    await p.keyboard.press("Enter");
+    await p.getByTestId("card-risultato").first().waitFor({ timeout: 6000 });
+    await p.waitForTimeout(400);
+    ok((await ds.count()) === 0 && (await p.getByText("Non posso rispondere adesso.").count()) === 0, "dai tuoi salvati: senza AI nessuna riga e nessun errore, restano i risultati");
+    await p.unroute("**/api/salvati/chiedi");
+    // La scheda di Osteria Due aperta qui ha già chiesto il suo verdetto: il controllo più avanti conta da zero.
+    verdettoChiesti.length = 0;
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" }); }
   await vaiSalvati(p);
   // Salvati come lista (mockup C vestito A, PR #87; src/components/salvati-lista.tsx): la schermata principale.
   { const L = p.getByTestId("salvati-lista");
