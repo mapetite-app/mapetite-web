@@ -3302,6 +3302,29 @@ else {
     ok((await s.getByTestId("prenota-volta").textContent().catch(() => "")).includes("3ª volta") && !prima.includes("volta da voi") && dopo.includes("Sarà la mia 3ª volta da voi."), `prenota: nei posti fissi 'Sarà la mia 3ª volta da voi' solo se lo accendi (${dopo})`); }
   await s.screenshot({ path: `${OUT}/62c-prenota-volta.png`, caret: "initial" });
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  // "Cliente di parola" (PROPOSTE 3): con 3 prenotazioni concluse bene (presente o disdetta in tempo), riga a scelta.
+  const parolaApri = async (lista) => {
+    await s.evaluate((l) => localStorage.setItem("mapetite.prenotazioni", JSON.stringify(l)), lista);
+    await bar.getByTestId("prenota-scheda").click();
+    await s.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
+    await s.getByTestId("foglio-prenota").getByRole("button", { name: "Domani" }).click();
+    await s.getByTestId("foglio-prenota").getByRole("button", { name: "20:30" }).click();
+    if (await s.getByTestId("prenota-avanti").isEnabled().catch(() => false) === false) await s.getByLabel("Una persona in più").click();
+    await s.getByTestId("prenota-avanti").click();
+    await s.getByTestId("prenota-messaggio").waitFor({ timeout: 3000 }).catch(() => {});
+  };
+  const pb = (id, extra) => ({ id, placeId: `P${id}`, placeName: "x", lat: null, lng: null, date: "2026-09-10", time: "20:30", people: 2, special: null, via: "whatsapp", createdAt: 1, ...extra });
+  await parolaApri([pb("1", { outcome: "bene" }), pb("2", { outcome: "male" }), pb("3", { outcome: "non-andato", dismissed: true, disdetta: new Date(2026, 8, 9, 18).getTime() }), pb("4", {})]);
+  { const prima = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    await s.getByTestId("prenota-parola").locator("input").check().catch(() => {});
+    const dopo = await s.getByTestId("prenota-messaggio").inputValue().catch(() => "");
+    ok((await s.getByTestId("prenota-parola").textContent().catch(() => "")).includes("Scrivi che sei di parola (3 su 3)") && !prima.includes("Con Mapetite") && dopo.includes("Con Mapetite ho già prenotato 3 tavoli, anche altrove: sempre presente o disdetto in tempo."), `cliente di parola: con 3 prenotazioni concluse bene la riga c'è solo se la accendi (${dopo})`); }
+  await s.getByTestId("foglio-prenota").screenshot({ path: `${OUT}/62d-prenota-parola.png` });
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await parolaApri([pb("1", { outcome: "bene" }), pb("2", { outcome: "bene" }), pb("3", { outcome: "bene" }), pb("5", { outcome: "non-andato" })]);
+  ok((await s.getByTestId("prenota-parola").count()) === 0, "cliente di parola: con una prenotazione mancata la riga non si propone");
+  await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
+  await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await s.unroute("**/rest/v1/saved_places**");
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
@@ -3714,6 +3737,16 @@ else {
   let as = null;
   try { as = await import(new URL("../../src/lib/assistant.ts", import.meta.url).href); } catch (e) { ok(false, `assistente: modulo src/lib/assistant.ts importabile (${e.message})`); }
   if (bk) {
+    { // "Cliente di parola" (PROPOSTE 3): conta solo presenze e disdette prima dell'ora del tavolo.
+      const b = (o) => ({ id: "x", placeId: "p", placeName: "x", date: "2026-10-10", time: "21:00", people: 2, special: null, via: "whatsapp", lat: null, lng: null, createdAt: 1, ...o });
+      const inTempo = new Date(2026, 9, 10, 15).getTime(), tardi = new Date(2026, 9, 10, 22).getTime();
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "male" })]) === null, "cliente di parola: sotto 3 prenotazioni concluse niente riga");
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "male" }), b({ outcome: "non-andato", disdetta: inTempo }), b({})]) === 3, "cliente di parola: presenze + disdetta in tempo = 3 (quelle aperte non contano)");
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato", disdetta: tardi })]) === null, "cliente di parola: una disdetta dopo l'ora del tavolo azzera la riga");
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato", date: null, disdetta: inTempo })]) === null, "cliente di parola: una disdetta senza giorno conta come mancata (prudente)");
+      ok(bk.clienteDiParola([b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "bene" }), b({ outcome: "non-andato" })]) === null, "cliente di parola: un 'Non ci sono andato' azzera la riga");
+      ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho già prenotato 4 tavoli, anche altrove: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
+    }
     const now = new Date(2026, 9, 15, 18, 0); // giovedì 15/10, ore 18
     const r = bk.parseBooking("prenotami domani alle 21 per 2 con terrazza a Roma", now);
     ok(r.isBooking && r.date === "2026-10-16" && r.time === "21:00" && r.people === 2 && r.special === "in terrazza" && r.search === "ristorante con terrazza a roma", `prenota: frase capita senza AI (${JSON.stringify(r)})`);
@@ -4002,6 +4035,8 @@ else {
     await ap.waitForTimeout(300);
     ok((await ap.getByTestId("promemoria-oggi").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta" && e.props?.contesto === "whatsapp"), "promemoria: dopo la disdetta il promemoria sparisce e la disdetta si conta");
     { const ev = aEvents.find((e) => e.type === "funzione" && e.props?.nome === "prenotazione_disdetta");
+      const salvata = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").find((x) => x.placeId === "P1"));
+      ok(salvata?.outcome === "non-andato" && typeof salvata?.disdetta === "number" && Math.abs(salvata.disdetta - Date.now()) < 120_000, "cliente di parola: 'Non vado più' segna l'ora della disdetta (distinta da 'Non ci sono andato')");
       ok(ev?.googlePlaceId === "P1" && (typeof ev?.props?.ore === "number" || ev?.props?.stato === "in_ritardo"), `disdetta: segnale con il locale e le ore di anticipo (o "in ritardo" dopo l'ora del tavolo), per il pannello del ristoratore (${JSON.stringify({ g: ev?.googlePlaceId, ore: ev?.props?.ore, stato: ev?.props?.stato })})`); } }
   // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
   await ap.evaluate(() => {

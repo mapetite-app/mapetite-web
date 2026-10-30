@@ -31,7 +31,7 @@ function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
     const ore = quando ? Math.round((quando.getTime() - Date.now()) / 3_600_000) : null;
     // Disdetta dopo l'ora del tavolo: si conta, ma non è un "tavolo liberato per tempo".
     track("funzione", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { nome: "prenotazione_disdetta", contesto, ...(ore != null && ore >= 0 ? { ore } : {}), ...(quando && quando.getTime() < Date.now() ? { stato: "in_ritardo" } : {}) });
-    updateBooking(b.id, { outcome: "non-andato", dismissed: true });
+    updateBooking(b.id, { outcome: "non-andato", dismissed: true, disdetta: Date.now() });
   };
   const btn = "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand";
   return (

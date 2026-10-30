@@ -183,7 +183,7 @@ export function missingDetails(b: BookingDetails): ("persone" | "giorno" | "ora"
 
 // Il messaggio per il locale: cortese, breve, modificabile. Solo dati scelti dall'utente.
 // volta: "Sarà la mia 3ª volta da voi" (PROPOSTE.md 11), solo se l'utente lo accende nel foglio Prenota.
-export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date(), volta: number | null = null): string {
+export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date(), volta: number | null = null, parola: number | null = null): string {
   const greeting = now.getHours() < 13 ? "Buongiorno" : "Buonasera";
   const parts = [`${greeting}, vorrei prenotare un tavolo`];
   if (b.people) parts.push(` per ${b.people} ${b.people === 1 ? "persona" : "persone"}`);
@@ -192,6 +192,7 @@ export function bookingMessage(b: BookingDetails, name: string | null, now: Date
   if (b.special) parts.push(`, ${b.special} se possibile`);
   parts.push(". È disponibile?");
   if (volta && volta >= 2) parts.push(` Sarà la mia ${volta}ª volta da voi.`);
+  if (parola && parola >= PAROLA_MIN) parts.push(` Con Mapetite ho già prenotato ${parola} tavoli, anche altrove: sempre presente o disdetto in tempo.`);
   const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
   return `${parts.join("")} ${sign}`;
 }
@@ -240,6 +241,7 @@ export type BookingRequest = BookingDetails & {
   dismissedEve?: boolean; // promemoria del giorno prima nascosto (quello del giorno stesso resta)
   riapre?: number | null;  // richiesta mandata a locale chiuso: quando riapre (ms), per "ti hanno risposto?"
   dismissedRisposta?: boolean;
+  disdetta?: number | null; // "Non vado più" toccato (ms): distingue la disdetta dal "Non ci sono andato" (dal 29/10)
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -279,6 +281,30 @@ export function updateBooking(id: string, patch: Partial<BookingRequest>) {
 }
 export function removeBooking(id: string) {
   storeBookings(loadBookings().filter((b) => b.id !== id));
+}
+
+// "Cliente di parola" (PROPOSTE.md 3, primo passo, 29/10): quante prenotazioni fatte da Mapetite si sono
+// concluse bene, cioè presente ("Com'è andata?" con 👍/👎) o disdetta prima dell'ora del tavolo con
+// "Non vado più". Solo da PAROLA_MIN prenotazioni concluse e con ZERO mancate: la riga nel messaggio
+// la sceglie l'utente ed è una sua frase, mai un voto di Mapetite. Restano i dati del telefono
+// (ultime 30): la conferma vera arriverà dal locale (pannello o gestionale), non da qui.
+export const PAROLA_MIN = 3;
+function inizioTavolo(b: BookingRequest): number | null {
+  if (!b.date) return null;
+  const [y, m, d] = b.date.split("-").map(Number);
+  const [hh, mm] = (b.time ?? "12:00").split(":").map(Number);
+  return new Date(y, m - 1, d, hh, mm).getTime();
+}
+export function clienteDiParola(list: BookingRequest[]): number | null {
+  let concluse = 0;
+  for (const b of list) {
+    if (b.outcome === "bene" || b.outcome === "male") { concluse++; continue; }
+    if (b.outcome !== "non-andato") continue;
+    const inizio = inizioTavolo(b);
+    if (b.disdetta != null && inizio != null && b.disdetta < inizio) { concluse++; continue; }
+    return null; // una mancata (o una disdetta arrivata dopo l'ora del tavolo): niente riga
+  }
+  return concluse >= PAROLA_MIN ? concluse : null;
 }
 
 // "Prenota come l'ultima volta" (PROPOSTE.md 10): persone e ora dell'ultima richiesta fatta da Mapetite
