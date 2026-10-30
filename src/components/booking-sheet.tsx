@@ -26,6 +26,21 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { POSTO_FISSO, visiteDi } from "@/lib/diario";
 import type { Canale } from "@/lib/canale-prenotazione";
 
+// "Prenota su TheFork": bocciato due volte dal collaudo il 30/10 (regola del team: niente produzione).
+// Spento per tutti finché un revisore nuovo non lo approva; si prova con ?beta=prenota.
+const PIATTAFORMA_PER_TUTTI = false;
+// ?beta=prenota una volta lo accende su quel telefono (resta anche cambiando pagina).
+function piattaformaAccesa(): boolean {
+  if (PIATTAFORMA_PER_TUTTI) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URLSearchParams(window.location.search).get("beta") === "prenota") localStorage.setItem("mapetite.beta.prenota", "1");
+    return localStorage.getItem("mapetite.beta.prenota") === "1";
+  } catch {
+    return false;
+  }
+}
+
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
 // (WhatsApp solo se il numero è un cellulare, chiamata, sito), con il messaggio già scritto.
 // Mapetite non vede i tavoli liberi: lo si dice sempre, la conferma arriva dal locale.
@@ -91,7 +106,7 @@ export default function BookingSheet({
   const [canale, setCanale] = useState<{ sito: string; canale: Canale | null } | null>(null);
   useEffect(() => {
     const sito = place.websiteUri;
-    if (!sito) return;
+    if (!sito || !piattaformaAccesa()) return;
     const ctrl = new AbortController();
     fetch(`/api/prenota/canale?u=${encodeURIComponent(sito)}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))

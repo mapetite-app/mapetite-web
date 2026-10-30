@@ -20,11 +20,11 @@ export const PIATTAFORME: Piattaforma[] = [
 // Solo la pagina del locale sulla piattaforma o il suo modulo incorporato, con il percorso ancorato
 // all'inizio: niente blog, premi, elenchi di città o home (collaudo del 30/10).
 const PERCORSO_OK: Record<string, RegExp> = {
-  thefork: /^\/(?:[a-z]{2}\/)?(?:ristorante|restaurant|restaurante|restaurang)\/[^/]+-r\d+\/?$|^\/(?:[a-z]{2}\/)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-  quandoo: /^\/(?:[a-z]{2}\/)?place\/[^/]+-\d+\/?$/i,
+  thefork: /^\/(?:[a-z]{2}\/)?(?:ristorante|restaurant|restaurante|restaurang)\/[^/?]+-r\d+\/?(?:\?|$)|^\/[a-z]{2}_[A-Z]{2}\/module\/\d+|^\/(?:[a-z]{2}\/)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  quandoo: /^\/(?:[a-z]{2}\/)?place\/[^/?]+-\d+\/?(?:\?|$)/i,
   zenchef: /^\/results\/?\?(?:.*&)?rid=\d+/i,
   covermanager: /^\/(?:[a-z]{2}\/)?(?:reserve|reserva|reservation)\/(?:module_restaurant\/)?[^/]+/i,
-  opentable: /^\/r\/[^/]+\/?$|^\/restref\/client\/?\?(?:.*&)?rid=\d+/i,
+  opentable: /^\/r\/[^/?]+\/?(?:\?|$)|^\/widget\/reservation\/loader\/?\?(?:.*&)?rid=\d+|^\/restref\/client\/?\?(?:.*&)?rid=\d+/i,
   sevenrooms: /^\/reservations\/[^/?]+/i,
   resy: /^\/cities\/[^/]+\/venues\/[^/?]+/i,
 };

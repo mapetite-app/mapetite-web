@@ -29,11 +29,14 @@ function ipv4Pubblico(ip: string): boolean {
 }
 
 // Risolve e controlla nello stesso passo in cui ci si collega: l'indirizzo usato è quello controllato.
-const lookupSicuro: LookupFunction = (host, _opts, cb) => {
+// Da Node 20 la connessione chiede `all: true` e vuole la lista (secondo collaudo del 30/10: con un
+// indirizzo solo ogni richiesta falliva in silenzio).
+const lookupSicuro: LookupFunction = (host, opts, cb) => {
   dnsLookup(host, { family: 4, all: true }, (err, addrs) => {
     if (err) return cb(err, "", 4);
     const lista = addrs as { address: string; family: number }[];
     if (!lista.length || !lista.every((x) => ipv4Pubblico(x.address))) return cb(new Error("indirizzo non pubblico"), "", 4);
+    if ((opts as { all?: boolean }).all) return (cb as unknown as (e: null, a: { address: string; family: number }[]) => void)(null, lista.map((x) => ({ address: x.address, family: 4 })));
     cb(null, lista[0].address, 4);
   });
 };
