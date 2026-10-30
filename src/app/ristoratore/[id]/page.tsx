@@ -7,6 +7,8 @@ import { cityFromAddress } from "@/lib/city";
 import { computeRistoratore, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
+import { giornoItalia, pulisciOmaggio, OMAGGIO_OGNI_GIORNI, type Omaggio } from "@/lib/omaggio";
+import { codiceDelGiorno } from "@/lib/omaggio-server";
 import Pannello, { PERIODI } from "../pannello";
 
 // Pannello del ristoratore (PIANO-25-OTTOBRE.md 8.2), id = UUID del locale in places.
@@ -22,7 +24,7 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Serate = { giorni: number[]; at: string | null; apertoDal: string | null };
+type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate };
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
@@ -35,7 +37,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
-    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal) } };
+    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -103,11 +105,16 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   const attesa = (tutti ?? []) as RistSalvataggio[];
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
   // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
-  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null };
-  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal").eq("id", id).maybeSingle<Sr>();
+  // "Omaggio a chi torna" (20261030b_omaggio.sql): senza colonne, si rilegge senza.
+  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null; omaggio_testo?: string | null; omaggio_soglia?: number | null };
+  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia").eq("id", id).maybeSingle<Sr>();
+  if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<Sr>());
   if (srErr) console.error("[ristoratore] lettura serate:", srErr.message);
-  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal) };
+  // Omaggi mostrati negli ultimi 30 giorni: la fedeltà misurata (senza tabella: 0).
+  const daOmaggi = new Date(Date.now() - OMAGGIO_OGNI_GIORNI * 86_400_000).toISOString().slice(0, 10);
+  const { count: omaggiMostrati } = await db.from("omaggi_usati").select("user_id", { count: "exact", head: true }).eq("place_id", id).gte("giorno", daOmaggi);
+  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
   return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate };
 }
 

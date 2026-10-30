@@ -4983,6 +4983,30 @@ else {
       const futuro = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, apertoDal: "2999-01" } });
       ok(j2.apertoDal === due && JSON.stringify(j2.giorni) === "[5]" && futuro.status() === 400 && ((await ap.getByTestId("aperto-dal-anteprima").textContent()) ?? "").includes("🆕"), `pannello ristoratore: 'Aperto da' salvato e riletto dalla scheda, senza toccare le serate; mese futuro rifiutato (${JSON.stringify(j2)} / ${futuro.status()})`);
       await rp.screenshot({ path: `${OUT}/71-pannello-aperto-dal.png`, caret: "initial" }); }
+    // "Omaggio a chi torna" (PROPOSTE 12): niente denaro, si salva, codice del giorno uguale a quello del cliente.
+    { const om = rp.getByTestId("pannello-omaggio");
+      await om.getByTestId("omaggio-testo").fill("10% di sconto");
+      ok(await om.getByTestId("omaggio-salva").isDisabled() && await om.getByText("senza sconti né euro").isVisible(), "omaggio pannello: uno sconto in denaro non si può salvare");
+      const soldi = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, omaggio: { testo: "5 euro", soglia: 2 } } });
+      await om.getByTestId("omaggio-testo").fill("un caffè");
+      await om.getByRole("button", { name: "3ª visita" }).click();
+      await om.getByTestId("omaggio-salva").click();
+      await om.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const j3 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      const codice = ((await om.getByTestId("omaggio-codice-oggi").textContent().catch(() => "")) ?? "").match(/[A-Z]{4}$/)?.[0];
+      ok(soldi.status() === 400 && j3.omaggio?.testo === "un caffè" && j3.omaggio?.soglia === 3 && JSON.stringify(j3.giorni) === "[5]" && !!codice && ((await om.getByTestId("omaggio-anteprima").textContent()) ?? "").includes("🎁 Il locale ti offre un caffè"), `omaggio pannello: salvato e riletto dalla scheda, serate intatte, codice di oggi (${JSON.stringify(j3)} / ${soldi.status()} / ${codice})`);
+      await om.scrollIntoViewIfNeeded().catch(() => {});
+      await rp.screenshot({ path: `${OUT}/71b-pannello-omaggio.png`, caret: "initial" });
+      const poche = await rp.request.post(`${BASE}/api/omaggio`, { data: { id: LOC, visite: 2 } });
+      const usa = await rp.request.post(`${BASE}/api/omaggio`, { data: { id: LOC, visite: 3 } });
+      const uj = await usa.json().catch(() => ({}));
+      const ancora = await rp.request.post(`${BASE}/api/omaggio`, { data: { id: LOC, visite: 3 } });
+      ok(poche.status() === 403 && usa.status() === 200 && uj.codice === codice && uj.testo === "un caffè" && ancora.status() === 200, `omaggio: alla 2ª visita no (soglia 3), alla 3ª sì con lo stesso codice del pannello, riapribile lo stesso giorno (${poche.status()} / ${JSON.stringify(uj)} / ${ancora.status()})`);
+      await rctx.clearCookies({ name: "e2e_omaggio" });
+      await om.getByTestId("omaggio-spegni").click();
+      await om.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const j4 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      ok(j4.omaggio === null && (await om.getByTestId("omaggio-codice-oggi").count()) === 0, `omaggio pannello: 'Spegni' lo toglie dalla scheda (${JSON.stringify(j4.omaggio)})`); }
     ok(await st.getByText("Salvato").isVisible() && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
     await rctx.clearCookies({ name: "e2e_serate" }); }
 
@@ -5512,6 +5536,8 @@ else {
     ok(dPatches.length === 2 && JSON.stringify(dPatches[0].body?.tags) === '["Già visitato"]' && last?.visited_at === ieri && JSON.stringify(last?.tags) === '["Già visitato","Non fa per me"]' && !("note" in last), `ci sei stato → diario: data di ieri e 👎, la nota non viene toccata (${JSON.stringify(dPatches)})`);
 
     // Nella scheda della mappa: "Ci sono stato" → foglio → data di oggi e 👍 (passando dalla mappa)
+    // Forno Sei è verificato e offre un caffè dalla 2ª visita (PROPOSTE 12, cookie e2e_serate al posto di places).
+    await dctx.addCookies([{ name: "e2e_serate", value: encodeURIComponent(JSON.stringify({ id: pid("06"), verificato: true, giorni: [], omaggio: { testo: "un caffè", soglia: 2 } })), url: BASE }]);
     dPatches = [];
     await d.goto(`${BASE}/mappa?salvato=${pid("06")}`, { waitUntil: "networkidle" });
     await d.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).catch(() => {});
@@ -5528,18 +5554,27 @@ else {
     const dateP = dPatches.find((x) => x.body && "visited_at" in x.body);
     const likeP = dPatches.filter((x) => x.body?.tags).pop();
     ok(dateP?.body.visited_at === oggi && dateP.id === pid("06") && likeP?.body.tags.includes("Mi è piaciuto") && likeP.body.tags.includes("Già visitato"), `scheda → diario: data di oggi e 👍 salvati (${JSON.stringify(dPatches)})`);
+    ok(!dPatches.some((x) => x.body && "visita_vista_al" in x.body) && (await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: senza permesso di posizione niente prova e nessuna richiesta di permesso");
     ok((await d.getByTestId("diario-scheda-data").textContent()).includes("Ci sei stato oggi") && (await d.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).getAttribute("aria-pressed")) === "true", "scheda → diario: la scheda mostra 'Ci sei stato oggi' e il 👍");
     ok((await d.getByTestId("diario-scheda-link").getAttribute("href")) === "/profilo/diario", "scheda → diario: link 'Il tuo diario'");
+    ok(((await d.getByTestId("omaggio-scheda").textContent().catch(() => "")) ?? "").includes("Alla 2ª visita il locale ti offre un caffè") && (await d.getByTestId("omaggio-mostra").count()) === 0, "omaggio scheda: alla 1ª visita una riga che invoglia a tornare, niente pulsante");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55-scheda-diario.png`, caret: "initial" });
     ok(dEvents.some((e) => e.type === "funzione" && e.props?.nome === "diario" && e.props?.fonte === "scheda"), "scheda → diario: registrato (fonte 'scheda')");
-    // Salta: chiude senza scrivere la data
+    // Salta: chiude senza scrivere la data. Qui con il permesso di posizione già dato e il telefono a
+    // ~40 m dal locale (Forno Sei, 41.88, 12.48): la visita è "vista" (PROPOSTE 28), si salva solo l'ora.
     dPatches = [];
+    await dctx.grantPermissions(["geolocation"], { origin: BASE });
+    await dctx.setGeolocation({ latitude: 41.8803, longitude: 12.4803, accuracy: 20 });
     await d.goto(`${BASE}/mappa?salvato=${pid("06")}`, { waitUntil: "networkidle" });
     await d.getByTestId("stato-salvato").waitFor({ timeout: 8000 }).catch(() => {});
     await d.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
-    await d.waitForTimeout(500);
+    await d.waitForTimeout(800);
+    { const vp = dPatches.find((x) => x.body && "visita_vista_al" in x.body);
+      ok(vp?.id === pid("06") && Object.keys(vp.body).join() === "visita_vista_al" && Math.abs(Date.parse(vp.body.visita_vista_al) - Date.now()) < 120_000 && !JSON.stringify(dPatches).includes("41.88"), `visita vista: vicino al locale si salva solo l'ora, mai la posizione (${JSON.stringify(vp)})`);
+      ok((await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: senza la data della visita (foglio saltato) '📍 sul posto' non compare: il segno vale solo accanto al giorno visto"); }
+    dPatches = dPatches.filter((x) => !(x.body && "visita_vista_al" in x.body));
     ok((await d.getByTestId("diario-foglio").count()) === 0 && !dPatches.some((x) => x.body && "visited_at" in x.body), "scheda → diario: 'Salta' chiude e non scrive la data");
     // "↻ Ci sono tornato" (PROPOSTE.md 8): seconda visita con la data di oggi, titolo "2ª volta", poi "· 2 volte"
     dPatches = [];
@@ -5548,16 +5583,63 @@ else {
     ok((await d.getByTestId("diario-foglio").textContent().catch(() => "")).includes("Ci sei tornato · 2ª volta"), "posti fissi: 'Ci sono tornato' apre il foglio '↻ Ci sei tornato · 2ª volta'");
     await d.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await d.waitForTimeout(400);
-    ok(!dPatches.some((x) => x.body && "visite" in x.body), `posti fissi: 'Salta' non conta la visita (${JSON.stringify(dPatches)})`);
+    ok(!dPatches.some((x) => x.body && ("visite" in x.body || "visita_vista_al" in x.body)), `posti fissi: 'Salta' non conta la visita e non scrive la prova (${JSON.stringify(dPatches)})`);
     await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
     await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
     await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
     await d.waitForTimeout(400);
-    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`); }
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 2 && tp.body.visited_at === oggi && tp.id === pid("06"), `posti fissi: salvando il foglio si contano 2 visite con la data di oggi (${JSON.stringify(dPatches)})`);
+      ok(typeof tp?.body.visita_vista_al === "string", "visita vista: 'Ci sono tornato' sul posto salva la prova insieme alla visita"); }
     ok((await d.getByTestId("diario-scheda-tornato").count()) === 0, "posti fissi: dopo la visita di oggi niente '↻ Ci sono tornato' (due tocchi non fanno due visite)");
+    ok((await d.getByTestId("diario-scheda-vista").textContent().catch(() => "")).includes("Sul posto: il telefono era vicino al locale"), "visita vista: dopo 'Ci sono tornato' oggi sul posto, riga '📍 Sul posto' con la spiegazione già scritta");
+    { const box = await d.getByTestId("diario-scheda-data").boundingBox(); ok(box && box.height <= 44, `visita vista: a 390 px 'Ci sei stato oggi · 2 volte · Cambia' resta su una riga (${box?.height})`); }
     ok((await d.getByTestId("diario-scheda-volte").textContent().catch(() => "")).includes("2 volte"), "posti fissi: la scheda dice '· 2 volte'");
     await d.getByTestId("diario-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
     await d.screenshot({ path: `${OUT}/55b-scheda-tornato.png`, caret: "initial" });
+    // Dal collaudo del 30/10: la prova vale solo accanto al giorno visto, solo oggi e solo vicino al locale.
+    await d.getByTestId("diario-scheda-data").click();
+    await d.getByTestId("diario-foglio").getByRole("button", { name: "Ieri" }).click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    ok((await d.getByTestId("diario-scheda-vista").count()) === 0, "visita vista: spostata la visita a ieri, '📍 Sul posto' sparisce (la prova è di oggi)");
+    dPatches = [];
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").getByRole("button", { name: "Ieri" }).click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 3 && tp.body.visited_at === ieri && !("visita_vista_al" in tp.body), `visita vista: 'Ci sono tornato' con la data di ieri, anche vicino al locale, non scrive la prova (${JSON.stringify(dPatches)})`); }
+    dPatches = [];
+    await dctx.setGeolocation({ latitude: 41.8950, longitude: 12.4950, accuracy: 20 }); // ~2 km da Forno Sei
+    await d.getByTestId("diario-scheda-tornato").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-salva").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("diario-foglio").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    await d.waitForTimeout(400);
+    { const tp = dPatches.find((x) => x.body && "visite" in x.body); ok(tp?.body.visite === 4 && tp.body.visited_at === oggi && !("visita_vista_al" in tp.body), `visita vista: telefono a 2 km dal locale, nessuna prova (${JSON.stringify(dPatches)})`); }
+    // Omaggio (PROPOSTE 12): dalla 2ª visita "Mostralo al tavolo"; si apre solo al locale.
+    await d.getByTestId("omaggio-mostra").click({ timeout: 5000 }).catch(() => {});
+    await d.getByTestId("omaggio-avviso").waitFor({ timeout: 8000 }).catch(() => {});
+    ok(((await d.getByTestId("omaggio-avviso").textContent().catch(() => "")) ?? "").includes("Si apre quando sei al locale") && (await d.getByTestId("omaggio-schermata").count()) === 0, "omaggio scheda: a 2 km dal locale la schermata non si apre");
+    await dctx.setGeolocation({ latitude: 41.8803, longitude: 12.4803, accuracy: 20 });
+    await d.getByTestId("omaggio-mostra").click();
+    await d.getByTestId("omaggio-schermata").waitFor({ timeout: 8000 }).catch(() => {});
+    { const t = (await d.getByTestId("omaggio-schermata").textContent().catch(() => "")) ?? "";
+      ok(t.includes("Un caffè") && t.includes("offerto da Forno Sei") && /^[A-Z]{4}$/.test((await d.getByTestId("omaggio-codice").textContent().catch(() => "")) ?? "") && t.includes("Oggi,"), `omaggio scheda: al locale la schermata con omaggio, locale, giorno e codice (${t.slice(0, 160)})`); }
+    await d.screenshot({ path: `${OUT}/55c-omaggio-schermata.png`, caret: "initial" });
+    ok(dEvents.some((e) => e.type === "funzione" && e.props?.nome === "omaggio"), "omaggio scheda: registrato (solo il nome, nessun dato personale)");
+    await d.keyboard.press("Escape");
+    ok((await d.getByTestId("omaggio-schermata").count()) === 0 && await d.getByTestId("omaggio-mostra").isVisible(), "omaggio scheda: Esc chiude solo la schermata, la scheda del locale resta");
+    { const g = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+      await dctx.addCookies([{ name: "e2e_omaggio", value: encodeURIComponent(JSON.stringify({ [pid("06")]: g })), url: BASE }]);
+      await d.getByTestId("omaggio-mostra").click();
+      await d.getByTestId("omaggio-avviso").waitFor({ timeout: 8000 }).catch(() => {});
+      ok(((await d.getByTestId("omaggio-avviso").textContent().catch(() => "")) ?? "").includes("Già usato") && (await d.getByTestId("omaggio-schermata").count()) === 0, "omaggio scheda: uno ogni 30 giorni ('Già usato il …')"); }
+    await d.getByTestId("omaggio-scheda").evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+    await d.screenshot({ path: `${OUT}/55d-omaggio-scheda.png`, caret: "initial" });
+    await dctx.clearCookies({ name: "e2e_omaggio" });
+    await dctx.clearCookies({ name: "e2e_serate" });
+    await dctx.clearPermissions();
     // Senza migrazione: la scheda non mostra la riga della data e non si rompe
     visitedMissing = true;
     await d.goto(`${BASE}/mappa?salvato=${pid("01")}`, { waitUntil: "networkidle" });

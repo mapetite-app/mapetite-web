@@ -8,6 +8,8 @@ import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
 import SerateTranquille from "./serate";
 import ApertoDal from "./aperto-dal";
+import OmaggioRitorno from "./omaggio";
+import type { Omaggio } from "@/lib/omaggio";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -358,7 +360,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
-  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null };
+  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -442,7 +444,7 @@ export default function Pannello({
       <nav aria-label="Approfondisci" className="mt-4 divide-y divide-border rounded-card border border-border bg-white px-4">
         <Vai id="clienti" titolo="Clienti" testo="Cosa chiedeva chi ti ha trovato, e tutte le azioni" />
         <Vai id="zona" titolo={`Zona`} testo={`Cosa cerca la gente ${zonaNome}, ora per ora`} />
-        <Vai id="promozione" titolo="Promozione" testo="Serate tranquille e posti in evidenza" />
+        <Vai id="promozione" titolo="Promozione" testo="Serate tranquille, omaggio a chi torna, posti in evidenza" />
       </nav>
     </>
   );
@@ -550,6 +552,10 @@ export default function Pannello({
     <>
       <Sezione titolo="Serate tranquille" nota="I giorni in cui di solito hai posto. Chi ti ha salvato lo vede nella tua scheda: niente sconti, niente commissioni." piano="Verified" testId="pannello-serate">
         <SerateTranquille placeId={locale.id} iniziali={demo ? [2, 3] : serate.giorni} at={demo ? new Date().toISOString() : serate.at} verificato={verificato} demo={demo} />
+      </Sezione>
+      {/* "Omaggio a chi torna" (PROPOSTE.md, proposta 12): fedeltà senza tessere né POS, legata alla visita vera. */}
+      <Sezione titolo="Omaggio a chi torna" nota="Un piccolo omaggio per chi torna: lo mostra al tavolo, solo quando è nel locale. Niente sconti, niente commissioni." piano="Verified" testId="pannello-omaggio">
+        <OmaggioRitorno placeId={locale.id} iniziale={demo ? { testo: "un caffè", soglia: 2 } : serate.omaggio ?? null} verificato={verificato} demo={demo} codice={demo ? "KTRA" : serate.codiceOggi ?? null} mostrati={demo ? 7 : serate.omaggiMostrati ?? 0} />
       </Sezione>
       {/* "Aperto da poco" (PROPOSTE.md, proposta 7): i primi mesi sono i più fragili. */}
       <Sezione titolo="Aperto da poco" nota="Il mese in cui hai aperto. Per il primo anno la tua scheda lo dice: chi ama il tuo genere ti scopre prima." piano="Verified" testId="pannello-aperto-dal">

@@ -8,6 +8,7 @@ import { saveVisit } from "@/lib/diario-write";
 import { VisitaContext } from "@/lib/visita-context";
 import { track, trackFeature } from "@/lib/track";
 import DiarioFoglio, { type DiarioValori } from "@/components/diario-foglio";
+import OmaggioScheda from "@/components/omaggio-scheda";
 import { visitaVistaQui } from "@/lib/visita-vista";
 
 // Nella scheda di un locale segnato "Ci sono stato" (piano 4.4): quando ci sei stato e il link
@@ -139,6 +140,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
           <span aria-hidden>📍 </span>Sul posto: il telefono era vicino al locale quando l&apos;hai segnato
         </p>
       )}
+      <OmaggioScheda place={place} visite={stato.visite} coords={coords} />
       {open && (
         <DiarioFoglio
           place={place}

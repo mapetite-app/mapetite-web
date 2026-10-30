@@ -19,11 +19,14 @@ export function provaVisita(fix: Fix | null, locale: Punto | null | undefined): 
   return distanceMeters(fix, locale) <= VISTA_METRI;
 }
 
-async function posizioneSePermessa(timeoutMs = 4000): Promise<Fix | null> {
+async function posizioneSePermessa(timeoutMs = 4000, chiedi = false): Promise<Fix | null> {
   try {
-    if (typeof navigator === "undefined" || !navigator.geolocation || !navigator.permissions) return null;
-    const status = await navigator.permissions.query({ name: "geolocation" });
-    if (status.state !== "granted") return null;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+    if (!chiedi) {
+      if (!navigator.permissions) return null;
+      const status = await navigator.permissions.query({ name: "geolocation" });
+      if (status.state !== "granted") return null;
+    }
     return await new Promise((resolve) => {
       const timer = setTimeout(() => resolve(null), timeoutMs);
       navigator.geolocation.getCurrentPosition(
@@ -43,3 +46,11 @@ export async function visitaVistaQui(locale: Punto | null | undefined): Promise<
   return provaVisita(await posizioneSePermessa(), locale);
 }
 
+/** Come visitaVistaQui, ma dopo un tocco esplicito ("Mostralo al tavolo"): il telefono può chiedere il permesso.
+ *  "lontano" = posizione avuta ma non al locale; "senza" = permesso negato o posizione non disponibile. */
+export async function seiAlLocale(locale: Punto | null | undefined): Promise<"si" | "lontano" | "senza"> {
+  if (!locale) return "senza";
+  const fix = await posizioneSePermessa(10_000, true);
+  if (!fix) return "senza";
+  return provaVisita(fix, locale) ? "si" : "lontano";
+}
