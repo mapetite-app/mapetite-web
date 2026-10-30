@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Corner cerca per atmosfera tra i posti della sua mappa, non tra i tuoi; Mapstr solo con filtri. Nessuno usa le tue note.
 - **Valore per l'utente:** decide tra i posti che ha già raccolto, che è il motivo per cui li ha salvati. **Valore per il ristoratore:** chi lo aveva salvato ci va davvero (il dato "salvato → visita").
 - **Sforzo:** M. **Costo:** zero Google; un Haiku per domanda (circa 2–3k token, sotto un decimo di centesimo).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **Costruita il 30/10 sera** (ricerca dei salvati: una frase di 3+ parole mostra "Chiedi ai tuoi posti"; prova dal vivo: 1,2–1,5 s, ~800 token in ingresso e 100 in uscita, circa 0,1 centesimi a domanda).
 
 ## 29/10/2026 (notte, sessione 22:08, CEO che chiude)
 

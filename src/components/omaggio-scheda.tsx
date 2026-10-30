@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { giornoLeggibile, pulisciOmaggio, type Omaggio } from "@/lib/omaggio";
 import { seiAlLocale } from "@/lib/visita-vista";
 import { trackFeature } from "@/lib/track";
+import { leggiInfoLocale } from "@/components/posto-locale";
 
 // "Grazie di essere tornato" (PROPOSTE.md 12) nella scheda di un locale segnato "Ci sono stato".
 // Il titolare verificato offre un piccolo omaggio (un caffè, il dolce) dalla 2ª o 3ª visita.
@@ -20,12 +21,11 @@ export default function OmaggioScheda({ place, visite, coords }: { place: { id: 
   const [schermata, setSchermata] = useState<Schermata | null>(null);
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    fetch(`/api/ristoratore/serate?id=${encodeURIComponent(place.id)}`, { signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setInfo({ id: place.id, omaggio: j?.verificato ? pulisciOmaggio(j.omaggio?.testo, j.omaggio?.soglia) : null }))
-      .catch(() => { /* senza rete: niente riga */ });
-    return () => ctrl.abort();
+    let vivo = true;
+    leggiInfoLocale(place.id).then((j) => {
+      if (vivo) setInfo({ id: place.id, omaggio: j ? pulisciOmaggio(j.omaggio?.testo, j.omaggio?.soglia) : null });
+    });
+    return () => { vivo = false; };
   }, [place.id]);
 
   useEffect(() => {
