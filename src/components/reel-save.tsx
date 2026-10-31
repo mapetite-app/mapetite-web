@@ -455,7 +455,8 @@ function PlaceRow({
     const place = st.out.place!;
     return (
       <div className="rounded-card border border-success/30 bg-success/10 p-4" data-testid="reel-salvato" aria-live="polite">
-        {auto && <div className="mb-3"><Foto place={st.top} big /></div>}
+        {/* Senza foto Google niente riquadro da 160 px con la sola emoji (collaudo 31/10: riquadro troppo lungo). */}
+        {auto && st.top.photoRef && <div className="mb-3"><Foto place={st.top} big /></div>}
         <p className="text-xs font-semibold uppercase tracking-wide text-success">
           {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Voglio andarci"}
         </p>
@@ -464,26 +465,27 @@ function PlaceRow({
         <VerdettoSubito place={st.top} />
         {!st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} bg-brand text-white`}>
-            Apri sulla mappa
+        {/* Una cosa principale ("Apri sulla mappa"); le altre due in una riga di testo sotto (collaudo 31/10:
+            il riquadro era denso). Proposta 35: "Altri come questo" apre i simili di questo posto, 1 Google
+            e 1 Haiku solo se toccato. */}
+        <Link href={`/mappa?salvato=${encodeURIComponent(place.id)}`} className={`${btn} mt-3 w-full justify-center bg-brand text-white`}>
+          Apri sulla mappa
+        </Link>
+        <div className="mt-1 flex items-center justify-between gap-2" data-testid="reel-azioni">
+          <Link
+            href={`/mappa?come=${encodeURIComponent(place.id)}`}
+            onClick={() => trackFeature("altri_come_reel")}
+            data-testid="reel-altri-come"
+            className="inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline decoration-brand/30 underline-offset-4"
+          >
+            ✨ Altri come questo
           </Link>
           {st.auto && (
-            <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className={`${btn} border border-border bg-white text-brand`}>
+            <button type="button" onClick={() => notThis(st.top, st.rest, st.out)} disabled={linking} data-testid="reel-non-e-questo" className="min-h-11 shrink-0 px-1 text-sm text-text-muted underline underline-offset-4 disabled:opacity-60">
               Non è questo
             </button>
           )}
         </div>
-        {/* Proposta 35: dal reel appena visto, i posti simili fuori dai soliti giri (stessa ricerca della
-            scheda, 1 Google e 1 Haiku solo se toccata). Link e non pulsante: la cosa principale resta "Apri". */}
-        <Link
-          href={`/mappa?come=${encodeURIComponent(place.id)}`}
-          onClick={() => trackFeature("altri_come_reel")}
-          data-testid="reel-altri-come"
-          className="mt-2 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline-offset-2 hover:underline"
-        >
-          ✨ Altri come questo
-        </Link>
       </div>
     );
   }

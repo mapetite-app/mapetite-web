@@ -1275,6 +1275,15 @@ export default function MapView({
   })();
 
 
+  // "Dai tuoi salvati": dalla riga sopra le card o dal suo segnalino sulla mappa, si apre la scheda.
+  const apriDaiSalvati = (place: Place, da: "riga" | "pin") => {
+    trackFeature("dai_tuoi_salvati", { da });
+    viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
+    dispatch({ type: "OPEN_VENUE", placeId: place.id });
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 16) });
+  };
+
   // Un locale e' salvato se il suo UUID canonico e' in savedIds.
   const isPlaceSaved = (id: string): boolean => {
     const uuid = resolveUuid(id);
@@ -1841,13 +1850,13 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190) => {
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom }; return; }
     pendingFitRef.current = null;
     const lngs = list.map((p) => p.lng);
     const lats = list.map((p) => p.lat);
@@ -1856,7 +1865,7 @@ export default function MapView({
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom: Math.round(h * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom: Math.round(h * 0.5) + extraBottom, left: 40, right: 40 }, maxZoom: 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -2386,6 +2395,25 @@ export default function MapView({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
   }, []);
+
+  // "Dai tuoi salvati": se un salvato scelto resta fuori dalla parte di mappa libera (fuori schermo o sotto
+  // la riga e le card), la mappa si allarga una volta per ricerca a risultati + salvati scelti (collaudo 31/10).
+  const inquadratoPer = useRef<number | null>(null);
+  const dalSalvatiChiave = dalSalvatiVisti.map((d) => d.place.id).join(",");
+  useEffect(() => {
+    if (!dalSalvati || dalSalvatiVisti.length === 0 || inquadratoPer.current === dalSalvati.ticket || isDesktop()) return;
+    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number } } } | null)?.getMap?.();
+    if (!map || !mapReadyRef.current) return;
+    inquadratoPer.current = dalSalvati.ticket;
+    const w = window.innerWidth, h = window.innerHeight;
+    // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
+    const fuori = dalSalvatiVisti.some(({ place }) => {
+      const pt = map.project([place.lng, place.lat]);
+      return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
+    });
+    if (fuori) fitToPlaces([...(aiSearch?.risultati ?? []), ...dalSalvatiVisti.map((d) => d.place)], 190, 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
+  }, [dalSalvatiChiave]);
 
   // /mappa?come=UUID (dal reel appena salvato): una volta sola, quando il salvato e il suo verdetto ci sono.
   // Se il salvato non c'è (tolto, altro account) non parte nessuna ricerca a pagamento.
@@ -3162,7 +3190,7 @@ export default function MapView({
         onLoad={() => {
           mapReadyRef.current = true;
           const pending = pendingFitRef.current;
-          if (pending) fitToPlaces(pending.list, pending.top);
+          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom);
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
@@ -3285,8 +3313,33 @@ export default function MapView({
         })}
 
         {/* I tuoi salvati sempre in vista (?beta=pin-salvati, come Mapstr): piccoli segnalibri anche in Esplora. */}
+        {/* "Dai tuoi salvati" (minore del collaudo del 30/10): i salvati scelti per questa ricerca hanno il
+            loro segnalino, così si vede dove sono rispetto ai risultati. Segnalibro pieno color brand (il corallo è
+            "selezionato"), sotto i risultati; la mappa si allarga per mostrarli (effetto sopra il return). */}
+        {dalSalvatiVisti.map(({ place: p }) => (
+          <Marker
+            key={`dai-salvati-${p.id}`}
+            longitude={p.lng}
+            latitude={p.lat}
+            anchor="bottom"
+            style={{ zIndex: 1 }}
+            onClick={(e) => { e.originalEvent.stopPropagation(); apriDaiSalvati(p, "pin"); }}
+          >
+            <span data-testid="pin-dai-salvati" data-place={p.id} className="flex cursor-pointer flex-col items-center">
+              <span
+                aria-label={`${p.name}, dai tuoi salvati`}
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-brand text-white shadow-float"
+              >
+                <Bookmark size={16} fill="currentColor" aria-hidden />
+              </span>
+              <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
+                📌 {pinName(p.name)}
+              </span>
+            </span>
+          </Marker>
+        ))}
         {savedPinsOn && view === "all" && (() => {
-          const shown = new Set(mapPlaces.map((p) => resolveUuid(p.id) ?? p.id));
+          const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
           return savedPlaces.filter((p) => !shown.has(p.id)).map((p) => (
             <Marker
               key={`salvato-${p.id}`}
@@ -3664,13 +3717,7 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           fromSaved={dalSalvatiVisti}
-          onOpenSaved={(place) => {
-            trackFeature("dai_tuoi_salvati");
-            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
-            dispatch({ type: "OPEN_VENUE", placeId: place.id });
-            const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-            if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 16) });
-          }}
+          onOpenSaved={(place) => apriDaiSalvati(place, "riga")}
           onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
