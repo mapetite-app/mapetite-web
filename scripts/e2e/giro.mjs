@@ -5196,14 +5196,15 @@ else {
   const Lr = { id: LOC, name: "Osteria Pigneto", address: locR.place.address, category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GOSTERIA" };
   // Tavoli da Mapetite (PROPOSTE 3, passo 3): tre persone, una di parola (3 concluse altrove), una disdetta che non conta.
   const oggiK = (n) => { const d = new Date(Date.now() + n * 86_400_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-  const pr = (id, placeId, date, extra = {}) => ({ id, placeId, placeName: "X", via: "whatsapp", createdAt: Date.now() - 86_400_000, date, time: "20:00", people: 2, special: null, lat: null, lng: null, ...extra });
+  const pr = (id, placeId, date, extra = {}) => ({ id, placeId, placeName: "X", via: "whatsapp", createdAt: Date.now() - 86_400_000, date, time: "20:00", ...extra });
   const prenR = [
-    { user_id: "A", dati: pr("a001", LOC, oggiK(-3), { outcome: "bene" }) }, { user_id: "A", dati: pr("a002", "ALTRO", oggiK(-20), { outcome: "bene" }) }, { user_id: "A", dati: pr("a003", "ALTRO", oggiK(-40), { outcome: "male" }) },
+    { user_id: "A", dati: pr("a001", LOC, oggiK(-3), { outcome: "bene" }) }, { user_id: "A", dati: pr("a002", "Z", oggiK(-20), { outcome: "bene" }) }, { user_id: "A", dati: pr("a003", "Z", oggiK(-40), { outcome: "male" }) },
     { user_id: "B", dati: pr("b001", "GOSTERIA", oggiK(5)) }, { user_id: "B", dati: pr("b002", LOC, oggiK(6), { outcome: "non-andato", disdetta: Date.now() }) },
     { user_id: "C", dati: pr("c001", LOC, oggiK(-1), { outcome: "non-andato" }) }, { user_id: "C", dati: pr("c002", LOC, oggiK(-90), { createdAt: Date.now() - 95 * 86_400_000 }) },
   ];
+  await setCookie("e2e_prenotazioni", prenR);
   await setCookie("e2e_ristoratore", {
-    locale: Lr, simili: [Lr], verificato: true, salvati: [], prenotazioni: prenR,
+    locale: Lr, simili: [Lr], verificato: true, salvati: [],
     eventi: [
       { created_at: iso(60), type: "ricerca", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], zona: "Pigneto" } },
       { created_at: iso(59), type: "apri_scheda", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: "GOSTERIA", props: { fonte: "ricerca" } },

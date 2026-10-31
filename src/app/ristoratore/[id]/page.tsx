@@ -48,7 +48,10 @@ async function e2eDati(id: string): Promise<Dati | null> {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
     const giorni = PERIODI.find((p) => String(p) === String(v.giorni)) ?? 30;
-    const prenotazioni = Array.isArray(v.prenotazioni) ? contaPrenotazioni(v.prenotazioni, v.locale, giorni) : null;
+    // Prenotazioni finte in un cookie a parte (e2e_prenotazioni): in uno solo non ci stanno.
+    let finte: unknown = null;
+    try { finte = JSON.parse(decodeURIComponent((await cookies()).get("e2e_prenotazioni")?.value ?? "null")); } catch { /* niente */ }
+    const prenotazioni = Array.isArray(finte) ? contaPrenotazioni(finte, v.locale, giorni) : null;
     return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
