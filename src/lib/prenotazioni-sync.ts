@@ -21,10 +21,14 @@ function remote(v: unknown): PrenotazioneAccount[] {
 function ids(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
+// Confronto che non dipende dall'ordine delle chiavi (niente riscritture inutili del telefono).
+function firma(list: unknown[]): string {
+  return JSON.stringify(list, (_k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined && x !== null).sort(([a], [b]) => a.localeCompare(b))) : v));
+}
 function unisci(j: Risposta) {
   const locali = loadBookings();
   const merged = unisciPrenotazioni(locali, remote(j.prenotazioni), [...ids(j.tolte), ...tolteInAttesa()]);
-  if (JSON.stringify(merged) !== JSON.stringify(locali)) sostituisciPrenotazioni(merged);
+  if (firma(merged) !== firma(locali)) sostituisciPrenotazioni(merged);
 }
 
 // Stato del consenso e, se acceso: le tolte in attesa vanno all'account, quelle dell'account si

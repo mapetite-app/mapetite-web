@@ -21,7 +21,9 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 //   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Voglio andarci" salvato da più di una settimana
 //   copertine     nel profilo: ogni raccolta mostra le emoji e i nomi dei suoi locali invece dell'iniziale
 //   home-salvati  in home, per chi ha salvati: "N posti da provare" con "Stasera dove andiamo?" e "I miei N"
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati";
+//   prenota-account  in "Le mie prenotazioni": "Tienile sul tuo account" (Cliente di parola, passo 2; spenta
+//                 dal 31/10 dopo due collaudi bocciati, si prova con ?beta=prenota-account)
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati" | "prenota-account";
 const OPTIN_KEY = "mapetite.beta";
 
 // Accese per tutti dal 14/10 (Lorenzo: carta bianca, "accendi quello che hai verificato").

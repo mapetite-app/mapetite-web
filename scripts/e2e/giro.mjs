@@ -3924,7 +3924,7 @@ else {
       if (pa) {
         const pul = pa.pulisciPrenotazione({ ...b({ id: "abcd1", outcome: "bene", createdAt: 1_790_000_000_000 }), extra: "<script>", people: 500, date: "domani", via: "whatsapp" });
         ok(pul && !("extra" in pul) && pul.people === null && pul.date === null && pul.outcome === "bene", "prenotazioni sull'account: solo i campi noti, valori fuori forma tolti");
-        ok(pa.pulisciPrenotazione({ ...b({ id: "abcd2", createdAt: 1_790_000_000_000 }), via: "email" }) === null && pa.pulisciPrenotazione(b({ id: "abcd3", createdAt: 1e300 })) === null && pa.pulisciPrenotazione(b({ id: "abcd4", createdAt: 1_790_000_000_000, disdetta: 1e300 }))?.disdetta === null && pa.pulisciPrenotazione({ id: "a" }) === null && pa.pulisciPrenotazione("x") === null, "prenotazioni sull'account: prenotazioni non valide rifiutate");
+        ok(pa.pulisciPrenotazione({ ...b({ id: "abcd2", createdAt: 1_790_000_000_000 }), via: "email" }) === null && pa.pulisciPrenotazione(b({ id: "abcd3", createdAt: 1e300 })) === null && pa.pulisciPrenotazione(b({ id: "abcd5", createdAt: 1_790_000_000_000, date: "2026-02-31" }))?.date === null && pa.pulisciPrenotazione(b({ id: "abcd4", createdAt: 1_790_000_000_000, disdetta: 1e300 }))?.disdetta === null && pa.pulisciPrenotazione({ id: "a" }) === null && pa.pulisciPrenotazione("x") === null, "prenotazioni sull'account: prenotazioni non valide rifiutate");
         const u = pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2, outcome: null }), b({ id: "l2", createdAt: 3 })], [b({ id: "l1", createdAt: 2, outcome: "bene" }), b({ id: "r1", createdAt: 1 })]);
         ok(u.map((x) => x.id).join() === "r1,l1,l2" && u.find((x) => x.id === "l1").outcome === "bene", "prenotazioni sull'account: unione per id, l'account riempie i vuoti del telefono");
         ok(pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2 }), b({ id: "l2", createdAt: 3 })], [b({ id: "r1", createdAt: 1 })], ["l1", "r1"]).map((x) => x.id).join() === "l2", "prenotazioni sull'account: le tolte (lapidi) non tornano né dal telefono né dall'account");
@@ -5419,12 +5419,17 @@ else {
       if (m === "GET") return route.fulfill({ json: st() });
       if (m === "PUT") { acc.consenso = true; for (const p of body.prenotazioni) if (!acc.tolte.has(p.id)) acc.list.set(p.id, p); return route.fulfill({ json: { ok: true, ...st() } }); }
       if (m === "POST") { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); if (!acc.consenso) return route.fulfill({ status: 403, json: {} }); for (const p of body.prenotazioni) if (!acc.tolte.has(p.id)) acc.list.set(p.id, p); return route.fulfill({ json: { ok: true } }); }
-      if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); acc.tolte.clear(); } else { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); acc.list.delete(body.id); acc.tolte.add(body.id); } return route.fulfill({ json: { ok: true } }); }
+      if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); } else { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); acc.list.delete(body.id); acc.tolte.add(body.id); } return route.fulfill({ json: { ok: true } }); }
       return route.fallback();
     });
+    // Spenta per tutti dopo due collaudi bocciati: senza ?beta=prenota-account niente riga e niente chiamate.
     await pp.reload({ waitUntil: "networkidle" });
+    await pp.waitForTimeout(300);
+    ok((await pp.getByTestId("prenotazioni-account").count()) === 0 && acc.calls.length === 0, "prenotazioni sull'account: spenta per tutti (nessuna riga, nessuna chiamata)");
+    await pp.goto(`${BASE}/prenotazioni?beta=prenota-account`, { waitUntil: "networkidle" });
     await pp.getByTestId("prenotazioni-account").waitFor({ timeout: 5000 }).catch(() => {});
     const card = pp.getByTestId("prenotazioni-account");
+    { const c = await card.boundingBox(); const l = await past.last().boundingBox(); ok(!!c && !!l && c.y > l.y && c.height <= 90, `prenotazioni sull'account: riga sottile sotto l'elenco (alta ${Math.round(c?.height ?? 0)} px)`); }
     ok(await card.isVisible() && (await card.textContent()).includes("Tienile sul tuo account") && (await card.getByRole("link", { name: "Cosa salviamo" }).getAttribute("href")) === "/privacy#prenotazioni", "prenotazioni sull'account: spento di base, invito con 'Cosa salviamo' (informativa)");
     ok(!acc.calls.some((c) => c.m !== "GET"), "prenotazioni sull'account: senza consenso nessuna scrittura");
     await pshot("85-prenotazioni-account-invito");
@@ -5452,7 +5457,7 @@ else {
     await pp.getByTestId("prenotazioni-account-spegni-conferma").getByRole("button", { name: "Sì, togli" }).click();
     await pp.getByTestId("prenotazioni-account").waitFor({ timeout: 5000 }).catch(() => {});
     const n0 = acc.calls.length;
-    ok(!acc.consenso && acc.list.size === 0 && acc.tolte.size === 0 && await pp.getByTestId("prenotazioni-account").isVisible() && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.account"))) === null, "prenotazioni sull'account: spento, cancellate dall'account, restano sul telefono");
+    ok(!acc.consenso && acc.list.size === 0 && acc.tolte.has("x9x9") && await pp.getByTestId("prenotazioni-account").isVisible() && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.account"))) === null, "prenotazioni sull'account: spento, cancellate dall'account (restano solo le lapidi), restano sul telefono");
     { const w = await width(); ok(w <= 390, `prenotazioni sull'account: niente scorrimento orizzontale (${w}px)`); }
     ok(acc.calls.length === n0, "prenotazioni sull'account: spento, nessuna chiamata in più");
     // Ripristino per i controlli dopo: stesso elenco di prima (Pub Fuori Tema tolto, x9 tolta).

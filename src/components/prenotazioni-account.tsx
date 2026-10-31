@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 import { accendiPrenotazioniAccount, sincronizzaPrenotazioni, spegniPrenotazioniAccount, type StatoAccount } from "@/lib/prenotazioni-sync";
 import { trackFeature } from "@/lib/track";
 
-// "Tienile sul tuo account" (Cliente di parola, passo 2, PROPOSTE.md 3): una riga in /prenotazioni.
+// "Tienile sul tuo account" (Cliente di parola, passo 2, PROPOSTE.md 3): una riga sotto l'elenco di /prenotazioni.
 // Spento di base: si accende solo con il tocco della persona, dopo aver letto cosa si salva.
 // Senza accesso (401) o con un errore non compare niente: le prenotazioni restano sul telefono.
 export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPrenotazioni: boolean; onStato?: (s: StatoAccount) => void }) {
@@ -52,7 +52,7 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
       );
     }
     return (
-      <p data-testid="prenotazioni-account-acceso" className="mt-3 flex flex-wrap items-center gap-x-2 text-sm font-sans text-text-muted">
+      <p data-testid="prenotazioni-account-acceso" className="mt-6 flex flex-wrap items-center justify-center gap-x-2 text-sm font-sans text-text-muted">
         <span className="inline-flex items-center gap-1 font-display font-semibold text-brand"><Check size={15} aria-hidden /> Sul tuo account</span>
         <span aria-hidden>·</span>
         <button type="button" data-testid="prenotazioni-account-spegni" onClick={() => { setErrore(null); setChiedi(true); }} className="min-h-10 font-display font-semibold text-text-muted underline underline-offset-2">
@@ -64,13 +64,17 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
   }
 
   if (stato !== "spento" || !haPrenotazioni) return null;
+  // Riga sottile sotto l'elenco (dal secondo collaudo): le prenotazioni restano la cosa principale.
   return (
-    <div data-testid="prenotazioni-account" className="mt-4 rounded-card border border-border bg-white p-4 shadow-card">
-      <p className="font-display text-[15px] font-semibold text-brand">Tienile sul tuo account</p>
-      <p className="mt-1 text-sm font-sans leading-relaxed text-text-muted">
-        Non le perdi cambiando telefono e «di parola» vale ovunque.{" "}
-        <Link href="/privacy#prenotazioni" className="font-display font-semibold text-brand underline underline-offset-2">Cosa salviamo</Link>
-      </p>
+    <div data-testid="prenotazioni-account" className="mt-6 flex items-center gap-3 rounded-card border border-dashed border-border px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-display font-semibold text-brand">Tienile sul tuo account</p>
+        <p className="mt-0.5 text-xs font-sans leading-relaxed text-text-muted">
+          Non le perdi cambiando telefono.{" "}
+          <Link href="/privacy#prenotazioni" className="font-semibold text-brand underline underline-offset-2">Cosa salviamo</Link>
+        </p>
+        {errore && <p role="status" className="mt-1 text-xs font-sans text-accent">{errore}</p>}
+      </div>
       <button
         type="button"
         data-testid="prenotazioni-account-attiva"
@@ -83,11 +87,10 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
           if (ok) { imposta("acceso"); trackFeature("prenotazioni_account", { stato: "acceso" }); }
           else setErrore("Non ci sono riuscito. Riprova tra poco.");
         }}
-        className="mt-3 min-h-11 w-full rounded-pill bg-brand px-4 text-[15px] font-display font-semibold text-white active:scale-[0.98] disabled:opacity-60"
+        className="min-h-10 shrink-0 rounded-pill border border-brand px-4 text-sm font-display font-semibold text-brand active:scale-[0.98] disabled:opacity-60"
       >
         {busy ? "Un attimo…" : "Attiva"}
       </button>
-      {errore && <p role="status" className="mt-2 text-xs font-sans text-accent">{errore}</p>}
     </div>
   );
 }

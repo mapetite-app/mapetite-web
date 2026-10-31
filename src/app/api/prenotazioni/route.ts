@@ -8,11 +8,12 @@ import { pulisciPrenotazione, type PrenotazioneAccount } from "@/lib/prenotazion
 //  PUT    → "Attiva": accende il consenso e carica quelle del telefono { prenotazioni }
 //  POST   → salva o aggiorna { prenotazioni: [...] , utente } (solo con consenso, mai lo accende)
 //  DELETE → { id, utente } la toglie lasciando una lapide (un altro telefono non la ricarica);
-//           { tutte: true } "Spegni": prima toglie il consenso, poi cancella tutto.
+//           { tutte: true } "Spegni": prima toglie il consenso, poi cancella tutti i dati (restano
+//           solo le lapidi, un codice senza dati).
 // `utente` è l'account a cui il telefono le ha legate: se è cambiato, nessuna scrittura (409).
 
 const MAX = 30;
-const MAX_RIGHE = 500;        // tetto per persona, lapidi comprese
+const MAX_RIGHE = 300;        // tetto di prenotazioni vive per persona (le lapidi non contano)
 const MAX_CORPO = 64_000;     // byte
 
 // Giro automatico in sviluppo: utente finto, nessuna scrittura vera (memoria del processo).
@@ -60,7 +61,12 @@ function riga(userId: string, p: PrenotazioneAccount) {
 type Sb = Awaited<ReturnType<typeof createClient>>;
 async function stato(supabase: Sb, userId: string) {
   const { data: c } = await supabase.from("prenotazioni_consenso").select("user_id").eq("user_id", userId).maybeSingle();
-  if (!c) return { utente: userId, consenso: false, prenotazioni: [], tolte: [] };
+  if (!c) {
+    // Consenso spento ma righe rimaste (uno "Spegni" a metà, o una scrittura arrivata insieme): si
+    // cancellano adesso. Le lapidi restano (solo un codice, nessun dato).
+    await supabase.from("prenotazioni").delete().eq("user_id", userId).is("cancellata_at", null);
+    return { utente: userId, consenso: false, prenotazioni: [], tolte: [] };
+  }
   const [vive, lapidi] = await Promise.all([
     supabase.from("prenotazioni").select("dati").eq("user_id", userId).is("cancellata_at", null).order("created_at", { ascending: false }).limit(MAX),
     supabase.from("prenotazioni").select("id").eq("user_id", userId).not("cancellata_at", "is", null).order("cancellata_at", { ascending: false }).limit(200),
@@ -71,9 +77,19 @@ async function stato(supabase: Sb, userId: string) {
 }
 async function salva(supabase: Sb, userId: string, list: PrenotazioneAccount[]): Promise<number> {
   if (list.length === 0) return 200;
-  const { count } = await supabase.from("prenotazioni").select("id", { count: "exact", head: true }).eq("user_id", userId);
-  if ((count ?? 0) + list.length > MAX_RIGHE) return 409;
-  const { error } = await supabase.from("prenotazioni").upsert(list.map((p) => riga(userId, p)), { onConflict: "user_id,id" });
+  // Le lapidi non si riempiono di nuovo: le prenotazioni già tolte si saltano.
+  const { data: gia, error: ge } = await supabase.from("prenotazioni").select("id, cancellata_at").eq("user_id", userId).in("id", list.map((p) => p.id));
+  if (ge) return 500;
+  const lapidi = new Set((gia ?? []).filter((r) => r.cancellata_at).map((r) => r.id as string));
+  const esistenti = new Set((gia ?? []).map((r) => r.id as string));
+  const vive = list.filter((p) => !lapidi.has(p.id));
+  if (vive.length === 0) return 200;
+  const nuove = vive.filter((p) => !esistenti.has(p.id)).length;
+  if (nuove > 0) {
+    const { count } = await supabase.from("prenotazioni").select("id", { count: "exact", head: true }).eq("user_id", userId).is("cancellata_at", null);
+    if ((count ?? 0) + nuove > MAX_RIGHE) return 409;
+  }
+  const { error } = await supabase.from("prenotazioni").upsert(vive.map((p) => riga(userId, p)), { onConflict: "user_id,id" });
   if (!error) return 200;
   console.warn(`[prenotazioni] salvataggio non riuscito ${error.code ?? ""}`);
   return error.code === "42501" ? 403 : 500; // 42501: RLS, consenso spento
@@ -106,7 +122,8 @@ export async function PUT(request: Request) {
     console.warn(`[prenotazioni] consenso non salvato ${ce.code ?? ""}`);
     return NextResponse.json({ error: "Non sono riuscito a salvare la scelta." }, { status: 500 });
   }
-  await salva(supabase, userId, list);
+  const st = await salva(supabase, userId, list);
+  if (st !== 200) return NextResponse.json({ error: "Non sono riuscito a caricarle." }, { status: st });
   const s = await stato(supabase, userId);
   return NextResponse.json({ ok: true, ...(s ?? { utente: userId, consenso: true, prenotazioni: [], tolte: [] }) });
 }
@@ -137,7 +154,7 @@ export async function DELETE(request: Request) {
   if (!tutte && (!id || !per)) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
   const { supabase, userId, dev } = await utente();
   if (dev) {
-    if (tutte) { dev.consenso = false; dev.list.clear(); dev.tolte.clear(); return NextResponse.json({ ok: true }); }
+    if (tutte) { dev.consenso = false; dev.list.clear(); return NextResponse.json({ ok: true }); }
     if (per !== dev.id) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
     if (dev.consenso) { dev.list.delete(id!); dev.tolte.add(id!); }
     return NextResponse.json({ ok: true });
@@ -147,7 +164,9 @@ export async function DELETE(request: Request) {
     // Prima il consenso: da quel momento la RLS rifiuta ogni scrittura in arrivo.
     const { error: ce } = await supabase.from("prenotazioni_consenso").delete().eq("user_id", userId);
     if (ce) return NextResponse.json({ error: "Non sono riuscito a spegnere." }, { status: 500 });
-    const { error } = await supabase.from("prenotazioni").delete().eq("user_id", userId);
+    // Le lapidi restano (solo il codice della prenotazione tolta, nessun dato): se si riaccende, un
+    // altro telefono non può ricaricare quelle già tolte. Se questo passo fallisce, lo rifà la GET dopo.
+    const { error } = await supabase.from("prenotazioni").delete().eq("user_id", userId).is("cancellata_at", null);
     if (error) return NextResponse.json({ error: "Non sono riuscito a toglierle." }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

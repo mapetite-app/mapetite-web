@@ -12,6 +12,14 @@ const n = (v: unknown): number | null => (typeof v === "number" && Number.isFini
 const t = (v: unknown): number | null => { const x = n(v); return x != null && x >= 1_577_836_800_000 && x <= 4_102_444_800_000 ? x : null; };
 const b = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 
+// "AAAA-MM-GG" di un giorno che esiste (niente 31 febbraio: il database lo rifiuterebbe).
+function dataVera(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const [y, m, g] = d.split("-").map(Number);
+  const x = new Date(Date.UTC(y, m - 1, g));
+  return x.getUTCFullYear() === y && x.getUTCMonth() === m - 1 && x.getUTCDate() === g;
+}
+
 export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
@@ -31,7 +39,7 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
     placeName,
     via: o.via as BookingRequest["via"],
     createdAt,
-    date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+    date: date && dataVera(date) ? date : null,
     time: time && /^\d{2}:\d{2}$/.test(time) ? time : null,
     people: people != null && people >= 1 && people <= 50 ? Math.round(people) : null,
     special: s(o.special, 200),

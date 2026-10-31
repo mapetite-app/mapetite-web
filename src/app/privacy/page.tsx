@@ -26,7 +26,7 @@ const SEZIONI: { titolo: string; righe: string[] }[] = [
       "I tuoi posti: locali salvati, note, raccolte, visite (\"Ci sono stato\"), recensioni e foto che pubblichi, gruppi e persone che segui.",
       "Uso dell'app: quali funzioni usi e le ricerche che fai, per capire cosa migliorare. Con una ricerca può essere registrato il punto della mappa da cui cerchi.",
       "Posizione: solo se la permetti, per mostrare le distanze e i posti vicini. Non la seguiamo in background.",
-      "Prenotazioni: le richieste che mandi ai locali da Mapetite restano sul telefono. Solo se tocchi \"Attiva\" in Le mie prenotazioni le teniamo anche sul tuo account (locale, giorno, ora, persone, eventuale richiesta speciale, come l'hai chiesta, se ci sei andato o hai disdetto), per non perderle cambiando telefono e contare la riga \"di parola\". Oggi non le vede nessun altro, nemmeno il locale. Con \"Spegni\" le cancelliamo dall'account.",
+      "Prenotazioni: le richieste che mandi ai locali da Mapetite restano sul telefono. Solo se tocchi \"Attiva\" in Le mie prenotazioni (su uno dei tuoi telefoni) le teniamo anche sul tuo account (locale con indirizzo e numero, giorno, ora, persone, eventuale richiesta speciale, come l'hai chiesta, se ci sei andato o hai disdetto), per non perderle cambiando telefono e contare la riga \"di parola\". Oggi non le vede nessun altro, nemmeno il locale. Con \"Spegni\" le cancelliamo dall'account: delle prenotazioni che avevi tolto resta solo un codice senza dati, perché non ricompaiano.",
       "Sul telefono restano alcune preferenze (per esempio l'ultima vista della mappa e le risposte del primo accesso non ancora salvate).",
     ],
   },

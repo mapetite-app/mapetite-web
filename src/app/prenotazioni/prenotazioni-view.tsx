@@ -18,6 +18,7 @@ import {
 import { track } from "@/lib/track";
 import PrenotazioniAccount from "@/components/prenotazioni-account";
 import type { StatoAccount } from "@/lib/prenotazioni-sync";
+import { useOptIn } from "@/lib/beta";
 
 // "Le mie prenotazioni" (piano 1.5b): le richieste mandate ai locali dal foglio Prenota,
 // salvate nel telefono. Stato: Richiesta inviata → Confermata (lo segna l'utente: Mapetite
@@ -272,6 +273,7 @@ export default function PrenotazioniView() {
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const { upcoming, past } = splitBookings(list);
   const [sullAccount, setSullAccount] = useState(false);
+  const accountAcceso = useOptIn("prenota-account");
   const onStato = useCallback((s: StatoAccount) => setSullAccount(s === "acceso"), []);
 
   // Apertura della pagina, una volta (la vista "pagina" la conta già track-auto).
@@ -289,7 +291,6 @@ export default function PrenotazioniView() {
       <p className="mt-1 text-sm font-sans text-text-muted">
         Le richieste che hai mandato ai locali, salvate {sullAccount ? "sul telefono e sul tuo account" : "su questo telefono"}.
       </p>
-      {mounted && <PrenotazioniAccount haPrenotazioni={list.length > 0} onStato={onStato} />}
 
       {!mounted ? (
         <div aria-hidden className="mt-6 h-40 animate-pulse rounded-card bg-surface" />
@@ -337,6 +338,7 @@ export default function PrenotazioniView() {
           )}
         </>
       )}
+      {mounted && accountAcceso && <PrenotazioniAccount haPrenotazioni={list.length > 0} onStato={onStato} />}
     </main>
   );
 }
