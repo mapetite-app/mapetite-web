@@ -467,6 +467,11 @@ const TIPO_PER_RICERCA: Record<string, string> = { Pesce: "ristorante di pesce",
 const CUCINE = new Set(["Giapponese", "Cinese", "Indiano", "Thailandese", "Messicano", "Greco", "Spagnolo", "Francese", "Americano", "Mediorientale", "Vegano", "Vegetariano"]);
 // Aggettivi dei tag AI che non cambiano col genere ("trattoria tradizionale", "bar vivace").
 const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
+// "Messi da parte" senza il posto di partenza di "Altri come questo" (nomi, non id).
+function senzaNome<T extends Record<string, string[] | undefined>>(daParte: T | null, nome: string | null): T | null {
+  if (!daParte || nome == null) return daParte;
+  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
+}
 // Salvato con 👍, o visitato senza 👎: la scheda offre "Altri come questo".
 function piaciuto(tags: string[] | null | undefined): boolean {
   const t = tags ?? [];
@@ -1975,7 +1980,7 @@ export default function MapView({
         }
         const id = ticket;
         setClusterPlaces(null); setFilterError(null);
-        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, simileA: opts.simile?.nome, daParte: data.da_parte ?? null });
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, simileA: opts.simile?.nome, daParte: senzaNome(data.da_parte ?? null, nomeFuori) });
         setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
