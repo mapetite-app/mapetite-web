@@ -19,6 +19,7 @@ export default async function RistoratoreDemoPage({ searchParams }: { searchPara
   const p = computeRistoratore(dati, giorni);
   // Tavoli chiesti da Mapetite (PROPOSTE.md 3, passo 3): anche questi inventati, in proporzione al periodo.
   const tavoli = Math.round(giorni * 0.6) + 4;
-  const prenotazioni = { tavoli, diParola: Math.round(tavoli * 0.45), persone: tavoli - Math.round(tavoli * 0.15) };
+  // Spenta come nel pannello vero (bocciata due volte il 31/10 notte): si vede con ?beta=tavoli.
+  const prenotazioni = sp.beta === "tavoli" ? { tavoli, diParola: Math.round(tavoli * 0.45), persone: tavoli - Math.round(tavoli * 0.15), personeParola: Math.round(tavoli * 0.4) } : null;
   return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }

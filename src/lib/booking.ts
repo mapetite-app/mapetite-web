@@ -369,14 +369,14 @@ export function clienteDiParola(list: BookingRequest[]): number | null {
 // scelto di tenere sull'account; mai nomi: il pannello mostra il numero solo da SOGLIA persone in su.
 // `tutte` = le prenotazioni (di ogni locale) delle persone che hanno prenotato qui: "di parola" si
 // calcola sulle ultime 30, come sul telefono. Contano i tavoli chiesti da `daMs` in poi, disdette escluse.
-export function prenotazioniAlLocale(tutte: { utente: string; p: BookingRequest }[], placeIds: string[], daMs: number): { tavoli: number; diParola: number; persone: number } {
+export function prenotazioniAlLocale(tutte: { utente: string; p: BookingRequest }[], placeIds: string[], daMs: number): { tavoli: number; diParola: number; persone: number; personeParola: number } {
   const ids = new Set(placeIds);
   const perUtente = new Map<string, BookingRequest[]>();
   for (const { utente, p } of tutte) perUtente.set(utente, [...(perUtente.get(utente) ?? []), p]);
   const qui = tutte.filter(({ p }) => ids.has(p.placeId) && p.createdAt >= daMs && p.disdetta == null);
   const ultime = (u: string) => [...(perUtente.get(u) ?? [])].sort((a, c) => a.createdAt - c.createdAt).slice(-30);
   const diParola = new Map([...new Set(qui.map((x) => x.utente))].map((u) => [u, clienteDiParola(ultime(u)) != null]));
-  return { tavoli: qui.length, diParola: qui.filter((x) => diParola.get(x.utente)).length, persone: diParola.size };
+  return { tavoli: qui.length, diParola: qui.filter((x) => diParola.get(x.utente)).length, persone: diParola.size, personeParola: [...diParola.values()].filter(Boolean).length };
 }
 
 // "Prenota come l'ultima volta" (PROPOSTE.md 10): persone e ora dell'ultima richiesta fatta da Mapetite

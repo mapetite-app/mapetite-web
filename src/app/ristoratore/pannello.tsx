@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, CalendarCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
 import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
@@ -362,7 +362,7 @@ export default function Pannello({
   avviso?: string | null;
   vista?: string;
   serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
-  prenotazioni?: { tavoli: number; diParola: number; persone: number } | null;
+  prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -375,6 +375,9 @@ export default function Pannello({
   const risposte = p.visite.piaciuto + p.visite.nonPiaciuto;
   // Tavoli da Mapetite (PROPOSTE.md 3, passo 3): solo da SOGLIA persone, altrimenti si riconoscerebbe chi.
   const tavoli = prenotazioni && prenotazioni.persone >= SOGLIA ? prenotazioni : null;
+  // "Di parola" solo se sia chi lo è sia chi non lo è sono almeno SOGLIA persone: il locale conosce i
+  // nomi di chi ha prenotato, con meno saprebbe chi ha mancato un tavolo (anche altrove).
+  const parola = tavoli && tavoli.personeParola >= SOGLIA && tavoli.persone - tavoli.personeParola >= SOGLIA ? tavoli.diParola : null;
   const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
   const panoramica = (
     <>
@@ -423,9 +426,9 @@ export default function Pannello({
               (sempre presenti o disdetto in tempo). Solo da chi tiene le prenotazioni sull'account. */}
           {tavoli && (
             <p data-testid="pannello-tavoli" className={`flex items-baseline gap-2 ${primaTavoli ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-title text-2xl font-semibold leading-none"><CalendarCheck size={20} aria-hidden />{tavoli.tavoli.toLocaleString("it-IT")}</span>
-              <span className="text-sm font-sans leading-snug text-white/90" title="Di parola: sempre presenti o disdetto in tempo, su Mapetite">
-                {tavoli.tavoli === 1 ? "tavolo" : "tavoli"} da Mapetite{tavoli.diParola > 0 ? ` · ${tavoli.diParola.toLocaleString("it-IT")} di clienti di parola` : ""} ({p.giorni} giorni)
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🤝 {tavoli.tavoli.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">
+                {tavoli.tavoli === 1 ? "tavolo" : "tavoli"} da Mapetite{parola ? `, ${parola.toLocaleString("it-IT")} da clienti che vengono o disdicono in tempo` : ""} ({p.giorni}{"\u00a0"}giorni)
               </span>
             </p>
           )}

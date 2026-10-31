@@ -27,7 +27,7 @@ const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
 type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
-type Prenotazioni = { tavoli: number; diParola: number; persone: number };
+type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null };
 
 // Tavoli chiesti da Mapetite nel periodo (dalla data della richiesta, come gli altri numeri).
@@ -142,11 +142,13 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
       const { data: righe, error: tErr } = await db.from("prenotazioni").select("user_id, dati").in("user_id", persone.slice(0, 500)).is("cancellata_at", null).limit(10_000);
       if (tErr) console.error("[ristoratore] lettura prenotazioni delle persone:", tErr.message);
       prenotazioni = contaPrenotazioni(righe ?? [], locale, giorni);
-    } else if (!pErr) prenotazioni = { tavoli: 0, diParola: 0, persone: 0 };
+    } else if (!pErr) prenotazioni = { tavoli: 0, diParola: 0, persone: 0, personeParola: 0 };
   }
   return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni };
 }
 
+// "Tavoli da Mapetite" (PROPOSTE.md 3, passo 3): bocciata due volte al collaudo del 31/10 notte, per
+// regola spenta finché un revisore nuovo non la approva. Si prova con ?beta=tavoli.
 export default async function RistoratorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
@@ -160,5 +162,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={dati.prenotazioni} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "tavoli" ? dati.prenotazioni : null} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }

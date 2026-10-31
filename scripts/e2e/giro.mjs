@@ -3938,7 +3938,7 @@ else {
         { const P = (u, id, placeId, createdAt, extra = {}) => ({ utente: u, p: b({ id, placeId, createdAt, ...extra }) });
           const due = bk.prenotazioniAlLocale([P("A", "a1", "L", 200), P("B", "b1", "L", 300)], ["L"], 100);
           const fuori = bk.prenotazioniAlLocale([P("A", "a1", "L", 50), P("B", "b1", "M", 200), P("C", "c1", "L", 200, { disdetta: 5 })], ["L"], 100);
-          ok(due.persone === 2 && due.tavoli === 2 && due.diParola === 0 && fuori.tavoli === 0 && fuori.persone === 0, `pannello: tavoli da Mapetite contati solo nel periodo, nel locale e senza disdette (${JSON.stringify(due)} ${JSON.stringify(fuori)})`);
+          ok(due.persone === 2 && due.tavoli === 2 && due.diParola === 0 && due.personeParola === 0 && fuori.tavoli === 0 && fuori.persone === 0, `pannello: tavoli da Mapetite contati solo nel periodo, nel locale e senza disdette (${JSON.stringify(due)} ${JSON.stringify(fuori)})`);
           // Disdetta alle 22:30 di Roma per un tavolo alle 21: non è "in tempo", anche su un server in UTC.
           const tardi = Date.UTC(2026, 9, 10, 20, 30);
           ok(bk.clienteDiParola([b({ id: "t1", date: "2026-10-10", time: "21:00", outcome: "non-andato", disdetta: tardi }), b({ id: "t2", outcome: "bene" }), b({ id: "t3", outcome: "bene" }), b({ id: "t4", outcome: "bene" })]) === null, "cliente di parola: ora del tavolo in ora italiana (disdetta dopo l'ora non conta)"); }
@@ -5213,7 +5213,10 @@ else {
   { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
-    { const t = (await rp.getByTestId("pannello-tavoli").textContent().catch(() => "")) ?? ""; ok(t.startsWith("3") && t.includes("tavoli da Mapetite · 1 di clienti di parola") && !/[ABC]\b/.test(t.replace(/Mapetite|\(|\)/g, "")), `pannello ristoratore: tavoli chiesti da Mapetite e quanti da clienti di parola, senza nomi (${t})`); }
+    ok((await rp.getByTestId("pannello-tavoli").count()) === 0, "pannello ristoratore: 'tavoli da Mapetite' spenta di base (bocciata due volte)");
+    await rp.goto(`${BASE}/ristoratore/${LOC}?beta=tavoli`, { waitUntil: "networkidle" });
+    { const t = (await rp.getByTestId("pannello-tavoli").textContent().catch(() => "")) ?? ""; ok(t.includes("🤝 3") && t.includes("tavoli da Mapetite") && !t.includes("disdicono"), `pannello ristoratore: con ?beta=tavoli 3 tavoli da Mapetite, e con una sola persona di parola niente 'di parola' (${t})`); }
+    await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
   // Serate tranquille sul pannello vero: si salvano (cookie e2e_serate al posto di places) e la scheda le rilegge per Place ID.
