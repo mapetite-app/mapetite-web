@@ -1878,8 +1878,10 @@ else {
     { const rg = p.getByTestId("recensione-google");
       const href = (await rg.count()) ? (await rg.getAttribute("href")) ?? "" : "";
       ok(href.startsWith("https://search.google.com/local/writereview?placeid=") && (await rg.getAttribute("target")) === "_blank", `dopo 👍: 'Aiuta il locale: lascia due righe su Google' con il link ufficiale (${href || "assente"})`); }
+    ok(await p.getByTestId("altri-come").isVisible().catch(() => false), "dopo 👍: 'Altri come questo' nella scheda (proposta 27)");
     await p.getByTestId("com-era").getByRole("button", { name: "👎 Non fa per me" }).click();
     await p.waitForTimeout(400);
+    ok(!(await p.getByTestId("altri-come").isVisible().catch(() => false)), "dopo 👎: niente 'Altri come questo'");
     const t2 = patched?.tags ?? [];
     ok(t1.includes("Mi è piaciuto") && t1.includes("Già visitato") && t2.includes("Non fa per me") && !t2.includes("Mi è piaciuto") && t2.includes("Già visitato"), `com'era: 👍/👎 si escludono e lo stato resta (${JSON.stringify(t2)})`);
     // Ripensamento: "Voglio andarci" dopo un 👎 toglie anche il 👎 (altrimenti resterebbe nascosto e fuori da Stasera)
@@ -1890,6 +1892,28 @@ else {
     await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
     await p.getByTestId("diario-salta").click({ timeout: 5000 }).catch(() => {});
     await p.waitForTimeout(400);
+    // "Altri come questo" (proposta 27): visitato senza 👎 → ricerca nel mondo con i tratti del posto,
+    // "fuori dai soliti giri", attorno al posto; il posto stesso non torna tra i risultati.
+    const nomeQui = ((await p.locator("h2").filter({ hasNotText: /^$/ }).last().textContent()) ?? "").trim();
+    let corpoSimili = null;
+    await p.route("**/api/search", (r) => {
+      corpoSimili = r.request().postDataJSON();
+      return r.fulfill({ json: { ...SEARCH_FAST, risultati: [...PLACES, mk("PDOPPIO", nomeQui, 41.9005, 12.4905)] } });
+    });
+    await p.getByTestId("altri-come").scrollIntoViewIfNeeded().catch(() => {});
+    await p.screenshot({ path: `${OUT}/13c-altri-come.png`, caret: "initial" });
+    await p.getByTestId("altri-come").click();
+    await p.locator("ul.snap-x li").first().waitFor({ timeout: 6000 }).catch(() => {});
+    await p.waitForTimeout(800);
+    const nomi = await p.locator("ul.snap-x li").allTextContents();
+    const testo = (await p.locator("body").textContent()) ?? "";
+    ok(corpoSimili?.source === "world" && /fuori dai soliti giri/.test(corpoSimili?.query ?? "") && corpoSimili?.searchIntent === "natural",
+      `altri come questo: ricerca nel mondo 'fuori dai soliti giri' (${JSON.stringify(corpoSimili?.query)})`);
+    const pillola = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
+    ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith(`come ${nomeQui}`),
+      `altri come questo: pillola '${pillola}', il posto di partenza (anche con un altro id) non è tra i ${nomi.length} risultati`);
+    await p.screenshot({ path: `${OUT}/13d-altri-come-risultati.png`, caret: "initial" });
+    await p.unroute("**/api/search");
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");

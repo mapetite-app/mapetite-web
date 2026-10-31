@@ -2,6 +2,39 @@
 
 Bilancio della settimana, scritto dalla prima sessione del sabato (regola del team gstack). Fonti: `git log` di `main`, PR, `BACKLOG.md`, database di produzione.
 
+## Settimana 24–30/10 (scritta sabato 31/10 alle 03:30)
+
+### Cosa è stato fatto
+- **In produzione (12 PR unite, dalla #98 alla #109):** scheda nuova con foto vera e verdetto in alto; primo accesso nuovo acceso per tutti; avvisi push ("Avvisami quel giorno", nascosti finché mancano le chiavi su Vercel); "Scrivi che sei di parola" nel messaggio di prenotazione; "📍 Sul posto"; omaggio a chi torna (pannello e scheda); "Guarda il reel qui" per Instagram; "Chiedi ai tuoi posti" nei salvati e "Dai tuoi salvati" su ogni ricerca.
+- **Costruito ma spento:** "Prenota su TheFork" (bocciato due volte, si prova con `?beta=prenota`).
+- **Verificato e non fattibile:** leggere un reel Instagram dal link (l'oEmbed senza chiave non dà la didascalia).
+
+### Cosa ha funzionato
+- **Collaudo a due livelli** (bloccanti e minori, deciso nella retro scorsa): i merge sono ripartiti. Le voci passano a 8,5–8,8 al secondo revisore invece di fermarsi per giorni.
+- **Voci piccole e collegate:** "Chiedi ai tuoi posti" (venerdì sera) è diventata "Dai tuoi salvati" la sessione dopo, riusando lo stesso server. Due funzioni in produzione in 5 ore.
+- **Il credito Anthropic è tornato** (Lorenzo, 29/10): il verdetto c'è di nuovo sui locali nuovi.
+
+### Cosa non ha funzionato
+1. **Tanto lato ristoratore, ancora nessun ristoratore.** Omaggio, serate, "cliente di parola": tutto pronto e nessun locale verificato che lo usi. Resta lavoro fermo finché Lorenzo o Roberto non portano il primo.
+2. **Nessuna prova dal vivo delle funzioni AI con salvati veri.** "Chiedi ai tuoi posti" e "Dai tuoi salvati" sono provati con dati simulati e un solo account di prova.
+3. **Il primo revisore boccia quasi sempre** (7–8,2), il secondo approva. Il primo giro trova difetti veri, ma costa una sessione intera.
+4. **Avvisi push fermi** per 4 variabili su Vercel (DA-FARE 8): codice in produzione e invisibile da 3 giorni.
+
+### Cosa cambiamo da oggi
+- **Prima il lato utente.** Finché non c'è un locale verificato, niente funzioni nuove per ristoratori: solo bozze in `PARTNER.md`. Le sessioni lavorano su "fatti suggerire" (proposta 27 da stanotte) e sul ritrovare.
+- **Prima del revisore, un autocontrollo** con l'elenco dei difetti che i primi revisori hanno trovato più spesso (testo tagliato a 390 px, stato perso dopo una ricarica, tocco sotto la barra, riga duplicata). Obiettivo: approvata al primo giro.
+
+### I 3 problemi da attaccare la settimana prossima
+1. **"Fatti suggerire" con pochi dati** (problema 15, nuovo): chi ha pochi salvati non riceve consigli. "Altri come questo" parte da un solo posto amato.
+2. **Disdette e tavoli vuoti** (problema 1): promemoria con risposta (proposta 31), ora che gli avvisi push esistono.
+3. **Salvato ma mai andato** (problema 9): misurare quanti "Quando ci vai?" diventano "Ci sono stato".
+
+### Revisione dei documenti del team
+- **`PROPOSTE.md`:** fatte nella settimana: 3 (primo passo), 6, 12, 25 (bozza), 28, 33; progettata: 9. Da stanotte in costruzione: 27. Nuove: 34, 35.
+- **`COMPETITOR.md`:** aggiunti Zest e WittyFood (consigli dai propri comportamenti o da una foto); aggiornata Beli (servono 15 posti in classifica prima dei consigli).
+- **`PROBLEMI.md`:** 15 problemi. Aggiunto il 15 (consigli personali solo dopo tanti dati).
+- **`PARTNER.md`:** nessun contatto partito, giusto così. Bozza per Roberto ("Stasera c'è posto") pronta dal 29/10.
+
 ## Settimana 17–23/10 (scritta sabato 24/10 alle 00:30)
 
 ### Cosa è stato fatto

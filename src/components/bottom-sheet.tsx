@@ -63,6 +63,8 @@ export interface BottomSheetProps {
   savedLabel?: (id: string) => string | null;
   // "Per te" dai salvati: nome di un tuo salvato simile (stesso tipo e prezzo), mostrato sulla card.
   similarTo?: (id: string) => string | null;
+  // "Altri come questo" (proposta 27): nella pillola "3 posti · come Da Cesare", nome com'è scritto.
+  simileA?: string | null;
   onSave?: (place: Place) => void;
   // Card finale "Questi risultati non vanno?": solo per la ricerca intera, non per un gruppo di pin.
   showSearchFeedback?: boolean;
@@ -285,7 +287,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -641,7 +643,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           )}
           <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
           {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
-          {capito.length > 0 && !headerOpen && (
+          {simileA && !headerOpen && (
+            <span data-testid="simile-pillola" className="min-w-0 shrink truncate font-sans font-normal text-text"><span aria-hidden className="mx-1.5 text-text-muted">·</span>come {simileA}</span>
+          )}
+          {capito.length > 0 && !headerOpen && !simileA && (
             <span data-testid="capito-pillola" className="min-w-0 truncate font-sans font-normal text-text">
               {capito.map((u) => <span key={u}><span aria-hidden className="mx-1.5 text-text-muted">·</span>{u.toLowerCase()}</span>)}
             </span>

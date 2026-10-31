@@ -177,3 +177,11 @@ Ultimo aggiornamento: 30/10/2026 (notte).
 - **OGGI nell'app:** gli strumenti del pannello chiedono un minuto e poi vanno da soli: serate tranquille (7 tocchi), omaggio a chi torna (una riga di testo, da stanotte), codice del giorno già pronto per il personale. Nessuna tessera, nessun POS, nessuna formazione.
 - **DAVVERO, in futuro:** il pannello che arriva da solo (un avviso alla settimana sul telefono del titolare, proposta 32) e il collegamento ai gestionali che il locale usa già, così niente si inserisce due volte.
 - **Primo passo:** proposta 32 (team, M). Chiedere a 3 titolari quanto tempo alla settimana dedicano ai gestionali (Lorenzo/Roberto, domanda per `RICERCA-RISTORATORI.md`).
+
+## 15. I consigli "per te" arrivano solo dopo tanti dati: chi ha pochi posti non ne riceve — 31/10 notte
+- **Chi lo ha:** il cliente nuovo, cioè proprio chi prova l'app per la prima volta (tester e demo).
+- **Quanto pesa:** Beli comincia a consigliare solo dopo almeno 15 ristoranti messi in classifica e non consiglia nelle città con pochi utenti ([Spoon University](https://spoonuniversity.com/lifestyle/beli-the-new-app-personalizing-restaurant-reviews-and-recommendations), [Food Network](https://www.foodnetwork.com/fn-dish/news/beli-app-trend)). Zest impara dai pagamenti con la carta ([AndroGuider, 6/2026](https://www.androguider.com/2026/06/zest-revolutionizes-restaurant.html)): serve dare l'accesso ai propri conti. Quanti utenti abbandonano prima di arrivare ai consigli: dato non trovato.
+- **OGGI nell'app:** la mappa del gusto al primo accesso dà subito "posti per te"; "Dai tuoi salvati" e "Chiedi ai tuoi posti" partono da 3 salvati. Da stanotte **"Altri come questo"**: basta un posto che ti è piaciuto per avere i simili, con il perché dalle recensioni e i posti di massa in fondo.
+- **DAVVERO, in futuro:** "Altri come questo" anche dal reel salvato (prima ancora di esserci stati) e i simili che imparano dai 👍 e 👎 dati ai risultati (proposta 34).
+- **Primo passo:** misurare quanti tocchi su "Altri come questo" finiscono in un salvataggio (`funzione: altri_come` nel pannello numeri, team).
+

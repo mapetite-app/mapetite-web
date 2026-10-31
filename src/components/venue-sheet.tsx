@@ -101,6 +101,8 @@ type VenueSheetProps = {
   onBookAlternative?: (id: string, details: BookingDetails) => void;
   autoBook?: boolean;
   onBookingClosed?: () => void;
+  // "Altri come questo" (proposta 27): solo per i salvati con 👍 o "Ci sono stato" (e non 👎).
+  onAltriCome?: () => void;
 };
 
 // "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
@@ -145,6 +147,7 @@ export default function VenueSheet({
   onBookAlternative,
   autoBook = false,
   onBookingClosed,
+  onAltriCome,
 }: VenueSheetProps) {
   const {
     name,
@@ -455,6 +458,17 @@ export default function VenueSheet({
                 );
               })}
             </div>
+            {/* Proposta 27: dal posto che ti è piaciuto, una ricerca con i suoi tratti (vedi altriCome in map-view). */}
+            {onAltriCome && !personalTags?.includes("Non fa per me") && (
+              <button
+                type="button"
+                data-testid="altri-come"
+                onClick={onAltriCome}
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill border border-accent/40 bg-accent/5 px-4 text-sm font-display font-semibold text-accent active:scale-[0.98]"
+              >
+                ✨ Altri come questo
+              </button>
+            )}
             {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
                 dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}
             {personalTags?.includes("Mi è piaciuto") && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (

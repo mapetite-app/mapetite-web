@@ -452,6 +452,50 @@ function similarSaved(place: Place, saved: Place[]): string | null {
   return best?.name ?? null;
 }
 
+// Nome confrontabile ("Da Cesare al Casaletto" = "da cesare al casaletto"), senza accenti e punteggiatura.
+function nomeChiave(nome: string): string {
+  return nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// "Altri come questo" (proposta 27): la frase di ricerca dai tratti veri del posto (tipo, punti forti
+// e atmosfera scritti dall'AI dalle recensioni), "fuori dai soliti giri" così i posti di massa vanno in
+// fondo (src/lib/mainstream.ts). Il tipo prima dal nome ("Trattoria da Lucia"), poi dal tipo Google.
+// In ordine di precisione: "Bar Pizzeria Roma" è una pizzeria, non un bar.
+const TIPI_DAL_NOME = ["trattoria", "osteria", "hosteria", "pizzeria", "enoteca", "vineria", "bistrot", "taverna", "locanda", "gelateria", "pasticceria", "panificio", "forno", "birreria", "cocktail bar", "wine bar", "sushi", "ramen", "pub", "caffè", "caffe", "bar"];
+// Etichette che non reggono una frase di ricerca ("dolci fuori dai soliti giri").
+const TIPO_PER_RICERCA: Record<string, string> = { Pesce: "ristorante di pesce", Dolci: "pasticceria", Dolciumi: "pasticceria", Colazione: "bar per colazione", "Da asporto": "ristorante", "Area food": "ristorante", "Succhi e centrifughe": "bar", "Bar e griglia": "ristorante", Diner: "ristorante" };
+const CUCINE = new Set(["Giapponese", "Cinese", "Indiano", "Thailandese", "Messicano", "Greco", "Spagnolo", "Francese", "Americano", "Mediorientale", "Vegano", "Vegetariano"]);
+// Aggettivi dei tag AI che non cambiano col genere ("trattoria tradizionale", "bar vivace").
+const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
+// "Messi da parte" senza il posto di partenza di "Altri come questo" (nomi, non id).
+function senzaNome<T extends Record<string, string[] | undefined>>(daParte: T | null, nome: string | null): T | null {
+  if (!daParte || nome == null) return daParte;
+  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
+}
+// Salvato con 👍, o visitato senza 👎: la scheda offre "Altri come questo".
+function piaciuto(tags: string[] | null | undefined): boolean {
+  const t = tags ?? [];
+  return t.includes(OPINION_LIKE) || (t.includes(VISIT_DONE) && !t.includes(OPINION_DISLIKE));
+}
+function queryAltriCome(v: { name: string; category: string | null; address: string | null; goFor: string[] | null; tags: string[] | null }): string {
+  const nome = v.name.toLowerCase();
+  const dalNome = TIPI_DAL_NOME.find((t) => new RegExp(`(^|[^\\p{L}])${t}($|[^\\p{L}])`, "u").test(nome));
+  const label = categoryLabel(v.category);
+  const tipo = dalNome
+    ?? (!label ? "ristorante"
+      : TIPO_PER_RICERCA[label] ?? (CUCINE.has(label) ? `ristorante ${label.toLowerCase()}` : label.toLowerCase()));
+  const tag = (v.tags ?? []).find((t) => TAG_INVARIABILI.has(t));
+  const forti = (v.goFor ?? []).filter((c) => c.length <= 20).slice(0, 2);
+  const city = cityFromAddress(v.address);
+  return [
+    tipo,
+    tag,
+    forti.length > 0 ? `con ${forti.join(" e ")}` : null,
+    "fuori dai soliti giri",
+    city ? `a ${city}` : null,
+  ].filter(Boolean).join(" ");
+}
+
 // Salvati non caricati: senza rete o con la pagina che cambia a metà richiesta ("Failed to fetch")
 // è normale e non va segnalato come errore; il resto sì.
 function logSavedError(error: { message?: string }) {
@@ -872,7 +916,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -1851,27 +1895,30 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
   }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
-  const runAISearch = async (q: string, center?: { lat: number; lng: number }) => {
+  // opts.mondo: ricerca nel mondo anche se si parte dai salvati (la vista passa a "all" nello stesso
+  // tocco, ma qui `view` è ancora quella di prima). opts.simile: "Altri come questo" (proposta 27).
+  const runAISearch = async (q: string, center?: { lat: number; lng: number }, opts: { mondo?: boolean; simile?: { nome: string; escludi: string[] } } = {}) => {
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
+    const mondo = opts.mondo === true || view === "all";
     // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
     // o i filtri ha un numero vecchio e si scarta.
     const ticket = ++searchSeq.current;
     setDalSalvati(null);
-    ricercaMondo.current = view === "all" ? ticket : null;
-    if (view === "all" && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
+    ricercaMondo.current = mondo ? ticket : null;
+    if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);
       try {
         // Frase già capita mentre si scriveva: la ricerca non riaspetta l'AI (~1-2 s in meno).
-        const intent = view === "all" ? await intentFor(q) : null;
+        const intent = mondo ? await intentFor(q) : null;
         if (searchSeq.current !== ticket) return;
         const res = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: q,
-            source: view === "all" ? "world" : "saved",
+            source: mondo ? "world" : "saved",
             searchIntent: "natural",
             phase: "fast",
             ...(intent && { intent, intentQuery: q.trim() }),
@@ -1893,7 +1940,10 @@ export default function MapView({
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
           goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
         };
-        const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
+        // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
+        const fuori = new Set(opts.simile?.escludi ?? []);
+        const nomeFuori = opts.simile ? nomeChiave(opts.simile.nome) : null;
+        const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null && !fuori.has(p.id) && (nomeFuori == null || nomeChiave(p.name) !== nomeFuori));
         const places: Place[] = raw.map((p) => ({
           id: p.id,
           name: p.name,
@@ -1930,12 +1980,12 @@ export default function MapView({
         }
         const id = ticket;
         setClusterPlaces(null); setFilterError(null);
-        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, daParte: data.da_parte ?? null });
+        setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, simileA: opts.simile?.nome, daParte: senzaNome(data.da_parte ?? null, nomeFuori) });
         setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
-      if (view === "all") saveRecentSearch(q);
+      if (mondo && !opts.simile) saveRecentSearch(q);
       // Distanze solo se hanno senso: senza la posizione del telefono si misura dal centro della mappa,
       // e cercando "a Milano" con la mappa su Roma ogni card diceva "479 km".
       const nearAt = places.filter((p) => distanceMeters(at, p) < 20_000).length;
@@ -1948,6 +1998,27 @@ export default function MapView({
         if (searchSeq.current === ticket) setAiSearching(false);
       }
 
+  };
+
+  // "Altri come questo" (proposta 27): dalla scheda di un posto che ti è piaciuto, la ricerca nel mondo
+  // con i suoi tratti, attorno al posto. Costa quanto una ricerca scritta a mano (1 Google, 1 Haiku).
+  const simileRef = useRef<{ nome: string; escludi: string[] } | null>(null);
+  const altriCome = (p: Place) => {
+    const uuid = resolveUuid(p.id);
+    const d = venueDetails[p.id] ?? (uuid ? venueDetails[uuid] : undefined);
+    const q = queryAltriCome({ name: p.name, category: p.category, address: p.address, goFor: d?.goFor ?? null, tags: d?.tags ?? null });
+    const gid = Object.keys(placeUuids).find((g) => placeUuids[g] === uuid);
+    const escludi = [p.id, uuid, gid].filter((x): x is string => x != null);
+    trackFeature("altri_come");
+    // Chiudendo la scheda la mappa tornerebbe alla vista di prima (dalla mappa dei salvati: l'Italia
+    // intera) sopra il centraggio sui risultati: qui la vista di prima non serve più.
+    viewBeforeVenue.current = null;
+    simileRef.current = { nome: p.name, escludi };
+    setSalvatiMappa(false); setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setClusterPlaces(null); setFilterError(null);
+    setWelcomeDismissed(true); setIdeasOpen(false);
+    setAiQuery(q);
+    setViewState((v) => ({ ...v, latitude: p.lat, longitude: p.lng, zoom: 13 }));
+    void runAISearch(q, { lat: p.lat, lng: p.lng }, { mondo: true, simile: { nome: p.name, escludi } });
   };
 
   // Posizione per "Vicino a me" e il raggio "da me": chiesta solo a un tocco dell'utente, con una
@@ -3018,7 +3089,10 @@ export default function MapView({
                 void runFilteredSearch(f, { query: filterQueryRef.current });
                 return;
               }
-              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q);
+              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q);
+              // "Altri come questo" spostata: resta la stessa ricerca (pillola, posto escluso, niente recenti).
+              const simile = aiSearch?.simileA && q === aiSearch.query?.trim() && simileRef.current?.nome === aiSearch.simileA ? simileRef.current : null;
+              void runAISearch(q, undefined, simile ? { simile } : {});
             }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
@@ -3274,6 +3348,7 @@ export default function MapView({
               onBookAlternative={(id, details) => { setPendingBooking({ placeId: id, details }); dispatch({ type: "OPEN_VENUE", placeId: id }); }}
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
+              onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}
@@ -3480,13 +3555,14 @@ export default function MapView({
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
+          simileA={aiSearch !== null && view === "all" ? aiSearch.simileA ?? null : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
           nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
           quick={quickFilters}
-          title={aiSearch !== null && view === "all" ? aiSearch.query ?? null : null}
+          title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           heading={view === "saved" && aiSearch === null
             ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}`
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
@@ -3516,7 +3592,8 @@ export default function MapView({
           } : undefined}
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
-          similarTo={aiSearch !== null && view === "all" && savedPlaces.length > 0 ? (id) => {
+          // "Altri come questo": il titolo dice già "come chi"; sulle card restano i ✓ con la prova.
+          similarTo={aiSearch !== null && view === "all" && !aiSearch.simileA && savedPlaces.length > 0 ? (id) => {
             if (isPlaceSaved(id)) return null;
             const place = displayedPlaces.find((p) => p.id === id);
             return place ? similarSaved(place, savedPlaces) : null;

@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 31/10/2026 (notte, sessione 03:06, CEO che chiude)
+
+### 34. "Più così / meno così" sui simili (i consigli che imparano dal tuo 👍)
+- **Problema:** `PROBLEMI.md`, 15. "Altri come questo" oggi usa i tratti del posto di partenza, non quello che fai dei risultati.
+- **Cosa fa:** su ogni card di "Altri come …" due tocchi piccoli, 👍 "più così" e 👎 "meno così". Il 👍 aggiunge i punti forti di quel posto alla ricerca successiva, il 👎 li sposta in fondo (mai esclusi). Si salva nel profilo del gusto (`profiles.gusto`), che già guida ordine e verdetti.
+- **Da dove nasce:** Beli chiede 15 confronti prima di consigliare; Zest vuole i pagamenti. Noi impariamo dal primo tocco, con un segnale implicito e visibile.
+- **Valore per l'utente:** la seconda ricerca è già più sua della prima. **Valore per il ristoratore:** i dati "chi ama X ama anche Y" sono la base del futuro "clienti simili ai tuoi" nel pannello.
+- **Sforzo:** M. **Costo:** zero Google in più (si usa al prossimo tocco); Haiku come oggi.
+- **Stato proposto:** PRONTA, dopo una settimana di numeri su "Altri come questo".
+
+### 35. "Altri come questo" dal reel appena salvato
+- **Problema:** `PROBLEMI.md`, 8 e 15. Chi salva da un reel non ci è ancora stato: oggi i simili si offrono solo dopo "Ci sono stato" o 👍.
+- **Cosa fa:** nel "✓ Salvato" del reel, sotto "Quando ci vai?", una riga "Ce ne sono altri così vicino a te?" che apre la stessa ricerca dei simili. Un tocco, una ricerca.
+- **Da dove nasce:** WittyFood cerca piatti simili da una foto; nessuno collega il reel ai posti simili nella tua città.
+- **Valore per l'utente:** dal video visto stasera a 5 alternative vere, nella stessa zona. **Valore per il ristoratore:** domanda da chi ama locali come il suo, prima ancora della scelta.
+- **Sforzo:** S (riusa `queryAltriCome`). **Costo:** 1 ricerca Google e 1 Haiku per tocco, solo se toccata.
+- **Stato proposto:** PRONTA.
+
 ## 30/10/2026 (notte, sessione 03:06, CEO che chiude)
 
 ### 32. "La tua settimana" sul telefono del titolare (il pannello che arriva da solo)
@@ -90,7 +108,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** dal posto che ama a 5 posti nuovi, in un tocco, senza scrivere niente.
 - **Valore per il ristoratore:** clienti che arrivano perché amano locali come il suo, cioè la domanda più qualificata che esista. È la base di un futuro "sei simile a…" nel pannello.
 - **Sforzo:** S (riusa la ricerca a parole e i tratti del verdetto). **Costo:** 1 ricerca Google per tocco, come una ricerca normale; Haiku come una ricerca.
-- **Stato proposto:** PRONTA, dopo il 26/10 (fuori dalle chiavi di volta dello sprint).
+- **Stato proposto:** PRONTA, dopo il 26/10 (fuori dalle chiavi di volta dello sprint). **Costruita il 31/10 notte:** tasto "✨ Altri come questo" nella scheda dei salvati con 👍 o "Ci sono stato" (non con 👎); ricerca nel mondo "tipo + punti forti + fuori dai soliti giri + città", attorno al posto; il posto di partenza non torna tra i risultati; pillola "N posti · come Nome"; sulle card i ✓ con la prova delle recensioni.
 
 ## 23/10/2026 (mattina, sessione 05:06, CEO che chiude — solo chiavi di volta)
 
