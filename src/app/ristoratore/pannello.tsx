@@ -351,6 +351,7 @@ export default function Pannello({
   avviso,
   vista,
   serate = { giorni: [], at: null },
+  prenotazioni = null,
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -361,6 +362,7 @@ export default function Pannello({
   avviso?: string | null;
   vista?: string;
   serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+  prenotazioni?: { tavoli: number; diParola: number; persone: number } | null;
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -371,6 +373,9 @@ export default function Pannello({
 
   const attesa = p.inAttesa;
   const risposte = p.visite.piaciuto + p.visite.nonPiaciuto;
+  // Tavoli da Mapetite (PROPOSTE.md 3, passo 3): solo da SOGLIA persone, altrimenti si riconoscerebbe chi.
+  const tavoli = prenotazioni && prenotazioni.persone >= SOGLIA ? prenotazioni : null;
+  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
@@ -379,7 +384,7 @@ export default function Pannello({
 
       {/* Domanda latente: il dato che nessun altro dà al ristoratore (POSIZIONAMENTO.md, proposta 2).
           Compatta, sotto i 4 numeri: la prima schermata resta quella. */}
-      {(attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0) && (
+      {(primaTavoli || tavoli) && (
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
           {attesa.persone > 0 && (
             <p className="flex items-baseline gap-2">
@@ -411,6 +416,16 @@ export default function Pannello({
               <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔁 {p.disdette.n.toLocaleString("it-IT")}</span>
               <span className="text-sm font-sans leading-snug text-white/90">
                 {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: disdetti su Mapetite{p.disdette.orePrimaMedia != null ? ` in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""}, invece di un tavolo vuoto ({p.giorni} giorni)
+              </span>
+            </p>
+          )}
+          {/* "Cliente di parola", passo 3: tavoli chiesti da Mapetite e quanti da clienti di parola
+              (sempre presenti o disdetto in tempo). Solo da chi tiene le prenotazioni sull'account. */}
+          {tavoli && (
+            <p data-testid="pannello-tavoli" className={`flex items-baseline gap-2 ${primaTavoli ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">📅 {tavoli.tavoli.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">
+                {tavoli.tavoli === 1 ? "tavolo chiesto" : "tavoli chiesti"} da Mapetite{tavoli.diParola > 0 ? `, ${tavoli.diParola.toLocaleString("it-IT")} da clienti di parola (sempre presenti o disdetto in tempo)` : ""} ({p.giorni} giorni e prossimi 30)
               </span>
             </p>
           )}

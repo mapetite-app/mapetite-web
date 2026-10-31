@@ -3932,6 +3932,14 @@ else {
         const u = pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2, outcome: null }), b({ id: "l2", createdAt: 3 })], [b({ id: "l1", createdAt: 2, outcome: "bene" }), b({ id: "r1", createdAt: 1 })]);
         ok(u.map((x) => x.id).join() === "r1,l1,l2" && u.find((x) => x.id === "l1").outcome === "bene", "prenotazioni sull'account: unione per id, l'account riempie i vuoti del telefono");
         ok(pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2 }), b({ id: "l2", createdAt: 3 })], [b({ id: "r1", createdAt: 1 })], ["l1", "r1"]).map((x) => x.id).join() === "l2", "prenotazioni sull'account: le tolte (lapidi) non tornano né dal telefono né dall'account");
+        const vecchio = pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2, outcome: "male", modificataAt: 10 })], [b({ id: "l1", createdAt: 2, outcome: "bene", modificataAt: 20 })]);
+        const nuovo = pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2, outcome: "male", modificataAt: 30 })], [b({ id: "l1", createdAt: 2, outcome: "bene", modificataAt: 20 })]);
+        ok(vecchio[0].outcome === "bene" && vecchio[0].modificataAt === 20 && nuovo[0].outcome === "male", "prenotazioni sull'account: tra due telefoni vince la modifica più recente (un esito vecchio non riscrive quello nuovo)");
+        { const P = (u, id, placeId, date, extra = {}) => ({ utente: u, p: b({ id, placeId, date, createdAt: 1, ...extra }) });
+          const due = bk.prenotazioniAlLocale([P("A", "a1", "L", "2026-10-10"), P("B", "b1", "L", "2026-10-11")], ["L"], "2026-10-01", "2026-10-31");
+          const fuori = bk.prenotazioniAlLocale([P("A", "a1", "L", "2026-09-10"), P("B", "b1", "M", "2026-10-11"), P("C", "c1", "L", "2026-10-12", { disdetta: 5 })], ["L"], "2026-10-01", "2026-10-31");
+          ok(due.persone === 2 && due.tavoli === 2 && due.diParola === 0 && fuori.tavoli === 0 && fuori.persone === 0, `pannello: tavoli da Mapetite contati solo nel periodo, nel locale e senza disdette (${JSON.stringify(due)} ${JSON.stringify(fuori)})`); }
+        ok(pa.pulisciPrenotazione(b({ id: "abcd6", createdAt: 1_790_000_000_000, modificataAt: 1_790_000_100_000 }))?.modificataAt === 1_790_000_100_000 && !("modificataAt" in pa.pulisciPrenotazione(b({ id: "abcd7", createdAt: 1_790_000_000_000, modificataAt: 5 }))), "prenotazioni sull'account: data dell'ultima modifica tenuta solo se plausibile");
       }
       ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho già prenotato 4 tavoli, anche altrove: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
     }
@@ -5183,8 +5191,16 @@ else {
   // Con dati finti (cookie e2e_ristoratore, solo in sviluppo): pochi dati → messaggio onesto e soglia.
   const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
   const Lr = { id: LOC, name: "Osteria Pigneto", address: locR.place.address, category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GOSTERIA" };
+  // Tavoli da Mapetite (PROPOSTE 3, passo 3): tre persone, una di parola (3 concluse altrove), una disdetta che non conta.
+  const oggiK = (n) => { const d = new Date(Date.now() + n * 86_400_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const pr = (id, placeId, date, extra = {}) => ({ id, placeId, placeName: "X", via: "whatsapp", createdAt: 1_790_000_000_000, date, time: "20:00", people: 2, special: null, lat: null, lng: null, ...extra });
+  const prenR = [
+    { user_id: "A", dati: pr("a001", LOC, oggiK(-3), { outcome: "bene" }) }, { user_id: "A", dati: pr("a002", "ALTRO", oggiK(-20), { outcome: "bene" }) }, { user_id: "A", dati: pr("a003", "ALTRO", oggiK(-40), { outcome: "male" }) },
+    { user_id: "B", dati: pr("b001", "GOSTERIA", oggiK(5)) }, { user_id: "B", dati: pr("b002", LOC, oggiK(6), { outcome: "non-andato", disdetta: Date.now() }) },
+    { user_id: "C", dati: pr("c001", LOC, oggiK(-1), { outcome: "non-andato" }) }, { user_id: "C", dati: pr("c002", LOC, oggiK(-90)) },
+  ];
   await setCookie("e2e_ristoratore", {
-    locale: Lr, simili: [Lr], verificato: true, salvati: [],
+    locale: Lr, simili: [Lr], verificato: true, salvati: [], prenotazioni: prenR,
     eventi: [
       { created_at: iso(60), type: "ricerca", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], zona: "Pigneto" } },
       { created_at: iso(59), type: "apri_scheda", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: "GOSTERIA", props: { fonte: "ricerca" } },
@@ -5194,6 +5210,7 @@ else {
   { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
+    { const t = (await rp.getByTestId("pannello-tavoli").textContent().catch(() => "")) ?? ""; ok(t.includes("📅 3") && t.includes("tavoli chiesti da Mapetite") && t.includes("1 da clienti di parola") && !/[ABC]\b/.test(t.replace(/Mapetite|\(|\)/g, "")), `pannello ristoratore: tavoli chiesti da Mapetite e quanti da clienti di parola, senza nomi (${t})`); }
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
   // Serate tranquille sul pannello vero: si salvano (cookie e2e_serate al posto di places) e la scheda le rilegge per Place ID.

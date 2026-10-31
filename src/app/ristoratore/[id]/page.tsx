@@ -9,6 +9,8 @@ import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { giornoItalia, pulisciOmaggio, OMAGGIO_OGNI_GIORNI, type Omaggio } from "@/lib/omaggio";
 import { codiceDelGiorno } from "@/lib/omaggio-server";
+import { dateKey, prenotazioniAlLocale, type BookingRequest } from "@/lib/booking";
+import { pulisciPrenotazione } from "@/lib/prenotazioni-account";
 import Pannello, { PERIODI } from "../pannello";
 
 // Pannello del ristoratore (PIANO-25-OTTOBRE.md 8.2), id = UUID del locale in places.
@@ -25,7 +27,19 @@ const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
 type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
-type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate };
+type Prenotazioni = { tavoli: number; diParola: number; persone: number };
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null };
+
+// Tavoli chiesti da Mapetite dal primo giorno del periodo ai prossimi 30 giorni.
+function finestra(giorni: number): [string, string] {
+  const oggi = new Date();
+  return [dateKey(new Date(oggi.getTime() - giorni * 86_400_000)), dateKey(new Date(oggi.getTime() + 30 * 86_400_000))];
+}
+function contaPrenotazioni(righe: { user_id: unknown; dati: unknown }[], locale: RistLocale, giorni: number): Prenotazioni {
+  const tutte = righe.flatMap((r) => { const p = pulisciPrenotazione(r.dati); return p && typeof r.user_id === "string" ? [{ utente: r.user_id, p: p as BookingRequest }] : []; });
+  const [da, a] = finestra(giorni);
+  return prenotazioniAlLocale(tutte, [locale.id, ...(locale.google_place_id ? [locale.google_place_id] : [])], da, a);
+}
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
 // scripts/e2e/giro.mjs), perché il giro non può leggere il database. Senza cookie si passa
@@ -37,7 +51,9 @@ async function e2eDati(id: string): Promise<Dati | null> {
   try {
     const v = JSON.parse(decodeURIComponent(raw));
     if (v?.locale?.id !== id) return null;
-    return { locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
+    const giorni = PERIODI.find((p) => String(p) === String(v.giorni)) ?? 30;
+    const prenotazioni = Array.isArray(v.prenotazioni) ? contaPrenotazioni(v.prenotazioni, v.locale, giorni) : null;
+    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -115,7 +131,23 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   const daOmaggi = new Date(Date.now() - OMAGGIO_OGNI_GIORNI * 86_400_000).toISOString().slice(0, 10);
   const { count: omaggiMostrati } = await db.from("omaggi_usati").select("user_id", { count: "exact", head: true }).eq("place_id", id).gte("giorno", daOmaggi);
   const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
-  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate };
+  // "Cliente di parola", passo 3 (PROPOSTE.md 3): tavoli chiesti da Mapetite, solo dalle prenotazioni
+  // che le persone tengono sull'account (con il loro consenso: senza, le righe non esistono). Poi tutte
+  // le prenotazioni di quelle persone, per sapere se sono di parola. Al telefono arrivano solo numeri.
+  let prenotazioni: Prenotazioni | null = null;
+  {
+    const [da, a] = finestra(giorni);
+    const posti = [locale.id, ...(locale.google_place_id ? [locale.google_place_id] : [])];
+    const { data: qui, error: pErr } = await db.from("prenotazioni").select("user_id").in("place_id", posti).is("cancellata_at", null).gte("giorno", da).lte("giorno", a).limit(2000);
+    if (pErr) console.error("[ristoratore] lettura prenotazioni:", pErr.message);
+    const persone = [...new Set((qui ?? []).map((r) => r.user_id as string))];
+    if (persone.length > 0) {
+      const { data: righe, error: tErr } = await db.from("prenotazioni").select("user_id, dati").in("user_id", persone.slice(0, 500)).is("cancellata_at", null).limit(10_000);
+      if (tErr) console.error("[ristoratore] lettura prenotazioni delle persone:", tErr.message);
+      prenotazioni = contaPrenotazioni(righe ?? [], locale, giorni);
+    } else if (!pErr) prenotazioni = { tavoli: 0, diParola: 0, persone: 0 };
+  }
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni };
 }
 
 export default async function RistoratorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -131,5 +163,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={dati.prenotazioni} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
