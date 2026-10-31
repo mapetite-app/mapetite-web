@@ -32,3 +32,7 @@ drop policy if exists "prenotazioni: le mie" on public.prenotazioni;
 create policy "prenotazioni: le mie" on public.prenotazioni
   for all using (auth.uid() = user_id)
   with check (auth.uid() = user_id and exists (select 1 from public.prenotazioni_consenso c where c.user_id = auth.uid()));
+
+-- Dal collaudo (31/10): una prenotazione tolta resta come "lapide" (cancellata_at, dati svuotati),
+-- così un altro telefono non la ricarica. "Spegni" cancella anche le lapidi.
+alter table public.prenotazioni add column if not exists cancellata_at timestamptz;

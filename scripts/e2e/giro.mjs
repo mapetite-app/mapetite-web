@@ -3922,11 +3922,12 @@ else {
       let pa = null;
       try { pa = await import(new URL("../../src/lib/prenotazioni-account.ts", import.meta.url).href); } catch (e) { ok(false, `prenotazioni sull'account: modulo importabile (${e.message})`); }
       if (pa) {
-        const pul = pa.pulisciPrenotazione({ ...b({ id: "abcd1", outcome: "bene" }), extra: "<script>", people: 500, date: "domani", via: "whatsapp" });
+        const pul = pa.pulisciPrenotazione({ ...b({ id: "abcd1", outcome: "bene", createdAt: 1_790_000_000_000 }), extra: "<script>", people: 500, date: "domani", via: "whatsapp" });
         ok(pul && !("extra" in pul) && pul.people === null && pul.date === null && pul.outcome === "bene", "prenotazioni sull'account: solo i campi noti, valori fuori forma tolti");
-        ok(pa.pulisciPrenotazione({ ...b({ id: "abcd2" }), via: "email" }) === null && pa.pulisciPrenotazione({ id: "a" }) === null && pa.pulisciPrenotazione("x") === null, "prenotazioni sull'account: prenotazioni non valide rifiutate");
+        ok(pa.pulisciPrenotazione({ ...b({ id: "abcd2", createdAt: 1_790_000_000_000 }), via: "email" }) === null && pa.pulisciPrenotazione(b({ id: "abcd3", createdAt: 1e300 })) === null && pa.pulisciPrenotazione(b({ id: "abcd4", createdAt: 1_790_000_000_000, disdetta: 1e300 }))?.disdetta === null && pa.pulisciPrenotazione({ id: "a" }) === null && pa.pulisciPrenotazione("x") === null, "prenotazioni sull'account: prenotazioni non valide rifiutate");
         const u = pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2, outcome: null }), b({ id: "l2", createdAt: 3 })], [b({ id: "l1", createdAt: 2, outcome: "bene" }), b({ id: "r1", createdAt: 1 })]);
         ok(u.map((x) => x.id).join() === "r1,l1,l2" && u.find((x) => x.id === "l1").outcome === "bene", "prenotazioni sull'account: unione per id, l'account riempie i vuoti del telefono");
+        ok(pa.unisciPrenotazioni([b({ id: "l1", createdAt: 2 }), b({ id: "l2", createdAt: 3 })], [b({ id: "r1", createdAt: 1 })], ["l1", "r1"]).map((x) => x.id).join() === "l2", "prenotazioni sull'account: le tolte (lapidi) non tornano né dal telefono né dall'account");
       }
       ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho già prenotato 4 tavoli, anche altrove: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
     }
@@ -5409,15 +5410,16 @@ else {
   // "Tienile sul tuo account" (Cliente di parola, passo 2): spento di base, si accende con un tocco,
   // poi ogni modifica va all'account; "Spegni" chiede conferma e cancella dall'account. API simulata.
   {
-    const acc = { consenso: false, list: new Map([["x9", { id: "x9", placeId: "P9", placeName: "Altro Telefono", lat: null, lng: null, date: "2026-09-02", time: "20:00", people: 2, special: null, via: "whatsapp", createdAt: 1, outcome: "bene" }]]), calls: [] };
+    const acc = { consenso: false, list: new Map([["x9x9", { id: "x9x9", placeId: "P9", placeName: "Altro Telefono", lat: null, lng: null, date: "2026-09-02", time: "20:00", people: 2, special: null, via: "whatsapp", createdAt: 1_790_000_000_000, outcome: "bene" }]]), tolte: new Set(["zz99"]), calls: [] };
     await pctx.route("**/api/prenotazioni", async (route) => {
       const m = route.request().method();
       const body = route.request().postDataJSON?.() ?? null;
       acc.calls.push({ m, body });
-      if (m === "GET") return route.fulfill({ json: { consenso: acc.consenso, prenotazioni: acc.consenso ? [...acc.list.values()] : [] } });
-      if (m === "PUT") { acc.consenso = true; for (const p of body.prenotazioni) acc.list.set(p.id, p); return route.fulfill({ json: { ok: true, prenotazioni: [...acc.list.values()] } }); }
-      if (m === "POST") { if (!acc.consenso) return route.fulfill({ status: 403, json: {} }); acc.list.set(body.prenotazione.id, body.prenotazione); return route.fulfill({ json: { ok: true } }); }
-      if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); } else acc.list.delete(body.id); return route.fulfill({ json: { ok: true } }); }
+      const st = () => ({ utente: "U1", consenso: acc.consenso, prenotazioni: acc.consenso ? [...acc.list.values()] : [], tolte: acc.consenso ? [...acc.tolte] : [] });
+      if (m === "GET") return route.fulfill({ json: st() });
+      if (m === "PUT") { acc.consenso = true; for (const p of body.prenotazioni) if (!acc.tolte.has(p.id)) acc.list.set(p.id, p); return route.fulfill({ json: { ok: true, ...st() } }); }
+      if (m === "POST") { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); if (!acc.consenso) return route.fulfill({ status: 403, json: {} }); for (const p of body.prenotazioni) if (!acc.tolte.has(p.id)) acc.list.set(p.id, p); return route.fulfill({ json: { ok: true } }); }
+      if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); acc.tolte.clear(); } else { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); acc.list.delete(body.id); acc.tolte.add(body.id); } return route.fulfill({ json: { ok: true } }); }
       return route.fallback();
     });
     await pp.reload({ waitUntil: "networkidle" });
@@ -5430,24 +5432,31 @@ else {
     await pp.getByTestId("prenotazioni-account-acceso").waitFor({ timeout: 5000 }).catch(() => {});
     const local = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
     ok(await pp.getByTestId("prenotazioni-account-acceso").isVisible() && acc.consenso && acc.list.has("u1") && acc.list.has("p1"), "prenotazioni sull'account: 'Attiva' accende il consenso e carica quelle del telefono");
-    ok(local.some((b) => b.id === "x9") && (await pp.getByText("Altro Telefono").count()) === 1, "prenotazioni sull'account: arrivano anche quelle salvate da un altro telefono");
+    ok(local.some((b) => b.id === "x9x9") && (await pp.getByText("Altro Telefono").count()) >= 1, `prenotazioni sull'account: arrivano anche quelle salvate da un altro telefono (${local.map((b) => b.id)})`);
     ok((await pp.locator("main > p").first().textContent()).includes("sul tuo account"), "prenotazioni sull'account: la frase in alto dice dove sono salvate");
     await pshot("86-prenotazioni-account-acceso");
     await past.nth(0).getByRole("button", { name: /Togli la prenotazione/ }).click();
     await pp.getByRole("button", { name: "Sì, togli" }).click();
     await pp.waitForTimeout(400);
-    ok(acc.calls.some((c) => c.m === "DELETE" && c.body?.id), "prenotazioni sull'account: 'Togli' la toglie anche dall'account");
+    ok(acc.calls.some((c) => c.m === "DELETE" && c.body?.id && c.body?.utente === "U1") && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.tolte"))) === null, "prenotazioni sull'account: 'Togli' la toglie anche dall'account (lapide, nessuna in attesa)");
+    // Una tolta sull'altro telefono (lapide) sparisce anche qui alla visita dopo; nessuna PUT (il consenso non si riaccende da solo).
+    acc.list.delete("x9x9"); acc.tolte.add("x9x9");
+    const putPrima = acc.calls.filter((c) => c.m === "PUT").length;
+    await pp.reload({ waitUntil: "networkidle" });
+    await pp.getByTestId("prenotazioni-account-acceso").waitFor({ timeout: 5000 }).catch(() => {});
+    await pp.waitForTimeout(300);
+    ok((await pp.getByText("Altro Telefono").count()) === 0 && !acc.list.has("x9x9") && acc.calls.filter((c) => c.m === "PUT").length === putPrima, "prenotazioni sull'account: tolta su un altro telefono non ricompare e non torna sull'account");
     await pp.getByTestId("prenotazioni-account-spegni").click();
     ok(await pp.getByTestId("prenotazioni-account-spegni-conferma").isVisible(), "prenotazioni sull'account: 'Spegni' chiede conferma");
     await pshot("87-prenotazioni-account-spegni");
     await pp.getByTestId("prenotazioni-account-spegni-conferma").getByRole("button", { name: "Sì, togli" }).click();
     await pp.getByTestId("prenotazioni-account").waitFor({ timeout: 5000 }).catch(() => {});
     const n0 = acc.calls.length;
-    ok(!acc.consenso && acc.list.size === 0 && await pp.getByTestId("prenotazioni-account").isVisible() && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.account"))) === null, "prenotazioni sull'account: spento, cancellate dall'account, restano sul telefono");
+    ok(!acc.consenso && acc.list.size === 0 && acc.tolte.size === 0 && await pp.getByTestId("prenotazioni-account").isVisible() && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.account"))) === null, "prenotazioni sull'account: spento, cancellate dall'account, restano sul telefono");
     { const w = await width(); ok(w <= 390, `prenotazioni sull'account: niente scorrimento orizzontale (${w}px)`); }
     ok(acc.calls.length === n0, "prenotazioni sull'account: spento, nessuna chiamata in più");
     // Ripristino per i controlli dopo: stesso elenco di prima (Pub Fuori Tema tolto, x9 tolta).
-    await pp.evaluate(() => localStorage.setItem("mapetite.prenotazioni", JSON.stringify(JSON.parse(localStorage.getItem("mapetite.prenotazioni")).filter((b) => b.id !== "x9"))));
+    await pp.evaluate(() => localStorage.setItem("mapetite.prenotazioni", JSON.stringify(JSON.parse(localStorage.getItem("mapetite.prenotazioni")).filter((b) => b.id !== "x9x9"))));
     await pctx.unroute("**/api/prenotazioni");
   }
 

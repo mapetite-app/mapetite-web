@@ -8,6 +8,8 @@ const VIE = new Set(["whatsapp", "telefono", "sito", "copiato"]);
 const ESITI = new Set(["bene", "male", "non-andato"]);
 const s = (v: unknown, max: number): string | null => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null);
 const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+// Istanti (ms) solo in un intervallo plausibile: 2020–2100.
+const t = (v: unknown): number | null => { const x = n(v); return x != null && x >= 1_577_836_800_000 && x <= 4_102_444_800_000 ? x : null; };
 const b = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 
 export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
@@ -16,7 +18,7 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
   const id = s(o.id, 40);
   const placeId = s(o.placeId, 200);
   const placeName = s(o.placeName, 200);
-  const createdAt = n(o.createdAt);
+  const createdAt = t(o.createdAt);
   if (!id || id.length < 4 || !placeId || !placeName || createdAt == null || !VIE.has(o.via as string)) return null;
   const date = s(o.date, 10);
   const time = s(o.time, 5);
@@ -37,8 +39,8 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
     lng: lng != null && Math.abs(lng) <= 180 ? lng : null,
     outcome: ESITI.has(o.outcome as string) ? (o.outcome as BookingRequest["outcome"]) : null,
     phone: s(o.phone, 40),
-    riapre: n(o.riapre),
-    disdetta: n(o.disdetta),
+    riapre: t(o.riapre),
+    disdetta: t(o.disdetta),
     piattaforma: s(o.piattaforma, 40),
   };
   for (const k of ["dismissed", "confirmed", "dismissedEve", "dismissedRisposta"] as const) {
@@ -51,10 +53,13 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
 // Unione telefono + account, per id: vale il dato del telefono, quello dell'account riempie i vuoti
 // (per esempio "Com'è andata?" risposto su un altro telefono). Le prenotazioni che il telefono non ha
 // arrivano dall'account. Ordine per data di creazione, ultime 30.
-export function unisciPrenotazioni(locali: BookingRequest[], remote: BookingRequest[]): BookingRequest[] {
+// Le tolte (lapidi dell'account o tolte qui in attesa) non tornano.
+export function unisciPrenotazioni(locali: BookingRequest[], remote: BookingRequest[], tolte: Iterable<string> = []): BookingRequest[] {
+  const via = new Set(tolte);
   const byId = new Map<string, BookingRequest>();
-  for (const r of remote) byId.set(r.id, r);
+  for (const r of remote) if (!via.has(r.id)) byId.set(r.id, r);
   for (const l of locali) {
+    if (via.has(l.id)) continue;
     const r = byId.get(l.id);
     if (!r) { byId.set(l.id, l); continue; }
     const m: Record<string, unknown> = { ...r };

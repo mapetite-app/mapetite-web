@@ -287,7 +287,7 @@ export default function PrenotazioniView() {
     <main className="mx-auto w-full max-w-lg px-4 pb-10 pt-6">
       <h1 className="font-title text-3xl font-semibold leading-tight text-text">Le mie prenotazioni</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">
-        Le richieste che hai mandato ai locali, salvate {sullAccount ? "sul tuo account" : "su questo telefono"}.
+        Le richieste che hai mandato ai locali, salvate {sullAccount ? "sul telefono e sul tuo account" : "su questo telefono"}.
       </p>
       {mounted && <PrenotazioniAccount haPrenotazioni={list.length > 0} onStato={onStato} />}
 

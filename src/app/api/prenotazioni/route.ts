@@ -3,26 +3,48 @@ import { createClient } from "@/lib/supabase/server";
 import { pulisciPrenotazione, type PrenotazioneAccount } from "@/lib/prenotazioni-account";
 
 // Prenotazioni sull'account ("Cliente di parola", passo 2, PROPOSTE.md 3). Solo con il consenso
-// esplicito della persona (tabella prenotazioni_consenso, RLS: ognuno la propria riga).
-//  GET    → { consenso, prenotazioni }        (401 senza accesso)
-//  PUT    → accende il consenso e carica quelle del telefono { prenotazioni }
-//  POST   → salva o aggiorna una prenotazione { prenotazione } (solo con consenso)
-//  DELETE → { id } ne toglie una; { tutte: true } spegne: cancella tutto e toglie il consenso.
+// esplicito della persona (tabella prenotazioni_consenso; la RLS rifiuta le scritture senza).
+//  GET    → { utente, consenso, prenotazioni, tolte }   (401 senza accesso)
+//  PUT    → "Attiva": accende il consenso e carica quelle del telefono { prenotazioni }
+//  POST   → salva o aggiorna { prenotazioni: [...] , utente } (solo con consenso, mai lo accende)
+//  DELETE → { id, utente } la toglie lasciando una lapide (un altro telefono non la ricarica);
+//           { tutte: true } "Spegni": prima toglie il consenso, poi cancella tutto.
+// `utente` è l'account a cui il telefono le ha legate: se è cambiato, nessuna scrittura (409).
 
 const MAX = 30;
+const MAX_RIGHE = 500;        // tetto per persona, lapidi comprese
+const MAX_CORPO = 64_000;     // byte
 
 // Giro automatico in sviluppo: utente finto, nessuna scrittura vera (memoria del processo).
-const devStore = new Map<string, { consenso: boolean; list: Map<string, PrenotazioneAccount> }>();
+type Dev = { id: string; consenso: boolean; list: Map<string, PrenotazioneAccount>; tolte: Set<string> };
+const devStore = new Map<string, Dev>();
 async function utente() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const fake = process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER ? process.env.E2E_FAKE_USER : null;
   const dev = !user && fake ? fake : null;
-  if (dev && !devStore.has(dev)) devStore.set(dev, { consenso: false, list: new Map() });
+  if (dev && !devStore.has(dev)) devStore.set(dev, { id: dev, consenso: false, list: new Map(), tolte: new Set() });
   return { supabase, userId: user?.id ?? null, dev: dev ? devStore.get(dev)! : null };
 }
 
+async function corpo(request: Request): Promise<Record<string, unknown> | null> {
+  const len = Number(request.headers.get("content-length") ?? "0");
+  if (len > MAX_CORPO) return null;
+  const text = await request.text().catch(() => "");
+  if (text.length > MAX_CORPO) return null;
+  try {
+    const j = JSON.parse(text || "null");
+    return j && typeof j === "object" ? (j as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+function lista(v: unknown): PrenotazioneAccount[] | null {
+  if (!Array.isArray(v) || v.length > MAX) return null;
+  return v.map(pulisciPrenotazione).filter((p): p is PrenotazioneAccount => p !== null);
+}
 function riga(userId: string, p: PrenotazioneAccount) {
+  // Niente cancellata_at qui: un upsert su una lapide la lascia lapide.
   return {
     user_id: userId,
     id: p.id,
@@ -35,32 +57,48 @@ function riga(userId: string, p: PrenotazioneAccount) {
   };
 }
 
-export async function GET() {
-  const { supabase, userId, dev } = await utente();
-  if (dev) return NextResponse.json({ consenso: dev.consenso, prenotazioni: [...dev.list.values()] });
-  if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
+type Sb = Awaited<ReturnType<typeof createClient>>;
+async function stato(supabase: Sb, userId: string) {
   const { data: c } = await supabase.from("prenotazioni_consenso").select("user_id").eq("user_id", userId).maybeSingle();
-  if (!c) return NextResponse.json({ consenso: false, prenotazioni: [] });
-  const { data, error } = await supabase.from("prenotazioni").select("dati").eq("user_id", userId).order("created_at", { ascending: false }).limit(MAX);
-  if (error) return NextResponse.json({ error: "Non riesco a leggere le prenotazioni." }, { status: 500 });
-  const prenotazioni = (data ?? []).map((r) => pulisciPrenotazione(r.dati)).filter((p): p is PrenotazioneAccount => p !== null);
-  return NextResponse.json({ consenso: true, prenotazioni });
+  if (!c) return { utente: userId, consenso: false, prenotazioni: [], tolte: [] };
+  const [vive, lapidi] = await Promise.all([
+    supabase.from("prenotazioni").select("dati").eq("user_id", userId).is("cancellata_at", null).order("created_at", { ascending: false }).limit(MAX),
+    supabase.from("prenotazioni").select("id").eq("user_id", userId).not("cancellata_at", "is", null).order("cancellata_at", { ascending: false }).limit(200),
+  ]);
+  if (vive.error || lapidi.error) return null;
+  const prenotazioni = (vive.data ?? []).map((r) => pulisciPrenotazione(r.dati)).filter((p): p is PrenotazioneAccount => p !== null);
+  return { utente: userId, consenso: true, prenotazioni, tolte: (lapidi.data ?? []).map((r) => r.id as string) };
+}
+async function salva(supabase: Sb, userId: string, list: PrenotazioneAccount[]): Promise<number> {
+  if (list.length === 0) return 200;
+  const { count } = await supabase.from("prenotazioni").select("id", { count: "exact", head: true }).eq("user_id", userId);
+  if ((count ?? 0) + list.length > MAX_RIGHE) return 409;
+  const { error } = await supabase.from("prenotazioni").upsert(list.map((p) => riga(userId, p)), { onConflict: "user_id,id" });
+  if (!error) return 200;
+  console.warn(`[prenotazioni] salvataggio non riuscito ${error.code ?? ""}`);
+  return error.code === "42501" ? 403 : 500; // 42501: RLS, consenso spento
+}
+function devStato(d: Dev) {
+  return { utente: d.id, consenso: d.consenso, prenotazioni: d.consenso ? [...d.list.values()] : [], tolte: d.consenso ? [...d.tolte] : [] };
 }
 
-function lista(v: unknown): PrenotazioneAccount[] | null {
-  if (!Array.isArray(v) || v.length > MAX) return null;
-  return v.map(pulisciPrenotazione).filter((p): p is PrenotazioneAccount => p !== null);
+export async function GET() {
+  const { supabase, userId, dev } = await utente();
+  if (dev) return NextResponse.json(devStato(dev));
+  if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
+  const s = await stato(supabase, userId);
+  return s ? NextResponse.json(s) : NextResponse.json({ error: "Non riesco a leggere le prenotazioni." }, { status: 500 });
 }
 
 export async function PUT(request: Request) {
-  const body = (await request.json().catch(() => null)) as { prenotazioni?: unknown } | null;
+  const body = await corpo(request);
   const list = lista(body?.prenotazioni ?? []);
   if (!list) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
   const { supabase, userId, dev } = await utente();
   if (dev) {
     dev.consenso = true;
-    for (const p of list) dev.list.set(p.id, p);
-    return NextResponse.json({ ok: true, prenotazioni: [...dev.list.values()] });
+    for (const p of list) if (!dev.tolte.has(p.id)) dev.list.set(p.id, p);
+    return NextResponse.json({ ok: true, ...devStato(dev) });
   }
   if (!userId) return NextResponse.json({ error: "Accedi per tenerle sul tuo account." }, { status: 401 });
   const { error: ce } = await supabase.from("prenotazioni_consenso").upsert({ user_id: userId }, { onConflict: "user_id" });
@@ -68,49 +106,58 @@ export async function PUT(request: Request) {
     console.warn(`[prenotazioni] consenso non salvato ${ce.code ?? ""}`);
     return NextResponse.json({ error: "Non sono riuscito a salvare la scelta." }, { status: 500 });
   }
-  if (list.length > 0) {
-    const { error } = await supabase.from("prenotazioni").upsert(list.map((p) => riga(userId, p)), { onConflict: "user_id,id" });
-    if (error) console.warn(`[prenotazioni] caricamento non riuscito ${error.code ?? ""}`);
-  }
-  const { data } = await supabase.from("prenotazioni").select("dati").eq("user_id", userId).order("created_at", { ascending: false }).limit(MAX);
-  const prenotazioni = (data ?? []).map((r) => pulisciPrenotazione(r.dati)).filter((p): p is PrenotazioneAccount => p !== null);
-  return NextResponse.json({ ok: true, prenotazioni });
+  await salva(supabase, userId, list);
+  const s = await stato(supabase, userId);
+  return NextResponse.json({ ok: true, ...(s ?? { utente: userId, consenso: true, prenotazioni: [], tolte: [] }) });
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { prenotazione?: unknown } | null;
-  const p = pulisciPrenotazione(body?.prenotazione);
-  if (!p) return NextResponse.json({ error: "Prenotazione non valida." }, { status: 400 });
+  const body = await corpo(request);
+  const list = lista(body?.prenotazioni);
+  const per = typeof body?.utente === "string" ? body.utente : null;
+  if (!list || !per) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
   const { supabase, userId, dev } = await utente();
   if (dev) {
+    if (per !== dev.id) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
     if (!dev.consenso) return NextResponse.json({ error: "Consenso spento." }, { status: 403 });
-    dev.list.set(p.id, p);
+    for (const p of list) if (!dev.tolte.has(p.id)) dev.list.set(p.id, p);
     return NextResponse.json({ ok: true });
   }
   if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
-  // La policy RLS rifiuta la scrittura senza consenso: niente salvataggi "di nascosto".
-  const { error } = await supabase.from("prenotazioni").upsert(riga(userId, p), { onConflict: "user_id,id" });
-  if (error) return NextResponse.json({ error: "Non salvata sull'account." }, { status: error.code === "42501" ? 403 : 500 });
-  return NextResponse.json({ ok: true });
+  if (per !== userId) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
+  const st = await salva(supabase, userId, list);
+  return st === 200 ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Non salvate sull'account." }, { status: st });
 }
 
 export async function DELETE(request: Request) {
-  const body = (await request.json().catch(() => null)) as { id?: unknown; tutte?: unknown } | null;
-  const id = typeof body?.id === "string" && body.id.length <= 40 ? body.id : null;
+  const body = await corpo(request);
+  const id = typeof body?.id === "string" && body.id.length >= 4 && body.id.length <= 40 ? body.id : null;
+  const per = typeof body?.utente === "string" ? body.utente : null;
   const tutte = body?.tutte === true;
-  if (!id && !tutte) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
+  if (!tutte && (!id || !per)) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
   const { supabase, userId, dev } = await utente();
   if (dev) {
-    if (tutte) { dev.consenso = false; dev.list.clear(); } else dev.list.delete(id!);
+    if (tutte) { dev.consenso = false; dev.list.clear(); dev.tolte.clear(); return NextResponse.json({ ok: true }); }
+    if (per !== dev.id) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
+    if (dev.consenso) { dev.list.delete(id!); dev.tolte.add(id!); }
     return NextResponse.json({ ok: true });
   }
   if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
   if (tutte) {
+    // Prima il consenso: da quel momento la RLS rifiuta ogni scrittura in arrivo.
+    const { error: ce } = await supabase.from("prenotazioni_consenso").delete().eq("user_id", userId);
+    if (ce) return NextResponse.json({ error: "Non sono riuscito a spegnere." }, { status: 500 });
     const { error } = await supabase.from("prenotazioni").delete().eq("user_id", userId);
     if (error) return NextResponse.json({ error: "Non sono riuscito a toglierle." }, { status: 500 });
-    await supabase.from("prenotazioni_consenso").delete().eq("user_id", userId);
-  } else {
-    await supabase.from("prenotazioni").delete().eq("user_id", userId).eq("id", id!);
+    return NextResponse.json({ ok: true });
   }
+  if (per !== userId) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
+  // Lapide: si tengono solo id e locale, i dati si svuotano. Se non c'era, si crea (un altro telefono
+  // potrebbe ancora averla e ricaricarla). Senza consenso la RLS rifiuta: niente da togliere.
+  const { error } = await supabase.from("prenotazioni").upsert(
+    { user_id: userId, id: id!, place_id: "-", giorno: null, esito: null, disdetta_at: null, dati: {}, cancellata_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { onConflict: "user_id,id" },
+  );
+  if (error && error.code !== "42501") return NextResponse.json({ error: "Non tolta dall'account." }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

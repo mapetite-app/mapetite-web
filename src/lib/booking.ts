@@ -290,17 +290,44 @@ export function removeBooking(id: string) {
 }
 
 // Prenotazioni anche sull'account ("Cliente di parola", passo 2, PROPOSTE.md 3): solo se la persona
-// l'ha acceso in /prenotazioni (src/lib/prenotazioni-sync.ts). Senza consenso nessuna chiamata.
+// l'ha acceso in /prenotazioni (src/lib/prenotazioni-sync.ts). La chiave tiene l'id dell'account a
+// cui sono legate: se sul telefono entra un altro account il server rifiuta (409). Senza consenso
+// nessuna chiamata. Le tolte aspettano in TOLTE_KEY finché l'account non le ha segnate.
 export const ACCOUNT_KEY = "mapetite.prenotazioni.account";
-export function prenotazioniSullAccount(): boolean {
-  try { return window.localStorage.getItem(ACCOUNT_KEY) === "1"; } catch { return false; }
+export const TOLTE_KEY = "mapetite.prenotazioni.tolte";
+export function accountPrenotazioni(): string | null {
+  try {
+    const v = window.localStorage.getItem(ACCOUNT_KEY);
+    return v && v !== "1" ? v : null;
+  } catch {
+    return null;
+  }
+}
+export function tolteInAttesa(): string[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(TOLTE_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(-100) : [];
+  } catch {
+    return [];
+  }
+}
+export function segnaTolte(ids: string[]) {
+  try {
+    if (ids.length === 0) window.localStorage.removeItem(TOLTE_KEY);
+    else window.localStorage.setItem(TOLTE_KEY, JSON.stringify(ids.slice(-100)));
+  } catch { /* storage non disponibile */ }
 }
 export function sostituisciPrenotazioni(list: BookingRequest[]) {
   storeBookings(list);
 }
-function inviaAccount(method: "POST" | "DELETE", body: unknown) {
-  if (!prenotazioniSullAccount()) return;
-  void fetch("/api/prenotazioni", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
+function inviaAccount(method: "POST" | "DELETE", body: { prenotazione?: BookingRequest; id?: string }) {
+  const utente = accountPrenotazioni();
+  if (!utente) return;
+  if (method === "DELETE" && body.id) segnaTolte([...tolteInAttesa().filter((x) => x !== body.id), body.id]);
+  const payload = method === "POST" ? { prenotazioni: [body.prenotazione], utente } : { id: body.id, utente };
+  void fetch("/api/prenotazioni", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true })
+    .then((r) => { if (r.ok && method === "DELETE") segnaTolte(tolteInAttesa().filter((x) => x !== body.id)); })
+    .catch(() => {});
 }
 
 // "Cliente di parola" (PROPOSTE.md 3, primo passo, 29/10): quante prenotazioni fatte da Mapetite si sono
