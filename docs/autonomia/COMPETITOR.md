@@ -56,9 +56,13 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 ### Beli
 - **Cosa fa:** classifica personale dei ristoranti con confronti "meglio questo o quello?"; trasforma i confronti in un voto e li usa per consigliare (`BACKLOG.md`, proposta del 12/10).
 - **Da prendere:** la classifica a confronti (fatta: "Ti è piaciuto più di X?").
-- **Migliorabile:** serve aver già provato tanti posti prima che consigli bene; poco aiuto a chi parte da zero o a chi raccoglie dai social. Noi: impariamo anche da ciò che salvi, non solo da ciò che hai provato.
+- **Migliorabile:** serve aver già provato tanti posti prima che consigli bene (almeno 15 in classifica, [Spoon University](https://spoonuniversity.com/lifestyle/beli-the-new-app-personalizing-restaurant-reviews-and-recommendations)); "Match Score" personale e consigli prioritari nel piano a pagamento ([mwm.ai](https://mwm.ai/apps/beli/1478375386), fonte secondaria). Noi: impariamo anche da ciò che salvi; da un solo posto amato "Altri come questo" (31/10), gratis e con il perché.
 - Numeri: dato non trovato.
-- Ultimo controllo: 19/10/2026
+- Ultimo controllo: 31/10/2026
+
+### Novità viste il 31/10
+- **Zest** (giugno 2026): consigli imparati da dove mangi davvero, letti dai pagamenti con la carta ([AndroGuider](https://www.androguider.com/2026/06/zest-revolutionizes-restaurant.html)). Stessa idea nostra (comportamenti, non voti) ma chiede l'accesso ai conti: noi usiamo salvati, filtri e visite, senza dati bancari.
+- **WittyFood**: da una foto o una descrizione di un piatto trova piatti simili vicino a te, con un punteggio di somiglianza ([mwm.ai](https://mwm.ai/apps/wittyfood/6757565731), fonte secondaria). Da tenere d'occhio per "Altri come questo" partendo da uno screenshot.
 
 ### Novità viste il 20/10 (seconda sessione)
 - **Mapstr** — con Mapstr Plus accesso alle pre-aperture dei nuovi locali, per ora solo a Parigi ([Tendance Hôtellerie, 31/7/2026](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/23822-article/mapstr-offre-desormais-a-ses-utilisateurs-un-acces-exclusif-a-des-pre-ouvertures-de-nouveaux-lieux)); mappa dei suggerimenti con tre filtri (chi segui, "Mapstr Matching", nuove aperture: [mapstr.com](https://mapstr.com/mapstore/fr/article/article_all-in-map_fr_1), senza data); la scheda di Mapstr Plus cita suggerimenti AI per umore, budget o dieta e un filtro "tavoli disponibili" ([App Store](https://apps.apple.com/FR/app/id917288465)). **Da prendere:** le nuove aperture come segnale. **Meglio noi:** gratis, a Roma e Milano, legate al gusto (proposta 7). Ultimo controllo: 20/10/2026
