@@ -1582,7 +1582,10 @@ else {
     ok(((await p.getByTestId("dai-salvati-perche").textContent()) ?? "").includes("osteria romana"), "dai tuoi salvati: con un salvato solo il perché è già sotto il nome");
     await p.screenshot({ path: `${OUT}/11h-dai-salvati.png`, caret: "initial" });
     { const pins = p.getByTestId("pin-dai-salvati");
-      ok((await pins.count()) === 1 && (await pins.first().getAttribute("data-place")) === "00000000-0000-4000-8000-000000000002", `dai tuoi salvati: il salvato scelto ha il suo segnalino sulla mappa (${await pins.count()})`); }
+      ok((await pins.count()) === 1 && (await pins.first().getAttribute("data-place")) === "00000000-0000-4000-8000-000000000002", `dai tuoi salvati: il salvato scelto ha il suo segnalino sulla mappa (${await pins.count()})`);
+      await p.waitForTimeout(1300);
+      const b = await pins.first().boundingBox(); const riga = await ds.boundingBox();
+      ok(!!b && !!riga && b.x >= 0 && b.x + b.width <= 390 && b.y >= 0 && b.y + b.height <= riga.y, `dai tuoi salvati: il segnalino si vede tutto, nome compreso, sopra la riga (${JSON.stringify(b && { x: Math.round(b.x), y: Math.round(b.y), h: Math.round(b.height) })}, riga a ${Math.round(riga?.y ?? 0)})`); }
     await p.getByTestId("dai-salvati-apri").click();
     await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
     ok(await p.getByTestId("scheda-pannello").getByText("Osteria Due").first().isVisible(), "dai tuoi salvati: con un salvato solo il tocco apre la sua scheda");

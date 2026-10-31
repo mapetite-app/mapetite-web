@@ -455,7 +455,8 @@ function PlaceRow({
     const place = st.out.place!;
     return (
       <div className="rounded-card border border-success/30 bg-success/10 p-4" data-testid="reel-salvato" aria-live="polite">
-        {auto && <div className="mb-3"><Foto place={st.top} big /></div>}
+        {/* Senza foto Google niente riquadro da 160 px con la sola emoji (collaudo 31/10: riquadro troppo lungo). */}
+        {auto && st.top.photoRef && <div className="mb-3"><Foto place={st.top} big /></div>}
         <p className="text-xs font-semibold uppercase tracking-wide text-success">
           {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Voglio andarci"}
         </p>
