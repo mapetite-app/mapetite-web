@@ -1911,7 +1911,7 @@ else {
     ok(corpoSimili?.source === "world" && /fuori dai soliti giri/.test(corpoSimili?.query ?? "") && corpoSimili?.searchIntent === "natural",
       `altri come questo: ricerca nel mondo 'fuori dai soliti giri' (${JSON.stringify(corpoSimili?.query)})`);
     const pillola = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
-    ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith(`come ${nomeQui}`),
+    ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith("simili"),
       `altri come questo: pillola '${pillola}', il posto di partenza (anche con un altro id) non è tra i ${nomi.length} risultati`);
     await p.screenshot({ path: `${OUT}/13d-altri-come-risultati.png`, caret: "initial" });
     { const barra = (await p.getByTestId("barra-ricerca").locator("input").inputValue().catch(() => "")) ?? "";
@@ -1921,7 +1921,7 @@ else {
       await p.getByTestId("barra-ricerca").locator("input").press("Enter");
       await p.waitForTimeout(900);
       const pill2 = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
-      ok(/fuori dai soliti giri/.test(corpoSimili?.query ?? "") && pill2.endsWith(`come ${nomeQui}`), `altri come questo: 'Altri come Nome' reinviata dalla barra rifà la stessa ricerca (${JSON.stringify(corpoSimili?.query)}, '${pill2}')`); }
+      ok(/fuori dai soliti giri/.test(corpoSimili?.query ?? "") && pill2.endsWith("simili"), `altri come questo: 'Altri come Nome' reinviata dalla barra rifà la stessa ricerca (${JSON.stringify(corpoSimili?.query)}, '${pill2}')`); }
     await p.unroute("**/api/search");
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
@@ -1934,7 +1934,7 @@ else {
     await p.goto(`${BASE}/mappa?come=${patchedId}`, { waitUntil: "networkidle" });
     await p.getByTestId("simile-pillola").waitFor({ timeout: 8000 }).catch(() => {});
     const pill = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
-    ok(corpoCome?.source === "world" && /fuori dai soliti giri/.test(corpoCome?.query ?? "") && /come /.test(pill) && !p.url().includes("come="),
+    ok(corpoCome?.source === "world" && /fuori dai soliti giri/.test(corpoCome?.query ?? "") && /simili$/.test(pill) && !p.url().includes("come="),
       `dal reel: /mappa?come=… apre 'Altri come questo' sul salvato (${JSON.stringify(corpoCome?.query)}, '${pill}')`);
     await p.screenshot({ path: `${OUT}/13e-altri-come-da-link.png`, caret: "initial" });
     await p.unroute("**/api/search");

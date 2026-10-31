@@ -464,7 +464,7 @@ function nomeChiave(nome: string): string {
 const TIPI_DAL_NOME = ["trattoria", "osteria", "hosteria", "pizzeria", "enoteca", "vineria", "bistrot", "taverna", "locanda", "gelateria", "pasticceria", "panificio", "forno", "birreria", "cocktail bar", "wine bar", "sushi", "ramen", "pub", "caffè", "caffe", "bar"];
 // Etichette che non reggono una frase di ricerca ("dolci fuori dai soliti giri").
 const TIPO_PER_RICERCA: Record<string, string> = { Pesce: "ristorante di pesce", Dolci: "pasticceria", Dolciumi: "pasticceria", Colazione: "bar per colazione", "Da asporto": "ristorante", "Area food": "ristorante", "Succhi e centrifughe": "bar", "Bar e griglia": "ristorante", Diner: "ristorante" };
-const CUCINE = new Set(["Giapponese", "Cinese", "Indiano", "Thailandese", "Messicano", "Greco", "Spagnolo", "Francese", "Americano", "Mediorientale", "Vegano", "Vegetariano"]);
+const CUCINE = new Set(["Giapponese", "Cinese", "Indiano", "Thailandese", "Messicano", "Greco", "Spagnolo", "Francese", "Americano", "Mediorientale", "Vegano", "Vegetariano", "Coreano", "Vietnamita", "Turco", "Libanese", "Brasiliano", "Peruviano", "Africano", "Asiatico"]);
 // Aggettivi dei tag AI che non cambiano col genere ("trattoria tradizionale", "bar vivace").
 const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
 // "Messi da parte" senza il posto di partenza di "Altri come questo" (nomi, non id).
@@ -1914,6 +1914,8 @@ export default function MapView({
     const daBarra = !optsDati.simile && s != null && qScritta.trim() === `Altri come ${s.nome}`;
     const q = daBarra ? s.query : qScritta;
     const opts = daBarra ? { ...optsDati, simile: { nome: s.nome, escludi: s.escludi } } : optsDati;
+    // Un'altra ricerca chiude "Altri come": l'etichetta scritta a mano dopo non la riapre (collaudo 31/10).
+    if (!opts.simile) simileRef.current = null;
     const at = center ?? { lat: viewState.latitude, lng: viewState.longitude };
     const mondo = opts.mondo === true || view === "all";
     // Il numero della ricerca si prende SUBITO: una risposta arrivata dopo ✕, un'altra ricerca
@@ -2296,10 +2298,12 @@ export default function MapView({
       return;
     }
     const come = params.get("come");
-    if (come && /^[0-9a-f-]{36}$/i.test(come)) {
+    if (come != null) {
       params.delete("come");
       const rest = params.toString();
       window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+    }
+    if (come && /^[0-9a-f-]{36}$/i.test(come)) {
       comeRef.current = come;
       setTimeout(() => setWelcomeDismissed(true), 0);
       return;
@@ -3599,6 +3603,7 @@ export default function MapView({
           nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
+          shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
             ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}`
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}

@@ -65,9 +65,9 @@ const LABELS: Record<string, string> = {
   peruvian_restaurant: "Peruviano",
   african_restaurant: "Africano",
   asian_restaurant: "Asiatico",
-  barbecue_restaurant: "Griglia",
+  barbecue_restaurant: "Braceria",
   buffet_restaurant: "Buffet",
-  food_store: "Gastronomia",
+  food_store: "Alimentari",
 };
 
 // Il nome del locale dice già che cos'è ("Trattoria da Lucia", che Google segna come seafood_restaurant):
