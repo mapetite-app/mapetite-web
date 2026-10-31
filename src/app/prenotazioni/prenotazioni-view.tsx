@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarPlus, Check, MessageCircle, Navigation, Phone, Globe, Copy, Trash2 } from "lucide-react";
 import {
@@ -16,6 +16,8 @@ import {
   type BookingRequest,
 } from "@/lib/booking";
 import { track } from "@/lib/track";
+import PrenotazioniAccount from "@/components/prenotazioni-account";
+import type { StatoAccount } from "@/lib/prenotazioni-sync";
 
 // "Le mie prenotazioni" (piano 1.5b): le richieste mandate ai locali dal foglio Prenota,
 // salvate nel telefono. Stato: Richiesta inviata → Confermata (lo segna l'utente: Mapetite
@@ -269,6 +271,8 @@ export default function PrenotazioniView() {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const { upcoming, past } = splitBookings(list);
+  const [sullAccount, setSullAccount] = useState(false);
+  const onStato = useCallback((s: StatoAccount) => setSullAccount(s === "acceso"), []);
 
   // Apertura della pagina, una volta (la vista "pagina" la conta già track-auto).
   const opened = useRef(false);
@@ -282,7 +286,10 @@ export default function PrenotazioniView() {
   return (
     <main className="mx-auto w-full max-w-lg px-4 pb-10 pt-6">
       <h1 className="font-title text-3xl font-semibold leading-tight text-text">Le mie prenotazioni</h1>
-      <p className="mt-1 text-sm font-sans text-text-muted">Le richieste che hai mandato ai locali, salvate su questo telefono.</p>
+      <p className="mt-1 text-sm font-sans text-text-muted">
+        Le richieste che hai mandato ai locali, salvate {sullAccount ? "sul tuo account" : "su questo telefono"}.
+      </p>
+      {mounted && <PrenotazioniAccount haPrenotazioni={list.length > 0} onStato={onStato} />}
 
       {!mounted ? (
         <div aria-hidden className="mt-6 h-40 animate-pulse rounded-card bg-surface" />

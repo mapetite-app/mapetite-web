@@ -1,0 +1,93 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Check } from "lucide-react";
+import { accendiPrenotazioniAccount, sincronizzaPrenotazioni, spegniPrenotazioniAccount, type StatoAccount } from "@/lib/prenotazioni-sync";
+import { trackFeature } from "@/lib/track";
+
+// "Tienile sul tuo account" (Cliente di parola, passo 2, PROPOSTE.md 3): una riga in /prenotazioni.
+// Spento di base: si accende solo con il tocco della persona, dopo aver letto cosa si salva.
+// Senza accesso (401) o con un errore non compare niente: le prenotazioni restano sul telefono.
+export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPrenotazioni: boolean; onStato?: (s: StatoAccount) => void }) {
+  const [stato, setStato] = useState<StatoAccount | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [chiedi, setChiedi] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void sincronizzaPrenotazioni().then((s) => { if (alive) { setStato(s); onStato?.(s); } });
+    return () => { alive = false; };
+  }, [onStato]);
+
+  const imposta = (s: StatoAccount) => { setStato(s); onStato?.(s); };
+
+  if (stato === "acceso") {
+    if (chiedi) {
+      return (
+        <div data-testid="prenotazioni-account-spegni-conferma" className="mt-4 rounded-btn bg-accent-light p-3">
+          <p className="text-sm font-sans text-text">Le togliamo dal tuo account. Su questo telefono restano.</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                const ok = await spegniPrenotazioniAccount();
+                setBusy(false);
+                setChiedi(false);
+                if (ok) { imposta("spento"); trackFeature("prenotazioni_account", { stato: "spento" }); }
+                else setErrore("Non ci sono riuscito. Riprova tra poco.");
+              }}
+              className="min-h-10 flex-1 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white disabled:opacity-60"
+            >
+              Sì, togli
+            </button>
+            <button type="button" onClick={() => setChiedi(false)} className="min-h-10 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand">
+              No
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <p data-testid="prenotazioni-account-acceso" className="mt-3 flex flex-wrap items-center gap-x-2 text-sm font-sans text-text-muted">
+        <span className="inline-flex items-center gap-1 font-display font-semibold text-brand"><Check size={15} aria-hidden /> Sul tuo account</span>
+        <span aria-hidden>·</span>
+        <button type="button" data-testid="prenotazioni-account-spegni" onClick={() => { setErrore(null); setChiedi(true); }} className="min-h-10 font-display font-semibold text-text-muted underline underline-offset-2">
+          Spegni
+        </button>
+        {errore && <span role="status" className="w-full text-xs text-accent">{errore}</span>}
+      </p>
+    );
+  }
+
+  if (stato !== "spento" || !haPrenotazioni) return null;
+  return (
+    <div data-testid="prenotazioni-account" className="mt-4 rounded-card border border-border bg-white p-4 shadow-card">
+      <p className="font-display text-[15px] font-semibold text-brand">Tienile sul tuo account</p>
+      <p className="mt-1 text-sm font-sans leading-relaxed text-text-muted">
+        Non le perdi cambiando telefono e «di parola» vale ovunque.{" "}
+        <Link href="/privacy#prenotazioni" className="font-display font-semibold text-brand underline underline-offset-2">Cosa salviamo</Link>
+      </p>
+      <button
+        type="button"
+        data-testid="prenotazioni-account-attiva"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setErrore(null);
+          const ok = await accendiPrenotazioniAccount();
+          setBusy(false);
+          if (ok) { imposta("acceso"); trackFeature("prenotazioni_account", { stato: "acceso" }); }
+          else setErrore("Non ci sono riuscito. Riprova tra poco.");
+        }}
+        className="mt-3 min-h-11 w-full rounded-pill bg-brand px-4 text-[15px] font-display font-semibold text-white active:scale-[0.98] disabled:opacity-60"
+      >
+        {busy ? "Un attimo…" : "Attiva"}
+      </button>
+      {errore && <p role="status" className="mt-2 text-xs font-sans text-accent">{errore}</p>}
+    </div>
+  );
+}

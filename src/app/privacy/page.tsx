@@ -26,6 +26,7 @@ const SEZIONI: { titolo: string; righe: string[] }[] = [
       "I tuoi posti: locali salvati, note, raccolte, visite (\"Ci sono stato\"), recensioni e foto che pubblichi, gruppi e persone che segui.",
       "Uso dell'app: quali funzioni usi e le ricerche che fai, per capire cosa migliorare. Con una ricerca può essere registrato il punto della mappa da cui cerchi.",
       "Posizione: solo se la permetti, per mostrare le distanze e i posti vicini. Non la seguiamo in background.",
+      "Prenotazioni: le richieste che mandi ai locali da Mapetite restano sul telefono. Solo se tocchi \"Attiva\" in Le mie prenotazioni le teniamo anche sul tuo account (locale, giorno, ora, persone, eventuale richiesta speciale, come l'hai chiesta, se ci sei andato o hai disdetto), per non perderle cambiando telefono e contare la riga \"di parola\". Oggi non le vede nessun altro, nemmeno il locale. Con \"Spegni\" le cancelliamo dall'account.",
       "Sul telefono restano alcune preferenze (per esempio l'ultima vista della mappa e le risposte del primo accesso non ancora salvate).",
     ],
   },
@@ -60,13 +61,13 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-6" data-testid="privacy">
       <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Mapetite</p>
       <h1 className="mt-1 font-title text-[28px] font-semibold leading-tight text-brand">Privacy</h1>
-      <p className="mt-2 text-sm font-sans text-text-muted">Ultimo aggiornamento: 29 ottobre 2026</p>
+      <p className="mt-2 text-sm font-sans text-text-muted">Ultimo aggiornamento: 31 ottobre 2026</p>
       {SEZIONI.map((s) => (
         <section key={s.titolo} className="mt-6">
           <h2 className="font-display text-lg font-semibold text-brand">{s.titolo}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {s.righe.map((r) => (
-              <li key={r} className="text-[15px] font-sans leading-relaxed text-text">{r}</li>
+              <li key={r} id={r.startsWith("Prenotazioni:") ? "prenotazioni" : undefined} className="text-[15px] font-sans leading-relaxed text-text">{r}</li>
             ))}
           </ul>
         </section>

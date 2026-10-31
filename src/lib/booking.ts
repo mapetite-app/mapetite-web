@@ -275,13 +275,32 @@ export function subscribeBookings(cb: () => void): () => void {
 export function addBooking(b: Omit<BookingRequest, "id" | "createdAt">): BookingRequest {
   const full: BookingRequest = { ...b, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: Date.now() };
   storeBookings([...loadBookings(), full]);
+  inviaAccount("POST", { prenotazione: full });
   return full;
 }
 export function updateBooking(id: string, patch: Partial<BookingRequest>) {
-  storeBookings(loadBookings().map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  const list = loadBookings().map((b) => (b.id === id ? { ...b, ...patch } : b));
+  storeBookings(list);
+  const agg = list.find((b) => b.id === id);
+  if (agg) inviaAccount("POST", { prenotazione: agg });
 }
 export function removeBooking(id: string) {
   storeBookings(loadBookings().filter((b) => b.id !== id));
+  inviaAccount("DELETE", { id });
+}
+
+// Prenotazioni anche sull'account ("Cliente di parola", passo 2, PROPOSTE.md 3): solo se la persona
+// l'ha acceso in /prenotazioni (src/lib/prenotazioni-sync.ts). Senza consenso nessuna chiamata.
+export const ACCOUNT_KEY = "mapetite.prenotazioni.account";
+export function prenotazioniSullAccount(): boolean {
+  try { return window.localStorage.getItem(ACCOUNT_KEY) === "1"; } catch { return false; }
+}
+export function sostituisciPrenotazioni(list: BookingRequest[]) {
+  storeBookings(list);
+}
+function inviaAccount(method: "POST" | "DELETE", body: unknown) {
+  if (!prenotazioniSullAccount()) return;
+  void fetch("/api/prenotazioni", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
 }
 
 // "Cliente di parola" (PROPOSTE.md 3, primo passo, 29/10): quante prenotazioni fatte da Mapetite si sono
