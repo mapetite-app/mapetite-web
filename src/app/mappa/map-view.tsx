@@ -1850,13 +1850,13 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
   const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top }; return; }
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom }; return; }
     pendingFitRef.current = null;
     const lngs = list.map((p) => p.lng);
     const lats = list.map((p) => p.lat);
@@ -2402,9 +2402,9 @@ export default function MapView({
   const dalSalvatiChiave = dalSalvatiVisti.map((d) => d.place.id).join(",");
   useEffect(() => {
     if (!dalSalvati || dalSalvatiVisti.length === 0 || inquadratoPer.current === dalSalvati.ticket || isDesktop()) return;
-    inquadratoPer.current = dalSalvati.ticket;
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number } } } | null)?.getMap?.();
-    if (!map) return;
+    if (!map || !mapReadyRef.current) return;
+    inquadratoPer.current = dalSalvati.ticket;
     const w = window.innerWidth, h = window.innerHeight;
     // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
     const fuori = dalSalvatiVisti.some(({ place }) => {
@@ -3190,7 +3190,7 @@ export default function MapView({
         onLoad={() => {
           mapReadyRef.current = true;
           const pending = pendingFitRef.current;
-          if (pending) fitToPlaces(pending.list, pending.top);
+          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom);
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
