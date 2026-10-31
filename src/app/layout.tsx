@@ -1,32 +1,42 @@
 import { avvioStartupImages } from "@/lib/avvio";
 import type { Metadata, Viewport } from "next";
-import { Poppins, Inter, Newsreader } from "next/font/google";
+import localFont from "next/font/local";
 import OfflineBanner from "@/components/offline-banner";
 import NavBar from "@/components/nav-bar";
 import { getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import "./globals.css";
 
-const poppins = Poppins({
+// Font dentro il progetto (sottoinsieme latino, licenza OFL), non scaricati da Google Fonts a ogni build:
+// il 31/10 due deploy di produzione su tre sono falliti perché Vercel non riusciva a scaricarli.
+const poppins = localFont({
   variable: "--font-poppins",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  src: [
+    { path: "./fonts/poppins-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/poppins-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/poppins-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/poppins-800.woff2", weight: "800", style: "normal" },
+  ],
   display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
-const inter = Inter({
+const inter = localFont({
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  src: "./fonts/inter-var.woff2",
+  weight: "400 700",
+  style: "normal",
   display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
 // Variante in prova dei titoli (decisione grafica aperta): serif editoriale come Places.
 // Si scarica solo se la pagina la usa davvero (?titoli=serif).
-const newsreader = Newsreader({
+const newsreader = localFont({
   variable: "--font-newsreader",
-  subsets: ["latin"],
-  weight: ["500", "600"],
+  src: "./fonts/newsreader-var.woff2",
+  weight: "500 600",
+  style: "normal",
   display: "swap",
   // Usato solo con ?titoli=serif: niente precaricamento per tutti.
   preload: false,
