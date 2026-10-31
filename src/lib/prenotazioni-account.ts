@@ -51,6 +51,8 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
     disdetta: t(o.disdetta),
     piattaforma: s(o.piattaforma, 40),
   };
+  const mod = t(o.modificataAt);
+  if (mod != null) out.modificataAt = mod;
   for (const k of ["dismissed", "confirmed", "dismissedEve", "dismissedRisposta"] as const) {
     const val = b(o[k]);
     if (val !== undefined) out[k] = val;
@@ -58,8 +60,9 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
   return out;
 }
 
-// Unione telefono + account, per id: vale il dato del telefono, quello dell'account riempie i vuoti
-// (per esempio "Com'è andata?" risposto su un altro telefono). Le prenotazioni che il telefono non ha
+// Unione telefono + account, per id: vale la versione modificata più di recente (modificataAt, dal
+// 31/10; a parità o senza data vale il telefono), l'altra riempie i vuoti (per esempio "Com'è andata?"
+// risposto su un altro telefono). Le prenotazioni che il telefono non ha
 // arrivano dall'account. Ordine per data di creazione, ultime 30.
 // Le tolte (lapidi dell'account o tolte qui in attesa) non tornano.
 export function unisciPrenotazioni(locali: BookingRequest[], remote: BookingRequest[], tolte: Iterable<string> = []): BookingRequest[] {
@@ -70,9 +73,15 @@ export function unisciPrenotazioni(locali: BookingRequest[], remote: BookingRequ
     if (via.has(l.id)) continue;
     const r = byId.get(l.id);
     if (!r) { byId.set(l.id, l); continue; }
-    const m: Record<string, unknown> = { ...r };
-    for (const [k, val] of Object.entries(l)) if (val !== null && val !== undefined) m[k] = val;
+    const [base, sopra] = ultimaModifica(r) > ultimaModifica(l) ? [l, r] : [r, l];
+    const m: Record<string, unknown> = { ...base };
+    for (const [k, val] of Object.entries(sopra)) if (val !== null && val !== undefined) m[k] = val;
     byId.set(l.id, m as BookingRequest);
   }
   return [...byId.values()].sort((a, c) => a.createdAt - c.createdAt).slice(-30);
+}
+
+// Quando è stata toccata l'ultima volta (le prenotazioni di prima del 31/10 non hanno la data).
+export function ultimaModifica(p: BookingRequest): number {
+  return p.modificataAt ?? p.createdAt;
 }

@@ -243,6 +243,7 @@ export type BookingRequest = BookingDetails & {
   dismissedRisposta?: boolean;
   disdetta?: number | null; // "Non vado più" toccato (ms): distingue la disdetta dal "Non ci sono andato" (dal 29/10)
   piattaforma?: string | null; // "Prenota su TheFork" (via "sito"): il nome della piattaforma (dal 30/10)
+  modificataAt?: number;   // ultima modifica fatta sul telefono (ms): tra due telefoni vince la più recente (dal 31/10)
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -273,13 +274,14 @@ export function subscribeBookings(cb: () => void): () => void {
   return () => { listeners.delete(cb); window.removeEventListener("storage", onStorage); };
 }
 export function addBooking(b: Omit<BookingRequest, "id" | "createdAt">): BookingRequest {
-  const full: BookingRequest = { ...b, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: Date.now() };
+  const now = Date.now();
+  const full: BookingRequest = { ...b, id: `${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: now, modificataAt: now };
   storeBookings([...loadBookings(), full]);
   inviaAccount("POST", { prenotazione: full });
   return full;
 }
 export function updateBooking(id: string, patch: Partial<BookingRequest>) {
-  const list = loadBookings().map((b) => (b.id === id ? { ...b, ...patch } : b));
+  const list = loadBookings().map((b) => (b.id === id ? { ...b, ...patch, modificataAt: Date.now() } : b));
   storeBookings(list);
   const agg = list.find((b) => b.id === id);
   if (agg) inviaAccount("POST", { prenotazione: agg });
@@ -352,6 +354,20 @@ export function clienteDiParola(list: BookingRequest[]): number | null {
     return null; // una mancata (o una disdetta arrivata dopo l'ora del tavolo): niente riga
   }
   return concluse >= PAROLA_MIN ? concluse : null;
+}
+
+// "Cliente di parola", passo 3 (PROPOSTE.md 3): per il pannello del locale, quanti tavoli sono stati
+// chiesti da Mapetite e quanti da clienti di parola. Solo dalle prenotazioni che le persone hanno
+// scelto di tenere sull'account; mai nomi: il pannello mostra il numero solo da SOGLIA persone in su.
+// `tutte` = tutte le prenotazioni (di ogni locale) delle persone che hanno prenotato qui, per sapere
+// se sono di parola; contano i tavoli con giorno tra `da` e `a` (compresi), disdette escluse.
+export function prenotazioniAlLocale(tutte: { utente: string; p: BookingRequest }[], placeIds: string[], da: string, a: string): { tavoli: number; diParola: number; persone: number } {
+  const ids = new Set(placeIds);
+  const perUtente = new Map<string, BookingRequest[]>();
+  for (const { utente, p } of tutte) perUtente.set(utente, [...(perUtente.get(utente) ?? []), p]);
+  const qui = tutte.filter(({ p }) => ids.has(p.placeId) && p.date && p.date >= da && p.date <= a && p.disdetta == null);
+  const diParola = new Map([...new Set(qui.map((x) => x.utente))].map((u) => [u, clienteDiParola(perUtente.get(u) ?? []) != null]));
+  return { tavoli: qui.length, diParola: qui.filter((x) => diParola.get(x.utente)).length, persone: diParola.size };
 }
 
 // "Prenota come l'ultima volta" (PROPOSTE.md 10): persone e ora dell'ultima richiesta fatta da Mapetite
