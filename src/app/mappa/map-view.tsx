@@ -460,7 +460,10 @@ function nomeChiave(nome: string): string {
 // "Altri come questo" (proposta 27): la frase di ricerca dai tratti veri del posto (tipo, punti forti
 // e atmosfera scritti dall'AI dalle recensioni), "fuori dai soliti giri" così i posti di massa vanno in
 // fondo (src/lib/mainstream.ts). Il tipo prima dal nome ("Trattoria da Lucia"), poi dal tipo Google.
-const TIPO_DAL_NOME = /\b(trattoria|osteria|pizzeria|enoteca|bistrot|hosteria|taverna|locanda|gelateria|pasticceria|forno|panificio|birreria|vineria|cocktail bar|wine bar|sushi|ramen|pub|caff[eè]|bar)\b/i;
+// In ordine di precisione: "Bar Pizzeria Roma" è una pizzeria, non un bar.
+const TIPI_DAL_NOME = ["trattoria", "osteria", "hosteria", "pizzeria", "enoteca", "vineria", "bistrot", "taverna", "locanda", "gelateria", "pasticceria", "panificio", "forno", "birreria", "cocktail bar", "wine bar", "sushi", "ramen", "pub", "caffè", "caffe", "bar"];
+// Etichette che non reggono una frase di ricerca ("dolci fuori dai soliti giri").
+const TIPO_PER_RICERCA: Record<string, string> = { Pesce: "ristorante di pesce", Dolci: "pasticceria", Dolciumi: "pasticceria", Colazione: "bar per colazione", "Da asporto": "ristorante", "Area food": "ristorante", "Succhi e centrifughe": "bar", "Bar e griglia": "ristorante", Diner: "ristorante" };
 const CUCINE = new Set(["Giapponese", "Cinese", "Indiano", "Thailandese", "Messicano", "Greco", "Spagnolo", "Francese", "Americano", "Mediorientale", "Vegano", "Vegetariano"]);
 // Aggettivi dei tag AI che non cambiano col genere ("trattoria tradizionale", "bar vivace").
 const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
@@ -470,14 +473,12 @@ function piaciuto(tags: string[] | null | undefined): boolean {
   return t.includes(OPINION_LIKE) || (t.includes(VISIT_DONE) && !t.includes(OPINION_DISLIKE));
 }
 function queryAltriCome(v: { name: string; category: string | null; address: string | null; goFor: string[] | null; tags: string[] | null }): string {
-  const dalNome = v.name.match(TIPO_DAL_NOME)?.[1];
+  const nome = v.name.toLowerCase();
+  const dalNome = TIPI_DAL_NOME.find((t) => new RegExp(`(^|[^\\p{L}])${t}($|[^\\p{L}])`, "u").test(nome));
   const label = categoryLabel(v.category);
   const tipo = dalNome
-    ? dalNome.toLowerCase()
-    : !label ? "ristorante"
-      : label === "Pesce" ? "ristorante di pesce"
-        : CUCINE.has(label) ? `ristorante ${label.toLowerCase()}`
-          : label.toLowerCase();
+    ?? (!label ? "ristorante"
+      : TIPO_PER_RICERCA[label] ?? (CUCINE.has(label) ? `ristorante ${label.toLowerCase()}` : label.toLowerCase()));
   const tag = (v.tags ?? []).find((t) => TAG_INVARIABILI.has(t));
   const forti = (v.goFor ?? []).filter((c) => c.length <= 20).slice(0, 2);
   const city = cityFromAddress(v.address);
@@ -1996,6 +1997,7 @@ export default function MapView({
 
   // "Altri come questo" (proposta 27): dalla scheda di un posto che ti è piaciuto, la ricerca nel mondo
   // con i suoi tratti, attorno al posto. Costa quanto una ricerca scritta a mano (1 Google, 1 Haiku).
+  const simileRef = useRef<{ nome: string; escludi: string[] } | null>(null);
   const altriCome = (p: Place) => {
     const uuid = resolveUuid(p.id);
     const d = venueDetails[p.id] ?? (uuid ? venueDetails[uuid] : undefined);
@@ -2003,7 +2005,11 @@ export default function MapView({
     const gid = Object.keys(placeUuids).find((g) => placeUuids[g] === uuid);
     const escludi = [p.id, uuid, gid].filter((x): x is string => x != null);
     trackFeature("altri_come");
-    setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setClusterPlaces(null); setFilterError(null);
+    // Chiudendo la scheda la mappa tornerebbe alla vista di prima (dalla mappa dei salvati: l'Italia
+    // intera) sopra il centraggio sui risultati: qui la vista di prima non serve più.
+    viewBeforeVenue.current = null;
+    simileRef.current = { nome: p.name, escludi };
+    setSalvatiMappa(false); setView("all"); setActiveTag(null); setActiveCity(null); setSavedQuery(""); setClusterPlaces(null); setFilterError(null);
     setWelcomeDismissed(true); setIdeasOpen(false);
     setAiQuery(q);
     setViewState((v) => ({ ...v, latitude: p.lat, longitude: p.lng, zoom: 13 }));
@@ -3078,7 +3084,10 @@ export default function MapView({
                 void runFilteredSearch(f, { query: filterQueryRef.current });
                 return;
               }
-              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q); void runAISearch(q);
+              const q = (aiSearch?.query ?? aiQuery).trim(); setAiQuery(q);
+              // "Altri come questo" spostata: resta la stessa ricerca (pillola, posto escluso, niente recenti).
+              const simile = aiSearch?.simileA && q === aiSearch.query?.trim() && simileRef.current?.nome === aiSearch.simileA ? simileRef.current : null;
+              void runAISearch(q, undefined, simile ? { simile } : {});
             }}
             className="pointer-events-auto min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white shadow-float active:scale-95 disabled:opacity-60"
           >
