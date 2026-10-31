@@ -474,6 +474,16 @@ function PlaceRow({
             </button>
           )}
         </div>
+        {/* Proposta 35: dal reel appena visto, i posti simili fuori dai soliti giri (stessa ricerca della
+            scheda, 1 Google e 1 Haiku solo se toccata). Link e non pulsante: la cosa principale resta "Apri". */}
+        <Link
+          href={`/mappa?come=${encodeURIComponent(place.id)}`}
+          onClick={() => trackFeature("altri_come_reel")}
+          data-testid="reel-altri-come"
+          className="mt-2 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline-offset-2 hover:underline"
+        >
+          ✨ Altri come questo
+        </Link>
       </div>
     );
   }

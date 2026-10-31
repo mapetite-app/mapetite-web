@@ -1838,9 +1838,10 @@ else {
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   // Stato del salvato: "Ci sono stato" con un tocco nella scheda (tag esistente, nessuna migrazione)
   let patched = null;
+  let patchedId = null;
   await p.route("**/rest/v1/saved_places**", (r) => {
     // Solo le scritture dei tag: dopo "Ci sono stato" la classifica (4.3) può scrivere a parte rank_score.
-    if (r.request().method() === "PATCH") { const b = r.request().postDataJSON(); if (b?.tags) patched = b; return r.fulfill({ status: 204, body: "" }); }
+    if (r.request().method() === "PATCH") { const b = r.request().postDataJSON(); if (b?.tags) { patched = b; patchedId = new URL(r.request().url()).searchParams.get("place_id")?.replace(/^eq\./, "") ?? null; } return r.fulfill({ status: 204, body: "" }); }
     return r.fallback();
   });
   // Buoni pasto (PROPOSTE.md 19/10): la riga in scheda solo con almeno 2 risposte concordi; risposta nel diario.
@@ -1910,13 +1911,41 @@ else {
     ok(corpoSimili?.source === "world" && /fuori dai soliti giri/.test(corpoSimili?.query ?? "") && corpoSimili?.searchIntent === "natural",
       `altri come questo: ricerca nel mondo 'fuori dai soliti giri' (${JSON.stringify(corpoSimili?.query)})`);
     const pillola = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
-    ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith(`come ${nomeQui}`),
+    ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith("simili"),
       `altri come questo: pillola '${pillola}', il posto di partenza (anche con un altro id) non è tra i ${nomi.length} risultati`);
     await p.screenshot({ path: `${OUT}/13d-altri-come-risultati.png`, caret: "initial" });
+    { const barra = (await p.getByTestId("barra-ricerca").locator("input").inputValue().catch(() => "")) ?? "";
+      ok(barra === `Altri come ${nomeQui}`, `altri come questo: nella barra 'Altri come Nome', non la frase lunga ('${barra}')`);
+      // Reinviata dalla barra così com'è: è ancora la ricerca dei simili (frase vera, posto escluso).
+      corpoSimili = null;
+      await p.getByTestId("barra-ricerca").locator("input").press("Enter");
+      await p.waitForTimeout(900);
+      const pill2 = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
+      ok(/fuori dai soliti giri/.test(corpoSimili?.query ?? "") && pill2.endsWith("simili"), `altri come questo: 'Altri come Nome' reinviata dalla barra rifà la stessa ricerca (${JSON.stringify(corpoSimili?.query)}, '${pill2}')`); }
     await p.unroute("**/api/search");
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
+  // Proposta 35: dal reel appena salvato /mappa?come=UUID lancia "Altri come questo" su quel salvato.
+  if (patchedId) {
+    let corpoCome = null;
+    await p.route("**/api/search", (r) => { corpoCome = r.request().postDataJSON(); return r.fulfill({ json: { ...SEARCH_FAST, risultati: PLACES } }); });
+    await p.waitForLoadState("networkidle").catch(() => {});
+    await p.goto(`${BASE}/mappa?come=${patchedId}`, { waitUntil: "networkidle" });
+    await p.getByTestId("simile-pillola").waitFor({ timeout: 8000 }).catch(() => {});
+    const pill = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
+    ok(corpoCome?.source === "world" && /fuori dai soliti giri/.test(corpoCome?.query ?? "") && /simili$/.test(pill) && !p.url().includes("come="),
+      `dal reel: /mappa?come=… apre 'Altri come questo' sul salvato (${JSON.stringify(corpoCome?.query)}, '${pill}')`);
+    await p.screenshot({ path: `${OUT}/13e-altri-come-da-link.png`, caret: "initial" });
+    await p.unroute("**/api/search");
+    // Salvato che non c'è (tolto, altro account): nessuna ricerca a pagamento.
+    corpoCome = null;
+    await p.route("**/api/search", (r) => { corpoCome = r.request().postDataJSON(); return r.fulfill({ json: { ...SEARCH_FAST, risultati: PLACES } }); });
+    await p.goto(`${BASE}/mappa?come=00000000-0000-4000-8000-00000000dead`, { waitUntil: "networkidle" });
+    await p.waitForTimeout(1500);
+    ok(corpoCome === null, "dal reel: /mappa?come= di un salvato che non c'è non fa partire nessuna ricerca");
+    await p.unroute("**/api/search");
+  } else ok(false, "dal reel: /mappa?come=… (manca l'id del salvato dal giro precedente)");
   await p.unroute("**/rest/v1/saved_places**");
   // Esc può tornare indietro nella cronologia: si aspetta che finisca, altrimenti il goto sotto
   // veniva interrotto (ERR_ABORTED / timeout, visto anche sul codice di partenza il 15/10).
@@ -2697,6 +2726,7 @@ else {
     ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "salva dal reel: una sola ricerca Google, con nome e città del primo locale");
     ok(await lp.getByTestId("reel-altri").getByText("Nel reel ci sono anche").isVisible() && await lp.getByTestId("reel-altro").count() === 2, "salva dal reel: 'Nel reel ci sono anche' con gli altri 2 locali, senza cercarli");
     ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");
+    ok(await lp.getByTestId("reel-altri-come").getAttribute("href") === "/mappa?come=00000000-0000-0000-0000-000000000201", "salva dal reel: '✨ Altri come questo' porta ai simili di quel salvato (proposta 35)");
     await lp.getByTestId("reel-verdetto").waitFor({ timeout: 4000 }).catch(() => {});
     ok(await lp.getByTestId("reel-verdetto").getByText("Caffè da banco serio, cornetti sfornati la mattina.").isVisible() && verdCalls.length === 1 && verdCalls[0]?.googlePlaceId === "GBR1", "salva dal reel: nel '✓ Salvato' compare subito il verdetto Mapetite (una chiamata)");
     // "Quando ci vai?" (proposta 17): un tocco scrive il giorno nel salvato, un altro lo toglie.

@@ -53,6 +53,21 @@ const LABELS: Record<string, string> = {
   juice_shop: "Succhi e centrifughe",
   chocolate_shop: "Cioccolateria",
   meal_takeaway: "Da asporto",
+  brewery: "Birrificio",
+  brewpub: "Birreria",
+  beer_garden: "Birreria",
+  winery: "Cantina",
+  korean_restaurant: "Coreano",
+  vietnamese_restaurant: "Vietnamita",
+  turkish_restaurant: "Turco",
+  lebanese_restaurant: "Libanese",
+  brazilian_restaurant: "Brasiliano",
+  peruvian_restaurant: "Peruviano",
+  african_restaurant: "Africano",
+  asian_restaurant: "Asiatico",
+  barbecue_restaurant: "Braceria",
+  buffet_restaurant: "Buffet",
+  food_store: "Alimentari",
 };
 
 // Il nome del locale dice già che cos'è ("Trattoria da Lucia", che Google segna come seafood_restaurant):
@@ -65,6 +80,14 @@ const DAL_NOME: [RegExp, string][] = [
   [/\btaverna\b/i, "Taverna"],
   [/\bbraceria\b/i, "Braceria"],
 ];
+
+// Tipo Google in inglese senza etichetta italiana ("karaoke", "farm"): non va mai in una frase scritta
+// per l'utente ("brewery fuori dai soliti giri", collaudo del 31/10). Le categorie scritte a mano
+// ("Trattoria") hanno maiuscole o spazi e restano valide.
+export function tipoGoogleSconosciuto(category: string | null | undefined): boolean {
+  if (!category || !/^[a-z_]+$/.test(category)) return false;
+  return !LABELS[category] && !/_(?:restaurant|bar)$/.test(category);
+}
 
 export function categoryLabel(category: string | null | undefined, name?: string | null): string | null {
   if (!category) return null;

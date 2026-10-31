@@ -53,6 +53,9 @@ export interface BottomSheetProps {
   setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
+  // Frase vera da condividere quando il titolo è un'etichetta ("Altri come X"): chi apre il link rifà
+  // la ricerca dei simili, non una ricerca Google della frase "Altri come X".
+  shareQuery?: string | null;
   // Intestazione semplice senza azioni (es. "I tuoi salvati · Roma"), quando non c'è un titolo di ricerca.
   heading?: string | null;
   // Riapre il pannello di ricerca con la frase attuale, per correggerla.
@@ -287,7 +290,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -598,7 +601,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           aria-label="Condividi questa ricerca"
           onClick={async () => {
             const at = shareAt ? `&at=${shareAt.lat.toFixed(4)},${shareAt.lng.toFixed(4)}` : "";
-            const url = `${window.location.origin}/mappa?q=${encodeURIComponent(title)}${at}`;
+            const url = `${window.location.origin}/mappa?q=${encodeURIComponent(shareQuery ?? title)}${at}`;
             trackFeature("condividi_ricerca");
             try {
               if (typeof navigator.share === "function") await navigator.share({ title: "Mapetite", text: title, url });
@@ -644,7 +647,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
           {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
           {simileA && !headerOpen && (
-            <span data-testid="simile-pillola" className="min-w-0 shrink truncate font-sans font-normal text-text"><span aria-hidden className="mx-1.5 text-text-muted">·</span>come {simileA}</span>
+            <span data-testid="simile-pillola" className="min-w-0 shrink truncate font-sans font-normal text-text"><span aria-hidden className="mx-1.5 text-text-muted">·</span>simili</span>
           )}
           {capito.length > 0 && !headerOpen && !simileA && (
             <span data-testid="capito-pillola" className="min-w-0 truncate font-sans font-normal text-text">
