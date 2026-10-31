@@ -2703,11 +2703,13 @@ else {
       return { status: r.status(), loc: r.headers()["location"] ?? "" };
     };
     const SEARCH = [
-      { id: "GBR1", name: "Bar Rossi", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, category: "bar", rating: 4.6, priceLevel: 2 },
+      { id: "GBR1", name: "Bar Rossi", address: "Via Po, 2/a, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, category: "bar", rating: 4.6, priceLevel: 2, photoRef: "places/GBR1/photos/QUOTA" },
       { id: "GBR2", name: "Bar Rossi Bis", address: "Via Tuscolana 10, 00182 Roma RM, Italy", lat: 41.88, lng: 12.52, category: "bar", rating: 4.4, priceLevel: 1 },
     ];
     const searchCalls = [];
     const addCalls = [];
+    // Quota foto finita (429) per la foto di Bar Rossi: nel "✓ Salvato" niente riquadro con la sola emoji.
+    await lctx.route("**/api/places/photo**", (route) => route.request().url().includes("QUOTA") ? route.fulfill({ status: 429, json: {} }) : route.fallback());
     await lctx.route("**/api/places/search", (route) => { searchCalls.push(route.request().postDataJSON()); return route.fulfill({ json: { results: SEARCH } }); });
     await lctx.route("**/api/places/add", (route) => { const b = route.request().postDataJSON(); addCalls.push(b); return route.fulfill({ json: { place: { id: b.googlePlaceId === "GBR2" ? "00000000-0000-0000-0000-000000000202" : "00000000-0000-0000-0000-000000000201", name: b.name } } }); });
     // Verdetto subito (proposta 14): Bar Rossi ce l'ha, Bar Rossi Bis no (tetto del giorno raggiunto).
@@ -2726,6 +2728,8 @@ else {
     await lp.getByTestId("reel-salvato").waitFor({ timeout: 5000 });
     const ins = lwrites.slice(w0).find((w) => w.m === "POST");
     ok(await lp.getByTestId("reel-salvato").getByText("Bar Rossi, Roma").isVisible() && await lp.getByText("✓ Salvato in 📌 Voglio andarci").isVisible(), "salva dal reel: il locale che combacia si salva da solo ('✓ Salvato in 📌 Voglio andarci')");
+    await lp.waitForTimeout(400);
+    ok((await lp.getByTestId("reel-salvato-foto").count()) === 0, "salva dal reel: con la quota foto finita (429) il '✓ Salvato' non mostra il riquadro da 160 px con la sola emoji");
     ok(addCalls.at(-1)?.googlePlaceId === "GBR1" && JSON.stringify(ins?.body?.tags) === '["Da provare"]' && ins?.body?.place_id === "00000000-0000-0000-0000-000000000201", "salva dal reel: salvato in 'Da provare' senza toccare niente");
     ok((await lp.getByTestId("screenshot-piu").textContent())?.trim() === "Ho letto 2 immagini: 3 posti.", `carosello: legge tutte le slide e unisce i locali senza doppioni (${await lp.getByTestId("screenshot-piu").textContent()})`);
     ok(searchCalls.length === 1 && searchCalls[0]?.query === "Bar Rossi Roma", "salva dal reel: una sola ricerca Google, con nome e città del primo locale");
@@ -5422,15 +5426,15 @@ else {
       if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); } else { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); acc.list.delete(body.id); acc.tolte.add(body.id); } return route.fulfill({ json: { ok: true } }); }
       return route.fallback();
     });
-    // Spenta per tutti dopo due collaudi bocciati: senza ?beta=prenota-account niente riga e niente chiamate.
-    await pp.reload({ waitUntil: "networkidle" });
+    // Accesa per tutti dal 31/10 sera; con ?beta=-prenota-account niente riga e niente chiamate.
+    await pp.goto(`${BASE}/prenotazioni?beta=-prenota-account`, { waitUntil: "networkidle" });
     await pp.waitForTimeout(300);
-    ok((await pp.getByTestId("prenotazioni-account").count()) === 0 && acc.calls.length === 0, "prenotazioni sull'account: spenta per tutti (nessuna riga, nessuna chiamata)");
+    ok((await pp.getByTestId("prenotazioni-account").count()) === 0 && acc.calls.length === 0, "prenotazioni sull'account: si spegne con ?beta=-prenota-account (nessuna riga, nessuna chiamata)");
     await pp.goto(`${BASE}/prenotazioni?beta=prenota-account`, { waitUntil: "networkidle" });
     await pp.getByTestId("prenotazioni-account").waitFor({ timeout: 5000 }).catch(() => {});
     const card = pp.getByTestId("prenotazioni-account");
     { const c = await card.boundingBox(); const l = await past.last().boundingBox(); ok(!!c && !!l && c.y > l.y && c.height <= 90, `prenotazioni sull'account: riga sottile sotto l'elenco (alta ${Math.round(c?.height ?? 0)} px)`); }
-    ok(await card.isVisible() && (await card.textContent()).includes("Tienile sul tuo account") && (await card.getByRole("link", { name: "Cosa salviamo" }).getAttribute("href")) === "/privacy#prenotazioni", "prenotazioni sull'account: spento di base, invito con 'Cosa salviamo' (informativa)");
+    ok(await card.isVisible() && (await card.textContent()).includes("Tienile sul tuo account") && (await card.textContent()).includes("«di parola» vale ovunque") && (await card.getByRole("link", { name: "Cosa salviamo" }).getAttribute("href")) === "/privacy#prenotazioni", "prenotazioni sull'account: spento di base, invito con 'Cosa salviamo' (informativa)");
     ok(!acc.calls.some((c) => c.m !== "GET"), "prenotazioni sull'account: senza consenso nessuna scrittura");
     await pshot("85-prenotazioni-account-invito");
     await pp.getByTestId("prenotazioni-account-attiva").click();
