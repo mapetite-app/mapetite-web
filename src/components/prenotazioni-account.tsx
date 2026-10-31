@@ -70,12 +70,12 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
   if (stato !== "spento" || !haPrenotazioni) return null;
   // Riga sottile sotto l'elenco (dal secondo collaudo): le prenotazioni restano la cosa principale.
   return (
-    <div data-testid="prenotazioni-account" className="mt-6 flex items-center gap-3 rounded-card border border-border bg-white px-4 py-3">
+    <div data-testid="prenotazioni-account" className="mt-6 flex items-center gap-3 rounded-card border border-border bg-white px-4 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-display font-semibold text-brand">Tienile sul tuo account</p>
         <p className="mt-0.5 text-xs font-sans leading-relaxed text-text-muted">
           Non le perdi cambiando telefono e «di parola» vale ovunque.{" "}
-          <Link href="/privacy#prenotazioni" className="inline-block whitespace-nowrap py-1 font-semibold text-brand underline underline-offset-2">Cosa salviamo</Link>
+          <Link href="/privacy#prenotazioni" className="whitespace-nowrap font-semibold text-brand underline underline-offset-2">Cosa salviamo</Link>
         </p>
         {errore && <p role="status" className="mt-1 text-xs font-sans text-accent">{errore}</p>}
       </div>
