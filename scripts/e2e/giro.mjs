@@ -1581,6 +1581,8 @@ else {
       ok(!!b && !!c && b.height >= 44 && b.y + b.height <= c.y && b.x >= 0 && b.x + b.width <= 390, `dai tuoi salvati: una riga sopra le card, toccabile (alta ${Math.round(b?.height ?? 0)} px)`); }
     ok(((await p.getByTestId("dai-salvati-perche").textContent()) ?? "").includes("osteria romana"), "dai tuoi salvati: con un salvato solo il perché è già sotto il nome");
     await p.screenshot({ path: `${OUT}/11h-dai-salvati.png`, caret: "initial" });
+    { const pins = p.getByTestId("pin-dai-salvati");
+      ok((await pins.count()) === 1 && (await pins.first().getAttribute("data-place")) === "00000000-0000-4000-8000-000000000002", `dai tuoi salvati: il salvato scelto ha il suo segnalino sulla mappa (${await pins.count()})`); }
     await p.getByTestId("dai-salvati-apri").click();
     await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
     ok(await p.getByTestId("scheda-pannello").getByText("Osteria Due").first().isVisible(), "dai tuoi salvati: con un salvato solo il tocco apre la sua scheda");
@@ -2727,6 +2729,8 @@ else {
     ok(await lp.getByTestId("reel-altri").getByText("Nel reel ci sono anche").isVisible() && await lp.getByTestId("reel-altro").count() === 2, "salva dal reel: 'Nel reel ci sono anche' con gli altri 2 locali, senza cercarli");
     ok(await lp.getByRole("link", { name: "Apri sulla mappa" }).getAttribute("href") === "/mappa?salvato=00000000-0000-0000-0000-000000000201", "salva dal reel: 'Apri sulla mappa' sul salvato");
     ok(await lp.getByTestId("reel-altri-come").getAttribute("href") === "/mappa?come=00000000-0000-0000-0000-000000000201", "salva dal reel: '✨ Altri come questo' porta ai simili di quel salvato (proposta 35)");
+    { const a = await lp.getByTestId("reel-altri-come").boundingBox(); const n = await lp.getByTestId("reel-non-e-questo").boundingBox(); const ap = await lp.getByRole("link", { name: "Apri sulla mappa" }).boundingBox();
+      ok(!!a && !!n && !!ap && Math.abs(a.y - n.y) < 4 && a.y > ap.y && a.height >= 44 && n.height >= 44, "salva dal reel: sotto 'Apri sulla mappa' una sola riga con 'Altri come questo' e 'Non è questo'"); }
     await lp.getByTestId("reel-verdetto").waitFor({ timeout: 4000 }).catch(() => {});
     ok(await lp.getByTestId("reel-verdetto").getByText("Caffè da banco serio, cornetti sfornati la mattina.").isVisible() && verdCalls.length === 1 && verdCalls[0]?.googlePlaceId === "GBR1", "salva dal reel: nel '✓ Salvato' compare subito il verdetto Mapetite (una chiamata)");
     // "Quando ci vai?" (proposta 17): un tocco scrive il giorno nel salvato, un altro lo toglie.

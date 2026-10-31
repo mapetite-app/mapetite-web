@@ -1275,6 +1275,15 @@ export default function MapView({
   })();
 
 
+  // "Dai tuoi salvati": dalla riga sopra le card o dal suo segnalino sulla mappa, si apre la scheda.
+  const apriDaiSalvati = (place: Place, da: "riga" | "pin") => {
+    trackFeature("dai_tuoi_salvati", { da });
+    viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
+    dispatch({ type: "OPEN_VENUE", placeId: place.id });
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 16) });
+  };
+
   // Un locale e' salvato se il suo UUID canonico e' in savedIds.
   const isPlaceSaved = (id: string): boolean => {
     const uuid = resolveUuid(id);
@@ -3285,8 +3294,32 @@ export default function MapView({
         })}
 
         {/* I tuoi salvati sempre in vista (?beta=pin-salvati, come Mapstr): piccoli segnalibri anche in Esplora. */}
+        {/* "Dai tuoi salvati" (minore del collaudo del 30/10): i salvati scelti per questa ricerca hanno il
+            loro segnalino, così si vede dove sono rispetto ai risultati. Corallo con il nome, sotto i risultati. */}
+        {dalSalvatiVisti.map(({ place: p }) => (
+          <Marker
+            key={`dai-salvati-${p.id}`}
+            longitude={p.lng}
+            latitude={p.lat}
+            anchor="bottom"
+            style={{ zIndex: 2 }}
+            onClick={(e) => { e.originalEvent.stopPropagation(); apriDaiSalvati(p, "pin"); }}
+          >
+            <span data-testid="pin-dai-salvati" data-place={p.id} className="flex cursor-pointer flex-col items-center">
+              <span
+                aria-label={`${p.name}, dai tuoi salvati`}
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-accent text-white shadow-float"
+              >
+                <Bookmark size={16} fill="currentColor" aria-hidden />
+              </span>
+              <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-accent shadow-card">
+                {pinName(p.name)}
+              </span>
+            </span>
+          </Marker>
+        ))}
         {savedPinsOn && view === "all" && (() => {
-          const shown = new Set(mapPlaces.map((p) => resolveUuid(p.id) ?? p.id));
+          const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
           return savedPlaces.filter((p) => !shown.has(p.id)).map((p) => (
             <Marker
               key={`salvato-${p.id}`}
@@ -3664,13 +3697,7 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           fromSaved={dalSalvatiVisti}
-          onOpenSaved={(place) => {
-            trackFeature("dai_tuoi_salvati");
-            viewBeforeVenue.current = { latitude: viewState.latitude, longitude: viewState.longitude, zoom: viewState.zoom };
-            dispatch({ type: "OPEN_VENUE", placeId: place.id });
-            const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-            if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 16) });
-          }}
+          onOpenSaved={(place) => apriDaiSalvati(place, "riga")}
           onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
       )}
