@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { pulisciPrenotazione, type PrenotazioneAccount } from "@/lib/prenotazioni-account";
+import { pulisciPrenotazione, ultimaModifica, type PrenotazioneAccount } from "@/lib/prenotazioni-account";
 
 // Prenotazioni sull'account ("Cliente di parola", passo 2, PROPOSTE.md 3). Solo con il consenso
 // esplicito della persona (tabella prenotazioni_consenso; la RLS rifiuta le scritture senza).
@@ -78,11 +78,14 @@ async function stato(supabase: Sb, userId: string) {
 async function salva(supabase: Sb, userId: string, list: PrenotazioneAccount[]): Promise<number> {
   if (list.length === 0) return 200;
   // Le lapidi non si riempiono di nuovo: le prenotazioni già tolte si saltano.
-  const { data: gia, error: ge } = await supabase.from("prenotazioni").select("id, cancellata_at").eq("user_id", userId).in("id", list.map((p) => p.id));
+  const { data: gia, error: ge } = await supabase.from("prenotazioni").select("id, cancellata_at, dati").eq("user_id", userId).in("id", list.map((p) => p.id));
   if (ge) return 500;
   const lapidi = new Set((gia ?? []).filter((r) => r.cancellata_at).map((r) => r.id as string));
   const esistenti = new Set((gia ?? []).map((r) => r.id as string));
-  const vive = list.filter((p) => !lapidi.has(p.id));
+  // Collaudo 31/10 sera: un telefono con una versione vecchia (per esempio senza "Com'è andata?")
+  // non riscrive quella più nuova arrivata da un altro telefono.
+  const ultima = new Map((gia ?? []).map((r) => { const d = pulisciPrenotazione(r.dati); return [r.id as string, d ? ultimaModifica(d) : 0]; }));
+  const vive = list.filter((p) => !lapidi.has(p.id) && ultimaModifica(p) >= (ultima.get(p.id) ?? 0));
   if (vive.length === 0) return 200;
   const nuove = vive.filter((p) => !esistenti.has(p.id)).length;
   if (nuove > 0) {
@@ -142,7 +145,10 @@ export async function POST(request: Request) {
   if (dev) {
     if (per !== dev.id) return NextResponse.json({ error: "Account diverso." }, { status: 409 });
     if (!dev.consenso) return NextResponse.json({ error: "Consenso spento." }, { status: 403 });
-    for (const p of list) if (!dev.tolte.has(p.id)) dev.list.set(p.id, p);
+    for (const p of list) {
+      const g = dev.list.get(p.id);
+      if (!dev.tolte.has(p.id) && (!g || ultimaModifica(p) >= ultimaModifica(g))) dev.list.set(p.id, p);
+    }
     return NextResponse.json({ ok: true });
   }
   if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
