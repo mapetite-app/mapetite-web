@@ -61,6 +61,7 @@ export default function PlacePhoto({
   priority = false,
   credit = null,
   creditClassName = "absolute bottom-2 right-3",
+  onFail,
 }: {
   photoRef: string | null | undefined;
   alt: string;
@@ -73,6 +74,8 @@ export default function PlacePhoto({
   // restava sopra l'emoji anche quando la foto non arrivava (quota giornaliera finita).
   credit?: string | null;
   creditClassName?: string;
+  // Chiamata quando la foto non arriva (quota finita, errore): chi la ospita può togliere il riquadro.
+  onFail?: () => void;
 }) {
   // Primo tentativo: l'indirizzo già visto per il locale; se non carica (riferimento scaduto e
   // fuori dalla cache) si riprova una volta con il riferimento di questa ricerca.
@@ -97,6 +100,7 @@ export default function PlacePhoto({
           const retry = n === 0 && src !== urlFor(photoRef);
           if (retry) forget(photoRef);
           setAttempt({ ref: photoRef, n: retry ? 1 : 2 });
+          if (!retry) onFail?.();
         }}
         className={className}
       />

@@ -456,7 +456,7 @@ function PlaceRow({
     return (
       <div className="rounded-card border border-success/30 bg-success/10 p-4" data-testid="reel-salvato" aria-live="polite">
         {/* Senza foto Google niente riquadro da 160 px con la sola emoji (collaudo 31/10: riquadro troppo lungo). */}
-        {auto && st.top.photoRef && <div className="mb-3"><Foto place={st.top} big /></div>}
+        {auto && st.top.photoRef && <Foto place={st.top} big hideOnFail />}
         <p className="text-xs font-semibold uppercase tracking-wide text-success">
           {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Voglio andarci"}
         </p>
@@ -561,11 +561,14 @@ function PlaceRow({
 }
 
 // Foto Google del locale (riferimento dalla ricerca, mai salvato) o, se manca, l'emoji del tipo.
-function Foto({ place, big = false }: { place: { name: string; category: string | null; photoRef?: string | null; photoAuthor?: string | null }; big?: boolean }) {
+function Foto({ place, big = false, hideOnFail = false }: { place: { name: string; category: string | null; photoRef?: string | null; photoAuthor?: string | null }; big?: boolean; hideOnFail?: boolean }) {
+  // Nel "✓ Salvato": se la foto non arriva (quota foto finita, 429) niente riquadro da 160 px con la sola emoji.
+  const [failed, setFailed] = useState(false);
+  if (hideOnFail && failed) return null;
   const emoji = <span aria-hidden className={big ? "text-5xl" : "text-xl"}>{getCategoryEmoji(place.category, place.name)}</span>;
   return (
-    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-accent-light ${big ? "h-40 w-full rounded-btn" : "h-11 w-11 rounded-btn"}`}>
-      <PlacePhoto photoRef={place.photoRef ?? null} alt={place.name} className="h-full w-full object-cover" fallback={emoji} credit={big ? place.photoAuthor ?? null : null} />
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-accent-light ${big ? "h-40 w-full rounded-btn" : "h-11 w-11 rounded-btn"} ${hideOnFail ? "mb-3" : ""}`} data-testid={hideOnFail ? "reel-salvato-foto" : undefined}>
+      <PlacePhoto photoRef={place.photoRef ?? null} alt={place.name} className="h-full w-full object-cover" fallback={emoji} credit={big ? place.photoAuthor ?? null : null} onFail={hideOnFail ? () => setFailed(true) : undefined} />
     </span>
   );
 }
