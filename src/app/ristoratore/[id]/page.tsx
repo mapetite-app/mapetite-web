@@ -30,15 +30,11 @@ type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; o
 type Prenotazioni = { tavoli: number; diParola: number; persone: number };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null };
 
-// Tavoli chiesti da Mapetite dal primo giorno del periodo ai prossimi 30 giorni.
-function finestra(giorni: number): [string, string] {
-  const oggi = new Date();
-  return [dateKey(new Date(oggi.getTime() - giorni * 86_400_000)), dateKey(new Date(oggi.getTime() + 30 * 86_400_000))];
-}
+// Tavoli chiesti da Mapetite nel periodo (dalla data della richiesta, come gli altri numeri).
+const inizioPeriodo = (giorni: number) => Date.now() - giorni * 86_400_000;
 function contaPrenotazioni(righe: { user_id: unknown; dati: unknown }[], locale: RistLocale, giorni: number): Prenotazioni {
   const tutte = righe.flatMap((r) => { const p = pulisciPrenotazione(r.dati); return p && typeof r.user_id === "string" ? [{ utente: r.user_id, p: p as BookingRequest }] : []; });
-  const [da, a] = finestra(giorni);
-  return prenotazioniAlLocale(tutte, [locale.id, ...(locale.google_place_id ? [locale.google_place_id] : [])], da, a);
+  return prenotazioniAlLocale(tutte, [locale.id, ...(locale.google_place_id ? [locale.google_place_id] : [])], inizioPeriodo(giorni));
 }
 
 // Solo in sviluppo con E2E_FAKE_USER: dati finti dal cookie "e2e_ristoratore" (scritto da
@@ -136,9 +132,10 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // le prenotazioni di quelle persone, per sapere se sono di parola. Al telefono arrivano solo numeri.
   let prenotazioni: Prenotazioni | null = null;
   {
-    const [da, a] = finestra(giorni);
+    // Il giorno del tavolo viene sempre dopo la richiesta: filtro largo sull'indice, poi conta la data della richiesta.
+    const da = dateKey(new Date(inizioPeriodo(giorni)));
     const posti = [locale.id, ...(locale.google_place_id ? [locale.google_place_id] : [])];
-    const { data: qui, error: pErr } = await db.from("prenotazioni").select("user_id").in("place_id", posti).is("cancellata_at", null).gte("giorno", da).lte("giorno", a).limit(2000);
+    const { data: qui, error: pErr } = await db.from("prenotazioni").select("user_id").in("place_id", posti).is("cancellata_at", null).gte("giorno", da).limit(2000);
     if (pErr) console.error("[ristoratore] lettura prenotazioni:", pErr.message);
     const persone = [...new Set((qui ?? []).map((r) => r.user_id as string))];
     if (persone.length > 0) {

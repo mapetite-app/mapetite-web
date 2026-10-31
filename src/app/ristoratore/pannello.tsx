@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
+import { BadgeCheck, CalendarCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
 import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
@@ -423,9 +423,9 @@ export default function Pannello({
               (sempre presenti o disdetto in tempo). Solo da chi tiene le prenotazioni sull'account. */}
           {tavoli && (
             <p data-testid="pannello-tavoli" className={`flex items-baseline gap-2 ${primaTavoli ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
-              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">📅 {tavoli.tavoli.toLocaleString("it-IT")}</span>
-              <span className="text-sm font-sans leading-snug text-white/90">
-                {tavoli.tavoli === 1 ? "tavolo chiesto" : "tavoli chiesti"} da Mapetite{tavoli.diParola > 0 ? `, ${tavoli.diParola.toLocaleString("it-IT")} da clienti di parola (sempre presenti o disdetto in tempo)` : ""} ({p.giorni} giorni e prossimi 30)
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-title text-2xl font-semibold leading-none"><CalendarCheck size={20} aria-hidden />{tavoli.tavoli.toLocaleString("it-IT")}</span>
+              <span className="text-sm font-sans leading-snug text-white/90" title="Di parola: sempre presenti o disdetto in tempo, su Mapetite">
+                {tavoli.tavoli === 1 ? "tavolo" : "tavoli"} da Mapetite{tavoli.diParola > 0 ? ` · ${tavoli.diParola.toLocaleString("it-IT")} di clienti di parola` : ""} ({p.giorni} giorni)
               </span>
             </p>
           )}
