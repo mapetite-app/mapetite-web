@@ -90,7 +90,12 @@ async function salva(supabase: Sb, userId: string, list: PrenotazioneAccount[]):
     if ((count ?? 0) + nuove > MAX_RIGHE) return 409;
   }
   const { error } = await supabase.from("prenotazioni").upsert(vive.map((p) => riga(userId, p)), { onConflict: "user_id,id" });
-  if (!error) return 200;
+  if (!error) {
+    // Collaudo 31/10 sera: se un altro telefono ha tolto una di queste proprio adesso, la lapide si
+    // sarebbe riempita di nuovo. Si svuota subito (cancellata_at resta: non ricompare).
+    await supabase.from("prenotazioni").update({ place_id: "-", giorno: null, esito: null, disdetta_at: null, dati: {} }).eq("user_id", userId).in("id", vive.map((p) => p.id)).not("cancellata_at", "is", null);
+    return 200;
+  }
   console.warn(`[prenotazioni] salvataggio non riuscito ${error.code ?? ""}`);
   return error.code === "42501" ? 403 : 500; // 42501: RLS, consenso spento
 }
@@ -161,7 +166,9 @@ export async function DELETE(request: Request) {
   }
   if (!userId) return NextResponse.json({ error: "Accedi." }, { status: 401 });
   if (tutte) {
-    // Prima il consenso: da quel momento la RLS rifiuta ogni scrittura in arrivo.
+    // Le lapidi si svuotano prima (finché c'è il consenso la RLS lo permette): restano solo i codici.
+    await supabase.from("prenotazioni").update({ place_id: "-", giorno: null, esito: null, disdetta_at: null, dati: {} }).eq("user_id", userId).not("cancellata_at", "is", null);
+    // Poi il consenso: da quel momento la RLS rifiuta ogni scrittura in arrivo.
     const { error: ce } = await supabase.from("prenotazioni_consenso").delete().eq("user_id", userId);
     if (ce) return NextResponse.json({ error: "Non sono riuscito a spegnere." }, { status: 500 });
     // Le lapidi restano (solo il codice della prenotazione tolta, nessun dato): se si riaccende, un

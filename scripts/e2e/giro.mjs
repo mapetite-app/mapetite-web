@@ -5426,15 +5426,15 @@ else {
       if (m === "DELETE") { if (body.tutte) { acc.consenso = false; acc.list.clear(); } else { if (body.utente !== "U1") return route.fulfill({ status: 409, json: {} }); acc.list.delete(body.id); acc.tolte.add(body.id); } return route.fulfill({ json: { ok: true } }); }
       return route.fallback();
     });
-    // Spenta per tutti dopo due collaudi bocciati: senza ?beta=prenota-account niente riga e niente chiamate.
-    await pp.reload({ waitUntil: "networkidle" });
+    // Accesa per tutti dal 31/10 sera; con ?beta=-prenota-account niente riga e niente chiamate.
+    await pp.goto(`${BASE}/prenotazioni?beta=-prenota-account`, { waitUntil: "networkidle" });
     await pp.waitForTimeout(300);
-    ok((await pp.getByTestId("prenotazioni-account").count()) === 0 && acc.calls.length === 0, "prenotazioni sull'account: spenta per tutti (nessuna riga, nessuna chiamata)");
+    ok((await pp.getByTestId("prenotazioni-account").count()) === 0 && acc.calls.length === 0, "prenotazioni sull'account: si spegne con ?beta=-prenota-account (nessuna riga, nessuna chiamata)");
     await pp.goto(`${BASE}/prenotazioni?beta=prenota-account`, { waitUntil: "networkidle" });
     await pp.getByTestId("prenotazioni-account").waitFor({ timeout: 5000 }).catch(() => {});
     const card = pp.getByTestId("prenotazioni-account");
     { const c = await card.boundingBox(); const l = await past.last().boundingBox(); ok(!!c && !!l && c.y > l.y && c.height <= 90, `prenotazioni sull'account: riga sottile sotto l'elenco (alta ${Math.round(c?.height ?? 0)} px)`); }
-    ok(await card.isVisible() && (await card.textContent()).includes("Tienile sul tuo account") && (await card.getByRole("link", { name: "Cosa salviamo" }).getAttribute("href")) === "/privacy#prenotazioni", "prenotazioni sull'account: spento di base, invito con 'Cosa salviamo' (informativa)");
+    ok(await card.isVisible() && (await card.textContent()).includes("Tienile sul tuo account") && (await card.textContent()).includes("«di parola» vale ovunque") && (await card.getByRole("link", { name: "Cosa salviamo" }).getAttribute("href")) === "/privacy#prenotazioni", "prenotazioni sull'account: spento di base, invito con 'Cosa salviamo' (informativa)");
     ok(!acc.calls.some((c) => c.m !== "GET"), "prenotazioni sull'account: senza consenso nessuna scrittura");
     await pshot("85-prenotazioni-account-invito");
     await pp.getByTestId("prenotazioni-account-attiva").click();
