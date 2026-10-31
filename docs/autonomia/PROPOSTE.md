@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** WittyFood cerca piatti simili da una foto; nessuno collega il reel ai posti simili nella tua città.
 - **Valore per l'utente:** dal video visto stasera a 5 alternative vere, nella stessa zona. **Valore per il ristoratore:** domanda da chi ama locali come il suo, prima ancora della scelta.
 - **Sforzo:** S (riusa `queryAltriCome`). **Costo:** 1 ricerca Google e 1 Haiku per tocco, solo se toccata.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 31/10 mattina** (sessione 10:06): "✨ Altri come questo" nel "✓ Salvato" del reel apre `/mappa?come=<salvato>`. Scelta: la ricerca è attorno al posto del reel, non a te (il reel è spesso di un'altra zona: i simili servono lì).
 
 ## 30/10/2026 (notte, sessione 03:06, CEO che chiude)
 
