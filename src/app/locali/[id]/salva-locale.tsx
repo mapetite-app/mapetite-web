@@ -5,7 +5,7 @@ import { useState } from "react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { withNext } from "@/lib/next-path";
 
-// Invito per chi ha ricevuto il link: salvarlo in Mapetite ("📌 Voglio andarci", tag "Da provare",
+// Invito per chi ha ricevuto il link: salvarlo in Mapetite ("📌 Da provare", tag "Da provare",
 // lo stesso dei salvataggi da link e dalla scheda) oppure scoprire l'app.
 // Il pulsante principale sta in una barra flottante in fondo (come la scheda B): sempre in vista.
 const WANT_TAG = "Da provare";
@@ -65,7 +65,7 @@ export default function SalvaLocale({
         {done ? (
           <div role="status" data-testid="salvato-pubblico" className="flex flex-col gap-2 rounded-card bg-brand p-3 shadow-float">
             <p className="text-center text-sm font-display font-semibold text-white">
-              {state === "saved" ? "✓ Salvato tra i tuoi “Voglio andarci”" : "✓ È già tra i tuoi salvati"}
+              {state === "saved" ? "✓ Salvato tra i tuoi “Da provare”" : "✓ È già tra i tuoi salvati"}
             </p>
             <Link
               href={`/mappa?salvato=${placeId}`}

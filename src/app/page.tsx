@@ -16,7 +16,7 @@ import { createClient, getUser } from "@/lib/supabase/server";
 
 type SavedRow = { tags: string[] | null; places: { category: string | null; name: string | null } | null };
 
-// Salvati per la striscia "I tuoi posti": totale, "Voglio andarci" (tag "Da provare") e le emoji degli
+// Salvati per la striscia "I tuoi posti": totale, "Da provare" (tag "Da provare") e le emoji degli
 // ultimi. In sviluppo con E2E_FAKE_USER li legge dal cookie "e2e_profilo" del giro automatico, come il profilo.
 async function savedSummary(supabase: Awaited<ReturnType<typeof createClient>>, userId: string | null): Promise<{ total: number; want: number; emoji: string[] }> {
   let rows: SavedRow[] = [];

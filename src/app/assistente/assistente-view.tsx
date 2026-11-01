@@ -665,17 +665,13 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   };
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-bg md:min-h-[calc(100dvh-3.5rem)]">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-bg/95 px-4 py-2.5 backdrop-blur md:top-14">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Sparkles size={18} aria-hidden /></span>
-          <div className="min-w-0">
-            <h1 className="font-title text-xl leading-tight text-brand">Assistente Mapetite</h1>
-            <p className="truncate text-xs font-sans text-text-muted">Trova, filtra, prenota</p>
-          </div>
-        </div>
+    // Fondo carta come Salvati (revisore 1/11, terzo giro). Un solo titolo: niente barra "Assistente
+    // Mapetite" sopra il benvenuto; in alto a destra restano solo la mappa e, in conversazione, "Nuova".
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
+      <header data-testid="assistente-barra" className={`sticky top-0 z-20 flex items-center justify-end gap-2 px-4 pt-2 md:top-14 ${c.msgs.length > 0 ? "bg-[#f8f6f2]/95 pb-2 backdrop-blur" : ""}`}>
+        {c.msgs.length > 0 && <h1 className="sr-only">Assistente</h1>}
         <div className="flex items-center gap-1">
-          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full text-brand"><MapIcon size={18} /></Link>
+          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-brand"><MapIcon size={18} /></Link>
           {c.msgs.length > 0 && (
             <button
               type="button"
@@ -689,10 +685,10 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         </div>
       </header>
 
-      <div className="flex-1 px-4 pb-36 pt-4" data-testid="assistente-conversazione">
+      <div className={`flex-1 px-4 pb-36 ${c.msgs.length === 0 ? "pt-0" : "pt-2"}`} data-testid="assistente-conversazione">
         {c.msgs.length === 0 && (
-          <div data-testid="assistente-benvenuto" className="pt-6">
-            <p className="font-title text-3xl font-semibold leading-tight text-text">Ciao! Dimmi cosa cerchi.</p>
+          <div data-testid="assistente-benvenuto" className="pt-2">
+            <h1 className="font-title text-[34px] font-medium leading-tight tracking-tight text-text">Ciao! Dimmi cosa cerchi.</h1>
             <p className="mt-2 text-[15px] font-sans leading-relaxed text-text-muted">
               Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi, e se vuoi ti preparo la prenotazione.
             </p>
@@ -705,7 +701,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                   type="button"
                   aria-label={e.text}
                   onClick={() => submit(e.text)}
-                  className="flex min-h-10 items-center gap-1.5 rounded-pill border border-border bg-surface px-3.5 text-sm font-sans text-text active:scale-[0.98]"
+                  className="flex min-h-10 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-sm font-sans text-text active:scale-[0.98]"
                 >
                   <span aria-hidden>{e.emoji}</span> {e.short}
                 </button>
@@ -721,7 +717,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               </button>
             </div>
             {moreIdeas && (
-              <ul data-testid="assistente-idee" className="mt-3 flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+              <ul data-testid="assistente-idee" className="mt-3 flex flex-col divide-y divide-[#e8e2d8] rounded-card border border-[#e8e2d8] bg-white">
                 {EXAMPLES.map((e) => (
                   <li key={e.text}>
                     <button
@@ -919,7 +915,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
-            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Voglio andarci”
+            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”
           </p>
           <Link href={`/mappa?salvato=${savedToast.uuid}`} className="shrink-0 text-sm font-display font-semibold text-accent">
             Sulla mappa
@@ -930,10 +926,10 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       {/* Campo in basso, sopra la barra di navigazione: scrivi o detta. */}
       <form
         onSubmit={(e) => { e.preventDefault(); submit(input); }}
-        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-border bg-bg/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
+        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-[#e8e2d8] bg-[#f8f6f2]/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
       >
         {voiceError && <p role="status" className="mx-auto mb-1 max-w-lg px-1 text-xs font-sans text-error">{voiceError}</p>}
-        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-border bg-surface py-1 pl-4 pr-1 shadow-card">
+        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white py-1 pl-4 pr-1 shadow-card">
           <input
             data-testid="assistente-campo"
             value={input}

@@ -63,7 +63,7 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
           ) : null}
         </span>
       </button>
-      {/* Salva in un tocco ("📌 Voglio andarci", come il segnalibro della mappa) e Prenota. */}
+      {/* Salva in un tocco ("📌 Da provare", come il segnalibro della mappa) e Prenota. */}
       <div className="absolute bottom-2.5 left-2.5 right-2.5 flex gap-2">
         {saved ? (
           <span
@@ -80,7 +80,7 @@ export default function AssistantPlaceCard({ p, photo, showOpen, waitingVerdict,
             data-testid="assistente-salva"
             onClick={onSave}
             disabled={saving === "saving"}
-            aria-label={`Salva ${p.name} tra i Voglio andarci`}
+            aria-label={`Salva ${p.name} tra i Da provare`}
             className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-white/15 text-sm font-display font-semibold text-white backdrop-blur active:scale-[0.98] disabled:opacity-80"
           >
             <Bookmark size={16} aria-hidden />

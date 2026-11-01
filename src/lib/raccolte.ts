@@ -63,6 +63,6 @@ export const placesLabel = (n: number) => `${n} ${n === 1 ? "locale" : "locali"}
 export function checkCollectionName(raw: string, existing: string[], current?: string): { tag: string } | { error: string } {
   const tag = normalizeTagName(raw, existing.filter((t) => t !== current));
   if (!tag) return { error: "Scrivi un nome per la raccolta." };
-  if (isStateTag(tag)) return { error: "Questo nome è già usato per lo stato del locale (Voglio andarci / Ci sono stato): scegline un altro." };
+  if (isStateTag(tag)) return { error: "Questo nome è già usato per lo stato del locale (Da provare / Ci sono stato): scegline un altro." };
   return { tag };
 }

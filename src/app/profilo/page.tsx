@@ -182,7 +182,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
   const counters = [
     { label: "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
-    { label: "Voglio andarci", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
+    { label: "Da provare", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
     { label: "Ci sono stato", value: doneCount, href: savedHref({ stato: "fatto" }), id: "fatto" },
   ];
 
@@ -200,7 +200,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       : [],
   );
 
-  // "Ci sei stato?" (?beta=ci-sei-stato): i "Voglio andarci", dal più vecchio (la soglia di 7 giorni nel componente).
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Da provare", dal più vecchio (la soglia di 7 giorni nel componente).
   const visitCandidates: VisitCandidate[] = saved
     .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -217,6 +217,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const row = "flex min-h-14 items-center gap-3 border-t border-border px-4 py-2 active:bg-surface";
 
   return (
+    // Fondo carta come Salvati e Importa (revisore 1/11, terzo giro): stesso foglio in tutte le schermate.
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
       {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
           Tutto il resto sta in "Impostazioni" in fondo, chiusa. Una sola "Impostazioni" (revisore, 1/11):
@@ -232,7 +234,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </div>
         </div>
         {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
-        <nav aria-label="La mia guida" data-testid="guida-contatori" className="mt-4 grid grid-cols-3 divide-x divide-border rounded-card border border-border bg-surface">
+        <nav aria-label="La mia guida" data-testid="guida-contatori" className="mt-4 grid grid-cols-3 divide-x divide-[#e8e2d8] rounded-card border border-[#e8e2d8] bg-white">
           {counters.map((c) => (
             <Link
               key={c.id}
@@ -247,21 +249,34 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         </nav>
       </header>
 
+      {/* Mappa del gusto non ancora fatta: l'invito sta in cima, sotto nome e numeri (non chiuso in
+          Impostazioni), perché da lì ricerca, verdetti e "per te" parlano di chi usa l'app. */}
+      {senzaGusto && (
+        <Link href="/onboarding" data-testid="invito-mappa-gusto" className="mb-5 flex min-h-16 items-center gap-3 rounded-card border border-[#f3c9bd] bg-white px-4 py-3 active:scale-[0.99]">
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={18} strokeWidth={1.75} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-sm font-semibold text-text">Fai la tua mappa del gusto</span>
+            <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
+          </span>
+          <ChevronRight aria-hidden size={16} className="text-text-muted" />
+        </Link>
+      )}
+
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
         <h2 id="mie-cose-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le mie cose</h2>
         <div className="grid grid-cols-3 gap-2">
           {/* Le raccolte si guardano nei Salvati, dove sono già copertine (revisore 1/11: era un doppione).
               Rinomina, unisci ed elimina restano in "Impostazioni" → "Gestisci le raccolte". */}
-          <Link href={savedHref()} data-testid="tessera-raccolte" className={TILE_CLASS}>
-            <TileBody icon={<FolderHeart {...icon} />} label="Raccolte" count={raccolteCount} sub="Per occasione" />
+          <Link href={raccolteCount === 0 ? "/profilo?raccolta=nuova" : savedHref()} data-testid="tessera-raccolte" className={TILE_CLASS}>
+            <TileBody icon={<FolderHeart {...icon} />} label="Raccolte" count={raccolteCount} sub="Per occasione" invito="Crea la prima" />
           </Link>
           <Link href="/profilo/diario" data-testid="profilo-diario" className={TILE_CLASS}>
-            <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub={doneCount === 0 ? "Voti e note" : `${doneCount} ${doneCount === 1 ? "provato" : "provati"}`} />
+            <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub={`${doneCount} ${doneCount === 1 ? "provato" : "provati"}`} invito="Segna il primo posto" />
           </Link>
           {ranks ? (
             <a href="#classifica" data-testid="tessera-classifica" className={TILE_CLASS}>
-              <TileBody icon={<Trophy {...icon} />} label="Classifica" count={classificaRows.length} sub="I tuoi preferiti" />
+              <TileBody icon={<Trophy {...icon} />} label="Classifica" count={classificaRows.length} sub="I tuoi preferiti" invito="Vota il primo posto" />
             </a>
           ) : (
             <a href="#ricerche" data-testid="tessera-ricerche" className={TILE_CLASS}>
@@ -305,16 +320,6 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       <div className="mt-2 overflow-hidden rounded-card border border-border bg-white">
         <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, raccolte, inviti, account">
           <div className="-mx-4 -mb-4">
-            {senzaGusto && (
-              <Link href="/onboarding" data-testid="invito-mappa-gusto" className={row}>
-                <span aria-hidden className="w-5 shrink-0 text-center text-lg">✨</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-display text-sm font-semibold text-text">Fai la tua mappa del gusto</span>
-                  <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
-                </span>
-                <ChevronRight aria-hidden size={16} className="text-text-muted" />
-              </Link>
-            )}
             <Link href="/me" data-testid="profilo-gusti-link" className={row}>
               <SlidersHorizontal {...icon} aria-hidden className="shrink-0 text-brand" />
               <span className="min-w-0 flex-1">
@@ -404,6 +409,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </div>
         </ProfiloSezione>
       </div>
+    </div>
     </div>
   );
 }

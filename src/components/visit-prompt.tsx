@@ -10,7 +10,7 @@ import { dayKey, withVoto } from "@/lib/diario";
 import { saveVisit } from "@/lib/diario-write";
 import DiarioFoglio from "@/components/diario-foglio";
 
-// "Ci sei stato?" (?beta=ci-sei-stato): nel profilo, un locale "📌 Voglio andarci" salvato da
+// "Ci sei stato?" (?beta=ci-sei-stato): nel profilo, un locale "📌 Da provare" salvato da
 // più di una settimana. Un tocco lo segna "✓ Ci sono stato". Le visite sono il segnale di gusto
 // più forte (VISIONE.md), ma oggi quasi nessuno le segna da solo. Stessi tag di sempre,
 // nessuna migrazione; "Non ancora" lo nasconde per 30 giorni (solo su questo telefono).

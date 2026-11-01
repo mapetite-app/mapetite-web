@@ -14,11 +14,11 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 // quel telefono; ?beta=off le spegne tutte). Quelle in DEFAULT_ON sono già accese per tutti.
 //   gemme         badge "💎 Poco conosciuto" sui locali molto amati ma con poche recensioni
 //   articolo      risposta della ricerca da leggere come un articolo (Places), con "Fai un'altra domanda"
-//   salva         finestra "Salva" dal basso come Places: Voglio andarci / Ci sono stato, nota, tag
-//   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Voglio andarci"
+//   salva         finestra "Salva" dal basso come Places: Da provare / Ci sono stato, nota, tag
+//   sorprendimi   "🎲 Scegli tu" nei salvati: apre un locale a caso, prima i "Da provare"
 //   voce          🎤 nella barra di ricerca: si detta la ricerca (riconoscimento vocale del telefono)
 //   pin-salvati   i tuoi salvati restano sulla mappa come piccoli segnalibri anche in Esplora e dopo una ricerca
-//   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Voglio andarci" salvato da più di una settimana
+//   ci-sei-stato  nel profilo: "Ci sei stato?" su un "Da provare" salvato da più di una settimana
 //   copertine     nel profilo: ogni raccolta mostra le emoji e i nomi dei suoi locali invece dell'iniziale
 //   home-salvati  in home, per chi ha salvati: "N posti da provare" con "Stasera dove andiamo?" e "I miei N"
 //   prenota-account  in "Le mie prenotazioni": "Tienile sul tuo account" (Cliente di parola, passo 2; accesa

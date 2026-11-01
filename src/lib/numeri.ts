@@ -80,7 +80,7 @@ const ETICHETTE: Record<string, string> = {
   domanda_successiva: "Domanda successiva",
   apri_scheda: "Scheda aperta",
   ci_sono_stato: "Ci sono stato",
-  voglio_andarci: "Voglio andarci",
+  voglio_andarci: "Da provare",
   condividi_ricerca: "Condividi ricerca",
   vicino_adesso: "Vicino a me, aperto adesso",
   raggio: "Raggio sulla mappa",

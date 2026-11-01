@@ -66,7 +66,7 @@ export interface BottomSheetProps {
   onRefine?: () => void;
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
-  // Stato del locale già salvato ("📌 Voglio andarci" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
+  // Stato del locale già salvato ("📌 Da provare" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
   savedLabel?: (id: string) => string | null;
   // "Per te" dai salvati: nome di un tuo salvato simile (stesso tipo e prezzo), mostrato sulla card.
   similarTo?: (id: string) => string | null;
