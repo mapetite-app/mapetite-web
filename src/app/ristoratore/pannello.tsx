@@ -403,7 +403,7 @@ export default function Pannello({
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
           {attesa.persone > 0 && (
             <p className="flex items-baseline gap-2">
-              <span className="font-title text-2xl font-semibold leading-none">{mostraPersone(attesa.persone)}</span>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔖 {mostraPersone(attesa.persone)}</span>
               <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare</span>
             </p>
           )}
@@ -427,13 +427,13 @@ export default function Pannello({
                 {/* Visite vere (POSIZIONAMENTO.md, proposta 4): solo sopra la soglia di risposte,
                     con 1 o 2 si riconoscerebbe chi ha risposto. */}
                 {risposte >= SOGLIA && (
-                  <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo={`su ${risposte.toLocaleString("it-IT")}: piaciuto a chi è venuto`} />
+                  <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo="è piaciuto" sotto={`su ${risposte.toLocaleString("it-IT")} che sono venuti e hanno risposto`} />
                 )}
                 {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
                 {p.disdette.n > 0 && (
                   <Riga
                     testId="pannello-disdette"
-                    numero={`🔁 ${p.disdette.n.toLocaleString("it-IT")}`}
+                    numero={`🪑 ${p.disdette.n.toLocaleString("it-IT")}`}
                     testo={p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}
                     sotto={p.disdette.orePrimaMedia != null ? `disdetti in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : undefined}
                   />
@@ -444,7 +444,7 @@ export default function Pannello({
                     testId="pannello-tavoli"
                     numero={`🤝 ${tavoli.tavoli.toLocaleString("it-IT")}`}
                     testo={tavoli.tavoli === 1 ? "tavolo da Mapetite" : "tavoli da Mapetite"}
-                    sotto={parola ? `${parola.toLocaleString("it-IT")} da chi viene o disdice in tempo` : undefined}
+                    sotto={parola ? `di cui ${parola.toLocaleString("it-IT")} da chi viene o disdice in tempo` : undefined}
                   />
                 )}
               </ul>
