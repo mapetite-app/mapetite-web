@@ -1215,7 +1215,11 @@ export default function MapView({
     // Place ID Google: cerco con entrambi, così note e tag compaiono sempre.
     const uuid = placeUuids[id];
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
-    return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
+    // Giro del 1/11: l'elenco generale (page.tsx) non ha voto né prezzo; quelli del salvato sì. Prima la scheda
+    // di Hostaria Del Moro (4,5 in archivio) mostrava solo "250 m".
+    return savedVersion
+      ? { ...base, tags: savedVersion.tags, note: savedVersion.note, rating: base.rating ?? savedVersion.rating, priceLevel: base.priceLevel ?? savedVersion.priceLevel }
+      : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
   const schedaAperta = selected != null;
