@@ -2,21 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, ChevronDown, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, UtensilsCrossed, X } from "lucide-react";
+import { Check, ChevronDown, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, UtensilsCrossed, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
-import { collectionColor, summarizeCollections } from "@/lib/raccolte";
+import { hasStateOrTag, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
+import { summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
-// di stato con i conteggi veri, Filtri, "Stasera" e ordine (Vicino / Recenti) su una sola riga scorrevole,
+// di stato con i conteggi veri, Filtri e ordine (Vicino / Recenti) su una sola riga scorrevole ("Stasera" in alto, accanto al "+"),
 // raccolte come copertine basse (mosaico e nome dentro) sotto, righe con lo stato sempre, 👍,
 // verdetto e provenienza sotto il nome, così il nome ha tutta la riga.
 // Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo) sta nel foglio "Filtri"
@@ -29,7 +29,7 @@ const PAPER = "bg-[#f8f6f2]";
 const LINE = "border-[#e8e2d8]";
 
 // Miniatura al posto della foto: emoji del tipo su un fondo carta unico (giro 1/11, D42: niente
-// colori a caso tra un posto e l'altro). Le raccolte invece hanno il loro colore, come cartelle.
+// colori a caso tra un posto e l'altro). Anche le raccolte hanno un fondo solo (revisore 2/11).
 function Miniatura({ place, size }: { place: Place; size: string }) {
   return (
     <span aria-hidden className={`flex shrink-0 items-center justify-center border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] ${size}`}>
@@ -38,25 +38,26 @@ function Miniatura({ place, size }: { place: Place; size: string }) {
   );
 }
 
-// Copertina di una raccolta (correzione del revisore, 1/11): bassa (64 px), come una cartella colorata,
-// con il mosaico delle emoji dei primi posti a sinistra e il nome dentro, il numero piccolo accanto.
-// Così la lista dei posti parte entro i primi 330 px anche con 2–3 raccolte.
+// Copertina di una raccolta (correzione del revisore, 1/11): bassa (64 px), con il mosaico delle emoji dei
+// primi posti a sinistra e il nome dentro, il numero piccolo accanto. Così la lista dei posti parte entro
+// i primi 330 px anche con 2–3 raccolte. Revisore 2/11: niente più un colore a caso per raccolta (il blu
+// era fuori marchio): un fondo beige con bordo per tutte, come le miniature dei posti; teal se accesa.
 function Copertina({ name, count, preview, on }: { name: string; count: number; preview: Place[]; on: boolean }) {
   const tiles = preview.slice(0, 4);
+  const tile = on ? "bg-white/[0.14]" : "bg-white";
   return (
     <span
       data-testid="raccolta-copertina"
-      className={`flex h-16 w-full items-center gap-2 overflow-hidden rounded-[16px] p-1.5 pr-3 ${on ? "shadow-[0_0_0_2px_#f8f6f2,0_0_0_4px_#ff6b4a]" : ""}`}
-      style={{ background: collectionColor(name) }}
+      className={`flex h-16 w-full items-center gap-2 overflow-hidden rounded-[16px] border p-1.5 pr-3 ${on ? "border-brand bg-brand" : "border-[#e3dbcd] bg-[#f1ebe1]"}`}
     >
       <span aria-hidden className={`grid h-[44px] w-[44px] shrink-0 gap-[2px] overflow-hidden rounded-[11px] ${tiles.length >= 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-1"}`}>
         {tiles.length === 0 ? (
-          <span className="flex items-center justify-center rounded-[11px] bg-white/[0.13] text-[26px]">📍</span>
+          <span className={`flex items-center justify-center rounded-[11px] ${tile} text-[26px]`}>📍</span>
         ) : (
           tiles.map((t, i) => (
             <span
               key={t.id}
-              className={`flex items-center justify-center bg-white/[0.13] ${tiles.length === 1 ? "rounded-[11px] text-[26px]" : `rounded-[6px] text-[13px] ${tiles.length === 2 || (tiles.length === 3 && i === 0) ? "row-span-2" : ""}`}`}
+              className={`flex items-center justify-center ${tile} ${tiles.length === 1 ? "rounded-[11px] text-[26px]" : `rounded-[6px] text-[13px] ${tiles.length === 2 || (tiles.length === 3 && i === 0) ? "row-span-2" : ""}`}`}
             >
               {getCategoryEmoji(t.category, t.name)}
             </span>
@@ -64,8 +65,8 @@ function Copertina({ name, count, preview, on }: { name: string; count: number; 
         )}
       </span>
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight text-white`}>{tagDisplay(name)}</span>
-        <span className="shrink-0 text-[12px] font-semibold text-white/75">{count}</span>
+        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight ${on ? "text-white" : "text-text"}`}>{tagDisplay(name)}</span>
+        <span className={`shrink-0 text-[12px] font-semibold ${on ? "text-white/75" : "text-text-muted"}`}>{count}</span>
       </span>
     </span>
   );
@@ -152,7 +153,7 @@ export default function SalvatiLista({
     return () => { alive = false; };
   }, [userId]);
 
-  const count = (tag: string) => all.filter((p) => p.tags?.includes(tag)).length;
+  const count = (tag: string) => all.filter((p) => hasStateOrTag(p.tags, tag)).length;
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   const collections = useMemo(() => summarizeCollections([...all].reverse(), 4), [all]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
@@ -188,7 +189,7 @@ export default function SalvatiLista({
     { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
   ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
-  const iconBtn = "flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-text active:scale-95";
+  const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ddd5c8] text-text active:scale-95";
 
   return (
     <section
@@ -199,14 +200,20 @@ export default function SalvatiLista({
       <div className="mx-auto max-w-md px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
         <p data-testid="salvati-lista-sopra" className="truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{kicker}</p>
         <header className="mt-1.5 flex items-center justify-between gap-3">
-          <h1 className={`${SERIF} min-w-0 text-[38px] font-medium leading-none tracking-tight text-text`}>I tuoi posti</h1>
-          <div className="flex shrink-0 gap-2">
+          <h1 className={`${SERIF} min-w-0 text-[34px] font-medium leading-none tracking-tight text-text`}>I tuoi posti</h1>
+          <div className="flex shrink-0 gap-1.5">
             <button type="button" aria-label="Cerca" aria-pressed={searching} onClick={() => { if (searching) { onQuery(""); setSearchOpen(false); } else setSearchOpen(true); }} className={`${iconBtn} ${searching ? "bg-brand text-white border-brand" : ""}`}>
               <Search size={18} aria-hidden />
             </button>
             <button type="button" data-testid="salvati-lista-mappa" aria-label="Vedi sulla mappa" onClick={onMap} className={iconBtn}>
               <MapIcon size={18} aria-hidden />
             </button>
+            {/* "Stasera" è uno strumento, non un filtro (revisore 2/11): sta qui con le azioni, accanto al "+",
+                con la sua icona corallo; il nome intero lo dicono l'etichetta e il suggerimento. */}
+            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" title="Stasera dove andiamo?" className={`${iconBtn} border-[#f3c9bd] bg-white`}>
+              <UtensilsCrossed size={18} strokeWidth={2} aria-hidden className="text-accent" />
+              <span className="sr-only">Stasera</span>
+            </Link>
             <Link href="/importa" aria-label="Aggiungi un posto" className={`${iconBtn} border-brand bg-brand text-white`}>
               <Plus size={20} aria-hidden />
             </Link>
@@ -286,7 +293,7 @@ export default function SalvatiLista({
         {/* Con una domanda e niente trovato per nome: solo la risposta (una cosa per schermata). */}
         {!soloRisposta && (<>
         {/* Revisore 1/11 (terzo giro): una sola riga di comandi, scorrevole, prima delle raccolte: Filtri,
-            stati (senza "Ci sono stato" quando è 0), "Stasera" e l'ordine come una pillola sola "Recenti ▾".
+            stati (senza "Ci sono stato" quando è 0) e l'ordine come una pillola sola "Recenti ▾".
             Così il primo posto parte entro ~300 px anche con 2 raccolte. */}
         <div data-testid="salvati-comandi" className="-mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
           <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
@@ -313,10 +320,6 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
-          {/* "Stasera" è uno strumento (non una raccolta): pillola con l'icona a tratto corallo. */}
-          <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#f3c9bd] bg-white px-3.5 text-[14px] font-medium text-[#33373d] active:scale-95">
-            <UtensilsCrossed size={15} strokeWidth={2} aria-hidden className="text-accent" /> Stasera
-          </Link>
           {/* Ordine in una pillola sola: il menu nativo del telefono sceglie "Vicino" o "Recenti". */}
           <label className="relative flex min-h-11 shrink-0 items-center rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-[#33373d]">
             <select
@@ -398,7 +401,6 @@ export default function SalvatiLista({
               const fonte = reels[p.id];
               const verdict = verdicts[p.id]?.verdict ?? null;
               const done = p.tags?.includes(DONE);
-              const want = !done && p.tags?.includes(WANT);
               const liked = p.tags?.includes(OPINION_LIKE);
               const chip = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
               return (
@@ -424,11 +426,12 @@ export default function SalvatiLista({
                       ) : p.note ? (
                         <span data-testid="salvato-nota" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>“{p.note}”</span>
                       ) : null}
-                      {/* Lo stato c'è sempre (revisore 1/11): "Salvato" neutro se non è né da provare né visitato. */}
+                      {/* Lo stato c'è sempre, e sono solo due (revisore 2/11): senza stato è "Da provare".
+                          📌 è l'icona di "Da provare" in tutta l'app; il segnalibro resta per Salva/Salvato. */}
                       <span className="mt-1 flex flex-wrap gap-1.5">
                           <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
-                            {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <Bookmark size={11} strokeWidth={2.6} aria-hidden />}
-                            {done ? "Ci sono stato" : want ? "Da provare" : "Salvato"}
+                            {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <span aria-hidden className="text-[10px] leading-none">📌</span>}
+                            {done ? "Ci sono stato" : "Da provare"}
                           </span>
                           {liked && (
                             <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>👍 Piaciuto</span>

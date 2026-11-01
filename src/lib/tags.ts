@@ -54,3 +54,14 @@ export function replaceTag(tags: string[], from: string, to: string): string[] {
   }
   return out;
 }
+
+// Revisore 2/11: "Salvato" come terzo stato confondeva. Un salvato senza stato è "Da provare" (solo
+// nel mostrarlo e nei conteggi/filtri): nel database i tag restano com'erano, nessuna scrittura.
+export function isWanted(tags: readonly string[] | null | undefined): boolean {
+  return !(tags ?? []).includes(STATE_TAGS[1]);
+}
+
+// Il tag di stato vale per un salvato: "Da provare" anche senza tag, gli altri solo se ci sono.
+export function hasStateOrTag(tags: readonly string[] | null | undefined, tag: string): boolean {
+  return tag === STATE_TAGS[0] ? isWanted(tags) : (tags ?? []).includes(tag);
+}

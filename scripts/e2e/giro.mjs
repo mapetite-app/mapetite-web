@@ -1804,13 +1804,15 @@ else {
     const st = L.getByTestId("salvati-stato");
     // Revisore 1/11: il totale sta già sopra il titolo, "Tutti" non lo ripete.
     // Terzo giro del revisore: "Ci sono stato 0" non si mostra (filtro morto).
-    ok((await st.getByRole("button").allTextContents()).join("|") === "Tutti|Da provare 1" && (await st.getByRole("button", { name: "Tutti" }).getAttribute("aria-pressed")) === "true", "salvati lista: filtri 'Tutti / Da provare 1', senza 'Ci sono stato 0' (il numero solo sopra il titolo)");
-    // Terzo giro: Filtri, stati, "Stasera" e ordine su UNA sola riga, prima delle raccolte.
+    // Revisore 2/11: un salvato senza stato conta come "Da provare" (qui tutti e 3), niente terzo stato "Salvato".
+    ok((await st.getByRole("button").allTextContents()).join("|") === "Tutti|Da provare 3" && (await st.getByRole("button", { name: "Tutti" }).getAttribute("aria-pressed")) === "true", "salvati lista: filtri 'Tutti / Da provare 3' (anche i salvati senza stato), senza 'Ci sono stato 0' (il numero solo sopra il titolo)");
+    // Terzo giro: Filtri, stati e ordine su UNA sola riga, prima delle raccolte ("Stasera" in alto dal 2/11).
     { const cm = L.getByTestId("salvati-comandi");
-      const ys = await Promise.all(["salvati-lista-filtri", "salvati-stato", "lista-stasera", "salvati-ordine"].map((id) => cm.getByTestId(id).boundingBox()));
+      ok((await cm.getByTestId("lista-stasera").count()) === 0, "salvati lista: 'Stasera' non sta più nella riga dei filtri (è uno strumento, revisore 2/11)");
+      const ys = await Promise.all(["salvati-lista-filtri", "salvati-stato", "salvati-ordine"].map((id) => cm.getByTestId(id).boundingBox()));
       const rb = await L.getByTestId("salvati-raccolte").boundingBox();
       const mid = (b) => b.y + b.height / 2;
-      ok(ys.every(Boolean) && ys.every((b) => Math.abs(mid(b) - mid(ys[0])) < 6) && !!rb && rb.y > ys[0].y + ys[0].height && await cm.evaluate((el) => getComputedStyle(el).overflowX === "auto"), `salvati lista: Filtri, stati, Stasera e ordine su una sola riga scorrevole, raccolte sotto (y ${ys.map((b) => Math.round(b?.y ?? -1)).join(",")} / raccolte ${Math.round(rb?.y ?? -1)})`); }
+      ok(ys.every(Boolean) && ys.every((b) => Math.abs(mid(b) - mid(ys[0])) < 6) && !!rb && rb.y > ys[0].y + ys[0].height && await cm.evaluate((el) => getComputedStyle(el).overflowX === "auto"), `salvati lista: Filtri, stati e ordine su una sola riga scorrevole, raccolte sotto (y ${ys.map((b) => Math.round(b?.y ?? -1)).join(",")} / raccolte ${Math.round(rb?.y ?? -1)})`); }
     ok((await L.getByTestId("raccolta-cerchio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).join("|") === "Amici, 1 posto|Romantico, 1 posto", "salvati lista: le raccolte vere come copertine, con la maiuscola (Amici, Romantico)");
     // Giro del 1/11 e revisore: copertine basse (64 px) con il mosaico dei posti e il nome dentro, numero piccolo accanto,
     // "Nuova" ultima e intera nello schermo, "Stasera" pulsante piccolo nella riga di "Filtri".
@@ -1820,11 +1822,16 @@ else {
       ok((await cop.count()) === 2 && !!box && box.width >= 120 && box.height >= 56 && box.height <= 72 && t0.startsWith("🍝") && t0.includes("Amici") && !t0.includes("amici") && t0.endsWith("1"), `salvati lista: copertine basse (${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}) con emoji, nome e numero dentro (${t0})`);
       const tagliati = await cop.evaluateAll((els) => els.filter((e) => { const n = e.querySelector(".truncate"); return !!n && n.scrollWidth > n.clientWidth + 1; }).length);
       ok(tagliati === 0, `salvati lista: i nomi brevi delle raccolte stanno interi nella copertina (${tagliati} tagliati)`);
+      // Revisore 2/11: un solo fondo per tutte le copertine (beige con bordo, niente blu fuori marchio); teal se accesa.
+      { const fondi = await cop.evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+        ok(fondi.length === 2 && new Set(fondi).size === 1 && fondi[0] === "rgb(241, 235, 225)", `salvati lista: copertine tutte dello stesso fondo beige (${[...new Set(fondi)].join(", ")})`); }
       const nuova = L.getByTestId("salvati-raccolte").locator("li").last().getByRole("link", { name: "Nuova raccolta" });
       const nb = await nuova.boundingBox();
       ok((await nuova.count()) === 1 && ((await nuova.textContent()) ?? "").trim() === "Nuova" && !!nb && nb.x >= 0 && nb.x + nb.width <= 390, `salvati lista: 'Nuova' è l'ultima copertina, intera nello schermo (${Math.round(nb?.x ?? 0)}–${Math.round((nb?.x ?? 0) + (nb?.width ?? 0))} px)`); }
-    { const sb = await L.getByTestId("lista-stasera").boundingBox(); const fb = await L.getByTestId("salvati-lista-filtri").boundingBox();
-      ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByTestId("lista-stasera").getAttribute("aria-label")) === "Stasera dove andiamo?" && ((await L.getByTestId("lista-stasera").textContent()) ?? "").includes("Stasera") && (await L.getByTestId("salvati-raccolte").getByTestId("lista-stasera").count()) === 0 && !!sb && !!fb && Math.abs((sb.y + sb.height / 2) - (fb.y + fb.height / 2)) < 6 && sb.height <= 48 && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", `salvati lista: 'Stasera' pulsante piccolo nella riga di 'Filtri' (alto ${Math.round(sb?.height ?? 0)} px), 'Nuova raccolta' e '+' per aggiungere`);
+    // Revisore 2/11: "Stasera" è uno strumento, sta in alto tra le azioni, subito prima del "+".
+    { const sb = await L.getByTestId("lista-stasera").boundingBox(); const pb = await L.getByRole("link", { name: "Aggiungi un posto" }).boundingBox();
+      const hb = await L.getByRole("heading", { name: "I tuoi posti" }).boundingBox();
+      ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByTestId("lista-stasera").getAttribute("aria-label")) === "Stasera dove andiamo?" && ((await L.getByTestId("lista-stasera").textContent()) ?? "").includes("Stasera") && (await L.locator("header").getByTestId("lista-stasera").count()) === 1 && !!sb && !!pb && Math.abs((sb.y + sb.height / 2) - (pb.y + pb.height / 2)) < 4 && pb.x > sb.x && pb.x - (sb.x + sb.width) < 12 && pb.x + pb.width <= 390 && !!hb && hb.x + hb.width <= sb.x && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", `salvati lista: 'Stasera' accanto al '+' in alto, titolo intero, 'Nuova raccolta' e '+' per aggiungere (Stasera x ${Math.round(sb?.x ?? 0)}, + x ${Math.round(pb?.x ?? 0)})`);
       // Terzo giro: "Stasera" senza emoji sbiadita, con l'icona a tratto corallo (lucide).
       const ic = await L.getByTestId("lista-stasera").evaluate((el) => { const svg = el.querySelector("svg"); return { svg: !!svg, colore: svg ? getComputedStyle(svg).color : "", testo: el.textContent.trim() }; });
       ok(ic.svg && ic.colore === "rgb(255, 107, 74)" && ic.testo === "Stasera", `salvati lista: 'Stasera' con l'icona a tratto corallo, senza emoji (${JSON.stringify(ic)})`); }
@@ -1842,8 +1849,11 @@ else {
       ok(sn === sv && sn.includes("italic") && (await righe.filter({ hasText: "Caffè Milano" }).getByTestId("salvato-nota").textContent()).startsWith("“"), `salvati lista: nota in serif corsivo come il verdetto (${sn} / ${sv})`); }
     ok((await righe.count()) === 3, "salvati lista: tutti e 3 i salvati in lista");
     const osteria = righe.filter({ hasText: "Osteria Due" });
-    // Terzo giro: ogni riga dice sempre lo stato; senza tag di stato "Salvato" neutro (nessuno stato inventato).
-    ok((await osteria.getByTestId("stato-lista").textContent()) === "Da provare" && (await L.getByTestId("stato-lista").count()) === 3 && (await L.getByTestId("stato-lista").allTextContents()).filter((t) => t === "Salvato").length === 2, `salvati lista: stato su ogni riga, 'Da provare' dove c'è e 'Salvato' altrove (${(await L.getByTestId("stato-lista").allTextContents()).join("|")})`);
+    // Revisore 2/11: due stati soli. Senza tag di stato la riga dice "Da provare" (nel database non si scrive niente);
+    // "Da provare" ha sempre 📌 (il segnalibro resta per Salva/Salvato).
+    { const stati = await L.getByTestId("stato-lista").allTextContents();
+      const icone = await L.getByTestId("stato-lista").evaluateAll((els) => els.map((e) => ({ pin: e.textContent.includes("📌"), segnalibro: !!e.querySelector("svg.lucide-bookmark") })));
+      ok((await osteria.getByTestId("stato-lista").textContent()) === "📌Da provare" && stati.length === 3 && stati.every((t) => t === "📌Da provare") && icone.every((i) => i.pin && !i.segnalibro), `salvati lista: stato su ogni riga, '📌 Da provare' anche senza tag, niente 'Salvato' né segnalibro (${stati.join("|")})`); }
     // Revisore 1/11: "Da provare" è quasi ovunque, quindi grigio neutro; il corallo resta per le cose da notare.
     { const c = await osteria.getByTestId("stato-lista").evaluate((el) => getComputedStyle(el).color);
       const [r, g, b] = (c.match(/\d+/g) ?? []).map(Number);
@@ -1856,9 +1866,9 @@ else {
     { const bs = [...await st.getByRole("button").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height)), ...await righe.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height)), ...await L.locator("header button, header a").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))];
       ok(bs.every((h) => h >= 44), `salvati lista: aree toccabili almeno 44 px (min ${Math.round(Math.min(...bs))})`); }
     await p.screenshot({ path: `${OUT}/11f-salvati-lista.png`, caret: "initial" });
-    await st.getByRole("button", { name: "Da provare 1" }).click();
-    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Osteria Due"), "salvati lista: 'Da provare' tiene solo i salvati da provare");
-    await st.getByRole("button", { name: "Da provare 1" }).click();
+    await st.getByRole("button", { name: "Da provare 3" }).click();
+    ok((await righe.count()) === 3 && (await st.getByRole("button", { name: "Da provare 3" }).getAttribute("aria-pressed")) === "true", "salvati lista: 'Da provare' tiene i salvati da provare, anche quelli senza stato");
+    await st.getByRole("button", { name: "Da provare 3" }).click();
     await L.getByRole("button", { name: "romantico, 1 posto" }).click();
     ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Terrazza Uno") && (await L.getByRole("button", { name: "romantico, 1 posto" }).getAttribute("aria-pressed")) === "true", "salvati lista: un tocco su una raccolta filtra la lista");
     await L.getByRole("button", { name: "romantico, 1 posto" }).click();
@@ -1913,21 +1923,38 @@ else {
     ok(await L.waitFor({ timeout: 3000 }).then(() => true, () => false) && (await righe.count()) === 3, "salvati lista: chiusa la scheda si torna alla lista");
     await L.getByTestId("salvati-lista-mappa").click();
     ok(await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).then(() => true, () => false) && (await L.count()) === 0, "salvati lista: l'icona mappa mostra i salvati sulla mappa"); }
-  // In mappa (dalla lista): in alto UNA riga (cerca + Stasera + torna alla lista), il resto dietro "Filtri".
+  // In mappa (dalla lista), revisore 2/11: in alto UNA riga con UN solo campo ("Cerca nei salvati", niente
+  // "Chiedi all'AI"), torna alla lista e "Filtri"; sotto, le zone dei salvati (Roma, Milano) per passare da una all'altra.
   { const box = await p.getByTestId("salvati-filtri").boundingBox();
-    ok(!!box && box.height < 70 && (await p.getByTestId("salvati-filtri").getByRole("button").allTextContents()).length === 1 && await p.getByTestId("salvati-vedi-lista").isVisible() && await p.getByLabel("Cerca tra i salvati").isVisible(), `salvati: una sola riga di controlli in alto (alta ${Math.round(box?.height ?? 0)} px, niente chip sempre in vista, solo 'Vedi la lista')`);
-    ok((await p.getByRole("button", { name: "Filtri", exact: true }).count()) === 1 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un solo pulsante 'Filtri', senza numero se nessun filtro è acceso"); }
-  ok((await p.getByTestId("vai-stasera").getAttribute("href")) === "/stasera" && await p.getByTestId("vai-stasera").isVisible(), "salvati: 'Stasera dove andiamo?' porta alla scelta tra i salvati");
+    const campi = await p.getByTestId("pannello-ricerca").locator("input").evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).map((e) => e.getAttribute("placeholder")));
+    ok(!!box && box.height < 60 && await p.getByTestId("salvati-vedi-lista").isVisible() && await p.getByLabel("Cerca tra i salvati").isVisible() && JSON.stringify(campi) === '["Cerca nei salvati"]' && (await p.getByTestId("barra-ricerca").count()) === 0, `salvati: una sola riga in alto con un solo campo 'Cerca nei salvati' (alta ${Math.round(box?.height ?? 0)} px, campi ${JSON.stringify(campi)})`);
+    ok((await p.getByRole("button", { name: "Filtri", exact: true }).count()) === 1 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un solo pulsante 'Filtri', senza numero se nessun filtro è acceso");
+    ok((await p.getByTestId("vai-stasera").count()) === 0, "salvati: sulla mappa niente 'Stasera' (sta nella lista, accanto al '+')");
+    // Zone: Roma (2) accesa all'apertura, Milano (1) a un tocco. La mappa inquadra la città, non l'Italia intera.
+    const zone = p.getByTestId("salvati-zona");
+    const stato = async () => (await zone.evaluateAll((els) => els.map((e) => `${e.textContent.replace(/\s+/g, " ").trim()}${e.getAttribute("aria-pressed") === "true" ? "*" : ""}`))).join("|");
+    ok(await stato() === "Roma 2*|Milano 1", `salvati mappa: zone Roma e Milano, Roma (con più salvati) inquadrata per prima (${await stato()})`);
+    const visibili = async () => p.evaluate(() => [...document.querySelectorAll(".mapboxgl-marker")].filter((m) => { const r = m.getBoundingClientRect(); return r.width > 0 && r.top > 0 && r.bottom < innerHeight && r.left > -10 && r.right < innerWidth + 10; }).length);
+    const zoom = async () => p.evaluate(() => { try { return JSON.parse(localStorage.getItem("mapetite.vista") ?? "null")?.zoom ?? null; } catch { return null; } });
+    await p.waitForTimeout(1300);
+    { const z = await zoom(); ok(z === null || z >= 9, `salvati mappa: inquadra la città (zoom ${z}), non l'Italia (zoom ~5)`); }
+    await zone.filter({ hasText: "Milano" }).click();
+    await p.waitForTimeout(1300);
+    ok(await stato() === "Roma 2|Milano 1*" && (await zoom() ?? 99) >= 9 && await visibili() >= 1, `salvati mappa: un tocco su 'Milano' porta la mappa sui salvati di Milano (${await stato()}, zoom ${await zoom()})`);
+    await zone.filter({ hasText: "Roma" }).click();
+    await p.waitForTimeout(1000);
+    const zb = await zone.first().boundingBox();
+    ok(!!zb && !!box && zb.y >= box.y + box.height && zb.y + zb.height <= 140, `salvati mappa: le zone stanno subito sotto il campo (y ${Math.round(zb?.y ?? 0)})`); }
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   { const fs = p.getByTestId("salvati-foglio");
     ok(await fs.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2 (nel foglio Filtri)");
-    ok(await fs.getByRole("button", { name: "📌 Da provare · 1" }).isVisible() && await fs.getByRole("button", { name: "✓ Ci sono stato · 0" }).isVisible(), "salvati: nel foglio Filtri lo stato '📌 Da provare · 1' / '✓ Ci sono stato · 0' (con quanti sono)");
+    ok(await fs.getByRole("button", { name: "📌 Da provare · 3" }).isVisible() && await fs.getByRole("button", { name: "✓ Ci sono stato · 0" }).isVisible(), "salvati: nel foglio Filtri lo stato '📌 Da provare · 3' (anche senza stato) / '✓ Ci sono stato · 0' (con quanti sono)");
     ok(await fs.getByRole("button", { name: "Romantico · 1", exact: true }).isVisible() && await fs.getByText("Raccolte", { exact: true }).isVisible() && await fs.getByText("Ordine", { exact: true }).isVisible(), "salvati: nel foglio Filtri anche raccolte e ordine");
     await p.screenshot({ path: `${OUT}/11e-salvati-foglio-filtri.png`, caret: "initial" });
-    await fs.getByRole("button", { name: "📌 Da provare · 1" }).click();
-    ok((await fs.getByTestId("salvati-mostra").textContent()) === "Mostra 1 posto", "foglio Filtri: il pulsante dice quanti posti mostrerà");
+    await fs.getByRole("button", { name: "📌 Da provare · 3" }).click();
+    ok((await fs.getByTestId("salvati-mostra").textContent()) === "Mostra 3 posti", "foglio Filtri: il pulsante dice quanti posti mostrerà");
     await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
-    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 1 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
+    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 3 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
     ok((await p.locator("ul.snap-x li").first().getByTestId("stato-card").textContent()) === "📌 Da provare", "card salvato: lo stato in alto ('📌 Da provare')");
     await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).click();
     ok((await p.locator("ul.snap-x li").count()) === 3 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un tocco sul filtro acceso lo toglie"); }
@@ -1965,7 +1992,7 @@ else {
   // Semplificare 5 (17/10): intestazione dei salvati corta, Condividi come icona e niente "3 posti" ripetuto.
   { const sh = p.getByTestId("condividi-lista"); const bb = await sh.boundingBox();
     ok((await sh.getAttribute("aria-label")) === "Condividi questa lista" && !((await sh.textContent()) ?? "").includes("Condividi") && !!bb && bb.width <= 40, `salvati: 'Condividi' è un'icona (${Math.round(bb?.width ?? 0)}px)`);
-    ok(((await p.getByTestId("conteggio-risultati").boundingBox())?.width ?? 0) <= 1 && ((await p.getByLabel("Cerca tra i salvati").getAttribute("placeholder").catch(() => "")) ?? "").includes("3"), "salvati: il numero sta solo in 'Cerca in N salvati'"); }
+    ok(((await p.getByTestId("conteggio-risultati").boundingBox())?.width ?? 0) <= 1 && ((await p.getByLabel("Cerca tra i salvati").getAttribute("placeholder").catch(() => "")) ?? "") === "Cerca nei salvati", "salvati: nessun numero ripetuto, il campo dice 'Cerca nei salvati' (il totale sta sopra il titolo della lista)"); }
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
@@ -2167,10 +2194,10 @@ else {
   ok(p.url().includes("vista=salvati") && (await p.locator("nav").first().getByRole("link", { name: "Salvati" }).getAttribute("aria-current")) === "page", "salvati aperti: 'Salvati' resta acceso nella barra in basso");
   await p.goto(`${BASE}/mappa?vista=salvati&stato=voglio`, { waitUntil: "networkidle" });
   await p.getByTestId("salvati-lista").waitFor({ timeout: 5000 });
-  ok((await p.getByTestId("salvati-stato").getByRole("button", { name: /^Da provare/ }).getAttribute("aria-pressed")) === "true" && (await p.getByTestId("salvato-riga").count()) === 1 && !p.url().includes("stato="), "profilo → 'Da provare': lista dei soli salvati da provare");
+  ok((await p.getByTestId("salvati-stato").getByRole("button", { name: /^Da provare/ }).getAttribute("aria-pressed")) === "true" && (await p.getByTestId("salvato-riga").count()) === 3 && !p.url().includes("stato="), "profilo → 'Da provare': lista dei salvati da provare (anche quelli senza stato, revisore 2/11)");
   await p.getByTestId("salvati-lista-mappa").click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible() && (await p.locator("ul.snap-x li").count()) === 1, "profilo → 'Da provare': anche sulla mappa solo i salvati da provare");
+  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible() && (await p.locator("ul.snap-x li").count()) === 3, "profilo → 'Da provare': anche sulla mappa solo i salvati da provare");
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Da provare/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Da provare': acceso anche nel foglio Filtri");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
@@ -2425,7 +2452,7 @@ else {
       await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
       const hs = p.getByTestId("home-salvati");
       await hs.waitFor({ timeout: 4000 }).catch(() => {});
-      ok(await hs.isVisible() && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I tuoi posti · 6") && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("3 da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home: 'I tuoi posti · 6', '3 da provare' e 'Stasera?'");
+      ok(await hs.isVisible() && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("I tuoi posti · 6") && (await hs.getByTestId("home-salvati-tutti").textContent())?.includes("4 da provare") && await hs.getByTestId("home-salvati-stasera").getAttribute("href") === "/stasera" && await hs.getByTestId("home-salvati-tutti").getAttribute("href") === "/mappa?vista=salvati", "home: 'I tuoi posti · 6', '4 da provare' (anche senza stato) e 'Stasera?'");
       await p.screenshot({ path: `${OUT}/00c-home-salvati.png`, caret: "initial" });
       await p.evaluate(() => { try { const k = "mapetite.beta"; localStorage.setItem(k, (localStorage.getItem(k) ?? "").split(",").filter((f) => f !== "copertine" && f !== "home-salvati").join(",")); } catch { /* niente */ } });
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
