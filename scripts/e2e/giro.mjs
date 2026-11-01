@@ -5506,6 +5506,24 @@ else {
     ok(!acc.consenso && acc.list.size === 0 && acc.tolte.has("x9x9") && await pp.getByTestId("prenotazioni-account").isVisible() && (await pp.evaluate(() => localStorage.getItem("mapetite.prenotazioni.account"))) === null, "prenotazioni sull'account: spento, cancellate dall'account (restano solo le lapidi), restano sul telefono");
     { const w = await width(); ok(w <= 390, `prenotazioni sull'account: niente scorrimento orizzontale (${w}px)`); }
     ok(acc.calls.length === n0, "prenotazioni sull'account: spento, nessuna chiamata in più");
+    // Telefono legato a un altro account (accesso diverso sullo stesso telefono): la riga lo spiega,
+    // nessuna scrittura e nessuna azione (minore del collaudo del 31/10).
+    await pp.evaluate(() => localStorage.setItem("mapetite.prenotazioni.account", "U2"));
+    acc.consenso = true;
+    const nAltro = acc.calls.length;
+    await pp.reload({ waitUntil: "networkidle" });
+    await pp.getByTestId("prenotazioni-account-altro").waitFor({ timeout: 5000 }).catch(() => {});
+    {
+      const altro = pp.getByTestId("prenotazioni-account-altro");
+      const txt = (await altro.textContent().catch(() => "")) ?? "";
+      ok(await altro.isVisible().catch(() => false) && txt.includes("Legate a un altro account") && txt.includes("Restano su questo telefono") && (await altro.getByRole("button").count()) === 0, "prenotazioni sull'account: telefono legato a un altro account → riga che lo spiega, senza tasti");
+      ok(acc.calls.slice(nAltro).every((c) => c.m === "GET") && (await pp.getByTestId("prenotazioni-account").count()) === 0 && (await pp.getByTestId("prenotazioni-account-acceso").count()) === 0, "prenotazioni sull'account: legato a un altro account, nessuna scrittura né invito");
+      ok((await pp.locator("main > p").first().textContent()).includes("su questo telefono"), "prenotazioni sull'account: legato a un altro, la frase in alto dice 'su questo telefono'");
+      const c = await altro.boundingBox(); ok(!!c && c.height <= 90, `prenotazioni sull'account: riga 'altro account' sottile (alta ${Math.round(c?.height ?? 0)} px)`);
+      await pshot("87b-prenotazioni-account-altro");
+    }
+    acc.consenso = false;
+    await pp.evaluate(() => localStorage.removeItem("mapetite.prenotazioni.account"));
     // Ripristino per i controlli dopo: stesso elenco di prima (Pub Fuori Tema tolto, x9 tolta).
     await pp.evaluate(() => localStorage.setItem("mapetite.prenotazioni", JSON.stringify(JSON.parse(localStorage.getItem("mapetite.prenotazioni")).filter((b) => b.id !== "x9x9"))));
     await pctx.unroute("**/api/prenotazioni");

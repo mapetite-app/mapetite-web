@@ -119,7 +119,7 @@ function RemoveButton({ b, confirmText }: { b: BookingRequest; confirmText: stri
       aria-label={`Togli la prenotazione da ${b.placeName}`}
       className="flex min-h-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
     >
-      <Trash2 size={15} /> Togli
+      <Trash2 size={15} className="shrink-0" /> Togli
     </button>
   );
 }
@@ -180,7 +180,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
             onClick={() => track("percorso", placeOf(b), { fonte: "prenotazioni" })}
             className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand"
           >
-            <Navigation size={15} /> Percorso
+            <Navigation size={15} className="shrink-0" /> Percorso
           </a>
         ) : <span />}
         <button
@@ -190,7 +190,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           onClick={() => downloadIcs(b)}
           className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand disabled:opacity-40"
         >
-          <CalendarPlus size={15} /> Calendario
+          <CalendarPlus size={15} className="shrink-0" /> Calendario
         </button>
         <RemoveButton
           b={b}
