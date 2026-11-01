@@ -8,6 +8,7 @@ import ProfiloRicerche from "@/components/profilo-ricerche";
 import BookingReminder from "@/components/booking-reminder";
 import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
+import { summarizeCollections } from "@/lib/raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import ProfiloSocial from "@/components/profilo-social";
 import InvitaAmico from "@/components/invita-amico";
@@ -187,7 +188,9 @@ export default async function ProfiloPage() {
   const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
     row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
-  const raccolteCount = new Set(saved.flatMap((r) => (r.tags ?? []).filter((t) => t !== STATE_WANT && t !== STATE_DONE))).size;
+  // Stessa regola della sezione Raccolte e dei Salvati: "👍 Mi è piaciuto" / "👎 Non fa per me" non sono raccolte
+  // (giro del 1/11, D47: il riquadro diceva "Raccolte 1" con zero raccolte visibili).
+  const raccolteCount = summarizeCollections(saved).length;
 
   const classificaRows: ClassificaRow[] = saved.flatMap((r) =>
     r.places && r.tags?.includes(STATE_DONE)
