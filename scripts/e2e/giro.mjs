@@ -2027,6 +2027,12 @@ else {
     // 18/10: con il permesso già dato l'avviso compare da solo all'apertura, senza toccare niente.
     { const t0 = await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).then(() => p.getByTestId("vicino-salvato").textContent(), () => "");
       ok((t0 ?? "").includes("Osteria Due"), `vicino a un salvato: all'apertura della mappa l'avviso compare da solo (${(t0 ?? "").slice(0, 60)})`); }
+    // Giro del 1/11: l'avviso si chiude con ✕ e, da solo, non torna alla riapertura dello stesso giorno.
+    await p.getByTestId("vicino-salvato-chiudi").click().catch(() => {});
+    ok(!(await p.getByTestId("vicino-salvato").isVisible().catch(() => false)), "vicino a un salvato: ✕ chiude l'avviso");
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.waitForTimeout(2500);
+    ok((await p.getByTestId("vicino-salvato").count()) === 0, "vicino a un salvato: riaprendo la mappa lo stesso giorno l'avviso non torna da solo");
     await p.waitForTimeout(800);
     await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
     const near = p.getByTestId("vicino-salvato");

@@ -600,7 +600,7 @@ function SaveButton({
         onClick={handleClick}
         disabled={isPending}
         aria-label={error ? "Errore durante il salvataggio. Riprova." : undefined}
-        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-success" : "bg-white/10"} disabled:opacity-60`}
+        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-accent" : "bg-white/10"} disabled:opacity-60`}
       >
         <Bookmark size={18} aria-hidden fill={isSaved ? "currentColor" : "none"} />
         {isPending ? "..." : error ? "Riprova" : isSaved ? "Salvato" : "Salva"}
@@ -616,7 +616,7 @@ function SaveButton({
         disabled={isPending}
         className={
           isSaved
-            ? "min-h-11 rounded-pill bg-success px-4 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "min-h-11 rounded-pill border border-accent bg-white px-4 text-sm font-display font-semibold text-accent hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
             : "min-h-11 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
@@ -1328,8 +1328,15 @@ export default function MapView({
   // "La mia posizione" e un suo "Voglio andarci" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showNearby = (near: { place: Place; meters: number } | null) => {
+  const showNearby = (near: { place: Place; meters: number } | null, daSolo = false) => {
     if (!near) return;
+    // Giro del 1/11: l'avviso tornava a ogni apertura e copriva il fondo dello schermo. Da solo
+    // (all'apertura) una volta al giorno per posto; dal tasto "La mia posizione" sempre.
+    if (daSolo) {
+      const chiave = `mapetite.vicino.${near.place.id}`;
+      const oggi = new Date().toDateString();
+      try { if (localStorage.getItem(chiave) === oggi) return; localStorage.setItem(chiave, oggi); } catch { /* storage non disponibile */ }
+    }
     setNearbySaved(near);
     if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
     nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
@@ -1344,7 +1351,7 @@ export default function MapView({
     nearbyChecked.current = true;
     if (aiSearch !== null) return;
     const near = nearestWanted(savedPlaces, userPos);
-    if (near) setTimeout(() => showNearby(near), 0);
+    if (near) setTimeout(() => showNearby(near, true), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showNearby cambia a ogni disegno; basta la prima posizione
   }, [userPos, savedPlaces]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2435,7 +2442,11 @@ export default function MapView({
       const pt = map.project([place.lng, place.lat]);
       return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
     });
-    if (fuori) fitToPlaces([...(aiSearch?.risultati ?? []), ...dalSalvatiVisti.map((d) => d.place)], 190, 60);
+    // Giro del 1/11: allargare fino a un salvato a 4 km ammassava i 12 risultati sul bordo. Si allarga solo
+    // per i salvati vicini ai risultati (entro 2,5 km); gli altri restano nella riga "Dai tuoi salvati".
+    const risultati = aiSearch?.risultati ?? [];
+    const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= 2500)).map((d) => d.place);
+    if (fuori && vicini.length > 0) fitToPlaces([...risultati, ...vicini], 190, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
   }, [dalSalvatiChiave]);
 
@@ -2668,7 +2679,7 @@ export default function MapView({
               <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
             </IdeaGroup>
             <IdeaGroup title="Per te">
-              {[
+              {(() => { const mie = [
                 userId && savedPlaces.length > 0 ? (
                   <IdeaRow key="stasera" testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
                 ) : null,
@@ -2678,8 +2689,12 @@ export default function MapView({
                 savedSuggestion ? (
                   <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
                 ) : null,
-              ].filter(Boolean).slice(0, 2)}
-              <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
+              ].filter(Boolean);
+              // Al massimo 3 righe: le idee tue prima, "Sorprendimi" solo se resta posto.
+              return (<>
+                {mie}
+                {mie.length < 3 && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />}
+              </>); })()}
             </IdeaGroup>
             {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 ? (
               <IdeaChips
@@ -3443,7 +3458,7 @@ export default function MapView({
             );
           })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none">
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg ${(carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).length >= 2 && (carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).includes(selected.id) ? "max-h-[calc(100dvh-6rem)]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -3565,7 +3580,7 @@ export default function MapView({
       )}
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
-      {nearbySaved && !savedToast && !selected && (
+      {nearbySaved && !savedToast && !selected && aiSearch === null && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
@@ -3577,6 +3592,9 @@ export default function MapView({
               className="min-h-10 shrink-0 rounded-pill bg-accent px-4 text-sm font-display font-semibold active:scale-95"
             >
               Apri
+            </button>
+            <button type="button" data-testid="vicino-salvato-chiudi" aria-label="Chiudi" onClick={() => setNearbySaved(null)} className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center text-white/80 active:scale-95">
+              <X size={16} aria-hidden />
             </button>
           </div>
         </div>
