@@ -3,6 +3,9 @@
 Questo file sostituisce Lorenzo quando lavori da solo (sessioni notturne programmate). Prima leggi `VISIONE.md`: cosa costruiamo e perché.
 Leggilo per intero prima di toccare codice. In caso di dubbio vale la regola più prudente.
 
+## Sessioni piene e piano fino all'8/11 (Lorenzo, 1/11 sera) — prevale
+"Devi sfruttare tutte e 5 le ore… lavori tipo un'ora". Ogni sessione lavora fino al limite di utilizzo o fino all'ora della sessione successiva, voce dopo voce, con sotto-agenti in parallelo; non si chiude dopo la prima voce. Fino all'8/11 solo il piano in cima a `BACKLOG.md` (Idee, Importa da Google, Salvati, Mappa, Ricerca, Grafica, Demo), prendendo spunto da Places, Mapstr, Google Maps, Beli, Corner e Albo.
+
 ## Dopo lo sprint (dal 27/10) — vale questo
 Lo sprint qui sotto è **finito il 26/10** e non prevale più. Restano: asticella di qualità (in produzione solo con voto design ≥ 8,5 del revisore separato), giro da utente vero sulla produzione a fine sessione, copione demo di 3 minuti (`DEMO.md`). Priorità: in cima a `BACKLOG.md` (decisioni di Lorenzo del 29/10). Ricerche Google: quota 50 al giorno, di cui 10 per le sessioni. Le proposte nuove e il lato ristoratori tornano ammessi.
 
