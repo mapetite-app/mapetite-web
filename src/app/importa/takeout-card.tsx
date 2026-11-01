@@ -206,9 +206,9 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
   const skippedWhy = [...new Set(skipped.map((s) => s.motivo))].slice(0, 4).join(", ");
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5" data-testid="importa-file">
+    <section className="rounded-card border border-border bg-white p-5" data-testid="importa-file">
       <h2 className="font-display text-lg font-semibold text-brand">
-        <span aria-hidden>🗂️ </span>Carica il file di Google Maps
+        <span aria-hidden>🗂️ </span>Tutti i salvati di Google Maps
       </h2>
       <p className="mt-1 text-sm text-text-muted">Tutti i posti che hai salvato in Google Maps, in un colpo solo. Il file resta nel telefono.</p>
 

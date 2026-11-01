@@ -6,7 +6,7 @@ import { trackFeature } from "@/lib/track";
 // Salva da iPhone (piano 3.3). Su iPhone le app web non compaiono nel menu Condividi:
 // la strada più corta è "Copia link" nell'app → qui "Incolla il link copiato" (2 tocchi).
 // Su Android, con l'app installata, Mapetite compare direttamente in Condividi.
-// Feedback 16/10 ("il dono della sintesi"): è una riga discreta "Come salvare dal telefono" che si
+// Feedback 16/10 ("il dono della sintesi"): è una riga discreta "Come copio il link?" che si
 // apre con un tocco; l'unico pulsante Incolla è quello grande in cima a Importa.
 type Phone = "iphone" | "android" | null;
 
@@ -27,8 +27,10 @@ function readInstalled(): boolean {
 
 const noop = () => () => {};
 
-export default function SalvaDaTelefono() {
-  const [open, setOpen] = useState(false);
+// Dal 1/11 è l'unica guida della pagina: la tessera "Da Google Maps" era un doppione (giro D50).
+export default function SalvaDaTelefono({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  // Dal primo accesso ("Porta qui i tuoi posti") la guida è già aperta.
+  const [open, setOpen] = useState(defaultOpen);
   const detected = useSyncExternalStore(noop, readPhone, () => null);
   const installed = useSyncExternalStore(noop, readInstalled, () => false);
   // Da computer (né iPhone né Android) si mostra la guida iPhone, la più comune tra i tester.
@@ -38,11 +40,11 @@ export default function SalvaDaTelefono() {
   const steps =
     phone === "iphone"
       ? [
-          { icon: "🔗", title: "Copia il link", text: "In Instagram, TikTok o Maps: Condividi → Copia link" },
+          { icon: "🔗", title: "Copia il link", text: "In Google Maps apri il posto (o un reel): Condividi → Copia link" },
           { icon: "📋", title: "Incolla qui", text: "Apri Mapetite e tocca Incolla un link" },
         ]
       : [
-          { icon: "📤", title: "Tocca Condividi", text: "Sul reel, sul video o sul locale in Maps" },
+          { icon: "📤", title: "Tocca Condividi", text: "Sul posto in Google Maps, o su un reel" },
           { icon: "🍽️", title: "Scegli Mapetite", text: installed ? "Lo salvo io, con nome e posizione" : "Compare dopo aver installato l’app" },
         ];
 
@@ -58,10 +60,10 @@ export default function SalvaDaTelefono() {
         }}
         className="flex min-h-11 w-full items-center justify-center gap-1.5 text-sm font-display font-semibold text-brand"
       >
-        <span aria-hidden>📱</span> Come salvare dal telefono <span aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
+        <span aria-hidden>📱</span> Come copio il link? <span aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
       </button>
       {open && (
-        <div className="rounded-card bg-brand p-4 text-white shadow-float">
+        <div className="rounded-card bg-brand p-4 text-white shadow-float" data-testid="importa-maps-guida">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-display text-base font-semibold">{phone === "iphone" ? "Da iPhone" : "Da Android"}</h2>
             <button

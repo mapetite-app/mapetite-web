@@ -18,9 +18,9 @@ function errorText(e: unknown): string {
 }
 
 // "Incolla un link" in cima a Importa (stile "Aggiungi qualsiasi cosa" di Albo): un solo pulsante
-// che capisce da solo il link. Google Maps (anche più link) si salva subito; un reel di
-// Instagram/TikTok/YouTube passa a "Salva dal reel" (src/components/reel-save.tsx); una chat o una nota con tanti link misti passa alla lista di "Incolla più link".
-const MAX_DIRECT = 5;
+// che capisce da solo il link. Un link di Google Maps si salva subito; un reel di
+// Instagram/TikTok/YouTube passa a "Salva dal reel" (src/components/reel-save.tsx); più link insieme
+// (una chat, una nota, tanti link di Maps) passano all'elenco di "Incolla più link" (multi-link-card.tsx).
 export default function GoogleMapsCard({
   userId,
   onMulti,
@@ -52,7 +52,8 @@ export default function GoogleMapsCard({
       return;
     }
     const all = extractAllLinks(value).links;
-    if (onMulti && all.length > 1 && (all.some((l) => l.kind !== "maps") || all.length > MAX_DIRECT)) {
+    // Più di un link (anche solo di Google Maps): prima l'elenco dei posti trovati, poi "Salva tutti".
+    if (onMulti && all.length > 1) {
       setError(null);
       setResults(null);
       setDraft("");
@@ -130,7 +131,7 @@ export default function GoogleMapsCard({
             {busy ? "Salvo..." : "📋 Incolla un link"}
           </button>
           <p className="mt-2 text-center text-xs text-white/80" data-testid="importa-incolla-fonti">
-            Instagram, TikTok, YouTube o Google Maps. Anche tanti link insieme.
+            Un posto di Google Maps, un reel, o una chat piena di link.
           </p>
 
           {(showField || pending) ? (
