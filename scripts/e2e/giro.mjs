@@ -2095,6 +2095,14 @@ else {
     await near.getByRole("button", { name: "Apri" }).click().catch(() => {});
     await p.waitForTimeout(1200);
     ok(await p.getByRole("heading", { name: "Osteria Due" }).first().isVisible().catch(() => false), "vicino a un salvato: 'Apri' apre la sua scheda");
+    // Giro del 1/11 (D18): l'avviso non copre mai una ricerca, né mentre arriva né i risultati.
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).catch(() => {});
+    const avvisoPrima = await p.getByTestId("vicino-salvato").isVisible().catch(() => false);
+    await p.getByLabel("Cosa cerchi?").fill("cena romantica a Roma");
+    await p.keyboard.press("Enter");
+    await p.getByTestId("card-risultato").first().waitFor({ timeout: 6000 }).catch(() => {});
+    ok(avvisoPrima && (await p.getByTestId("vicino-salvato").count()) === 0, `vicino a un salvato: con una ricerca l'avviso sparisce e non copre le card (prima ${avvisoPrima ? "c'era" : "non c'era"})`);
     await sctx.clearPermissions();
   }
 

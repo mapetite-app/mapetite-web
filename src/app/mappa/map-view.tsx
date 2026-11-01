@@ -1936,6 +1936,8 @@ export default function MapView({
     // "Altri come questo" non chiede ai salvati, nemmeno dall'effetto qui sopra (prova in produzione
     // del 1/11: "Dai tuoi salvati" riproponeva il posto da cui si era partiti).
     ricercaMondo.current = mondo && !opts.simile ? ticket : null;
+    // L'avviso "A 250 m c'è…" non torna a coprire la mappa quando si chiude la ricerca.
+    setNearbySaved(null);
     if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
@@ -3540,8 +3542,9 @@ export default function MapView({
         />
       )}
 
-      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
-      {nearbySaved && !savedToast && !selected && (
+      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva).
+          Mai sopra una ricerca, né mentre arriva né sui risultati: copriva metà della prima card (giro del 1/11, D18). */}
+      {nearbySaved && !savedToast && !selected && aiSearch === null && !aiSearching && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
