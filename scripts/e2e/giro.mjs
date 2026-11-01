@@ -1289,6 +1289,24 @@ const cardSrcs = await page.locator("ul.snap-x img").evaluateAll((els) => els.ma
 ok(pinSrcs.length >= 1, `pin con foto: ${pinSrcs.length} pin mostrano la foto`);
 ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stesse foto delle card (nessun costo in più)");
 await shot("20-pin-foto");
+// Segnalini durante l'attesa (giro del 1/11, D16): finché la foto non arriva si vede l'emoji del tipo di locale,
+// mai un cerchio bianco vuoto.
+{
+  await page.route("**/api/places/photo**", async (r) => { await new Promise((res) => setTimeout(res, 4000)); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }).catch(() => {}); });
+  await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+  await page.evaluate(() => { try { localStorage.removeItem("mapetite.foto"); } catch { /* */ } });
+  await (await esempio(page)).click();
+  await page.getByTestId("pin-foto").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(300);
+  const pinAttesa = await page.getByTestId("pin-foto").evaluateAll((els) => els.map((e) => {
+    const img = e.querySelector("img");
+    return { emoji: (e.querySelector("[data-testid=pin-emoji]")?.textContent ?? "").trim(), foto: !!img && img.complete && img.naturalWidth > 0 };
+  }));
+  ok(pinAttesa.length >= 1 && pinAttesa.every((x) => x.emoji.length > 0), `segnalini in attesa della foto: emoji del tipo di locale sotto la foto (${pinAttesa.map((x) => x.emoji + (x.foto ? "+foto" : "")).join(" ")})`);
+  ok(pinAttesa.some((x) => !x.foto), "segnalini in attesa della foto: la foto non è ancora arrivata ma il segnalino non è vuoto");
+  await shot("20b-pin-attesa-foto");
+  await page.unroute("**/api/places/photo**");
+}
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
 // 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"

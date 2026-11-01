@@ -3271,37 +3271,38 @@ export default function MapView({
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
-                    className={`block overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
                       selected?.id === place.id || focusId === place.id ? "h-14 w-14 border-accent" : "h-11 w-11 border-brand"
                     }`}
                   >
+                    {/* Emoji del tipo di locale sotto la foto: si vede subito e resta finché la foto non arriva
+                        (giro del 1/11: per secondi i segnalini erano cerchi bianchi vuoti). */}
+                    <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
                       alt={place.name}
                       width={500}
-                      className="h-full w-full object-cover"
-                      fallback={<span className="flex h-full w-full items-center justify-center text-xl">{getCategoryEmoji(place.category, place.name)}</span>}
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   </span>
                 ) : (
                   <span
                     role="img"
                     aria-label={place.category ?? "locale"}
-                    className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
                       selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                     }`}
                   >
                     {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
-                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                    {getCategoryEmoji(place.category, place.name)}
+                    {/* Sopra l'emoji, che resta visibile finché la foto non è arrivata. */}
+                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef && (
                       <PlacePhoto
                         photoRef={venueDetails[place.id]?.photoRef}
                         alt=""
                         width={500}
-                        className="h-full w-full rounded-full object-cover"
-                        fallback={getCategoryEmoji(place.category, place.name)}
+                        className="absolute inset-0 h-full w-full rounded-full object-cover"
                       />
-                    ) : (
-                      getCategoryEmoji(place.category, place.name)
                     )}
                   </span>
                 )}
