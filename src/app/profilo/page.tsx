@@ -1,7 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -93,7 +93,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   if (!user) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="font-title text-2xl text-brand">Il tuo profilo ti aspetta</p>
+        <p className="font-title text-2xl text-text">Il tuo profilo ti aspetta</p>
         <p className="max-w-xs text-sm text-text-muted">
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>
@@ -219,24 +219,17 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
       {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
-          Tutto il resto sta in "Impostazioni" in fondo, chiuso: l'ingranaggio in alto ci porta. */}
+          Tutto il resto sta in "Impostazioni" in fondo, chiusa. Una sola "Impostazioni" (revisore, 1/11):
+          l'ingranaggio in alto apriva la stessa riga, era un doppione. */}
       <header className="mb-5">
         <div className="flex items-center gap-3">
           <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
             {initial}
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-title text-[28px] leading-tight text-brand">{name}</h1>
+            <h1 className="truncate font-title text-[28px] leading-tight text-text">{name}</h1>
             <p className="truncate text-xs text-text-muted">{user.email}</p>
           </div>
-          <a
-            href="#altro"
-            aria-label="Impostazioni"
-            data-testid="profilo-impostazioni"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
-          >
-            <Settings size={20} strokeWidth={1.75} aria-hidden />
-          </a>
         </div>
         {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
         <nav aria-label="La mia guida" data-testid="guida-contatori" className="mt-4 grid grid-cols-3 divide-x divide-border rounded-card border border-border bg-surface">
@@ -258,9 +251,11 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
         <h2 id="mie-cose-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le mie cose</h2>
         <div className="grid grid-cols-3 gap-2">
-          <a href="#raccolte" data-testid="tessera-raccolte" className={TILE_CLASS}>
+          {/* Le raccolte si guardano nei Salvati, dove sono già copertine (revisore 1/11: era un doppione).
+              Rinomina, unisci ed elimina restano in "Impostazioni" → "Gestisci le raccolte". */}
+          <Link href={savedHref()} data-testid="tessera-raccolte" className={TILE_CLASS}>
             <TileBody icon={<FolderHeart {...icon} />} label="Raccolte" count={raccolteCount} sub="Per occasione" />
-          </a>
+          </Link>
           <Link href="/profilo/diario" data-testid="profilo-diario" className={TILE_CLASS}>
             <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub={doneCount === 0 ? "Voti e note" : `${doneCount} ${doneCount === 1 ? "provato" : "provati"}`} />
           </Link>
@@ -276,7 +271,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           <ProfiloPrenotazioni />
           {/* "Importa" non è più nella barra in basso: si raggiunge da qui. */}
           <Link href="/importa" data-testid="profilo-importa" className={TILE_CLASS}>
-            <TileBody icon={<Download {...icon} />} label="Importa" sub="Da Instagram e Maps" />
+            <TileBody icon={<Download {...icon} />} label="Importa" sub="Link e file" />
           </Link>
           {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
           <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className={TILE_CLASS}>
@@ -285,7 +280,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      {/* Raccolte e classifica: si aprono dalla loro tessera (nessuna riga doppia nella pagina). */}
+      {/* Raccolte e classifica: pannelli chiusi (non si vedono). Le raccolte si aprono da "Gestisci le
+          raccolte" in Impostazioni, da /profilo#raccolte o da "Nuova" nei Salvati; la classifica dalla sua tessera. */}
       <ProfiloSezione id="raccolte" pannello aperta={nuovaRaccolta} icon={<FolderHeart {...icon} />} title="Le tue raccolte" hint="Per occasione o per viaggio">
         <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
       </ProfiloSezione>
@@ -307,7 +303,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       {/* Impostazioni: tutto il resto, chiuso. Ogni riga si apre al tocco; i link "#…" da altre
           pagine (es. #cosa-so-di-te, #profilo-pubblico) aprono sia "Impostazioni" sia la riga. */}
       <div className="mt-2 overflow-hidden rounded-card border border-border bg-white">
-        <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, inviti, profilo pubblico, avvisi, account">
+        <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, raccolte, inviti, account">
           <div className="-mx-4 -mb-4">
             {senzaGusto && (
               <Link href="/onboarding" data-testid="invito-mappa-gusto" className={row}>
@@ -327,6 +323,15 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
               </span>
               <ChevronRight aria-hidden size={16} className="text-text-muted" />
             </Link>
+            {/* Gestione delle raccolte (rinomina, unisci, elimina, nuova): apre il pannello "Le tue raccolte". */}
+            <a href="#raccolte" data-testid="profilo-gestisci-raccolte" className={row}>
+              <FolderHeart {...icon} aria-hidden className="shrink-0 text-brand" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-semibold text-text">Gestisci le raccolte</span>
+                <span className="block truncate text-xs text-text-muted">Rinomina, unisci, elimina</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="text-text-muted" />
+            </a>
             {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
             <ProfiloSezione id="gusti" icon={<Sparkles {...icon} />} title="Cosa so di te" hint="I gusti che l’assistente ricorda">
               <ProfiloGusti userId={user.id} />
@@ -367,28 +372,23 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
               <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
             </ProfiloSezione>
-            <ProfiloSezione
-              id="pubblico"
-              icon={<Globe {...icon} />}
-              title="Profilo pubblico"
-              hint={"stato" in social ? "In arrivo" : social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
-            >
-              <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
-            </ProfiloSezione>
+            {/* Profilo pubblico: solo quando la parte social c'è davvero (niente righe "in arrivo", revisore 1/11). */}
+            {!("stato" in social) && (
+              <ProfiloSezione
+                id="pubblico"
+                icon={<Globe {...icon} />}
+                title="Profilo pubblico"
+                hint={social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
+              >
+                <ProfiloSocial userId={user.id} initial={social} />
+              </ProfiloSezione>
+            )}
             {ranks && (
               <ProfiloSezione id="ricerche" icon={<History {...icon} />} title="Le tue ricerche" hint="Da rifare con un tocco">
                 <ProfiloRicerche />
               </ProfiloSezione>
             )}
-            {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
-            <Link href="/premium" data-testid="profilo-premium" className={row}>
-              <Gem {...icon} aria-hidden className="shrink-0 text-accent" />
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-semibold text-text">Mapetite Premium <span className="text-xs text-accent">· in arrivo</span></span>
-                <span className="block truncate text-xs text-text-muted">Assistente senza limiti, raccolte illimitate</span>
-              </span>
-              <ChevronRight aria-hidden size={16} className="text-text-muted" />
-            </Link>
+            {/* Premium (piano 8b) non compare finché è solo "in arrivo" (revisore 1/11): la pagina /premium resta. */}
             {/* Lato ristoratori (piano 8). */}
             <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
               <Store {...icon} aria-hidden className="shrink-0 text-brand" />

@@ -54,7 +54,7 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
       </Link>
       <header className="mt-1">
         <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">I posti dove sei stato</p>
-        <h1 className="mt-0.5 font-title text-3xl font-semibold leading-tight text-brand">Il mio diario</h1>
+        <h1 className="mt-0.5 font-title text-3xl font-semibold leading-tight text-text">Il mio diario</h1>
         {entries.length > 0 && (
           <p data-testid="diario-riepilogo" className="mt-1 text-sm text-text-muted">
             {entries.length} {entries.length === 1 ? "posto provato" : "posti provati"}
@@ -85,7 +85,7 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
         groups.map((g) => (
           <section key={g.key} data-testid="diario-mese" className="mt-6">
             <h2 className="mb-2 flex items-baseline justify-between gap-2 border-b border-border pb-1.5">
-              <span className="font-title text-xl font-semibold text-brand">{withDate ? g.label : "I tuoi posti provati"}</span>
+              <span className="font-title text-xl font-semibold text-text">{withDate ? g.label : "I tuoi posti provati"}</span>
               <span className="shrink-0 text-xs font-display text-text-muted">{g.items.length}</span>
             </h2>
             <ul className="divide-y divide-border">

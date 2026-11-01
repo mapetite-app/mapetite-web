@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 // Riga richiudibile del profilo: le cose secondarie restano a un tocco ma non riempiono lo
 // schermo. Si apre da sola se l'indirizzo punta a lei o a qualcosa che contiene
@@ -60,14 +60,19 @@ export default function ProfiloSezione({
     ? "mb-6 overflow-hidden rounded-card border border-border bg-white [&:not([open])]:hidden"
     : "border-t border-border first:border-t-0";
   return (
-    <details ref={ref} id={id} data-testid={testId} open={aperta || undefined} suppressHydrationWarning className={`scroll-mt-4 [&[open]>summary>svg]:rotate-180 ${box}`}>
+    <details ref={ref} id={id} data-testid={testId} open={aperta || undefined} suppressHydrationWarning className={`scroll-mt-4 ${pannello ? "[&[open]>summary>svg]:rotate-180" : "[&[open]>summary>svg]:rotate-90"} ${box}`}>
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 active:bg-surface [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-brand">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className={pannello ? "block font-title text-xl text-brand" : "block font-display text-sm font-semibold text-text"}>{title}</span>
+          <span className={pannello ? "block font-title text-xl text-text" : "block font-display text-sm font-semibold text-text"}>{title}</span>
           {hint && <span className="block truncate text-xs font-sans font-normal text-text-muted">{hint}</span>}
         </span>
-        <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-text-muted transition-transform duration-150" />
+        {/* Una sola freccia in tutte le righe del profilo (revisore 1/11): ›, che gira verso il basso quando la riga è aperta. */}
+        {pannello ? (
+          <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-text-muted transition-transform duration-150" />
+        ) : (
+          <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted transition-transform duration-150" />
+        )}
       </summary>
       {/* Il titolo interno del componente è già nella riga: resta solo per i lettori di schermo. */}
       <div className="px-4 pb-4 [&_h2]:sr-only [&>section]:mb-0">{children}</div>

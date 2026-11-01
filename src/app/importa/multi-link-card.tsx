@@ -319,7 +319,7 @@ export default function MultiLinkCard({
 
   return (
     <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-white p-5" data-testid="importa-multi">
-      <h2 className="font-title text-xl text-brand">
+      <h2 className="font-title text-xl text-text">
         {phase === "done" ? "Fatto" : mapsCount === total && total > 0 ? `${total} posti da Google Maps` : "I link che hai incollato"}
       </h2>
       {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="multi-errore">{error}</p>}

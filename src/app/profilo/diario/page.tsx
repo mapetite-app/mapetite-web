@@ -32,7 +32,7 @@ export default async function DiarioPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
         <span aria-hidden className="text-5xl">📔</span>
-        <h1 className="font-title text-2xl font-semibold text-brand">Il tuo diario</h1>
+        <h1 className="font-title text-2xl font-semibold text-text">Il tuo diario</h1>
         <p data-testid="diario-accedi" className="max-w-xs text-sm text-text-muted">
           Accedi per ritrovare i posti dove sei stato, con la data, il tuo voto e le tue note.
         </p>

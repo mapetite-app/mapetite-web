@@ -68,7 +68,7 @@ export default function ShareImport({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">{social ? "Salva dal reel" : "Salva da Google Maps"}</h1>
+      <h1 className="mb-6 font-title text-3xl font-semibold text-text">{social ? "Salva dal reel" : "Salva da Google Maps"}</h1>
 
       {/* Reel di Instagram/TikTok/YouTube: si legge e si salva da qui, senza passare da Importa. */}
       {social && <ReelSave text={fullText} userId={userId} autoSave={autoSave} />}

@@ -7,7 +7,7 @@ export function GruppiInArrivo() {
   return (
     <section data-testid="gruppi-in-arrivo" className="rounded-card border border-border bg-surface p-6 text-center">
       <p aria-hidden className="text-4xl">🍽️</p>
-      <p className="mt-2 font-display text-lg font-semibold text-brand">Le liste di gruppo arrivano presto</p>
+      <p className="mt-2 font-title text-xl text-text">Le liste di gruppo arrivano presto</p>
       <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
         Presto potrai creare liste come &quot;Cene del giovedì&quot; con gli amici: ognuno propone un posto, si vota e si sceglie. Intanto la tua mappa funziona come sempre.
       </p>
@@ -23,7 +23,7 @@ export function GruppiAccedi({ next }: { next: string }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center" data-testid="gruppi-accedi">
       <p aria-hidden className="text-4xl">🍽️</p>
-      <p className="font-title text-2xl text-brand">Scegliete insieme dove andare</p>
+      <p className="font-title text-2xl text-text">Scegliete insieme dove andare</p>
       <p className="max-w-xs text-sm text-text-muted">Accedi per creare una lista con gli amici: ognuno propone un posto, si vota e vince il preferito.</p>
       <div className="flex gap-2">
         <a href={`/login?next=${n}`} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">Accedi</a>

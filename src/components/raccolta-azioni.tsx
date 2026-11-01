@@ -77,7 +77,7 @@ export default function RaccoltaAzioni({
           <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col rounded-t-[24px] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3 shadow-float">
             <span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="min-w-0 truncate font-title text-lg font-semibold text-brand">{title}</h3>
+              <h3 className="min-w-0 truncate font-title text-lg font-semibold text-text">{title}</h3>
               <button type="button" onClick={close} disabled={busy} className="min-h-10 shrink-0 text-sm font-display font-semibold text-text-muted disabled:opacity-40">Chiudi</button>
             </div>
             {mode === "menu" && (

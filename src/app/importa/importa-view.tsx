@@ -347,7 +347,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         data-testid="importa-screenshot"
         className={`mt-4 scroll-mt-4 rounded-card border bg-white p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
       >
-      <h2 className="mb-1 font-title text-xl text-brand">
+      <h2 className="mb-1 font-title text-xl text-text">
         <span aria-hidden>📸 </span>Da uno screenshot
       </h2>
       <p className="text-sm text-text-muted mb-5" data-testid="importa-condividi-android">
