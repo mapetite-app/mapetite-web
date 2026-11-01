@@ -15,6 +15,7 @@ import { pulisciPrenotazione, ultimaModifica, type PrenotazioneAccount } from "@
 const MAX = 30;
 const MAX_RIGHE = 300;        // tetto di prenotazioni vive per persona (le lapidi non contano)
 const MAX_CORPO = 64_000;     // byte
+const MAX_LAPIDI = 200;       // prenotazioni tolte ricordate per persona (oltre, le più vecchie si cancellano)
 
 // Giro automatico in sviluppo: utente finto, nessuna scrittura vera (memoria del processo).
 type Dev = { id: string; consenso: boolean; list: Map<string, PrenotazioneAccount>; tolte: Set<string> };
@@ -69,7 +70,7 @@ async function stato(supabase: Sb, userId: string) {
   }
   const [vive, lapidi] = await Promise.all([
     supabase.from("prenotazioni").select("dati").eq("user_id", userId).is("cancellata_at", null).order("created_at", { ascending: false }).limit(MAX),
-    supabase.from("prenotazioni").select("id").eq("user_id", userId).not("cancellata_at", "is", null).order("cancellata_at", { ascending: false }).limit(200),
+    supabase.from("prenotazioni").select("id").eq("user_id", userId).not("cancellata_at", "is", null).order("cancellata_at", { ascending: false }).limit(MAX_LAPIDI),
   ]);
   if (vive.error || lapidi.error) return null;
   const prenotazioni = (vive.data ?? []).map((r) => pulisciPrenotazione(r.dati)).filter((p): p is PrenotazioneAccount => p !== null);
@@ -191,5 +192,12 @@ export async function DELETE(request: Request) {
     { onConflict: "user_id,id" },
   );
   if (error && error.code !== "42501") return NextResponse.json({ error: "Non tolta dall'account." }, { status: 500 });
+  // Tetto alle lapidi (minore del collaudo del 31/10): il telefono tiene al massimo 30 prenotazioni e
+  // la GET ne rimanda al massimo MAX_LAPIDI, quindi le più vecchie oltre quel numero non servono più.
+  if (!error) {
+    const { data: vecchie } = await supabase.from("prenotazioni").select("id").eq("user_id", userId).not("cancellata_at", "is", null).order("cancellata_at", { ascending: false }).range(MAX_LAPIDI, MAX_LAPIDI + 99);
+    const ids = (vecchie ?? []).map((r) => r.id as string);
+    if (ids.length > 0) await supabase.from("prenotazioni").delete().eq("user_id", userId).in("id", ids);
+  }
   return NextResponse.json({ ok: true });
 }

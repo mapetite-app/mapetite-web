@@ -341,6 +341,18 @@ function Vai({ id, titolo, testo }: { id: string; titolo: string; testo: string 
   );
 }
 
+function Riga({ testId, numero, testo, sotto }: { testId: string; numero: string; testo: string; sotto?: string }) {
+  return (
+    <li data-testid={testId}>
+      <p className="flex items-baseline gap-2">
+        <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">{numero}</span>
+        <span className="text-sm font-sans leading-snug text-white/90">{testo}</span>
+      </p>
+      {sotto && <p className="mt-0.5 text-xs font-sans text-white/65">{sotto}</p>}
+    </li>
+  );
+}
+
 export default function Pannello({
   p,
   locale,
@@ -391,9 +403,12 @@ export default function Pannello({
         <section data-testid="pannello-in-attesa" className="mt-2 rounded-card bg-brand px-4 py-3 text-white shadow-card">
           {attesa.persone > 0 && (
             <p className="flex items-baseline gap-2">
-              <span className="font-title text-2xl font-semibold leading-none">{mostraPersone(attesa.persone)}</span>
-              <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare: hanno salvato il locale e non ci sono ancora state</span>
+              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔖 {mostraPersone(attesa.persone)}</span>
+              <span className="text-sm font-sans leading-snug text-white/90">ti vogliono provare</span>
             </p>
+          )}
+          {attesa.persone > 0 && (
+            <p className="mt-0.5 text-xs font-sans text-white/65">ti hanno salvato e non sono ancora venuti</p>
           )}
           {attesa.occasioni.some((o) => o.persone >= SOGLIA) && (
             <p className="mt-2 flex flex-wrap gap-1.5" aria-label="Per quale occasione">
@@ -402,35 +417,38 @@ export default function Pannello({
               ))}
             </p>
           )}
-          {/* Visite vere (POSIZIONAMENTO.md, proposta 4): il "Com'è andata?" di chi ci è stato davvero.
-              Solo sopra la soglia di risposte: con 1 o 2 si riconoscerebbe chi ha risposto. */}
-          {risposte >= SOGLIA && (
-            <p data-testid="pannello-visite-vere" className={`flex items-baseline gap-2 ${attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
-              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">👍 {p.visite.piaciuto.toLocaleString("it-IT")}</span>
-              <span className="text-sm font-sans leading-snug text-white/90">
-                su {risposte.toLocaleString("it-IT")}: chi ti aveva salvato, ci è andato e ha detto com&apos;è andata ({p.giorni} giorni)
-              </span>
-            </p>
-          )}
-          {/* Tavoli liberati per tempo (PROBLEMI.md 1): chi aveva prenotato da Mapetite e non poteva più venire
-              ti ha avvisato con "Non vado più", invece di non presentarsi. */}
-          {p.disdette.n > 0 && (
-            <p data-testid="pannello-disdette" className={`flex items-baseline gap-2 ${attesa.persone > 0 || risposte >= SOGLIA ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
-              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🔁 {p.disdette.n.toLocaleString("it-IT")}</span>
-              <span className="text-sm font-sans leading-snug text-white/90">
-                {p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}: disdetti su Mapetite{p.disdette.orePrimaMedia != null ? ` in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : ""}, invece di un tavolo vuoto ({p.giorni} giorni)
-              </span>
-            </p>
-          )}
-          {/* "Cliente di parola", passo 3: tavoli chiesti da Mapetite e quanti da clienti di parola
-              (sempre presenti o disdetto in tempo). Solo da chi tiene le prenotazioni sull'account. */}
-          {tavoli && (
-            <p data-testid="pannello-tavoli" className={`flex items-baseline gap-2 ${primaTavoli ? "mt-2.5 border-t border-white/15 pt-2.5" : ""}`}>
-              <span className="whitespace-nowrap font-title text-2xl font-semibold leading-none">🤝 {tavoli.tavoli.toLocaleString("it-IT")}</span>
-              <span className="text-sm font-sans leading-snug text-white/90">
-                {tavoli.tavoli === 1 ? "tavolo" : "tavoli"} da Mapetite{parola ? `, ${parola.toLocaleString("it-IT")} da clienti che vengono o disdicono in tempo` : ""} ({p.giorni}{"\u00a0"}giorni)
-              </span>
-            </p>
+          {/* Dal 1/11: il periodo si scrive una volta sola, in testa ai numeri del periodo; ogni riga è
+              numero + 2–3 parole, il dettaglio (se serve) su una seconda riga piccola. "Ti vogliono provare"
+              resta sopra perché non dipende dal periodo (chi ha salvato e non è ancora venuto, oggi). */}
+          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli) && (
+            <div data-testid="pannello-periodo" className={attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2" : ""}>
+              <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-white/60">Ultimi {p.giorni}{"\u00a0"}giorni</p>
+              <ul className="mt-1.5 space-y-2">
+                {/* Visite vere (POSIZIONAMENTO.md, proposta 4): solo sopra la soglia di risposte,
+                    con 1 o 2 si riconoscerebbe chi ha risposto. */}
+                {risposte >= SOGLIA && (
+                  <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo="è piaciuto" sotto={`su ${risposte.toLocaleString("it-IT")} che sono venuti e hanno risposto`} />
+                )}
+                {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
+                {p.disdette.n > 0 && (
+                  <Riga
+                    testId="pannello-disdette"
+                    numero={`🪑 ${p.disdette.n.toLocaleString("it-IT")}`}
+                    testo={p.disdette.n === 1 ? "tavolo liberato per tempo" : "tavoli liberati per tempo"}
+                    sotto={p.disdette.orePrimaMedia != null ? `disdetti in media ${p.disdette.orePrimaMedia} ${p.disdette.orePrimaMedia === 1 ? "ora" : "ore"} prima` : undefined}
+                  />
+                )}
+                {/* "Cliente di parola", passo 3: solo da chi tiene le prenotazioni sull'account. */}
+                {tavoli && (
+                  <Riga
+                    testId="pannello-tavoli"
+                    numero={`🤝 ${tavoli.tavoli.toLocaleString("it-IT")}`}
+                    testo={tavoli.tavoli === 1 ? "tavolo da Mapetite" : "tavoli da Mapetite"}
+                    sotto={parola ? `di cui ${parola.toLocaleString("it-IT")} da chi viene o disdice in tempo` : undefined}
+                  />
+                )}
+              </ul>
+            </div>
           )}
         </section>
       )}
