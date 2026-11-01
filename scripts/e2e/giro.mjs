@@ -2331,16 +2331,16 @@ else {
   // Profilo come "la mia guida" (voce 11e). Il profilo legge Supabase dal server: in sviluppo con
   // E2E_FAKE_USER prende i dati finti dal cookie "e2e_profilo".
   {
-    const pr = (id, name, category, address) => ({ id: `00000000-0000-4000-8000-0000000001${id}`, name, category, address });
+    const pr = (id, name, category, address, lat, lng) => ({ id: `00000000-0000-4000-8000-0000000001${id}`, name, category, address, lat, lng });
     const profilo = {
       email: "giulia@example.com",
       saved: [
-        { created_at: "2026-10-10", tags: ["Romantico", "Da provare"], note: "Tavolo in terrazza al tramonto", places: pr("01", "Terrazza Uno", "bar", "Via Po, 2/a, 00198 Roma RM, Italy") },
-        { created_at: "2026-10-09", tags: ["Con amici", "Già visitato"], note: null, places: pr("02", "Osteria Due", "restaurant", "Via dei Vascellari 29, Roma") },
-        { created_at: "2026-10-08", tags: ["Romantico", "Speciale", "Da provare"], note: null, places: pr("03", "Enoteca Tre", "wine_bar", "Via del Governo Vecchio 12, 00186 Roma RM, Italy") },
-        { created_at: "2026-10-07", tags: ["Con amici", "Economico"], note: "Pizza al taglio", places: pr("04", "Forno Quattro", "bakery", "Via Ostiense 50, Roma") },
-        { created_at: "2026-09-20", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy") },
-        { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy") },
+        { created_at: "2026-10-10", tags: ["Romantico", "Da provare"], note: "Tavolo in terrazza al tramonto", places: pr("01", "Terrazza Uno", "bar", "Via Po, 2/a, 00198 Roma RM, Italy", 41.915, 12.497) },
+        { created_at: "2026-10-09", tags: ["Con amici", "Già visitato"], note: null, places: pr("02", "Osteria Due", "restaurant", "Via dei Vascellari 29, Roma", 41.889, 12.474) },
+        { created_at: "2026-10-08", tags: ["Romantico", "Speciale", "Da provare"], note: null, places: pr("03", "Enoteca Tre", "wine_bar", "Via del Governo Vecchio 12, 00186 Roma RM, Italy", 41.898, 12.469) },
+        { created_at: "2026-10-07", tags: ["Con amici", "Economico"], note: "Pizza al taglio", places: pr("04", "Forno Quattro", "bakery", "Via Ostiense 50, Roma", 41.87, 12.48) },
+        { created_at: "2026-09-20", tags: ["Da provare"], note: "Brunch domenica", places: pr("05", "Caffè Milano", "cafe", "Corso Monforte, 26, 20122 Milano MI, Italy", 45.467, 9.2) },
+        { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy", 45.452, 9.165) },
       ],
       reviews: [{ id: "r1", rating: 5, comment: "Vista bellissima, cocktail ottimi.", created_at: "2026-10-01", places: { name: "Terrazza Uno" } }],
     };
@@ -2350,7 +2350,10 @@ else {
     if (!(await guida.isVisible())) ok(false, "profilo: numeri della guida in cima (Salvati · Da provare · Ci sono stato)");
     else {
       const num = async (id) => (await p.getByTestId(`guida-${id}`).textContent())?.replace(/\D.*$/s, "");
-      ok(await num("salvati") === "6" && await num("voglio") === "3" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 3 voglio andarci, 2 ci sono stato)");
+      // Revisore 2/11: "Da provare" conta anche il salvato senza stato (Forno Quattro), come nei Salvati.
+      ok(await num("salvati") === "6" && await num("voglio") === "4" && await num("fatto") === "2" && (await guida.getByRole("link").count()) === 3, "profilo: tre numeri della guida giusti (6 salvati, 4 da provare compreso quello senza stato, 2 ci sono stato)");
+      // Revisore 2/11: il nome preso dall'email ha l'iniziale maiuscola ("giulia@…" → "Giulia").
+      ok((await p.locator("main h1, h1").first().textContent())?.trim() === "Giulia", `profilo: nome dall'email con la maiuscola (${(await p.locator("h1").first().textContent())?.trim()})`);
       // Le mie cose (semplificazione 16/10): una griglia di tessere con il numero, ognuna porta alla sua pagina o sezione.
       const cose = p.getByTestId("profilo-mie-cose");
       // Semplificare 5 (17/10): la carta del gusto è una tessera, le liste di gruppo stanno solo in Amici.
@@ -2364,7 +2367,13 @@ else {
       // Revisore 1/11 (terzo giro): tessere vuote = un invito con il gesto da fare, mai "0" o "Nessuna".
       { const pren = cose.getByTestId("profilo-prenotazioni");
         const t = ((await pren.textContent()) ?? "").replace(/\s+/g, " ");
-        ok((await pren.getByTestId("tessera-invito").textContent()) === "Prenota da una scheda →" && !/Nessuna|\b0\b/.test(t) && ((await cose.getByTestId("profilo-diario").textContent()) ?? "").includes("2") && (await cose.getByTestId("profilo-diario").getByTestId("tessera-invito").count()) === 0, `profilo: Prenotazioni vuota invita 'Prenota da una scheda', Diario con 2 mostra il numero (${t})`); }
+        ok((await pren.getByTestId("tessera-invito").textContent()) === "Prenota da una scheda" && !/Nessuna|\b0\b/.test(t) && ((await cose.getByTestId("profilo-diario").textContent()) ?? "").includes("2") && (await cose.getByTestId("profilo-diario").getByTestId("tessera-invito").count()) === 0, `profilo: Prenotazioni vuota invita 'Prenota da una scheda', Diario con 2 mostra il numero (${t})`);
+        // Revisore 2/11: l'invito grigio come gli altri sottotitoli (il corallo sembrava un errore); titoli delle
+        // tessere in Inter medio, non Poppins grassetto accanto al serif dei numeri.
+        const inv = await pren.getByTestId("tessera-invito").evaluate((el) => getComputedStyle(el).color);
+        const sub = await cose.getByTestId("profilo-importa").locator(".truncate").evaluate((el) => getComputedStyle(el).color);
+        const titoli = await cose.locator("a").evaluateAll((els) => els.map((a) => { const s = a.querySelectorAll(":scope > span")[1]?.firstElementChild; const c = s ? getComputedStyle(s) : null; return c ? `${/Inter/i.test(c.fontFamily) && !/Poppins/i.test(c.fontFamily.split(",")[0]) ? "Inter" : c.fontFamily.split(",")[0]} ${c.fontWeight}` : "?"; }));
+        ok(inv === sub && titoli.length === 6 && titoli.every((x) => x === "Inter 500"), `profilo: invito grigio come i sottotitoli (${inv}) e titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
       // Stesso fondo carta di Salvati e Importa.
       ok(await p.locator("body").evaluate((m) => [...m.querySelectorAll("div")].some((d) => getComputedStyle(d).backgroundColor === "rgb(248, 246, 242)" && d.getBoundingClientRect().height > 600)), "profilo: fondo carta come Salvati");
       { const zero = { ...profilo, saved: profilo.saved.map((r) => ({ ...r, tags: (r.tags ?? []).filter((t) => t !== "Già visitato") })) };
@@ -2373,7 +2382,7 @@ else {
         const c0 = p.getByTestId("profilo-mie-cose");
         const inviti = await c0.getByTestId("tessera-invito").allTextContents();
         const cl = c0.getByTestId("tessera-classifica");
-        ok(inviti.includes("Segna il primo posto →") && ((await cl.count()) === 0 || ((await cl.textContent()) ?? "").includes("Vota il primo posto")) && !/Voti e note/.test((await c0.textContent()) ?? ""), `profilo: con 0 visite Diario${(await cl.count()) ? " e Classifica" : ""} diventano inviti (${inviti.join(" | ")})`);
+        ok(inviti.includes("Segna il primo posto") && ((await cl.count()) === 0 || ((await cl.textContent()) ?? "").includes("Vota il primo posto")) && !/Voti e note/.test((await c0.textContent()) ?? ""), `profilo: con 0 visite Diario${(await cl.count()) ? " e Classifica" : ""} diventano inviti (${inviti.join(" | ")})`);
         await p.screenshot({ path: `${OUT}/profilo-tessere-vuote.png`, caret: "initial" });
         await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
         await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" }); }
@@ -2418,6 +2427,24 @@ else {
         ok(tt.titoli.length > 0 && storti.length === 0, `titoli: su ${path} tutti in serif e dello stesso colore di 'I tuoi posti' (${tt.titoli.length} titoli${storti.length ? `, diversi: ${JSON.stringify(storti)}` : ""})`);
       }
       await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+      // "Ci sei stato?" vicino a dove sei (revisore 2/11: proponeva Milano a chi era a Roma). Senza posizione
+      // permessa vale l'ultima vista della mappa (se è su una città) o la zona con più salvati.
+      { const vista = (lat, lng, zoom) => p.evaluate(([a, b, z]) => localStorage.setItem("mapetite.vista", JSON.stringify({ lat: a, lng: b, zoom: z, t: Date.now() })), [lat, lng, zoom]);
+        const proposto = async () => { const b = p.getByTestId("ci-sei-stato"); await b.waitFor({ timeout: 2500 }).catch(() => {}); return (await b.count()) ? ((await b.locator("a").first().textContent()) ?? "").trim() : null; };
+        await vista(41.9, 12.48, 13);
+        await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+        const aRoma = await proposto();
+        ok(aRoma === "Forno Quattro", `ci sei stato: con la mappa su Roma propone un posto di Roma (il più vecchio, anche senza stato), non Caffè Milano (${aRoma})`);
+        await vista(40.85, 14.27, 13);
+        await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+        await p.waitForTimeout(800);
+        ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: con la mappa su Napoli (nessun salvato entro 30 km) niente riquadro");
+        await vista(42.5, 12.5, 5);
+        await p.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
+        const italia = await proposto();
+        ok(italia === "Forno Quattro", `ci sei stato: con la mappa sull'Italia intera vale la zona con più salvati (Roma) (${italia})`);
+        // Per il controllo storico qui sotto (Caffè Milano): la mappa su Milano.
+        await vista(45.464, 9.19, 13); }
       // "Ci sei stato?" (?beta=ci-sei-stato, spento di default): un "Da provare" salvato da più di una settimana
       await p.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
       ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: si spegne con ?beta=-ci-sei-stato (acceso di default)");
