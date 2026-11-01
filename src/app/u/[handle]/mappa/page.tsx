@@ -65,7 +65,7 @@ export default async function MappaPersonaPage({ params }: Props) {
           <span className="min-w-0">
             <span className="block truncate font-title text-lg font-semibold leading-tight text-text">La mappa di {name}</span>
             <span className="block truncate text-xs font-sans text-text-muted">
-              {plural(visitedCount, "visitato", "visitati")} · {plural(places.length - visitedCount, "da provare", "da provare")}
+              {plural(visitedCount, "provato", "provati")} · {plural(places.length - visitedCount, "da provare", "da provare")}
             </span>
           </span>
         </Link>

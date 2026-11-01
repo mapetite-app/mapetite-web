@@ -239,7 +239,7 @@ export default function StaseraView({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
+  const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche dove sono stato"].join(" · ");
 
   return (
     <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
@@ -350,7 +350,7 @@ export default function StaseraView({ userId }: { userId: string }) {
             <h2 className="mb-2.5 mt-6 font-display text-sm font-semibold text-white/70">Che voglia?</h2>
             <div data-testid="stasera-novita" className="flex flex-wrap gap-2">
               <Pill active={onlyNew} onClick={() => setOnlyNew(true)}>📌 Mai provati</Pill>
-              <Pill active={!onlyNew} onClick={() => setOnlyNew(false)}>Anche già visitati</Pill>
+              <Pill active={!onlyNew} onClick={() => setOnlyNew(false)}>Anche dove sono stato</Pill>
             </div>
 
             {matchCount === 0 ? (
@@ -370,7 +370,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                   )}
                   {onlyNew && (
                     <button type="button" data-testid="stasera-allarga" onClick={() => setOnlyNew(false)} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
-                      Anche già visitati
+                      Anche dove sono stato
                     </button>
                   )}
                 </div>
