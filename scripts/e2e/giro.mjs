@@ -1661,7 +1661,8 @@ else {
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
     await p.keyboard.press("Enter");
-    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await ds.textContent()).includes("Terrazza Uno e un altro") && (await p.getByTestId("dai-salvati-posto").count()) === 0, "dai tuoi salvati: con due salvati una riga 'Terrazza Uno e un altro', chiusa");
+    // Giro del 1/11 (D26): niente nome tagliato ("Hostaria Del M… e un altro"), il numero e le emoji dei posti.
+    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await p.getByTestId("dai-salvati-numero").textContent()) === "2 dei tuoi salvati" && !(await ds.textContent()).includes("Terrazza Uno") && (await p.getByTestId("dai-salvati-posto").count()) === 0, "dai tuoi salvati: con due salvati una riga '2 dei tuoi salvati' con le loro emoji, chiusa");
     await p.getByTestId("dai-salvati-apri").click();
     const righeDs = p.getByTestId("dai-salvati-posto");
     ok((await righeDs.count()) === 2 && (await righeDs.first().textContent()).includes("tavolo sulla terrazza"), "dai tuoi salvati: un tocco apre le righe con il perché");
@@ -1676,7 +1677,8 @@ else {
       await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
       await p.keyboard.press("Enter");
       await ds.waitFor({ timeout: 6000 }).catch(() => {});
-      ok(await p.getByText("e un altro", { exact: true }).isVisible().catch(() => false), "dai tuoi salvati: con un nome lungo 'e un altro' resta in vista");
+      { const n = await p.getByTestId("dai-salvati-numero").boundingBox().catch(() => null);
+        ok(!!n && n.x + n.width <= 390 && await p.getByTestId("dai-salvati-numero").isVisible(), "dai tuoi salvati: con un nome lungo '2 dei tuoi salvati' resta tutto in vista"); }
       await p.getByTestId("dai-salvati-apri").click();
       const hs = await p.getByTestId("dai-salvati-posto").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
       const box = await ds.boundingBox();

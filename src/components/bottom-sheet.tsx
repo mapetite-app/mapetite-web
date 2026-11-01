@@ -128,13 +128,24 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       >
         <span aria-hidden>📌</span>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-baseline">
-            <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
-            <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
-            <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
-            {/* "e altri 2" resta sempre in vista: con un nome lungo si taglia il nome, non il numero. */}
-            {many && <span className="shrink-0 whitespace-pre font-sans text-text">{` e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}`}</span>}
-          </span>
+          {many ? (
+            // Con più salvati il numero e le loro emoji, senza nomi tagliati a metà ("Hostaria Del M… e un
+            // altro", giro del 1/11, D26): i nomi sono a un tocco, nelle righe che si aprono.
+            <span className="flex min-w-0 items-center gap-2">
+              <span data-testid="dai-salvati-numero" className="shrink-0 font-display font-semibold text-accent">{items.length} dei tuoi salvati</span>
+              <span aria-hidden className="flex shrink-0 -space-x-1.5">
+                {items.slice(0, 3).map((it) => (
+                  <span key={it.place.id} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-accent-light text-[13px] leading-none">{getCategoryEmoji(it.place.category, it.place.name)}</span>
+                ))}
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-baseline">
+              <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
+              <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
+              <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
+            </span>
+          )}
           {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
           {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
         </span>
