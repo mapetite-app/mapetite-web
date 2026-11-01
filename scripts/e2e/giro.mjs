@@ -3549,11 +3549,31 @@ else {
   const rIn = await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
   ok(rIn?.status() === 200 && await sp.getByTestId("profilo-pubblico-in-arrivo").getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /u/<nome> dice 'in arrivo' invece di rompersi");
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
-  ok(await sp.getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /amici dice 'in arrivo'");
-  // Revisore 1/11 (terzo giro): icona a tratto teal (lucide) al posto dell'emoji 👥 blu, fondo carta.
-  { const ic = await sp.getByTestId("social-in-arrivo").getByTestId("amici-icona").evaluate((el) => ({ svg: !!el.querySelector("svg.lucide"), colore: getComputedStyle(el).color }));
+  // Revisore 2/11: niente più vicolo cieco "Gli amici arrivano presto": cose vere che funzionano già (invito,
+  // carta del gusto) e "in arrivo" piccolo in fondo. Senza posti visitati la sezione "Da consigliare" non c'è.
+  { const intanto = sp.getByTestId("amici-intanto");
+    ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0, "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
+    const nota = sp.getByTestId("amici-in-arrivo");
+    const fs = await nota.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const ib = await intanto.getByTestId("amici-carta-gusto").boundingBox(); const nb = await nota.boundingBox();
+    ok(/in arrivo/.test((await nota.textContent()) ?? "") && fs <= 13 && !!ib && !!nb && nb.y > ib.y, `amici: 'in arrivo' è una riga piccola in fondo (${fs}px)`);
     const bg = await sp.getByTestId("amici").evaluate((el) => getComputedStyle(el.parentElement).backgroundColor);
-    ok(ic.svg && ic.colore === "rgb(26, 60, 64)" && !((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(248, 246, 242)", `amici: icona a tratto teal, niente emoji 👥, fondo carta (${JSON.stringify(ic)}, ${bg})`); }
+    ok(!((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(248, 246, 242)", `amici: niente emoji 👥, fondo carta (${bg})`); }
+  // Con posti visitati: "Da consigliare", prima quelli che ti sono piaciuti, mai quelli che "non fanno per te";
+  // ognuno porta alla pagina pubblica del locale e si manda con un tocco.
+  { const sav = (id, name, category, tags, created_at) => ({ created_at, tags, note: null, places: { id: `00000000-0000-4000-8000-0000000007${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } });
+    await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", reviews: [], saved: [
+      sav("01", "Osteria Visitata", "restaurant", ["Già visitato"], "2026-10-20"),
+      sav("02", "Bar Piaciuto", "bar", ["Già visitato", "Mi è piaciuto"], "2026-10-01"),
+      sav("03", "Pizzeria No", "restaurant", ["Già visitato", "Non fa per me"], "2026-10-25"),
+      sav("04", "Da Provare Uno", "restaurant", ["Da provare"], "2026-10-26"),
+    ] })), url: BASE }]);
+    await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+    const righe = sp.getByTestId("amici-consiglio");
+    const nomi = (await righe.locator("a .font-title").allTextContents()).map((t) => t.trim());
+    ok(nomi.join("|") === "Bar Piaciuto|Osteria Visitata" && (await righe.first().locator("a").first().getAttribute("href")) === "/locali/00000000-0000-4000-8000-000000000702" && (await righe.first().getByTestId("amici-consiglio-manda").count()) === 1, `amici: 'Da consigliare' con i posti visitati, prima quelli piaciuti, senza 'Non fa per me' né i 'Da provare' (${nomi.join(" | ")})`);
+    if (process.env.AMICI_SHOT) await sp.screenshot({ path: process.env.AMICI_SHOT, caret: "initial" });
+    await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]); }
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
   // Revisore 1/11: senza la parte social la riga "Profilo pubblico · In arrivo" non compare (non faceva niente).
   ok((await sp.getByTestId("profilo-social-in-arrivo").count()) === 0 && (await sp.locator("#pubblico").count()) === 0 && await sp.getByTestId("profilo-altro").isVisible(), "social in arrivo: nel profilo nessuna riga 'Profilo pubblico · In arrivo', il profilo si apre lo stesso");
