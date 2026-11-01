@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await loadProfilePage(handle);
   if (data.stato !== "ok") return { title: "Profilo · Mapetite" };
   const name = personName(data.profile);
-  const description = `${name} su Mapetite: ${plural(data.profile.visitati, "posto visitato", "posti visitati")}, ${plural(data.profile.da_provare, "da provare", "da provare")}${data.profile.city ? ` a ${data.profile.city}` : ""}.`;
+  const description = `${name} su Mapetite: ${plural(data.profile.visitati, "posto provato", "posti provati")}, ${plural(data.profile.da_provare, "da provare", "da provare")}${data.profile.city ? ` a ${data.profile.city}` : ""}.`;
   return {
     title: `${name} (@${data.profile.handle}) · Mapetite`,
     description,
@@ -98,7 +98,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
     ? topByCity(visited.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 5).slice(0, 3)
     : [];
   const stats = [
-    { label: "Visitati", value: profile.visitati, id: "visitati" },
+    { label: "Provati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },
     { label: "Seguaci", value: profile.seguaci, id: "seguaci" },
     { label: "Seguiti", value: profile.seguiti, id: "seguiti" },
@@ -203,7 +203,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
             <MappaPersonaLazy spots={spots} className="h-full w-full" />
           </div>
           <p className="mt-2 flex items-center gap-3 text-xs font-sans text-text-muted">
-            <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" /> Visitati</span>
+            <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" /> Provati</span>
             <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-brand" /> Da provare</span>
           </p>
         </section>

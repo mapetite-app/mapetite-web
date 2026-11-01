@@ -23,7 +23,7 @@ export function GruppiAccedi({ next }: { next: string }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center" data-testid="gruppi-accedi">
       <p aria-hidden className="text-4xl">🍽️</p>
-      <p className="font-display text-xl font-semibold text-brand">Scegliete insieme dove andare</p>
+      <p className="font-title text-2xl text-brand">Scegliete insieme dove andare</p>
       <p className="max-w-xs text-sm text-text-muted">Accedi per creare una lista con gli amici: ognuno propone un posto, si vota e vince il preferito.</p>
       <div className="flex gap-2">
         <a href={`/login?next=${n}`} className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">Accedi</a>

@@ -30,26 +30,26 @@ const inter = localFont({
   fallback: ["system-ui", "sans-serif"],
 });
 
-// Variante in prova dei titoli (decisione grafica aperta): serif editoriale come Places.
-// Si scarica solo se la pagina la usa davvero (?titoli=serif).
+// Serif editoriale dei titoli (come Places): dal 1/11 è lo stile unico di titoli e nomi dei locali
+// in tutta l'app (giro del revisore, correzione 7). ?titoli=sans torna a Poppins su questo telefono.
 const newsreader = localFont({
   variable: "--font-newsreader",
   src: "./fonts/newsreader-var.woff2",
   weight: "500 600",
   style: "normal",
   display: "swap",
-  // Usato solo con ?titoli=serif: niente precaricamento per tutti.
-  preload: false,
+  // Titoli di ogni pagina: si precarica come gli altri caratteri.
+  preload: true,
 });
 
 // Varianti grafiche in prova, ricordate su questo telefono:
-//   ?titoli=serif | ?titoli=sans   font dei titoli (serif editoriale come Places / Poppins)
+//   ?titoli=serif | ?titoli=sans   font dei titoli (serif editoriale come Places, predefinito dal 1/11 / Poppins)
 //   ?scheda=b     | ?scheda=a      scheda del locale (stile Places, predefinita dal 12/10 per scelta di Lorenzo / vecchia)
 //   ?home=b       | ?home=a        primo accesso con campo di ricerca diretto (stile Places / attuale)
 //   ?pin=b        | ?pin=a         pin con la foto del locale (stile Places / emoji)
 //   ?stile=places | ?stile=attuale tutte insieme
 // Gira prima del primo disegno, così non si vede il cambio.
-const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(t==="poppins")t="sans";if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}if(!localStorage.getItem("mapetite.scheda"))document.documentElement.dataset.scheda="b"}catch(e){}`;
+const VARIANTI_SCRIPT = `try{var q=new URLSearchParams(location.search),v={titoli:["serif","sans"],scheda:["b","a"],home:["b","a"],pin:["b","a"]},st=q.get("stile");for(var k in v){var t=st==="places"?v[k][0]:st==="attuale"?v[k][1]:q.get(k);if(t==="poppins")t="sans";if(v[k].indexOf(t)>=0)localStorage.setItem("mapetite."+k,t);if(localStorage.getItem("mapetite."+k)===v[k][0])document.documentElement.dataset[k]=v[k][0]}if(!localStorage.getItem("mapetite.scheda"))document.documentElement.dataset.scheda="b";if(localStorage.getItem("mapetite.titoli")==="sans")document.documentElement.dataset.titoli="sans"}catch(e){}`;
 
 // Primo accesso (src/components/home-intro.tsx): sulla home, se l'intro non è mai stata vista
 // (o con ?intro=1), segna <html data-intro="nuovo"> prima del disegno, così non c'è lampo.
@@ -100,6 +100,7 @@ export default async function RootLayout({
   return (
     <html
       lang="it"
+      data-titoli="serif"
       className={`${poppins.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
       suppressHydrationWarning
     >

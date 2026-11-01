@@ -1317,18 +1317,25 @@ ok((await page.getByTestId("posizione-card").count()) >= 1, "?lista=b: torna la 
 await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "serif" && d.scheda === "b" && d.home === "b" && d.pin === "b"; }), "?stile=places accende tutte le varianti");
 await page.goto(`${BASE}/mappa?stile=attuale`, { waitUntil: "networkidle" });
-ok(await page.evaluate(() => { const d = document.documentElement.dataset; return !d.titoli && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte");
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "sans" && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte (titoli in Poppins)");
 
-// 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
+// 7a. Titoli: un solo stile, il serif (giro 1/11, correzione 7). ?titoli=sans torna a Poppins (ricordato sul telefono).
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+await page.evaluate(() => { try { localStorage.removeItem("mapetite.titoli"); } catch { /* niente */ } });
 await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
-{ const f = await titleFont(); ok(/Poppins/i.test(f), `titoli: Poppins di default (${f.slice(0, 40)})`); }
-await page.goto(`${BASE}/mappa?titoli=serif&beta=-suggerimenti`, { waitUntil: "networkidle" });
-ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
-await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
-ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+{ const f = await titleFont(); ok(/Newsreader/i.test(f), `titoli: serif di default (${f.slice(0, 40)})`); }
 await page.goto(`${BASE}/mappa?titoli=sans&beta=-suggerimenti`, { waitUntil: "networkidle" });
 ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
+await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
+ok(/Poppins/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+await page.goto(`${BASE}/mappa?titoli=serif&beta=-suggerimenti`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif riaccende il serif");
+// Stesso stile di titolo nelle pagine principali (prima stasera, importa, profilo, assistente erano in Poppins grassetto).
+for (const path of ["/stasera", "/importa", "/assistente", "/profilo", "/amici"]) {
+  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+  const f = await page.evaluate(() => { const h = document.querySelector("main h1, h1, main .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+  ok(/Newsreader/i.test(f), `titoli: su ${path} il titolo è nel serif della home (${f.slice(0, 30)})`);
+}
 
 // 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
 await page.goto(`${BASE}/login?error=Email%20o%20password%20non%20corrette.`, { waitUntil: "networkidle" });
@@ -2141,10 +2148,19 @@ else {
       ok(await cose.isVisible() && (await cose.locator("a").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await cose.getByTestId("profilo-gruppi").count()) === 0, `profilo: griglia 'Le mie cose' con 6 tessere, carta del gusto compresa, senza liste di gruppo (${await cose.locator("a").count()})`);
       ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Importa con i loro ingressi");
       { const sz = await cose.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      // Profilo corto (giro 1/11, correzione 10): in vista solo identità, numeri e "Le mie cose"; il resto in "Impostazioni", chiuso.
+      { const h = await p.evaluate(() => document.documentElement.scrollHeight); ok(h <= 844 * 1.6, `profilo corto: al massimo una schermata e mezza (${h}px, prima erano circa 5 schermate)`); }
+      ok(!(await p.getByTestId("raccolte").isVisible()) && !(await p.getByTestId("profilo-premium").isVisible()) && !(await p.getByTestId("profilo-account").isVisible()) && !(await p.getByTestId("invito-mappa-gusto").isVisible()) && (await p.getByRole("link", { name: "I tuoi gusti →" }).count()) === 0, "profilo corto: raccolte, Premium, account e inviti non in vista finché non li apri");
+      ok(parseInt((await cose.getByTestId("tessera-raccolte").textContent()).match(/\d+/)?.[0] ?? "-1", 10) === (await p.getByTestId("raccolta").count()),"profilo: il numero della tessera 'Raccolte' è quello delle raccolte mostrate (giro 1/11, D47)");
       await cose.getByTestId("tessera-raccolte").click();
-      await p.waitForFunction(() => { const r = document.getElementById("raccolte")?.getBoundingClientRect(); return !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' porta alle raccolte"));
-      // Le cose secondarie stanno chiuse in "Altro": l'ingranaggio in alto ci porta.
-      ok((await p.getByTestId("profilo-impostazioni").getAttribute("href")) === "#altro" && !(await p.getByTestId("invita-amico").isVisible()) && !(await p.getByTestId("cosa-so-di-te").isVisible()) && await p.getByTestId("profilo-premium").isVisible() && await p.getByTestId("profilo-ristoratori").isVisible(), "profilo: 'Altro' in fondo, chiuso (invito, profilo pubblico, gusti, ricerche) con Premium e ristoratori in elenco");
+      await p.waitForFunction(() => { const d = document.getElementById("raccolte"); const r = d?.getBoundingClientRect(); return !!d?.open && !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' apre e porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' apre e porta alle raccolte"));
+      ok(await p.getByTestId("raccolte").isVisible(), "profilo: le raccolte si vedono dopo il tocco sulla tessera");
+      // Le cose secondarie stanno chiuse in "Impostazioni": l'ingranaggio in alto la apre.
+      ok((await p.getByTestId("profilo-impostazioni").getAttribute("href")) === "#altro" && !(await p.getByTestId("invita-amico").isVisible()) && !(await p.getByTestId("cosa-so-di-te").isVisible()), "profilo: 'Impostazioni' in fondo, chiusa (invito, profilo pubblico, gusti, ricerche)");
+      await p.getByTestId("profilo-impostazioni").click();
+      await p.getByTestId("profilo-premium").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await p.getByTestId("profilo-premium").isVisible() && await p.getByTestId("profilo-ristoratori").isVisible() && await p.getByTestId("profilo-account").isVisible() && await p.getByTestId("profilo-gusti-link").getAttribute("href") === "/me", "profilo: l'ingranaggio apre 'Impostazioni' con gusti, Premium, ristoratori, feedback ed Esci");
+      ok(!(await p.getByTestId("invita-amico").isVisible()), "profilo: dentro 'Impostazioni' le righe restano chiuse finché non le tocchi");
       await p.locator("#gusti > summary").click();
       ok(await p.getByTestId("cosa-so-di-te").isVisible(), "profilo: una riga di 'Altro' si apre al tocco (Cosa so di te)");
       ok(await p.getByTestId("guida-voglio").getAttribute("href") === "/mappa?vista=salvati&stato=voglio" && await p.getByTestId("guida-fatto").getAttribute("href") === "/mappa?vista=salvati&stato=fatto" && await p.getByTestId("guida-salvati").getAttribute("href") === "/mappa?vista=salvati", "profilo: ogni numero apre la mappa sui salvati filtrati");
@@ -2154,7 +2170,8 @@ else {
       ok(await p.getByTestId("profilo-importa").getAttribute("href") === "/importa", "profilo: '+ Importa locali' porta a /importa");
       // Semplificare 5 (17/10): niente doppioni dei Salvati nel profilo ("Stasera" e l'elenco stanno nella scheda Salvati).
       ok((await p.getByTestId("profilo-stasera").count()) === 0 && (await p.getByTestId("profilo-salvati").count()) === 0 && (await p.getByTestId("profilo-salvato-recente").count()) === 0, "profilo: niente card 'Stasera' né 'Ultimi salvati' (doppioni della scheda Salvati)");
-      ok(await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: le recensioni restano");
+      await p.locator("#recensioni > summary").click();
+      ok(await p.getByText("Vista bellissima, cocktail ottimi.").isVisible(), "profilo: le recensioni restano (in Impostazioni)");
       ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
@@ -2175,7 +2192,7 @@ else {
       // Copertine delle raccolte (?beta=copertine, spenta di default): emoji e nomi dei locali al posto dell'iniziale
       await p.goto(`${BASE}/profilo?beta=-copertine`, { waitUntil: "networkidle" });
       ok((await p.getByTestId("raccolta-copertina").count()) === 0, "copertine: si spengono con ?beta=-copertine (resta l'iniziale; accese di default)");
-      await p.goto(`${BASE}/profilo?beta=copertine`, { waitUntil: "networkidle" });
+      await p.goto(`${BASE}/profilo?beta=copertine#raccolte`, { waitUntil: "networkidle" });
       const amici = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
       await amici.getByTestId("raccolta-copertina").waitFor({ timeout: 4000 }).catch(() => {});
       const emojiAmici = (await amici.getByTestId("raccolta-copertina").locator("span").allTextContents()).length;
@@ -2200,7 +2217,11 @@ else {
     // Gestione delle raccolte dal profilo: rinomina, unisci, elimina, nuova. Le scritture partono
     // dal browser (Supabase con la sessione dell'utente): si catturano i PATCH su saved_places.
     {
-      await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+      // Dai Salvati, "Nuova" raccolta (/profilo?raccolta=nuova): il pannello delle raccolte è aperto e il foglio pure.
+      await p.goto(`${BASE}/profilo?raccolta=nuova`, { waitUntil: "networkidle" });
+      await p.getByTestId("raccolte-sheet").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await p.getByTestId("raccolte-sheet").isVisible() && await p.evaluate(() => !!document.getElementById("raccolte")?.open), "profilo: ?raccolta=nuova apre le raccolte e il foglio 'Nuova raccolta'");
+      await p.goto(`${BASE}/profilo#raccolte`, { waitUntil: "networkidle" });
       let patches = [];
       let patchFail = false;
       // Tag "freschi" dal database (letti prima di ogni scrittura): per simulare "Ci sei stato?" fatto dopo il caricamento.
@@ -2286,6 +2307,7 @@ else {
 
       // "Le tue ricerche": le recenti salvate su questo telefono
       const ric = p.getByTestId("profilo-ricerche");
+      await p.locator("#altro > summary").click();
       await p.locator("#ricerche > summary").click();
       // (le ricerche fatte prima in questo giro restano sul "telefono": si parte da vuoto)
       await p.evaluate(() => { localStorage.removeItem("mapetite.recenti"); window.dispatchEvent(new Event("mapetite-recenti")); });
@@ -2315,7 +2337,7 @@ else {
     await ep.route("**/api/events", (r) => { try { evs.push(r.request().postDataJSON()); } catch { /* corpo non JSON */ } return r.fulfill({ json: { ok: true } }); });
     let delStatus = 500;
     await ep.route("**/api/account/elimina", (r) => { delCalls.push(r.request().method()); return r.fulfill({ status: delStatus, json: delStatus === 200 ? { ok: true } : { error: "Non sono riuscito a eliminare l'account. Riprova tra poco." } }); });
-    await ep.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    await ep.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
     const btn = ep.getByTestId("elimina-account");
     const accBox = await ep.getByTestId("profilo-account").boundingBox();
     const btnBox = await btn.boundingBox();
@@ -2391,8 +2413,10 @@ else {
     // Festa + Mai provati: nessuno → si allarga con un tocco
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
     ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante");
-    await sq.getByTestId("stasera-allarga").filter({ hasText: "Anche già visitati" }).click();
-    ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("1 salvato") && (await sq.getByTestId("stasera-novita").getByRole("button", { name: "Anche già visitati" }).getAttribute("aria-pressed")) === "true", "stasera: 'Anche già visitati' allarga con un tocco (1 salvato)");
+    await sq.getByTestId("stasera-allarga").filter({ hasText: "Anche dove sono stato" }).click();
+    ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("1 salvato") && (await sq.getByTestId("stasera-novita").getByRole("button", { name: "Anche dove sono stato" }).getAttribute("aria-pressed")) === "true", "stasera: 'Anche dove sono stato' allarga con un tocco (1 salvato)");
+    // Giro 1/11 (D36): lo stato si chiama "Ci sono stato" ovunque, mai "visitato".
+    ok(!/visitat[oi]/i.test(await sq.locator("main").innerText()), "stasera: nessun 'visitato' nei testi (si dice 'Ci sono stato')");
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Qualsiasi" }).click();
     await sq.getByTestId("stasera-novita").getByRole("button", { name: "📌 Mai provati" }).click();
     // Proposte: 3, tutte "Voglio andarci" (ce ne sono 4 su 6)
@@ -3248,7 +3272,9 @@ else {
   ok((await sp.getByRole("heading", { level: 1 }).textContent()) === "Giulia" && await sp.getByText("@giulia.rm").isVisible() && await sp.getByTestId("profilo-bio").isVisible(), "profilo pubblico: nome, @nome e bio");
   ok((await sp.title()) === "Giulia (@giulia.rm) · Mapetite", `profilo pubblico: titolo per l'anteprima (${await sp.title()})`);
   { const n = async (id) => (await sp.getByTestId(`numero-${id}`).textContent())?.replace(/\s+/g, " ").trim();
-    ok((await n("visitati")) === "1Visitati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
+    ok((await n("visitati")) === "1Provati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
+  // Giro 1/11 (D36): uno stato, una parola. Per i posti di un'altra persona "Provati", come il titolo "Già provati".
+  ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) >= 1, "profilo pubblico: 'Provato/Provati' ovunque, mai 'Visitato'");
   { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
   ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
   ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
@@ -3611,7 +3637,7 @@ else {
     { created_at: "2026-10-08", tags: ["Weekend a Napoli con gli amici"], note: null, places: pr("03", "Tre") },
   ] };
   await qctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profiloQ)), url: BASE }]);
-  await qp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  await qp.goto(`${BASE}/profilo#raccolte`, { waitUntil: "networkidle" });
   if (await qp.getByTestId("raccolta-nome").first().isVisible()) {
     const spezzate = await qp.getByTestId("raccolta-nome").evaluateAll((els) => els.flatMap((el) => { const t = el.firstChild; if (!t) return []; const out = []; const re = /\S+/g; let m; while ((m = re.exec(t.textContent))) { const r = document.createRange(); r.setStart(t, m.index); r.setEnd(t, m.index + m[0].length); const tops = new Set([...r.getClientRects()].map((x) => Math.round(x.top))); if (tops.size > 1) out.push(m[0]); } return out; }));
     ok(spezzate.length === 0, `360px profilo: nomi delle raccolte senza parole spezzate${spezzate.length ? " (" + spezzate.join(", ") + ")" : ""}`);
@@ -4882,7 +4908,7 @@ else {
     p.on("pageerror", (e) => errors.push(e.message));
 
     // 4.1 Cartelle nel profilo
-    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    await p.goto(`${BASE}/profilo#raccolte`, { waitUntil: "networkidle" });
     const folders = p.getByTestId("raccolta");
     ok((await folders.count()) === 1 && (await folders.first().getAttribute("href")) === "/raccolte/Con%20amici", "cartelle: una per raccolta, apre /raccolte/<nome>");
     ok((await folders.first().getByTestId("raccolta-copertina").locator("span").count()) === 2 && (await folders.first().textContent()).includes("2 locali"), "cartelle: copertina con le emoji dei locali e il numero");
@@ -4928,7 +4954,9 @@ else {
     patches = [];
 
     // 4.3 Classifica nel profilo: Roma con 2 in classifica (Osteria Due > Trattoria Tre), Enoteca da mettere
+    await p.getByTestId("tessera-classifica").click();
     const cls = p.getByTestId("profilo-classifica");
+    await cls.waitFor({ timeout: 3000 }).catch(() => {});
     ok(await cls.isVisible() && order(await cls.getByTestId("classifica-voce").allTextContents()) === "OT", "classifica: nel profilo la top di Roma in ordine");
     await cls.getByTestId("classifica-ordina").click();
     await cls.getByTestId("classifica-confronto").waitFor({ timeout: 4000 }).catch(() => {});
@@ -4947,7 +4975,7 @@ else {
     patches = [];
     // Senza la colonna rank_score (migrazione non applicata) la classifica non compare
     await setProfilo(rc, { ...profilo, classifica: false });
-    await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    await p.goto(`${BASE}/profilo?senza=classifica#raccolte`, { waitUntil: "networkidle" });
     ok((await p.getByTestId("profilo-classifica").count()) === 0 && await p.getByTestId("raccolte").isVisible(), "classifica: senza migrazione il profilo resta com'era (sezione nascosta)");
     await setProfilo(rc, profilo);
 
@@ -5659,14 +5687,15 @@ else {
     }
     if (w === 390) {
       // Profilo da collegato: in fondo feedback ed Esci (prima erano nella barra).
-      await bp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+      await bp.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
       const acc = bp.getByTestId("profilo-account");
-      ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in fondo 'Dai un feedback' ed 'Esci'");
+      ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
-      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Mappa"]]) {
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
-        ok(accese.length === 1 && accese[0] === voce, `barra: su ${path} è accesa '${voce}' (${accese.join(",")})`);
+        // Home (giro 1/11, D5): nessuna voce accesa, "Mappa" solo sulla mappa.
+        ok(voce === null ? accese.length === 0 : accese.length === 1 && accese[0] === voce, `barra: su ${path} ${voce ? `è accesa '${voce}'` : "nessuna voce accesa"} (${accese.join(",")})`);
       }
     }
     await bctx.close();
@@ -5717,7 +5746,7 @@ else {
       ok(false, "avvisi: 'Quando ci vai?' non è comparso nella pagina dell'esito dello screenshot");
     }
     await actx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
-    await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+    await ap.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
     const riga = ap.getByTestId("avvisi-riga").getByRole("switch");
     await riga.waitFor({ timeout: 4000 }).catch(() => {});
     ok(await riga.isVisible() && (await riga.getAttribute("aria-checked")) === "false", "avvisi: nel profilo l'interruttore 'Avvisi' (spento in una pagina nuova senza iscrizione)");

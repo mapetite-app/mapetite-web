@@ -35,17 +35,18 @@
      senza dvh; l'@supports sotto la promuove a dvh (esclude la barra URL iOS). */
   --sheet-max-h: 85vh;
 
-  /* Font dei titoli (nomi dei locali, titolo della risposta): Poppins di default,
-     serif editoriale con ?titoli=serif (variante in prova, vedi layout.tsx). */
-  --title-font: var(--font-poppins);
-}
-
-:root[data-titoli="serif"] {
+  /* Font dei titoli (titoli di pagina, nomi dei locali, titolo della risposta): un solo stile in
+     tutta l'app, il serif editoriale di home, salvati e scheda (giro 1/11, correzione 7).
+     Inter per il testo, Poppins solo per pulsanti ed etichette. ?titoli=sans torna a Poppins. */
   --title-font: var(--font-newsreader), "Iowan Old Style", Georgia, serif;
 }
 
+:root[data-titoli="sans"] {
+  --title-font: var(--font-poppins);
+}
+
 /* Il serif rende meglio un po' più grande e meno pesante, con spaziatura stretta. */
-:root[data-titoli="serif"] .font-title {
+:root:not([data-titoli="sans"]) .font-title {
   font-weight: 500;
   letter-spacing: -0.01em;
 }

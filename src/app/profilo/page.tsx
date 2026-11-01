@@ -1,7 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, Send, Settings, Sparkles, Store, Trophy } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Gem, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -82,7 +82,9 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-export default async function ProfiloPage() {
+export default async function ProfiloPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // "Nuova" raccolta dai Salvati (/profilo?raccolta=nuova): il pannello delle raccolte nasce aperto.
+  const nuovaRaccolta = (await searchParams).raccolta === "nuova";
   const supabase = await createClient();
   const fake = await e2eProfile();
   const { data: userData } = fake ? { data: null } : await getUser();
@@ -91,7 +93,7 @@ export default async function ProfiloPage() {
   if (!user) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="font-display text-xl font-semibold text-brand">Il tuo profilo ti aspetta</p>
+        <p className="font-title text-2xl text-brand">Il tuo profilo ti aspetta</p>
         <p className="max-w-xs text-sm text-text-muted">
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>
@@ -188,8 +190,8 @@ export default async function ProfiloPage() {
   const raccoltaRows: RaccoltaRow[] = saved.flatMap((row) =>
     row.places ? [{ placeId: row.places.id, name: row.places.name, address: row.places.address, category: row.places.category, tags: row.tags ?? [] }] : [],
   );
-  // Stessa regola della sezione Raccolte e dei Salvati: "👍 Mi è piaciuto" / "👎 Non fa per me" non sono raccolte
-  // (giro del 1/11, D47: il riquadro diceva "Raccolte 1" con zero raccolte visibili).
+  // Stesso conteggio delle cartelle mostrate (summarizeCollections esclude stati e opinioni come
+  // "Mi è piaciuto"): prima contava anche le opinioni e diceva "Raccolte 1" senza nessuna raccolta (giro 1/11, D47).
   const raccolteCount = summarizeCollections(saved).length;
 
   const classificaRows: ClassificaRow[] = saved.flatMap((r) =>
@@ -216,22 +218,20 @@ export default async function ProfiloPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
-      {/* Intestazione: chi sei, i tre numeri (toccabili) e l'ingranaggio per le cose secondarie. */}
+      {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
+          Tutto il resto sta in "Impostazioni" in fondo, chiuso: l'ingranaggio in alto ci porta. */}
       <header className="mb-5">
         <div className="flex items-center gap-3">
           <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
             {initial}
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-title text-2xl font-semibold leading-tight text-brand">{name}</h1>
+            <h1 className="truncate font-title text-[28px] leading-tight text-brand">{name}</h1>
             <p className="truncate text-xs text-text-muted">{user.email}</p>
-            <Link href="/me" className="inline-flex min-h-8 items-center text-sm font-display font-semibold text-accent">
-              I tuoi gusti →
-            </Link>
           </div>
           <a
             href="#altro"
-            aria-label="Impostazioni e altro"
+            aria-label="Impostazioni"
             data-testid="profilo-impostazioni"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-brand active:scale-95"
           >
@@ -252,26 +252,10 @@ export default async function ProfiloPage() {
             </Link>
           ))}
         </nav>
-        {gems && <ScopritoreRiga gemme={gems.gemme} provate={gems.provate} />}
       </header>
 
-      {senzaGusto && (
-        <Link href="/onboarding" data-testid="invito-mappa-gusto" className="mb-6 flex min-h-16 items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-card active:scale-[0.99]">
-          <span aria-hidden className="text-2xl">✨</span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-display text-[15px] font-semibold">Fai la tua mappa del gusto</span>
-            <span className="block text-xs font-sans text-white/80">1 minuto: da lì ricerca e verdetti parlano di te</span>
-          </span>
-          <ChevronRight aria-hidden size={18} className="shrink-0 text-white/80" />
-        </Link>
-      )}
-
-      {/* Promemoria che compaiono solo quando servono. */}
-      <BookingReminder />
-      <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
-
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
-      <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-8">
+      <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
         <h2 id="mie-cose-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le mie cose</h2>
         <div className="grid grid-cols-3 gap-2">
           <a href="#raccolte" data-testid="tessera-raccolte" className={TILE_CLASS}>
@@ -301,87 +285,125 @@ export default async function ProfiloPage() {
         </div>
       </section>
 
-      <PostiFissi posti={postiFissi} handle={"stato" in social || !social.is_public ? null : social.handle} />
-
-      <div id="raccolte" className="scroll-mt-4">
+      {/* Raccolte e classifica: si aprono dalla loro tessera (nessuna riga doppia nella pagina). */}
+      <ProfiloSezione id="raccolte" pannello aperta={nuovaRaccolta} icon={<FolderHeart {...icon} />} title="Le tue raccolte" hint="Per occasione o per viaggio">
         <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
-      </div>
-
-      {ranks && (
-        <div id="classifica" className="scroll-mt-4">
+      </ProfiloSezione>
+      {ranks ? (
+        <ProfiloSezione id="classifica" pannello icon={<Trophy {...icon} />} title="La tua classifica" hint="I posti dove sei stato, dal preferito">
           <ProfiloClassifica userId={user.id} initialRows={classificaRows} />
-        </div>
+        </ProfiloSezione>
+      ) : (
+        // Senza classifica la tessera "Ricerche" porta qui (e in Impostazioni non c'è la riga doppia).
+        <ProfiloSezione id="ricerche" pannello icon={<History {...icon} />} title="Le tue ricerche" hint="Da rifare con un tocco">
+          <ProfiloRicerche />
+        </ProfiloSezione>
       )}
 
-      {reviews.length > 0 && (
-        <section className="mb-8" data-testid="profilo-recensioni">
-          <h2 className="mb-2 font-title text-xl font-semibold text-brand">Le mie recensioni <span className="text-base text-text-muted">· {reviews.length}</span></h2>
-          <ul className="space-y-2">
-            {reviews.slice(0, REVIEWS_PREVIEW).map((review) => (
-              <ReviewItem key={review.id} review={review} />
-            ))}
-          </ul>
-          {reviews.length > REVIEWS_PREVIEW && (
-            <details className="group mt-2">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-pill border border-border text-sm font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
-                Vedi tutte le {reviews.length}
-                <ChevronDown aria-hidden size={16} className="transition-transform duration-150 group-open:rotate-180" />
-              </summary>
-              <ul className="mt-2 space-y-2">
-                {reviews.slice(REVIEWS_PREVIEW).map((review) => (
-                  <ReviewItem key={review.id} review={review} />
-                ))}
-              </ul>
-            </details>
-          )}
-        </section>
-      )}
+      {/* Promemoria che compaiono solo quando servono. */}
+      <BookingReminder />
+      <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
 
-      {/* Altro: le cose secondarie in un elenco discreto, ognuna si apre al tocco. */}
-      <section id="altro" aria-labelledby="altro-titolo" className="scroll-mt-4">
-        <h2 id="altro-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Altro</h2>
-        <div className="overflow-hidden rounded-card border border-border bg-white">
-          {/* Invito (piano 9.1): il proprio link personale. */}
-          <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
-            <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
-          </ProfiloSezione>
-          <ProfiloSezione
-            id="pubblico"
-            icon={<Globe {...icon} />}
-            title="Profilo pubblico"
-            hint={"stato" in social ? "In arrivo" : social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
-          >
-            <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
-          </ProfiloSezione>
-          {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
-          <ProfiloSezione id="gusti" icon={<Sparkles {...icon} />} title="Cosa so di te" hint="I gusti che l’assistente ricorda">
-            <ProfiloGusti userId={user.id} />
-          </ProfiloSezione>
-          <ProfiloSezione id="ricerche" icon={<History {...icon} />} title="Le tue ricerche" hint="Da rifare con un tocco">
-            <ProfiloRicerche />
-          </ProfiloSezione>
-          {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
-          <Link href="/premium" data-testid="profilo-premium" className={row}>
-            <Gem {...icon} aria-hidden className="shrink-0 text-accent" />
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-sm font-semibold text-text">Mapetite Premium <span className="text-xs text-accent">· in arrivo</span></span>
-              <span className="block truncate text-xs text-text-muted">Assistente senza limiti, raccolte illimitate</span>
-            </span>
-            <ChevronRight aria-hidden size={16} className="text-text-muted" />
-          </Link>
-          {/* Lato ristoratori (piano 8). */}
-          <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
-            <Store {...icon} aria-hidden className="shrink-0 text-brand" />
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-sm font-semibold text-text">Hai un locale?</span>
-              <span className="block truncate text-xs text-text-muted">Mapetite per i ristoratori</span>
-            </span>
-            <ChevronRight aria-hidden size={16} className="text-text-muted" />
-          </Link>
-        </div>
-      </section>
-
-      <ProfiloAccount loggedIn />
+      {/* Impostazioni: tutto il resto, chiuso. Ogni riga si apre al tocco; i link "#…" da altre
+          pagine (es. #cosa-so-di-te, #profilo-pubblico) aprono sia "Impostazioni" sia la riga. */}
+      <div className="mt-2 overflow-hidden rounded-card border border-border bg-white">
+        <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, inviti, profilo pubblico, avvisi, account">
+          <div className="-mx-4 -mb-4">
+            {senzaGusto && (
+              <Link href="/onboarding" data-testid="invito-mappa-gusto" className={row}>
+                <span aria-hidden className="w-5 shrink-0 text-center text-lg">✨</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-sm font-semibold text-text">Fai la tua mappa del gusto</span>
+                  <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
+                </span>
+                <ChevronRight aria-hidden size={16} className="text-text-muted" />
+              </Link>
+            )}
+            <Link href="/me" data-testid="profilo-gusti-link" className={row}>
+              <SlidersHorizontal {...icon} aria-hidden className="shrink-0 text-brand" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-semibold text-text">I tuoi gusti</span>
+                <span className="block truncate text-xs text-text-muted">Mappa del gusto e preferenze</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="text-text-muted" />
+            </Link>
+            {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
+            <ProfiloSezione id="gusti" icon={<Sparkles {...icon} />} title="Cosa so di te" hint="I gusti che l’assistente ricorda">
+              <ProfiloGusti userId={user.id} />
+            </ProfiloSezione>
+            {gems && (
+              <div className="border-t border-border px-4 pb-3 [&>details]:mt-0">
+                <ScopritoreRiga gemme={gems.gemme} provate={gems.provate} />
+              </div>
+            )}
+            {postiFissi.length > 0 && (
+              <ProfiloSezione id="posti-fissi" icon={<Repeat {...icon} />} title="I tuoi posti fissi" hint={`${postiFissi.length} ${postiFissi.length === 1 ? "posto dove torni" : "posti dove torni"}`}>
+                <PostiFissi posti={postiFissi} handle={"stato" in social || !social.is_public ? null : social.handle} />
+              </ProfiloSezione>
+            )}
+            {reviews.length > 0 && (
+              <ProfiloSezione id="recensioni" testId="profilo-recensioni" icon={<MessageSquareText {...icon} />} title="Le mie recensioni" hint={`${reviews.length} ${reviews.length === 1 ? "recensione" : "recensioni"}`}>
+                <ul className="space-y-2">
+                  {reviews.slice(0, REVIEWS_PREVIEW).map((review) => (
+                    <ReviewItem key={review.id} review={review} />
+                  ))}
+                </ul>
+                {reviews.length > REVIEWS_PREVIEW && (
+                  <details className="group mt-2">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-pill border border-border text-sm font-display font-semibold text-brand [&::-webkit-details-marker]:hidden">
+                      Vedi tutte le {reviews.length}
+                      <ChevronDown aria-hidden size={16} className="transition-transform duration-150 group-open:rotate-180" />
+                    </summary>
+                    <ul className="mt-2 space-y-2">
+                      {reviews.slice(REVIEWS_PREVIEW).map((review) => (
+                        <ReviewItem key={review.id} review={review} />
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </ProfiloSezione>
+            )}
+            {/* Invito (piano 9.1): il proprio link personale. */}
+            <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
+              <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
+            </ProfiloSezione>
+            <ProfiloSezione
+              id="pubblico"
+              icon={<Globe {...icon} />}
+              title="Profilo pubblico"
+              hint={"stato" in social ? "In arrivo" : social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
+            >
+              <ProfiloSocial userId={user.id} initial={"stato" in social ? null : social} />
+            </ProfiloSezione>
+            {ranks && (
+              <ProfiloSezione id="ricerche" icon={<History {...icon} />} title="Le tue ricerche" hint="Da rifare con un tocco">
+                <ProfiloRicerche />
+              </ProfiloSezione>
+            )}
+            {/* Premium (piano 8b): solo l'elenco di cosa arriverà, nessun pagamento. */}
+            <Link href="/premium" data-testid="profilo-premium" className={row}>
+              <Gem {...icon} aria-hidden className="shrink-0 text-accent" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-semibold text-text">Mapetite Premium <span className="text-xs text-accent">· in arrivo</span></span>
+                <span className="block truncate text-xs text-text-muted">Assistente senza limiti, raccolte illimitate</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="text-text-muted" />
+            </Link>
+            {/* Lato ristoratori (piano 8). */}
+            <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
+              <Store {...icon} aria-hidden className="shrink-0 text-brand" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-semibold text-text">Hai un locale?</span>
+                <span className="block truncate text-xs text-text-muted">Mapetite per i ristoratori</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="text-text-muted" />
+            </Link>
+            <div className="border-t border-border px-4 pb-4">
+              <ProfiloAccount loggedIn compatto />
+            </div>
+          </div>
+        </ProfiloSezione>
+      </div>
     </div>
   );
 }

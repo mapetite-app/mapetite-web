@@ -46,7 +46,7 @@ export function PostoRiga({ spot, verdict = null }: { spot: Spot; verdict?: stri
         )}
       </span>
       <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-display font-semibold ${visited ? "bg-accent-light text-accent" : "bg-brand/10 text-brand"}`}>
-        {visited ? "✓ Visitato" : "📌 Da provare"}
+        {visited ? "✓ Provato" : "📌 Da provare"}
       </span>
     </Link>
   );

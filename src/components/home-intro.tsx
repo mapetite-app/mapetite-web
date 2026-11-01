@@ -228,7 +228,7 @@ export default function HomeIntro({ loggedIn }: { loggedIn: boolean }) {
           <div className="mb-8">
             <Illu />
           </div>
-          <h2 id="intro-titolo" className="font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand">
+          <h2 id="intro-titolo" className="font-title text-[2rem] leading-tight text-brand">
             {title}
           </h2>
           <p className="mt-3 text-base leading-relaxed font-sans text-text-muted">{text}</p>

@@ -670,7 +670,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Sparkles size={18} aria-hidden /></span>
           <div className="min-w-0">
-            <h1 className="font-display text-base font-semibold leading-tight text-brand">Assistente Mapetite</h1>
+            <h1 className="font-title text-xl leading-tight text-brand">Assistente Mapetite</h1>
             <p className="truncate text-xs font-sans text-text-muted">Trova, filtra, prenota</p>
           </div>
         </div>

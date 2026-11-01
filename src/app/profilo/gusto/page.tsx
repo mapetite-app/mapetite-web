@@ -42,7 +42,7 @@ export default async function CartaGustoPage() {
         <Indietro />
         <div data-testid="carta-vuota" className="mt-6 rounded-card bg-brand px-6 py-10 text-center text-white">
           <p className="font-display text-sm text-white/70">La tua carta del gusto</p>
-          <p className="mt-2 font-display text-2xl font-semibold leading-tight">
+          <p className="mt-2 font-title text-[28px] leading-tight">
             Ancora {mancano} {mancano === 1 ? "posto" : "posti"} e la tua carta è pronta
           </p>
           <p className="mx-auto mt-3 max-w-xs text-sm text-white/80">
@@ -79,7 +79,7 @@ export default async function CartaGustoPage() {
           <span className="font-display text-sm font-bold">Mapetite</span>
         </div>
         <p className="mt-6 font-display text-sm text-white/70">La mia carta del gusto</p>
-        <h1 data-testid="carta-titolo" className="mt-1 font-display text-[32px] font-bold leading-[1.08] tracking-tight text-accent">{c.titolo}</h1>
+        <h1 data-testid="carta-titolo" className="mt-1 font-title text-[36px] leading-[1.05] text-accent">{c.titolo}</h1>
         <p data-testid="carta-perche" className="mt-2 text-sm text-white/85">{c.perche}</p>
 
         <div data-testid="carta-numeri" className="mt-6 grid grid-cols-3 gap-2">
