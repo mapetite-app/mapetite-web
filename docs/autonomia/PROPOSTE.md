@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 1/11/2026 (notte, sessione 03:06, CEO che chiude)
+
+### 36. "Ti ricordi di disdire?" il giorno prima, solo per chi tende a dimenticare
+- **Problema:** `PROBLEMI.md` 16: il no-show nasce soprattutto dal dimenticarsi di disdire, non dalla malafede.
+- **Cosa fa:** la sera prima di una prenotazione fatta da Mapetite, una riga in home (e l'avviso push, quando acceso): "Domani alle 20:30 da Nome · Ci vai? Sì / Non più". "Non più" apre il messaggio di disdetta già scritto. Chi ha già confermato non vede niente.
+- **Da dove nasce:** TheFork manda promemoria generici; nessuno lega il promemoria al tavolo liberato che il locale vede nel pannello (🔁 tavoli liberati per tempo). Si appoggia su proposta 31.
+- **Valore per l'utente:** non fai la figura del bidone, resti "di parola".
+- **Valore per il ristoratore:** tavoli liberati la sera prima, rivendibili; il numero sale nel pannello.
+- **Sforzo:** S (la base c'è: `booking-reminder.tsx`, prenotazioni con data e ora).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 37. "Avvisami se si libera" sul salvato (come Corner, ma dal pannello del locale)
+- **Problema:** chi salva un posto pieno lo perde; il locale ha tavoli che si liberano all'ultimo e nessuno lo sa.
+- **Cosa fa:** sul salvato, "🔔 Avvisami se si libera stasera". Quando il locale (verificato) segna nel pannello "si è liberato un tavolo" o arriva una disdetta da Mapetite, parte un avviso a chi l'ha chiesto, in ordine di chi l'ha chiesto prima.
+- **Da dove nasce:** Corner avvisa quando si apre una prenotazione su un posto salvato ([dnyuz, 21/7/2026](https://dnyuz.com/2026/07/21/a-startup-building-a-map-to-help-you-make-plans-with-friends-has-doubled-its-funding/)), ma solo dai sistemi di prenotazione USA. Noi lo facciamo partire dal locale stesso e dalle disdette "di parola".
+- **Valore per l'utente:** il posto difficile diventa raggiungibile.
+- **Valore per il ristoratore:** riempie i tavoli liberati senza commissioni; dato da piano Growth.
+- **Sforzo:** M (tabella richieste, tasto nel pannello, avvisi push già pronti ma spenti finché non ci sono le chiavi: DA-FARE 8).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, dopo l'accensione degli avvisi.
+
 ## 31/10/2026 (notte, sessione 03:06, CEO che chiude)
 
 ### 34. "Più così / meno così" sui simili (i consigli che imparano dal tuo 👍)

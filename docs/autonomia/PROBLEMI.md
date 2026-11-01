@@ -185,3 +185,9 @@ Ultimo aggiornamento: 30/10/2026 (notte).
 - **DAVVERO, in futuro:** "Altri come questo" anche dal reel salvato (prima ancora di esserci stati) e i simili che imparano dai 👍 e 👎 dati ai risultati (proposta 34).
 - **Primo passo:** misurare quanti tocchi su "Altri come questo" finiscono in un salvataggio (`funzione: altri_come` nel pannello numeri, team).
 
+## 16. Il no-show nasce dal dimenticarsi, non dalla cattiveria — 1/11 notte
+- **Il problema:** il 12,8% delle prenotazioni finisce in no-show (Incrementoo, oltre 212.000 prenotazioni in 300 ristoranti, gennaio–agosto 2025); con caparra o pre-autorizzazione si scende al 5,4% ([Dissapore](https://www.dissapore.com/notizie/il-no-show-e-un-problema-sempre-piu-grande-per-la-ristorazione-italiana/)). Tra chi ammette un no-show, il motivo più citato è essersi dimenticati di disdire (rilevazione TheFork riportata da [Panorama](https://www.panorama.it/abbonati/costume/vizio), data non chiara). Nel 2026 se ne parla ancora come perdita secca per i piccoli locali ([Linkiesta, marzo 2026](https://www.linkiesta.it/2026/03/perche-devi-disdire-la-prenotazione-a-un-ristorante-se-sai-che-non-ci-andrai/)).
+- **OGGI nell'app:** "Non vado più" in un tocco con il messaggio già scritto; il locale vede i "tavoli liberati per tempo"; "di parola" nel messaggio di prenotazione. Da stanotte il riquadro del pannello è più leggibile (periodo scritto una volta, numero + 2–3 parole).
+- **DAVVERO, in futuro:** promemoria la sera prima con "Ci vai? Sì / Non più" (proposta 36) e "Avvisami se si libera" per riempire il tavolo liberato (proposta 37). La caparra resta DA DECIDERE LORENZO.
+- **Primo passo:** proposta 36, S, nessun costo.
+
