@@ -821,13 +821,16 @@ const WELCOME_EXAMPLES_MILANO = [
 ];
 
 // Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
-function IdeaGroup({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+// hideTitle (revisore 1/11: tre intestazioni per sei righe): il gruppo resta per i lettori di schermo, l'elenco è unico.
+function IdeaGroup({ title, action, children, hideTitle = false }: { title: string; action?: React.ReactNode; children: React.ReactNode; hideTitle?: boolean }) {
   return (
-    <section className="mt-1 first-of-type:mt-0">
-      <div className="flex min-h-8 items-center justify-between px-2">
-        <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
-        {action}
-      </div>
+    <section aria-label={title} className="mt-1 first-of-type:mt-0">
+      {hideTitle ? null : (
+        <div className="flex min-h-8 items-center justify-between px-2">
+          <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+          {action}
+        </div>
+      )}
       <ul className="flex flex-col">{children}</ul>
     </section>
   );
@@ -864,7 +867,7 @@ function IdeaChips({ title, action, children }: { title: string; action?: React.
         <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
         {action}
       </div>
-      <div className="-mx-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">{children}</div>
+      <div className="-mx-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,black_85%,transparent)]">{children}</div>
     </section>
   );
 }
@@ -2668,10 +2671,10 @@ export default function MapView({
                 3 idee tue, poi le recenti (o gli esempi per chi non ha ancora cercato) in una riga sola.
                 "Parla con l'assistente" è già nella barra in basso: niente doppione. */}
             <div className="px-2 pb-1 pt-1">
-              <p className="font-title text-lg font-semibold leading-tight text-brand">Ti suggeriamo</p>
+              <p className="font-title text-xl font-semibold leading-tight text-text">Idee</p>
               {momentHour != null && <p data-testid="idee-contesto" className="text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
             </div>
-            <IdeaGroup title="Adesso">
+            <IdeaGroup title="Adesso" hideTitle>
               {momentExample && (
                 <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
@@ -2680,7 +2683,7 @@ export default function MapView({
               ); })()}
               <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
             </IdeaGroup>
-            <IdeaGroup title="Per te">
+            <IdeaGroup title="Per te" hideTitle>
               {(() => { const mie = [
                 userId && savedPlaces.length > 0 ? (
                   <IdeaRow key="stasera" testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
@@ -2714,7 +2717,7 @@ export default function MapView({
             ) : null}
             <IdeaChips title="Prova a chiedere">
               {welcomeExamples.map((ex) => (
-                <IdeaChip key={ex.query} label={ex.query} text={`${ex.title} ${ex.sub}`} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+                <IdeaChip key={ex.query} label={ex.query} text={ex.title} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
               ))}
             </IdeaChips>
           </div>
@@ -3582,7 +3585,7 @@ export default function MapView({
       )}
 
       {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
-      {nearbySaved && !savedToast && !selected && aiSearch === null && (
+      {nearbySaved && !savedToast && !selected && aiSearch === null && view === "all" && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">

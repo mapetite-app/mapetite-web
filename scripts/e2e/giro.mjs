@@ -174,11 +174,11 @@ ok((await page.getByRole("button", { name: "I miei salvati" }).count()) === 0 &&
 await shot("01-benvenuto");
 await idee(page);
 { const pan = page.getByTestId("idee-pannello");
-  ok(await pan.getByText("Ti suggeriamo").isVisible() && await pan.getByText("Adesso", { exact: true }).isVisible() && await pan.getByText("Per te").isVisible() && await pan.getByText("Prova a chiedere").isVisible(), "Idee: pannello 'Ti suggeriamo' con i gruppi Adesso · Per te · Prova a chiedere");
+  ok(await pan.getByText("Idee", { exact: true }).isVisible() && (await pan.getByText("Ti suggeriamo").count()) === 0 && (await pan.getByText("Adesso", { exact: true }).count()) === 0 && await pan.getByText("Prova a chiedere").isVisible(), "Idee: un solo nome (pulsante e titolo 'Idee'), elenco unico senza intestazioni, esempi in una riga");
   ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && (await pan.getByTestId("mappa-assistente").count()) === 0, "Idee: Sorprendimi c'è, 'Parla con l'assistente' no (è già nella barra in basso)");
   // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
   ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
-  { const righe = await pan.locator("li").count(); const adesso = await pan.locator("section").filter({ hasText: /^Adesso/ }).locator("li").count(); const perTe = await pan.locator("section").filter({ hasText: /^Per te/ }).locator("li").count();
+  { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
     ok(adesso === 3 && perTe >= 1 && perTe <= 3 && righe <= 6, `Idee: al massimo 6 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
   { const es = pan.getByRole("button", { name: /per due a Roma|non turistica a Trastevere|qui vicino|appuntamento/ }); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
     ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
@@ -2357,7 +2357,7 @@ else {
     await btn.click();
     await ep.getByTestId("elimina-account-conferma").click();
     await foglio.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
-    ok(delCalls.length === 1 && delCalls[0] === "POST" && (await foglio.getByRole("alert").textContent())?.includes("Riprova") && ep.url().endsWith("/profilo"), "elimina account: se il server non riesce, lo dice e si resta nel profilo");
+    ok(delCalls.length === 1 && delCalls[0] === "POST" && (await foglio.getByRole("alert").textContent())?.includes("Riprova") && new URL(ep.url()).pathname === "/profilo", "elimina account: se il server non riesce, lo dice e si resta nel profilo");
     // Riuscita: dati del telefono tolti, home con "Account eliminato".
     delStatus = 200;
     await ep.evaluate(() => { localStorage.setItem("mapetite.recenti", JSON.stringify(["prova"])); localStorage.setItem("mapetite.intro", "visto"); });
@@ -7376,7 +7376,7 @@ else {
   await idee(vp);
   const riga = vp.getByTestId("vicino-adesso");
   ok(await riga.isVisible() && (await riga.textContent())?.includes("Vicino a me, aperto adesso"), "vicino: riga '📍 Vicino a me, aperto adesso' nel pannello 'Ti suggeriamo' (gruppo Adesso)");
-  ok((await vp.getByTestId("vicino-adesso").locator("xpath=ancestor::section[1]").textContent())?.startsWith("Adesso"), "vicino: la riga sta nel gruppo 'Adesso'");
+  ok((await vp.getByTestId("vicino-adesso").locator("xpath=ancestor::section[1]").getAttribute("aria-label")) === "Adesso", "vicino: la riga sta nel gruppo 'Adesso'");
   await vp.screenshot({ path: `${OUT}/99-vicino-idee.png`, caret: "initial" });
   await riga.click();
   await vp.getByTestId("intestazione-lista").waitFor({ timeout: 6000 }).catch(() => {});
