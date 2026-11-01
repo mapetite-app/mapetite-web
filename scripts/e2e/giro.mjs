@@ -5648,10 +5648,11 @@ else {
       const acc = bp.getByTestId("profilo-account");
       ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in fondo 'Dai un feedback' ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
-      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Mappa"]]) {
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
-        ok(accese.length === 1 && accese[0] === voce, `barra: su ${path} è accesa '${voce}' (${accese.join(",")})`);
+        // Home (giro 1/11, D5): nessuna voce accesa, "Mappa" solo sulla mappa.
+        ok(voce === null ? accese.length === 0 : accese.length === 1 && accese[0] === voce, `barra: su ${path} ${voce ? `è accesa '${voce}'` : "nessuna voce accesa"} (${accese.join(",")})`);
       }
     }
     await bctx.close();

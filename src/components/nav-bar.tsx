@@ -43,8 +43,9 @@ function voci(pathname: string, vista: string | null, search: string | null, log
   return [
     { id: "assistente", label: "Assistente", href: "/assistente", Icon: Sparkles, active: under(pathname, "/assistente") },
     { id: "salvati", label: "Salvati", href: SAVED_HREF, Icon: Bookmark, active: savedActive },
-    // Mappa (id "esplora"): la mappa e la home di ricerca. Al centro della barra.
-    { id: "esplora", label: "Mappa", href: "/mappa", Icon: Earth, active: (onMap && !savedActive) || pathname === "/" },
+    // Mappa (id "esplora"): solo sulla mappa, al centro della barra. Sulla home nessuna voce è
+    // accesa: la home non è la mappa (giro 1/11, D5).
+    { id: "esplora", label: "Mappa", href: "/mappa", Icon: Earth, active: onMap && !savedActive },
     // Amici: il feed, i profili delle persone (/u/<nome>) e le liste di gruppo (/gruppi).
     { id: "amici", label: "Amici", href: "/amici", Icon: UsersRound, active: under(pathname, "/amici") || under(pathname, "/u") || under(pathname, "/gruppi") },
     loggedIn
