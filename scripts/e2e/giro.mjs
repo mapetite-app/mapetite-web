@@ -7884,11 +7884,11 @@ else {
   await setS({ ...base, scopritori: scop });
   const s = await sc.newPage();
   s.on("pageerror", (e) => errors.push(e.message));
-  await s.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  // Profilo corto (1/11): la riga Scopritore sta dentro Impostazioni; #altro la apre.
+  await s.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
   const riga = s.getByTestId("scopritore-riga");
   ok(await riga.isVisible() && (await riga.textContent())?.includes("Scopritore · Esploratore") && await riga.getByTestId("scopritore-livello").textContent() === "Liv. 2", "scopritori: nel profilo la riga compatta '💎 Scopritore · Esploratore · Liv. 2'");
-  const yRiga = (await riga.boundingBox())?.y ?? 9999;
-  ok(yRiga < ((await s.getByTestId("profilo-mie-cose").boundingBox())?.y ?? 0), "scopritori: la riga sta sotto i numeri, prima di 'Le mie cose'");
+  ok(await s.getByTestId("profilo-altro").locator("[data-testid=scopritore-riga]").count() === 1, "scopritori: la riga sta dentro Impostazioni (profilo corto)");
   await riga.locator("summary").click();
   ok((await riga.getByTestId("scopritore-mancano").textContent())?.includes("Ancora 5 punti per il livello 3") && (await riga.getByTestId("scopritore-cerca").getAttribute("href")) === "/sorprendimi", "scopritori: aperta dice quanto manca e porta a scoprire un posto poco conosciuto");
   await s.waitForTimeout(300);
