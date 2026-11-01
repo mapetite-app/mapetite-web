@@ -1931,7 +1931,9 @@ export default function MapView({
     // o i filtri ha un numero vecchio e si scarta.
     const ticket = ++searchSeq.current;
     setDalSalvati(null);
-    ricercaMondo.current = mondo ? ticket : null;
+    // "Altri come questo" non chiede ai salvati, nemmeno dall'effetto qui sopra (prova in produzione
+    // del 1/11: "Dai tuoi salvati" riproponeva il posto da cui si era partiti).
+    ricercaMondo.current = mondo && !opts.simile ? ticket : null;
     if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
