@@ -67,6 +67,20 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
     );
   }
 
+  // Telefono legato a un altro account (stesso telefono, accesso diverso): niente sincronizzazione,
+  // ma lo si dice, altrimenti la riga sparisce senza motivo (minore del collaudo del 31/10).
+  // Nessuna azione qui: spostarle su questo account mescolerebbe le prenotazioni di due persone.
+  if (stato === "altro" && haPrenotazioni) {
+    return (
+      <div data-testid="prenotazioni-account-altro" role="note" className="mt-6 rounded-card border border-border bg-white px-4 py-2.5">
+        <p className="text-sm font-display font-semibold text-brand">Legate a un altro account</p>
+        <p className="mt-0.5 text-xs font-sans leading-relaxed text-text-muted">
+          Restano su questo telefono. Per tenerle aggiornate entra con l&apos;account con cui le hai attivate.
+        </p>
+      </div>
+    );
+  }
+
   if (stato !== "spento" || !haPrenotazioni) return null;
   // Riga sottile sotto l'elenco (dal secondo collaudo): le prenotazioni restano la cosa principale.
   return (
