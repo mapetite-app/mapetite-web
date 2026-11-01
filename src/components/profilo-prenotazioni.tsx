@@ -17,8 +17,9 @@ export default function ProfiloPrenotazioni() {
       <TileBody
         icon={<CalendarCheck size={18} strokeWidth={1.75} />}
         label="Prenotazioni"
-        count={n > 0 ? n : undefined}
-        sub={<span data-testid="profilo-prenotazioni-conteggio">{n === 0 ? "Nessuna" : `${n} in arrivo`}</span>}
+        count={n}
+        sub={<span data-testid="profilo-prenotazioni-conteggio">{`${n} in arrivo`}</span>}
+        invito="Prenota da una scheda"
       />
     </Link>
   );
