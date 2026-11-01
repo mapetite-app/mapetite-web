@@ -2,43 +2,62 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
+import { Bookmark, Check, ChevronRight, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { STATE_TAGS } from "@/lib/tags";
+import { OPINION_LIKE, STATE_TAGS } from "@/lib/tags";
 import { collectionColor, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
-// nella PR #87): fondo carta, titolo in serif, filtri di stato con i conteggi veri, raccolte come
-// cerchi (le storie), lista per vicinanza con lo stato e la provenienza (reel collegato).
-// Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo, ordine) sta nel foglio
-// "Filtri" di map-view; la mappa è a un tocco (icona in alto). Nessuna foto: le foto Google non si
-// conservano e chiederle per ogni salvato costerebbe quota; si usano emoji e colori.
+// nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
+// di stato con i conteggi veri, raccolte come copertine (mosaico dei posti dentro), "Stasera" come
+// azione a parte (non è una raccolta), ordine visibile (Vicino / Recenti) e righe con stato, 👍,
+// verdetto e provenienza sotto il nome, così il nome ha tutta la riga.
+// Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo) sta nel foglio "Filtri"
+// di map-view; la mappa è a un tocco (icona in alto). Nessuna foto: le foto Google non si
+// conservano e chiederle per ogni salvato costerebbe quota; si usano emoji su un fondo unico.
 
 const [WANT, DONE] = STATE_TAGS;
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f8f6f2]";
 const LINE = "border-[#e8e2d8]";
 
-// Sfondi caldi delle miniature (al posto della foto): sempre lo stesso per lo stesso tipo di locale.
-const TONES = [
-  "linear-gradient(160deg,#5a2f1c,#2a150d)",
-  "linear-gradient(170deg,#4a1820,#24090f)",
-  "linear-gradient(160deg,#6b2b10,#2b1007)",
-  "linear-gradient(160deg,#e9dccb,#b89670)",
-  "linear-gradient(165deg,#1f4a50,#0b1e21)",
-  "linear-gradient(160deg,#7c8f5a,#43532e)",
-] as const;
-function toneFor(key: string): string {
-  let h = 0;
-  for (const ch of key) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
-  return TONES[h % TONES.length];
+// Miniatura al posto della foto: emoji del tipo su un fondo carta unico (giro 1/11, D42: niente
+// colori a caso tra un posto e l'altro). Le raccolte invece hanno il loro colore, come cartelle.
+function Miniatura({ place, size }: { place: Place; size: string }) {
+  return (
+    <span aria-hidden className={`flex shrink-0 items-center justify-center border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] ${size}`}>
+      {getCategoryEmoji(place.category, place.name)}
+    </span>
+  );
+}
+
+// Copertina di una raccolta: mosaico delle emoji dei primi posti dentro (1, 2, 3 o 4 riquadri).
+function Copertina({ name, preview }: { name: string; preview: Place[] }) {
+  const tiles = preview.slice(0, 4);
+  const layout = tiles.length >= 3 ? "grid-cols-2 grid-rows-2" : tiles.length === 2 ? "grid-cols-2" : "grid-cols-1";
+  return (
+    <span data-testid="raccolta-copertina" aria-hidden className={`grid h-[92px] w-full gap-[3px] overflow-hidden rounded-[16px] p-[3px] ${layout}`} style={{ background: collectionColor(name) }}>
+      {tiles.length === 0 ? (
+        <span className="flex items-center justify-center text-[34px]">📍</span>
+      ) : (
+        tiles.map((t, i) => (
+          <span
+            key={t.id}
+            className={`flex items-center justify-center rounded-[12px] bg-white/[0.13] ${tiles.length === 1 ? "text-[44px]" : tiles.length === 3 && i === 0 ? "row-span-2 text-[34px]" : tiles.length === 2 ? "text-[34px]" : "text-[24px]"}`}
+          >
+            {getCategoryEmoji(t.category, t.name)}
+          </span>
+        ))
+      )}
+    </span>
+  );
 }
 
 const FONTE_LABEL: Record<string, string> = { Instagram: "Reel Instagram", TikTok: "Video TikTok", YouTube: "Video YouTube" };
@@ -83,6 +102,8 @@ export default function SalvatiLista({
   hideOnDesktop?: boolean;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  // Ordine visibile (giro 1/11): "Vicino" se la posizione è nota, altrimenti "Recenti". Si cambia con un tocco.
+  const [ordine, setOrdine] = useState<"vicino" | "recenti" | null>(null);
   // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
   // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
   type Risposta = { q: string; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
@@ -121,7 +142,8 @@ export default function SalvatiLista({
   }, [userId]);
 
   const count = (tag: string) => all.filter((p) => p.tags?.includes(tag)).length;
-  const collections = useMemo(() => summarizeCollections(all, 1), [all]);
+  // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
+  const collections = useMemo(() => summarizeCollections([...all].reverse(), 4), [all]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
   const kicker = useMemo(() => {
     const byCity = new globalThis.Map<string, number>();
@@ -133,10 +155,12 @@ export default function SalvatiLista({
     const where = cities.length === 0 ? "" : cities.length === 1 ? cities[0] : cities.length === 2 ? `${cities[0]} e ${cities[1]}` : `${cities[0]}, ${cities[1]} e altre`;
     return `${all.length} ${all.length === 1 ? "posto" : "posti"}${where ? ` · ${where}` : ""}`;
   }, [all]);
-  // Per vicinanza quando la posizione è nota (mai chiesta da sola: c'è "Vicino a me").
+  // Per vicinanza quando la posizione è nota (mai chiesta da sola: la chiede il tocco su "Vicino");
+  // "Recenti" = dall'ultimo salvato (map-view li legge dal più vecchio al più nuovo).
+  const sort = ordine ?? (origin ? "vicino" : "recenti");
   const list = useMemo(
-    () => (origin ? [...shown].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b)) : shown),
-    [shown, origin],
+    () => (sort === "vicino" && origin ? [...shown].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b)) : sort === "recenti" ? [...shown].reverse() : shown),
+    [shown, origin, sort],
   );
   const searching = searchOpen || query !== "";
   const domanda = searching && sembraDomanda(query);
@@ -232,9 +256,7 @@ export default function SalvatiLista({
                   {scelti.map((s, i) => (
                     <li key={s.id} className={i > 0 ? `border-t ${LINE}` : ""}>
                       <button type="button" data-testid="chiedi-salvati-posto" onClick={() => onOpen(s.place, scelti.map((x) => x.id))} className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-black/[0.03]">
-                        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] text-[22px]" style={{ background: toneFor(categoryLabel(s.place.category) ?? s.place.category ?? s.place.name) }}>
-                          {getCategoryEmoji(s.place.category, s.place.name)}
-                        </span>
+                        <Miniatura place={s.place} size="h-12 w-12 text-[22px] rounded-[12px]" />
                         <span className="min-w-0 flex-1">
                           <span className={`${SERIF} block truncate text-[18px] font-medium leading-tight text-text`}>{s.place.name}</span>
                           <span className="mt-0.5 block text-[13px] leading-snug text-text-muted">{s.perche}</span>
@@ -264,61 +286,90 @@ export default function SalvatiLista({
           ))}
         </div>
 
-        {/* Le raccolte come le storie: un tocco filtra la lista. Prima "Stasera" (il momento della scelta). */}
-        <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-5 flex gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none]">
-          <li className="w-[68px] shrink-0">
-            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" className="flex flex-col items-center gap-1.5 active:scale-95">
-              <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-[linear-gradient(150deg,#ff8a6e,#ff6b4a_55%,#e2553a)] text-[28px] shadow-[0_0_0_2px_#f8f6f2,0_0_0_3.5px_#ff6b4a]">🍽️</span>
-              <span className="w-full truncate text-center text-xs font-semibold text-accent">Stasera</span>
-            </Link>
-          </li>
-          {collections.map((c) => {
-            const on = activeTag === c.name;
-            const first = c.preview[0];
-            return (
-              <li key={c.name} className="w-[68px] shrink-0">
-                <button
-                  type="button"
-                  data-testid="raccolta-cerchio"
-                  aria-pressed={on}
-                  aria-label={`${c.name}, ${c.count} ${c.count === 1 ? "posto" : "posti"}`}
-                  onClick={() => onTag(on ? null : c.name)}
-                  className="flex w-full flex-col items-center gap-1.5 active:scale-95"
-                >
-                  <span
-                    aria-hidden
-                    className={`flex h-16 w-16 items-center justify-center rounded-full text-[28px] ${on ? "shadow-[0_0_0_2px_#f8f6f2,0_0_0_4.5px_#ff6b4a]" : "shadow-[0_0_0_2px_#f8f6f2,0_0_0_3.5px_#e3ddd2]"}`}
-                    style={{ background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,.22), transparent 55%), ${collectionColor(c.name)}` }}
+        {/* Le raccolte come copertine (Places 07, Albo 12): un tocco filtra la lista. "Nuova raccolta" è l'ultima. */}
+        <h2 className="mt-5 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Raccolte</h2>
+        {collections.length === 0 ? (
+          <Link
+            href="/profilo?raccolta=nuova"
+            aria-label="Nuova raccolta"
+            data-testid="raccolte-vuote"
+            className="mt-2 flex min-h-[64px] items-center gap-3 rounded-card border-[1.5px] border-dashed border-[#d6cec1] px-3 py-2.5 active:scale-[0.98]"
+          >
+            <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-white text-text-muted"><Plus size={20} /></span>
+            <span className="min-w-0 flex-1">
+              <span className={`${SERIF} block text-[17px] font-medium leading-tight text-text`}>Nuova raccolta</span>
+              <span className="block truncate text-[13px] text-text-muted">Cena a due, con gli amici, weekend…</span>
+            </span>
+          </Link>
+        ) : (
+          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-2 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none]">
+            {collections.map((c) => {
+              const on = activeTag === c.name;
+              return (
+                <li key={c.name} className="w-[136px] shrink-0 snap-start">
+                  <button
+                    type="button"
+                    data-testid="raccolta-cerchio"
+                    aria-pressed={on}
+                    aria-label={`${c.name}, ${c.count} ${c.count === 1 ? "posto" : "posti"}`}
+                    onClick={() => onTag(on ? null : c.name)}
+                    className="block w-full text-left active:scale-[0.97]"
                   >
-                    {first ? getCategoryEmoji(first.category, first.name) : "📍"}
-                  </span>
-                  <span className={`w-full truncate text-center text-xs ${on ? "font-semibold text-accent" : "font-medium text-[#33373d]"}`}>{c.name}</span>
-                </button>
-              </li>
-            );
-          })}
-          <li className="w-[68px] shrink-0">
-            <Link href="/profilo?raccolta=nuova" aria-label="Nuova raccolta" className="flex flex-col items-center gap-1.5 active:scale-95">
-              <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full border-[1.5px] border-dashed border-[#c9c2b6] text-text-muted"><Plus size={22} /></span>
-              <span className="w-full truncate text-center text-xs font-medium text-[#33373d]">Nuova</span>
-            </Link>
-          </li>
-        </ul>
+                    <span className={`block rounded-[18px] ${on ? "shadow-[0_0_0_2px_#f8f6f2,0_0_0_4px_#ff6b4a]" : ""}`}>
+                      <Copertina name={c.name} preview={c.preview} />
+                    </span>
+                    <span className={`${SERIF} mt-1.5 block truncate px-0.5 text-[17px] font-medium leading-tight ${on ? "text-accent" : "text-text"}`}>{c.name}</span>
+                    <span className="block px-0.5 pb-0.5 text-[12px] text-text-muted">{c.count} {c.count === 1 ? "posto" : "posti"}</span>
+                  </button>
+                </li>
+              );
+            })}
+            <li className="w-[104px] shrink-0 snap-start">
+              <Link href="/profilo?raccolta=nuova" aria-label="Nuova raccolta" className="block active:scale-[0.97]">
+                <span aria-hidden className="flex h-[92px] w-full items-center justify-center rounded-[16px] border-[1.5px] border-dashed border-[#c9c2b6] text-text-muted"><Plus size={24} /></span>
+                <span className="mt-1.5 block truncate px-0.5 text-[13px] font-medium leading-tight text-[#33373d]">Nuova raccolta</span>
+              </Link>
+            </li>
+          </ul>
+        )}
 
-        <div className="mt-6 flex items-center justify-between gap-2">
-          <h2 className="truncate font-display text-base font-semibold text-text">{origin ? "Vicino a te" : "I tuoi salvati"}</h2>
-          <div className="flex shrink-0 items-center gap-1.5">
+        {/* "Stasera" è uno strumento, non una raccolta (giro 1/11, D39): un'azione a parte, una riga sola. */}
+        <Link
+          href="/stasera"
+          data-testid="lista-stasera"
+          aria-label="Stasera dove andiamo?"
+          className={`mt-3 flex min-h-[56px] items-center gap-3 rounded-card border ${LINE} bg-white px-3 py-2 shadow-card active:scale-[0.98]`}
+        >
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-[20px]">🍽️</span>
+          <span className="min-w-0 flex-1">
+            <span className={`${SERIF} block truncate text-[18px] font-medium leading-tight text-text`}>Stasera dove andiamo?</span>
+            <span className="block truncate text-[12.5px] text-text-muted">Scelgo io tra i tuoi {all.length === 1 ? "posti" : `${all.length} posti`}</span>
+          </span>
+          <ChevronRight size={18} aria-hidden className="shrink-0 text-accent" />
+        </Link>
+
+        {/* Ordine e filtri in una riga: "Vicino" chiede la posizione al tocco, "Filtri" è l'unico punto per il resto. */}
+        <div className="mt-5 flex items-center justify-between gap-2">
+          <div role="group" aria-label="Ordina" data-testid="salvati-ordine" className="flex shrink-0 rounded-pill bg-[#ece6dc] p-1">
+            {([["vicino", locating && !origin ? "Cerco…" : "Vicino"], ["recenti", "Recenti"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={sort === k}
+                onClick={() => { setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
+                className={`min-h-9 rounded-pill px-3.5 text-[13px] font-medium transition-colors ${sort === k ? "bg-white font-semibold text-text shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-text-muted"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5">
             {activeCity !== null && (
-              <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
-                {activeCity} <X size={12} aria-hidden />
+              <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 min-w-0 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
+                <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
               </button>
             )}
-            {!origin && (
-              <button type="button" onClick={onLocate} disabled={locating} className="min-h-11 rounded-pill px-2 text-[13px] text-text-muted active:scale-95 disabled:opacity-60">
-                {locating ? "Cerco…" : "Vicino a me"}
-              </button>
-            )}
-            <button type="button" data-testid="salvati-lista-filtri" onClick={onFilters} className="relative flex min-h-11 items-center gap-1.5 rounded-pill px-2 text-[13px] font-medium text-brand active:scale-95">
+            <button type="button" data-testid="salvati-lista-filtri" onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill px-2 text-[13px] font-medium text-brand active:scale-95">
               <SlidersHorizontal size={15} aria-hidden /> Filtri
               {filtersOn > 0 && (
                 <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 font-display text-[11px] font-bold text-white">{filtersOn}</span>
@@ -344,39 +395,56 @@ export default function SalvatiLista({
             {list.map((p, i) => {
               const kind = categoryLabel(p.category);
               const city = cityFromAddress(p.address);
-              // Prima la distanza: a 360 px si taglia la città, non i metri.
-              const meta = [origin ? distanceLabel(origin, p) : null, kind, city].filter(Boolean).join(" · ");
+              const meta = [kind, city].filter(Boolean).join(" · ");
+              const dist = origin ? distanceLabel(origin, p) : null;
               const fonte = reels[p.id];
               const verdict = verdicts[p.id]?.verdict ?? null;
               const done = p.tags?.includes(DONE);
               const want = !done && p.tags?.includes(WANT);
+              const liked = p.tags?.includes(OPINION_LIKE);
+              const chip = "inline-flex h-[22px]shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
               return (
                 <li key={p.id} className={i > 0 ? `border-t ${LINE}` : ""}>
                   <button
                     type="button"
                     data-testid="salvato-riga"
                     onClick={() => onOpen(p, list.map((x) => x.id))}
-                    className="flex min-h-[84px] w-full items-center gap-3 px-3 py-3 text-left transition-colors active:bg-black/[0.03]"
+                    className="flex min-h-[84px] w-full items-start gap-3 px-3 py-3 text-left transition-colors active:bg-black/[0.03]"
                   >
-                    <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] text-[26px]" style={{ background: toneFor(kind ?? p.category ?? p.name) }}>
-                      {getCategoryEmoji(p.category, p.name)}
-                    </span>
+                    <Miniatura place={p} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
                     <span className="min-w-0 flex-1">
+                      {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
                       <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-                      {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
-                      {fonte ? (
-                        <span data-testid="salvato-provenienza" className="mt-0.5 flex items-center gap-1 text-xs text-accent">
-                          <SquarePlay size={13} aria-hidden /> {FONTE_LABEL[fonte]}
+                      {(meta || dist) && (
+                        <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-[13px] text-text-muted">
+                          <span className="min-w-0 truncate">{meta}</span>
+                          {dist && <span data-testid="salvato-distanza" className="shrink-0">{meta ? "· " : ""}{dist}</span>}
                         </span>
-                      ) : verdict ? (
-                        <span data-testid="salvato-verdetto" className="mt-0.5 block truncate text-xs text-text-muted"><span aria-hidden className="text-accent">✦ </span>{verdict}</span>
+                      )}
+                      {verdict ? (
+                        <span data-testid="salvato-verdetto" className={`${SERIF} mt-1 block truncate text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>
+                      ) : p.note ? (
+                        <span data-testid="salvato-nota" className="mt-1 block truncate text-[13px] text-[#4a4f55]">“{p.note}”</span>
                       ) : null}
+                      {(done || want || liked || fonte) && (
+                        <span className="mt-1 flex flex-wrap gap-1.5">
+                          {(done || want) && (
+                            <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-accent-light text-[#b8432a]"}`}>
+                              {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <Bookmark size={11} strokeWidth={2.6} aria-hidden />}
+                              {done ? "Ci sono stato" : "Da provare"}
+                            </span>
+                          )}
+                          {liked && (
+                            <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>👍 Piaciuto</span>
+                          )}
+                          {fonte && (
+                            <span data-testid="salvato-provenienza" className={`${chip} bg-[#f1ece3] font-medium text-[#33373d]`}>
+                              <SquarePlay size={12} aria-hidden className="text-accent" /> {FONTE_LABEL[fonte]}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </span>
-                    {(done || want) && (
-                      <span data-testid="stato-lista" className={`shrink-0 whitespace-nowrap rounded-pill px-2.5 py-1 text-[11.5px] font-semibold ${done ? "bg-[#e6f5ee] text-[#16784f]" : "bg-[#eef4f4] text-brand"}`}>
-                        {done ? "✓ Visitato" : "Da provare"}
-                      </span>
-                    )}
                   </button>
                 </li>
               );

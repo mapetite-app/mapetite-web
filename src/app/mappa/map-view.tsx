@@ -1405,7 +1405,9 @@ export default function MapView({
       const { data, error } = await supabase
         .from("saved_places")
         .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
+        .order("created_at", { ascending: true });
 
       setLoadingSaved(false);
       setSavedLoaded(true);
