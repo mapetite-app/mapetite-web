@@ -1661,9 +1661,18 @@ else {
     ok(await L.getByRole("heading", { name: "I tuoi posti" }).isVisible() && (await L.getByTestId("salvati-lista-sopra").textContent()) === "3 posti · Roma e Milano", "salvati lista: titolo serif 'I tuoi posti' e sopra '3 posti · Roma e Milano' (città vere)");
     const st = L.getByTestId("salvati-stato");
     ok((await st.getByRole("button").allTextContents()).join("|") === "Tutti 3|Da provare 1|Ci sono stato 0" && (await st.getByRole("button", { name: "Tutti 3" }).getAttribute("aria-pressed")) === "true", "salvati lista: filtri 'Tutti 3 / Da provare 1 / Ci sono stato 0' con i conteggi veri");
-    ok((await L.getByTestId("raccolta-cerchio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).join("|") === "amici, 1 posto|romantico, 1 posto", "salvati lista: le raccolte vere come cerchi (amici, romantico)");
-    ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", "salvati lista: 'Stasera' tra i cerchi, 'Nuova' raccolta e '+' per aggiungere");
+    ok((await L.getByTestId("raccolta-cerchio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).join("|") === "amici, 1 posto|romantico, 1 posto", "salvati lista: le raccolte vere come copertine (amici, romantico)");
+    // Giro del 1/11: copertine con il mosaico dei posti dentro, "Nuova raccolta" ultima card, "Stasera" fuori dalle raccolte.
+    { const cop = L.getByTestId("raccolta-copertina");
+      const box = await cop.first().boundingBox();
+      ok((await cop.count()) === 2 && !!box && box.width >= 120 && box.height >= 80 && (await cop.first().textContent()).trim() === "🍝", `salvati lista: copertine larghe (${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}) con l'emoji dei posti dentro (amici → 🍝)`);
+      ok((await L.getByTestId("salvati-raccolte").locator("li").last().getByRole("link", { name: "Nuova raccolta" }).count()) === 1, "salvati lista: 'Nuova raccolta' è l'ultima copertina"); }
+    ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByTestId("salvati-raccolte").getByTestId("lista-stasera").count()) === 0 && (await L.getByTestId("lista-stasera").textContent()).includes("Stasera dove andiamo?") && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", "salvati lista: 'Stasera dove andiamo?' è un'azione a parte (non tra le raccolte), 'Nuova raccolta' e '+' per aggiungere");
     const righe = L.getByTestId("salvato-riga");
+    // Ordine visibile: senza posizione "Recenti" (dall'ultimo salvato: Caffè Milano è l'ultimo della risposta).
+    { const ord = L.getByTestId("salvati-ordine");
+      ok((await ord.getByRole("button").allTextContents()).join("|") === "Vicino|Recenti" && (await ord.getByRole("button", { name: "Recenti" }).getAttribute("aria-pressed")) === "true" && (await righe.first().textContent()).includes("Caffè Milano"), "salvati lista: ordine 'Vicino / Recenti' in vista, senza posizione 'Recenti' con l'ultimo salvato in cima");
+      ok((await righe.filter({ hasText: "Caffè Milano" }).getByTestId("salvato-nota").textContent()).includes("Brunch domenica") && (await L.getByTestId("salvato-distanza").count()) === 0, "salvati lista: senza verdetto la riga mostra la nota; senza posizione nessuna distanza inventata"); }
     ok((await righe.count()) === 3, "salvati lista: tutti e 3 i salvati in lista");
     const osteria = righe.filter({ hasText: "Osteria Due" });
     ok((await osteria.getByTestId("stato-lista").textContent()) === "Da provare" && (await L.getByTestId("stato-lista").count()) === 1, "salvati lista: badge 'Da provare' solo dove lo stato c'è (nessuno stato inventato)");
