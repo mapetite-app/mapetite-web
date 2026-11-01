@@ -180,7 +180,7 @@ await idee(page);
   ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
     ok(adesso === 3 && perTe >= 1 && perTe <= 3 && righe <= 6, `Idee: al massimo 6 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
-  { const es = pan.getByRole("button", { name: /per due a Roma|non turistica a Trastevere|qui vicino|appuntamento/ }); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
+  { const es = pan.locator("section").filter({ hasText: /^Prova a chiedere/ }).getByRole("button"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
     ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
   ok(((await pan.getByTestId("suggerimento-momento-2").textContent()) ?? "") !== ((await pan.getByTestId("suggerimento-momento").textContent()) ?? ""), "Idee: la seconda idea del momento è diversa dalla prima");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
