@@ -6,7 +6,7 @@ export default function SocialInArrivo({ titolo = "Gli amici arrivano presto" }:
   return (
     <section data-testid="social-in-arrivo" className="rounded-card border border-border bg-surface p-6 text-center">
       <p aria-hidden className="text-4xl">👥</p>
-      <p className="mt-2 font-display text-lg font-semibold text-brand">{titolo}</p>
+      <p className="mt-2 font-title text-xl text-text">{titolo}</p>
       <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
         Stiamo preparando profili pubblici, amici da seguire e i posti consigliati da chi conosci. Intanto la tua mappa funziona come sempre.
       </p>

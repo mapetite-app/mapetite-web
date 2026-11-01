@@ -21,7 +21,7 @@ export default function CreatorListe({ creators, viewer, seguo }: { creators: Cr
   return (
     <section className="mt-6" aria-labelledby="creator-titolo" data-testid="creator-liste">
       <TracciaFunzione nome="creator_liste" contesto="amici" />
-      <h2 id="creator-titolo" className="font-title text-xl font-semibold text-brand">Liste dei creator da seguire</h2>
+      <h2 id="creator-titolo" className="font-title text-xl font-semibold text-text">Liste dei creator da seguire</h2>
       <p className="mt-0.5 text-sm font-sans text-text-muted">Food blogger e critici scelti da Mapetite, con i posti che consigliano davvero.</p>
       <ul className="-mx-4 mt-3 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2">
         {cards.map(({ profile, tipo, places, raccolte }) => {

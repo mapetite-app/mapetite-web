@@ -61,7 +61,7 @@ export default function ProfiloClassifica({ userId, initialRows }: { userId: str
 
   return (
     <section id="classifica" data-testid="profilo-classifica" className="mb-10 scroll-mt-4">
-      <h2 className="mb-3 flex items-center gap-2 font-title text-xl font-semibold text-brand">
+      <h2 className="mb-3 flex items-center gap-2 font-title text-xl font-semibold text-text">
         <Trophy size={20} aria-hidden className="text-accent" /> La tua classifica
       </h2>
 

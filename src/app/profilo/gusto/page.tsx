@@ -25,7 +25,7 @@ export default async function CartaGustoPage() {
   if (rows === null) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <h1 className="font-title text-2xl font-semibold text-brand">La tua carta del gusto</h1>
+        <h1 className="font-title text-2xl font-semibold text-text">La tua carta del gusto</h1>
         <p className="max-w-xs text-sm text-text-muted">Accedi per vedere il tuo gusto riassunto in una card da condividere.</p>
         <Link href="/login?next=%2Fprofilo%2Fgusto" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
           Accedi

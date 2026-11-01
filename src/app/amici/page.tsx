@@ -22,7 +22,7 @@ export default async function AmiciPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center" data-testid="amici-accedi">
         <p aria-hidden className="text-4xl">👥</p>
-        <p className="font-title text-2xl text-brand">I posti dei tuoi amici</p>
+        <p className="font-title text-2xl text-text">I posti dei tuoi amici</p>
         <p className="max-w-xs text-sm text-text-muted">Accedi per seguire gli amici e vedere dove sono stati e dove vogliono andare.</p>
         <div className="flex gap-2">
           <a href="/login?next=%2Famici" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">Accedi</a>
@@ -48,7 +48,7 @@ export default async function AmiciPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
-      <h1 className="font-title text-3xl font-semibold text-brand">Amici</h1>
+      <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
 
       {feed.stato === "in-arrivo" ? (

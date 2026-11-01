@@ -33,7 +33,7 @@ export default async function GruppiPage({ searchParams }: Props) {
       <Link href="/amici" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-display font-semibold text-brand">
         <ArrowLeft size={18} aria-hidden /> Amici
       </Link>
-      <h1 className="mt-1 font-title text-3xl font-semibold text-brand">Liste di gruppo</h1>
+      <h1 className="mt-1 font-title text-3xl font-semibold text-text">Liste di gruppo</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">Ognuno propone un posto, si vota con 👍 e il preferito sale in cima.</p>
 
       <div className="mt-5">

@@ -124,7 +124,7 @@ export default function ManualAddCard({
       className="scroll-mt-4 rounded-card border border-border bg-surface p-5"
       data-testid="importa-mano"
     >
-      <h2 className="font-display text-lg font-semibold text-brand">
+      <h2 className="font-title text-xl text-text">
         <span aria-hidden>✍️ </span>Aggiungi a mano
       </h2>
       <p className="mt-1 text-sm text-text-muted">Te l&apos;ha consigliato qualcuno? Scrivi il nome e la città, lo trovo io.</p>

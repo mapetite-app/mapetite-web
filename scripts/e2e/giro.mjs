@@ -2194,6 +2194,14 @@ else {
       ok(!(await p.content()).includes(", Italy<") , "profilo: indirizzi senza ', Italy' in fondo");
       await p.screenshot({ path: `${OUT}/27-profilo-guida.png`, caret: "initial" });
       if (process.env.PROFILO_SHOT) await p.screenshot({ path: process.env.PROFILO_SHOT, caret: "initial" });
+      // Revisore 1/11: titoli e stati vuoti tutti in serif e di un solo colore, quello di "I tuoi posti" nei Salvati (niente teal qua e nero là).
+      for (const path of ["/profilo", "/amici", "/importa"]) {
+        await p.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+        const tt = await p.evaluate(() => { const ref = getComputedStyle(document.body).getPropertyValue("--color-text").trim(); const probe = document.createElement("span"); probe.style.color = ref; document.body.append(probe); const want = getComputedStyle(probe).color; probe.remove(); return { want, titoli: [...document.querySelectorAll("h1, h2.font-title, h3.font-title, [data-testid=social-in-arrivo] .font-title, summary .font-title")].filter((e) => e.getClientRects().length > 0 && !e.closest("nav")).map((e) => ({ t: (e.textContent ?? "").trim().slice(0, 24), c: getComputedStyle(e).color, serif: /Newsreader/i.test(getComputedStyle(e).fontFamily) })) }; });
+        const storti = tt.titoli.filter((x) => x.c !== tt.want || !x.serif);
+        ok(tt.titoli.length > 0 && storti.length === 0, `titoli: su ${path} tutti in serif e dello stesso colore di 'I tuoi posti' (${tt.titoli.length} titoli${storti.length ? `, diversi: ${JSON.stringify(storti)}` : ""})`);
+      }
+      await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
       // "Ci sei stato?" (?beta=ci-sei-stato, spento di default): un "Voglio andarci" salvato da più di una settimana
       await p.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
       ok((await p.getByTestId("ci-sei-stato").count()) === 0, "ci sei stato: si spegne con ?beta=-ci-sei-stato (acceso di default)");

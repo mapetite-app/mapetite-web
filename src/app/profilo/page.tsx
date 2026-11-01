@@ -93,7 +93,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   if (!user) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="font-title text-2xl text-brand">Il tuo profilo ti aspetta</p>
+        <p className="font-title text-2xl text-text">Il tuo profilo ti aspetta</p>
         <p className="max-w-xs text-sm text-text-muted">
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>
@@ -226,7 +226,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             {initial}
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-title text-[28px] leading-tight text-brand">{name}</h1>
+            <h1 className="truncate font-title text-[28px] leading-tight text-text">{name}</h1>
             <p className="truncate text-xs text-text-muted">{user.email}</p>
           </div>
           <a

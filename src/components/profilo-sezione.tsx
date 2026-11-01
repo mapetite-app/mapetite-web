@@ -64,7 +64,7 @@ export default function ProfiloSezione({
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 active:bg-surface [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-brand">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className={pannello ? "block font-title text-xl text-brand" : "block font-display text-sm font-semibold text-text"}>{title}</span>
+          <span className={pannello ? "block font-title text-xl text-text" : "block font-display text-sm font-semibold text-text"}>{title}</span>
           {hint && <span className="block truncate text-xs font-sans font-normal text-text-muted">{hint}</span>}
         </span>
         <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-text-muted transition-transform duration-150" />

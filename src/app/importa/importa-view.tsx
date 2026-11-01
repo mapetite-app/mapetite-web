@@ -284,12 +284,12 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     <div className="mx-auto max-w-2xl px-4 py-8">
       {benvenuto ? (
         <>
-          <h1 data-testid="importa-benvenuto" className="mb-1 font-title text-3xl font-semibold text-brand">Porta qui i tuoi posti</h1>
+          <h1 data-testid="importa-benvenuto" className="mb-1 font-title text-3xl font-semibold text-text">Porta qui i tuoi posti</h1>
           <p className="mb-5 text-sm text-text-muted">Incolla i link dei posti salvati su Google Maps, anche tutti insieme.</p>
         </>
       ) : (
         <>
-          <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Aggiungi un posto</h1>
+          <h1 className="mb-1 font-title text-3xl font-semibold text-text">Aggiungi un posto</h1>
           <p className="mb-5 text-sm text-text-muted">Da un reel, da Google Maps, da uno screenshot: in un gesto.</p>
         </>
       )}
@@ -328,7 +328,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       </div>
 
       <section id={PANEL_ID.maps} hidden={panel !== "maps"} className="mt-4 scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-maps-guida">
-        <h2 className="font-title text-xl text-brand">
+        <h2 className="font-title text-xl text-text">
           <span aria-hidden>📍 </span>Da Google Maps
         </h2>
         <ol className="mt-3 space-y-2">
@@ -356,7 +356,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         data-testid="importa-screenshot"
         className={`mt-6 scroll-mt-4 rounded-card border bg-surface p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
       >
-      <h2 className="mb-1 font-title text-xl text-brand">
+      <h2 className="mb-1 font-title text-xl text-text">
         <span aria-hidden>📸 </span>Da uno screenshot
       </h2>
       <p className="text-sm text-text-muted mb-5" data-testid="importa-condividi-android">

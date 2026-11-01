@@ -239,7 +239,7 @@ export default function MultiLinkCard({
 
   return (
     <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-multi">
-      <h2 className="font-title text-xl text-brand">
+      <h2 className="font-title text-xl text-text">
         <span aria-hidden>🔗 </span>I link che hai incollato
       </h2>
       <>

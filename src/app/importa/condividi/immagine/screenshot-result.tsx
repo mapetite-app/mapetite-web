@@ -49,7 +49,7 @@ export default function ScreenshotResult({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 font-title text-3xl font-semibold text-brand">Salva dal reel</h1>
+      <h1 className="mb-6 font-title text-3xl font-semibold text-text">Salva dal reel</h1>
 
       {(piu || lette > 1) && !errore && (
         <p className="mb-4 rounded-btn bg-accent-light px-4 py-3 text-sm font-semibold text-brand" data-testid="screenshot-piu">
