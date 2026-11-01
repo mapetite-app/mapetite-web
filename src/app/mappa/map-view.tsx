@@ -10,6 +10,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
@@ -3313,7 +3314,7 @@ export default function MapView({
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
                 {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className={`mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
-                    {pinName(place.name)}
+                    {nomeLeggibile(pinName(place.name))}
                   </span>
                 )}
               </div>
@@ -3342,7 +3343,7 @@ export default function MapView({
                 <Bookmark size={16} fill="currentColor" aria-hidden />
               </span>
               <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
-                📌 {pinName(p.name)}
+                📌 {nomeLeggibile(pinName(p.name))}
               </span>
             </span>
           </Marker>

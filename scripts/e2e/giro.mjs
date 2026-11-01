@@ -939,7 +939,7 @@ await page.unroute("**/api/search");
   const TIPI = [
     { ...PLACES[0], category: "restaurant", types: ["sushi_restaurant", "japanese_restaurant", "restaurant"] },
     { ...PLACES[1], category: "restaurant", types: ["brazilian_restaurant", "restaurant"] },
-    { ...PLACES[2], category: "restaurant", types: ["restaurant", "food"] },
+    { ...PLACES[2], name: "CASA ENCANTO ROMA", category: "restaurant", types: ["restaurant", "food"] },
   ];
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: TIPI, sintesi_pendente: null } }));
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -950,6 +950,10 @@ await page.unroute("**/api/search");
   const [c1, c2, c3] = [await cop("P1"), await cop("P2"), await cop("P3")];
   ok(c1 === "🍣" && c2 === "🥩" && c3 === "🍝", `emoji dal tipo vero: sushi 🍣, churrascaria 🥩, ristorante generico 🍝 (${c1} ${c2} ${c3})`);
   ok((await pin("P1")).includes("🍣"), `emoji dal tipo vero: anche il segnalino del sushi ha 🍣 (${await pin("P1")})`);
+  // D24: i nomi tutti in maiuscolo di Google si leggono come gli altri (solo in vista: il nome vero non cambia).
+  { const nome = (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("card-risultato").innerText()).includes("Casa Encanto Roma");
+    const p3 = await pin("P3");
+    ok(nome && !p3.includes("CASA") && (p3 === "🍝" || p3.includes("Casa Encanto")), `nomi in maiuscolo: card e segnalino dicono "Casa Encanto Roma" (${p3.replace(/\n/g, " ")})`); }
   await page.unroute("**/api/search");
 }
 

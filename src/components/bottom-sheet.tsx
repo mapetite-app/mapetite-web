@@ -4,6 +4,7 @@ import { fraseDaRecensioni } from "@/lib/frase-recensione";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
@@ -813,7 +814,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
                       </span>
-                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
+                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
                       {(d?.openNow != null || similar || req.length > 0) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
@@ -918,7 +919,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{nomeLeggibile(place.name)}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
