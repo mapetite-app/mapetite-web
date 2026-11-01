@@ -2,22 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, UtensilsCrossed, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { OPINION_LIKE, STATE_TAGS } from "@/lib/tags";
+import { OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
 import { collectionColor, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
-// di stato con i conteggi veri, raccolte come copertine basse (mosaico e nome dentro), "Stasera" come
-// pulsante piccolo accanto a Filtri (non è una raccolta), ordine visibile (Vicino / Recenti), righe con stato, 👍,
+// di stato con i conteggi veri, Filtri, "Stasera" e ordine (Vicino / Recenti) su una sola riga scorrevole,
+// raccolte come copertine basse (mosaico e nome dentro) sotto, righe con lo stato sempre, 👍,
 // verdetto e provenienza sotto il nome, così il nome ha tutta la riga.
 // Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo) sta nel foglio "Filtri"
 // di map-view; la mappa è a un tocco (icona in alto). Nessuna foto: le foto Google non si
@@ -64,7 +64,7 @@ function Copertina({ name, count, preview, on }: { name: string; count: number; 
         )}
       </span>
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight text-white`}>{name}</span>
+        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight text-white`}>{tagDisplay(name)}</span>
         <span className="shrink-0 text-[12px] font-semibold text-white/75">{count}</span>
       </span>
     </span>
@@ -186,7 +186,8 @@ export default function SalvatiLista({
     { label: "Tutti", n: null, on: !stateOn && !collections.some((c) => c.name === activeTag), tag: null },
     { label: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
     { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
-  ];
+    // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
+  ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
   const iconBtn = "flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-text active:scale-95";
 
   return (
@@ -284,18 +285,52 @@ export default function SalvatiLista({
 
         {/* Con una domanda e niente trovato per nome: solo la risposta (una cosa per schermata). */}
         {!soloRisposta && (<>
-        <div role="group" aria-label="Stato" data-testid="salvati-stato" className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
-          {pills.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              aria-pressed={p.on}
-              onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-              className={`min-h-11 shrink-0 rounded-pill px-4 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
-            >
-              {p.n === null ? p.label : `${p.label} ${p.n}`}
+        {/* Revisore 1/11 (terzo giro): una sola riga di comandi, scorrevole, prima delle raccolte: Filtri,
+            stati (senza "Ci sono stato" quando è 0), "Stasera" e l'ordine come una pillola sola "Recenti ▾".
+            Così il primo posto parte entro ~300 px anche con 2 raccolte. */}
+        <div data-testid="salvati-comandi" className="-mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+          <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
+            <SlidersHorizontal size={15} aria-hidden /> Filtri
+            {filtersOn > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 font-display text-[11px] font-bold text-white">{filtersOn}</span>
+            )}
+          </button>
+          {activeCity !== null && (
+            <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 max-w-[160px] shrink-0 items-center gap-1 rounded-pill bg-brand px-3.5 text-[14px] font-semibold text-white active:scale-95">
+              <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
             </button>
-          ))}
+          )}
+          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-2">
+            {pills.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                aria-pressed={p.on}
+                onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
+                className={`min-h-11 shrink-0 rounded-pill px-4 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
+              >
+                {p.n === null ? p.label : `${p.label} ${p.n}`}
+              </button>
+            ))}
+          </div>
+          {/* "Stasera" è uno strumento (non una raccolta): pillola con l'icona a tratto corallo. */}
+          <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#f3c9bd] bg-white px-3.5 text-[14px] font-medium text-[#33373d] active:scale-95">
+            <UtensilsCrossed size={15} strokeWidth={2} aria-hidden className="text-accent" /> Stasera
+          </Link>
+          {/* Ordine in una pillola sola: il menu nativo del telefono sceglie "Vicino" o "Recenti". */}
+          <label className="relative flex min-h-11 shrink-0 items-center rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-[#33373d]">
+            <select
+              data-testid="salvati-ordine"
+              aria-label="Ordina"
+              value={sort}
+              onChange={(e) => { const k = e.target.value as "vicino" | "recenti"; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
+              className="min-h-11 appearance-none rounded-pill bg-transparent pl-3.5 pr-8 focus:outline-none"
+            >
+              <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
+              <option value="recenti">Recenti</option>
+            </select>
+            <ChevronDown size={15} aria-hidden className="pointer-events-none absolute right-3 text-text-muted" />
+          </label>
         </div>
 
         {/* Le raccolte come copertine basse (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima.
@@ -314,7 +349,7 @@ export default function SalvatiLista({
             </span>
           </Link>
         ) : (
-          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
+          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-2.5 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
             {collections.map((c) => {
               const on = activeTag === c.name;
               return (
@@ -323,7 +358,7 @@ export default function SalvatiLista({
                     type="button"
                     data-testid="raccolta-cerchio"
                     aria-pressed={on}
-                    aria-label={`${c.name}, ${c.count} ${c.count === 1 ? "posto" : "posti"}`}
+                    aria-label={`${tagDisplay(c.name)}, ${c.count} ${c.count === 1 ? "posto" : "posti"}`}
                     onClick={() => onTag(on ? null : c.name)}
                     className="block w-full text-left active:scale-[0.97]"
                   >
@@ -341,47 +376,6 @@ export default function SalvatiLista({
           </ul>
         )}
 
-        {/* Ordine, "Stasera" e filtri in una riga: "Vicino" chiede la posizione al tocco, "Stasera" è uno
-            strumento (non una raccolta) e sta qui come pulsante piccolo, "Filtri" è l'unico punto per il resto. */}
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <div role="group" aria-label="Ordina" data-testid="salvati-ordine" className="flex shrink-0 rounded-pill bg-[#ece6dc] p-1">
-            {([["vicino", locating && !origin ? "Cerco…" : "Vicino"], ["recenti", "Recenti"]] as const).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={sort === k}
-                onClick={() => { setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
-                className={`min-h-9 rounded-pill px-3.5 text-[13px] font-medium transition-colors ${sort === k ? "bg-white font-semibold text-text shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-text-muted"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex min-w-0 items-center gap-1">
-            {activeCity !== null && (
-              <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 min-w-0 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
-                <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
-              </button>
-            )}
-            <Link
-              href="/stasera"
-              data-testid="lista-stasera"
-              aria-label="Stasera dove andiamo?"
-              className="flex min-h-11 shrink-0 items-center active:scale-95"
-            >
-              <span className="flex h-9 items-center gap-1 rounded-pill bg-accent-light px-3 text-[13px] font-semibold text-[#b8432a]">
-                <span aria-hidden>🍽️</span> Stasera
-              </span>
-            </Link>
-            <button type="button" data-testid="salvati-lista-filtri" onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill px-2 text-[13px] font-medium text-brand active:scale-95">
-              <SlidersHorizontal size={15} aria-hidden /> Filtri
-              {filtersOn > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 font-display text-[11px] font-bold text-white">{filtersOn}</span>
-              )}
-            </button>
-          </div>
-        </div>
-
         {list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
             <p className={`${SERIF} text-xl font-medium text-text`}>Nessun posto qui</p>
@@ -395,7 +389,7 @@ export default function SalvatiLista({
             </button>
           </div>
         ) : (
-          <ul data-testid="salvati-lista-posti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+          <ul data-testid="salvati-lista-posti" className={`mt-2.5 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
             {list.map((p, i) => {
               const kind = categoryLabel(p.category);
               const city = cityFromAddress(p.address);
@@ -428,16 +422,14 @@ export default function SalvatiLista({
                       {verdict ? (
                         <span data-testid="salvato-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>
                       ) : p.note ? (
-                        <span data-testid="salvato-nota" className="mt-1 line-clamp-2 text-[13px] text-[#4a4f55]">“{p.note}”</span>
+                        <span data-testid="salvato-nota" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>“{p.note}”</span>
                       ) : null}
-                      {(done || want || liked || fonte) && (
-                        <span className="mt-1 flex flex-wrap gap-1.5">
-                          {(done || want) && (
-                            <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
-                              {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <Bookmark size={11} strokeWidth={2.6} aria-hidden />}
-                              {done ? "Ci sono stato" : "Da provare"}
-                            </span>
-                          )}
+                      {/* Lo stato c'è sempre (revisore 1/11): "Salvato" neutro se non è né da provare né visitato. */}
+                      <span className="mt-1 flex flex-wrap gap-1.5">
+                          <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
+                            {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <Bookmark size={11} strokeWidth={2.6} aria-hidden />}
+                            {done ? "Ci sono stato" : want ? "Da provare" : "Salvato"}
+                          </span>
                           {liked && (
                             <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>👍 Piaciuto</span>
                           )}
@@ -446,8 +438,7 @@ export default function SalvatiLista({
                               <SquarePlay size={12} aria-hidden className="text-accent" /> {FONTE_LABEL[fonte]}
                             </span>
                           )}
-                        </span>
-                      )}
+                      </span>
                     </span>
                   </button>
                 </li>
