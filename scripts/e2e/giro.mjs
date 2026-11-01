@@ -1902,6 +1902,9 @@ else {
     // "fuori dai soliti giri", attorno al posto; il posto stesso non torna tra i risultati.
     const nomeQui = ((await p.locator("h2").filter({ hasNotText: /^$/ }).last().textContent()) ?? "").trim();
     let corpoSimili = null;
+    // Prova in produzione del 1/11: "Dai tuoi salvati" riproponeva il posto di partenza. I simili non chiedono ai salvati.
+    let chiestiSimili = 0;
+    await p.route("**/api/salvati/chiedi", (r) => { chiestiSimili++; return r.fulfill({ json: { scelti: [] } }); });
     await p.route("**/api/search", (r) => {
       corpoSimili = r.request().postDataJSON();
       return r.fulfill({ json: { ...SEARCH_FAST, risultati: [...PLACES, mk("PDOPPIO", nomeQui, 41.9005, 12.4905)] } });
@@ -1919,6 +1922,8 @@ else {
     ok(nomi.length >= 1 && !nomi.some((t) => nomeQui && t.includes(nomeQui)) && testo.includes(`Altri come ${nomeQui}`) && pillola.endsWith("simili"),
       `altri come questo: pillola '${pillola}', il posto di partenza (anche con un altro id) non è tra i ${nomi.length} risultati`);
     await p.screenshot({ path: `${OUT}/13d-altri-come-risultati.png`, caret: "initial" });
+    await p.waitForTimeout(600);
+    ok(chiestiSimili === 0 && (await p.getByTestId("dai-salvati").count()) === 0, `altri come questo: nessuna domanda ai salvati, niente "Dai tuoi salvati" (${chiestiSimili} domande)`);
     { const barra = (await p.getByTestId("barra-ricerca").locator("input").inputValue().catch(() => "")) ?? "";
       ok(barra === `Altri come ${nomeQui}`, `altri come questo: nella barra 'Altri come Nome', non la frase lunga ('${barra}')`);
       // Reinviata dalla barra così com'è: è ancora la ricerca dei simili (frase vera, posto escluso).
@@ -1928,6 +1933,7 @@ else {
       const pill2 = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
       ok(/fuori dai soliti giri/.test(corpoSimili?.query ?? "") && pill2.endsWith("simili"), `altri come questo: 'Altri come Nome' reinviata dalla barra rifà la stessa ricerca (${JSON.stringify(corpoSimili?.query)}, '${pill2}')`); }
     await p.unroute("**/api/search");
+    await p.unroute("**/api/salvati/chiedi");
   }, () => ok(false, "com'era: compare dopo 'Ci sono stato'"));
   await p.screenshot({ path: `${OUT}/13b-stato-salvato.png`, caret: "initial" });
   await p.keyboard.press("Escape");
@@ -1935,12 +1941,17 @@ else {
   if (patchedId) {
     let corpoCome = null;
     await p.route("**/api/search", (r) => { corpoCome = r.request().postDataJSON(); return r.fulfill({ json: { ...SEARCH_FAST, risultati: PLACES } }); });
+    let chiestiCome = 0;
+    await p.route("**/api/salvati/chiedi", (r) => { chiestiCome++; return r.fulfill({ json: { scelti: [] } }); });
     await p.waitForLoadState("networkidle").catch(() => {});
     await p.goto(`${BASE}/mappa?come=${patchedId}`, { waitUntil: "networkidle" });
     await p.getByTestId("simile-pillola").waitFor({ timeout: 8000 }).catch(() => {});
     const pill = ((await p.getByTestId("simile-pillola").textContent().catch(() => "")) ?? "").trim();
     ok(corpoCome?.source === "world" && /fuori dai soliti giri/.test(corpoCome?.query ?? "") && /simili$/.test(pill) && !p.url().includes("come="),
       `dal reel: /mappa?come=… apre 'Altri come questo' sul salvato (${JSON.stringify(corpoCome?.query)}, '${pill}')`);
+    await p.waitForTimeout(1500);
+    ok(chiestiCome === 0, `dal reel: 'Altri come questo' non chiede ai salvati, nemmeno quando arrivano dopo la ricerca (${chiestiCome} domande)`);
+    await p.unroute("**/api/salvati/chiedi");
     await p.screenshot({ path: `${OUT}/13e-altri-come-da-link.png`, caret: "initial" });
     await p.unroute("**/api/search");
     // Salvato che non c'è (tolto, altro account): nessuna ricerca a pagamento.
