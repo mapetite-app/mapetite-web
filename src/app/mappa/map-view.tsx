@@ -33,7 +33,7 @@ import { contestoIdee, percheMomento, secondaIdea } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
-import { labelsToHide, pinName } from "@/lib/pin-labels";
+import { posizionaEtichette, pinName, project as projectMercator, type LabelSide, type MapItem } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
@@ -52,6 +52,13 @@ const isDesktop = () => typeof window !== "undefined" && window.matchMedia("(min
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
+// Dove sta il nome rispetto al segnalino (sempre in assoluto: il segnalino resta fermo sul punto).
+const LATO_ETICHETTA: Record<LabelSide, string> = {
+  sotto: "left-1/2 top-full mt-0.5 -translate-x-1/2",
+  destra: "left-full top-1/2 ml-[3px] -translate-y-1/2",
+  sinistra: "right-full top-1/2 mr-[3px] -translate-y-1/2",
+  sopra: "bottom-full left-1/2 mb-0.5 -translate-x-1/2",
+};
 
 // Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
@@ -905,6 +912,8 @@ export default function MapView({
   // sostituisce venueDetails.
   const savedSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
+  // Misure della mappa a schermo, per tenere i nomi dei segnalini dentro il bordo (vedi latiEtichette).
+  const [mapBox, setMapBox] = useState<{ w: number; h: number } | null>(null);
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
   // Stato scelto in scheda prima di aprire Salva ("Da provare" / "Ci sono stato"); vuoto dal segnalibro.
@@ -1831,14 +1840,6 @@ export default function MapView({
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
 
-  // Nomi dei primi risultati senza sovrapposizioni: vince quello più in alto in lista.
-  const hiddenLabels = useMemo(() => {
-    if (topPlaces.length < 2) return new Set<string>();
-    const rank = (id: string) => (id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
-    const ordered = [...topPlaces].sort((a, b) => rank(a.id) - rank(b.id));
-    return labelsToHide(ordered.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, big: p.id === focusId })), viewState.zoom);
-  }, [topPlaces, carouselOrder, focusId, viewState.zoom]);
-
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
     const points = mapPlaces.filter((p) => !top.has(p.id)).map((place) => ({
@@ -1872,6 +1873,58 @@ export default function MapView({
       })),
     ];
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces, topPlaces]);
+
+  // Piccoli segnalibri dei salvati in Esplora (?beta=pin-salvati), tranne quelli già sulla mappa.
+  const pinSalvatiVisti = savedPinsOn && view === "all"
+    ? (() => {
+        const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
+        return savedPlaces.filter((p) => !shown.has(p.id));
+      })()
+    : [];
+
+  // Nomi sulla mappa senza sovrapposizioni (revisore del 1/11): ogni segnalino è un ostacolo, il nome
+  // va sotto, a destra o a sinistra del suo; se non trova posto si nasconde (il segnalino resta).
+  // Sempre in vista: il selezionato, la card al centro e la prima card. La 2ª e la 3ª scelgono per prime
+  // il posto, ma se intorno è tutto pieno si nascondono anche loro: un nome sopra un segnalino è
+  // proprio il difetto da togliere. Calcolo a ogni disegno: pochi segnalini, nessun costo che si senta.
+  const latiEtichette: Record<string, LabelSide> = (() => {
+    const singoli = clusters.filter((c) => !c.properties.cluster).map((c) => c.properties.placeData as Place);
+    const inRicerca = aiSearch !== null && clusterPlaces === null;
+    const conNome = (place: Place) => (inRicerca
+      ? topPlaces.includes(place) || viewState.zoom >= 16
+      : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id;
+    const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
+    const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
+    const items: MapItem[] = [...singoli].sort((a, b) => rank(a.id) - rank(b.id)).map((place) => {
+      const big = selected?.id === place.id || focusId === place.id;
+      const foto = pinPhotoIds.has(place.id) && !!venueDetails[place.id]?.photoRef;
+      return {
+        id: place.id, lat: place.lat, lng: place.lng,
+        size: foto ? (big ? 56 : 44) : big ? 53 : 36,
+        label: conNome(place) ? nomeLeggibile(pinName(place.name)) : null,
+        fixed: fissi.has(place.id),
+      };
+    });
+    for (const { place: p } of dalSalvatiVisti) items.push({ id: `dai-salvati-${p.id}`, lat: p.lat, lng: p.lng, size: 36, label: nomeLeggibile(pinName(p.name)), extraW: 16 });
+    for (const c of clusters) {
+      if (!c.properties.cluster) continue;
+      const n = (c.properties as { point_count: number }).point_count;
+      const [lng, lat] = c.geometry.coordinates;
+      items.push({ id: `gruppo-${(c as { id: number }).id}`, lat, lng, size: 30 + (n / Math.max(1, displayedPlaces.length)) * 30, anchor: "center" });
+    }
+    for (const p of pinSalvatiVisti) items.push({ id: `salvato-${p.id}`, lat: p.lat, lng: p.lng, size: 28 });
+    // Posizioni a schermo dal centro della mappa e dalle sue misure: un nome non esce dal bordo.
+    if (!mapBox) return posizionaEtichette(items, viewState.zoom);
+    const pad = (viewState as { padding?: { top: number; bottom: number; left: number; right: number } }).padding;
+    const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
+    const cx = pad ? pad.left + (mapBox.w - pad.left - pad.right) / 2 : mapBox.w / 2;
+    const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
+    return posizionaEtichette(items, viewState.zoom, {
+      project: (lat, lng) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; },
+      w: mapBox.w,
+      h: mapBox.h,
+    });
+  })();
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
@@ -3247,6 +3300,7 @@ export default function MapView({
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
+        onResize={(e) => { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }}
         onMoveEnd={(evt) => saveLastView({ lat: evt.viewState.latitude, lng: evt.viewState.longitude, zoom: evt.viewState.zoom })}
         onMoveStart={(evt) => {
           if (!(evt as { originalEvent?: unknown }).originalEvent) return;
@@ -3261,8 +3315,9 @@ export default function MapView({
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
         // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
         language="it"
-        onLoad={() => {
+        onLoad={(e) => {
           mapReadyRef.current = true;
+          { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }
           const pending = pendingFitRef.current;
           if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom);
         }}
@@ -3332,7 +3387,7 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
@@ -3376,9 +3431,10 @@ export default function MapView({
                     )}
                   </span>
                 )}
-                {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
-                {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
-                  <span className={`mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
+                {/* Nome solo dove non copre altri segnalini o nomi (vedi latiEtichette). In assoluto: mostrarlo
+                    o nasconderlo non sposta il segnalino, che resta fermo sul punto. */}
+                {latiEtichette[place.id] && (
+                  <span data-testid="etichetta-pin" data-lato={latiEtichette[place.id]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${LATO_ETICHETTA[latiEtichette[place.id]]} ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
                     {nomeLeggibile(pinName(place.name))}
                   </span>
                 )}
@@ -3400,22 +3456,22 @@ export default function MapView({
             style={{ zIndex: 1 }}
             onClick={(e) => { e.originalEvent.stopPropagation(); apriDaiSalvati(p, "pin"); }}
           >
-            <span data-testid="pin-dai-salvati" data-place={p.id} className="flex cursor-pointer flex-col items-center">
+            <span data-testid="pin-dai-salvati" data-place={p.id} className="relative flex cursor-pointer flex-col items-center">
               <span
                 aria-label={`${p.name}, dai tuoi salvati`}
                 className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-brand text-white shadow-float"
               >
                 <Bookmark size={16} fill="currentColor" aria-hidden />
               </span>
-              <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
-                📌 {nomeLeggibile(pinName(p.name))}
-              </span>
+              {latiEtichette[`dai-salvati-${p.id}`] && (
+                <span data-testid="etichetta-pin" data-lato={latiEtichette[`dai-salvati-${p.id}`]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card ${LATO_ETICHETTA[latiEtichette[`dai-salvati-${p.id}`]]}`}>
+                  📌 {nomeLeggibile(pinName(p.name))}
+                </span>
+              )}
             </span>
           </Marker>
         ))}
-        {savedPinsOn && view === "all" && (() => {
-          const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
-          return savedPlaces.filter((p) => !shown.has(p.id)).map((p) => (
+        {pinSalvatiVisti.map((p) => (
             <Marker
               key={`salvato-${p.id}`}
               longitude={p.lng}
@@ -3432,8 +3488,7 @@ export default function MapView({
                 <Bookmark size={14} fill="currentColor" aria-hidden />
               </span>
             </Marker>
-          ));
-        })()}
+          ))}
         {/* Raggio dei Filtri (piano 2.1): cerchio leggero e la sua misura sul bordo, solo con i risultati dei Filtri. */}
         {radiusCircle && (
           <>

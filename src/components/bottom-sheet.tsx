@@ -95,9 +95,9 @@ export interface BottomSheetProps {
   onOpenSaved?: (place: Place) => void;
 }
 
-// Una riga sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la sua
-// scheda; con due o tre si aprono le righe con il perché, preso solo dai dati della persona.
-function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Place; perche: string }[]; onOpen: (place: Place) => void; inline?: boolean }) {
+// "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
+// sua scheda; con due o tre si aprono le righe con il perché, preso solo dai dati della persona.
+function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { items: { place: Place; perche: string }[]; onOpen: (place: Place) => void; inline?: boolean; aligned?: boolean }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   const first = items[0];
@@ -117,8 +117,37 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       </span>
     </button>
   );
+  // Sopra il carosello (revisore del 1/11: riga + card coprivano metà mappa): una pillola alta 44 px,
+  // "📌 2 dei tuoi salvati" che al tocco apre le righe sopra di sé, oppure "📌 Nome" che apre la scheda.
+  // Il perché di un salvato solo resta per i lettori di schermo e nella scheda.
+  if (!inline) {
+    return (
+      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "ml-[13vw] mr-3 lg:mx-5" : "mx-3 lg:mx-5"}`}>
+        {many && open && (
+          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(87vw-0.75rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
+        )}
+        <button
+          type="button"
+          data-testid="dai-salvati-apri"
+          aria-expanded={many ? open : undefined}
+          aria-label={many ? `${items.length} dei tuoi salvati adatti a questa ricerca` : `Dai tuoi salvati: ${first.place.name}. ${first.perche}`}
+          onClick={() => { if (many) setOpen((v) => !v); else onOpen(first.place); }}
+          className={`flex min-h-11 max-w-[calc(100vw-1.5rem)] items-center gap-1.5 rounded-pill px-3.5 text-sm shadow-float active:scale-[0.98] lg:shadow-card ${many && open ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          <span aria-hidden>📌</span>
+          {many ? (
+            <span data-testid="dai-salvati-numero" className={`shrink-0 font-display font-semibold ${open ? "text-white" : "text-brand"}`}>{items.length} dei tuoi salvati</span>
+          ) : (
+            <span className="min-w-0 truncate font-display font-semibold text-brand">{first.place.name}</span>
+          )}
+          {!many && <span data-testid="dai-salvati-perche" className="sr-only">{first.perche}</span>}
+          <span aria-hidden className={`shrink-0 text-base leading-none transition-transform ${many ? (open ? "rotate-90 text-white/80" : "-rotate-90 text-text-muted") : "text-text-muted"}`}>›</span>
+        </button>
+      </div>
+    );
+  }
   return (
-    <div data-testid="dai-salvati" className={`pointer-events-auto ${inline ? "mb-2 rounded-card border border-border bg-white" : "mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface shadow-float lg:mx-5 lg:max-w-[calc(100%-2.5rem)] lg:shadow-none"}`}>
+    <div data-testid="dai-salvati" className="pointer-events-auto mb-2 rounded-card border border-border bg-white">
       <button
         type="button"
         data-testid="dai-salvati-apri"
@@ -129,8 +158,6 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
         <span aria-hidden>📌</span>
         <span className="min-w-0 flex-1">
           {many ? (
-            // Con più salvati il numero e le loro emoji, senza nomi tagliati a metà ("Hostaria Del M… e un
-            // altro", giro del 1/11, D26): i nomi sono a un tocco, nelle righe che si aprono.
             <span className="flex min-w-0 items-center gap-2">
               <span data-testid="dai-salvati-numero" className="shrink-0 font-display font-semibold text-accent">{items.length} dei tuoi salvati</span>
               <span aria-hidden className="flex shrink-0 -space-x-1.5">
@@ -146,7 +173,6 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
               <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
             </span>
           )}
-          {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
           {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
         </span>
         <span aria-hidden className={`shrink-0 pl-1 text-text-muted transition-transform ${many && open ? "rotate-90" : ""}`}>›</span>
@@ -746,7 +772,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {title && headerOpen && optionsPanel}
         </div>}
         {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
-        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} />}
+        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
@@ -795,8 +821,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       onSelect(place);
                     }}
                     data-testid="card-risultato"
-                    // Altezza fissa: verdetto e chip che arrivano dopo non fanno saltare la card.
-                    className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
+                    // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
+                    // insieme), con un minimo; il contenuto sta in basso, sopra resta solo la foto. Prima era
+                    // fissa e alta: con un verdetto corto metà card era vuota (revisore del 1/11).
+                    className="relative flex h-full min-h-[clamp(212px,28dvh,240px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-16 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
                     <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
@@ -825,7 +853,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
                       </span>
-                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
+                      <span data-testid="nome-card" className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
                       {(d?.openNow != null || similar || req.length > 0) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
@@ -846,8 +874,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           )}
                         </span>
                       )}
-                      {/* Spazio del verdetto riservato (2 righe) fin dall'inizio. */}
-                      <span className="mt-1.5 block min-h-10">
+                      {/* Verdetto fino a 2 righe; mentre arriva, il segnaposto tiene le sue 2 righe. */}
+                      <span className="mt-1.5 block">
                         {d?.verdict ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
