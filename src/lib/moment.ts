@@ -23,7 +23,7 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
   if (h >= 11 && h < 15) return weekend ? "🍝 Pranzo della domenica in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";
   if (h >= 18 && h < 21) return day === 5 || day === 6 ? "🍸 Cocktail bar per iniziare la serata" : "🍹 Aperitivo con vista stasera";
-  if (h >= 21) return "🍷 Wine bar tranquillo per stasera";
+  if (h >= 21) return "🍷 Wine bar qui vicino";
   return "🌙 Locale aperto adesso qui vicino";
 }
 

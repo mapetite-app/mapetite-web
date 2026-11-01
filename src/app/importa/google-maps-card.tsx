@@ -128,10 +128,10 @@ export default function GoogleMapsCard({
             data-testid="importa-incolla"
             className="min-h-16 w-full rounded-pill bg-accent px-4 text-lg font-display font-semibold text-white shadow-float active:scale-[0.99] disabled:opacity-60"
           >
-            {busy ? "Salvo..." : "📋 Incolla un link"}
+            {busy ? "Salvo..." : "Incolla un link"}
           </button>
           <p className="mt-2 text-center text-xs text-white/80" data-testid="importa-incolla-fonti">
-            Un posto di Google Maps, un reel, o una chat piena di link.
+            Google Maps, un reel o una chat di link
           </p>
 
           {(showField || pending) ? (
@@ -159,7 +159,7 @@ export default function GoogleMapsCard({
               onClick={() => setShowField(true)}
               className="mt-1 min-h-11 w-full text-center text-sm text-white/80 underline"
             >
-              Oppure incollalo in un riquadro
+              Scrivi o incolla a mano
             </button>
           )}
 

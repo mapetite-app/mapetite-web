@@ -50,6 +50,7 @@ export function secondaIdea(now: Date, weather: Weather | null): IdeaMomento {
       ? { emoji: "🍷", title: "Enoteca con cucina", sub: "Al coperto, per la cena", query: "Enoteca con cucina al coperto per stasera" }
       : { emoji: "🍝", title: "Trattoria di quartiere", sub: "Per la cena, non turistica", query: "Trattoria di quartiere non turistica per stasera" };
   }
-  if (h >= 21) return { emoji: "🍸", title: "Cocktail bar tranquillo", sub: "Per il dopocena", query: "Cocktail bar tranquillo per il dopocena" };
+  // Dopo le 21 la prima idea è già un wine bar: qui un dolce, non un altro bar (revisore 1/11).
+  if (h >= 21) return { emoji: "🍨", title: "Gelato o dolce", sub: "Per il dopocena", query: "Gelateria o pasticceria aperta stasera qui vicino" };
   return { emoji: "🍸", title: "Cocktail bar aperto", sub: "A quest'ora", query: "Cocktail bar aperto adesso qui vicino" };
 }

@@ -2828,19 +2828,19 @@ else {
     ok((await lp.evaluate(() => localStorage.getItem("mapetite-link-google-in-attesa")))?.includes("maps.app.goo.gl/AAA111"), "condividi da disconnessi: il link resta in attesa");
     console.log("SKIP  salva da Google Maps con accesso: dev server senza E2E_FAKE_USER");
   } else {
-    ok(await card.getByRole("button", { name: "📋 Incolla un link" }).isVisible(), "importa: pulsante grande '📋 Incolla un link'");
+    ok(await card.getByRole("button", { name: "Incolla un link", exact: true }).isVisible(), "importa: pulsante grande 'Incolla un link'");
     await lp.screenshot({ path: `${OUT}/30-importa-google.png`, caret: "initial" });
     // Più link negli appunti, uno per riga: prima l'elenco dei posti (lettura simulata), nessun salvataggio da solo.
     const lpreviews = [];
     await lctx.route("**/api/places/link-preview", (route) => { const b = route.request().postDataJSON(); lpreviews.push(b); return route.fulfill({ json: { stato: "riconosciuto", chiamate: 1, place: { id: b.link.includes("BBB") ? "00000000-0000-0000-0000-000000000102" : "00000000-0000-0000-0000-000000000101", name: b.link.includes("BBB") ? "Trattoria Due" : "Bar Rossi", address: "Via Roma 1, Roma" } } }); });
     await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/BBB222"));
-    await card.getByRole("button", { name: "📋 Incolla un link" }).click();
+    await card.getByRole("button", { name: "Incolla un link", exact: true }).click();
     await lp.getByTestId("multi-salva").waitFor({ timeout: 5000 }).catch(() => {});
     ok(apiCalls.length === 0 && lpreviews.length === 2 && await lp.getByTestId("importa-multi").getByText("Trattoria Due").isVisible() && await lp.getByTestId("multi-salva").textContent() === "Salva tutti (2)" && !lwrites.some((w) => w.m === "POST"), "incolla: due link di Google Maps → elenco dei posti trovati e 'Salva tutti (2)', niente salvato da solo");
     await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
     // Un link solo: si salva subito, in un gesto.
     await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111"));
-    await card.getByRole("button", { name: "📋 Incolla un link" }).click();
+    await card.getByRole("button", { name: "Incolla un link", exact: true }).click();
     await card.getByTestId("link-salvato").first().waitFor({ timeout: 5000 });
     ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Bar Rossi").isVisible(), "incolla: un link di Google Maps si salva subito ('Salvato in Mapetite')");
     const posts = lwrites.filter((w) => w.m === "POST");
@@ -2863,7 +2863,7 @@ else {
     const np = await nctx.newPage();
     np.on("pageerror", (e) => errors.push(e.message));
     await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-    await np.getByRole("button", { name: "📋 Incolla un link" }).click();
+    await np.getByRole("button", { name: "Incolla un link", exact: true }).click();
     ok(await np.getByLabel("Link da incollare").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
     await np.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/AAA111");
     await np.getByRole("button", { name: "Salva", exact: true }).click();
@@ -3123,7 +3123,7 @@ if (!fakeUser) {
   // Instagram incollato con un nome nel testo: l'AI legge il testo, una ricerca, "È questo?" se il nome non combacia.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
-  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
+  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
   await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   const sI = mSearch.length;
   const wI = mWrites.length;
@@ -3160,7 +3160,7 @@ if (!fakeUser) {
   // TikTok incollato: si legge il video da solo e si salva se combacia (nessun tocco in più).
   await mp.evaluate(() => sessionStorage.clear());
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
+  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
   const sT = mSearch.length;
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
@@ -3170,7 +3170,7 @@ if (!fakeUser) {
   await gcard.getByTestId("reel-salvato").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
+  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
   await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   await gcard.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
@@ -6622,7 +6622,7 @@ if (fakeUser) {
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
   ok((await mc.count()) === 0, "incolla più link: 'Incolla altri link' torna all'unico Incolla");
   const n0 = previews.length;
-  await mp.getByTestId("importa-google").getByRole("button", { name: "Oppure incollalo in un riquadro" }).click();
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Scrivi o incolla a mano" }).click();
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
