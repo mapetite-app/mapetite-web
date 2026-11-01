@@ -32,6 +32,17 @@ export async function inviaAvviso(sub: Iscrizione, avviso: Avviso): Promise<"ok"
   }
 }
 
+// "Ci vai domani?" (proposta 36): la sera prima di una prenotazione sull'account, a chi non ha ancora
+// risposto. Il tocco apre la home, dove c'è "Sì, ci vado / Non più".
+export function avvisoPrenotazioneDomani(nome: string, ora: string | null): Avviso {
+  return {
+    title: `Domani${ora ? ` alle ${ora}` : ""} da ${nome}`,
+    body: "Ci vai? Se non puoi più, avvisa il locale in un tocco.",
+    url: "/",
+    tag: "prenotazione-domani",
+  };
+}
+
 /** Testo dell'avviso del giorno: "Stasera: Trattoria da Mario" o "Stasera: Da Mario e altri 2". */
 export function avvisoDelGiorno(nomi: string[], sabato: boolean): Avviso {
   const quando = sabato ? "Oggi" : "Stasera";

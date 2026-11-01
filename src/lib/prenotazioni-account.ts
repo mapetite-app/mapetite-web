@@ -51,6 +51,8 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
     disdetta: t(o.disdetta),
     piattaforma: s(o.piattaforma, 40),
   };
+  const ciVado = t(o.ciVado);
+  if (ciVado != null) out.ciVado = ciVado;
   const mod = t(o.modificataAt);
   if (mod != null) out.modificataAt = mod;
   for (const k of ["dismissed", "confirmed", "dismissedEve", "dismissedRisposta"] as const) {

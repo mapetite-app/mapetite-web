@@ -120,6 +120,52 @@ function Doppio({ group, domani }: { group: BookingRequest[]; domani: boolean })
   );
 }
 
+// "Ci vai domani?" (proposta 36, PROBLEMI.md 16): il tavolo vuoto nasce quasi sempre da chi si dimentica
+// di disdire. Il giorno prima una sola domanda: "Sì" chiude il promemoria (e l'avviso non parte),
+// "Non più" apre la disdetta già scritta. Chi ha già risposto non vede più niente fino al giorno stesso.
+function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; onNonPiu: () => void }) {
+  const dettagli = [b.time ? `alle ${b.time}` : null, b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null].filter(Boolean).join(" · ");
+  return (
+    <section data-testid="promemoria-domani" className="rounded-card bg-brand p-4 text-white shadow-card">
+      <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
+        <CalendarCheck size={14} /> Domani{dettagli ? ` ${dettagli}` : ""}
+      </p>
+      <p data-testid="ci-vai-titolo" className="mt-1 flex min-w-0 font-title text-lg font-semibold leading-tight">
+        <span className="truncate">{b.placeName}</span>
+        <span className="shrink-0 whitespace-pre">: ci vai?</span>
+      </p>
+      {!open ? (
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            data-testid="ci-vai-si"
+            onClick={() => { updateBooking(b.id, { ciVado: Date.now() }); trackFeature("ci_vai_domani", { stato: "si" }); }}
+            className="min-h-11 flex-1 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
+          >
+            Sì, ci vado
+          </button>
+          <button
+            type="button"
+            data-testid="ci-vai-non-piu"
+            aria-expanded={open}
+            onClick={() => { onNonPiu(); trackFeature("ci_vai_domani", { stato: "non_piu" }); }}
+            className="min-h-11 flex-1 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white active:scale-95"
+          >
+            Non più
+          </button>
+        </div>
+      ) : (
+        <>
+          <Disdetta b={b} />
+          <button type="button" data-testid="ci-vai-ripensato" onClick={onNonPiu} className="mt-1 min-h-11 text-sm font-display font-semibold text-white/80 underline underline-offset-2">
+            Indietro
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
@@ -158,28 +204,30 @@ export default function BookingReminder() {
       {doppi.map(({ group, domani }) => (
         <Doppio key={group.map((b) => b.id).join()} group={group} domani={domani} />
       ))}
-      {prossime.map(({ b, domani }) => (
-        <section key={b.id} data-testid={domani ? "promemoria-domani" : "promemoria-oggi"} className="rounded-card bg-brand p-4 text-white shadow-card">
+      {prossime.map(({ b, domani }) => (domani ? (
+        <CiVaiDomani key={b.id} b={b} open={cancelling === b.id} onNonPiu={() => setCancelling(cancelling === b.id ? null : b.id)} />
+      ) : (
+        <section key={b.id} data-testid="promemoria-oggi" className="rounded-card bg-brand p-4 text-white shadow-card">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                <CalendarCheck size={14} /> {domani ? "Domani" : "Oggi"}{b.time ? ` alle ${b.time}` : ""}
+                <CalendarCheck size={14} /> Oggi{b.time ? ` alle ${b.time}` : ""}
               </p>
               <p className="mt-1 truncate font-title text-lg font-semibold leading-tight">{b.placeName}</p>
               <p className="mt-0.5 text-sm font-sans text-white/80">
                 {b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"} · ` : ""}{VIA[b.via]}
               </p>
             </div>
-            <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, domani ? { dismissedEve: true } : { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
+            <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
               <X size={16} />
             </button>
           </div>
           <p className="mt-2 text-xs font-sans text-white/70">
-            {domani ? "Se non puoi più andare, avvisa il locale: libera il tavolo per qualcun altro." : "La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate."}{" "}
+            La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.{" "}
             <Link href="/prenotazioni" data-testid="promemoria-tutte" className="font-semibold text-white underline underline-offset-2">Le mie prenotazioni</Link>
           </p>
           <div className="mt-3 flex gap-2">
-            {!domani && b.lat != null && b.lng != null && (
+            {b.lat != null && b.lng != null && (
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
                 target="_blank"
@@ -202,7 +250,7 @@ export default function BookingReminder() {
           </div>
           {cancelling === b.id && <Disdetta b={b} />}
         </section>
-      ))}
+      )))}
       {howWasIt.slice(0, 1).map((b) => (
         <section key={b.id} data-testid="promemoria-com-e-andata" className="rounded-card border border-border bg-surface p-4 shadow-card">
           <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Com&apos;è andata?</p>
