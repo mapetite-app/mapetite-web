@@ -1332,12 +1332,16 @@ await shot("18-login");
 await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
 ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-// Feedback 16/10 ("il dono della sintesi"): un solo pulsante Incolla in cima, poi 4 tessere che aprono il proprio pannello.
+// Feedback 16/10 ("il dono della sintesi") e giro 1/11: un solo pulsante Incolla in cima, poi "Altri modi" in 3 righe compatte.
 ok(await page.getByTestId("importa-incolla").isVisible() && (await page.getByRole("button", { name: /Incolla/ }).count()) === 1, "importa: un solo pulsante Incolla, in cima");
 { const tiles = await page.getByTestId("importa-tessere").getByRole("button").allTextContents();
-  ok(tiles.length === 4 && ["Da Google Maps", "Da file di Google", "Da screenshot", "A mano"].every((t, i) => tiles[i]?.includes(t)), `importa: 4 tessere Da Google Maps · Da file di Google · Da screenshot · A mano (${tiles.length})`); }
+  ok(tiles.length === 3 && ["Da uno screenshot", "Scrivi il nome", "Tutti i salvati di Google Maps"].every((t, i) => tiles[i]?.includes(t)), `importa: 3 righe Da uno screenshot · Scrivi il nome · Tutti i salvati di Google Maps (${tiles.length})`); }
+ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page.getByText("Da file di Google", { exact: true }).count()) === 0, "importa: niente tessera 'Da Google Maps' (doppione di Incolla, giro D50) né 'Da file di Google' (D51)");
 { const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
-  ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 * 1.05, `importa: Incolla grande sopra le tessere, tutto nel primo schermo (${Math.round(inc?.height ?? 0)}px, tessere fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+  const rh = await page.getByTestId("importa-tessera-shot").boundingBox();
+  ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 - 64 && rh && rh.height <= 72, `importa: Incolla grande sopra 'Altri modi', righe compatte, tutto sopra la barra (${Math.round(inc?.height ?? 0)}px, righe ${Math.round(rh?.height ?? 0)}px, fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+{ const look = await page.evaluate(() => ({ h1: getComputedStyle(document.querySelector("h1")).fontFamily, bg: getComputedStyle(document.querySelector("[data-testid=importa-pagina]")).backgroundColor }));
+  ok(/newsreader/i.test(look.h1) && look.bg === "rgb(248, 246, 242)", `importa: titolo nel serif e fondo beige di home e salvati (giro D7, D52) (${look.h1.slice(0, 30)}, ${look.bg})`); }
 ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
 await page.getByTestId("importa-tessera-shot").click();
 ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getByTestId("importa-tessera-shot").getAttribute("aria-expanded")) === "true", "importa: la tessera 'Da screenshot' apre il pannello con il pulsante in italiano");
@@ -2626,10 +2630,12 @@ else {
 
   await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const card = lp.getByTestId("importa-google");
-  await lp.getByTestId("importa-tessera-maps").click();
   const guida = lp.getByTestId("importa-maps-guida");
-  ok(await guida.getByText("Da Google Maps").isVisible(), "importa: la tessera 'Da Google Maps' apre la sua guida");
-  ok((await guida.locator("ol li").count()) === 3 && await guida.getByText("Tocca Condividi → Copia link").isVisible(), "importa: tre passi numerati in italiano");
+  if (fakeUser) {
+    ok((await guida.count()) === 0, "importa: la guida 'Come copio il link?' è chiusa all'inizio");
+    await lp.getByTestId("salva-telefono-apri").click();
+    ok(await guida.isVisible() && (await guida.getByTestId("salva-telefono-passo").count()) === 2 && await guida.getByText("Condividi → Copia link", { exact: false }).isVisible() && await guida.getByText("Google Maps", { exact: false }).first().isVisible(), "importa: 'Come copio il link?' apre l'unica guida (Google Maps: Condividi → Copia link)");
+  }
   const cardTop = (await card.boundingBox())?.y ?? 9999;
   const shotTop = (await lp.getByTestId("importa-tessera-shot").boundingBox())?.y ?? 0;
   ok(cardTop < shotTop, "importa: 'Incolla un link' viene prima dello screenshot");
@@ -2643,13 +2649,21 @@ else {
   } else {
     ok(await card.getByRole("button", { name: "📋 Incolla un link" }).isVisible(), "importa: pulsante grande '📋 Incolla un link'");
     await lp.screenshot({ path: `${OUT}/30-importa-google.png`, caret: "initial" });
-    // Più link negli appunti, uno per riga.
+    // Più link negli appunti, uno per riga: prima l'elenco dei posti (lettura simulata), nessun salvataggio da solo.
+    const lpreviews = [];
+    await lctx.route("**/api/places/link-preview", (route) => { const b = route.request().postDataJSON(); lpreviews.push(b); return route.fulfill({ json: { stato: "riconosciuto", chiamate: 1, place: { id: b.link.includes("BBB") ? "00000000-0000-0000-0000-000000000102" : "00000000-0000-0000-0000-000000000101", name: b.link.includes("BBB") ? "Trattoria Due" : "Bar Rossi", address: "Via Roma 1, Roma" } } }); });
     await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/BBB222"));
     await card.getByRole("button", { name: "📋 Incolla un link" }).click();
-    await card.getByTestId("link-salvato").nth(1).waitFor({ timeout: 5000 });
-    ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Trattoria Due").isVisible(), "incolla: più link salvati in una volta ('Salvato in Mapetite')");
+    await lp.getByTestId("multi-salva").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(apiCalls.length === 0 && lpreviews.length === 2 && await lp.getByTestId("importa-multi").getByText("Trattoria Due").isVisible() && await lp.getByTestId("multi-salva").textContent() === "Salva tutti (2)" && !lwrites.some((w) => w.m === "POST"), "incolla: due link di Google Maps → elenco dei posti trovati e 'Salva tutti (2)', niente salvato da solo");
+    await lp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+    // Un link solo: si salva subito, in un gesto.
+    await lp.evaluate(() => navigator.clipboard.writeText("https://maps.app.goo.gl/AAA111"));
+    await card.getByRole("button", { name: "📋 Incolla un link" }).click();
+    await card.getByTestId("link-salvato").first().waitFor({ timeout: 5000 });
+    ok(await card.getByText("Salvato in Mapetite:").first().isVisible() && await card.getByText("Bar Rossi").isVisible(), "incolla: un link di Google Maps si salva subito ('Salvato in Mapetite')");
     const posts = lwrites.filter((w) => w.m === "POST");
-    ok(posts.length === 2 && posts.every((w) => JSON.stringify(w.body?.tags) === '["Da provare"]'), "incolla: salvati con stato 'Da provare' (📌 Voglio andarci)");
+    ok(posts.length === 1 && posts.every((w) => JSON.stringify(w.body?.tags) === '["Da provare"]'), "incolla: salvato con stato 'Da provare' (📌 Voglio andarci)");
     ok((await card.getByRole("link", { name: "Apri sulla mappa" }).first().getAttribute("href")) === "/mappa?salvato=00000000-0000-0000-0000-000000000100", "incolla: 'Apri sulla mappa' apre il salvato");
     await card.getByRole("button", { name: "Aggiungi nota" }).first().click();
     await card.getByLabel("Nota").fill("Consigliato da Giulia");
@@ -2670,7 +2684,7 @@ else {
     await np.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
     await np.getByRole("button", { name: "📋 Incolla un link" }).click();
     ok(await np.getByLabel("Link da incollare").waitFor({ timeout: 3000 }).then(() => true, () => false), "incolla senza permesso: compare il campo per incollare a mano");
-    await np.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/AAA111\nhttps://maps.app.goo.gl/ERR999");
+    await np.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/AAA111");
     await np.getByRole("button", { name: "Salva", exact: true }).click();
     await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
     ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
@@ -6264,21 +6278,27 @@ else {
   await actxS.close();
 }
 
-// 11. Incolla più link (piano 3.2): chat di WhatsApp con tanti link → lista con lo stato di ciascuno →
-//     "Salva gli N riconosciuti" in una raccolta. API simulata: nessuna chiamata Google.
+// 11. Incolla più link (piano 3.2, rifatto il 1/11): chat di WhatsApp con tanti link → avviso sulla quota
+//     (10 per volta) → elenco dei posti trovati → "Salva tutti" con l'avanzamento → riepilogo
+//     "Salvati · Già nei tuoi posti · Non trovati" → raccolta proposta dopo → non trovati da cercare a mano.
+//     API simulata: nessuna chiamata Google.
 if (fakeUser) {
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
   const mevents = [];
   await mctx.route("**/api/events", (r) => { mevents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   const SAVED_ID = "00000000-0000-4000-8000-0000000005a1";
   const minserts = [];
-  await mctx.route("**/rest/v1/saved_places**", (r) => {
+  const mpatches = [];
+  await mctx.route("**/rest/v1/saved_places**", async (r) => {
     const req = r.request();
-    if (req.method() === "POST") { minserts.push(req.postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    if (req.method() === "POST") { await new Promise((res) => setTimeout(res, 60)); minserts.push(req.postDataJSON()); return r.fulfill({ status: 201, body: "" }); }
+    if (req.method() === "PATCH") { mpatches.push({ url: req.url(), body: req.postDataJSON() }); return r.fulfill({ status: 204, body: "" }); }
     return r.fulfill({ json: [{ place_id: SAVED_ID, tags: ["Da provare", "Weekend"] }] });
   });
+  const mSearchQ = [];
+  await mctx.route("**/api/places/search", (r) => { mSearchQ.push(r.request().postDataJSON()?.query); return r.fulfill({ json: { results: [] } }); });
   const previews = [];
-  let inflight = 0, maxInflight = 0, spent = 0;
+  let inflight = 0, maxInflight = 0, spent = 0, confAsked = 0;
   await mctx.route("**/api/places/link-preview", async (r) => {
     const body = r.request().postDataJSON() ?? {};
     previews.push(body);
@@ -6292,6 +6312,7 @@ if (fakeUser) {
     if (link.includes("AAA111") || link.includes("DUPA11")) out = { stato: "riconosciuto", chiamate: 0, place: place("a1", "Bar Rossi", "Via Roma 1, Roma, Italia") };
     else if (link.includes("SAVED9")) out = { stato: "riconosciuto", chiamate: 0, place: { id: SAVED_ID, name: "Osteria Già Mia", address: "Via dei Salvati 2, Roma" } };
     else if (link.includes("BBB222")) out = body.budget >= 1 ? { stato: "riconosciuto", chiamate: 1, place: place("b2", "Trattoria Due", "") } : { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google: toccalo per riconoscerlo.", nome: "Trattoria Due" };
+    else if (link.includes("CONF77")) out = confAsked++ === 0 ? { stato: "da_confermare", chiamate: 0, motivo: "Google non risponde in questo momento: riprova tra poco.", nome: "Enoteca Ferma" } : { stato: "riconosciuto", chiamate: 1, place: place("f7", "Enoteca Ferma") };
     else if (link.includes("ERR")) out = { stato: "non_riconosciuto", chiamate: 0, motivo: "Il link non si apre: copialo di nuovo da Google Maps." };
     else {
       const n = link.match(/C(\d\d)/)?.[1] ?? "0";
@@ -6310,12 +6331,13 @@ if (fakeUser) {
   const chat = [
     "[15/10/26, 21:02:11] Lorenzo: Da provare! https://maps.app.goo.gl/AAA111",
     "[15/10/26, 21:03:40] Lorenzo: https://maps.app.goo.gl/BBB222",
+    "https://maps.app.goo.gl/CONF77",
     "[15/10/26, 21:05:02] Lorenzo: Pizzeria Ai Marmi Roma https://www.instagram.com/reel/XYZ123/",
     "15/10/26, 21:06 - Lorenzo: guarda https://vm.tiktok.com/ZMabc12/",
     "https://maps.app.goo.gl/SAVED9 (questo l'avevo già)",
     "https://maps.app.goo.gl/DUPA11",
     "https://example.com/articolo-sui-bar",
-    "https://maps.app.goo.gl/ERR999",
+    "Gelateria Sette https://maps.app.goo.gl/ERR999",
     ...Array.from({ length: 11 }, (_, i) => `https://maps.app.goo.gl/C${String(i + 1).padStart(2, "0")}x`),
     "di nuovo https://maps.app.goo.gl/AAA111",
   ].join("\n");
@@ -6323,68 +6345,91 @@ if (fakeUser) {
   await mp.getByTestId("importa-incolla").click();
   await mc.waitFor({ timeout: 4000 }).catch(() => {});
   ok(await yOf("importa-google") < await yOf("importa-multi") && await yOf("importa-multi") < await yOf("importa-tessere"), "incolla più link: tanti link misti dall'unico Incolla aprono la lista, subito sotto");
+  // Tanti link di Google Maps: prima l'avviso sulla quota, nessuna chiamata finché non si tocca.
+  const avviso = mc.getByTestId("multi-avviso");
+  await avviso.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await avviso.isVisible() && (await avviso.textContent()).includes("ne leggo 10 per volta") && await mc.getByTestId("multi-avvia").textContent() === "Leggi i primi 10" && previews.length === 0,
+    `incolla più link: 17 link di Google Maps → prima l'avviso sulla quota ('ne leggo 10 per volta'), nessuna ricerca prima del tocco (${previews.length})`);
+  ok((await mc.getByTestId("multi-riga").count()) === 20 && (await mc.getByTestId("multi-riga").first().textContent()).includes("In coda"), "incolla più link: l'elenco dei 20 link si vede già prima di partire");
+  await mp.screenshot({ path: `${OUT}/multi-link-avviso.png`, caret: "initial" });
+  await mc.getByTestId("multi-avvia").click();
   await mc.getByTestId("multi-avanzamento").waitFor({ timeout: 4000 }).catch(() => {});
   const progress = await mc.getByTestId("multi-avanzamento").textContent().catch(() => "");
-  ok(/Leggo i link… \d+ di 19/.test(progress), `incolla più link: avanzamento mentre legge ("${progress.trim()}")`);
+  ok(/Leggo i posti… \d+ di 10/.test(progress), `incolla più link: avanzamento mentre legge, 10 per volta ("${progress.trim()}")`);
   await mp.screenshot({ path: `${OUT}/multi-link-lettura.png`, caret: "initial" });
   await mc.getByTestId("multi-riepilogo").waitFor({ timeout: 15000 });
   const rows = mc.getByTestId("multi-riga");
-  const stati = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-stato")));
+  let stati = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-stato")));
   const by = (s) => stati.filter((x) => x === s).length;
-  ok(stati.length === 19, `incolla più link: 19 link diversi trovati nella chat, il doppione dello stesso link tolto (${stati.length})`);
+  ok(stati.length === 20, `incolla più link: 20 link diversi trovati nella chat, il doppione dello stesso link tolto (${stati.length})`);
   ok(maxInflight <= 2, `incolla più link: al massimo 2 link letti insieme (${maxInflight})`);
-  ok(spent <= 6 && spent >= 5 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: tetto di 6 chiamate Google per import (${spent})`);
-  const R = by("riconosciuto");
-  const label = (n) => `Salva ${String(n).startsWith("8") || n === 11 ? "gli" : "i"} ${n} riconosciuti`;
-  ok(R === 1 + spent && by("da_confermare") === 2 + (12 - spent) && by("gia_salvato") === 1 && by("doppione") === 1 && by("non_riconosciuto") === 2,
-    `incolla più link: stati riconosciuto/da confermare/già salvato/non riconosciuto (${JSON.stringify(Object.fromEntries([...new Set(stati)].map((s) => [s, by(s)])))})`);
+  ok(previews.length === 10 && spent === 5 && previews.every((b) => b.budget >= 0 && b.budget <= 2), `incolla più link: primo giro di 10 link di Maps, 5 ricerche Google (${previews.length}, ${spent})`);
+  ok(by("riconosciuto") === 6 && by("da_confermare") === 3 && by("gia_salvato") === 1 && by("doppione") === 1 && by("non_riconosciuto") === 2 && by("dopo") === 7,
+    `incolla più link: stati trovato/da confermare/già salvato/non trovato/prossimo giro (${JSON.stringify(Object.fromEntries([...new Set(stati)].map((s) => [s, by(s)])))})`);
   ok(previews.every((b) => !/instagram|tiktok|example/.test(b.link)), "incolla più link: Instagram, TikTok e altri siti non partono da soli");
+  ok(await mc.getByTestId("multi-prossimo-giro").isVisible() && await mc.getByTestId("multi-altri").textContent() === "Leggi gli altri 7", "incolla più link: i 7 link rimasti aspettano un tocco ('Leggi gli altri 7')");
+  await mc.getByTestId("multi-altri").click();
+  await mc.getByTestId("multi-prossimo-giro").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  await mc.getByTestId("multi-riepilogo").waitFor({ timeout: 15000 });
+  stati = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-stato")));
+  ok(previews.length === 17 && spent === 12 && by("riconosciuto") === 13 && by("dopo") === 0, `incolla più link: secondo giro con gli altri 7 (${previews.length} link letti, ${spent} ricerche, ${by("riconosciuto")} trovati)`);
   const first = rows.nth(0);
-  ok((await first.textContent()).includes("Bar Rossi") && (await first.textContent()).includes("Via Roma 1, Roma") && !(await first.textContent()).includes("Italia"), "incolla più link: riconosciuto con nome e indirizzo");
+  ok((await first.textContent()).includes("Bar Rossi") && (await first.textContent()).includes("Via Roma 1, Roma") && !(await first.textContent()).includes("Italia"), "incolla più link: trovato con nome e indirizzo");
   ok((await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Osteria Già Mia") && (await mc.locator('[data-stato="gia_salvato"]').textContent()).includes("Già salvato"), "incolla più link: chi è già nei salvati è 'Già salvato'");
   const ig = mc.locator('[data-stato="da_confermare"]').filter({ hasText: "Instagram" });
   ok(await ig.getByRole("button", { name: "Carica uno screenshot" }).isVisible() && await ig.getByRole("button", { name: "Cerca “Pizzeria Ai Marmi Roma”" }).isVisible(), "incolla più link: Instagram da confermare, con screenshot e 'Cerca' dal testo della chat");
   ok(await mc.locator('[data-stato="da_confermare"]').filter({ hasText: "TikTok" }).getByRole("button", { name: "✨ Trova dal video" }).isVisible(), "incolla più link: TikTok da confermare con 'Trova dal video'");
-  ok(await mc.getByTestId("multi-salva").textContent() === label(R), `incolla più link: pulsante unico '${await mc.getByTestId("multi-salva").textContent()}'`);
-  const opts = await mp.locator("#multi-raccolta option").allTextContents();
-  ok(opts.includes("📁 Weekend") && opts.some((o) => o.startsWith("＋ Nuova raccolta")), `incolla più link: scelta tra le raccolte esistenti o una nuova (${opts.join(" | ")})`);
+  ok(await mc.locator('[data-stato="non_riconosciuto"]').filter({ hasText: "Gelateria Sette" }).getByTestId("multi-cerca").textContent() === "Cerca “Gelateria Sette”", "incolla più link: non trovato → 'Cerca “Gelateria Sette”' col nome scritto nella chat");
+  // Da confermare (Google non rispondeva): un tocco lo riconosce.
+  await mc.locator('[data-stato="da_confermare"]').filter({ hasText: "Enoteca Ferma" }).getByTestId("multi-conferma").click();
+  await mc.getByTestId("multi-salva").getByText("Salva tutti (14)").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(previews.at(-1).budget === 2 && previews.at(-1).link.includes("CONF77") && await mc.getByTestId("multi-salva").textContent() === "Salva tutti (14)", "incolla più link: 'Riconosci' su un link da confermare, poi 'Salva tutti (14)'");
+  const riep = await mc.getByTestId("multi-riepilogo").textContent();
+  ok(riep === "14 da salvare · 1 già nei tuoi posti · 2 non trovati · 2 da guardare", `incolla più link: riepilogo in una riga prima di salvare ("${riep}")`);
+  { const sb = await mc.getByTestId("multi-salva").boundingBox(); const lb = await mc.getByTestId("multi-lista").boundingBox();
+    ok(sb && lb && sb.y < lb.y, "incolla più link: 'Salva tutti' sta sopra l'elenco, senza scorrere fino in fondo"); }
+  ok((await mp.locator("#multi-raccolta").count()) === 0, "incolla più link: niente scelta della raccolta prima di salvare (si propone dopo)");
   await mp.screenshot({ path: `${OUT}/multi-link-lista.png`, caret: "initial", fullPage: true });
-
-  // Oltre il tetto: un tocco riconosce un link alla volta.
-  const before = previews.length;
-  await mc.getByTestId("multi-conferma").first().click();
-  await mc.getByTestId("multi-salva").getByText(label(R + 1)).waitFor({ timeout: 4000 }).catch(() => {});
-  ok(previews.length === before + 1 && previews.at(-1).budget === 2 && await mc.getByTestId("multi-salva").textContent() === label(R + 1), "incolla più link: 'Riconosci' su un link da confermare, uno per uno");
 
   // 360px: niente scroll orizzontale.
   await mp.setViewportSize({ width: 360, height: 780 });
   const mx = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   ok(mx <= 0, `incolla più link 360px: nessuno scroll orizzontale (${mx}px)`);
-  await mc.getByTestId("multi-salva").scrollIntoViewIfNeeded();
-  await mp.screenshot({ path: `${OUT}/multi-link-360.png`, caret: "initial" });
   await mp.setViewportSize({ width: 390, height: 844 });
 
-  // Salva tutto in una raccolta nuova.
-  await mp.locator("#multi-raccolta").selectOption("__nuova__");
-  await mc.getByLabel("Nome della nuova raccolta").fill("Viaggio a Milano");
+  // Salva tutti: avanzamento "Salvo… N di 14", poi il riepilogo finale.
   await mc.getByTestId("multi-salva").click();
+  const sav = await mc.getByTestId("multi-salvataggio").textContent({ timeout: 3000 }).catch(() => "");
+  ok(/Salvo… \d+ di 14/.test(sav), `incolla più link: avanzamento mentre salva ("${sav}")`);
   await mc.getByTestId("multi-fatto").waitFor({ timeout: 8000 });
-  ok(minserts.length === R + 1 && minserts.every((b) => JSON.stringify(b.tags) === '["Da provare","Viaggio a Milano"]' && b.user_id === "00000000-0000-0000-0000-000000000001") && !minserts.some((b) => b.place_id === SAVED_ID) && new Set(minserts.map((b) => b.place_id)).size === R + 1,
-    `incolla più link: salvati tutti una volta sola, nella raccolta scelta, mai il già salvato (${minserts.length})`);
-  ok((await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 1} locali salvati in “Viaggio a Milano”`) && await mc.getByRole("link", { name: "Apri la raccolta" }).getAttribute("href") === "/raccolte/Viaggio%20a%20Milano", "incolla più link: conferma con link alla raccolta");
+  ok(minserts.length === 14 && minserts.every((b) => JSON.stringify(b.tags) === '["Da provare"]' && b.user_id === "00000000-0000-0000-0000-000000000001") && !minserts.some((b) => b.place_id === SAVED_ID) && new Set(minserts.map((b) => b.place_id)).size === 14,
+    `incolla più link: salvati tutti una volta sola in 'Voglio andarci', mai il già salvato (${minserts.length})`);
+  const fatto = await mc.getByTestId("multi-fatto-riepilogo").textContent();
+  ok(fatto.includes("Salvati 14 · Già nei tuoi posti 1 · Non trovati 2"), `incolla più link: riepilogo finale "Salvati 14 · Già nei tuoi posti 1 · Non trovati 2" ("${fatto}")`);
+  const today = new Date();
+  const sugg = await mp.getByLabel("Nome della raccolta").inputValue();
+  ok(sugg === `Importati il ${today.getDate()}/${today.getMonth() + 1}` && await mc.getByTestId("multi-raccolta-crea").textContent() === "Crea", `incolla più link: dopo il salvataggio propone una raccolta, nome suggerito con la data (città diverse) ("${sugg}")`);
+  ok(await mc.getByTestId("multi-da-sistemare").isVisible() && (await rows.count()) === 4 && (await rows.evaluateAll((els) => els.every((e) => ["non_riconosciuto", "da_confermare"].includes(e.getAttribute("data-stato"))))), "incolla più link: sotto il riepilogo restano solo i 4 da sistemare");
   await mc.getByTestId("multi-fatto").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${OUT}/multi-link-salvati.png`, caret: "initial" });
+  // Un tocco: tutti i posti appena salvati vanno nella raccolta (una sola scrittura).
+  await mp.getByLabel("Nome della raccolta").fill("Viaggio a Milano");
+  await mc.getByTestId("multi-raccolta-crea").click();
+  await mc.getByTestId("multi-raccolta-fatta").waitFor({ timeout: 4000 }).catch(() => {});
+  const pa = mpatches.at(-1);
+  ok(mpatches.length === 1 && JSON.stringify(pa?.body?.tags) === '["Da provare","Viaggio a Milano"]' && decodeURIComponent(pa.url).includes("place_id=in.(") && minserts.every((b) => decodeURIComponent(pa.url).includes(b.place_id)) && !decodeURIComponent(pa.url).includes(SAVED_ID),
+    "incolla più link: 'Crea' mette nella raccolta solo i posti appena importati, in una scrittura");
+  ok(await mc.getByTestId("multi-raccolta-fatta").textContent() === "Nella raccolta “Viaggio a Milano”." && await mc.getByRole("link", { name: "Apri la raccolta" }).getAttribute("href") === "/raccolte/Viaggio%20a%20Milano", "incolla più link: conferma con link alla raccolta");
   const fe = mevents.filter((e) => e?.type === "funzione" && e.props?.nome === "import_multiplo");
-  ok(fe.some((e) => e.props.risultati === 19 && e.props.contesto === "letti") && fe.some((e) => e.props.risultati === R + 1 && e.props.contesto === "salvati_raccolta"), `incolla più link: tracciato 'import_multiplo' con i numeri (${fe.map((e) => `${e.props.contesto}:${e.props.risultati}`).join(", ")})`);
+  ok(fe.some((e) => e.props.risultati === 20 && e.props.contesto === "letti") && fe.some((e) => e.props.risultati === 14 && e.props.contesto === "salvati") && fe.some((e) => e.props.risultati === 14 && e.props.contesto === "salvati_raccolta"), `incolla più link: tracciato 'import_multiplo' con i numeri (${fe.map((e) => `${e.props.contesto}:${e.props.risultati}`).join(", ")})`);
   ok(droppedKeys(fe).length === 0 && !JSON.stringify(fe).includes("goo.gl") && !JSON.stringify(fe).includes("instagram"), "incolla più link: nei segnali niente link, solo chiavi accettate");
 
-  // Dopo il salvataggio si può ancora riconoscere un link rimasto e salvarlo.
-  const ins0 = minserts.length;
-  await mc.getByTestId("multi-conferma").first().click();
-  await mc.getByTestId("multi-salva").waitFor({ timeout: 4000 }).catch(() => {});
-  await mc.getByTestId("multi-salva").click().catch(() => {});
-  await mc.getByTestId("multi-fatto").getByText(`${R + 2} locali salvati`).waitFor({ timeout: 4000 }).catch(() => {});
-  ok(minserts.length === ins0 + 1 && (await mc.getByTestId("multi-fatto").textContent()).includes(`${R + 2} locali salvati`), "incolla più link: un link riconosciuto dopo si salva con un secondo tocco");
+  // Non trovato: "Cerca" apre "Scrivi il nome" con il nome già scritto e lo cerca.
+  await mc.locator('[data-stato="non_riconosciuto"]').filter({ hasText: "Gelateria Sette" }).getByTestId("multi-cerca").click();
+  await mp.getByTestId("importa-mano").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await mp.getByTestId("importa-mano").isVisible() && await mp.getByTestId("importa-mano").getByLabel("Nome del locale e città").inputValue() === "Gelateria Sette", "incolla più link: 'Cerca' su un non trovato apre la ricerca a mano col nome già scritto");
+  await mp.waitForTimeout(400);
+  ok(mSearchQ.at(-1) === "Gelateria Sette", `incolla più link: la ricerca a mano parte col nome (${mSearchQ.at(-1)})`);
 
   // Testo senza link: spiegato in italiano, nessuna chiamata.
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
@@ -6394,6 +6439,15 @@ if (fakeUser) {
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+
+  // Pochi link (2 di Google Maps): niente avviso, si leggono subito; raccolta proposta col nome della città.
+  await mp.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/C01y\nhttps://maps.app.goo.gl/C02y");
+  await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+  await mc.getByTestId("multi-salva").waitFor({ timeout: 6000 }).catch(() => {});
+  ok((await mc.getByTestId("multi-avviso").count()) === 0 && previews.length === n0 + 2 && await mc.getByTestId("multi-salva").textContent() === "Salva tutti (2)", "incolla più link: 2 link di Google Maps si leggono subito, senza avviso, poi 'Salva tutti (2)'");
+  await mc.getByTestId("multi-salva").click();
+  await mc.getByTestId("multi-fatto").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(await mp.getByLabel("Nome della raccolta").inputValue().catch(() => "") === "Roma", "incolla più link: posti tutti della stessa città → raccolta proposta 'Roma'");
   await mctx.close();
 } else {
   console.log("SKIP  incolla più link: dev server senza E2E_FAKE_USER");
@@ -7416,7 +7470,7 @@ if (fakeUser) {
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await tp.getByTestId("importa-tessera-file").click();
   const tc = tp.getByTestId("importa-file");
-  ok(await tc.getByText("Carica il file di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
+  ok(await tc.getByText("Tutti i salvati di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
   await tp.getByTestId("file-aiuto").click();
   const passi = await tp.getByTestId("file-passi").textContent();
   ok(passi.includes("takeout.google.com") && passi.includes("Saved Places.json") && (await tp.getByTestId("file-passi").locator("li").count()) === 3 && (await tp.getByRole("link", { name: "takeout.google.com" }).getAttribute("href")) === "https://takeout.google.com/", "file Takeout: 3 passi con il link a takeout.google.com");
@@ -7488,7 +7542,7 @@ else {
   const guide = ip.getByTestId("salva-telefono");
   await guide.waitFor({ timeout: 5000 }).catch(() => {});
   ok(await guide.getAttribute("data-telefono").catch(() => null) === "iphone", "salva da iPhone: su iPhone compare la guida iPhone");
-  ok((await guide.getByTestId("salva-telefono-passo").count()) === 0 && await guide.getByTestId("salva-telefono-apri").getByText("Come salvare dal telefono").isVisible(), "salva da iPhone: guida chiusa in una riga discreta 'Come salvare dal telefono'");
+  ok((await guide.getByTestId("salva-telefono-passo").count()) === 0 && await guide.getByTestId("salva-telefono-apri").getByText("Come copio il link?").isVisible(), "salva da iPhone: guida chiusa in una riga discreta 'Come copio il link?'");
   await guide.getByTestId("salva-telefono-apri").click();
   ok((await guide.getByTestId("salva-telefono-passo").count()) === 2 && await guide.getByText("Copia il link").isVisible() && (await guide.getByRole("button", { name: /Incolla/ }).count()) === 0 && (await ip.getByRole("button", { name: /Incolla/ }).count()) === 1, "salva da iPhone: 2 passi (Copia il link → Incolla) e un solo pulsante Incolla nella pagina");
   ok(featureEv("salva_da_telefono_apri").some((e) => e.props?.contesto === "iphone"), "salva da iPhone: l'apertura della guida è registrata (contesto iphone)");
