@@ -4431,9 +4431,15 @@ else {
     const mb = await ap.getByRole("link", { name: "Apri la mappa" }).boundingBox();
     const bg = await ap.locator("main").evaluate((el) => getComputedStyle(el).backgroundColor);
     ok(h1.length === 1 && h1[0].t === "Ciao! Dimmi cosa cerchi." && /newsreader/i.test(h1[0].f) && (await ap.getByText("Assistente Mapetite").count()) === 0 && (await ap.getByText("Trova, filtra, prenota").count()) === 0 && !!mb && mb.x + mb.width > 340 && mb.y < 80 && bg === "rgb(248, 246, 242)", `assistente: un solo titolo serif, mappa in alto a destra, fondo carta (${JSON.stringify(h1)}, ${bg})`); }
-  ok((await ap.getByTestId("assistente-esempi").getByRole("button").count()) === 4 && (await ap.getByTestId("assistente-idee").count()) === 0, "assistente: tre chip brevi + 'Altre idee' (niente card lunghe, Lorenzo 16/10)");
+  // Revisore 2/11: tre domande intere ("Prova a chiedere", come sulla mappa), niente "Prenota domani" all'inizio;
+  // le altre (prenotazione, serata a tappe) si aggiungono sotto con "Altre idee".
+  { const es = ap.getByTestId("assistente-esempi");
+    const frasi = await es.getByRole("button").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+    ok(frasi.length === 3 && !frasi.some((f) => /prenot/i.test(f ?? "")) && frasi.every((f) => (f ?? "").split(" ").length >= 4) && (await ap.getByText("Prova a chiedere", { exact: true }).isVisible()) && (await ap.getByText("Ti suggeriamo", { exact: true }).count()) === 0, `assistente: tre domande intere da provare, niente 'Prenota domani' (${frasi.join(" | ")})`);
+    const eb = await es.boundingBox();
+    ok(!!eb && eb.height >= 150, `assistente: gli esempi riempiono la schermata (alti ${Math.round(eb?.height ?? 0)} px)`); }
   await ap.getByTestId("assistente-altre-idee").click();
-  ok((await ap.getByTestId("assistente-idee").getByRole("button").count()) === 5, "assistente: 'Altre idee' apre la lista completa delle frasi");
+  ok((await ap.getByTestId("assistente-esempi").getByRole("button").count()) === 5 && (await ap.getByTestId("assistente-idea-in-piu").count()) === 2 && (await ap.getByTestId("assistente-esempi").getByRole("button", { name: /^Prenotami domani/ }).count()) === 1, "assistente: 'Altre idee' aggiunge prenotazione e serata a tappe sotto le tre domande");
   await ap.getByTestId("assistente-altre-idee").click();
   { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
   await ashot("50-assistente-benvenuto");

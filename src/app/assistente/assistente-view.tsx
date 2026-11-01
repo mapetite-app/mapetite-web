@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, BookmarkCheck, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, BookmarkCheck, CalendarCheck, ChevronRight, Map as MapIcon, RotateCcw, X } from "lucide-react";
 import VenueSheet from "@/components/venue-sheet";
 import CommunityLocale from "@/components/community-locale";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
@@ -97,13 +97,16 @@ const patchMsg = (id: string, patch: Partial<BotMsg> | ((m: BotMsg) => Partial<B
   setConv((c) => ({ ...c, msgs: c.msgs.map((m) => (m.id === id && m.role === "assistant" ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m)) }));
 
 // ── Testi ──
+// Revisore 2/11: si parte da tre domande vere, scritte per intero come in "Prova a chiedere" della mappa
+// (non da "Prenota domani", che senza un posto scelto non dice niente). Le altre dietro "Altre idee".
 const EXAMPLES = [
-  { emoji: "🗓️", short: "Prenota domani", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
   { emoji: "🍝", short: "Trattoria vera", text: "Trattoria non turistica a Testaccio" },
   { emoji: "🍸", short: "Aperitivo con vista", text: "Aperitivo con vista a Milano" },
   { emoji: "🥞", short: "Brunch domenica", text: "Brunch domenica per 4 a Roma" },
+  { emoji: "🗓️", short: "Prenota domani", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
   { emoji: "🌙", short: "Serata a tappe", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
 ];
+const PRIME = 3;
 const REFINES: Ask[] = [
   { label: "Più economici", send: "più economici" },
   { label: "Aperti ora", send: "aperti ora" },
@@ -692,46 +695,34 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
             <p className="mt-2 text-[15px] font-sans leading-relaxed text-text-muted">
               Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi, e se vuoi ti preparo la prenotazione.
             </p>
-            {/* Lorenzo 16/10: poche chip brevi; la lista completa dietro "Altre idee". */}
-            <p className="mt-6 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Ti suggeriamo</p>
-            <div data-testid="assistente-esempi" className="mt-2 flex flex-wrap gap-2">
-              {EXAMPLES.slice(0, 3).map((e) => (
-                <button
-                  key={e.text}
-                  type="button"
-                  aria-label={e.text}
-                  onClick={() => submit(e.text)}
-                  className="flex min-h-10 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-sm font-sans text-text active:scale-[0.98]"
-                >
-                  <span aria-hidden>{e.emoji}</span> {e.short}
-                </button>
+            {/* Revisore 2/11: tre domande intere in un riquadro, come "Prova a chiedere" della mappa; le altre
+                (prenotazione, serata a tappe) si aggiungono sotto con "Altre idee". */}
+            <p className="mt-6 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Prova a chiedere</p>
+            <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
+              {EXAMPLES.slice(0, moreIdeas ? EXAMPLES.length : PRIME).map((e, i) => (
+                <li key={e.text} data-testid={i >= PRIME ? "assistente-idea-in-piu" : undefined}>
+                  <button
+                    type="button"
+                    aria-label={e.text}
+                    onClick={() => submit(e.text)}
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left text-[15px] font-sans leading-snug text-text active:bg-brand-light"
+                  >
+                    <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-lg">{e.emoji}</span>
+                    <span className="min-w-0 flex-1">“{e.text}”</span>
+                    <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+                  </button>
+                </li>
               ))}
-              <button
-                type="button"
-                data-testid="assistente-altre-idee"
-                aria-expanded={moreIdeas}
-                onClick={() => setMoreIdeas((v) => !v)}
-                className="flex min-h-10 items-center gap-1 rounded-pill border border-brand/30 bg-surface px-3.5 text-sm font-display font-semibold text-brand active:scale-[0.98]"
-              >
-                {moreIdeas ? "Meno idee" : "✨ Altre idee"}
-              </button>
-            </div>
-            {moreIdeas && (
-              <ul data-testid="assistente-idee" className="mt-3 flex flex-col divide-y divide-[#e8e2d8] rounded-card border border-[#e8e2d8] bg-white">
-                {EXAMPLES.map((e) => (
-                  <li key={e.text}>
-                    <button
-                      type="button"
-                      onClick={() => submit(e.text)}
-                      className="flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] font-sans text-text active:bg-brand-light"
-                    >
-                      <span aria-hidden className="text-lg">{e.emoji}</span>
-                      <span className="min-w-0 flex-1">“{e.text}”</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            </ul>
+            <button
+              type="button"
+              data-testid="assistente-altre-idee"
+              aria-expanded={moreIdeas}
+              onClick={() => setMoreIdeas((v) => !v)}
+              className="mt-2 flex min-h-11 items-center gap-1 px-1 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+            >
+              {moreIdeas ? "Meno idee" : "✨ Altre idee: prenota, serata a tappe"}
+            </button>
           </div>
         )}
 
