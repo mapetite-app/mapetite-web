@@ -904,19 +904,66 @@ await page.unroute("**/api/search");
   await page.unroute("**/api/search");
 }
 
-// 5f. Ordine per quanto il locale è adatto (giudizio di Haiku): "alto" in cima, "basso" in fondo, mai esclusi
+// 5f. Ordine per quanto il locale è adatto (giudizio di Haiku), solo tra le card non ancora viste:
+//     la prima card resta dov'è (correzione 8 del giro del 1/11: l'ordine non salta sotto il dito).
 {
-  await page.route("**/api/search/synthesis", (r) => r.fulfill({ json: { ...SYNTH, esclusi: [], livelli: { P1: "basso", P2: "medio", P3: "alto" } } }));
+  const ordineCard = async () => (await page.locator("ul.snap-x li[data-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")))).filter(Boolean);
+  await page.route("**/api/search/synthesis", async (r) => { await new Promise((res) => setTimeout(res, 2000)); return r.fulfill({ json: { ...SYNTH, esclusi: [], livelli: { P1: "basso", P2: "medio", P3: "alto" } } }); });
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id]").first().waitFor({ timeout: 6000 });
+  const prima = await ordineCard();
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
   await page.waitForTimeout(300);
-  const ordine = (await page.locator("ul.snap-x li[data-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")))).filter(Boolean);
-  ok(ordine.join(",") === "P3,P2,P1", `ordine: il locale più adatto in cima e il meno adatto in fondo, nessuno escluso (${ordine.join(",")})`);
+  const ordine = await ordineCard();
+  ok(prima.join(",") === "P1,P2,P3" && ordine[0] === "P1", `ordine fermo: la prima card vista resta la prima quando arrivano i verdetti (${prima.join(",")} → ${ordine.join(",")})`);
+  ok(ordine.join(",") === "P1,P3,P2", `ordine: dopo la card già vista, il più adatto prima, nessuno escluso (${ordine.join(",")})`);
   const z = async (id) => Number(await page.locator(`[data-testid=pin][data-place=${id}]`).first().evaluate((el) => getComputedStyle(el.closest(".mapboxgl-marker") ?? el).zIndex).catch(() => "0"));
-  const [z2, z1] = [await z("P2"), await z("P1")];
-  ok(z2 > z1, `mappa: il pin del 2° risultato sta sopra quello del 3° (il suo nome non finisce coperto) (${z2} > ${z1})`);
+  const [z2, z3] = [await z("P3"), await z("P2")];
+  ok(z2 > z3, `mappa: il pin del 2° risultato sta sopra quello del 3° (il suo nome non finisce coperto) (${z2} > ${z3})`);
   await page.unroute("**/api/search/synthesis");
+  // Card scorse prima dei verdetti: restano tutte al loro posto; un fuori tema già visto non sparisce
+  // (la lista non si accorcia sotto il dito) e la card dice "Poco in tema".
+  await page.route("**/api/search/synthesis", async (r) => { await new Promise((res) => setTimeout(res, 2500)); return r.fulfill({ json: { ...SYNTH, esclusi: ["P2"], livelli: { P1: "basso", P2: "basso", P3: "alto" } } }); });
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id]").first().waitFor({ timeout: 6000 });
+  await page.locator("ul.snap-x").evaluate((ul) => { const li = ul.querySelector("li[data-id=P2]"); ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2 }); });
+  await page.waitForTimeout(500);
+  const scorso = await ordineCard();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(300);
+  const dopo = await ordineCard();
+  ok(scorso.join(",") === "P1,P2,P3" && dopo.join(",") === "P1,P2,P3", `ordine fermo: le card già scorse non cambiano posto (${scorso.join(",")} → ${dopo.join(",")})`);
+  ok((await page.locator("li[data-id=P2]").getByTestId("fuori-tema-card").textContent().catch(() => "")) === "Poco in tema" && (await page.getByTestId("fuori-tema-card").count()) === 1, "fuori tema già visto: resta al suo posto con 'Poco in tema' (gli altri senza)");
+  await shot("05f-ordine-fermo");
+  await page.unroute("**/api/search/synthesis");
+}
+
+// 5f-bis. Emoji dal tipo vero (giro del 1/11, D23: 12 risultati su 12 con 🍝): con il tipo principale generico
+//         ("restaurant") decidono gli altri tipi Google del locale; il nome resta come prima.
+{
+  const TIPI = [
+    { ...PLACES[0], category: "restaurant", types: ["sushi_restaurant", "japanese_restaurant", "restaurant"] },
+    { ...PLACES[1], category: "restaurant", types: ["brazilian_restaurant", "restaurant"] },
+    { ...PLACES[2], name: "CASA ENCANTO ROMA", category: "restaurant", types: ["restaurant", "food"] },
+  ];
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: TIPI, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=P1]").waitFor({ timeout: 6000 });
+  const cop = async (id) => (await page.locator(`ul.snap-x li[data-id=${id}]`).getByTestId("copertina").textContent())?.trim();
+  const pin = async (id) => (await page.locator(`[data-testid=pin][data-place=${id}]`).first().innerText().catch(() => "")).trim();
+  const [c1, c2, c3] = [await cop("P1"), await cop("P2"), await cop("P3")];
+  ok(c1 === "🍣" && c2 === "🥩" && c3 === "🍝", `emoji dal tipo vero: sushi 🍣, churrascaria 🥩, ristorante generico 🍝 (${c1} ${c2} ${c3})`);
+  ok((await pin("P1")).includes("🍣"), `emoji dal tipo vero: anche il segnalino del sushi ha 🍣 (${await pin("P1")})`);
+  // D24: i nomi tutti in maiuscolo di Google si leggono come gli altri (solo in vista: il nome vero non cambia).
+  { const nome = (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("card-risultato").innerText()).includes("Casa Encanto Roma");
+    const p3 = await pin("P3");
+    ok(nome && !p3.includes("CASA") && (p3 === "🍝" || p3.includes("Casa Encanto")), `nomi in maiuscolo: card e segnalino dicono "Casa Encanto Roma" (${p3.replace(/\n/g, " ")})`); }
+  // D19: la frase più lunga del campo finisce con i puntini, non tagliata a metà parola senza segno.
+  ok((await page.getByLabel("Cosa cerchi?").evaluate((e) => getComputedStyle(e).textOverflow)) === "ellipsis", "barra: una frase lunga finisce con i puntini");
+  await page.unroute("**/api/search");
 }
 
 // 5e. Ricerca in un'altra città con la mappa su Roma e la posizione mai chiesta: niente "479 km" sulle card
@@ -1275,6 +1322,24 @@ const cardSrcs = await page.locator("ul.snap-x img").evaluateAll((els) => els.ma
 ok(pinSrcs.length >= 1, `pin con foto: ${pinSrcs.length} pin mostrano la foto`);
 ok(pinSrcs.every((src) => cardSrcs.includes(src)), "pin con foto: usano le stesse foto delle card (nessun costo in più)");
 await shot("20-pin-foto");
+// Segnalini durante l'attesa (giro del 1/11, D16): finché la foto non arriva si vede l'emoji del tipo di locale,
+// mai un cerchio bianco vuoto.
+{
+  await page.route("**/api/places/photo**", async (r) => { await new Promise((res) => setTimeout(res, 4000)); return r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }).catch(() => {}); });
+  await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+  await page.evaluate(() => { try { localStorage.removeItem("mapetite.foto"); } catch { /* */ } });
+  await (await esempio(page)).click();
+  await page.getByTestId("pin-foto").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(300);
+  const pinAttesa = await page.getByTestId("pin-foto").evaluateAll((els) => els.map((e) => {
+    const img = e.querySelector("img");
+    return { emoji: (e.querySelector("[data-testid=pin-emoji]")?.textContent ?? "").trim(), foto: !!img && img.complete && img.naturalWidth > 0 };
+  }));
+  ok(pinAttesa.length >= 1 && pinAttesa.every((x) => x.emoji.length > 0), `segnalini in attesa della foto: emoji del tipo di locale sotto la foto (${pinAttesa.map((x) => x.emoji + (x.foto ? "+foto" : "")).join(" ")})`);
+  ok(pinAttesa.some((x) => !x.foto), "segnalini in attesa della foto: la foto non è ancora arrivata ma il segnalino non è vuoto");
+  await shot("20b-pin-attesa-foto");
+  await page.unroute("**/api/places/photo**");
+}
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
 // 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"
@@ -1617,7 +1682,8 @@ else {
     await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
     await p.keyboard.press("Enter");
-    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await ds.textContent()).includes("Terrazza Uno e un altro") && (await p.getByTestId("dai-salvati-posto").count()) === 0, "dai tuoi salvati: con due salvati una riga 'Terrazza Uno e un altro', chiusa");
+    // Giro del 1/11 (D26): niente nome tagliato ("Hostaria Del M… e un altro"), il numero e le emoji dei posti.
+    ok(await ds.waitFor({ timeout: 6000 }).then(() => true, () => false) && (await p.getByTestId("dai-salvati-numero").textContent()) === "2 dei tuoi salvati" && !(await ds.textContent()).includes("Terrazza Uno") && (await p.getByTestId("dai-salvati-posto").count()) === 0, "dai tuoi salvati: con due salvati una riga '2 dei tuoi salvati' con le loro emoji, chiusa");
     await p.getByTestId("dai-salvati-apri").click();
     const righeDs = p.getByTestId("dai-salvati-posto");
     ok((await righeDs.count()) === 2 && (await righeDs.first().textContent()).includes("tavolo sulla terrazza"), "dai tuoi salvati: un tocco apre le righe con il perché");
@@ -1632,12 +1698,28 @@ else {
       await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
       await p.keyboard.press("Enter");
       await ds.waitFor({ timeout: 6000 }).catch(() => {});
-      ok(await p.getByText("e un altro", { exact: true }).isVisible().catch(() => false), "dai tuoi salvati: con un nome lungo 'e un altro' resta in vista");
+      { const n = await p.getByTestId("dai-salvati-numero").boundingBox().catch(() => null);
+        ok(!!n && n.x + n.width <= 390 && await p.getByTestId("dai-salvati-numero").isVisible(), "dai tuoi salvati: con un nome lungo '2 dei tuoi salvati' resta tutto in vista"); }
       await p.getByTestId("dai-salvati-apri").click();
       const hs = await p.getByTestId("dai-salvati-posto").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
       const box = await ds.boundingBox();
       ok(hs.length === 2 && hs.every((h) => h <= 64) && !!box && box.x + box.width <= 390, `dai tuoi salvati: perché lunghi in 2 righe al massimo (${hs.map(Math.round).join(", ")} px), dentro lo schermo`);
       rows[1].places.name = nomeVero; }
+    // Giro del 1/11 (D20): un salvato a 4 km dai risultati non allarga la mappa (resta nella riga e col suo
+    // segnalino, fuori dall'inquadratura); i risultati restano inquadrati.
+    { rows.push({ tags: ["Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000009", name: "Sushi Lontano", category: "restaurant", address: "Via Tiburtina 1, Roma", lat: 41.93, lng: 12.535, google_place_id: "G9" } });
+      await p.unroute("**/api/salvati/chiedi");
+      await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000009", perche: "Hai scritto: sushi." }] } }));
+      await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+      await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+      await p.keyboard.press("Enter");
+      await ds.waitFor({ timeout: 6000 }).catch(() => {});
+      await p.waitForTimeout(1500);
+      const lontano = await p.getByTestId("pin-dai-salvati").first().boundingBox().catch(() => null);
+      const vicino = await p.locator("[data-testid=pin][data-place=P3]").first().boundingBox().catch(() => null);
+      const fuoriVista = !lontano || lontano.x > 390 || lontano.x + lontano.width < 0 || lontano.y + lontano.height < 0 || lontano.y > 844;
+      ok((await ds.textContent()).includes("Sushi Lontano") && !!vicino && vicino.x > 0 && vicino.x < 390 && vicino.y > 100 && vicino.y < 520 && fuoriVista, `dai tuoi salvati: un salvato a 4 km non allarga la mappa, i risultati restano inquadrati (risultato a ${JSON.stringify(vicino && { x: Math.round(vicino.x), y: Math.round(vicino.y) })}, salvato ${fuoriVista ? "fuori vista" : JSON.stringify(lontano)})`);
+      rows.pop(); }
     await p.unroute("**/api/search");
     await p.unroute("**/api/salvati/chiedi");
     // Dalla home: /mappa?q=… parte prima che i salvati siano letti; la domanda ai salvati parte appena arrivano.
@@ -2066,6 +2148,16 @@ else {
     ok(await p.getByRole("heading", { name: "Osteria Due" }).first().isVisible().catch(() => false), "vicino a un salvato: 'Apri' apre la sua scheda");
     // Giro del 1/11: la scheda di un salvato mostra il voto in archivio (prima solo la distanza).
     ok(((await p.getByTestId("voto-scheda").first().textContent().catch(() => "")) ?? "").includes("4,5"), "scheda di un salvato: il voto in archivio si vede (★ 4,5)");
+    // Giro del 1/11 (D18): l'avviso non copre mai una ricerca, né mentre arriva né i risultati.
+    // L'avviso da solo compare una volta al giorno per posto: si azzera il ricordo per riprovarlo.
+    await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith("mapetite.vicino.")) localStorage.removeItem(k); });
+    await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).catch(() => {});
+    const avvisoPrima = await p.getByTestId("vicino-salvato").isVisible().catch(() => false);
+    await p.getByLabel("Cosa cerchi?").fill("cena romantica a Roma");
+    await p.keyboard.press("Enter");
+    await p.getByTestId("card-risultato").first().waitFor({ timeout: 6000 }).catch(() => {});
+    ok(avvisoPrima && (await p.getByTestId("vicino-salvato").count()) === 0, `vicino a un salvato: con una ricerca l'avviso sparisce e non copre le card (prima ${avvisoPrima ? "c'era" : "non c'era"})`);
     await sctx.clearPermissions();
   }
 

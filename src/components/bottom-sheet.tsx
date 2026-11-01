@@ -4,6 +4,7 @@ import { fraseDaRecensioni } from "@/lib/frase-recensione";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
@@ -47,6 +48,9 @@ export interface BottomSheetProps {
   onHover?: (place: Place) => void;
   // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
   onOrder?: (ids: string[]) => void;
+  // Card già viste che l'AI giudica chiaramente fuori tema: restano al loro posto (l'ordine non salta)
+  // con "Poco in tema" al posto del 💎. Quelle non ancora viste sono già state tolte dalla lista.
+  offTopic?: readonly string[];
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
@@ -124,13 +128,24 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       >
         <span aria-hidden>📌</span>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-baseline">
-            <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
-            <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
-            <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
-            {/* "e altri 2" resta sempre in vista: con un nome lungo si taglia il nome, non il numero. */}
-            {many && <span className="shrink-0 whitespace-pre font-sans text-text">{` e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}`}</span>}
-          </span>
+          {many ? (
+            // Con più salvati il numero e le loro emoji, senza nomi tagliati a metà ("Hostaria Del M… e un
+            // altro", giro del 1/11, D26): i nomi sono a un tocco, nelle righe che si aprono.
+            <span className="flex min-w-0 items-center gap-2">
+              <span data-testid="dai-salvati-numero" className="shrink-0 font-display font-semibold text-accent">{items.length} dei tuoi salvati</span>
+              <span aria-hidden className="flex shrink-0 -space-x-1.5">
+                {items.slice(0, 3).map((it) => (
+                  <span key={it.place.id} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-accent-light text-[13px] leading-none">{getCategoryEmoji(it.place.category, it.place.name)}</span>
+                ))}
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-baseline">
+              <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
+              <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
+              <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
+            </span>
+          )}
           {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
           {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
         </span>
@@ -290,7 +305,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -742,7 +757,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
-            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
+            const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
+            const gem = !stato && !saved && !poco && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);
@@ -783,18 +799,20 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
-                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     {i < PHOTO_CARDS && d?.photoRef && (
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
                     )}
                     {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
                     <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
-                    {(stato || saved || gem) && (
+                    {(stato || saved || gem || poco) && (
                       <span className="absolute left-3 top-3.5">
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" title="Secondo le recensioni non risponde a tutta la richiesta" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90 backdrop-blur-sm">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
@@ -807,7 +825,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
                       </span>
-                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
+                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
                       {(d?.openNow != null || similar || req.length > 0) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
@@ -889,7 +907,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
                       così si vede anche quando la foto non arriva (quota finita). */}
-                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
@@ -898,19 +916,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    {(stato || saved || gem) && (
+                    {(stato || saved || gem || poco) && (
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{nomeLeggibile(place.name)}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
@@ -1038,7 +1058,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     alt={place.name}
                     width={200}
                     className="h-full w-full object-cover"
-                    fallback={getCategoryEmoji(place.category, place.name)}
+                    fallback={getCategoryEmoji(place.category, place.name, place.types)}
                   />
                 </span>
                 <span className="min-w-0 flex-1">

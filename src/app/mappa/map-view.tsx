@@ -10,6 +10,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
@@ -250,7 +251,7 @@ function SaveModal({
           <div className="mx-auto mb-3 h-1 w-10 rounded-pill bg-border" />
           <div className="flex items-center gap-3 border-b border-border pb-4">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl">
-              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name)} />
+              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name, place.types)} />
             </span>
             <span className="min-w-0">
               <span className="block text-xs font-sans text-text-muted">{mode === "edit" ? "Tra i tuoi salvati" : "Salva"}</span>
@@ -431,6 +432,8 @@ const SIMILAR_MAX_METERS = 15_000;
 const NEARBY_SAVED_METERS = 800;
 // "Dai tuoi salvati" sopra i risultati: un salvato conta solo se è a meno di 20 km da dove si cerca.
 const DAL_SALVATI_METERS = 20_000;
+// Fin dove un salvato scelto per la ricerca allarga la mappa (oltre resta fuori dall'inquadratura).
+const DAL_SALVATI_INQUADRA_METERS = 2_500;
 // Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
 function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
   return places
@@ -534,6 +537,9 @@ export type Place = {
   note: string | null;
   rating: number | null;
   priceLevel: number | null;
+  // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
+  // generico ("restaurant"). I salvati non li hanno: la loro emoji resta quella di sempre.
+  types?: string[] | null;
 };
 
 function SaveButton({
@@ -945,7 +951,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[] } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -1147,18 +1153,16 @@ export default function MapView({
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
   // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
-  // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
-  const focusedIdRef = useRef<string | null>(null);
-  useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
-  const aiFirstIdRef = useRef<string | null>(null);
-  const refocusFirst = useRef(false);
+  // Card già viste in questa ricerca (state al centro del carosello almeno una volta, la prima compresa):
+  // quando arrivano i verdetti il loro posto non cambia più (giro del 1/11, correzione 8: a 8 s la prima
+  // card era una, a 20 s un'altra, sotto il dito). Si riordinano solo quelle non ancora viste.
+  const seenIdsRef = useRef<{ search: number | null; ids: Set<string> }>({ search: null, ids: new Set() });
   useEffect(() => {
-    aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null;
-    if (refocusFirst.current) {
-      refocusFirst.current = false;
-      if (aiFirstIdRef.current) setFocusedId(aiFirstIdRef.current);
-    }
-  }, [aiSearch]);
+    if (aiSearch == null) return;
+    const id = aiSearch.id ?? null;
+    if (seenIdsRef.current.search !== id) seenIdsRef.current = { search: id, ids: new Set() };
+    if (focusId && aiSearch.risultati.some((p) => p.id === focusId)) seenIdsRef.current.ids.add(focusId);
+  }, [aiSearch, focusId]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1745,10 +1749,10 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
-      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
+      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
       const details: Record<string, VenueDetails> = {};
       for (const p of raw) {
         details[p.id] = {
@@ -1972,6 +1976,8 @@ export default function MapView({
     // "Altri come questo" non chiede ai salvati, nemmeno dall'effetto qui sopra (prova in produzione
     // del 1/11: "Dai tuoi salvati" riproponeva il posto da cui si era partiti).
     ricercaMondo.current = mondo && !opts.simile ? ticket : null;
+    // L'avviso "A 250 m c'è…" non torna a coprire la mappa quando si chiude la ricerca.
+    setNearbySaved(null);
     if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
@@ -2005,7 +2011,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -2022,6 +2028,7 @@ export default function MapView({
           note: null,
           rating: p.rating ?? null,
           priceLevel: p.priceLevel ?? null,
+          types: p.types ?? null,
         }));
         const details: Record<string, VenueDetails> = {};
         for (const p of raw) {
@@ -2204,28 +2211,32 @@ export default function MapView({
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
-        // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
-        // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
-        // Passa al nuovo primo appena la lista riordinata è sullo schermo (effetto su aiSearch).
-        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) refocusFirst.current = true;
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
-          // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
-          // chiudeva la scheda sotto le dita e lasciava solo la mappa.
-          let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Ordine fermo per le card già viste (correzione 8 del giro del 1/11): la prima card, quelle su
+          // cui l'utente si è fermato e tutte quelle prima. Da computer (lista verticale) e con la lista
+          // vecchia se ne vedono più insieme: le prime 3. Con la scheda aperta non si sposta niente
+          // (le frecce "‹ 2 di 8 ›" seguono l'ordine della lista).
+          const seen = seenIdsRef.current.search === id ? seenIdsRef.current.ids : new Set<string>();
+          const open = openVenueIdRef.current;
+          let fermi = isDesktop() || listVariant !== "b" ? 3 : 1;
+          prev.risultati.forEach((p, i) => { if (seen.has(p.id) || p.id === open) fermi = Math.max(fermi, i + 1); });
+          if (open != null) fermi = prev.risultati.length;
           // Se l'AI scartasse tutti i locali (sommando i gruppi) non si esclude niente: nel dubbio il locale resta.
-          if (risultati.length === 0) risultati = prev.risultati;
-          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
-          // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
-          // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
-          // restano in fondo: il giudizio non li riporta su.
+          const fuori = prev.risultati.every((p) => esclusi.has(p.id)) ? new Set<string>() : esclusi;
+          const visti = prev.risultati.slice(0, fermi);
+          // Esclusioni approvate (Lorenzo 10/10): i locali chiaramente fuori tema non ancora visti spariscono
+          // come prima; quelli già visti restano al loro posto con "Poco in tema" sulla card (nessun salto).
+          const fuoriTema = visti.filter((p) => fuori.has(p.id)).map((p) => p.id);
+          if (fuoriTema.length > 0) console.info(`[ricerca] fuori tema lasciati al loro posto perché già visti: ${fuoriTema.join(", ")}`);
+          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni), solo
+          // tra le card non ancora viste: "alto" prima, "basso" dopo, a parità resta l'ordine di Google.
+          // I locali già messi da parte (molto famosi, fuori tema) restano in fondo: il giudizio non li riporta su.
           const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? [])]);
-          const touched = openVenueIdRef.current != null || (focusedIdRef.current != null && focusedIdRef.current !== prev.risultati[0]?.id);
-          if (!touched) {
-            const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
-            risultati = risultati.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
-          }
-          return { ...prev, risultati };
+          const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
+          const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
+            .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
+          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])] };
         });
       }
     } catch {
@@ -2446,16 +2457,17 @@ export default function MapView({
     if (!map || !mapReadyRef.current) return;
     inquadratoPer.current = dalSalvati.ticket;
     const w = window.innerWidth, h = window.innerHeight;
+    // Solo i salvati a due passi dai risultati spostano la mappa: un salvato a 4 km (Kiko Sushi Bar, giro
+    // del 1/11, D20) allargava la vista a mezza Roma e i risultati finivano ammassati sul bordo. Quelli più
+    // lontani restano nella riga "Dai tuoi salvati" e con il loro segnalino, fuori dall'inquadratura.
+    const risultati = aiSearch?.risultati ?? [];
+    const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= DAL_SALVATI_INQUADRA_METERS));
     // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
-    const fuori = dalSalvatiVisti.some(({ place }) => {
+    const fuori = vicini.some(({ place }) => {
       const pt = map.project([place.lng, place.lat]);
       return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
     });
-    // Giro del 1/11: allargare fino a un salvato a 4 km ammassava i 12 risultati sul bordo. Si allarga solo
-    // per i salvati vicini ai risultati (entro 2,5 km); gli altri restano nella riga "Dai tuoi salvati".
-    const risultati = aiSearch?.risultati ?? [];
-    const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= 2500)).map((d) => d.place);
-    if (fuori && vicini.length > 0) fitToPlaces([...risultati, ...vicini], 190, 60);
+    if (fuori) fitToPlaces([...risultati, ...vicini.map((d) => d.place)], 190, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
   }, [dalSalvatiChiave]);
 
@@ -2529,7 +2541,9 @@ export default function MapView({
                 onFocus={() => setIdeasOpen(true)}
                 placeholder="Chiedi all'AI…"
                 aria-label="Chiedi all'AI: cosa cerchi?"
-                className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
+                // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
+                className="min-h-11 min-w-0 flex-1 text-ellipsis bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
               {voiceOn && aiQuery === "" && aiSearch === null && (
                 <VoiceButton
@@ -3325,44 +3339,45 @@ export default function MapView({
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
-                    className={`block overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
                       selected?.id === place.id || focusId === place.id ? "h-14 w-14 border-accent" : "h-11 w-11 border-brand"
                     }`}
                   >
+                    {/* Emoji del tipo di locale sotto la foto: si vede subito e resta finché la foto non arriva
+                        (giro del 1/11: per secondi i segnalini erano cerchi bianchi vuoti). */}
+                    <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
                       alt={place.name}
                       width={500}
-                      className="h-full w-full object-cover"
-                      fallback={<span className="flex h-full w-full items-center justify-center text-xl">{getCategoryEmoji(place.category, place.name)}</span>}
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   </span>
                 ) : (
                   <span
                     role="img"
                     aria-label={place.category ?? "locale"}
-                    className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
                       selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                     }`}
                   >
                     {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
-                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                    {getCategoryEmoji(place.category, place.name, place.types)}
+                    {/* Sopra l'emoji, che resta visibile finché la foto non è arrivata. */}
+                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef && (
                       <PlacePhoto
                         photoRef={venueDetails[place.id]?.photoRef}
                         alt=""
                         width={500}
-                        className="h-full w-full rounded-full object-cover"
-                        fallback={getCategoryEmoji(place.category, place.name)}
+                        className="absolute inset-0 h-full w-full rounded-full object-cover"
                       />
-                    ) : (
-                      getCategoryEmoji(place.category, place.name)
                     )}
                   </span>
                 )}
                 {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
                 {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
                   <span className={`mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
-                    {pinName(place.name)}
+                    {nomeLeggibile(pinName(place.name))}
                   </span>
                 )}
               </div>
@@ -3391,7 +3406,7 @@ export default function MapView({
                 <Bookmark size={16} fill="currentColor" aria-hidden />
               </span>
               <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
-                📌 {pinName(p.name)}
+                📌 {nomeLeggibile(pinName(p.name))}
               </span>
             </span>
           </Marker>
@@ -3474,7 +3489,7 @@ export default function MapView({
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
-                category: selected.category, rating: selected.rating,
+                category: selected.category, types: selected.types ?? null, rating: selected.rating,
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,
@@ -3588,8 +3603,9 @@ export default function MapView({
         />
       )}
 
-      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
-      {nearbySaved && !savedToast && !selected && aiSearch === null && view === "all" && (
+      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva).
+          Mai sopra una ricerca, né mentre arriva né sui risultati: copriva metà della prima card (giro del 1/11, D18). */}
+      {nearbySaved && !savedToast && !selected && aiSearch === null && !aiSearching && view === "all" && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
@@ -3725,6 +3741,7 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
           setAside={aiSearch?.daParte ?? null}
+          offTopic={aiSearch?.fuoriTema}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}

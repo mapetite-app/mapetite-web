@@ -14,6 +14,7 @@ import { mapetiteShareUrl } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
@@ -46,6 +47,8 @@ export type Venue = {
   name: string;
   address: string | null;
   category: string | null;
+  // Tutti i tipi Google (solo dai risultati di ricerca): stessa emoji della card e del segnalino.
+  types?: string[] | null;
   rating: number | null;
   userRatingCount: number | null;
   priceLevel: number | null;
@@ -305,7 +308,7 @@ export default function VenueSheet({
   const variant = useVariant("scheda");
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
-  const emoji = getCategoryEmoji(category, name);
+  const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
     <ConfrontoFonti
@@ -635,10 +638,11 @@ export default function VenueSheet({
     // I nomi Google con la pubblicità dentro ("Trattoria Dal Cordaro (Roma) - Vino e Cucina romana dal 1922"):
     // in vista solo la parte prima di " - ", " | " o "(" (il nome intero resta in Info e nel titolo).
     // A 360px un nome su 3 righe spingeva "Orari, contatti, recensioni" sotto la barra (collaudo 23/10).
-    const nomeBreve = (() => {
+    // Nomi tutti in maiuscolo ("CASA ENCANTO ROMA", giro del 1/11): in minuscolo con le iniziali.
+    const nomeBreve = nomeLeggibile((() => {
       const m = name.split(/\s+[-–—|]\s+|\s*\(/)[0].trim();
       return m.length >= 3 && m.length < name.length ? m : name;
-    })();
+    })());
     const nameSize = nomeBreve.length > 30 ? "text-[24px]" : nomeBreve.length > 16 ? "text-[30px]" : "text-[40px]";
     const openDetails = () => {
       const next = !detailsOpen;
@@ -703,7 +707,7 @@ export default function VenueSheet({
               {kindLine.join(" · ")}
             </p>
           )}
-          <h2 title={nomeBreve !== name ? name : undefined} className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
+          <h2 title={nomeBreve.length < name.length ? name : undefined} className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
             {nomeBreve}
             {infoLocale && (
               <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-1 align-middle text-brand">
@@ -967,7 +971,7 @@ export default function VenueSheet({
             <div className="mx-[22px] mt-2" data-testid="scheda-info">
               <div className="flex flex-col divide-y divide-border">
                 {/* Il nome intero di Google, quando sotto la foto c'è quello accorciato. */}
-                {nomeBreve !== name && (
+                {nomeBreve.length < name.length && (
                   <p data-testid="nome-intero" className="flex min-h-11 items-center gap-3 py-2 text-sm font-sans text-text">
                     <Store size={18} className="shrink-0 text-brand" aria-hidden />
                     <span className="min-w-0 flex-1">{name}</span>
@@ -1126,11 +1130,11 @@ export default function VenueSheet({
             aria-label={category ?? "locale"}
             className="text-4xl leading-none"
           >
-            {getCategoryEmoji(category, name)}
+            {getCategoryEmoji(category, name, venue.types)}
           </span>
         )}
         <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[2.1rem]`}>
-          {name}
+          {nomeLeggibile(name)}
         </h2>
 
         {/* Come Places: "Città · distanza", poi tipo · voto · prezzo · aperto. */}
