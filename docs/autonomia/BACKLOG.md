@@ -6,6 +6,16 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## PIANO DAL 2/11 ALL'8/11 — PREVALE SU TUTTO IL RESTO (Lorenzo in chat, 1/11 sera)
+Lorenzo, 1/11: "non sto vedendo miglioramenti sull'app, né di grafica né di funzionalità… siamo ancora molto indietro". Causa: dal 27/10 quasi tutto il lavoro è andato su prenotazioni, pannello del locale e funzioni nascoste a due tocchi, che chi apre l'app non vede. Fino all'8/11 si lavora **solo** su ciò che si vede aprendo l'app: ricerca e grafica delle schermate principali. **Stop** a prenotazioni, pannello ristoratori, avvisi, proposte nuove e ricerche sui competitor. Ogni sessione chiude con un messaggio a Lorenzo con 3 cose che vede diverse, dove toccare e lo screenshot prima/dopo.
+- **Lun 2/11 notte:** giro da utente vero in produzione su tutte le schermate a 390 px, affiancate a Places e Mapstr; elenco numerato dei difetti visibili, in una pagina con gli screenshot, per Lorenzo. Si correggono subito i primi.
+- **Mar 3/11 notte:** ricerca precisa: le ricerche di `TEST-RICERCHE.md` (risposte salvate più massimo 10 vere), si correggono quelle che non rispettano i vincoli ("romantico con terrazza" senza osterie e pub).
+- **Mer 4/11 notte:** ricerca veloce e verdetto sempre presente in ogni card, anche senza AI.
+- **Gio 5/11 notte:** grafica di home e risultati.
+- **Ven 6/11 notte:** grafica di scheda del locale e salvati.
+- **Sab 7/11:** primo accesso e salva da reel o link, da capo a fondo; si tolgono dalle schermate le cose che non servono.
+- **Dom 8/11:** copione demo di 3 minuti provato dal vivo in produzione; pagina "prima/dopo" per Lorenzo. Versione per i tester.
+
 ## Avanzamento verso il 25/10
 **Piano fino al 25/10: `PIANO-25-OTTOBRE.md` (si segue quello, in ordine).**
 **Ricerche Google vere oggi (dalle 9:00 del 25/10):** 2 (lunedì 26/10: 04:10 "trattoria a Trastevere" senza AI, salvata; 05:32 la stessa in produzione dopo il merge). Il 23–24/10: 4 (sabato 24/10, sessione 00:06: casi 2, 3 e 20, per ricreare le risposte salvate dopo il riavvio del container; 1 in produzione dopo il merge della PR #96). Giorno prima (dalle 9:00 del 22/10): 4. Da qui solo risposte salvate.
