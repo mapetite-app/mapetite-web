@@ -175,7 +175,14 @@ await shot("01-benvenuto");
 await idee(page);
 { const pan = page.getByTestId("idee-pannello");
   ok(await pan.getByText("Ti suggeriamo").isVisible() && await pan.getByText("Adesso", { exact: true }).isVisible() && await pan.getByText("Per te").isVisible() && await pan.getByText("Prova a chiedere").isVisible(), "Idee: pannello 'Ti suggeriamo' con i gruppi Adesso · Per te · Prova a chiedere");
-  ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && await pan.getByTestId("mappa-assistente").isVisible(), "Idee: Sorprendimi e 'Parla con l'assistente' a due tocchi");
+  ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && (await pan.getByTestId("mappa-assistente").count()) === 0, "Idee: Sorprendimi c'è, 'Parla con l'assistente' no (è già nella barra in basso)");
+  // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
+  ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
+  { const righe = await pan.locator("li").count(); const adesso = await pan.locator("section").filter({ hasText: /^Adesso/ }).locator("li").count(); const perTe = await pan.locator("section").filter({ hasText: /^Per te/ }).locator("li").count();
+    ok(adesso === 3 && perTe >= 1 && perTe <= 3 && righe <= 6, `Idee: al massimo 6 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
+  { const es = pan.getByRole("button", { name: /per due a Roma|non turistica a Trastevere|qui vicino|appuntamento/ }); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
+    ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
+  ok(((await pan.getByTestId("suggerimento-momento-2").textContent()) ?? "") !== ((await pan.getByTestId("suggerimento-momento").textContent()) ?? ""), "Idee: la seconda idea del momento è diversa dalla prima");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
@@ -4053,7 +4060,7 @@ else {
   // Ingresso dalla mappa e dalla home
   await ap.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
   await idee(ap);
-  ok(await ap.getByTestId("mappa-assistente").isVisible(), "mappa: 'Parla con l'assistente' nelle Idee (la barra resta la ricerca di oggi)");
+  ok((await ap.getByTestId("mappa-assistente").count()) === 0, "mappa: niente 'Parla con l'assistente' nelle Idee (doppione della barra in basso, 1/11)");
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   // Semplificare (Lorenzo 17/10): dalla home l'assistente si apre dalla barra in basso (niente tessera doppia).
   ok(await ap.getByTestId("barra-assistente").isVisible(), "home: 'Assistente' nella barra in basso");

@@ -28,6 +28,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
+import { contestoIdee, percheMomento, secondaIdea } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
@@ -852,6 +853,27 @@ function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: s
         <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className={cls}>{inner}</button>
       )}
     </li>
+  );
+}
+
+// Recenti ed esempi in una riga che scorre: occupano una riga sola invece di tre o quattro.
+function IdeaChips({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="mt-1">
+      <div className="flex min-h-8 items-center justify-between px-2">
+        <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+        {action}
+      </div>
+      <div className="-mx-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">{children}</div>
+    </section>
+  );
+}
+
+function IdeaChip({ text, label, onClick, testId }: { text: string; label?: string; onClick: () => void; testId?: string }) {
+  return (
+    <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className="flex min-h-11 max-w-[15rem] shrink-0 items-center rounded-pill border border-border bg-white px-3.5 text-sm font-sans text-text active:scale-95">
+      <span className="truncate">{text}</span>
+    </button>
   );
 }
 
@@ -2629,28 +2651,38 @@ export default function MapView({
             data-testid="idee-pannello"
             className={`pointer-events-auto max-h-[calc(100dvh-14rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto rounded-card bg-surface p-2 shadow-float lg:w-auto lg:max-w-none ${ideasShown ? "" : "hidden"}`}
           >
-            <p className="px-2 pb-1 pt-1 font-title text-lg font-semibold text-brand">Ti suggeriamo</p>
+            {/* Ordinato (Lorenzo, 1/11: "troppe e randomiche"): il momento con il suo contesto, poi al massimo
+                3 idee tue, poi le recenti (o gli esempi per chi non ha ancora cercato) in una riga sola.
+                "Parla con l'assistente" è già nella barra in basso: niente doppione. */}
+            <div className="px-2 pb-1 pt-1">
+              <p className="font-title text-lg font-semibold leading-tight text-brand">Ti suggeriamo</p>
+              {momentHour != null && <p data-testid="idee-contesto" className="text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
+            </div>
             <IdeaGroup title="Adesso">
               {momentExample && (
-                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
+                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
+              {momentHour != null && (() => { const idea = secondaIdea(new Date(), weather); return (
+                <IdeaRow testId="suggerimento-momento-2" label={idea.query} emoji={idea.emoji} title={idea.title} sub={idea.sub} onClick={() => { setIdeasOpen(false); setAiQuery(idea.query); void runAISearch(idea.query); }} />
+              ); })()}
               <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
-              <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo che probabilmente ti piace" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
-              {userId && savedPlaces.length > 0 && (
-                <IdeaRow testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
-              )}
             </IdeaGroup>
             <IdeaGroup title="Per te">
-              {tasteSuggestion && (
-                <IdeaRow testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
-              )}
-              {savedSuggestion && (
-                <IdeaRow testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
-              )}
-              <IdeaRow testId="mappa-assistente" emoji="💬" title="Parla con l'assistente" sub="Chiedi, affina, prenota" href="/assistente" />
+              {[
+                userId && savedPlaces.length > 0 ? (
+                  <IdeaRow key="stasera" testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
+                ) : null,
+                tasteSuggestion ? (
+                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+                ) : null,
+                savedSuggestion ? (
+                  <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+                ) : null,
+              ].filter(Boolean).slice(0, 2)}
+              <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
             </IdeaGroup>
-            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-              <IdeaGroup
+            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 ? (
+              <IdeaChips
                 title="Recenti"
                 action={
                   <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
@@ -2659,15 +2691,15 @@ export default function MapView({
                 }
               >
                 {(JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
-                  <IdeaRow key={`r-${r}`} testId="recenti" label={`↻ ${r}`} emoji="↻" title={r} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
+                  <IdeaChip key={`r-${r}`} testId="recenti" label={`↻ ${r}`} text={`↻ ${r}`} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
                 ))}
-              </IdeaGroup>
-            )}
-            <IdeaGroup title="Prova a chiedere">
+              </IdeaChips>
+            ) : null}
+            <IdeaChips title="Prova a chiedere">
               {welcomeExamples.map((ex) => (
-                <IdeaRow key={ex.query} label={ex.query} emoji="🔎" title={ex.title} sub={ex.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+                <IdeaChip key={ex.query} label={ex.query} text={`${ex.title} ${ex.sub}`} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
               ))}
-            </IdeaGroup>
+            </IdeaChips>
           </div>
         )}
         {/* Pannello AI espandibile */}
