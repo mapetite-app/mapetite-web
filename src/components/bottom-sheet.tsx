@@ -47,6 +47,9 @@ export interface BottomSheetProps {
   onHover?: (place: Place) => void;
   // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
   onOrder?: (ids: string[]) => void;
+  // Card già viste che l'AI giudica chiaramente fuori tema: restano al loro posto (l'ordine non salta)
+  // con "Poco in tema" al posto del 💎. Quelle non ancora viste sono già state tolte dalla lista.
+  offTopic?: readonly string[];
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
@@ -290,7 +293,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -742,7 +745,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
-            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
+            const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
+            const gem = !stato && !saved && !poco && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);
@@ -789,12 +793,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     )}
                     {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
                     <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
-                    {(stato || saved || gem) && (
+                    {(stato || saved || gem || poco) && (
                       <span className="absolute left-3 top-3.5">
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" title="Secondo le recensioni non risponde a tutta la richiesta" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90 backdrop-blur-sm">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
@@ -898,19 +904,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    {(stato || saved || gem) && (
+                    {(stato || saved || gem || poco) && (
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{place.name}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (

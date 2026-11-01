@@ -920,7 +920,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[] } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -1122,18 +1122,16 @@ export default function MapView({
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
   // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
-  // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
-  const focusedIdRef = useRef<string | null>(null);
-  useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
-  const aiFirstIdRef = useRef<string | null>(null);
-  const refocusFirst = useRef(false);
+  // Card già viste in questa ricerca (state al centro del carosello almeno una volta, la prima compresa):
+  // quando arrivano i verdetti il loro posto non cambia più (giro del 1/11, correzione 8: a 8 s la prima
+  // card era una, a 20 s un'altra, sotto il dito). Si riordinano solo quelle non ancora viste.
+  const seenIdsRef = useRef<{ search: number | null; ids: Set<string> }>({ search: null, ids: new Set() });
   useEffect(() => {
-    aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null;
-    if (refocusFirst.current) {
-      refocusFirst.current = false;
-      if (aiFirstIdRef.current) setFocusedId(aiFirstIdRef.current);
-    }
-  }, [aiSearch]);
+    if (aiSearch == null) return;
+    const id = aiSearch.id ?? null;
+    if (seenIdsRef.current.search !== id) seenIdsRef.current = { search: id, ids: new Set() };
+    if (focusId && aiSearch.risultati.some((p) => p.id === focusId)) seenIdsRef.current.ids.add(focusId);
+  }, [aiSearch, focusId]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -2166,28 +2164,32 @@ export default function MapView({
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
-        // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
-        // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
-        // Passa al nuovo primo appena la lista riordinata è sullo schermo (effetto su aiSearch).
-        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) refocusFirst.current = true;
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
-          // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
-          // chiudeva la scheda sotto le dita e lasciava solo la mappa.
-          let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Ordine fermo per le card già viste (correzione 8 del giro del 1/11): la prima card, quelle su
+          // cui l'utente si è fermato e tutte quelle prima. Da computer (lista verticale) e con la lista
+          // vecchia se ne vedono più insieme: le prime 3. Con la scheda aperta non si sposta niente
+          // (le frecce "‹ 2 di 8 ›" seguono l'ordine della lista).
+          const seen = seenIdsRef.current.search === id ? seenIdsRef.current.ids : new Set<string>();
+          const open = openVenueIdRef.current;
+          let fermi = isDesktop() || listVariant !== "b" ? 3 : 1;
+          prev.risultati.forEach((p, i) => { if (seen.has(p.id) || p.id === open) fermi = Math.max(fermi, i + 1); });
+          if (open != null) fermi = prev.risultati.length;
           // Se l'AI scartasse tutti i locali (sommando i gruppi) non si esclude niente: nel dubbio il locale resta.
-          if (risultati.length === 0) risultati = prev.risultati;
-          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
-          // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
-          // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
-          // restano in fondo: il giudizio non li riporta su.
+          const fuori = prev.risultati.every((p) => esclusi.has(p.id)) ? new Set<string>() : esclusi;
+          const visti = prev.risultati.slice(0, fermi);
+          // Esclusioni approvate (Lorenzo 10/10): i locali chiaramente fuori tema non ancora visti spariscono
+          // come prima; quelli già visti restano al loro posto con "Poco in tema" sulla card (nessun salto).
+          const fuoriTema = visti.filter((p) => fuori.has(p.id)).map((p) => p.id);
+          if (fuoriTema.length > 0) console.info(`[ricerca] fuori tema lasciati al loro posto perché già visti: ${fuoriTema.join(", ")}`);
+          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni), solo
+          // tra le card non ancora viste: "alto" prima, "basso" dopo, a parità resta l'ordine di Google.
+          // I locali già messi da parte (molto famosi, fuori tema) restano in fondo: il giudizio non li riporta su.
           const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? [])]);
-          const touched = openVenueIdRef.current != null || (focusedIdRef.current != null && focusedIdRef.current !== prev.risultati[0]?.id);
-          if (!touched) {
-            const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
-            risultati = risultati.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
-          }
-          return { ...prev, risultati };
+          const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
+          const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
+            .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
+          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])] };
         });
       }
     } catch {
@@ -3666,6 +3668,7 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
           setAside={aiSearch?.daParte ?? null}
+          offTopic={aiSearch?.fuoriTema}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
