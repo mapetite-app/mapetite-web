@@ -2165,21 +2165,31 @@ else {
       const cose = p.getByTestId("profilo-mie-cose");
       // Semplificare 5 (17/10): la carta del gusto è una tessera, le liste di gruppo stanno solo in Amici.
       ok(await cose.isVisible() && (await cose.locator("a").count()) === 6 && (await cose.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await cose.getByTestId("profilo-gruppi").count()) === 0, `profilo: griglia 'Le mie cose' con 6 tessere, carta del gusto compresa, senza liste di gruppo (${await cose.locator("a").count()})`);
-      ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "#raccolte" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4) · Diario · Prenotazioni · Importa con i loro ingressi");
+      // Revisore 1/11: la tessera "Raccolte" porta ai Salvati (lì le raccolte sono copertine), non a un doppione nel profilo.
+      ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "/mappa?vista=salvati" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await cose.getByTestId("profilo-prenotazioni").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4, ai Salvati) · Diario · Prenotazioni · Importa con i loro ingressi");
+      // Revisore 1/11: il sottotitolo di Importa non si taglia.
+      { const sub = await cose.getByTestId("profilo-importa").locator(".truncate").evaluate((el) => ({ t: el.textContent, tagliato: el.scrollWidth > el.clientWidth + 1 }));
+        ok(sub.t === "Link e file" && !sub.tagliato, `profilo: tessera Importa con 'Link e file' intero (${JSON.stringify(sub)})`); }
       { const sz = await cose.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
       // Profilo corto (giro 1/11, correzione 10): in vista solo identità, numeri e "Le mie cose"; il resto in "Impostazioni", chiuso.
       { const h = await p.evaluate(() => document.documentElement.scrollHeight); ok(h <= 844 * 1.6, `profilo corto: al massimo una schermata e mezza (${h}px, prima erano circa 5 schermate)`); }
       ok(!(await p.getByTestId("raccolte").isVisible()) && !(await p.getByTestId("profilo-premium").isVisible()) && !(await p.getByTestId("profilo-account").isVisible()) && !(await p.getByTestId("invito-mappa-gusto").isVisible()) && (await p.getByRole("link", { name: "I tuoi gusti →" }).count()) === 0, "profilo corto: raccolte, Premium, account e inviti non in vista finché non li apri");
       ok(parseInt((await cose.getByTestId("tessera-raccolte").textContent()).match(/\d+/)?.[0] ?? "-1", 10) === (await p.getByTestId("raccolta").count()),"profilo: il numero della tessera 'Raccolte' è quello delle raccolte mostrate (giro 1/11, D47)");
-      await cose.getByTestId("tessera-raccolte").click();
-      await p.waitForFunction(() => { const d = document.getElementById("raccolte"); const r = d?.getBoundingClientRect(); return !!d?.open && !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: tessera 'Raccolte' apre e porta alle raccolte"), () => ok(false, "profilo: tessera 'Raccolte' apre e porta alle raccolte"));
-      ok(await p.getByTestId("raccolte").isVisible(), "profilo: le raccolte si vedono dopo il tocco sulla tessera");
-      // Le cose secondarie stanno chiuse in "Impostazioni": l'ingranaggio in alto la apre.
-      ok((await p.getByTestId("profilo-impostazioni").getAttribute("href")) === "#altro" && !(await p.getByTestId("invita-amico").isVisible()) && !(await p.getByTestId("cosa-so-di-te").isVisible()), "profilo: 'Impostazioni' in fondo, chiusa (invito, profilo pubblico, gusti, ricerche)");
-      await p.getByTestId("profilo-impostazioni").click();
-      await p.getByTestId("profilo-premium").waitFor({ timeout: 3000 }).catch(() => {});
-      ok(await p.getByTestId("profilo-premium").isVisible() && await p.getByTestId("profilo-ristoratori").isVisible() && await p.getByTestId("profilo-account").isVisible() && await p.getByTestId("profilo-gusti-link").getAttribute("href") === "/me", "profilo: l'ingranaggio apre 'Impostazioni' con gusti, Premium, ristoratori, feedback ed Esci");
+      // Le cose secondarie stanno chiuse in "Impostazioni", una sola (revisore 1/11): la riga in fondo, niente ingranaggio in alto.
+      ok((await p.getByTestId("profilo-impostazioni").count()) === 0 && (await p.getByLabel("Impostazioni", { exact: true }).count()) === 0 && (await p.getByText("Impostazioni", { exact: true }).count()) === 1 && !(await p.getByTestId("invita-amico").isVisible()) && !(await p.getByTestId("cosa-so-di-te").isVisible()), "profilo: una sola 'Impostazioni', in fondo e chiusa (niente ingranaggio doppione in alto)");
+      await p.locator("#altro > summary").click();
+      await p.getByTestId("profilo-ristoratori").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await p.getByTestId("profilo-ristoratori").isVisible() && await p.getByTestId("profilo-account").isVisible() && await p.getByTestId("profilo-gusti-link").getAttribute("href") === "/me" && await p.getByTestId("profilo-gestisci-raccolte").isVisible(), "profilo: 'Impostazioni' apre gusti, gestione raccolte, ristoratori, feedback ed Esci");
+      // Revisore 1/11: niente voci "in arrivo" che non fanno niente (Premium; Profilo pubblico senza la parte social).
+      ok((await p.getByTestId("profilo-premium").count()) === 0 && !/in arrivo/i.test((await p.getByTestId("profilo-altro").innerText()) ?? ""), "profilo: in Impostazioni nessuna voce 'in arrivo' (Premium e profilo pubblico non pronto non compaiono)");
+      // Revisore 1/11: un solo stile di freccia (›) in Impostazioni.
+      { const frecce = await p.getByTestId("profilo-altro").evaluate((el) => [...el.querySelectorAll("svg.lucide")].filter((s) => /chevron/.test(s.getAttribute("class") ?? "")).map((s) => [...s.classList].find((c) => c.startsWith("lucide-chevron")) ?? "?"));
+        ok(frecce.length > 3 && frecce.every((f) => f === "lucide-chevron-right"), `profilo: in Impostazioni frecce tutte uguali (${[...new Set(frecce)].join(", ")})`); }
       ok(!(await p.getByTestId("invita-amico").isVisible()), "profilo: dentro 'Impostazioni' le righe restano chiuse finché non le tocchi");
+      // Gestione delle raccolte: da "Impostazioni" → "Gestisci le raccolte" si apre il pannello delle raccolte.
+      await p.getByTestId("profilo-gestisci-raccolte").click();
+      await p.waitForFunction(() => { const d = document.getElementById("raccolte"); const r = d?.getBoundingClientRect(); return !!d?.open && !!r && r.top < 120 && r.top > -20; }, null, { timeout: 3000 }).then(() => ok(true, "profilo: 'Gestisci le raccolte' apre e porta alle raccolte"), () => ok(false, "profilo: 'Gestisci le raccolte' apre e porta alle raccolte"));
+      ok(await p.getByTestId("raccolte").isVisible(), "profilo: le raccolte si vedono dopo il tocco su 'Gestisci le raccolte'");
       await p.locator("#gusti > summary").click();
       ok(await p.getByTestId("cosa-so-di-te").isVisible(), "profilo: una riga di 'Altro' si apre al tocco (Cosa so di te)");
       ok(await p.getByTestId("guida-voglio").getAttribute("href") === "/mappa?vista=salvati&stato=voglio" && await p.getByTestId("guida-fatto").getAttribute("href") === "/mappa?vista=salvati&stato=fatto" && await p.getByTestId("guida-salvati").getAttribute("href") === "/mappa?vista=salvati", "profilo: ogni numero apre la mappa sui salvati filtrati");
@@ -2211,8 +2221,11 @@ else {
       const box = p.getByTestId("ci-sei-stato");
       await box.waitFor({ timeout: 4000 }).catch(() => {});
       ok(await box.getByText("Caffè Milano").isVisible() && !(await box.textContent()).includes("Enoteca Tre"), "ci sei stato: propone il 'Voglio andarci' salvato da più di una settimana (non quelli recenti)");
+      // Revisore 1/11: una riga compatta, non più il riquadro corallo alto 160 px.
+      { const bb = await box.boundingBox(); const bg = await box.evaluate((el) => getComputedStyle(el).backgroundColor);
+        ok(!!bb && bb.height <= 80 && bg === "rgb(255, 255, 255)" && ((await box.getByRole("button", { name: "Sì, ci sono stato" }).textContent()) ?? "").trim() === "Sì" && await box.getByRole("button", { name: "Non ancora" }).isVisible(), `ci sei stato: una riga di ${Math.round(bb?.height ?? 0)} px (max 80) con 'Sì' e 'Non ancora', fondo bianco`); }
       await p.screenshot({ path: `${OUT}/29-ci-sei-stato.png`, caret: "initial" });
-      await box.getByRole("button", { name: "✓ Sì, ci sono stato" }).click();
+      await box.getByRole("button", { name: "Sì, ci sono stato" }).click();
       await box.getByText("✓ Segnato: sei stato da Caffè Milano.").waitFor({ timeout: 3000 }).catch(() => {});
       ok(JSON.stringify(visitPatch?.body?.tags) === '["Già visitato"]' && visitPatch.url.includes("place_id=eq.00000000-0000-4000-8000-000000000105"), "ci sei stato: 'Sì' lo segna '✓ Ci sono stato' (al posto di 'Voglio andarci')");
       await p.unroute("**/rest/v1/saved_places**");
@@ -3290,7 +3303,8 @@ else {
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("social-in-arrivo").isVisible(), "social in arrivo: /amici dice 'in arrivo'");
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
-  ok(await sp.getByTestId("profilo-social-in-arrivo").isVisible(), "social in arrivo: nel profilo il riquadro 'Profilo pubblico' è 'in arrivo'");
+  // Revisore 1/11: senza la parte social la riga "Profilo pubblico · In arrivo" non compare (non faceva niente).
+  ok((await sp.getByTestId("profilo-social-in-arrivo").count()) === 0 && (await sp.locator("#pubblico").count()) === 0 && await sp.getByTestId("profilo-altro").isVisible(), "social in arrivo: nel profilo nessuna riga 'Profilo pubblico · In arrivo', il profilo si apre lo stesso");
   ok(await sp.locator("nav").first().getByRole("link", { name: "Amici" }).getAttribute("href") === "/amici", "barra in basso: voce 'Amici'");
 
   // Profilo pubblico da chi non ha l'account (link condiviso).
@@ -5965,7 +5979,7 @@ else {
     await d.goto(`${BASE}/profilo?beta=ci-sei-stato`, { waitUntil: "networkidle" });
     const box = d.getByTestId("ci-sei-stato");
     await box.waitFor({ timeout: 5000 }).catch(() => {});
-    await box.getByRole("button", { name: "✓ Sì, ci sono stato" }).click();
+    await box.getByRole("button", { name: "Sì, ci sono stato" }).click();
     await d.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).catch(() => {});
     ok(await d.getByTestId("diario-foglio").isVisible() && (await d.getByTestId("diario-foglio").getByRole("button", { name: "Oggi" }).getAttribute("aria-pressed")) === "true" && (await d.getByTestId("diario-nota").inputValue()) === "Me l'ha detto Marco", "ci sei stato → diario: foglio con oggi già scelto e la nota che avevi");
     await d.getByTestId("diario-foglio").getByRole("button", { name: "Ieri" }).click();
@@ -7090,7 +7104,8 @@ else {
   if (fakeUser) {
     await pmctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
     await pm.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
-    ok((await pm.getByTestId("profilo-premium").getAttribute("href")) === "/premium", "premium: collegato dal profilo");
+    // Revisore 1/11: finché è solo "in arrivo" Premium non sta nel profilo (la pagina /premium resta).
+    ok((await pm.getByTestId("profilo-premium").count()) === 0, "premium: non compare nel profilo finché è 'in arrivo'");
     ok((await pm.getByTestId("profilo-ristoratori").getAttribute("href")) === "/per-i-ristoratori", "profilo: link 'Mapetite per i ristoratori'");
   } else console.log("SKIP  premium dal profilo: dev server senza E2E_FAKE_USER");
   await pmctx.close();

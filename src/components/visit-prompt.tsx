@@ -99,46 +99,46 @@ export default function VisitPrompt({ userId, candidates, withDate = false }: { 
     next();
   };
 
+  // Una riga compatta (~64 px, revisore 1/11): prima era un riquadro corallo alto 160 px, il più vistoso del profilo.
   return (
-    <section data-testid="ci-sei-stato" className="mb-8 rounded-card border border-accent/30 bg-accent-light/60 p-4">
+    <section data-testid="ci-sei-stato" aria-label="Ci sei stato?" className="mb-6 rounded-card border border-border bg-white px-3 py-2.5">
       {done && (
-        <p role="status" className="mb-2 text-sm font-sans text-success">✓ Segnato: sei stato da {done}.</p>
+        <p role="status" className={current ? "sr-only" : "text-sm font-sans text-success"}>✓ Segnato: sei stato da {done}.</p>
       )}
       {current ? (
-        <>
-          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Ci sei stato?</p>
-          <div className="mt-2 flex items-center gap-3">
-            <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-white text-2xl">
-              {getCategoryEmoji(current.category, current.name)}
-            </span>
-            <span className="min-w-0">
-              <Link href={`/mappa?salvato=${current.id}`} className="block truncate font-display text-base font-semibold text-text">
-                {current.name}
-              </Link>
-              <span className="block text-xs text-text-muted">L&apos;hai salvato {weeksAgo(current.savedAt)}</span>
-            </span>
-          </div>
-          {error && <p role="alert" className="mt-2 text-sm text-error">Non sono riuscito a segnarlo. Riprova.</p>}
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => void yes()}
-              disabled={busy}
-              className="min-h-11 flex-1 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95 disabled:opacity-60"
-            >
-              ✓ Sì, ci sono stato
-            </button>
-            <button
-              type="button"
-              onClick={notYet}
-              className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-95"
-            >
-              Non ancora
-            </button>
-          </div>
-        </>
+        <div className="flex items-center gap-2.5">
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn bg-surface text-xl">
+            {getCategoryEmoji(current.category, current.name)}
+          </span>
+          <span className="min-w-0 flex-1">
+            {error ? (
+              <span role="alert" className="block truncate text-[11px] font-semibold text-error">Non riuscito. Riprova.</span>
+            ) : (
+              <span className="block truncate text-[11px] font-display font-semibold uppercase tracking-wide text-text-muted" title={`L'hai salvato ${weeksAgo(current.savedAt)}`}>Ci sei stato?</span>
+            )}
+            <Link href={`/mappa?salvato=${current.id}`} className="block truncate font-display text-[15px] font-semibold leading-tight text-text">
+              {current.name}
+            </Link>
+          </span>
+          <button
+            type="button"
+            onClick={() => void yes()}
+            disabled={busy}
+            aria-label="Sì, ci sono stato"
+            className="flex min-h-11 shrink-0 items-center active:scale-95 disabled:opacity-60"
+          >
+            <span className="flex h-8 items-center rounded-pill bg-brand px-3.5 text-[13px] font-display font-semibold text-white">Sì</span>
+          </button>
+          <button
+            type="button"
+            onClick={notYet}
+            className="flex min-h-11 shrink-0 items-center active:scale-95"
+          >
+            <span className="flex h-8 items-center rounded-pill border border-border px-3 text-[13px] font-display font-semibold text-brand">Non ancora</span>
+          </button>
+        </div>
       ) : (
-        <p className="text-sm text-text-muted">Per ora è tutto: i tuoi salvati sono aggiornati.</p>
+        null
       )}
       {foglio}
     </section>
