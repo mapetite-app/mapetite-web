@@ -5825,7 +5825,7 @@ else {
           scrollTo(0, document.documentElement.scrollHeight);
           await new Promise((r) => setTimeout(r, 150));
           const navTop = document.querySelector("[data-testid=barra]").getBoundingClientRect().top;
-          const els = [...document.querySelectorAll("body > div a, body > div button, body > div p, body > div h1, body > div h2")].filter((e) => e.offsetParent && !e.closest("nav"));
+          const els = [...document.querySelectorAll("body > div a, body > div button, body > div p, body > div h1, body > div h2")].filter((e) => e.offsetParent && !e.closest("nav") && e.checkVisibility());
           return Math.max(...els.map((e) => e.getBoundingClientRect().bottom)) - navTop;
         });
         ok(sotto <= 1, `barra ${w}px: su ${voce} l'ultimo contenuto resta sopra la barra (${Math.round(sotto)}px)`);
@@ -6002,7 +6002,7 @@ else {
     await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
 
     // Ingresso dal profilo
-    await d.goto(`${BASE}/profilo?beta=-ci-sei-stato`, { waitUntil: "networkidle" });
+    await d.goto(`${BASE}/profilo?beta=-ci-sei-stato#altro`, { waitUntil: "networkidle" });
     const card = d.getByTestId("profilo-diario");
     // "I tuoi posti fissi" (PROPOSTE 8): 2+ visite, dal più frequentato, con "Proponi"
     { const pf = d.getByTestId("posti-fissi");
