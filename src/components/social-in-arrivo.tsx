@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { Users } from "lucide-react";
 
 // Stato "in arrivo" della parte social: la migrazione del database non è ancora applicata
 // (o la lettura non riesce). Niente errori tecnici, niente pagine rotte.
 export default function SocialInArrivo({ titolo = "Gli amici arrivano presto" }: { titolo?: string }) {
   return (
-    <section data-testid="social-in-arrivo" className="rounded-card border border-border bg-surface p-6 text-center">
-      <p aria-hidden className="text-4xl">👥</p>
+    <section data-testid="social-in-arrivo" className="rounded-card border border-[#e8e2d8] bg-white p-6 text-center">
+      {/* Icona a tratto teal, non l'emoji blu (revisore 1/11, terzo giro). */}
+      <span aria-hidden data-testid="amici-icona" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f3efe8] text-brand"><Users size={30} strokeWidth={1.6} /></span>
       <p className="mt-2 font-title text-xl text-text">{titolo}</p>
       <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
         Stiamo preparando profili pubblici, amici da seguire e i posti consigliati da chi conosci. Intanto la tua mappa funziona come sempre.
