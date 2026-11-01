@@ -954,6 +954,8 @@ await page.unroute("**/api/search");
   { const nome = (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("card-risultato").innerText()).includes("Casa Encanto Roma");
     const p3 = await pin("P3");
     ok(nome && !p3.includes("CASA") && (p3 === "🍝" || p3.includes("Casa Encanto")), `nomi in maiuscolo: card e segnalino dicono "Casa Encanto Roma" (${p3.replace(/\n/g, " ")})`); }
+  // D19: la frase più lunga del campo finisce con i puntini, non tagliata a metà parola senza segno.
+  ok((await page.getByLabel("Cosa cerchi?").evaluate((e) => getComputedStyle(e).textOverflow)) === "ellipsis", "barra: una frase lunga finisce con i puntini");
   await page.unroute("**/api/search");
 }
 

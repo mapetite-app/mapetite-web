@@ -2503,7 +2503,9 @@ export default function MapView({
                 onFocus={() => setIdeasOpen(true)}
                 placeholder="Chiedi all'AI…"
                 aria-label="Chiedi all'AI: cosa cerchi?"
-                className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
+                // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
+                className="min-h-11 min-w-0 flex-1 text-ellipsis bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
               {voiceOn && aiQuery === "" && aiSearch === null && (
                 <VoiceButton
