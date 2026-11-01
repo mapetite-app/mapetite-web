@@ -26,7 +26,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** tavoli liberati la sera prima, rivendibili; il numero sale nel pannello.
 - **Sforzo:** S (la base c'è: `booking-reminder.tsx`, prenotazioni con data e ora).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** FATTA il 1/11 mattina (riga "Nome: ci vai?" con "Sì, ci vado / Non più" in home e nel profilo; avviso push del giorno prima per chi ha le prenotazioni sull'account, parte quando gli avvisi sono accesi).
 
 ### 37. "Avvisami se si libera" sul salvato (come Corner, ma dal pannello del locale)
 - **Problema:** chi salva un posto pieno lo perde; il locale ha tavoli che si liberano all'ultimo e nessuno lo sa.
