@@ -46,6 +46,8 @@ export type Venue = {
   name: string;
   address: string | null;
   category: string | null;
+  // Tutti i tipi Google (solo dai risultati di ricerca): stessa emoji della card e del segnalino.
+  types?: string[] | null;
   rating: number | null;
   userRatingCount: number | null;
   priceLevel: number | null;
@@ -305,7 +307,7 @@ export default function VenueSheet({
   const variant = useVariant("scheda");
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
-  const emoji = getCategoryEmoji(category, name);
+  const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
     <ConfrontoFonti
@@ -1126,7 +1128,7 @@ export default function VenueSheet({
             aria-label={category ?? "locale"}
             className="text-4xl leading-none"
           >
-            {getCategoryEmoji(category, name)}
+            {getCategoryEmoji(category, name, venue.types)}
           </span>
         )}
         <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[2.1rem]`}>

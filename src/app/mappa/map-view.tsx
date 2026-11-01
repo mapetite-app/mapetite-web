@@ -249,7 +249,7 @@ function SaveModal({
           <div className="mx-auto mb-3 h-1 w-10 rounded-pill bg-border" />
           <div className="flex items-center gap-3 border-b border-border pb-4">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl">
-              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name)} />
+              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name, place.types)} />
             </span>
             <span className="min-w-0">
               <span className="block text-xs font-sans text-text-muted">{mode === "edit" ? "Tra i tuoi salvati" : "Salva"}</span>
@@ -533,6 +533,9 @@ export type Place = {
   note: string | null;
   rating: number | null;
   priceLevel: number | null;
+  // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
+  // generico ("restaurant"). I salvati non li hanno: la loro emoji resta quella di sempre.
+  types?: string[] | null;
 };
 
 function SaveButton({
@@ -1705,10 +1708,10 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
-      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
+      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
       const details: Record<string, VenueDetails> = {};
       for (const p of raw) {
         details[p.id] = {
@@ -1965,7 +1968,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -1982,6 +1985,7 @@ export default function MapView({
           note: null,
           rating: p.rating ?? null,
           priceLevel: p.priceLevel ?? null,
+          types: p.types ?? null,
         }));
         const details: Record<string, VenueDetails> = {};
         for (const p of raw) {
@@ -3277,7 +3281,7 @@ export default function MapView({
                   >
                     {/* Emoji del tipo di locale sotto la foto: si vede subito e resta finché la foto non arriva
                         (giro del 1/11: per secondi i segnalini erano cerchi bianchi vuoti). */}
-                    <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name)}</span>
+                    <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
                       alt={place.name}
@@ -3294,7 +3298,7 @@ export default function MapView({
                     }`}
                   >
                     {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
-                    {getCategoryEmoji(place.category, place.name)}
+                    {getCategoryEmoji(place.category, place.name, place.types)}
                     {/* Sopra l'emoji, che resta visibile finché la foto non è arrivata. */}
                     {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef && (
                       <PlacePhoto
@@ -3421,7 +3425,7 @@ export default function MapView({
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
-                category: selected.category, rating: selected.rating,
+                category: selected.category, types: selected.types ?? null, rating: selected.rating,
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,

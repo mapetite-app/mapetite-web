@@ -933,6 +933,26 @@ await page.unroute("**/api/search");
   await page.unroute("**/api/search/synthesis");
 }
 
+// 5f-bis. Emoji dal tipo vero (giro del 1/11, D23: 12 risultati su 12 con 🍝): con il tipo principale generico
+//         ("restaurant") decidono gli altri tipi Google del locale; il nome resta come prima.
+{
+  const TIPI = [
+    { ...PLACES[0], category: "restaurant", types: ["sushi_restaurant", "japanese_restaurant", "restaurant"] },
+    { ...PLACES[1], category: "restaurant", types: ["brazilian_restaurant", "restaurant"] },
+    { ...PLACES[2], category: "restaurant", types: ["restaurant", "food"] },
+  ];
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: TIPI, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=P1]").waitFor({ timeout: 6000 });
+  const cop = async (id) => (await page.locator(`ul.snap-x li[data-id=${id}]`).getByTestId("copertina").textContent())?.trim();
+  const pin = async (id) => (await page.locator(`[data-testid=pin][data-place=${id}]`).first().innerText().catch(() => "")).trim();
+  const [c1, c2, c3] = [await cop("P1"), await cop("P2"), await cop("P3")];
+  ok(c1 === "🍣" && c2 === "🥩" && c3 === "🍝", `emoji dal tipo vero: sushi 🍣, churrascaria 🥩, ristorante generico 🍝 (${c1} ${c2} ${c3})`);
+  ok((await pin("P1")).includes("🍣"), `emoji dal tipo vero: anche il segnalino del sushi ha 🍣 (${await pin("P1")})`);
+  await page.unroute("**/api/search");
+}
+
 // 5e. Ricerca in un'altra città con la mappa su Roma e la posizione mai chiesta: niente "479 km" sulle card
 {
   const MILANO = PLACES.map((p, i) => ({ ...p, address: "Via di Prova 1, Milano", lat: 45.46 + i * 0.001, lng: 9.19 }));

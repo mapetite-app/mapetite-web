@@ -787,7 +787,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
-                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     {i < PHOTO_CARDS && d?.photoRef && (
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
                     )}
@@ -895,7 +895,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
                       così si vede anche quando la foto non arriva (quota finita). */}
-                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
@@ -1046,7 +1046,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     alt={place.name}
                     width={200}
                     className="h-full w-full object-cover"
-                    fallback={getCategoryEmoji(place.category, place.name)}
+                    fallback={getCategoryEmoji(place.category, place.name, place.types)}
                   />
                 </span>
                 <span className="min-w-0 flex-1">
