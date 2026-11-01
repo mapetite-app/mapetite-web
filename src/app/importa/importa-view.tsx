@@ -54,9 +54,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
   // Ricerca "a mano" chiesta da un altro punto della pagina (es. "Cerca …" sotto un link di Instagram).
   const [manualReq, setManualReq] = useState<{ q: string; n: number } | null>(null);
   const [flashShot, setFlashShot] = useState(false);
-  // Le 4 tessere (Da Google Maps · Da file di Google · Da screenshot · A mano): una sola aperta.
-  // Dal primo accesso si apre subito la guida di Google Maps.
-  const [panel, setPanel] = useState<Panel | null>(benvenuto ? "maps" : null);
+  // Le altre strade (screenshot · a mano · file di Google): una sola aperta.
+  const [panel, setPanel] = useState<Panel | null>(null);
   // Tanti link incollati insieme (chat, nota): li legge la lista di MultiLinkCard.
   const [multi, setMulti] = useState<{ text: string; n: number } | null>(null);
   // Link del video da cui si sta salvando (piano 5.6d): dopo il salvataggio si collega al locale,
@@ -281,16 +280,18 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    // Stesso fondo beige di home e salvati (giro 1/11, D52).
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]" data-testid="importa-pagina">
+    <div className="mx-auto max-w-2xl px-4 pb-10 pt-8">
       {benvenuto ? (
         <>
-          <h1 data-testid="importa-benvenuto" className="mb-1 font-title text-3xl font-semibold text-brand">Porta qui i tuoi posti</h1>
-          <p className="mb-5 text-sm text-text-muted">Incolla i link dei posti salvati su Google Maps, anche tutti insieme.</p>
+          <h1 data-testid="importa-benvenuto" className={TITLE}>Porta qui i tuoi posti</h1>
+          <p className="mb-5 mt-2 text-sm text-text-muted">Incolla i link dei posti salvati su Google Maps, anche tutti insieme.</p>
         </>
       ) : (
         <>
-          <h1 className="mb-1 font-title text-3xl font-semibold text-brand">Aggiungi un posto</h1>
-          <p className="mb-5 text-sm text-text-muted">Da un reel, da Google Maps, da uno screenshot: in un gesto.</p>
+          <h1 className={TITLE}>Aggiungi un posto</h1>
+          <p className="mb-5 mt-2 text-sm text-text-muted">Incolla un link: il resto lo faccio io.</p>
         </>
       )}
 
@@ -298,6 +299,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         userId={userId}
         onMulti={(text) => setMulti((m) => ({ text, n: (m?.n ?? 0) + 1 }))}
       />
+      {/* "Come copio il link?": l'unica guida (prima c'erano anche la tessera e il pannello "Da Google Maps", doppioni). */}
+      {userId && <SalvaDaTelefono defaultOpen={benvenuto} />}
       <MultiLinkCard
         userId={userId}
         onScreenshot={goToScreenshot}
@@ -306,10 +309,10 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         incoming={multi}
         onAgain={() => document.getElementById("importa-google-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}
       />
-      {userId && <SalvaDaTelefono />}
 
-      <p className="mb-2 mt-5 text-center text-xs font-display font-semibold uppercase tracking-widest text-text-muted">Oppure</p>
-      <div className="grid grid-cols-2 gap-3" data-testid="importa-tessere">
+      {/* Le altre strade: un tocco più in là, in righe compatte (una sola cosa principale per schermata). */}
+      <p className="mb-2 mt-6 text-xs font-display font-semibold uppercase tracking-widest text-text-muted">Altri modi</p>
+      <div className="divide-y divide-border overflow-hidden rounded-card border border-border bg-white" data-testid="importa-tessere">
         {TILES.map((t) => (
           <button
             key={t.id}
@@ -318,29 +321,17 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
             aria-expanded={panel === t.id}
             aria-controls={PANEL_ID[t.id]}
             onClick={() => (panel === t.id ? setPanel(null) : openPanel(t.id))}
-            className={`flex min-h-28 flex-col items-start rounded-card border bg-surface p-4 text-left shadow-sm transition-colors active:scale-[0.99] ${panel === t.id ? "border-brand ring-2 ring-brand/20" : "border-border"}`}
+            className={`flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-surface ${panel === t.id ? "bg-surface" : ""}`}
           >
-            <span aria-hidden className="text-3xl leading-none">{t.icon}</span>
-            <span className="mt-2 font-display text-base font-semibold leading-tight text-brand">{t.title}</span>
-            <span className="mt-0.5 text-xs leading-snug text-text-muted">{t.text}</span>
+            <span aria-hidden className="text-2xl leading-none">{t.icon}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-[15px] font-semibold leading-tight text-brand">{t.title}</span>
+              <span className="block truncate text-xs text-text-muted">{t.text}</span>
+            </span>
+            <span aria-hidden className={`text-lg text-text-muted transition-transform ${panel === t.id ? "rotate-90" : ""}`}>›</span>
           </button>
         ))}
       </div>
-
-      <section id={PANEL_ID.maps} hidden={panel !== "maps"} className="mt-4 scroll-mt-4 rounded-card border border-border bg-surface p-5" data-testid="importa-maps-guida">
-        <h2 className="font-display text-lg font-semibold text-brand">
-          <span aria-hidden>📍 </span>Da Google Maps
-        </h2>
-        <ol className="mt-3 space-y-2">
-          {["In Google Maps apri il locale o una tua lista", "Tocca Condividi → Copia link", "Torna qui e tocca Incolla un link"].map((st, i) => (
-            <li key={st} className="flex items-start gap-3 text-sm text-text">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{i + 1}</span>
-              <span className="pt-0.5">{st}</span>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-3 text-xs text-text-muted">Su Android, con Mapetite installata, puoi anche scegliere Mapetite direttamente da Condividi.</p>
-      </section>
 
       <div id={PANEL_ID.file} hidden={panel !== "file"} className="mt-4 scroll-mt-4">
         <TakeoutCard userId={userId} />
@@ -354,7 +345,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         id="da-screenshot"
         hidden={panel !== "shot"}
         data-testid="importa-screenshot"
-        className={`mt-6 scroll-mt-4 rounded-card border bg-surface p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
+        className={`mt-4 scroll-mt-4 rounded-card border bg-white p-5 transition-colors ${flashShot ? "border-accent ring-2 ring-accent/40" : "border-border"}`}
       >
       <h2 className="mb-1 font-display text-lg font-semibold text-brand">
         <span aria-hidden>📸 </span>Da uno screenshot
@@ -534,16 +525,20 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       )}
       </section>
     </div>
+    </div>
   );
 }
 
-type Panel = "maps" | "file" | "shot" | "mano";
-const PANEL_ID: Record<Panel, string> = { maps: "da-google-maps", file: "da-file", shot: "da-screenshot", mano: "a-mano" };
+// Titolo nel serif da rivista di home e salvati (giro 1/11, D7).
+const TITLE = "font-[family-name:var(--font-newsreader)] text-[38px] font-medium leading-none tracking-tight text-text";
+
+type Panel = "file" | "shot" | "mano";
+const PANEL_ID: Record<Panel, string> = { file: "da-file", shot: "da-screenshot", mano: "a-mano" };
+// "Da Google Maps" non è più una tessera: faceva la stessa cosa di "Incolla un link" (giro 1/11, D50).
 const TILES: { id: Panel; icon: string; title: string; text: string }[] = [
-  { id: "maps", icon: "📍", title: "Da Google Maps", text: "Copia il link e incollalo" },
-  { id: "file", icon: "🗂️", title: "Da file di Google", text: "Tutti i tuoi salvati in un colpo" },
-  { id: "shot", icon: "📸", title: "Da screenshot", text: "Post e storie: leggo io il nome" },
-  { id: "mano", icon: "✍️", title: "A mano", text: "Scrivi nome e città" },
+  { id: "shot", icon: "📸", title: "Da uno screenshot", text: "Post e storie: leggo io il nome" },
+  { id: "mano", icon: "✍️", title: "Scrivi il nome", text: "Nome e città, lo trovo io" },
+  { id: "file", icon: "🗂️", title: "Tutti i salvati di Google Maps", text: "Dal file che scarichi da Google" },
 ];
 
 function Row({

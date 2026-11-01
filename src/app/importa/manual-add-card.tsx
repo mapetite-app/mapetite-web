@@ -121,7 +121,7 @@ export default function ManualAddCard({
     <section
       ref={rootRef}
       id="a-mano"
-      className="scroll-mt-4 rounded-card border border-border bg-surface p-5"
+      className="scroll-mt-4 rounded-card border border-border bg-white p-5"
       data-testid="importa-mano"
     >
       <h2 className="font-display text-lg font-semibold text-brand">
