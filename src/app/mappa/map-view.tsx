@@ -431,6 +431,8 @@ const SIMILAR_MAX_METERS = 15_000;
 const NEARBY_SAVED_METERS = 800;
 // "Dai tuoi salvati" sopra i risultati: un salvato conta solo se è a meno di 20 km da dove si cerca.
 const DAL_SALVATI_METERS = 20_000;
+// Fin dove un salvato scelto per la ricerca allarga la mappa (oltre resta fuori dall'inquadratura).
+const DAL_SALVATI_INQUADRA_METERS = 2_500;
 // Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
 function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
   return places
@@ -2417,12 +2419,17 @@ export default function MapView({
     if (!map || !mapReadyRef.current) return;
     inquadratoPer.current = dalSalvati.ticket;
     const w = window.innerWidth, h = window.innerHeight;
+    // Solo i salvati a due passi dai risultati spostano la mappa: un salvato a 4 km (Kiko Sushi Bar, giro
+    // del 1/11, D20) allargava la vista a mezza Roma e i risultati finivano ammassati sul bordo. Quelli più
+    // lontani restano nella riga "Dai tuoi salvati" e con il loro segnalino, fuori dall'inquadratura.
+    const risultati = aiSearch?.risultati ?? [];
+    const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= DAL_SALVATI_INQUADRA_METERS));
     // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
-    const fuori = dalSalvatiVisti.some(({ place }) => {
+    const fuori = vicini.some(({ place }) => {
       const pt = map.project([place.lng, place.lat]);
       return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
     });
-    if (fuori) fitToPlaces([...(aiSearch?.risultati ?? []), ...dalSalvatiVisti.map((d) => d.place)], 190, 60);
+    if (fuori) fitToPlaces([...risultati, ...vicini.map((d) => d.place)], 190, 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
   }, [dalSalvatiChiave]);
 

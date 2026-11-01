@@ -1684,6 +1684,21 @@ else {
       const box = await ds.boundingBox();
       ok(hs.length === 2 && hs.every((h) => h <= 64) && !!box && box.x + box.width <= 390, `dai tuoi salvati: perché lunghi in 2 righe al massimo (${hs.map(Math.round).join(", ")} px), dentro lo schermo`);
       rows[1].places.name = nomeVero; }
+    // Giro del 1/11 (D20): un salvato a 4 km dai risultati non allarga la mappa (resta nella riga e col suo
+    // segnalino, fuori dall'inquadratura); i risultati restano inquadrati.
+    { rows.push({ tags: ["Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000009", name: "Sushi Lontano", category: "restaurant", address: "Via Tiburtina 1, Roma", lat: 41.93, lng: 12.535, google_place_id: "G9" } });
+      await p.unroute("**/api/salvati/chiedi");
+      await p.route("**/api/salvati/chiedi", (r) => r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000009", perche: "Hai scritto: sushi." }] } }));
+      await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+      await p.getByLabel("Cosa cerchi?").fill("cena con amici a Roma");
+      await p.keyboard.press("Enter");
+      await ds.waitFor({ timeout: 6000 }).catch(() => {});
+      await p.waitForTimeout(1500);
+      const lontano = await p.getByTestId("pin-dai-salvati").first().boundingBox().catch(() => null);
+      const vicino = await p.locator("[data-testid=pin][data-place=P3]").first().boundingBox().catch(() => null);
+      const fuoriVista = !lontano || lontano.x > 390 || lontano.x + lontano.width < 0 || lontano.y + lontano.height < 0 || lontano.y > 844;
+      ok((await ds.textContent()).includes("Sushi Lontano") && !!vicino && vicino.x > 0 && vicino.x < 390 && vicino.y > 100 && vicino.y < 520 && fuoriVista, `dai tuoi salvati: un salvato a 4 km non allarga la mappa, i risultati restano inquadrati (risultato a ${JSON.stringify(vicino && { x: Math.round(vicino.x), y: Math.round(vicino.y) })}, salvato ${fuoriVista ? "fuori vista" : JSON.stringify(lontano)})`);
+      rows.pop(); }
     await p.unroute("**/api/search");
     await p.unroute("**/api/salvati/chiedi");
     // Dalla home: /mappa?q=… parte prima che i salvati siano letti; la domanda ai salvati parte appena arrivano.
