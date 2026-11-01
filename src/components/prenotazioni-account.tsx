@@ -75,7 +75,7 @@ export default function PrenotazioniAccount({ haPrenotazioni, onStato }: { haPre
       <div data-testid="prenotazioni-account-altro" role="note" className="mt-6 rounded-card border border-border bg-white px-4 py-2.5">
         <p className="text-sm font-display font-semibold text-brand">Legate a un altro account</p>
         <p className="mt-0.5 text-xs font-sans leading-relaxed text-text-muted">
-          Restano su questo telefono. Per tenerle aggiornate entra con l&apos;account con cui le hai attivate.
+          Restano su questo telefono. Si aggiornano solo con l&apos;account a cui sono legate.
         </p>
       </div>
     );
