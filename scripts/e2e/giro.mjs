@@ -5216,7 +5216,7 @@ else {
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
     ok((await rp.getByTestId("pannello-tavoli").count()) === 0, "pannello ristoratore: 'tavoli da Mapetite' spenta di base (bocciata due volte)");
     await rp.goto(`${BASE}/ristoratore/${LOC}?beta=tavoli`, { waitUntil: "networkidle" });
-    { const t = (await rp.getByTestId("pannello-tavoli").textContent().catch(() => "")) ?? ""; ok(t.includes("🤝 3") && t.includes("tavoli da Mapetite") && !t.includes("disdicono"), `pannello ristoratore: con ?beta=tavoli 3 tavoli da Mapetite, e con una sola persona di parola niente 'di parola' (${t})`); }
+    { const t = (await rp.getByTestId("pannello-tavoli").textContent().catch(() => "")) ?? ""; ok(t.includes("🤝 3") && t.includes("tavoli da Mapetite") && !t.includes("in tempo"), `pannello ristoratore: con ?beta=tavoli 3 tavoli da Mapetite, e con una sola persona di parola niente 'di parola' (${t})`); }
     await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello ristoratore: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/74-pannello-ristoratore.png`, caret: "initial", fullPage: true });
@@ -5277,6 +5277,10 @@ else {
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").includes("👍 10 su 11"), "pannello demo: visite vere con il 'Com'è andata?' (👍 10 su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
         ok(/🔁 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); }
+      // Dal 1/11: riquadro scuro asciutto, il periodo scritto una volta sola in testa ai numeri del periodo.
+      { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
+        const volte = (t.match(/giorni/gi) ?? []).length;
+        ok(volte === 1 && /ultimi 30\s?giorni/i.test(t) && (await rp.getByTestId("pannello-periodo").count()) === 1, `pannello demo: periodo una volta sola nel riquadro scuro (${volte} volte: ${t.slice(0, 160)})`); }
       { const t = ((await rp.getByTestId("pannello-insight").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
         ok(/\d+ persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi/.test(t), `pannello demo: clienti che tornano in 'Cosa ti dicono i numeri' (${t.slice(-110)})`); } }
     // Prima schermata (feedback 16/10): 4 numeri chiave e "Cosa ti dicono i numeri" visibili senza scorrere.
