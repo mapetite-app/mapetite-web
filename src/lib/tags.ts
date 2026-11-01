@@ -1,7 +1,8 @@
 // I due tag di stato restano salvati come "Da provare" / "Già visitato" (dati esistenti),
 // ma si mostrano con le parole dei pulsanti della scheda, come in Places.
 const STATUS_LABEL: Record<string, string> = {
-  "Da provare": "📌 Voglio andarci",
+  // Un solo nome per lo stesso stato in tutta l'app (revisore 1/11, terzo giro): "Da provare".
+  "Da provare": "📌 Da provare",
   "Già visitato": "✓ Ci sono stato",
   // "Com'era?" dopo "Ci sono stato" (segnale per i suggerimenti): anche questi non sono raccolte.
   "Mi è piaciuto": "👍 Mi è piaciuto",
@@ -13,7 +14,13 @@ export const OPINION_DISLIKE = "Non fa per me";
 
 export function tagLabel(tag: string): string {
   // hasOwn: un tag scritto a mano come "constructor" non deve leggere le proprietà dell'oggetto.
-  return Object.hasOwn(STATUS_LABEL, tag) ? STATUS_LABEL[tag] : tag;
+  return Object.hasOwn(STATUS_LABEL, tag) ? STATUS_LABEL[tag] : tagDisplay(tag);
+}
+
+// Solo per mostrarlo (revisore 1/11, terzo giro): "romantico" → "Romantico" nelle pillole e nelle
+// copertine. Il tag salvato resta com'è (filtri, raccolte e conteggi usano il valore vero).
+export function tagDisplay(tag: string): string {
+  return tag.charAt(0).toLocaleUpperCase("it") + tag.slice(1);
 }
 
 // Stato prima, poi gli altri tag nell'ordine in cui sono stati scelti.

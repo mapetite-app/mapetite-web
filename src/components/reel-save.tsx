@@ -458,7 +458,7 @@ function PlaceRow({
         {/* Senza foto Google niente riquadro da 160 px con la sola emoji (collaudo 31/10: riquadro troppo lungo). */}
         {auto && st.top.photoRef && <Foto place={st.top} big hideOnFail />}
         <p className="text-xs font-semibold uppercase tracking-wide text-success">
-          {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Voglio andarci"}
+          {st.out.alreadySaved ? "✓ Era già nei tuoi salvati" : "✓ Salvato in 📌 Da provare"}
         </p>
         <p className="mt-1 font-title text-2xl text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>

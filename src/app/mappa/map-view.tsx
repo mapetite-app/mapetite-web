@@ -101,7 +101,7 @@ function SaveModal({
   // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
   knownTags?: string[];
 }) {
-  // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
+  // Variante stile Places (?beta=salva): foglio dal basso con "Da provare / Ci sono stato".
   const sheetOn = useOptIn("salva");
   // Nel foglio nuovo salvare vuol dire "voglio andarci" finché non si sceglie altro (come Places).
   const [selectedTags, setSelectedTags] = useState<string[]>(() =>
@@ -112,7 +112,7 @@ function SaveModal({
   const [error, setError] = useState(false);
 
   const toggleTag = (tag: string) => {
-    // "Voglio andarci" e "Ci sono stato" si escludono a vicenda, come nella scheda.
+    // "Da provare" e "Ci sono stato" si escludono a vicenda, come nella scheda.
     const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev.filter((t) => t !== other), tag]
@@ -260,7 +260,7 @@ function SaveModal({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-1 rounded-pill bg-brand/5 p-1" role="group" aria-label="Stato">
-            {([[VISIT_WANT, "📌 Voglio andarci"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
+            {([[VISIT_WANT, "📌 Da provare"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
               <button
                 key={v}
                 type="button"
@@ -434,7 +434,7 @@ const NEARBY_SAVED_METERS = 800;
 const DAL_SALVATI_METERS = 20_000;
 // Fin dove un salvato scelto per la ricerca allarga la mappa (oltre resta fuori dall'inquadratura).
 const DAL_SALVATI_INQUADRA_METERS = 2_500;
-// Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
+// Il "Da provare" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
 function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
   return places
     .filter((p) => p.tags?.includes(VISIT_WANT))
@@ -907,7 +907,7 @@ export default function MapView({
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
-  // Stato scelto in scheda prima di aprire Salva ("Voglio andarci" / "Ci sono stato"); vuoto dal segnalibro.
+  // Stato scelto in scheda prima di aprire Salva ("Da provare" / "Ci sono stato"); vuoto dal segnalibro.
   const [pendingSaveTags, setPendingSaveTags] = useState<string[]>([]);
   // Salvato da aprire appena arrivano i salvati (link dal profilo: /mappa?salvato=UUID).
   const openSavedRef = useRef<string | null>(null);
@@ -1334,11 +1334,11 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando cambia il locale aperto
   }, [selected?.id]);
 
-  // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Voglio andarci"
+  // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Da provare"
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   // "📌 A 300 m c'è X, che volevi provare" (come Mapstr, ma senza notifiche): quando l'utente tocca
-  // "La mia posizione" e un suo "Voglio andarci" è a due passi. Ritrova il locale nel momento giusto.
+  // "La mia posizione" e un suo "Da provare" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showNearby = (near: { place: Place; meters: number } | null, daSolo = false) => {
@@ -1585,7 +1585,7 @@ export default function MapView({
     }
   };
 
-  // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
+  // Stato del salvato come in Places ("Da provare" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
   const visitBusy = useRef(false);
   // pair: i due tag che si escludono (stato della visita, oppure "Com'era?").
@@ -2649,7 +2649,7 @@ export default function MapView({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-display font-semibold text-text">{p.name}</span>
                   <span className="block truncate text-xs font-sans text-text-muted">
-                    {[p.tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : p.tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : null, cityFromAddress(p.address), p.note ? `“${p.note}”` : null].filter(Boolean).join(" · ")}
+                    {[p.tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : p.tags?.includes(VISIT_WANT) ? "📌 Da provare" : null, cityFromAddress(p.address), p.note ? `“${p.note}”` : null].filter(Boolean).join(" · ")}
                   </span>
                 </span>
               </button>
@@ -3776,7 +3776,7 @@ export default function MapView({
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;
             if (!uuid || !savedIds.has(uuid)) return null;
-            return tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : "📌 Salvato";
+            return tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : tags?.includes(VISIT_WANT) ? "📌 Da provare" : "📌 Salvato";
           }}
           // Già salvato: la scheda permette di modificarlo o rimuoverlo (vedi quickSave).
           onSave={aiSearch !== null && view === "all" ? (place) => { void quickSave(place); } : undefined}
@@ -3893,7 +3893,7 @@ export default function MapView({
               >
                 Tipo di locale, voto e prezzo <ChevronRight size={16} aria-hidden />
               </button>
-              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
+              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Da provare". */}
               {pickOn && sheetShown.length >= 2 && (
                 <button
                   type="button"

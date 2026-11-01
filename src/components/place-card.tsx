@@ -11,7 +11,7 @@ type PlaceCardProps = {
 };
 
 // Card di un salvato nel profilo. Più leggera dal 17/10 (stile Places): tipo e via su una riga (la città è già nel titolo del gruppo),
-// lo stato ("Voglio andarci" / "Ci sono stato") in corallo, le raccolte in grigio.
+// lo stato ("Da provare" / "Ci sono stato") in corallo, le raccolte in grigio.
 export default function PlaceCard({ name, category, address, tags, note }: PlaceCardProps) {
   const emoji = getCategoryEmoji(category, name);
   const isState = (t: string) => (STATE_TAGS as readonly string[]).includes(t);

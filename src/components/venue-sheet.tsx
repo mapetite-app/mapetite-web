@@ -90,7 +90,7 @@ type VenueSheetProps = {
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
   onOpinion?: (opinion: "Mi è piaciuto" | "Non fa per me") => void; // "Com'era?" dopo "Ci sono stato"
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
-  // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
+  // Locale non ancora salvato: "📌 Da provare / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
   // Prenotazione assistita: giorno, ora e persone già capiti (dall'assistente), da confermare.
   booking?: Partial<BookingDetails> | null;
@@ -412,7 +412,7 @@ export default function VenueSheet({
   ) : null;
 
   // "Le tue note": stato, Com'era, classifica, tag e nota del salvato. withStatus=false quando
-  // "Voglio andarci / Ci sono stato" stanno già nella riga delle azioni (scheda B).
+  // "Da provare / Ci sono stato" stanno già nella riga delle azioni (scheda B).
   // senzaFiletto: subito sotto il verdetto, che ha già il suo filetto (collaudo 22/10: doppio filetto nei salvati).
   const personalBlock = (withStatus: boolean, editorial = false, senzaFiletto = false) => (
     <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e3ddd2] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
@@ -421,7 +421,7 @@ export default function VenueSheet({
         </p>
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
-            {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
+            {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
               const on = personalTags?.includes(tag) ?? false;
               return (
                 <button
@@ -843,7 +843,7 @@ export default function VenueSheet({
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (
           <div className="mx-[22px] mt-4 flex rounded-pill bg-bg p-1" data-testid="stato-rapido">
-            {([["Da provare", "Voglio andarci", "📌"], ["Già visitato", "Ci sono stato", "✓"]] as const).map(([tag, label, e]) => (
+            {([["Da provare", "Da provare", "📌"], ["Già visitato", "Ci sono stato", "✓"]] as const).map(([tag, label, e]) => (
               <button
                 key={tag}
                 type="button"
@@ -1234,7 +1234,7 @@ export default function VenueSheet({
       {/* Non salvato: le due scelte di Places come primo passo del salvataggio. */}
       {!isSaved && onQuickSave && (
         <div className="mx-5 mt-4 flex gap-2" data-testid="stato-rapido">
-          {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
+          {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
             <button
               key={tag}
               type="button"

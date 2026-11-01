@@ -35,7 +35,7 @@ async function alreadySavedMap(userId: string, googleIds: string[]): Promise<Rec
 }
 
 // "Aggiungi a mano": nome del locale e città → UNA ricerca Google (la stessa dell'import
-// da screenshot, /api/places/search) → fino a 5 risultati → Salva in "📌 Voglio andarci".
+// da screenshot, /api/places/search) → fino a 5 risultati → Salva in "📌 Da provare".
 // La ricerca parte solo quando l'utente tocca Cerca (o Invio); la stessa frase non viene
 // cercata due volte di seguito.
 export default function ManualAddCard({
@@ -170,7 +170,7 @@ export default function ManualAddCard({
           {saved && (
             <div className="mt-4 space-y-2">
               <LinkResults results={[saved]} userId={userId} />
-              {!saved.alreadySaved && <p className="text-xs text-text-muted">Lo trovi tra i salvati in 📌 Voglio andarci.</p>}
+              {!saved.alreadySaved && <p className="text-xs text-text-muted">Lo trovi tra i salvati in 📌 Da provare.</p>}
             </div>
           )}
 
@@ -218,7 +218,7 @@ export default function ManualAddCard({
           )}
 
           {results && results.length > 0 && !saved && (
-            <p className="mt-2 text-xs text-text-muted">Salva lo mette in 📌 Voglio andarci. Dopo puoi aggiungere una nota.</p>
+            <p className="mt-2 text-xs text-text-muted">Salva lo mette in 📌 Da provare. Dopo puoi aggiungere una nota.</p>
           )}
 
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error">{error}</p>}
