@@ -130,8 +130,9 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
       <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
         <CalendarCheck size={14} /> Domani{dettagli ? ` ${dettagli}` : ""}
       </p>
-      <p data-testid="ci-vai-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
-        <span className="line-clamp-2">{b.placeName}: ci vai?</span>
+      <p data-testid="ci-vai-titolo" className="mt-1 flex min-w-0 font-title text-lg font-semibold leading-tight">
+        <span className="truncate">{b.placeName}</span>
+        <span className="shrink-0 whitespace-pre">: ci vai?</span>
       </p>
       {!open ? (
         <div className="mt-3 flex gap-2">
@@ -156,8 +157,8 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
       ) : (
         <>
           <Disdetta b={b} />
-          <button type="button" data-testid="ci-vai-ripensato" onClick={onNonPiu} className="mt-2 min-h-9 text-xs font-display font-semibold text-white/80 underline underline-offset-2">
-            Ci vado: torna indietro
+          <button type="button" data-testid="ci-vai-ripensato" onClick={onNonPiu} className="mt-1 min-h-11 text-sm font-display font-semibold text-white/80 underline underline-offset-2">
+            Indietro
           </button>
         </>
       )}
