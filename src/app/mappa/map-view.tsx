@@ -2965,7 +2965,7 @@ export default function MapView({
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (aiQuery.trim()) void runAISearch(aiQuery.trim()); }
                 }}
                 placeholder="Cosa cerchi?"
-                className="font-title block w-full resize-none bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none"
+                className="font-sans block w-full resize-none bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none"
               />
               <div className="mt-1 flex items-center justify-between">
                 <button

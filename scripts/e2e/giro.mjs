@@ -1333,8 +1333,9 @@ ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif riaccende il se
 // Stesso stile di titolo nelle pagine principali (prima stasera, importa, profilo, assistente erano in Poppins grassetto).
 for (const path of ["/stasera", "/importa", "/assistente", "/profilo", "/amici"]) {
   await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
-  const f = await page.evaluate(() => { const h = document.querySelector("main h1, h1, main .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
-  ok(/Newsreader/i.test(f), `titoli: su ${path} il titolo è nel serif della home (${f.slice(0, 30)})`);
+  // Senza accesso alcune pagine portano al login: lì si controlla il titolo del login.
+  const f = await page.evaluate(() => { const h = document.querySelector("main h1, h1, main .font-title, .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+  ok(/Newsreader/i.test(f), `titoli: su ${path} (${new URL(page.url()).pathname}) il titolo è nel serif della home (${f.slice(0, 30)})`);
 }
 
 // 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
@@ -2221,7 +2222,8 @@ else {
       await p.goto(`${BASE}/profilo?raccolta=nuova`, { waitUntil: "networkidle" });
       await p.getByTestId("raccolte-sheet").waitFor({ timeout: 3000 }).catch(() => {});
       ok(await p.getByTestId("raccolte-sheet").isVisible() && await p.evaluate(() => !!document.getElementById("raccolte")?.open), "profilo: ?raccolta=nuova apre le raccolte e il foglio 'Nuova raccolta'");
-      await p.goto(`${BASE}/profilo#raccolte`, { waitUntil: "networkidle" });
+      // Indirizzo diverso da quello riscritto dalla pagina (/profilo#raccolte): così si ricarica davvero e il foglio è chiuso.
+      await p.goto(`${BASE}/profilo?giro=1#raccolte`, { waitUntil: "networkidle" });
       let patches = [];
       let patchFail = false;
       // Tag "freschi" dal database (letti prima di ogni scrittura): per simulare "Ci sei stato?" fatto dopo il caricamento.
