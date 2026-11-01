@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Check, ChevronRight, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
+import { Bookmark, Check, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -16,8 +16,8 @@ import { trackFeature } from "@/lib/track";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
-// di stato con i conteggi veri, raccolte come copertine (mosaico dei posti dentro), "Stasera" come
-// azione a parte (non è una raccolta), ordine visibile (Vicino / Recenti) e righe con stato, 👍,
+// di stato con i conteggi veri, raccolte come copertine basse (mosaico e nome dentro), "Stasera" come
+// pulsante piccolo accanto a Filtri (non è una raccolta), ordine visibile (Vicino / Recenti), righe con stato, 👍,
 // verdetto e provenienza sotto il nome, così il nome ha tutta la riga.
 // Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo) sta nel foglio "Filtri"
 // di map-view; la mappa è a un tocco (icona in alto). Nessuna foto: le foto Google non si
@@ -38,24 +38,35 @@ function Miniatura({ place, size }: { place: Place; size: string }) {
   );
 }
 
-// Copertina di una raccolta: mosaico delle emoji dei primi posti dentro (1, 2, 3 o 4 riquadri).
-function Copertina({ name, preview }: { name: string; preview: Place[] }) {
+// Copertina di una raccolta (correzione del revisore, 1/11): bassa (64 px), come una cartella colorata,
+// con il mosaico delle emoji dei primi posti a sinistra e il nome dentro, il numero piccolo accanto.
+// Così la lista dei posti parte entro i primi 330 px anche con 2–3 raccolte.
+function Copertina({ name, count, preview, on }: { name: string; count: number; preview: Place[]; on: boolean }) {
   const tiles = preview.slice(0, 4);
-  const layout = tiles.length >= 3 ? "grid-cols-2 grid-rows-2" : tiles.length === 2 ? "grid-cols-2" : "grid-cols-1";
   return (
-    <span data-testid="raccolta-copertina" aria-hidden className={`grid h-[92px] w-full gap-[3px] overflow-hidden rounded-[16px] p-[3px] ${layout}`} style={{ background: collectionColor(name) }}>
-      {tiles.length === 0 ? (
-        <span className="flex items-center justify-center text-[34px]">📍</span>
-      ) : (
-        tiles.map((t, i) => (
-          <span
-            key={t.id}
-            className={`flex items-center justify-center rounded-[12px] bg-white/[0.13] ${tiles.length === 1 ? "text-[44px]" : tiles.length === 3 && i === 0 ? "row-span-2 text-[34px]" : tiles.length === 2 ? "text-[34px]" : "text-[24px]"}`}
-          >
-            {getCategoryEmoji(t.category, t.name)}
-          </span>
-        ))
-      )}
+    <span
+      data-testid="raccolta-copertina"
+      className={`flex h-16 w-full items-center gap-2 overflow-hidden rounded-[16px] p-1.5 pr-3 ${on ? "shadow-[0_0_0_2px_#f8f6f2,0_0_0_4px_#ff6b4a]" : ""}`}
+      style={{ background: collectionColor(name) }}
+    >
+      <span aria-hidden className={`grid h-[44px] w-[44px] shrink-0 gap-[2px] overflow-hidden rounded-[11px] ${tiles.length >= 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-1"}`}>
+        {tiles.length === 0 ? (
+          <span className="flex items-center justify-center rounded-[11px] bg-white/[0.13] text-[26px]">📍</span>
+        ) : (
+          tiles.map((t, i) => (
+            <span
+              key={t.id}
+              className={`flex items-center justify-center bg-white/[0.13] ${tiles.length === 1 ? "rounded-[11px] text-[26px]" : `rounded-[6px] text-[13px] ${tiles.length === 2 || (tiles.length === 3 && i === 0) ? "row-span-2" : ""}`}`}
+            >
+              {getCategoryEmoji(t.category, t.name)}
+            </span>
+          ))
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight text-white`}>{name}</span>
+        <span className="shrink-0 text-[12px] font-semibold text-white/75">{count}</span>
+      </span>
     </span>
   );
 }
@@ -170,8 +181,9 @@ export default function SalvatiLista({
   const soloRisposta = domanda && list.length === 0 && activeTag === null && activeCity === null;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   const stateOn = activeTag === WANT || activeTag === DONE;
-  const pills: { label: string; n: number; on: boolean; tag: string | null }[] = [
-    { label: "Tutti", n: all.length, on: !stateOn && !collections.some((c) => c.name === activeTag), tag: null },
+  const pills: { label: string; n: number | null; on: boolean; tag: string | null }[] = [
+    // "Tutti" senza numero: il totale è già sopra il titolo ("3 posti · Roma").
+    { label: "Tutti", n: null, on: !stateOn && !collections.some((c) => c.name === activeTag), tag: null },
     { label: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
     { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
   ];
@@ -281,19 +293,19 @@ export default function SalvatiLista({
               onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
               className={`min-h-11 shrink-0 rounded-pill px-4 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
             >
-              {p.label} {p.n}
+              {p.n === null ? p.label : `${p.label} ${p.n}`}
             </button>
           ))}
         </div>
 
-        {/* Le raccolte come copertine (Places 07, Albo 12): un tocco filtra la lista. "Nuova raccolta" è l'ultima. */}
-        <h2 className="mt-5 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Raccolte</h2>
+        {/* Le raccolte come copertine basse (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima.
+            Niente titolo "Raccolte" né riga "N posti": la lista dei posti deve partire presto (revisore, 1/11). */}
         {collections.length === 0 ? (
           <Link
             href="/profilo?raccolta=nuova"
             aria-label="Nuova raccolta"
             data-testid="raccolte-vuote"
-            className="mt-2 flex min-h-[64px] items-center gap-3 rounded-card border-[1.5px] border-dashed border-[#d6cec1] px-3 py-2.5 active:scale-[0.98]"
+            className="mt-4 flex min-h-[64px] items-center gap-3 rounded-card border-[1.5px] border-dashed border-[#d6cec1] px-3 py-2.5 active:scale-[0.98]"
           >
             <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-white text-text-muted"><Plus size={20} /></span>
             <span className="min-w-0 flex-1">
@@ -302,11 +314,11 @@ export default function SalvatiLista({
             </span>
           </Link>
         ) : (
-          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-2 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none]">
+          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
             {collections.map((c) => {
               const on = activeTag === c.name;
               return (
-                <li key={c.name} className="w-[136px] shrink-0 snap-start">
+                <li key={c.name} className="min-w-[120px] max-w-[200px] shrink-0 snap-start">
                   <button
                     type="button"
                     data-testid="raccolta-cerchio"
@@ -315,41 +327,23 @@ export default function SalvatiLista({
                     onClick={() => onTag(on ? null : c.name)}
                     className="block w-full text-left active:scale-[0.97]"
                   >
-                    <span className={`block rounded-[18px] ${on ? "shadow-[0_0_0_2px_#f8f6f2,0_0_0_4px_#ff6b4a]" : ""}`}>
-                      <Copertina name={c.name} preview={c.preview} />
-                    </span>
-                    <span className={`${SERIF} mt-1.5 block truncate px-0.5 text-[17px] font-medium leading-tight ${on ? "text-accent" : "text-text"}`}>{c.name}</span>
-                    <span className="block px-0.5 pb-0.5 text-[12px] text-text-muted">{c.count} {c.count === 1 ? "posto" : "posti"}</span>
+                    <Copertina name={c.name} count={c.count} preview={c.preview} on={on} />
                   </button>
                 </li>
               );
             })}
-            <li className="w-[104px] shrink-0 snap-start">
-              <Link href="/profilo?raccolta=nuova" aria-label="Nuova raccolta" className="block active:scale-[0.97]">
-                <span aria-hidden className="flex h-[92px] w-full items-center justify-center rounded-[16px] border-[1.5px] border-dashed border-[#c9c2b6] text-text-muted"><Plus size={24} /></span>
-                <span className="mt-1.5 block truncate px-0.5 text-[13px] font-medium leading-tight text-[#33373d]">Nuova raccolta</span>
+            <li className="w-[60px] shrink-0 snap-start">
+              <Link href="/profilo?raccolta=nuova" aria-label="Nuova raccolta" className="flex h-16 w-full flex-col items-center justify-center gap-0.5 rounded-[16px] border-[1.5px] border-dashed border-[#c9c2b6] text-text-muted active:scale-[0.97]">
+                <Plus size={18} aria-hidden />
+                <span className="text-[12px] font-medium leading-none text-[#33373d]">Nuova</span>
               </Link>
             </li>
           </ul>
         )}
 
-        {/* "Stasera" è uno strumento, non una raccolta (giro 1/11, D39): un'azione a parte, una riga sola. */}
-        <Link
-          href="/stasera"
-          data-testid="lista-stasera"
-          aria-label="Stasera dove andiamo?"
-          className={`mt-3 flex min-h-[56px] items-center gap-3 rounded-card border ${LINE} bg-white px-3 py-2 shadow-card active:scale-[0.98]`}
-        >
-          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-[20px]">🍽️</span>
-          <span className="min-w-0 flex-1">
-            <span className={`${SERIF} block truncate text-[18px] font-medium leading-tight text-text`}>Stasera dove andiamo?</span>
-            <span className="block truncate text-[12.5px] text-text-muted">Scelgo io tra i tuoi {all.length === 1 ? "posti" : `${all.length} posti`}</span>
-          </span>
-          <ChevronRight size={18} aria-hidden className="shrink-0 text-accent" />
-        </Link>
-
-        {/* Ordine e filtri in una riga: "Vicino" chiede la posizione al tocco, "Filtri" è l'unico punto per il resto. */}
-        <div className="mt-5 flex items-center justify-between gap-2">
+        {/* Ordine, "Stasera" e filtri in una riga: "Vicino" chiede la posizione al tocco, "Stasera" è uno
+            strumento (non una raccolta) e sta qui come pulsante piccolo, "Filtri" è l'unico punto per il resto. */}
+        <div className="mt-3 flex items-center justify-between gap-2">
           <div role="group" aria-label="Ordina" data-testid="salvati-ordine" className="flex shrink-0 rounded-pill bg-[#ece6dc] p-1">
             {([["vicino", locating && !origin ? "Cerco…" : "Vicino"], ["recenti", "Recenti"]] as const).map(([k, label]) => (
               <button
@@ -363,12 +357,22 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1">
             {activeCity !== null && (
               <button type="button" onClick={onClearCity} aria-label={`Togli ${activeCity}`} className="flex min-h-11 min-w-0 items-center gap-1 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
                 <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
               </button>
             )}
+            <Link
+              href="/stasera"
+              data-testid="lista-stasera"
+              aria-label="Stasera dove andiamo?"
+              className="flex min-h-11 shrink-0 items-center active:scale-95"
+            >
+              <span className="flex h-9 items-center gap-1 rounded-pill bg-accent-light px-3 text-[13px] font-semibold text-[#b8432a]">
+                <span aria-hidden>🍽️</span> Stasera
+              </span>
+            </Link>
             <button type="button" data-testid="salvati-lista-filtri" onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill px-2 text-[13px] font-medium text-brand active:scale-95">
               <SlidersHorizontal size={15} aria-hidden /> Filtri
               {filtersOn > 0 && (
@@ -391,7 +395,7 @@ export default function SalvatiLista({
             </button>
           </div>
         ) : (
-          <ul data-testid="salvati-lista-posti" className={`mt-3 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+          <ul data-testid="salvati-lista-posti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
             {list.map((p, i) => {
               const kind = categoryLabel(p.category);
               const city = cityFromAddress(p.address);
@@ -402,7 +406,7 @@ export default function SalvatiLista({
               const done = p.tags?.includes(DONE);
               const want = !done && p.tags?.includes(WANT);
               const liked = p.tags?.includes(OPINION_LIKE);
-              const chip = "inline-flex h-[22px]shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
+              const chip = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
               return (
                 <li key={p.id} className={i > 0 ? `border-t ${LINE}` : ""}>
                   <button
@@ -422,14 +426,14 @@ export default function SalvatiLista({
                         </span>
                       )}
                       {verdict ? (
-                        <span data-testid="salvato-verdetto" className={`${SERIF} mt-1 block truncate text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>
+                        <span data-testid="salvato-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>
                       ) : p.note ? (
-                        <span data-testid="salvato-nota" className="mt-1 block truncate text-[13px] text-[#4a4f55]">“{p.note}”</span>
+                        <span data-testid="salvato-nota" className="mt-1 line-clamp-2 text-[13px] text-[#4a4f55]">“{p.note}”</span>
                       ) : null}
                       {(done || want || liked || fonte) && (
                         <span className="mt-1 flex flex-wrap gap-1.5">
                           {(done || want) && (
-                            <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-accent-light text-[#b8432a]"}`}>
+                            <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
                               {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <Bookmark size={11} strokeWidth={2.6} aria-hidden />}
                               {done ? "Ci sono stato" : "Da provare"}
                             </span>

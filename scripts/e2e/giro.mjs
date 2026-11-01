@@ -1668,14 +1668,25 @@ else {
     ok(await L.waitFor({ timeout: 5000 }).then(() => true, () => false) && await p.evaluate(() => [[195, 60], [195, 422], [195, 700]].every(([x, y]) => !!document.elementFromPoint(x, y)?.closest("[data-testid=salvati-lista]"))), "salvati: si apre la lista 'I tuoi posti' a tutto schermo (sopra la mappa)");
     ok(await L.getByRole("heading", { name: "I tuoi posti" }).isVisible() && (await L.getByTestId("salvati-lista-sopra").textContent()) === "3 posti · Roma e Milano", "salvati lista: titolo serif 'I tuoi posti' e sopra '3 posti · Roma e Milano' (città vere)");
     const st = L.getByTestId("salvati-stato");
-    ok((await st.getByRole("button").allTextContents()).join("|") === "Tutti 3|Da provare 1|Ci sono stato 0" && (await st.getByRole("button", { name: "Tutti 3" }).getAttribute("aria-pressed")) === "true", "salvati lista: filtri 'Tutti 3 / Da provare 1 / Ci sono stato 0' con i conteggi veri");
+    // Revisore 1/11: il totale sta già sopra il titolo, "Tutti" non lo ripete.
+    ok((await st.getByRole("button").allTextContents()).join("|") === "Tutti|Da provare 1|Ci sono stato 0" && (await st.getByRole("button", { name: "Tutti" }).getAttribute("aria-pressed")) === "true", "salvati lista: filtri 'Tutti / Da provare 1 / Ci sono stato 0' (il numero solo sopra il titolo)");
     ok((await L.getByTestId("raccolta-cerchio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).join("|") === "amici, 1 posto|romantico, 1 posto", "salvati lista: le raccolte vere come copertine (amici, romantico)");
-    // Giro del 1/11: copertine con il mosaico dei posti dentro, "Nuova raccolta" ultima card, "Stasera" fuori dalle raccolte.
+    // Giro del 1/11 e revisore: copertine basse (64 px) con il mosaico dei posti e il nome dentro, numero piccolo accanto,
+    // "Nuova" ultima e intera nello schermo, "Stasera" pulsante piccolo nella riga di "Filtri".
     { const cop = L.getByTestId("raccolta-copertina");
       const box = await cop.first().boundingBox();
-      ok((await cop.count()) === 2 && !!box && box.width >= 120 && box.height >= 80 && (await cop.first().textContent()).trim() === "🍝", `salvati lista: copertine larghe (${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}) con l'emoji dei posti dentro (amici → 🍝)`);
-      ok((await L.getByTestId("salvati-raccolte").locator("li").last().getByRole("link", { name: "Nuova raccolta" }).count()) === 1, "salvati lista: 'Nuova raccolta' è l'ultima copertina"); }
-    ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByTestId("salvati-raccolte").getByTestId("lista-stasera").count()) === 0 && (await L.getByTestId("lista-stasera").textContent()).includes("Stasera dove andiamo?") && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", "salvati lista: 'Stasera dove andiamo?' è un'azione a parte (non tra le raccolte), 'Nuova raccolta' e '+' per aggiungere");
+      const t0 = ((await cop.first().textContent()) ?? "").trim();
+      ok((await cop.count()) === 2 && !!box && box.width >= 120 && box.height >= 56 && box.height <= 72 && t0.startsWith("🍝") && t0.includes("amici") && t0.endsWith("1"), `salvati lista: copertine basse (${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}) con emoji, nome e numero dentro (${t0})`);
+      const tagliati = await cop.evaluateAll((els) => els.filter((e) => { const n = e.querySelector(".truncate"); return !!n && n.scrollWidth > n.clientWidth + 1; }).length);
+      ok(tagliati === 0, `salvati lista: i nomi brevi delle raccolte stanno interi nella copertina (${tagliati} tagliati)`);
+      const nuova = L.getByTestId("salvati-raccolte").locator("li").last().getByRole("link", { name: "Nuova raccolta" });
+      const nb = await nuova.boundingBox();
+      ok((await nuova.count()) === 1 && ((await nuova.textContent()) ?? "").trim() === "Nuova" && !!nb && nb.x >= 0 && nb.x + nb.width <= 390, `salvati lista: 'Nuova' è l'ultima copertina, intera nello schermo (${Math.round(nb?.x ?? 0)}–${Math.round((nb?.x ?? 0) + (nb?.width ?? 0))} px)`); }
+    { const sb = await L.getByTestId("lista-stasera").boundingBox(); const fb = await L.getByTestId("salvati-lista-filtri").boundingBox();
+      ok((await L.getByTestId("lista-stasera").getAttribute("href")) === "/stasera" && (await L.getByTestId("lista-stasera").getAttribute("aria-label")) === "Stasera dove andiamo?" && ((await L.getByTestId("lista-stasera").textContent()) ?? "").includes("Stasera") && (await L.getByTestId("salvati-raccolte").getByTestId("lista-stasera").count()) === 0 && !!sb && !!fb && Math.abs((sb.y + sb.height / 2) - (fb.y + fb.height / 2)) < 6 && sb.height <= 48 && (await L.getByRole("link", { name: "Nuova raccolta" }).getAttribute("href")) === "/profilo?raccolta=nuova" && (await L.getByRole("link", { name: "Aggiungi un posto" }).getAttribute("href")) === "/importa", `salvati lista: '🍽️ Stasera' pulsante piccolo nella riga di 'Filtri' (alto ${Math.round(sb?.height ?? 0)} px), 'Nuova raccolta' e '+' per aggiungere`); }
+    // Revisore 1/11 (grave): al primo sguardo si vedono i posti, non solo raccolte e pulsanti.
+    { const lb = await L.getByTestId("salvati-lista-posti").boundingBox();
+      ok(!!lb && lb.y <= 330, `salvati lista: con 2 raccolte la lista dei posti parte entro 330 px (y ${Math.round(lb?.y ?? 0)})`); }
     const righe = L.getByTestId("salvato-riga");
     // Ordine visibile: senza posizione "Recenti" (dall'ultimo salvato: Caffè Milano è l'ultimo della risposta).
     { const ord = L.getByTestId("salvati-ordine");
@@ -1684,8 +1695,15 @@ else {
     ok((await righe.count()) === 3, "salvati lista: tutti e 3 i salvati in lista");
     const osteria = righe.filter({ hasText: "Osteria Due" });
     ok((await osteria.getByTestId("stato-lista").textContent()) === "Da provare" && (await L.getByTestId("stato-lista").count()) === 1, "salvati lista: badge 'Da provare' solo dove lo stato c'è (nessuno stato inventato)");
+    // Revisore 1/11: "Da provare" è quasi ovunque, quindi grigio neutro; il corallo resta per le cose da notare.
+    { const c = await osteria.getByTestId("stato-lista").evaluate((el) => getComputedStyle(el).color);
+      const [r, g, b] = (c.match(/\d+/g) ?? []).map(Number);
+      ok(Math.max(r, g, b) - Math.min(r, g, b) <= 20, `salvati lista: badge 'Da provare' grigio neutro, non corallo (${c})`); }
     ok(await osteria.getByTestId("salvato-provenienza").textContent().then((t) => t.trim() === "Reel Instagram", () => false) && (await L.getByTestId("salvato-provenienza").count()) === 1, "salvati lista: 'Reel Instagram' sul salvato con un reel collegato (contenuti_locali)");
     ok(((await righe.filter({ hasText: "Terrazza Uno" }).getByTestId("salvato-verdetto").textContent()) ?? "").includes("Aperitivo lento sui tetti"), "salvati lista: il verdetto Mapetite in cache sulla riga");
+    // Revisore 1/11: il verdetto non si taglia a metà parola su una riga, va fino a 2 righe.
+    { const v = await righe.filter({ hasText: "Terrazza Uno" }).getByTestId("salvato-verdetto").evaluate((el) => { const lh = parseFloat(getComputedStyle(el).lineHeight); return { righe: Math.round(el.clientHeight / lh), tagliato: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1, clamp: getComputedStyle(el).webkitLineClamp }; });
+      ok(v.clamp === "2" && v.righe <= 2 && !v.tagliato, `salvati lista: verdetto fino a 2 righe, intero (${JSON.stringify(v)})`); }
     { const bs = [...await st.getByRole("button").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height)), ...await righe.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height)), ...await L.locator("header button, header a").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))];
       ok(bs.every((h) => h >= 44), `salvati lista: aree toccabili almeno 44 px (min ${Math.round(Math.min(...bs))})`); }
     await p.screenshot({ path: `${OUT}/11f-salvati-lista.png`, caret: "initial" });
