@@ -243,6 +243,7 @@ export type BookingRequest = BookingDetails & {
   dismissedRisposta?: boolean;
   disdetta?: number | null; // "Non vado più" toccato (ms): distingue la disdetta dal "Non ci sono andato" (dal 29/10)
   piattaforma?: string | null; // "Prenota su TheFork" (via "sito"): il nome della piattaforma (dal 30/10)
+  ciVado?: number | null;  // "Ci vai domani? Sì" (ms, proposta 36): il promemoria del giorno prima non torna (dal 1/11)
   modificataAt?: number;   // ultima modifica fatta sul telefono (ms): tra due telefoni vince la più recente (dal 31/10)
 };
 
@@ -396,7 +397,7 @@ export function bookingReminders(list: BookingRequest[], now: Date = new Date())
   return {
     today: live.filter((b) => b.date === todayKey).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     // Il giorno prima (contro i tavoli vuoti): se non si può più andare, è il momento giusto per avvisare.
-    tomorrow: live.filter((b) => b.date === tomorrowKey && !b.dismissedEve).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+    tomorrow: live.filter((b) => b.date === tomorrowKey && !b.dismissedEve && !b.ciVado && !b.outcome).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     howWasIt: live.filter((b) => b.date! < todayKey && b.date! >= oldest && !b.outcome),
     // Richiesta mandata a locale chiuso: dopo la riapertura, "ti hanno risposto?" (finché non si conferma
     // o si nasconde, e solo per prenotazioni ancora da fare).

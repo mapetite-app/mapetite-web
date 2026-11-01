@@ -3943,6 +3943,7 @@ else {
           const tardi = Date.UTC(2026, 9, 10, 20, 30);
           ok(bk.clienteDiParola([b({ id: "t1", date: "2026-10-10", time: "21:00", outcome: "non-andato", disdetta: tardi }), b({ id: "t2", outcome: "bene" }), b({ id: "t3", outcome: "bene" }), b({ id: "t4", outcome: "bene" })]) === null, "cliente di parola: ora del tavolo in ora italiana (disdetta dopo l'ora non conta)"); }
         ok(pa.pulisciPrenotazione(b({ id: "abcd6", createdAt: 1_790_000_000_000, modificataAt: 1_790_000_100_000 }))?.modificataAt === 1_790_000_100_000 && !("modificataAt" in pa.pulisciPrenotazione(b({ id: "abcd7", createdAt: 1_790_000_000_000, modificataAt: 5 }))), "prenotazioni sull'account: data dell'ultima modifica tenuta solo se plausibile");
+        ok(pa.pulisciPrenotazione(b({ id: "abcd8", createdAt: 1_790_000_000_000, ciVado: 1_790_000_200_000 }))?.ciVado === 1_790_000_200_000 && !("ciVado" in pa.pulisciPrenotazione(b({ id: "abcd9", createdAt: 1_790_000_000_000, ciVado: "si" }))), "prenotazioni sull'account: 'Sì, ci vado' arriva anche sull'account (un altro telefono non ripete la domanda)");
       }
       ok(bk.bookingMessage({ date: null, time: null, people: 2, special: null }, "Lorenzo", new Date(2026, 9, 15, 18), null, 4).includes(" Con Mapetite ho già prenotato 4 tavoli, anche altrove: sempre presente o disdetto in tempo. Grazie, Lorenzo"), "cliente di parola: la frase nel messaggio, prima della firma");
     }
@@ -3966,9 +3967,10 @@ else {
       { id: "d", date: "2026-10-01", placeName: "Vecchia", via: "sito" },
       { id: "e", date: "2026-10-16", time: "20:00", placeName: "Domani", via: "whatsapp" },
       { id: "f", date: "2026-10-16", placeName: "Domani nascosto", via: "whatsapp", dismissedEve: true },
+      { id: "g", date: "2026-10-16", placeName: "Domani ci vado", via: "whatsapp", ciVado: now.getTime() },
     ];
     const rem = bk.bookingReminders(list, now);
-    ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso)");
+    ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso; dopo 'Sì, ci vado' non torna)");
     ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
     // Due tavoli per lo stesso pasto (proposta CEO 19/10).
     const dop = [
@@ -4280,8 +4282,19 @@ else {
   { const dom = ap.getByTestId("promemoria-domani");
     const ok1 = await dom.waitFor({ timeout: 5000 }).then(() => true, () => false);
     ok(ok1 && ((await dom.textContent()) ?? "").includes("Domani alle 21:00") && (await dom.getByText("Percorso").count()) === 0, "promemoria: il giorno prima 'Domani alle 21:00', senza Percorso");
-    await dom.getByTestId("promemoria-non-vado").click();
-    ok(((await dom.getByTestId("disdetta-chiama").getAttribute("href")) ?? "") === "tel:0612345678" && ((await dom.getByTestId("promemoria-disdetta-testo").textContent()) ?? "").includes("di domani"), "promemoria: con un fisso la disdetta si fa chiamando, messaggio 'di domani'"); }
+    ok(((await dom.getByTestId("ci-vai-titolo").textContent()) ?? "").includes("Terrazza Uno: ci vai?") && (await dom.getByTestId("ci-vai-si").count()) === 1, "ci vai domani: il giorno prima una sola domanda 'Terrazza Uno: ci vai?' con 'Sì, ci vado' e 'Non più'");
+    await ashot("56b-ci-vai-domani");
+    await dom.getByTestId("ci-vai-non-piu").click();
+    ok((await dom.getByTestId("promemoria-disdetta").count()) === 1 && (await dom.getByTestId("ci-vai-si").count()) === 0 && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "ci_vai_domani" && e.props?.stato === "non_piu"), "ci vai domani: 'Non più' apre la disdetta già scritta (segnale ci_vai_domani)");
+    await ashot("56b2-ci-vai-non-piu");
+    ok(((await dom.getByTestId("disdetta-chiama").getAttribute("href")) ?? "") === "tel:0612345678" && ((await dom.getByTestId("promemoria-disdetta-testo").textContent()) ?? "").includes("di domani"), "promemoria: con un fisso la disdetta si fa chiamando, messaggio 'di domani'");
+    await dom.getByTestId("ci-vai-ripensato").click();
+    await dom.getByTestId("ci-vai-si").click();
+    await ap.waitForTimeout(300);
+    const t4 = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").find((x) => x.id === "t4"));
+    ok((await ap.getByTestId("promemoria-domani").count()) === 0 && typeof t4?.ciVado === "number" && !t4?.outcome && aEvents.some((e) => e.type === "funzione" && e.props?.nome === "ci_vai_domani" && e.props?.stato === "si"), "ci vai domani: 'Sì, ci vado' chiude il promemoria e lo ricorda (ciVado), la prenotazione resta");
+    await ap.reload({ waitUntil: "networkidle" });
+    ok((await ap.getByTestId("promemoria-domani").count()) === 0, "ci vai domani: chi ha risposto 'Sì' non lo rivede ricaricando"); }
   // Due tavoli domani sera (proposta CEO 19/10): un solo promemoria "quale tieni?", poi la disdetta dell'altro.
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { avvisoDelGiorno, inviaAvviso, pushConfigurato } from "@/lib/push-server";
+import { avvisoDelGiorno, avvisoPrenotazioneDomani, inviaAvviso, pushConfigurato, type Avviso } from "@/lib/push-server";
 import { oggiRoma } from "@/lib/stasera";
 
 // Avviso del giorno (proposta 6), una volta al giorno dal cron di Vercel (vercel.json): a chi ha
 // acceso gli avvisi e ha segnato un posto per oggi con "Quando ci vai?" (saved_places.piano_al).
-// Al massimo UN avviso per persona al giorno. Nessuna chiamata Google o AI.
+// Poi (proposta 36) "Ci vai domani?" a chi ha una prenotazione per domani sull'account e non ha ancora
+// risposto né disdetto. Al massimo UN avviso per persona al giorno: vince il posto di oggi. Nessuna chiamata Google o AI.
 // Vercel manda "Authorization: Bearer $CRON_SECRET": senza quel segreto non parte niente.
 
 export const maxDuration = 60;
@@ -33,17 +34,38 @@ export async function GET(request: Request) {
     if (r.places?.name) nomi.push(r.places.name);
     perUtente.set(r.user_id, nomi);
   }
-  if (perUtente.size === 0) return NextResponse.json({ inviati: 0 });
+  const avvisi = new Map<string, Avviso>();
+  for (const [u, nomi] of perUtente) avvisi.set(u, avvisoDelGiorno(nomi, sabato));
 
-  const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", [...perUtente.keys()]);
+  const domani = new Date(`${oggi}T12:00:00Z`);
+  domani.setUTCDate(domani.getUTCDate() + 1);
+  const { data: pren, error: errPren } = await admin
+    .from("prenotazioni")
+    .select("user_id, dati")
+    .eq("giorno", domani.toISOString().slice(0, 10))
+    .is("cancellata_at", null)
+    .is("esito", null)
+    .is("disdetta_at", null)
+    .limit(2000);
+  if (errPren) console.warn(`[cron-avvisi] lettura prenotazioni ${errPren.code ?? ""}`);
+  let domaniN = 0;
+  for (const r of (pren ?? []) as { user_id: string; dati: Record<string, unknown> | null }[]) {
+    const d = r.dati ?? {};
+    if (avvisi.has(r.user_id) || d.ciVado || d.dismissed || d.dismissedEve || typeof d.placeName !== "string") continue;
+    avvisi.set(r.user_id, avvisoPrenotazioneDomani(d.placeName, typeof d.time === "string" ? d.time : null));
+    domaniN++;
+  }
+  if (avvisi.size === 0) return NextResponse.json({ inviati: 0 });
+
+  const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", [...avvisi.keys()]);
   let inviati = 0;
   const scadute: string[] = [];
   for (const s of subs ?? []) {
-    const esito = await inviaAvviso(s, avvisoDelGiorno(perUtente.get(s.user_id) ?? [], sabato));
+    const esito = await inviaAvviso(s, avvisi.get(s.user_id)!);
     if (esito === "ok") inviati++;
     if (esito === "scaduta") scadute.push(s.id);
   }
   if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
-  console.log(`[cron-avvisi] ${oggi} persone=${perUtente.size} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
+  console.log(`[cron-avvisi] ${oggi} persone=${avvisi.size} domani=${domaniN} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
   return NextResponse.json({ inviati, scadute: scadute.length });
 }
