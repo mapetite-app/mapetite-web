@@ -1027,6 +1027,8 @@ export default function MapView({
     return () => { alive = false; };
   }, []);
   const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
+  // Seconda idea dello stesso momento nel pannello Idee (src/lib/idee.ts).
+  const ideaDue = momentHour == null ? null : secondaIdea(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   const [aiSearching, setAiSearching] = useState(false);
@@ -2696,9 +2698,9 @@ export default function MapView({
               {momentExample && (
                 <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
-              {momentHour != null && (() => { const idea = secondaIdea(new Date(), weather); return (
-                <IdeaRow testId="suggerimento-momento-2" label={idea.query} emoji={idea.emoji} title={idea.title} sub={idea.sub} onClick={() => { setIdeasOpen(false); setAiQuery(idea.query); void runAISearch(idea.query); }} />
-              ); })()}
+              {ideaDue && (
+                <IdeaRow testId="suggerimento-momento-2" label={ideaDue.query} emoji={ideaDue.emoji} title={ideaDue.title} sub={ideaDue.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ideaDue.query); void runAISearch(ideaDue.query); }} />
+              )}
               <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
             </IdeaGroup>
             <IdeaGroup title="Per te" hideTitle>
