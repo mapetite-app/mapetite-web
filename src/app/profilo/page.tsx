@@ -90,7 +90,7 @@ export default async function ProfiloPage() {
   if (!user) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="font-display text-xl font-semibold text-brand">Il tuo profilo ti aspetta</p>
+        <p className="font-title text-2xl text-brand">Il tuo profilo ti aspetta</p>
         <p className="max-w-xs text-sm text-text-muted">
           Accedi per ritrovare i tuoi locali salvati, le recensioni e i tuoi gusti.
         </p>

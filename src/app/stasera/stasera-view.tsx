@@ -269,7 +269,7 @@ export default function StaseraView({ userId }: { userId: string }) {
         ) : spots.length === 0 ? (
           <div data-testid="stasera-vuoto" className="mt-10 text-center">
             <span aria-hidden className="text-5xl">🍽️</span>
-            <h1 className="mt-4 font-display text-[28px] font-bold leading-tight">Stasera dove andiamo?</h1>
+            <h1 className="mt-4 font-title text-[32px] leading-tight">Stasera dove andiamo?</h1>
             <p className="mx-auto mt-3 max-w-xs text-[15px] text-white/80">
               Qui scegli tra i posti che hai salvato. Non ne hai ancora nessuno: cercane uno o porta qui quelli che hai già su Google Maps e Instagram.
             </p>
@@ -284,7 +284,7 @@ export default function StaseraView({ userId }: { userId: string }) {
           </div>
         ) : proposals ? (
           <section aria-label="Proposte per stasera">
-            <h1 className="font-display text-[28px] font-bold leading-tight">
+            <h1 className="font-title text-[32px] leading-tight">
               {proposals.length === 1 ? "Ecco un'idea per stasera" : `Ecco ${proposals.length} idee per stasera`}
             </h1>
             <p data-testid="stasera-riepilogo" className="mt-1 text-sm text-white/75">{summary}</p>
@@ -316,7 +316,7 @@ export default function StaseraView({ userId }: { userId: string }) {
           </section>
         ) : (
           <section aria-label="Le tue scelte">
-            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Stasera dove andiamo?</h1>
+            <h1 className="font-title text-[36px] leading-[1.05]">Stasera dove andiamo?</h1>
             <p className="mt-2 text-[15px] text-white/75">{spots.length === 1 ? "Tre tocchi e scegli: per ora hai un solo salvato." : `Tre tocchi e scegli tra i tuoi ${spots.length} salvati.`}</p>
 
             <h2 className="mb-2.5 mt-7 font-display text-sm font-semibold text-white/70">Che occasione?</h2>

@@ -44,7 +44,7 @@ export default function PremiumPage() {
           <li key={f.id} data-testid="premium-funzione" className="flex items-start gap-3 p-4">
             <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-light text-lg">{f.icon}</span>
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-base font-semibold leading-snug text-text">{f.title}</h2>
+              <h2 className="font-title text-lg leading-snug text-text">{f.title}</h2>
               <p className="mt-0.5 text-sm font-sans leading-snug text-text-muted">{f.text}</p>
               <MiInteressa id={f.id} />
             </div>

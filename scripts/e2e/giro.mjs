@@ -1310,18 +1310,25 @@ ok((await page.getByTestId("posizione-card").count()) >= 1, "?lista=b: torna la 
 await page.goto(`${BASE}/mappa?stile=places`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "serif" && d.scheda === "b" && d.home === "b" && d.pin === "b"; }), "?stile=places accende tutte le varianti");
 await page.goto(`${BASE}/mappa?stile=attuale`, { waitUntil: "networkidle" });
-ok(await page.evaluate(() => { const d = document.documentElement.dataset; return !d.titoli && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte");
+ok(await page.evaluate(() => { const d = document.documentElement.dataset; return d.titoli === "sans" && !d.scheda && !d.home && !d.pin; }), "?stile=attuale le spegne tutte (titoli in Poppins)");
 
-// 7a. Variante titoli serif (?titoli=serif, ricordata sul telefono; ?titoli=sans torna a Poppins)
+// 7a. Titoli: un solo stile, il serif (giro 1/11, correzione 7). ?titoli=sans torna a Poppins (ricordato sul telefono).
 const titleFont = async () => page.evaluate(() => { const h = document.querySelector("[data-testid=benvenuto] .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+await page.evaluate(() => { try { localStorage.removeItem("mapetite.titoli"); } catch { /* niente */ } });
 await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
-{ const f = await titleFont(); ok(/Poppins/i.test(f), `titoli: Poppins di default (${f.slice(0, 40)})`); }
-await page.goto(`${BASE}/mappa?titoli=serif&beta=-suggerimenti`, { waitUntil: "networkidle" });
-ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif accende il serif");
-await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
-ok(/Newsreader/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+{ const f = await titleFont(); ok(/Newsreader/i.test(f), `titoli: serif di default (${f.slice(0, 40)})`); }
 await page.goto(`${BASE}/mappa?titoli=sans&beta=-suggerimenti`, { waitUntil: "networkidle" });
 ok(/Poppins/i.test(await titleFont()), "titoli: ?titoli=sans torna a Poppins");
+await page.goto(`${BASE}/mappa?beta=-suggerimenti`, { waitUntil: "networkidle" });
+ok(/Poppins/i.test(await titleFont()), "titoli: la scelta resta anche senza parametro");
+await page.goto(`${BASE}/mappa?titoli=serif&beta=-suggerimenti`, { waitUntil: "networkidle" });
+ok(/Newsreader/i.test(await titleFont()), "titoli: ?titoli=serif riaccende il serif");
+// Stesso stile di titolo nelle pagine principali (prima stasera, importa, profilo, assistente erano in Poppins grassetto).
+for (const path of ["/stasera", "/importa", "/assistente", "/profilo", "/amici"]) {
+  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+  const f = await page.evaluate(() => { const h = document.querySelector("main h1, h1, main .font-title"); return h ? getComputedStyle(h).fontFamily : ""; });
+  ok(/Newsreader/i.test(f), `titoli: su ${path} il titolo è nel serif della home (${f.slice(0, 30)})`);
+}
 
 // 7c. Accesso, registrazione e importa: stile dell'app, niente zoom su iPhone, testi in italiano
 await page.goto(`${BASE}/login?error=Email%20o%20password%20non%20corrette.`, { waitUntil: "networkidle" });

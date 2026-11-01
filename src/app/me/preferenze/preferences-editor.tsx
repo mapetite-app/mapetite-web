@@ -103,7 +103,7 @@ export default function PreferencesEditor({
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-display font-bold text-text">
+        <h1 className="font-title text-3xl text-text">
           Modifica le tue preferenze
         </h1>
         <Link

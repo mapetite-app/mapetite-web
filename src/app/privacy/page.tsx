@@ -64,7 +64,7 @@ export default function PrivacyPage() {
       <p className="mt-2 text-sm font-sans text-text-muted">Ultimo aggiornamento: 31 ottobre 2026</p>
       {SEZIONI.map((s) => (
         <section key={s.titolo} className="mt-6">
-          <h2 className="font-display text-lg font-semibold text-brand">{s.titolo}</h2>
+          <h2 className="font-title text-xl text-brand">{s.titolo}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {s.righe.map((r) => (
               <li key={r} id={r.startsWith("Prenotazioni:") ? "prenotazioni" : undefined} className="text-[15px] font-sans leading-relaxed text-text">{r}</li>

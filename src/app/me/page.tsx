@@ -49,7 +49,7 @@ export default async function MePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="mb-2 text-2xl font-display font-bold text-text">
+      <h1 className="mb-2 font-title text-3xl text-text">
         Il tuo profilo
       </h1>
       <p className="text-text-muted">Sei loggato come:</p>
@@ -74,7 +74,7 @@ export default async function MePage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-6 text-lg font-display font-semibold text-text">
+        <h2 className="mb-6 font-title text-xl text-text">
           Le tue preferenze
         </h2>
 

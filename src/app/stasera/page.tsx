@@ -31,7 +31,7 @@ export default async function StaseraPage() {
     return (
       <main className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] flex min-h-dvh flex-col items-center justify-center gap-4 bg-brand px-6 pb-[var(--nav-height-mobile)] text-center text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
         <span aria-hidden className="text-5xl">🍽️</span>
-        <h1 className="font-display text-2xl font-bold">Stasera dove andiamo?</h1>
+        <h1 className="font-title text-[28px] leading-tight">Stasera dove andiamo?</h1>
         <p data-testid="stasera-accedi" className="max-w-xs text-sm text-white/80">
           Accedi per scegliere tra i locali che hai salvato: ti proponiamo tre posti per stasera.
         </p>
