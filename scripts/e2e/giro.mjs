@@ -3166,8 +3166,11 @@ if (fakeUser) {
     { created_at: "2026-09-15", tags: ["Da provare"], note: null, places: pr3("06", "Kiko Sushi Bar", "japanese_restaurant", "Via Ostiense 50, Roma", 41.87, 12.48) },
   ];
   const R3 = [
-    mk("E1", "Da Enzo al 29", 41.8885, 12.4775, { category: "restaurant", types: ["restaurant"] }), mk("E2", "Spirito di Vino", 41.8888, 12.4772, { category: "restaurant", types: ["restaurant"] }),
-    mk("E3", "Glass Hostaria", 41.8899, 12.4697, { category: "restaurant", types: ["restaurant"] }), mk("E4", "Antico Arco", 41.8888, 12.4645, { category: "restaurant", types: ["restaurant"] }),
+    mk("E1", "Da Enzo al 29", 41.8885, 12.4775, { category: "restaurant", types: ["restaurant"] }),
+    // E2 con punti forti e recensioni lunghe, E3 senza niente: il blocco sopra la barra della scheda (revisore del 2/11, r5).
+    mk("E2", "Spirito di Vino", 41.8888, 12.4772, { category: "restaurant", types: ["restaurant"], goFor: ["Carbonara", "Vino naturale", "Cantina medievale", "Tiramisù", "Servizio attento"],
+      selectedReviews: [{ text: "Locale raccolto, si mangia bene." }, { text: "Siamo scesi nella cantina medievale e ci hanno raccontato la storia del locale tra un piatto e l'altro, con una pazienza e una gentilezza che non si trovano più facilmente in centro a Roma." }, { text: "Carbonara cremosa e vino della casa onesto." }, { text: "Terza recensione che non deve comparire sopra la barra." }] }),
+    mk("E3", "Glass Hostaria", 41.8899, 12.4697, { category: "restaurant", types: ["restaurant"], selectedReviews: [] }), mk("E4", "Antico Arco", 41.8888, 12.4645, { category: "restaurant", types: ["restaurant"] }),
     mk("E5", "Trattoria Da Teo", 41.8875, 12.4755, { category: "restaurant", types: ["restaurant"], openNow: false }),
   ].map((r) => ({ ...r, priceLevel: 2 }));
   const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, geolocation: { latitude: 41.889, longitude: 12.47 }, permissions: ["geolocation"], locale: "it-IT" });
@@ -3227,6 +3230,9 @@ if (fakeUser) {
     ok(f.intera && f.righe === 1 && f.dist !== "tagliata", `card: riga dei fatti intera su una riga, la distanza c'è solo se ci sta (${f.testo} · distanza ${f.dist})`); }
   { const s = await card.getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), intera: el.scrollWidth <= el.clientWidth + 1, nome: el.textContent.includes("Hostaria Del Moro") }));
     ok(s.vis === "✨ Come un tuo salvato" && s.intera && s.nome, `card: 'Come un tuo salvato' intera, il nome del salvato per il lettore di schermo (${s.vis})`); }
+  // Revisore del 2/11 (r5): troppo corallo sulla card. Corallo solo su "Poco conosciuto"; "Come un tuo salvato" in bianco attenuato.
+  { const c = await card.getByTestId("simile-a").evaluate((el) => getComputedStyle(el).color);
+    ok(/^rgba\(255, 255, 255, 0\.[5-9]|^oklab\(0\.99\d* [-0-9.e]+ [-0-9.e]+ \/ 0\.[5-9]/.test(c), `card: 'Come un tuo salvato' in bianco attenuato, non corallo (${c})`); }
   { const a = await card.getByTestId("aperto-card").evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, c: getComputedStyle(el).color }));
     ok(a.bg === "rgb(255, 255, 255)" && a.c === "rgb(26, 60, 64)", `card: 'Aperto ora' bianco e teal, niente verde fuori marchio (${a.bg} / ${a.c})`); }
   await q3.screenshot({ path: `${OUT}/r3-risultati.png` });
@@ -3248,6 +3254,26 @@ if (fakeUser) {
   await q3.screenshot({ path: `${OUT}/r3-scheda.png` });
   await q3.getByRole("button", { name: "Locale successivo" }).click();
   await q3.locator("h2", { hasText: "Spirito di Vino" }).waitFor({ timeout: 4000 }).then(() => ok(true, "scheda: '›' nella barra apre il risultato dopo"), () => ok(false, "scheda: '›' nella barra apre il risultato dopo"));
+  // Revisore del 2/11 (r5): senza foto un terzo di schermo vuoto sopra la barra. Lì i punti forti (goFor) e due frasi
+  // delle recensioni Google già caricate, tagliate a 140 caratteri; tutto sopra la barra azioni.
+  await q3.waitForTimeout(600);
+  { const v = await q3.evaluate(() => {
+      const b = document.querySelector("[data-testid=scheda-in-vista]"); const barra = document.querySelector("[data-testid=barra-azioni]")?.getBoundingClientRect();
+      if (!b || !barra) return null;
+      const pill = b.querySelector("[data-testid=scheda-punti-forti] .flex-wrap"); const chips = [...(pill?.children ?? [])];
+      const righe = new Set(chips.filter((c) => c.getBoundingClientRect().bottom <= pill.getBoundingClientRect().bottom + 1).map((c) => Math.round(c.getBoundingClientRect().top))).size;
+      const frasi = [...b.querySelectorAll("[data-testid=scheda-frasi-recensioni] li")].map((l) => l.textContent);
+      return { chips: chips.map((c) => c.textContent), righe, frasi, fonte: b.textContent.includes("dalle recensioni Google"), fondo: Math.round(b.getBoundingClientRect().bottom), barra: Math.round(barra.top) };
+    });
+    ok(!!v && v.chips[0] === "Carbonara" && v.chips.length <= 4 && v.righe <= 2, `scheda senza foto: i punti forti in pillole sopra la barra, al massimo 2 righe (${v?.chips.join(", ")}; ${v?.righe} righe)`);
+    ok(!!v && v.frasi.length === 2 && v.frasi.every((f) => f.length <= 143 && f.startsWith("«")) && v.frasi[0].endsWith("…»") && !v.frasi.some((f) => f.includes("Terza") || f.includes("Locale raccolto")) && v.fonte,
+      `scheda: due frasi dalle recensioni Google tra virgolette (non quella già sotto il nome), tagliate a fine parola (${v?.frasi.map((f) => f.length).join(" e ")} caratteri)`);
+    ok(!!v && v.fondo <= v.barra, `scheda: il blocco sta sopra la barra azioni (fondo ${v?.fondo}, barra ${v?.barra})`); }
+  await q3.screenshot({ path: `${OUT}/r5-scheda-senza-foto.png` });
+  await q3.getByRole("button", { name: "Locale successivo" }).click();
+  await q3.locator("h2", { hasText: "Glass Hostaria" }).waitFor({ timeout: 4000 }).catch(() => {});
+  await q3.waitForTimeout(400);
+  ok((await q3.getByTestId("scheda-in-vista").count()) === 0, "scheda: senza punti forti né recensioni niente blocco sopra la barra");
   await q3.keyboard.press("Escape");
   // Lista dei salvati (revisore 2/11, terzo giro): nessuna foto Google chiesta, la foto scattata dall'utente (foto_locali)
   // al posto dell'emoji quando c'è; "Sulla mappa" sparisce mentre si scorre in giù e torna appena ci si ferma o si risale.
