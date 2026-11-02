@@ -1596,6 +1596,9 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
     ok(JSON.stringify(stati.map((t) => t.trim())) === '["Da provare","Ci sono stato","Da provare"]' && (await v.count()) === 1 && (await v.first().textContent()) === "Cotoletta vera, sala di quartiere." && it === "italic" && (await ult.getByTestId("importa-ultimi-riga").first().getByTestId("importa-ultimi-verdetto").count()) === 1 && /in\.\(.*GM1/.test(decodeURIComponent(synthUrl)),
       `importa: 'Ultimi aggiunti' con lo stato su ogni riga e il verdetto in corsivo solo dove c'è in archivio (${stati.join(" | ")}, ${await v.count()} verdetti, ${it})`); }
   await page.screenshot({ path: `${OUT}/19b-importa-ultimi.png`, fullPage: true, caret: "initial" });
+  // Revisore del 2/11: sotto il contenuto si vedeva il bianco. Il fondo beige arriva in fondo alla pagina.
+  { const f = await page.evaluate(() => { const r = document.querySelector("[data-testid=importa-pagina]").getBoundingClientRect(); return { fondo: Math.round(r.bottom + scrollY), doc: document.documentElement.scrollHeight }; });
+    ok(f.fondo >= f.doc - 1, `importa: il fondo beige copre tutta l'altezza (fino a ${f.fondo} px su ${f.doc})`); }
   await page.unroute("**/rest/v1/place_synthesis**");
   await page.unroute("**/rest/v1/saved_places**");
   await page.reload({ waitUntil: "networkidle" }); }
