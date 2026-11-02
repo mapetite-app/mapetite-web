@@ -46,6 +46,10 @@ export default function SchedaCarosello({
   const [mapBroken, setMapBroken] = useState(false);
   // Anche la mappa parte solo quando la pagina diventa visibile (un tocco sui puntini o lo scorrimento).
   const [mapWanted, setMapWanted] = useState(false);
+  // Foto arrivate davvero: se non arrivano (quota finita, errore) al loro posto c'è l'emoji. Senza nessuna foto visibile
+  // niente contatore "1 / 2" sopra l'emoji (revisore del 2/11); la mappa resta a uno scorrimento.
+  const [caricate, setCaricate] = useState<string[]>([]);
+  const fotoVisibili = photoRefs.filter((r) => caricate.includes(r)).length;
   const mapUrl = mapBroken ? null : staticMapUrl(lat, lng);
   const photos = photoRefs.length > 0 ? photoRefs : [null];
   const slides = photos.length + (mapUrl ? 1 : 0);
@@ -74,6 +78,7 @@ export default function SchedaCarosello({
                 priority={i === 0}
                 className="h-full w-full object-cover"
                 fallback={fallback}
+                onLoad={() => setCaricate((f) => (f.includes(ref) ? f : [...f, ref]))}
                 credit={i === 0 ? credit : null}
                 creditClassName="absolute bottom-3 left-3"
               />
@@ -113,7 +118,7 @@ export default function SchedaCarosello({
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-card bg-gradient-to-b from-black/30 to-transparent" />
       {/* "1 / 2" in basso a destra (mockup A): un tocco porta alla pagina dopo (l'ultima torna alla prima). */}
       {/* Senza foto (emoji al posto della foto) il contatore non dice niente: la mappa resta a uno scorrimento (collaudo 23/10). */}
-      {slides > 1 && photoRefs.length > 0 && (
+      {slides > 1 && fotoVisibili > 0 && (
         <div className="absolute bottom-1 right-2" data-testid="carosello-puntini">
           <button
             type="button"
