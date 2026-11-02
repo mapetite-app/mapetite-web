@@ -587,6 +587,16 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) >= 1, "gemme: restano accese su questo telefono");
+// Revisore del 2/11: se sono tutti poco conosciuti lo dice la frase sopra le card, una volta sola; niente 💎 su ogni card.
+await page.unroute("**/api/search");
+{ const tutte = [mk("G1", "Osteria Uno", 41.9, 12.49), mk("G2", "Trattoria Due", 41.901, 12.492), mk("G3", "Cantina Tre", 41.902, 12.494)].map((x) => ({ ...x, rating: 4.7, userRatingCount: 120 }));
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(500);
+  const dett = ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ");
+  ok(/Tutti poco conosciuti/.test(dett) && (await page.locator("ul.snap-x").getByTestId("gemma").count()) === 0, `gemme: tutti poco conosciuti → detto una volta sopra le card, nessun 💎 sulle card ('${dett}')`); }
 await page.unroute("**/api/search");
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
