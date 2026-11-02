@@ -913,7 +913,7 @@ ok(noPhotos && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto:
 ok((await page.locator("ul li[data-id=P3]").getByText("🍸").count()) >= 1 && (await page.locator("ul li[data-id=P3]").getByText("🍺").count()) === 0, "emoji: un cocktail bar ha 🍸, non il boccale di birra");
 photoMode = "ok";
 
-// 5c. Mappa affollata: i primi 5 risultati sempre come pin con nome, gli altri raggruppati o senza nome
+// 5c. Mappa affollata: i primi 5 risultati sempre come pin, i nomi dove ci stanno
 searchMode = "folla";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
@@ -925,10 +925,17 @@ await page.waitForTimeout(1500);
   const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
   ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
-  ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
-  // Revisore del 2/11: con i segnalini vicini i nomi si impilavano in colonna. Nome solo sui primi 3 (e sulla card al centro).
-  { const nomi = await page.getByTestId("etichetta-pin").allInnerTexts();
-    ok(nomi.length <= 3 && nomi.every((n) => /^Folla [123]$/.test(n.trim())), `mappa affollata: nomi solo sui primi 3 (${nomi.join(", ")})`); }
+  // Revisore del 2/11 (ottavo giro): nomi su tutti i segnalini quando lo spazio lo consente, mai uno sopra l'altro
+  // né sopra un altro segnalino (prima: al massimo 3 nomi).
+  { const u = await page.evaluate(() => {
+      const ov = (a, b) => a.left + 2 < b.right && b.left + 2 < a.right && a.top + 2 < b.bottom && b.top + 2 < a.bottom;
+      const nomi = [...document.querySelectorAll("[data-testid=etichetta-pin]")].map((e) => ({ t: e.textContent.trim(), b: e.getBoundingClientRect(), own: e.parentElement }));
+      const icone = [...document.querySelectorAll("[data-testid=pin], [data-testid=pin-dai-salvati], [data-testid=pin-salvato]")].map((e) => ({ el: e, b: (e.firstElementChild ?? e).getBoundingClientRect() }));
+      const out = [];
+      nomi.forEach((l, i) => { nomi.forEach((m, j) => { if (j > i && ov(l.b, m.b)) out.push(`${l.t} / ${m.t}`); }); icone.forEach((ic) => { if (ic.el !== l.own && ov(l.b, ic.b)) out.push(`${l.t} sul segnalino ${ic.el.dataset.place}`); }); });
+      return { nomi: nomi.map((l) => l.t), out };
+    });
+    ok(u.out.length === 0 && u.nomi.length >= 1, `mappa affollata: i nomi che ci stanno, nessuno sopra un altro nome o segnalino (${u.nomi.join(", ")}${u.out.length ? " — " + u.out.join("; ") : ""})`); }
   // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
   const q = await inquadratura(page, ["F11"]);
   ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);

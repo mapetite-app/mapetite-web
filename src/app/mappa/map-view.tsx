@@ -1925,12 +1925,10 @@ export default function MapView({
   const { lati: latiEtichette, scost: scostamenti } = ((): { lati: Record<string, LabelSide>; scost: Record<string, { dx: number; dy: number }> } => {
     const singoli = clusters.filter((c) => !c.properties.cluster).map((c) => c.properties.placeData as Place);
     const inRicerca = aiSearch !== null && clusterPlaces === null;
-    // In ricerca i nomi sono dei primi 5; gli altri solo avvicinando oltre lo zoom dell'inquadratura (16).
-    // Sulla mappa dei salvati il nome c'è sempre quando c'è spazio (come i risultati e Albo 08): chi li ha salvati
-    // li riconosce dal nome, non dall'emoji. posizionaEtichette lo nasconde solo se coprirebbe altro.
-    const conNome = (place: Place) => (inRicerca
-      ? topPlaces.includes(place) || viewState.zoom >= 17
-      : aiSearch !== null || mappaSalvati || viewState.zoom >= 14) || selected?.id === place.id;
+    // In ricerca e sulla mappa dei salvati il nome c'è su ogni segnalino quando c'è spazio (revisore del 2/11:
+    // "nomi su tutti i segnalini quando lo spazio lo consente", come Places e Albo 08): si riconoscono dal nome,
+    // non dall'emoji. posizionaEtichette lo nasconde solo se coprirebbe un altro nome o un altro segnalino.
+    const conNome = (place: Place) => inRicerca || aiSearch !== null || mappaSalvati || viewState.zoom >= 14 || selected?.id === place.id;
     const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
     // Il segnalino scelto (la card al centro) ha sempre il nome, anche sulla mappa dei salvati (revisore del
     // 2/11, terzo giro: senza nome non si capiva quale fosse); i segnalini vicini si scostano dal suo nome.
@@ -2007,22 +2005,9 @@ export default function MapView({
       for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
     }
     if (tuSeiQui) items.push(tuSeiQui);
+    // Niente più tetto di 3 nomi (revisore del 2/11): ogni nome che non tocca altri nomi o segnalini resta,
+    // nell'ordine della lista (selezionato, card al centro, poi la prima, la seconda…).
     const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
-    // Risultati affollati (revisore del 2/11: le etichette si impilavano in colonna): al massimo 3 nomi, nell'ordine
-    // della lista, più la card al centro e il selezionato. Con i segnalini distanti restano tutti quelli che ci stanno.
-    if (inRicerca) {
-      const centri = items.filter((it) => it.label).map((it) => { const q = proietta(it.lat, it.lng); return { x: q.x + (it.dx ?? 0), y: q.y + (it.dy ?? 0) }; });
-      const affollati = centri.some((a, i) => centri.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < 64));
-      if (affollati) {
-        let nomi = 0;
-        // items è già in ordine di lista (selezionato, card al centro, poi la prima, la seconda…).
-        for (const it of items) {
-          if (!lati[it.id] || it.id.startsWith("dai-salvati-")) continue;
-          if (fissi.has(it.id) || nomi < 3) nomi++;
-          else delete lati[it.id];
-        }
-      }
-    }
     return { lati, scost };
   })();
 
