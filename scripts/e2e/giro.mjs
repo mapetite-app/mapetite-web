@@ -4569,16 +4569,34 @@ else {
     const mb = await ap.getByRole("link", { name: "Apri la mappa" }).boundingBox();
     const bg = await ap.locator("main").evaluate((el) => getComputedStyle(el).backgroundColor);
     ok(h1.length === 1 && h1[0].t === "Ciao! Dimmi cosa cerchi." && /newsreader/i.test(h1[0].f) && (await ap.getByText("Assistente Mapetite").count()) === 0 && (await ap.getByText("Trova, filtra, prenota").count()) === 0 && !!mb && mb.x + mb.width > 340 && mb.y < 80 && bg === "rgb(248, 246, 242)", `assistente: un solo titolo serif, mappa in alto a destra, fondo carta (${JSON.stringify(h1)}, ${bg})`); }
-  // Revisore 2/11: tre domande intere ("Prova a chiedere", come sulla mappa), niente "Prenota domani" all'inizio;
-  // le altre (prenotazione, serata a tappe) si aggiungono sotto con "Altre idee".
+  // Revisore 2/11 (quinto giro): domande intere ("Prova a chiedere", come sulla mappa), nessuna promessa di
+  // prenotazione (né "Prenota domani", né "Altre idee: prenota", né "ti preparo la prenotazione"); la serata
+  // a tappe c'è davvero e resta in vista. Senza salvati il benvenuto sta al centro, senza vuoto enorme sotto.
   { const es = ap.getByTestId("assistente-esempi");
     const frasi = await es.getByRole("button").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
-    ok(frasi.length === 3 && !frasi.some((f) => /prenot/i.test(f ?? "")) && frasi.every((f) => (f ?? "").split(" ").length >= 4) && (await ap.getByText("Prova a chiedere", { exact: true }).isVisible()) && (await ap.getByText("Ti suggeriamo", { exact: true }).count()) === 0, `assistente: tre domande intere da provare, niente 'Prenota domani' (${frasi.join(" | ")})`);
+    const benv = (await ap.getByTestId("assistente-benvenuto").textContent()) ?? "";
+    ok(frasi.length === 4 && !frasi.some((f) => /prenot/i.test(f ?? "")) && !/prenot/i.test(benv) && frasi.every((f) => (f ?? "").split(" ").length >= 4) && frasi.some((f) => /^Organizzami/.test(f ?? "")) && (await ap.getByTestId("assistente-altre-idee").count()) === 0 && (await ap.getByText("Prova a chiedere", { exact: true }).isVisible()) && (await ap.getByText("Ti suggeriamo", { exact: true }).count()) === 0, `assistente: quattro domande intere, nessuna promessa di prenotazione (${frasi.join(" | ")})`);
     const eb = await es.boundingBox();
-    ok(!!eb && eb.height >= 150, `assistente: gli esempi riempiono la schermata (alti ${Math.round(eb?.height ?? 0)} px)`); }
-  await ap.getByTestId("assistente-altre-idee").click();
-  ok((await ap.getByTestId("assistente-esempi").getByRole("button").count()) === 5 && (await ap.getByTestId("assistente-idea-in-piu").count()) === 2 && (await ap.getByTestId("assistente-esempi").getByRole("button", { name: /^Prenotami domani/ }).count()) === 1, "assistente: 'Altre idee' aggiunge prenotazione e serata a tappe sotto le tre domande");
-  await ap.getByTestId("assistente-altre-idee").click();
+    const bb = await ap.getByTestId("assistente-benvenuto").boundingBox();
+    const fb = await ap.getByTestId("assistente-campo").boundingBox();
+    ok(!!eb && eb.height >= 200 && !!bb && !!fb && bb.y > 60 && fb.y - (bb.y + bb.height) < 260, `assistente: esempi al centro, senza vuoto enorme sotto (benvenuto da ${Math.round(bb?.y ?? 0)} a ${Math.round((bb?.y ?? 0) + (bb?.height ?? 0))} px, campo a ${Math.round(fb?.y ?? 0)})`);
+    ok((await ap.getByTestId("assistente-riparti").count()) === 0, "assistente: senza salvati niente 'Riparti da qui' (mai righe inventate)"); }
+  // Con salvati veri: "Riparti da qui" mostra 2 "Da provare" (mai i "Ci sono stato"); un tocco apre la scheda.
+  { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${10 + n}`, places: { id: `00000000-0000-4000-8000-00000000020${n}`, name, category, address: "Via del Moro 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.47 } });
+    const righe = [pr(1, "Osteria Uno Da Provare", "restaurant", ["Da provare"]), pr(2, "Pizzeria Due Visitata", "pizzeria", ["Già visitato"]), pr(3, "Bar Tre", "bar", null), pr(4, "Forno Quattro", "bakery", ["Romantico"]), pr(5, "Enoteca Cinque", "wine_bar", ["Da provare"])];
+    await ap.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: righe }));
+    await ap.reload({ waitUntil: "networkidle" });
+    const rip = ap.getByTestId("assistente-riparti");
+    await rip.waitFor({ timeout: 6000 }).catch(() => {});
+    const nomi = await rip.getByTestId("assistente-riparti-riga").allTextContents().catch(() => []);
+    const href = await rip.getByTestId("assistente-riparti-riga").first().getAttribute("href").catch(() => null);
+    const ultima = await rip.getByTestId("assistente-riparti-riga").last().boundingBox().catch(() => null);
+    const campo = await ap.getByTestId("assistente-campo").boundingBox();
+    ok(nomi.length === 2 && !nomi.some((t) => t.includes("Visitata")) && nomi[0].includes("Osteria Uno") && nomi[1].includes("Bar Tre") && /^\/mappa\?salvato=[0-9a-f-]{36}$/.test(href ?? ""), `assistente: 'Riparti da qui' con 2 'Da provare' veri (mai i 'Ci sono stato'), un tocco apre la scheda (${nomi.join(" | ")}, ${href})`);
+    ok(!!ultima && !!campo && ultima.y + ultima.height <= campo.y, `assistente: 'Riparti da qui' tutto sopra il campo, senza scorrere (fine ${Math.round((ultima?.y ?? 0) + (ultima?.height ?? 0))} px, campo ${Math.round(campo?.y ?? 0)})`);
+    await ashot("50b-assistente-riparti");
+    await ap.unroute("**/rest/v1/saved_places**");
+    await ap.reload({ waitUntil: "networkidle" }); }
   { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
   await ashot("50-assistente-benvenuto");
 

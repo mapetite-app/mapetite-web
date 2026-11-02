@@ -9,6 +9,7 @@ import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card
 import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
 import UtileFeedback from "@/components/utile-feedback";
+import SalvatiBrevi from "@/components/salvati-brevi";
 import VoiceButton from "@/components/voice-button";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
@@ -97,16 +98,15 @@ const patchMsg = (id: string, patch: Partial<BotMsg> | ((m: BotMsg) => Partial<B
   setConv((c) => ({ ...c, msgs: c.msgs.map((m) => (m.id === id && m.role === "assistant" ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m)) }));
 
 // ── Testi ──
-// Revisore 2/11: si parte da tre domande vere, scritte per intero come in "Prova a chiedere" della mappa
-// (non da "Prenota domani", che senza un posto scelto non dice niente). Le altre dietro "Altre idee".
+// Revisore 2/11: domande vere, scritte per intero come in "Prova a chiedere" della mappa. Niente
+// "Prenota domani" né "Altre idee: prenota" (revisore 2/11, quinto giro): la prenotazione automatica non
+// c'è, si prepara solo il messaggio per il locale. La serata a tappe invece c'è davvero e resta in vista.
 const EXAMPLES = [
-  { emoji: "🍝", short: "Trattoria vera", text: "Trattoria non turistica a Testaccio" },
-  { emoji: "🍸", short: "Aperitivo con vista", text: "Aperitivo con vista a Milano" },
-  { emoji: "🥞", short: "Brunch domenica", text: "Brunch domenica per 4 a Roma" },
-  { emoji: "🗓️", short: "Prenota domani", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
-  { emoji: "🌙", short: "Serata a tappe", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
+  { emoji: "🍝", text: "Trattoria non turistica a Testaccio" },
+  { emoji: "🍸", text: "Aperitivo con vista a Milano" },
+  { emoji: "🥞", text: "Brunch domenica per 4 a Roma" },
+  { emoji: "🌙", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
 ];
-const PRIME = 3;
 const REFINES: Ask[] = [
   { label: "Più economici", send: "più economici" },
   { label: "Aperti ora", send: "aperti ora" },
@@ -550,7 +550,6 @@ const WANT = "Da provare";
 export default function AssistenteView({ userId }: { userId: string | null }) {
   const c = useSyncExternalStore(subscribe, getConv, () => EMPTY);
   const [input, setInput] = useState("");
-  const [moreIdeas, setMoreIdeas] = useState(false);
   // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
@@ -688,19 +687,19 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         </div>
       </header>
 
-      <div className={`flex-1 px-4 pb-36 ${c.msgs.length === 0 ? "pt-0" : "pt-2"}`} data-testid="assistente-conversazione">
+      <div className={`flex-1 px-4 pb-36 ${c.msgs.length === 0 ? "flex flex-col pt-0" : "pt-2"}`} data-testid="assistente-conversazione">
         {c.msgs.length === 0 && (
-          <div data-testid="assistente-benvenuto" className="pt-2">
+          // Senza salvati il benvenuto sta al centro tra titolo e campo (niente vuoto enorme sotto);
+          // con i salvati sotto c'è "Riparti da qui": 2 "Da provare" veri (tutto in una schermata), i più vicini se la posizione è nota.
+          <div data-testid="assistente-benvenuto" className="my-auto py-4">
             <h1 className="font-title text-[34px] font-medium leading-tight tracking-tight text-text">Ciao! Dimmi cosa cerchi.</h1>
             <p className="mt-2 text-[15px] font-sans leading-relaxed text-text-muted">
-              Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi, e se vuoi ti preparo la prenotazione.
+              Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi.
             </p>
-            {/* Revisore 2/11: tre domande intere in un riquadro, come "Prova a chiedere" della mappa; le altre
-                (prenotazione, serata a tappe) si aggiungono sotto con "Altre idee". */}
             <p className="mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Prova a chiedere</p>
             <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
-              {EXAMPLES.slice(0, moreIdeas ? EXAMPLES.length : PRIME).map((e, i) => (
-                <li key={e.text} data-testid={i >= PRIME ? "assistente-idea-in-piu" : undefined}>
+              {EXAMPLES.map((e) => (
+                <li key={e.text}>
                   <button
                     type="button"
                     aria-label={e.text}
@@ -714,15 +713,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              data-testid="assistente-altre-idee"
-              aria-expanded={moreIdeas}
-              onClick={() => setMoreIdeas((v) => !v)}
-              className="mt-2 flex min-h-11 items-center gap-1 px-1 text-sm font-display font-semibold text-brand active:scale-[0.98]"
-            >
-              {moreIdeas ? "Meno idee" : "✨ Altre idee: prenota, serata a tappe"}
-            </button>
+            <SalvatiBrevi userId={userId} titolo="Riparti da qui" testid="assistente-riparti" max={2} soloDaProvare pos={c.pos} className="mt-6" />
           </div>
         )}
 
