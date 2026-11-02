@@ -2455,7 +2455,9 @@ else {
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await (await esempio(p)).click();
   await p.locator("ul.snap-x li[data-id=P2]").waitFor({ timeout: 5000 });
-  ok((await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").textContent()) === "✨ Come Terrazza Uno, che hai salvato", "per te: 'Come Terrazza Uno, che hai salvato' su un bar simile");
+  // Revisore del 2/11: "✨ Come Hostaria Del …" tagliato. In vista "Come un tuo salvato", intera; il nome per il lettore di schermo e nel title.
+  { const sim = await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), txt: el.textContent, title: el.title, intera: el.scrollWidth <= el.clientWidth + 1 }));
+    ok(sim.vis === "✨ Come un tuo salvato" && sim.txt.includes("Terrazza Uno") && sim.title === "Come Terrazza Uno, che hai salvato" && sim.intera, `per te: 'Come un tuo salvato' intera su un bar simile, il nome nel lettore di schermo (${sim.vis} | ${sim.title})`); }
   ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("simile-a").count()) === 0, "per te: niente indicazione se il tipo è diverso (cocktail bar)");
   await p.screenshot({ path: `${OUT}/28-per-te-simile.png`, caret: "initial" });
   await p.unroute("**/api/search/synthesis");
