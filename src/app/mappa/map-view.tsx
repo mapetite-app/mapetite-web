@@ -1984,6 +1984,28 @@ export default function MapView({
       }
     : null;
 
+  // "‹ 2 di 8 ›" nella barra azioni della scheda: posizione del locale aperto tra i risultati (stesso ordine del
+  // carosello) e passaggio al vicino senza tornare alla lista.
+  const navScheda = (() => {
+    if (!selected) return null;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    return i < 0 || ids.length < 2 ? null : { pos: i + 1, total: ids.length };
+  })();
+  const vaiRisultato = (passo: number) => {
+    if (!selected) return;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    if (i < 0 || ids.length < 2) return;
+    const id = ids[(i + passo + ids.length) % ids.length];
+    const place = displayedPlaces.find((p) => p.id === id);
+    if (!place) return;
+    setFocusedId(id);
+    dispatch({ type: "OPEN_VENUE", placeId: id });
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+  };
+
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
@@ -3650,30 +3672,8 @@ export default function MapView({
       {selected && (
         // Da computer la scheda si apre nel pannello a destra, al posto della lista (niente velo scuro).
         <div data-testid="scheda-pannello" className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40 lg:static lg:z-auto lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:items-stretch lg:justify-start lg:border-l lg:border-border lg:bg-bg" onClick={() => dispatch({ type: "CLOSE" })}>
-          {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
-          {(() => {
-            const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
-            const i = ids.indexOf(selected.id);
-            if (i < 0 || ids.length < 2) return null;
-            const go = (j: number) => {
-              const id = ids[(j + ids.length) % ids.length];
-              const place = displayedPlaces.find((p) => p.id === id);
-              if (!place) return;
-              setFocusedId(id);
-              dispatch({ type: "OPEN_VENUE", placeId: id });
-              const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-              if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
-            };
-            return (
-              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
-                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
-                <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
-                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
-              </div>
-            );
-          })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg ${(carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).length >= 2 && (carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).includes(selected.id) ? "max-h-[calc(100dvh-6rem)]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -3706,6 +3706,11 @@ export default function MapView({
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
               onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
+              // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
+              // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.
+              nav={navScheda}
+              onNavPrev={() => vaiRisultato(-1)}
+              onNavNext={() => vaiRisultato(1)}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}

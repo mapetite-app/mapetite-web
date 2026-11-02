@@ -1200,7 +1200,7 @@ for (const [label, sel] of [["Prenota", "[data-testid=barra-azioni] [data-testid
   ok(!!box && box.y + box.height <= 844 && box.y >= 0 && box.x >= 0 && box.x + box.width <= 390 && box.height >= 40, `scheda B: pulsante ${label} nel viewport e alto almeno 40px`);
 }
 // Barra teal (mockup A): Prenota corallo e più larga, Percorso e Salva uguali.
-{ const b = await page.getByTestId("barra-azioni").evaluate((el) => { const t = [...el.querySelectorAll("a, button")]; return { ws: t.map((x) => Math.round(x.getBoundingClientRect().width)), prenota: getComputedStyle(t[0]).backgroundColor, bar: getComputedStyle(el.firstElementChild).backgroundColor, r: parseFloat(getComputedStyle(el.firstElementChild).borderTopLeftRadius) }; });
+{ const b = await page.getByTestId("barra-azioni").evaluate((el) => { const t = [...el.querySelectorAll("a:not([data-testid=scheda-nav] *), button:not([data-testid=scheda-nav] *)")]; return { ws: t.map((x) => Math.round(x.getBoundingClientRect().width)), prenota: getComputedStyle(t[0]).backgroundColor, bar: getComputedStyle(el.firstElementChild).backgroundColor, r: parseFloat(getComputedStyle(el.firstElementChild).borderTopLeftRadius) }; });
   ok(b.ws.length === 3 && b.prenota === "rgb(255, 107, 74)" && b.bar === "rgb(26, 60, 64)" && b.r >= 20 && b.ws[0] > b.ws[1] && Math.abs(b.ws[1] - b.ws[2]) <= 2, `scheda (mockup A): barra teal arrotondata, Prenota corallo più larga, Percorso e Salva uguali (${b.ws.join("/")})`); }
 await apriDettagli(page);
 ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "true" && await page.getByTestId("scheda-tab-info").getAttribute("aria-selected") === "true", "scheda: 'Orari, contatti, recensioni ›' apre il resto, su Info");
@@ -3911,15 +3911,15 @@ else {
   await s.getByTestId("verdetto-scheda").waitFor({ timeout: 5000 });
   await s.waitForTimeout(800);
   const bar = s.getByTestId("barra-azioni");
-  { const labels = await bar.locator("a, button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+  { const labels = await bar.locator("a:not([data-testid=scheda-nav] *), button:not([data-testid=scheda-nav] *)").evaluateAll((els) => els.map((e) => e.textContent.trim()));
     ok(labels.length === 3 && labels[0] === "Prenota" && /^\d+ min$/.test(labels[1]) && labels[2] === "Salva", `scheda: barra Prenota / minuti a piedi / Salva per un ristorante (${labels.join(" / ")})`); }
   const barCheck = async (pg) => pg.getByTestId("barra-azioni").evaluate((el) => {
-    const tiles = [...el.querySelectorAll("a, button")].map((t) => t.getBoundingClientRect());
+    const tiles = [...el.querySelectorAll("a:not([data-testid=scheda-nav] *), button:not([data-testid=scheda-nav] *)")].map((t) => t.getBoundingClientRect());
     const nav = (() => { const n = document.querySelector("nav.fixed"); return n && getComputedStyle(n).display !== "none" ? n.getBoundingClientRect().top : innerHeight; })();
     const ws = tiles.map((t) => t.width);
     // Mockup A (21/10): Prenota, se c'è, è più larga; gli altri riquadri sono uguali tra loro.
     const pre = el.querySelector("[data-testid=prenota-scheda]")?.getBoundingClientRect().width ?? null;
-    const altri = [...el.querySelectorAll("a, button")].filter((t) => t.dataset.testid !== "prenota-scheda").map((t) => t.getBoundingClientRect().width);
+    const altri = [...el.querySelectorAll("a:not([data-testid=scheda-nav] *), button:not([data-testid=scheda-nav] *)")].filter((t) => t.dataset.testid !== "prenota-scheda").map((t) => t.getBoundingClientRect().width);
     return { dentro: tiles.every((t) => t.left >= 0 && t.right <= innerWidth && t.bottom <= nav + 1 && t.height >= 44), uguali: Math.max(...altri) - Math.min(...altri) <= 2 && (pre == null || pre > Math.max(...altri)), ws: ws.map(Math.round).join("/") };
   });
   { const r = await barCheck(s); ok(r.dentro && r.uguali, `scheda: tre riquadri (Prenota più larga, gli altri uguali), dentro lo schermo e sopra la barra in basso (${r.ws})`); }
@@ -4034,7 +4034,7 @@ else {
   await s.getByRole("button", { name: "Locale successivo" }).click();
   await s.locator("h2", { hasText: "Caffè Scheda" }).waitFor({ timeout: 4000 });
   await s.waitForTimeout(500);
-  { const labels = await bar.locator("a, button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+  { const labels = await bar.locator("a:not([data-testid=scheda-nav] *), button:not([data-testid=scheda-nav] *)").evaluateAll((els) => els.map((e) => e.textContent.trim()));
     ok(labels[0] === "Chiama" && labels.length === 3 && (await bar.getByTestId("prenota-scheda").count()) === 0, `scheda: per un caffè Chiama / Percorso / Salva, niente Prenota (${labels.join(" / ")})`); }
   ok((await s.getByTestId("amici-qui").count()) === 0, "scheda: nessun riquadro amici dove nessuno dei tuoi è stato");
   sEvents.length = 0;
