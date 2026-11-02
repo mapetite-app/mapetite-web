@@ -2868,18 +2868,28 @@ else {
       const xs = await sq.locator("main h2, [data-testid=stasera-sopra], main h1").evaluateAll((els) => els.map((e) => ({ x: Math.round(e.getBoundingClientRect().x), a: getComputedStyle(e).textAlign })));
       ok(bg === "rgb(248, 246, 242)" && xs.length >= 5 && xs.every((v) => v.x === 16 && v.a !== "center"), `stasera: fondo carta, titoli e titoletti a sinistra come Salvati (${bg}, ${JSON.stringify(xs)})`); }
     await sq.screenshot({ path: `${OUT}/40-stasera-scelte.png`, caret: "initial" });
+    // Revisore 2/11 (terzo giro): sotto il pulsante le miniature (emoji e nome) dei salvati che rispettano le scelte,
+    // aggiornate a ogni tocco; solo salvati veri. Riempiono il 40% inferiore che prima era vuoto.
+    const anteprima = async () => sq.getByTestId("stasera-anteprima-posto").allInnerTexts().catch(() => []);
+    { const nomi = await anteprima();
+      const bb = await sq.getByTestId("stasera-proponi").boundingBox(); const ab = await sq.getByTestId("stasera-anteprima").boundingBox().catch(() => null);
+      ok(nomi.length === 6 && ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"].every((n) => nomi.some((t) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
+        `stasera: sotto il pulsante le miniature dei 6 salvati che rispettano le scelte (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+    await sq.screenshot({ path: `${OUT}/s4-stasera.png`, caret: "initial" });
     // Città dei salvati come scelta rapida (più di una città): Roma = 5 mai provati
     const dove = await sq.getByTestId("stasera-distanza").getByRole("button").allTextContents();
     ok(dove.join("|") === "📍 Vicino a me|Roma|Milano|Ovunque", `stasera: 'Dove?' con le città dei salvati (${dove.join(" | ")})`);
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Roma" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), "stasera: 'Roma' tiene solo i salvati di Roma");
+    { const nomi = await anteprima(); ok(nomi.length === 5 && !nomi.some((t) => t.includes("Caffè Milano")), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length}, senza Caffè Milano)`); }
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).click();
     // Romantico: 2 posti
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Romantico" }).click();
     ok((await sq.getByTestId("stasera-proponi").textContent()) === "Proponimi i 2 posti", "stasera: con 'Romantico' restano 2 posti");
+    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")), `stasera: con 'Romantico' 2 miniature (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
     // Festa + Da provare: nessuno → si allarga con un tocco
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
-    ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante");
+    ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0 && (await sq.getByTestId("stasera-anteprima").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante né miniature");
     await sq.getByTestId("stasera-allarga").filter({ hasText: "Anche dove sono stato" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("1 salvato") && (await sq.getByTestId("stasera-novita").getByRole("button", { name: "Anche dove sono stato" }).getAttribute("aria-pressed")) === "true", "stasera: 'Anche dove sono stato' allarga con un tocco (1 salvato)");
     // Giro 1/11 (D36): lo stato si chiama "Ci sono stato" ovunque, mai "visitato".
