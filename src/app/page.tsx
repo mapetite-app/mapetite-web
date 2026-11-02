@@ -13,6 +13,7 @@ import HomeSearchInput from "@/components/home-search-input";
 import BookingReminder from "@/components/booking-reminder";
 import DomandaSettimanale from "@/components/domanda-settimanale";
 import { createClient, getUser } from "@/lib/supabase/server";
+import { isWanted } from "@/lib/tags";
 
 type SavedRow = { tags: string[] | null; places: { category: string | null; name: string | null } | null };
 
@@ -30,7 +31,8 @@ async function savedSummary(supabase: Awaited<ReturnType<typeof createClient>>, 
     rows = (data ?? []) as unknown as SavedRow[];
   }
   const emoji = [...new Set(rows.map((r) => getCategoryEmoji(r.places?.category ?? null, r.places?.name ?? null)))].slice(0, 3);
-  return { total: rows.length, want: rows.filter((r) => r.tags?.includes("Da provare")).length, emoji };
+  // "Da provare" conta anche i salvati senza stato, come Salvati e Profilo (revisore 2/11).
+  return { total: rows.length, want: rows.filter((r) => isWanted(r.tags)).length, emoji };
 }
 
 // Nome, città e mappa del gusto per il saluto e le proposte. Senza colonne o senza profilo: niente.

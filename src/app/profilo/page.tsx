@@ -10,6 +10,8 @@ import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import { summarizeCollections } from "@/lib/raccolte";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
+import { zoneDeiSalvati } from "@/lib/salvati-zone";
+import { isWanted } from "@/lib/tags";
 import ProfiloSocial from "@/components/profilo-social";
 import InvitaAmico from "@/components/invita-amico";
 import { loadMyGems, loadMySocial } from "@/lib/social";
@@ -32,6 +34,8 @@ type SavedPlaceRow = {
     name: string;
     category: string | null;
     address: string | null;
+    lat?: number | null;
+    lng?: number | null;
   } | null;
 };
 
@@ -46,7 +50,6 @@ type ReviewRow = {
 };
 
 // I due tag di stato (dati esistenti): non sono "raccolte", hanno i loro contatori.
-const STATE_WANT = "Da provare";
 const STATE_DONE = "Già visitato";
 
 // Link alla mappa aperta sui salvati, eventualmente filtrati (parametri letti da map-view).
@@ -121,7 +124,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     : await Promise.all([
     supabase
       .from("saved_places")
-      .select("created_at, tags, note, places (id, name, category, address)")
+      .select("created_at, tags, note, places (id, name, category, address, lat, lng)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -175,10 +178,13 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
-  const name = (!("stato" in social) && social.display_name) || (user.email ?? "").split("@")[0] || "Il mio profilo";
+  // Nome dall'email ("giulia@…"): con l'iniziale maiuscola, come un nome (revisore 2/11). Il nome scelto resta com'è.
+  const fromEmail = (user.email ?? "").split("@")[0];
+  const name = (!("stato" in social) && social.display_name) || (fromEmail ? fromEmail.charAt(0).toLocaleUpperCase("it") + fromEmail.slice(1) : "") || "Il mio profilo";
   // Tre numeri come il profilo di Places: salvati / voglio andarci / ci sono stato. Sono l'unico
   // ingresso ai salvati dal profilo (Semplificare 5, 17/10): l'elenco vero è la scheda "Salvati".
-  const wantCount = saved.filter((r) => r.tags?.includes(STATE_WANT)).length;
+  // Revisore 2/11: un salvato senza stato è "Da provare" (come nei Salvati), senza scrivere nel database.
+  const wantCount = saved.filter((r) => isWanted(r.tags)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
   const counters = [
     { label: "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
@@ -200,12 +206,19 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       : [],
   );
 
-  // "Ci sei stato?" (?beta=ci-sei-stato): i "Da provare", dal più vecchio (la soglia di 7 giorni nel componente).
+  // "Ci sei stato?" (?beta=ci-sei-stato): i "Da provare" (anche senza stato), dal più vecchio (la soglia di 7
+  // giorni nel componente). Il componente tiene solo quelli vicini a dove sei (revisore 2/11: proponeva Milano a Roma).
+  const coords = (r: SavedPlaceRow) => (r.places && Number.isFinite(r.places.lat) && Number.isFinite(r.places.lng) ? { lat: Number(r.places.lat), lng: Number(r.places.lng) } : null);
   const visitCandidates: VisitCandidate[] = saved
-    .filter((r) => r.places && r.tags?.includes(STATE_WANT) && !r.tags.includes(STATE_DONE))
+    .filter((r) => r.places && isWanted(r.tags))
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
-    .slice(0, 20)
-    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note }));
+    .slice(0, 40)
+    .map((r) => ({ id: r.places!.id, name: r.places!.name, category: r.places!.category, tags: r.tags ?? [], savedAt: r.created_at, note: r.note, ...coords(r) }));
+  // Senza posizione né ultima vista sulla mappa: "casa" è la zona con più salvati (media dei suoi posti).
+  const zonaCasa = zoneDeiSalvati(saved.flatMap((r) => { const c = coords(r); return c ? [{ ...c, address: r.places!.address }] : []; }))[0];
+  const casa = zonaCasa
+    ? { lat: zonaCasa.posti.reduce((s, p) => s + p.lat, 0) / zonaCasa.posti.length, lng: zonaCasa.posti.reduce((s, p) => s + p.lng, 0) / zonaCasa.posti.length }
+    : null;
 
   const postiFissi: PostoFisso[] = saved
     .flatMap((r) => (r.places ? [{ id: r.places.id, name: r.places.name, category: r.places.category, visite: visiteDi(r.tags, visite.get(r.places.id)) }] : []))
@@ -313,7 +326,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
       {/* Promemoria che compaiono solo quando servono. */}
       <BookingReminder />
-      <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} />
+      <VisitPrompt userId={user.id} candidates={visitCandidates} withDate={diaryWithDate} casa={casa} />
 
       {/* Impostazioni: tutto il resto, chiuso. Ogni riga si apre al tocco; i link "#…" da altre
           pagine (es. #cosa-so-di-te, #profilo-pubblico) aprono sia "Impostazioni" sia la riga. */}

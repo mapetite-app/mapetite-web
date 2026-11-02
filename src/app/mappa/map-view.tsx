@@ -21,10 +21,10 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { hasStateOrTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -44,6 +44,7 @@ import { surpriseFromMemory } from "@/lib/sorpresa";
 import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
+import { zoneDeiSalvati, zonaIniziale, type Zona } from "@/lib/salvati-zone";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
@@ -402,7 +403,8 @@ const savedText = (p: Place) => [p.name, categoryLabel(p.category), p.category, 
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
   const base = list.filter((p) => {
-    if (tag !== null && !p.tags?.includes(tag)) return false;
+    // "Da provare" comprende i salvati senza stato (revisore 2/11): nessun terzo stato "Salvato".
+    if (tag !== null && !hasStateOrTag(p.tags, tag)) return false;
     if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
     return true;
   });
@@ -936,6 +938,8 @@ export default function MapView({
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);
+  // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
+  const [zonaMappa, setZonaMappa] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -1260,6 +1264,10 @@ export default function MapView({
   const savedControlsOn = view === "saved" && userId != null && savedPlaces.length > 0;
   // Lista dei salvati a tutto schermo: sopra la mappa finché non si tocca "Vedi sulla mappa".
   const salvatiListaOn = savedControlsOn && aiSearch === null && clusterPlaces === null && !salvatiMappa;
+  // Mappa dei salvati (revisore 2/11): un solo campo in alto, "Cerca nei salvati", al posto di "Chiedi all'AI"
+  // più "Cerca in N salvati"; sotto, le zone (Roma, Milano…) quando i salvati sono in più città.
+  const salvatiMappaOn = savedControlsOn && !salvatiListaOn && aiSearch === null;
+  const zoneSalvati = salvatiMappaOn ? zoneDeiSalvati(displayedPlaces) : [];
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -1286,7 +1294,7 @@ export default function MapView({
   }, [savedPlaces]);
   // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
   const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
-  const countTag = (t: string) => savedPlaces.filter((p) => p.tags?.includes(t)).length;
+  const countTag = (t: string) => savedPlaces.filter((p) => hasStateOrTag(p.tags, t)).length;
   const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
   const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
   const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
@@ -1969,6 +1977,53 @@ export default function MapView({
     }
   };
 
+  // Mappa dei salvati per zone (revisore 2/11: con salvati a Roma e Milano inquadrava l'Italia intera con
+  // un solo gruppo). Si parte dalla zona dove sei (se hai salvati entro 30 km) o da quella con più salvati;
+  // margine in alto sotto il campo e le zone.
+  // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
+  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170); };
+  const apriMappaSalvati = () => {
+    setSalvatiMappa(true);
+    const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
+    if (z) inquadraZona(z);
+    else fitToPlaces(displayedPlaces, 170);
+  };
+  const cercaSalvati = (pill: boolean) => (
+    <input
+      type="search"
+      value={savedQuery}
+      onChange={(e) => {
+        const v = e.target.value;
+        setSavedQuery(v); setClusterPlaces(null);
+        // Dopo una pausa la mappa va sui salvati trovati ("il giapponese di Milano" da Roma).
+        if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
+        savedFitTimer.current = setTimeout(() => {
+          const found = filterSaved(savedPlaces, activeTag, activeCity, v);
+          if (v.trim() && found.length > 0) fitToPlaces(found, 170);
+        }, 600);
+      }}
+      placeholder="Cerca nei salvati"
+      aria-label="Cerca tra i salvati"
+      className={pill
+        ? "min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        : "min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"}
+    />
+  );
+  // Torna alla lista dei salvati (la schermata principale di "Salvati").
+  const vediLista = (pill: boolean) => (
+    <button
+      type="button"
+      data-testid="salvati-vedi-lista"
+      aria-label="Vedi la lista"
+      onClick={() => setSalvatiMappa(false)}
+      className={pill
+        ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95"
+        : "flex h-10 w-10 shrink-0 items-center justify-center rounded-btn border border-border bg-white text-brand active:scale-95"}
+    >
+      <ListIcon size={18} aria-hidden />
+    </button>
+  );
+
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
   // "Altri come questo" in corso: posto di partenza, id da escludere e frase vera della ricerca.
@@ -2567,8 +2622,16 @@ export default function MapView({
           </div>
         )}
         {/* Riga icone: Concierge AI + Filtri (con ?beta=barra: campo "Cosa cerchi?" sempre visibile, come Places) */}
-        <div className="pointer-events-auto flex gap-2">
-          {barOn ? (
+        <div data-testid={salvatiMappaOn ? "salvati-filtri" : undefined} className="pointer-events-auto flex gap-2">
+          {salvatiMappaOn ? (
+            <>
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-2 shadow-float">
+                <Search size={17} className="shrink-0 text-text-muted" aria-hidden />
+                {cercaSalvati(true)}
+              </label>
+              {vediLista(true)}
+            </>
+          ) : barOn ? (
             <form
               data-testid="barra-ricerca"
               className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-1 shadow-float"
@@ -2813,67 +2876,53 @@ export default function MapView({
             />
           </div>
         )}
-        {savedControlsOn && !salvatiListaOn && (
-          <div data-testid="salvati-filtri" className={`pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
-            {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
-                ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
-            <div className="flex items-center gap-1.5">
-              <input
-                type="search"
-                value={savedQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSavedQuery(v); setClusterPlaces(null);
-                  // Dopo una pausa la mappa va sui salvati trovati ("il giapponese di Milano" da Roma).
-                  if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
-                  savedFitTimer.current = setTimeout(() => {
-                    const found = filterSaved(savedPlaces, activeTag, activeCity, v);
-                    if (v.trim() && found.length > 0) fitToPlaces(found, 150);
-                  }, 600);
-                }}
-                placeholder={`Cerca in ${savedPlaces.length} salvati`}
-                aria-label="Cerca tra i salvati"
-                className="min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
-              />
-              {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
-              <Link
-                href="/stasera"
-                data-testid="vai-stasera"
-                aria-label="Stasera dove andiamo?"
-                className="flex min-h-10 shrink-0 items-center gap-1 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
-              >
-                <span aria-hidden>🍽️</span> Stasera
-              </Link>
-              {/* Torna alla lista dei salvati (la schermata principale di "Salvati"). */}
-              <button
-                type="button"
-                data-testid="salvati-vedi-lista"
-                aria-label="Vedi la lista"
-                onClick={() => setSalvatiMappa(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn border border-border bg-white text-brand active:scale-95"
-              >
-                <ListIcon size={18} aria-hidden />
-              </button>
-            </div>
-            {/* I filtri accesi restano in vista: un tocco li toglie. */}
+        {savedControlsOn && !salvatiListaOn && !salvatiMappaOn && (
+          <div data-testid="salvati-filtri" className={`pointer-events-auto flex items-center gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
+            {cercaSalvati(false)}
+            {vediLista(false)}
+          </div>
+        )}
+        {/* Sotto il campo: le zone dei salvati (se sono in più città) e i filtri accesi, un tocco li toglie.
+            "Stasera" non sta più qui: è uno strumento, accanto al "+" nella lista (revisore 2/11). */}
+        {salvatiMappaOn && (zoneSalvati.length > 1 || activeTag !== null || activeCity !== null || savedNearestOn) && (
+          <div data-testid="salvati-sotto" className={`pointer-events-auto -ml-1 flex gap-1.5 overflow-x-auto py-1 pl-1 [scrollbar-width:none] ${barOn ? "mr-14 lg:mr-0" : ""}`}>
+            {zoneSalvati.length > 1 && (
+              <span role="group" aria-label="Zone dei salvati" data-testid="salvati-zone" className="flex shrink-0 gap-1.5">
+                {zoneSalvati.map((z) => {
+                  const on = zonaMappa === z.nome;
+                  return (
+                    <button
+                      key={z.nome}
+                      type="button"
+                      data-testid="salvati-zona"
+                      aria-pressed={on}
+                      onClick={() => inquadraZona(z)}
+                      className={`flex min-h-9 shrink-0 items-center gap-1 rounded-pill px-3 text-xs font-display font-semibold shadow-float active:scale-95 ${on ? "bg-brand text-white" : "bg-surface text-brand"}`}
+                    >
+                      {z.nome} <span className={on ? "text-white/75" : "text-text-muted"}>{z.posti.length}</span>
+                    </button>
+                  );
+                })}
+              </span>
+            )}
             {(activeTag !== null || activeCity !== null || savedNearestOn) && (
-              <div data-testid="salvati-attivi" className="-mx-1.5 flex gap-1.5 overflow-x-auto px-1.5 [scrollbar-width:none]">
-                {activeTag !== null && (
-                  <button type="button" onClick={() => { setActiveTag(null); clearAiSearch(); setClusterPlaces(null); }} aria-label={`Togli ${tagLabel(activeTag)}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    {tagLabel(activeTag)} <X size={12} aria-hidden />
-                  </button>
-                )}
-                {activeCity !== null && (
-                  <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    📍 {activeCity} <X size={12} aria-hidden />
-                  </button>
-                )}
-                {savedNearestOn && (
-                  <button type="button" onClick={() => setSavedNearest(false)} aria-label="Togli Più vicini" className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    Più vicini <X size={12} aria-hidden />
-                  </button>
-                )}
-              </div>
+              <span data-testid="salvati-attivi" className="flex shrink-0 gap-1.5">
+                  {activeTag !== null && (
+                    <button type="button" onClick={() => { setActiveTag(null); clearAiSearch(); setClusterPlaces(null); }} aria-label={`Togli ${tagLabel(activeTag)}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      {tagLabel(activeTag)} <X size={12} aria-hidden />
+                    </button>
+                  )}
+                  {activeCity !== null && (
+                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      📍 {activeCity} <X size={12} aria-hidden />
+                    </button>
+                  )}
+                  {savedNearestOn && (
+                    <button type="button" onClick={() => setSavedNearest(false)} aria-label="Togli Più vicini" className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      Più vicini <X size={12} aria-hidden />
+                    </button>
+                  )}
+              </span>
             )}
           </div>
         )}
@@ -3760,7 +3809,7 @@ export default function MapView({
           onFilters={() => setSavedSheetOpen(true)}
           verdicts={venueDetails}
           hideOnDesktop={venueOpen}
-          onMap={() => { setSalvatiMappa(true); fitToPlaces(displayedPlaces, 150); }}
+          onMap={apriMappaSalvati}
           onOpen={(place, order) => {
             setCarouselOrder(order);
             setFocusedId(place.id);

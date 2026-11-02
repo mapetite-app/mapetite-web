@@ -11,7 +11,7 @@ import { isGem } from "@/lib/gem";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
-import { isStateTag, sortTags, tagLabel } from "@/lib/tags";
+import { isStateTag, sortTags, STATE_TAGS, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
@@ -782,7 +782,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
-            const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
+            // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
+            const stato = savedMode ? (place.tags ?? []).find(isStateTag) ?? STATE_TAGS[0] : undefined;
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {

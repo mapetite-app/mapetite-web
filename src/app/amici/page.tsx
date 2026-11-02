@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Users } from "lucide-react";
 import Avatar from "@/components/avatar";
-import SocialInArrivo from "@/components/social-in-arrivo";
+import AmiciIntanto from "./amici-intanto";
+import { loadMySaved } from "@/lib/raccolte-server";
 import { PostoCard } from "@/components/posto-persona";
 import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, viewerId } from "@/lib/social";
 import ScopritoriAmici from "./scopritori-amici";
@@ -56,7 +57,8 @@ export default async function AmiciPage() {
       <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
 
       {feed.stato === "in-arrivo" ? (
-        <div className="mt-6"><SocialInArrivo /></div>
+        // Revisore 2/11: niente più "Gli amici arrivano presto" a tutta pagina: le cose vere che si fanno già.
+        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} />
       ) : (
         <>
           {/* Trova persone: la ricerca per nome, come "Search by name" di Places. */}

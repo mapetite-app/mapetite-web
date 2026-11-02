@@ -9,12 +9,21 @@ import { track, trackFeature } from "@/lib/track";
 import { dayKey, withVoto } from "@/lib/diario";
 import { saveVisit } from "@/lib/diario-write";
 import DiarioFoglio from "@/components/diario-foglio";
+import { grantedPosition, readLastView } from "@/lib/last-view";
+import { distanceMeters } from "@/lib/distance";
+import { ZONA_METERS } from "@/lib/salvati-zone";
 
-// "Ci sei stato?" (?beta=ci-sei-stato): nel profilo, un locale "📌 Da provare" salvato da
+// "Ci sei stato?" (?beta=ci-sei-stato): nel profilo, un locale "📌 Da provare" (anche senza stato) salvato da
 // più di una settimana. Un tocco lo segna "✓ Ci sono stato". Le visite sono il segnale di gusto
 // più forte (VISIONE.md), ma oggi quasi nessuno le segna da solo. Stessi tag di sempre,
 // nessuna migrazione; "Non ancora" lo nasconde per 30 giorni (solo su questo telefono).
-export type VisitCandidate = { id: string; name: string; category: string | null; tags: string[]; savedAt: string; note?: string | null };
+export type VisitCandidate = { id: string; name: string; category: string | null; tags: string[]; savedAt: string; note?: string | null; lat?: number; lng?: number };
+
+// Revisore 2/11: proponeva un locale di Milano a chi era a Roma. Si propongono solo i posti entro 30 km
+// da dove sei (posizione già permessa), o dall'ultima vista della mappa se è su una città (non sull'Italia
+// intera), o dalla zona con più salvati. Nessuno vicino: niente riquadro.
+const VICINO_METERS = ZONA_METERS;
+const ZOOM_CITTA = 9;
 
 const WANT = "Da provare";
 const DONE = "Già visitato";
@@ -37,7 +46,7 @@ function weeksAgo(iso: string): string {
   return `${Math.floor(days / 30)} mesi fa`;
 }
 
-export default function VisitPrompt({ userId, candidates, withDate = false }: { userId: string; candidates: VisitCandidate[]; withDate?: boolean }) {
+export default function VisitPrompt({ userId, candidates, withDate = false, casa = null }: { userId: string; candidates: VisitCandidate[]; withDate?: boolean; casa?: { lat: number; lng: number } | null }) {
   const on = useOptIn("ci-sei-stato");
   const [queue, setQueue] = useState<VisitCandidate[] | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -47,11 +56,18 @@ export default function VisitPrompt({ userId, candidates, withDate = false }: { 
   const [diary, setDiary] = useState<VisitCandidate | null>(null);
 
   useEffect(() => {
+    let alive = true;
     const s = snoozed();
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    setTimeout(() => setQueue(candidates.filter((c) => new Date(c.savedAt).getTime() <= weekAgo && !(s[c.id] && now - s[c.id] < SNOOZE_MS))), 0);
-  }, [candidates]);
+    void (async () => {
+      const last = readLastView();
+      const qui = (await grantedPosition()) ?? (last && last.zoom >= ZOOM_CITTA ? last : null) ?? casa;
+      const vicino = (c: VisitCandidate) => !qui || (c.lat != null && c.lng != null && distanceMeters(qui, { lat: c.lat, lng: c.lng }) <= VICINO_METERS);
+      if (alive) setQueue(candidates.filter((c) => new Date(c.savedAt).getTime() <= weekAgo && !(s[c.id] && now - s[c.id] < SNOOZE_MS) && vicino(c)));
+    })();
+    return () => { alive = false; };
+  }, [candidates, casa]);
 
   if (!on || queue === null) return null;
   const current = queue[0];
@@ -116,7 +132,7 @@ export default function VisitPrompt({ userId, candidates, withDate = false }: { 
             ) : (
               <span className="block truncate text-[11px] font-display font-semibold uppercase tracking-wide text-text-muted" title={`L'hai salvato ${weeksAgo(current.savedAt)}`}>Ci sei stato?</span>
             )}
-            <Link href={`/mappa?salvato=${current.id}`} className="block truncate font-display text-[15px] font-semibold leading-tight text-text">
+            <Link href={`/mappa?salvato=${current.id}`} className="block truncate font-sans text-[15px] font-medium leading-tight text-text">
               {current.name}
             </Link>
           </span>
