@@ -3063,6 +3063,105 @@ else {
   await vctx.close();
 }
 
+// 9-ter. Revisore del 2/11 (terzo giro): segnalini che non si toccano a nessuno zoom, riga dei fatti e "Come un tuo
+//        salvato" interi, "Aperto ora" nei colori del marchio, scheda senza contatore foto se le foto non arrivano,
+//        "‹ 1 di 5 ›" dentro la barra azioni, mappa dei salvati che inquadra tutti i salvati della città.
+if (fakeUser) {
+  const pr3 = (n, name, category, address, lat, lng) => ({ id: `00000000-0000-4000-8000-0000000003${n}`, name, category, address, lat, lng, google_place_id: `GR${n}`, rating: 4.5, price_level: 2 });
+  const rows3 = [
+    { created_at: "2026-10-10", tags: ["Da provare"], note: null, places: pr3("01", "Hostaria Del Moro", "restaurant", "Vicolo del Moro 43, 00153 Roma RM, Italy", 41.889, 12.469) },
+    { created_at: "2026-10-09", tags: ["Già visitato"], note: null, places: pr3("02", "L'Elementare - Trastevere", "pizzeria", "Via della Lungaretta 1, Roma", 41.889, 12.474) },
+    { created_at: "2026-10-08", tags: ["Da provare"], note: null, places: pr3("03", "Il Goccetto", "wine_bar", "Via dei Banchi Vecchi 14, 00186 Roma RM, Italy", 41.898, 12.469) },
+    { created_at: "2026-10-07", tags: [], note: null, places: pr3("04", "Forno Campo de' Fiori", "bakery", "Campo de' Fiori 22, Roma", 41.8956, 12.472) },
+    { created_at: "2026-09-20", tags: ["Da provare"], note: null, places: pr3("05", "Santa Cocktail Club", "cocktail_bar", "Via Panisperna 225, Roma", 41.896, 12.491) },
+    { created_at: "2026-09-15", tags: ["Da provare"], note: null, places: pr3("06", "Kiko Sushi Bar", "japanese_restaurant", "Via Ostiense 50, Roma", 41.87, 12.48) },
+  ];
+  const R3 = [
+    mk("E1", "Da Enzo al 29", 41.8885, 12.4775, { category: "restaurant", types: ["restaurant"] }), mk("E2", "Spirito di Vino", 41.8888, 12.4772, { category: "restaurant", types: ["restaurant"] }),
+    mk("E3", "Glass Hostaria", 41.8899, 12.4697, { category: "restaurant", types: ["restaurant"] }), mk("E4", "Antico Arco", 41.8888, 12.4645, { category: "restaurant", types: ["restaurant"] }),
+    mk("E5", "Trattoria Da Teo", 41.8875, 12.4755, { category: "restaurant", types: ["restaurant"], openNow: false }),
+  ].map((r) => ({ ...r, priceLevel: 2 }));
+  const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, geolocation: { latitude: 41.889, longitude: 12.47 }, permissions: ["geolocation"], locale: "it-IT" });
+  await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* */ } });
+  await c3.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await c3.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await c3.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3 }));
+  await c3.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await c3.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+  await c3.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: R3, filtri_usati: { categoria: "restaurant", parole_chiave: ["romantico"], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: null } }));
+  const q3 = await c3.newPage();
+  q3.on("pageerror", (e) => errors.push(e.message));
+  // Segnalini (e gruppi) che si toccano: bordi a meno di 2 px.
+  const tocchi = (pg) => pg.evaluate(() => {
+    const els = [...document.querySelectorAll("[data-testid=pin], [data-testid=pin-gruppo]")].map((e) => ({ id: e.dataset.place ?? "gruppo", b: (e.dataset.testid === "pin" ? e.firstElementChild ?? e : e).getBoundingClientRect() }));
+    const out = [];
+    els.forEach((a, i) => els.forEach((c, j) => {
+      if (j <= i) return;
+      const d = Math.hypot(a.b.left + a.b.width / 2 - c.b.left - c.b.width / 2, a.b.top + a.b.height / 2 - c.b.top - c.b.height / 2);
+      if (d < (a.b.width + c.b.width) / 2 + 2) out.push(`${a.id}/${c.id}`);
+    }));
+    return out;
+  });
+  await q3.goto(`${BASE}/mappa?q=${encodeURIComponent("cena romantica a Trastevere")}`, { waitUntil: "networkidle" });
+  await q3.locator("ul.snap-x li[data-id=E1]").waitFor({ timeout: 8000 });
+  await q3.waitForTimeout(2500);
+  { const t = await tocchi(q3); ok(t.length === 0, `segnalini: nessuno tocca un altro dopo l'inquadratura (Spirito di Vino accanto a Da Enzo)${t.length ? " — " + t.join(" ") : ""}`); }
+  for (const passo of [1, 2, 3]) {
+    await q3.mouse.move(195, 330);
+    await q3.mouse.wheel(0, 500);
+    await q3.waitForTimeout(1300);
+    const t = await tocchi(q3);
+    ok(t.length === 0, `segnalini: nessuno tocca un altro allontanando la mappa (passo ${passo})${t.length ? " — " + t.join(" ") : ""}`);
+  }
+  await q3.screenshot({ path: `${OUT}/r3-segnalini-lontano.png` });
+  const card = q3.locator("ul.snap-x li[data-id=E1]");
+  { const f = await card.getByTestId("riga-fatti").evaluate((el) => {
+      const r = el.getBoundingClientRect(); const pad = parseFloat(getComputedStyle(el).paddingRight);
+      const testa = el.firstElementChild; const dist = el.querySelector("[data-testid=distanza-card]")?.getBoundingClientRect() ?? null;
+      return { intera: testa.scrollWidth <= testa.clientWidth + 1, righe: Math.round(r.height / parseFloat(getComputedStyle(el).lineHeight)),
+        dist: dist == null ? "nessuna" : dist.top >= r.bottom - 1 ? "nascosta" : dist.right <= r.right - pad + 1 ? "intera" : "tagliata", testo: testa.textContent };
+    });
+    ok(f.intera && f.righe === 1 && f.dist !== "tagliata", `card: riga dei fatti intera su una riga, la distanza c'è solo se ci sta (${f.testo} · distanza ${f.dist})`); }
+  { const s = await card.getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), intera: el.scrollWidth <= el.clientWidth + 1, nome: el.textContent.includes("Hostaria Del Moro") }));
+    ok(s.vis === "✨ Come un tuo salvato" && s.intera && s.nome, `card: 'Come un tuo salvato' intera, il nome del salvato per il lettore di schermo (${s.vis})`); }
+  { const a = await card.getByTestId("aperto-card").evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, c: getComputedStyle(el).color }));
+    ok(a.bg === "rgb(255, 255, 255)" && a.c === "rgb(26, 60, 64)", `card: 'Aperto ora' bianco e teal, niente verde fuori marchio (${a.bg} / ${a.c})`); }
+  await q3.screenshot({ path: `${OUT}/r3-risultati.png` });
+  // Scheda dal risultato con le foto che non arrivano (429): niente "1 / 2" sopra l'emoji; "‹ 1 di 5 ›" nella barra azioni.
+  await card.getByTestId("card-risultato").click();
+  await q3.getByTestId("barra-azioni").waitFor({ timeout: 4000 });
+  await q3.waitForTimeout(1200);
+  ok((await q3.getByTestId("carosello-contatore").count()) === 0, "scheda: senza foto visibili niente contatore '1 / 2' sopra l'emoji");
+  { const n = await q3.evaluate(() => { const nav = document.querySelector("[data-testid=scheda-nav]"); const sheet = document.querySelector("[data-testid=scheda-trascinabile]")?.getBoundingClientRect();
+      return { dentro: !!nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1) }; });
+    ok(n.dentro && n.testo?.replace(/\s/g, "") === "‹1di5›", `scheda: '‹ 1 di 5 ›' dentro la barra azioni in basso, non sopra la scheda (${n.testo})`); }
+  { const c = await q3.getByTestId("stato-apertura").evaluate((el) => getComputedStyle(el).color);
+    ok(c === "rgb(26, 60, 64)", `scheda: 'Aperto ora' in teal del marchio (${c})`); }
+  await q3.screenshot({ path: `${OUT}/r3-scheda.png` });
+  await q3.getByRole("button", { name: "Locale successivo" }).click();
+  await q3.locator("h2", { hasText: "Spirito di Vino" }).waitFor({ timeout: 4000 }).then(() => ok(true, "scheda: '›' nella barra apre il risultato dopo"), () => ok(false, "scheda: '›' nella barra apre il risultato dopo"));
+  await q3.keyboard.press("Escape");
+  // Mappa dei salvati: inquadra tutti i salvati di Roma (anche Kiko Sushi Bar, il più a sud), nessun nome sopra un altro segnalino.
+  await q3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await vaiSalvatiMappa(q3);
+  await q3.waitForTimeout(2500);
+  { const m = await q3.evaluate(() => {
+      const top = document.querySelector("[data-testid=salvati-filtri]")?.getBoundingClientRect().bottom ?? 100;
+      const sotto = document.querySelector("ul.snap-x")?.getBoundingClientRect().top ?? 844;
+      const pins = [...document.querySelectorAll("[data-testid=pin]")].map((e) => ({ id: e.dataset.place, el: e, b: (e.firstElementChild ?? e).getBoundingClientRect() }));
+      const fuori = pins.filter(({ b }) => b.top < top - 60 || b.bottom > sotto || b.left < 0 || b.right > innerWidth).map((p) => p.id.slice(-2));
+      const ov = (a, b) => a.left + 2 < b.right && b.left + 2 < a.right && a.top + 2 < b.bottom && b.top + 2 < a.bottom;
+      const coperti = [];
+      for (const l of document.querySelectorAll("[data-testid=etichetta-pin]")) { const lb = l.getBoundingClientRect(); for (const p of pins) if (p.el !== l.parentElement && ov(lb, p.b)) coperti.push(`${l.textContent.trim()} su ${p.id.slice(-2)}`); }
+      return { n: pins.length, fuori, coperti };
+    });
+    ok(m.n === 6 && m.fuori.length === 0, `mappa dei salvati: tutti i 6 salvati di Roma in vista, anche il più a sud (${m.n} segnalini${m.fuori.length ? ", fuori: " + m.fuori.join(",") : ""})`);
+    ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`); }
+  { const t = await tocchi(q3); ok(t.length === 0, `mappa dei salvati: nessun segnalino ne tocca un altro${t.length ? " — " + t.join(" ") : ""}`); }
+  await q3.screenshot({ path: `${OUT}/r3-salvati-mappa.png` });
+  await c3.close();
+}
+
 // 10. Salva da Google Maps: Condividi (Android) e "Incolla link" (iPhone). API simulata, niente Google.
 {
   const man = await (await fetch(`${BASE}/manifest.webmanifest`)).json().catch(() => ({}));
