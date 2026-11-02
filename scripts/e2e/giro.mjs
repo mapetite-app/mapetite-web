@@ -1989,7 +1989,12 @@ else {
       ok(!!lb && lb.y <= 200, `salvati lista: con 2 raccolte la lista dei posti parte entro 200 px (y ${Math.round(lb?.y ?? 0)}; prima ~245)`);
       // La mappa è il pulsante in basso, sopra la barra di navigazione, sempre in vista.
       const mb = await L.getByTestId("salvati-lista-mappa").boundingBox(); const nav = await p.locator("nav").filter({ has: p.getByRole("link", { name: "Salvati" }) }).first().boundingBox();
-      ok(!!mb && !!nav && mb.y + mb.height <= nav.y && mb.y > 600 && ((await L.getByTestId("salvati-lista-mappa").textContent()) ?? "").includes("Sulla mappa"), `salvati lista: 'Sulla mappa' è un pulsante in basso, sopra la barra (y ${Math.round(mb?.y ?? 0)}, barra a ${Math.round(nav?.y ?? 0)})`); }
+      ok(!!mb && !!nav && mb.y + mb.height <= nav.y && mb.y > 600 && ((await L.getByTestId("salvati-lista-mappa").textContent()) ?? "").includes("Sulla mappa"), `salvati lista: 'Sulla mappa' è un pulsante in basso, sopra la barra (y ${Math.round(mb?.y ?? 0)}, barra a ${Math.round(nav?.y ?? 0)})`);
+      // Revisore 2/11 (quinto giro): in fondo alla lista c'è lo spazio del pulsante, così l'ultimo posto non resta mai coperto.
+      { const fondo = await L.evaluate(async (el) => { const prima = el.scrollTop; el.scrollTop = el.scrollHeight; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); const b = el.querySelector("[data-testid=salvati-lista-mappa]").getBoundingClientRect(); const rows = [...el.querySelectorAll("[data-testid=salvato-riga]")]; const last = rows[rows.length - 1].getBoundingClientRect(); el.scrollTop = prima; return { ultima: Math.round(last.bottom), pulsante: Math.round(b.top) }; });
+        ok(fondo.ultima <= fondo.pulsante, `salvati lista: in fondo l'ultimo posto finisce sopra 'Sulla mappa' (${fondo.ultima} ≤ ${fondo.pulsante})`); }
+      // Le raccolte stanno nella stessa fila dei filtri (scorrevole): ci sono anche se partono fuori schermo a destra.
+      ok((await L.getByTestId("raccolta-cerchio").count()) >= 2, `salvati lista: le raccolte dell'utente nella fila dei Salvati (${await L.getByTestId("raccolta-cerchio").count()})`); }
     const righe = L.getByTestId("salvato-riga");
     // Ordine visibile: senza posizione "Recenti" (dall'ultimo salvato: Caffè Milano è l'ultimo della risposta).
     { const ord = L.getByTestId("salvati-ordine");
