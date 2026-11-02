@@ -927,7 +927,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
             onChange={(e) => setInput(e.target.value)}
             enterKeyHint="send"
             maxLength={300}
-            placeholder={c.msgs.length === 0 ? "Scrivi o detta cosa cerchi…" : "Chiedi altro, es. “più economici”"}
+            placeholder={c.msgs.length === 0 ? "Chiedi all'AI…" : "Chiedi altro, es. “più economici”"}
             aria-label="Scrivi all'assistente"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
           />

@@ -62,6 +62,8 @@ export default function PlacePhoto({
   credit = null,
   creditClassName = "absolute bottom-2 right-3",
   onFail,
+  onLoad,
+  revealOnLoad = false,
 }: {
   photoRef: string | null | undefined;
   alt: string;
@@ -76,10 +78,16 @@ export default function PlacePhoto({
   creditClassName?: string;
   // Chiamata quando la foto non arriva (quota finita, errore): chi la ospita può togliere il riquadro.
   onFail?: () => void;
+  // Chiamata quando la foto è arrivata davvero (chi la ospita può togliere la copertina con l'emoji).
+  onLoad?: () => void;
+  // Foto invisibile finché non è arrivata: niente icona rotta né testo alternativo dentro un segnalino
+  // mentre si aspetta (o se poi risponde 429). Sotto resta quello che c'è (di solito l'emoji).
+  revealOnLoad?: boolean;
 }) {
   // Primo tentativo: l'indirizzo già visto per il locale; se non carica (riferimento scaduto e
   // fuori dalla cache) si riprova una volta con il riferimento di questa ricerca.
   const [attempt, setAttempt] = useState<{ ref: string; n: number } | null>(null);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   if (!photoRef) return <>{fallback}</>;
   const n = attempt?.ref === photoRef ? attempt.n : 0;
   if (n >= 2) return <>{fallback}</>;
@@ -95,6 +103,10 @@ export default function PlacePhoto({
         alt={alt}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
+        // Già in cache: il "load" può arrivare prima che React lo ascolti, quindi si controlla anche qui.
+        ref={(img) => { if (img?.complete && img.naturalWidth > 0 && loadedSrc !== src) { setLoadedSrc(src); onLoad?.(); } }}
+        onLoad={() => { if (loadedSrc !== src) { setLoadedSrc(src); onLoad?.(); } }}
+        data-caricata={loadedSrc === src ? "true" : undefined}
         onError={() => {
           // Al secondo tentativo solo se l'indirizzo ricordato era diverso da quello di oggi.
           const retry = n === 0 && src !== urlFor(photoRef);
@@ -102,7 +114,7 @@ export default function PlacePhoto({
           setAttempt({ ref: photoRef, n: retry ? 1 : 2 });
           if (!retry) onFail?.();
         }}
-        className={className}
+        className={revealOnLoad ? `${className} transition-opacity duration-200 ${loadedSrc === src ? "opacity-100" : "opacity-0"}` : className}
       />
       {credit && (
         <span className={`${creditClassName} max-w-[55%] truncate rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-sans text-white`}>Foto: {credit}</span>

@@ -199,10 +199,10 @@ await idee(page);
   // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
   ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
-    ok(adesso === 3 && perTe >= 1 && perTe <= 3 && righe <= 6, `Idee: al massimo 6 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
+    ok(adesso === 2 && perTe >= 1 && perTe <= 2 && righe <= 4, `Idee: al massimo 4 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
   { const es = pan.locator("section").filter({ hasText: /^Prova a chiedere/ }).getByRole("button"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
     ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
-  ok(((await pan.getByTestId("suggerimento-momento-2").textContent()) ?? "") !== ((await pan.getByTestId("suggerimento-momento").textContent()) ?? ""), "Idee: la seconda idea del momento è diversa dalla prima");
+  ok((await pan.getByTestId("idee-stasera").count()) === 0 && (await pan.getByTestId("suggerimento-momento-2").count()) === 0, "Idee: niente 'Stasera dove andiamo?' (sta nei Salvati) né una seconda idea dello stesso momento");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
@@ -907,6 +907,9 @@ await page.waitForTimeout(1500);
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
   ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
+  // Revisore del 2/11: con i segnalini vicini i nomi si impilavano in colonna. Nome solo sui primi 3 (e sulla card al centro).
+  { const nomi = await page.getByTestId("etichetta-pin").allInnerTexts();
+    ok(nomi.length <= 3 && nomi.every((n) => /^Folla [123]$/.test(n.trim())), `mappa affollata: nomi solo sui primi 3 (${nomi.join(", ")})`); }
   // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
   const q = await inquadratura(page, ["F11"]);
   ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);
@@ -1437,6 +1440,26 @@ await shot("20-pin-foto");
   await shot("20b-pin-attesa-foto");
   await page.unroute("**/api/places/photo**");
 }
+// Foto che non arrivano (revisore del 2/11, in produzione 429 per quota finita): ogni segnalino è l'emoji su
+// fondo chiaro, niente disco pieno né icona rotta; ogni card ha la copertina con l'emoji, non metà card vuota.
+{
+  await page.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } }));
+  await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+  await page.evaluate(() => { try { localStorage.removeItem("mapetite.foto"); } catch { /* */ } });
+  await (await esempio(page)).click();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 });
+  await page.waitForTimeout(800);
+  const pins = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => {
+    const img = e.querySelector("img");
+    const disco = e.firstElementChild;
+    return { id: e.dataset.place, emoji: (e.querySelector("[data-testid=pin-emoji]")?.textContent ?? disco?.textContent ?? "").trim(), fotoVisibile: !!img && getComputedStyle(img).opacity !== "0", fondo: disco ? getComputedStyle(disco).backgroundColor : "" };
+  }));
+  ok(pins.length >= 2 && pins.every((x) => /\p{Extended_Pictographic}/u.test(x.emoji) && !x.fotoVisibile && x.fondo === "rgb(255, 255, 255)"), `foto non arrivate: tutti i segnalini con l'emoji su fondo chiaro (${pins.map((x) => `${x.id} ${x.emoji}${x.fotoVisibile ? " +foto" : ""}`).join(", ")})`);
+  const cop = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((li) => { const c = li.querySelector("[data-testid=copertina]"); return !!c && c.getBoundingClientRect().width > 0 && /\p{Extended_Pictographic}/u.test(c.textContent ?? ""); }));
+  ok(cop.length >= 2 && cop.every(Boolean), `foto non arrivate: ogni card ha la copertina con l'emoji del tipo (${cop.filter(Boolean).length} su ${cop.length})`);
+  await shot("20c-senza-foto");
+  await page.unroute("**/api/places/photo**");
+}
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
 // 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"
@@ -1585,6 +1608,33 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
   const txt = await wp.getByTestId("suggerimento-momento").textContent({ timeout: 5000 }).catch(() => "");
   ok(txt.includes(atteso), `suggerimento col meteo: "${txt}" contiene "${atteso}"`);
   await wctx.close();
+}
+// Idee in ogni fascia oraria (revisore del 2/11: di notte "Locale aperto adesso qui vicino", "Cocktail bar aperto"
+// e "Vicino a me, aperto adesso" dicevano la stessa cosa): al massimo 4 righe, nessun significato ripetuto,
+// niente "Stasera dove andiamo?". Orologio fisso, meteo simulato (nessun costo).
+{
+  const CONCETTI = { vicino: /vicin|qui intorno/i, "aperto ora": /aper(to|ti|ta) (adesso|ora)|a quest'ora/i, drink: /cocktail|drink|\bpub\b/i, colazione: /colazion|cornett|brunch/i, pranzo: /pranz/i, cena: /\bcena\b/i, aperitivo: /aperitiv/i, gelato: /gelat/i, vino: /wine|\bvino\b|enotec/i, trattoria: /trattori/i, dolci: /pasticc|merenda|\bdolc/i, pizza: /pizz/i, stasera: /stasera dove/i };
+  const casi = [["03:00", null], ["05:30", null], ["08:00", null], ["13:00", null], ["16:30", null], ["19:30", null], ["22:00", null], ["23:30", null],
+    ["08:00", { temperature_2m: 9, precipitation: 3, weather_code: 63 }], ["13:00", { temperature_2m: 26, precipitation: 0, weather_code: 1 }], ["19:30", { temperature_2m: 6, precipitation: 0, weather_code: 2 }], ["21:30", { temperature_2m: 12, precipitation: 2, weather_code: 61 }]];
+  const ictx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await ictx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  for (const [ora, meteo] of casi) {
+    await ictx.unroute("**/api.open-meteo.com/**").catch(() => {});
+    await ictx.route("**/api.open-meteo.com/**", (r) => (meteo ? r.fulfill({ json: { current: meteo } }) : r.fulfill({ status: 503, body: "" })));
+    const ip = await ictx.newPage();
+    await ip.addInitScript(() => { try { sessionStorage.clear(); } catch { /* ignorato */ } });
+    await ip.clock.setFixedTime(new Date(`2026-11-02T${ora}:00`));
+    await ip.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await ip.waitForTimeout(400);
+    await idee(ip);
+    const righe = (await ip.getByTestId("idee-pannello").locator("li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+    const doppi = Object.entries(CONCETTI).filter(([, re]) => righe.filter((r) => re.test(r)).length > 1).map(([k]) => k);
+    const nome = `${ora}${meteo ? (meteo.precipitation > 0 ? " pioggia" : ` ${meteo.temperature_2m}°`) : ""}`;
+    ok(righe.length <= 4 && doppi.length === 0 && (await ip.getByTestId("idee-stasera").count()) === 0, `Idee alle ${nome}: ${righe.length} righe, nessun doppione${doppi.length ? " (ripetuti: " + doppi.join(", ") + ")" : ""} — ${righe.join(" | ")}`);
+    await ip.close();
+  }
+  await ictx.close();
 }
 // Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani, il modulo di richiesta e l'esempio del pannello.
 { const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
@@ -1749,6 +1799,8 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  // Revisore del 2/11: con i salvati "Stasera dove andiamo?" era nelle Idee e nei Salvati. Ora solo nei Salvati.
+  ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 4, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 4 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
   // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie tra i salvati
   // in parallelo; restano solo quelli veri e vicini a dove si cerca (Caffè Milano no: si cerca a Roma).
   { const chiesti = [];
@@ -1770,7 +1822,9 @@ else {
       // Il nome sta in assoluto accanto al segnalino: si misura l'insieme di segnalino e nome (se c'è).
       const b = await pins.first().evaluate((el) => { const rs = [el, ...el.querySelectorAll("[data-testid=etichetta-pin]")].map((e) => e.getBoundingClientRect()); const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top)); return { x, y, width: Math.max(...rs.map((r) => r.right)) - x, height: Math.max(...rs.map((r) => r.bottom)) - y }; }).catch(() => null);
       const riga = await ds.boundingBox();
-      ok(!!b && !!riga && b.x >= 0 && b.x + b.width <= 390 && b.y >= 0 && b.y + b.height <= riga.y, `dai tuoi salvati: il segnalino si vede tutto, nome compreso, sopra la riga (${JSON.stringify(b && { x: Math.round(b.x), y: Math.round(b.y), h: Math.round(b.height) })}, riga a ${Math.round(riga?.y ?? 0)})`); }
+      ok(!!b && !!riga && b.x >= 0 && b.x + b.width <= 390 && b.y >= 0 && b.y + b.height <= riga.y, `dai tuoi salvati: il segnalino si vede tutto, nome compreso, sopra la riga (${JSON.stringify(b && { x: Math.round(b.x), y: Math.round(b.y), h: Math.round(b.height) })}, riga a ${Math.round(riga?.y ?? 0)})`);
+      // Revisore del 2/11: lo stesso salvato si leggeva due volte (nome sul segnalino + pillola "📌 Osteria Due").
+      ok((await pins.first().getByTestId("etichetta-pin").count()) === 0, "dai tuoi salvati: con un salvato solo il nome sta nella pillola, il segnalino è senza nome"); }
     await p.getByTestId("dai-salvati-apri").click();
     await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
     ok(await p.getByTestId("scheda-pannello").getByText("Osteria Due").first().isVisible(), "dai tuoi salvati: con un salvato solo il tocco apre la sua scheda");
