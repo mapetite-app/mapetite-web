@@ -2909,20 +2909,28 @@ else {
     const anteprima = async () => sq.getByTestId("stasera-anteprima-posto").allInnerTexts().catch(() => []);
     { const nomi = await anteprima();
       const bb = await sq.getByTestId("stasera-proponi").boundingBox(); const ab = await sq.getByTestId("stasera-anteprima").boundingBox().catch(() => null);
-      ok(nomi.length === 6 && ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"].every((n) => nomi.some((t) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
-        `stasera: sotto il pulsante le miniature dei 6 salvati che rispettano le scelte (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+      // Revisore 2/11 (sesto giro): due file finivano sotto la barra in basso. Ora una fila: 3 miniature e "+N".
+      const sei = ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"];
+      const altri = sq.getByTestId("stasera-anteprima-altri");
+      ok(nomi.length === 3 && nomi.every((t) => sei.some((n) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && (await altri.textContent())?.replace(/\s+/g, "").startsWith("+3") && (await altri.getAttribute("href")) === "/mappa?vista=salvati" && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
+        `stasera: sotto il pulsante 3 miniature dei salvati che rispettano le scelte più '+3' (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`);
+      // In fondo alla pagina la fila delle miniature resta tutta sopra la barra in basso.
+      await sq.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await sq.waitForTimeout(300);
+      const f = await sq.evaluate(() => { const ul = document.querySelector("[data-testid=stasera-anteprima] ul").getBoundingClientRect(); const nav = [...document.querySelectorAll("nav")].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= innerHeight - 2 && r.height < 120)[0]; return { fine: Math.round(ul.bottom), barra: Math.round(nav?.top ?? innerHeight), file: new Set([...document.querySelectorAll("[data-testid=stasera-anteprima] li")].map((li) => Math.round(li.getBoundingClientRect().top))).size }; });
+      ok(f.file === 1 && f.fine <= f.barra - 8, `stasera: miniature su una fila, sopra la barra in basso (${JSON.stringify(f)})`);
+      await sq.evaluate(() => window.scrollTo(0, 0)); }
     await sq.screenshot({ path: `${OUT}/s4-stasera.png`, caret: "initial" });
     // Città dei salvati come scelta rapida (più di una città): Roma = 5 mai provati
     const dove = await sq.getByTestId("stasera-distanza").getByRole("button").allTextContents();
     ok(dove.join("|") === "📍 Vicino a me|Roma|Milano|Ovunque", `stasera: 'Dove?' con le città dei salvati (${dove.join(" | ")})`);
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Roma" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), "stasera: 'Roma' tiene solo i salvati di Roma");
-    { const nomi = await anteprima(); ok(nomi.length === 5 && !nomi.some((t) => t.includes("Caffè Milano")), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length}, senza Caffè Milano)`); }
+    { const nomi = await anteprima(); ok(nomi.length === 3 && !nomi.some((t) => t.includes("Caffè Milano")) && (await sq.getByTestId("stasera-anteprima-altri").textContent())?.replace(/\s+/g, "").startsWith("+2"), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length} più '+2', senza Caffè Milano)`); }
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).click();
     // Romantico: 2 posti
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Romantico" }).click();
     ok((await sq.getByTestId("stasera-proponi").textContent()) === "Proponimi i 2 posti", "stasera: con 'Romantico' restano 2 posti");
-    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")), `stasera: con 'Romantico' 2 miniature (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")) && (await sq.getByTestId("stasera-anteprima-altri").count()) === 0, `stasera: con 'Romantico' 2 miniature, niente '+N' (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
     // Festa + Da provare: nessuno → si allarga con un tocco
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
     ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0 && (await sq.getByTestId("stasera-anteprima").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante né miniature");
