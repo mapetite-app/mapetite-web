@@ -1549,8 +1549,11 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
 // color inchiostro, non Poppins teal. "Ultimi aggiunti": solo con salvati veri (qui zero salvati: non compare).
 { const look = await page.getByTestId("importa-tessera-titolo").evaluateAll((els) => els.map((e) => { const c = getComputedStyle(e); return { f: c.fontFamily.split(",")[0].replace(/"/g, ""), w: c.fontWeight, col: c.color }; }));
   ok(look.length === 3 && look.every((x) => /Inter/i.test(x.f) && x.w === "500" && x.col !== "rgb(26, 60, 64)") && (await page.getByRole("button", { name: "Scrivi o incolla a mano" }).count()) === 0 && (await page.getByTestId("importa-ultimi").count()) === 0, `importa: righe 'Altri modi' in Inter medio inchiostro, niente 'Scrivi o incolla a mano', niente 'Ultimi aggiunti' senza salvati (${JSON.stringify(look[0])})`); }
-{ const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16 } });
+{ const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16, google_place_id: `GM${n}` } });
   await page.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [pr(1, "Trattoria Milanese Uno", "restaurant", null), pr(2, "Bar Due", "bar", ["Già visitato"]), pr(3, "Gelateria Tre", "ice_cream_shop", ["Da provare"])] }));
+  // Verdetto già in archivio solo per il primo (revisore 2/11, terzo giro): gli altri restano senza, mai inventati.
+  let synthUrl = "";
+  await page.route("**/rest/v1/place_synthesis**", (r) => { synthUrl = r.request().url(); return r.fulfill({ json: [{ place_id: "GM1", verdict: "Cotoletta vera, sala di quartiere." }] }); });
   await page.reload({ waitUntil: "networkidle" });
   const ult = page.getByTestId("importa-ultimi");
   await ult.waitFor({ timeout: 6000 }).catch(() => {});
@@ -1558,12 +1561,21 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
   const href = await ult.getByTestId("importa-ultimi-riga").first().getAttribute("href").catch(() => null);
   const tl = await page.getByTestId("importa-tessere").boundingBox(); const ub = await ult.boundingBox().catch(() => null);
   ok(righe.length === 3 && righe[0].includes("Trattoria Milanese Uno") && righe[1].includes("Bar Due") && href === "/mappa?salvato=00000000-0000-4000-8000-000000000301" && !!tl && !!ub && ub.y > tl.y + tl.height, `importa: 'Ultimi aggiunti' con gli ultimi 3 salvati veri sotto 'Altri modi', un tocco apre la scheda (${righe.join(" | ")})`);
+  { const stati = (await ult.getByTestId("importa-ultimi-stato").allTextContents()).map((t) => t.replace("📌", "").trim());
+    const v = ult.getByTestId("importa-ultimi-verdetto");
+    const it = await v.first().evaluate((e) => getComputedStyle(e).fontStyle).catch(() => "");
+    ok(JSON.stringify(stati.map((t) => t.trim())) === '["Da provare","Ci sono stato","Da provare"]' && (await v.count()) === 1 && (await v.first().textContent()) === "Cotoletta vera, sala di quartiere." && it === "italic" && (await ult.getByTestId("importa-ultimi-riga").first().getByTestId("importa-ultimi-verdetto").count()) === 1 && /in\.\(.*GM1/.test(decodeURIComponent(synthUrl)),
+      `importa: 'Ultimi aggiunti' con lo stato su ogni riga e il verdetto in corsivo solo dove c'è in archivio (${stati.join(" | ")}, ${await v.count()} verdetti, ${it})`); }
   await page.screenshot({ path: `${OUT}/19b-importa-ultimi.png`, fullPage: true, caret: "initial" });
+  await page.unroute("**/rest/v1/place_synthesis**");
   await page.unroute("**/rest/v1/saved_places**");
   await page.reload({ waitUntil: "networkidle" }); }
 { const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
   const rh = await page.getByTestId("importa-tessera-shot").boundingBox();
   ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 - 64 && rh && rh.height <= 72, `importa: Incolla grande sopra 'Altri modi', righe compatte, tutto sopra la barra (${Math.round(inc?.height ?? 0)}px, righe ${Math.round(rh?.height ?? 0)}px, fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+// Revisore 2/11 (terzo giro): il pulsante corallo da solo sul fondo carta, niente riquadro scuro attorno; il sottotitolo sotto.
+{ const g = await page.evaluate(() => { const card = document.querySelector("[data-testid=importa-google]"); const b = document.querySelector("[data-testid=importa-incolla]").getBoundingClientRect(); const f = document.querySelector("[data-testid=importa-incolla-fonti]"); return { bg: getComputedStyle(card).backgroundColor, btn: getComputedStyle(document.querySelector("[data-testid=importa-incolla]")).backgroundColor, sotto: Math.round(f.getBoundingClientRect().top - b.bottom), col: getComputedStyle(f).color }; });
+  ok(g.bg === "rgba(0, 0, 0, 0)" && g.btn === "rgb(255, 107, 74)" && g.sotto >= 0 && g.sotto < 16 && g.col !== "rgb(255, 255, 255)" && !g.col.startsWith("rgba(255, 255, 255"), `importa: 'Incolla un link' corallo da solo sul fondo chiaro, sottotitolo grigio subito sotto (${JSON.stringify(g)})`); }
 { const look = await page.evaluate(() => ({ h1: getComputedStyle(document.querySelector("h1")).fontFamily, bg: getComputedStyle(document.querySelector("[data-testid=importa-pagina]")).backgroundColor }));
   ok(/newsreader/i.test(look.h1) && look.bg === "rgb(248, 246, 242)", `importa: titolo nel serif e fondo beige di home e salvati (giro D7, D52) (${look.h1.slice(0, 30)}, ${look.bg})`); }
 ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
@@ -1572,6 +1584,8 @@ ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getB
 await page.getByTestId("importa-tessera-mano").click();
 ok(await page.getByTestId("importa-mano").isVisible() && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa: un pannello alla volta ('A mano' chiude lo screenshot)");
 await shot("19-importa");
+await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+await page.screenshot({ path: `${OUT}/s4-importa.png`, caret: "initial" });
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono.
 // Dal piano 6.4 sta nel profilo (sezione "Account"), anche da non collegati; non più nella barra.
@@ -2513,6 +2527,8 @@ else {
         { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy", 45.452, 9.165) },
       ],
       reviews: [{ id: "r1", rating: 5, comment: "Vista bellissima, cocktail ottimi.", created_at: "2026-10-01", places: { name: "Terrazza Uno" } }],
+      // Gusti del profilo (profiles.gusto/cuisines/occasions/price_range): le pillole "Il tuo gusto".
+      gusto: { gusto: { v: 2, zone: ["Trastevere"], su: ["trattoria", "enoteca"], giu: ["gourmet"], scoperta: "chicche" }, cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" },
     };
     await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
     await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -2528,7 +2544,18 @@ else {
       const cose = p.getByTestId("profilo-mie-cose");
       // Semplificare 5 (17/10): la carta del gusto è una tessera, le liste di gruppo stanno solo in Amici.
       // Revisore 2/11 (quarto giro): senza prenotazioni la tessera "Prenotazioni" non c'è (resta in Impostazioni): 5 tessere.
-      ok(await cose.isVisible() && (await cose.locator("a").count()) === 5 && (await cose.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await cose.getByTestId("profilo-gruppi").count()) === 0 && (await cose.getByTestId("profilo-prenotazioni").count()) === 0, `profilo: griglia 'Le mie cose' con 5 tessere (senza Prenotazioni vuota), carta del gusto compresa, senza liste di gruppo (${await cose.locator("a").count()})`);
+      // Revisore 2/11 (terzo giro): la carta del gusto non è più una tessera (doppione di "Il tuo gusto" sotto i numeri): 4 tessere.
+      ok(await cose.isVisible() && (await cose.locator("a").count()) === 4 && (await cose.getByTestId("profilo-carta-gusto").count()) === 0 && (await cose.getByTestId("profilo-gruppi").count()) === 0 && (await cose.getByTestId("profilo-prenotazioni").count()) === 0, `profilo: griglia 'Le mie cose' con 4 tessere (senza Prenotazioni vuota né la carta del gusto), senza liste di gruppo (${await cose.locator("a").count()})`);
+      // Revisore 2/11 (terzo giro): sotto i numeri "Il tuo gusto" con 3 pillole vere dal profilo (cucina, occasione, prezzo)
+      // che aprono la mappa del gusto; la carta da condividere è il link piccolo "Condividi". Il terzo inferiore non è vuoto.
+      { const gs = p.getByTestId("profilo-gusto");
+        const pill = (await gs.getByTestId("profilo-gusto-pillola").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+        const gb = await gs.boundingBox(); const nb = await p.getByTestId("guida-contatori").boundingBox();
+        ok(JSON.stringify(pill) === '["🍝 Romana","❤️ Cena romantica","€€ nella media"]' && (await gs.getByTestId("profilo-gusto-mappa").getAttribute("href")) === "/me" && (await gs.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && !!gb && !!nb && gb.y > nb.y + nb.height && gb.y - (nb.y + nb.height) < 20 && (await p.getByText("Il tuo gusto", { exact: true }).count()) === 1,
+          `profilo: 'Il tuo gusto' sotto i numeri con 3 pillole vere che aprono la mappa del gusto, 'Condividi' per la carta (${pill.join(" | ")})`);
+        const fondo = await p.evaluate(() => { const nav = [...document.querySelectorAll("nav")].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= innerHeight - 2 && r.height < 120)[0]; const el = document.querySelector("#altro")?.closest("div.rounded-card"); return { fine: Math.round(el?.getBoundingClientRect().bottom ?? 0), barra: Math.round(nav?.top ?? innerHeight) }; });
+        ok(fondo.fine >= 844 * 0.62, `profilo: il terzo inferiore non è vuoto (contenuto fino a ${fondo.fine} px, barra a ${fondo.barra})`);
+        await p.screenshot({ path: `${OUT}/s4-profilo.png`, caret: "initial" }); }
       // Revisore 1/11: la tessera "Raccolte" porta ai Salvati (lì le raccolte sono copertine), non a un doppione nel profilo.
       ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "/mappa?vista=salvati" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await p.getByTestId("profilo-prenotazioni-link").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4, ai Salvati) · Diario · Importa con i loro ingressi; Prenotazioni in Impostazioni");
       // Revisore 1/11: il sottotitolo di Importa non si taglia.
@@ -2543,12 +2570,12 @@ else {
         ok(!!n && n.dx >= 0 && n.dx <= 10 && n.dy <= 3, `profilo: il numero accanto al nome della tessera (${JSON.stringify(n)})`); }
       // Revisore 2/11 (quarto giro): tessere tutte alte uguali, titolo su una riga intero e alla stessa altezza nella fila.
       { const t = await cose.locator("a").evaluateAll((els) => els.map((a) => { const r = a.getBoundingClientRect(); const s = a.querySelector("[data-testid=tessera-titolo]"); const q = s?.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), dy: q ? Math.round(q.top - r.top) : -1, righe: q ? Math.round(q.height / parseFloat(getComputedStyle(s).lineHeight)) : 0, tagliato: s ? s.scrollWidth > s.clientWidth + 1 : true, testo: s?.textContent }; }));
-        ok(new Set(t.map((x) => x.h)).size === 1 && new Set(t.map((x) => x.dy)).size === 1 && t.every((x) => x.righe === 1 && !x.tagliato) && t.some((x) => x.testo === "Il tuo gusto"), `profilo: tessere alte uguali, titoli su una riga, interi e allineati (${JSON.stringify(t.map((x) => `${x.testo}:${x.h}/${x.dy}`))})`); }
+        ok(new Set(t.map((x) => x.h)).size === 1 && new Set(t.map((x) => x.dy)).size === 1 && t.every((x) => x.righe === 1 && !x.tagliato) && t.some((x) => x.testo === "Importa"), `profilo: tessere alte uguali, titoli su una riga, interi e allineati (${JSON.stringify(t.map((x) => `${x.testo}:${x.h}/${x.dy}`))})`); }
       // Revisore 1/11 (terzo giro): tessere vuote = un invito con il gesto da fare, mai "0" o "Nessuna".
       { ok(((await cose.getByTestId("profilo-diario").textContent()) ?? "").includes("2") && (await cose.getByTestId("profilo-diario").getByTestId("tessera-invito").count()) === 0, "profilo: Diario con 2 mostra il numero");
         // Revisore 2/11: titoli delle tessere in Inter medio, non Poppins grassetto accanto al serif dei numeri.
         const titoli = await cose.getByTestId("tessera-titolo").evaluateAll((els) => els.map((s) => { const c = getComputedStyle(s); return `${/Inter/i.test(c.fontFamily) && !/Poppins/i.test(c.fontFamily.split(",")[0]) ? "Inter" : c.fontFamily.split(",")[0]} ${c.fontWeight}`; }));
-        ok(titoli.length === 5 && titoli.every((x) => x === "Inter 500"), `profilo: titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
+        ok(titoli.length === 4 && titoli.every((x) => x === "Inter 500"), `profilo: titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
       // Stesso fondo carta di Salvati e Importa.
       ok(await p.locator("body").evaluate((m) => [...m.querySelectorAll("div")].some((d) => getComputedStyle(d).backgroundColor === "rgb(248, 246, 242)" && d.getBoundingClientRect().height > 600)), "profilo: fondo carta come Salvati");
       { const zero = { ...profilo, saved: profilo.saved.map((r) => ({ ...r, tags: (r.tags ?? []).filter((t) => t !== "Già visitato") })) };
@@ -2855,18 +2882,28 @@ else {
       const xs = await sq.locator("main h2, [data-testid=stasera-sopra], main h1").evaluateAll((els) => els.map((e) => ({ x: Math.round(e.getBoundingClientRect().x), a: getComputedStyle(e).textAlign })));
       ok(bg === "rgb(248, 246, 242)" && xs.length >= 5 && xs.every((v) => v.x === 16 && v.a !== "center"), `stasera: fondo carta, titoli e titoletti a sinistra come Salvati (${bg}, ${JSON.stringify(xs)})`); }
     await sq.screenshot({ path: `${OUT}/40-stasera-scelte.png`, caret: "initial" });
+    // Revisore 2/11 (terzo giro): sotto il pulsante le miniature (emoji e nome) dei salvati che rispettano le scelte,
+    // aggiornate a ogni tocco; solo salvati veri. Riempiono il 40% inferiore che prima era vuoto.
+    const anteprima = async () => sq.getByTestId("stasera-anteprima-posto").allInnerTexts().catch(() => []);
+    { const nomi = await anteprima();
+      const bb = await sq.getByTestId("stasera-proponi").boundingBox(); const ab = await sq.getByTestId("stasera-anteprima").boundingBox().catch(() => null);
+      ok(nomi.length === 6 && ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"].every((n) => nomi.some((t) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
+        `stasera: sotto il pulsante le miniature dei 6 salvati che rispettano le scelte (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+    await sq.screenshot({ path: `${OUT}/s4-stasera.png`, caret: "initial" });
     // Città dei salvati come scelta rapida (più di una città): Roma = 5 mai provati
     const dove = await sq.getByTestId("stasera-distanza").getByRole("button").allTextContents();
     ok(dove.join("|") === "📍 Vicino a me|Roma|Milano|Ovunque", `stasera: 'Dove?' con le città dei salvati (${dove.join(" | ")})`);
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Roma" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), "stasera: 'Roma' tiene solo i salvati di Roma");
+    { const nomi = await anteprima(); ok(nomi.length === 5 && !nomi.some((t) => t.includes("Caffè Milano")), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length}, senza Caffè Milano)`); }
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).click();
     // Romantico: 2 posti
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Romantico" }).click();
     ok((await sq.getByTestId("stasera-proponi").textContent()) === "Proponimi i 2 posti", "stasera: con 'Romantico' restano 2 posti");
+    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")), `stasera: con 'Romantico' 2 miniature (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
     // Festa + Da provare: nessuno → si allarga con un tocco
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
-    ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante");
+    ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0 && (await sq.getByTestId("stasera-anteprima").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante né miniature");
     await sq.getByTestId("stasera-allarga").filter({ hasText: "Anche dove sono stato" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("1 salvato") && (await sq.getByTestId("stasera-novita").getByRole("button", { name: "Anche dove sono stato" }).getAttribute("aria-pressed")) === "true", "stasera: 'Anche dove sono stato' allarga con un tocco (1 salvato)");
     // Giro 1/11 (D36): lo stato si chiama "Ci sono stato" ovunque, mai "visitato".
@@ -3176,6 +3213,40 @@ if (fakeUser) {
   await q3.getByRole("button", { name: "Locale successivo" }).click();
   await q3.locator("h2", { hasText: "Spirito di Vino" }).waitFor({ timeout: 4000 }).then(() => ok(true, "scheda: '›' nella barra apre il risultato dopo"), () => ok(false, "scheda: '›' nella barra apre il risultato dopo"));
   await q3.keyboard.press("Escape");
+  // Lista dei salvati (revisore 2/11, terzo giro): nessuna foto Google chiesta, la foto scattata dall'utente (foto_locali)
+  // al posto dell'emoji quando c'è; "Sulla mappa" sparisce mentre si scorre in giù e torna appena ci si ferma o si risale.
+  { const FOTO_ID = "11111111-1111-4111-8111-111111111111";
+    await c3.route("**/rest/v1/foto_locali**", (r) => r.fulfill({ json: [{ id: FOTO_ID, place_id: "00000000-0000-4000-8000-000000000301" }] }));
+    await c3.route("**/api/foto-utenti/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#b5653a"/><circle cx="60" cy="64" r="34" fill="#f2d6a2"/></svg>' }));
+    let fotoGoogle = 0;
+    q3.on("request", (rq) => { if (rq.url().includes("/api/places/photo")) fotoGoogle++; });
+    await q3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await vaiSalvati(q3);
+    const L3 = q3.getByTestId("salvati-lista");
+    await L3.getByTestId("salvato-riga").first().waitFor({ timeout: 6000 });
+    fotoGoogle = 0;
+    await L3.getByTestId("salvato-foto-mia").first().waitFor({ timeout: 4000 }).catch(() => {});
+    await q3.waitForTimeout(600);
+    const foto = await L3.getByTestId("salvato-foto-mia").evaluateAll((els) => els.map((e) => ({ src: e.getAttribute("src"), w: e.naturalWidth, riga: e.closest("[data-testid=salvato-riga]")?.textContent ?? "" })));
+    ok(foto.length === 1 && foto[0].src === `/api/foto-utenti/${FOTO_ID}` && foto[0].w > 0 && foto[0].riga.includes("Hostaria Del Moro") && (await L3.getByTestId("salvato-riga").count()) === 6 && fotoGoogle === 0,
+      `salvati lista: la foto dell'utente al posto dell'emoji solo dove c'è, nessuna foto Google chiesta (${JSON.stringify(foto.map((f) => f.riga.slice(0, 18)))}, foto Google ${fotoGoogle})`);
+    await q3.screenshot({ path: `${OUT}/s4-salvati-lista.png`, caret: "initial" });
+    const btn = L3.getByTestId("salvati-lista-mappa");
+    const vis = async () => btn.evaluate((e) => ({ nascosto: e.dataset.nascosto === "true", op: Number(getComputedStyle(e).opacity) }));
+    ok(!(await vis()).nascosto, "salvati lista: 'Sulla mappa' in vista da fermi");
+    await q3.mouse.move(195, 480);
+    await q3.mouse.wheel(0, 160);
+    await q3.waitForTimeout(260);
+    const giu = await vis();
+    const scorso = await L3.evaluate((el) => el.scrollTop);
+    await q3.screenshot({ path: `${OUT}/s4-salvati-lista-scorri.png`, caret: "initial" });
+    ok(scorso > 24 && giu.nascosto && giu.op < 0.2, `salvati lista: scorrendo in giù 'Sulla mappa' sparisce e non copre l'ultima riga (scorso ${scorso} px, opacità ${giu.op})`);
+    await q3.waitForTimeout(700);
+    ok(!(await vis()).nascosto && (await btn.evaluate((e) => getComputedStyle(e).pointerEvents)) !== "none", "salvati lista: fermi, 'Sulla mappa' torna e si tocca");
+    await q3.mouse.wheel(0, 160); await q3.waitForTimeout(150);
+    await q3.mouse.wheel(0, -80); await q3.waitForTimeout(150);
+    ok(!(await vis()).nascosto, "salvati lista: risalendo 'Sulla mappa' torna subito");
+    await L3.evaluate((el) => { el.scrollTop = 0; }); await q3.waitForTimeout(600); }
   // Mappa dei salvati: inquadra tutti i salvati di Roma (anche Kiko Sushi Bar, il più a sud), nessun nome sopra un altro segnalino.
   await q3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await vaiSalvatiMappa(q3);
@@ -3193,7 +3264,27 @@ if (fakeUser) {
     ok(m.n === 6 && m.fuori.length === 0, `mappa dei salvati: tutti i 6 salvati di Roma in vista, anche il più a sud (${m.n} segnalini${m.fuori.length ? ", fuori: " + m.fuori.join(",") : ""})`);
     ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`); }
   { const t = await tocchi(q3); ok(t.length === 0, `mappa dei salvati: nessun segnalino ne tocca un altro${t.length ? " — " + t.join(" ") : ""}`); }
+  // Revisore 2/11 (terzo giro): nomi sempre dallo stesso lato (a destra; a sinistra solo sul bordo destro dello schermo),
+  // il segnalino scelto ha sempre il nome, e nessun nome né segnalino copre il pallino blu.
+  { const e = await q3.evaluate(() => {
+      const ov = (a, b) => a.left + 1 < b.right && b.left + 1 < a.right && a.top + 1 < b.bottom && b.top + 1 < a.bottom;
+      const labels = [...document.querySelectorAll("[data-testid=pin] [data-testid=etichetta-pin]")].map((l) => ({ t: l.textContent.trim(), lato: l.dataset.lato, b: l.getBoundingClientRect() }));
+      const foc = document.querySelector("[data-testid=pin][data-focused=true]");
+      const tuEl = document.querySelector("[data-testid=tu-sei-qui]");
+      const tu = tuEl?.getBoundingClientRect();
+      const sopraTu = tu ? document.elementFromPoint(tu.left + tu.width / 2, tu.top + tu.height / 2) : null;
+      return {
+        lati: labels.map((l) => `${l.t}:${l.lato}`),
+        sinistraFuoriBordo: labels.filter((l) => l.lato === "sinistra").every((l) => l.b.right + l.b.width + 60 > innerWidth),
+        focNome: foc?.querySelector("[data-testid=etichetta-pin]")?.textContent?.trim() ?? null,
+        tu: !!tu, nomiSulTu: tu ? labels.filter((l) => ov(l.b, tu)).map((l) => l.t) : [], tuInVista: !tu || !!sopraTu?.closest("[data-testid=tu-sei-qui]"),
+      };
+    });
+    ok(e.lati.length >= 4 && e.lati.every((x) => /:(destra|sinistra)$/.test(x)) && e.sinistraFuoriBordo, `mappa dei salvati: i nomi sempre a destra del segnalino (a sinistra solo sul bordo) (${e.lati.join(", ")})`);
+    ok(!!e.focNome, `mappa dei salvati: il segnalino scelto (card al centro) ha sempre il nome (${e.focNome})`);
+    ok(e.tu && e.nomiSulTu.length === 0 && e.tuInVista, `mappa dei salvati: il pallino blu in vista, sopra i segnalini e senza nomi sopra (${e.tu ? (e.nomiSulTu.join(",") || "libero") : "pallino assente"})`); }
   await q3.screenshot({ path: `${OUT}/r3-salvati-mappa.png` });
+  await q3.screenshot({ path: `${OUT}/s4-salvati-mappa.png`, caret: "initial" });
   await c3.close();
 }
 
@@ -3826,7 +3917,8 @@ else {
   // Revisore 2/11: niente più vicolo cieco "Gli amici arrivano presto": cose vere che funzionano già (invito,
   // carta del gusto) e "in arrivo" piccolo in fondo. Senza posti visitati la sezione "Da consigliare" non c'è.
   { const intanto = sp.getByTestId("amici-intanto");
-    ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0, "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
+    ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0 && await intanto.getByTestId("amici-carta-gusto").evaluate((a) => a.getBoundingClientRect().height <= 48 && !a.querySelector("svg.lucide-id-card") && parseFloat(getComputedStyle(a).fontSize) <= 14) && !/Il tuo gusto|La tua carta del gusto/.test(await intanto.innerText()), "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
+    await sp.screenshot({ path: `${OUT}/s4-amici.png`, fullPage: true, caret: "initial" });
     // Revisore 2/11 (quarto giro): niente riga "in arrivo", niente indirizzo grezzo, titolo dell'invito senza Poppins.
     { const t = (await intanto.innerText()) ?? "";
       const font = await intanto.getByTestId("invita-amico").locator("p").first().evaluate((el) => `${getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "")} ${getComputedStyle(el).fontWeight}`);
@@ -4728,9 +4820,10 @@ else {
     ok(!!eb && eb.height >= 200 && !!bb && !!fb && bb.y > 60 && fb.y - (bb.y + bb.height) < 260, `assistente: esempi al centro, senza vuoto enorme sotto (benvenuto da ${Math.round(bb?.y ?? 0)} a ${Math.round((bb?.y ?? 0) + (bb?.height ?? 0))} px, campo a ${Math.round(fb?.y ?? 0)})`);
     ok((await ap.getByTestId("assistente-riparti").count()) === 0, "assistente: senza salvati niente 'Riparti da qui' (mai righe inventate)"); }
   // Con salvati veri: "Riparti da qui" mostra 2 "Da provare" (mai i "Ci sono stato"); un tocco apre la scheda.
-  { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${10 + n}`, places: { id: `00000000-0000-4000-8000-00000000020${n}`, name, category, address: "Via del Moro 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.47 } });
+  { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${10 + n}`, places: { id: `00000000-0000-4000-8000-00000000020${n}`, name, category, address: "Via del Moro 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.47, google_place_id: `GA${n}` } });
     const righe = [pr(1, "Osteria Uno Da Provare", "restaurant", ["Da provare"]), pr(2, "Pizzeria Due Visitata", "pizzeria", ["Già visitato"]), pr(3, "Bar Tre", "bar", null), pr(4, "Forno Quattro", "bakery", ["Romantico"]), pr(5, "Enoteca Cinque", "wine_bar", ["Da provare"])];
     await ap.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: righe }));
+    await ap.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "GA1", verdict: "Carbonara seria in un vicolo tranquillo." }] }));
     await ap.reload({ waitUntil: "networkidle" });
     const rip = ap.getByTestId("assistente-riparti");
     await rip.waitFor({ timeout: 6000 }).catch(() => {});
@@ -4740,7 +4833,13 @@ else {
     const campo = await ap.getByTestId("assistente-campo").boundingBox();
     ok(nomi.length === 2 && !nomi.some((t) => t.includes("Visitata")) && nomi[0].includes("Osteria Uno") && nomi[1].includes("Bar Tre") && /^\/mappa\?salvato=[0-9a-f-]{36}$/.test(href ?? ""), `assistente: 'Riparti da qui' con 2 'Da provare' veri (mai i 'Ci sono stato'), un tocco apre la scheda (${nomi.join(" | ")}, ${href})`);
     ok(!!ultima && !!campo && ultima.y + ultima.height <= campo.y, `assistente: 'Riparti da qui' tutto sopra il campo, senza scorrere (fine ${Math.round((ultima?.y ?? 0) + (ultima?.height ?? 0))} px, campo ${Math.round(campo?.y ?? 0)})`);
+    { const stati = (await rip.getByTestId("assistente-riparti-stato").allTextContents()).map((t) => t.replace("📌", "").trim());
+      const v = rip.getByTestId("assistente-riparti-verdetto");
+      const it = await v.first().evaluate((e) => getComputedStyle(e).fontStyle).catch(() => "");
+      ok(stati.length === 2 && stati.every((t) => t.trim() === "Da provare") && (await v.count()) === 1 && (await v.first().textContent()) === "Carbonara seria in un vicolo tranquillo." && it === "italic", `assistente: 'Riparti da qui' con lo stato e il verdetto in corsivo già in archivio (${stati.join(" | ")}, ${await v.count()} verdetti)`); }
     await ashot("50b-assistente-riparti");
+    await ap.screenshot({ path: `${OUT}/s4-assistente.png`, caret: "initial" });
+    await ap.unroute("**/rest/v1/place_synthesis**");
     await ap.unroute("**/rest/v1/saved_places**");
     await ap.reload({ waitUntil: "networkidle" }); }
   { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
@@ -7370,7 +7469,7 @@ else {
     await pg.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     const inv = pg.getByTestId("invito-mappa-gusto");
     const bx = await inv.boundingBox().catch(() => null);
-    ok(!!bx && bx.y < 400 && (await inv.getAttribute("href")) === "/onboarding", `profilo: senza mappa del gusto, l'invito a farla in cima (${Math.round(bx?.y ?? -1)})`);
+    ok(!!bx && bx.y < 400 && (await inv.getAttribute("href")) === "/onboarding" && (await pg.getByTestId("profilo-gusto").getByTestId("invito-mappa-gusto").count()) === 1 && (await pg.getByTestId("profilo-gusto-pillola").count()) === 0, `profilo: senza mappa del gusto, l'invito a farla in cima, dentro 'Il tuo gusto' (${Math.round(bx?.y ?? -1)})`);
     await pg.screenshot({ path: `${OUT}/profilo-invito-mappa-gusto.png`, caret: "initial" });
     await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
     await pg.close(); }
@@ -8381,7 +8480,7 @@ else {
   g.on("pageerror", (e) => errors.push(e.message));
   await g.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   const entry = g.getByTestId("profilo-carta-gusto");
-  ok(await entry.isVisible() && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 1, "carta del gusto: ingresso compatto dentro 'Le mie cose'");
+  ok(await entry.isVisible() && (await g.getByTestId("profilo-gusto").getByTestId("profilo-carta-gusto").count()) === 1 && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 0, "carta del gusto: ingresso 'Condividi' dentro 'Il tuo gusto', non più una tessera");
   await entry.click();
   await g.waitForURL(/\/profilo\/gusto$/, { timeout: 8000 }).catch(() => {});
   const card = g.getByTestId("carta-gusto");

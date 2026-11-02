@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, IdCard } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import InvitaAmico from "@/components/invita-amico";
 import CondividiLink from "@/components/condividi-link";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -10,7 +10,7 @@ import type { MySavedRow } from "@/lib/raccolte-server";
 
 // Amici quando la parte social non c'è ancora (revisore 2/11: "Gli amici arrivano presto" era un vicolo
 // cieco in una demo). Solo cose vere che funzionano già: il proprio link d'invito, i posti dove sei stato
-// da mandare a un amico (pagina pubblica /locali/<UUID>, si apre anche senza account) e la carta del gusto.
+// da mandare a un amico (pagina pubblica /locali/<UUID>, si apre anche senza account) e un link piccolo alla carta del gusto.
 // Revisore 2/11 (quarto giro): niente più la riga "Seguire gli amici: in arrivo" (una promessa in una demo).
 const DONE = STATE_TAGS[1];
 const MAX_CONSIGLI = 5;
@@ -61,13 +61,9 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
         </section>
       )}
 
-      <Link href="/profilo/gusto" data-testid="amici-carta-gusto" className="mt-4 flex min-h-16 items-center gap-3 rounded-card border border-[#e8e2d8] bg-white px-4 py-3 active:scale-[0.99]">
-        <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-brand"><IdCard size={18} strokeWidth={1.75} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-sans text-[15px] font-medium text-text">La tua carta del gusto</span>
-          <span className="block truncate text-xs text-text-muted">Fai vedere agli amici cosa ti piace</span>
-        </span>
-        <ChevronRight aria-hidden size={16} className="text-text-muted" />
+      {/* Il gusto sta nel Profilo (revisore 2/11, terzo giro: era in due posti): qui solo un link piccolo alla carta. */}
+      <Link href="/profilo/gusto" data-testid="amici-carta-gusto" className="mt-3 inline-flex min-h-11 items-center gap-1 text-[13px] font-medium text-brand">
+        Manda agli amici la tua carta del gusto <ChevronRight aria-hidden size={14} />
       </Link>
 
     </div>

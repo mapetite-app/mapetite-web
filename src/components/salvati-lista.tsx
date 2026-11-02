@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
@@ -13,6 +13,7 @@ import { hasStateOrTag, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags"
 import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
+import { fotoUrl } from "@/lib/foto-utenti";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
@@ -20,8 +21,9 @@ import { trackFeature } from "@/lib/track";
 // raccolte come copertine basse (mosaico e nome dentro) sotto, righe con lo stato sempre, 👍,
 // verdetto e provenienza sotto il nome, così il nome ha tutta la riga.
 // Cosa principale: ritrovare un posto. Il resto (città, tipo, voto, prezzo) sta nel foglio "Filtri"
-// di map-view; la mappa è a un tocco (icona in alto). Nessuna foto: le foto Google non si
-// conservano e chiederle per ogni salvato costerebbe quota; si usano emoji su un fondo unico.
+// di map-view; la mappa è a un tocco (icona in alto). Nessuna foto Google: non si conservano e chiederle
+// per ogni salvato costerebbe quota (decisione di Lorenzo in sospeso); emoji su un fondo unico, oppure
+// la foto scattata dall'utente quando c'è (foto_locali, già nostra).
 
 const [WANT, DONE] = STATE_TAGS;
 const SERIF = "font-[family-name:var(--font-newsreader)]";
@@ -30,10 +32,16 @@ const LINE = "border-[#e8e2d8]";
 
 // Miniatura al posto della foto: emoji del tipo su un fondo carta unico (giro 1/11, D42: niente
 // colori a caso tra un posto e l'altro). Anche le raccolte hanno un fondo solo (revisore 2/11).
-function Miniatura({ place, size }: { place: Place; size: string }) {
+// Con una foto scattata dall'utente (foto_locali, già sui nostri server) si usa quella; se non si carica torna l'emoji.
+function Miniatura({ place, size, foto }: { place: Place; size: string; foto?: string | null }) {
+  const [rotta, setRotta] = useState(false);
   return (
-    <span aria-hidden className={`flex shrink-0 items-center justify-center border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] ${size}`}>
+    <span aria-hidden className={`relative flex shrink-0 items-center justify-center overflow-hidden border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] ${size}`}>
       {getCategoryEmoji(place.category, place.name)}
+      {foto && !rotta && (
+        // eslint-disable-next-line @next/next/no-img-element -- foto privata servita da /api/foto-utenti (controllo di chi la vede)
+        <img src={foto} alt="" data-testid="salvato-foto-mia" loading="lazy" onError={() => setRotta(true)} className="absolute inset-0 h-full w-full object-cover" />
+      )}
     </span>
   );
 }
@@ -137,6 +145,44 @@ export default function SalvatiLista({
     return () => { alive = false; };
   }, [userId]);
 
+  // "Sulla mappa" sparisce mentre si scorre verso il basso e torna quando ci si ferma o si risale, come le
+  // barre di Places (revisore 2/11, terzo giro: copriva la nota e l'etichetta dell'ultima riga in vista).
+  const [mappaNascosta, setMappaNascosta] = useState(false);
+  const scorri = useRef<{ y: number; timer: ReturnType<typeof setTimeout> | null }>({ y: 0, timer: null });
+  useEffect(() => {
+    const s = scorri.current;
+    return () => { if (s.timer) clearTimeout(s.timer); };
+  }, []);
+  const onScroll = (e: React.UIEvent<HTMLElement>) => {
+    const y = e.currentTarget.scrollTop;
+    const s = scorri.current;
+    const d = y - s.y;
+    s.y = y;
+    if (d > 2 && y > 24) setMappaNascosta(true);
+    else if (d < -2) setMappaNascosta(false);
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = setTimeout(() => setMappaNascosta(false), 450);
+  };
+
+  // Foto dell'utente (foto_locali, già nostre: nessuna foto Google e nessuna quota): la prima di ogni salvato
+  // prende il posto dell'emoji. Senza foto, senza tabella o senza rete resta l'emoji.
+  const [fotoMie, setFotoMie] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    browserClient()
+      .then((supabase) => supabase.from("foto_locali").select("id, place_id").eq("user_id", userId).order("created_at", { ascending: true }).limit(600))
+      .then(({ data, error }) => {
+        if (!alive || error || !Array.isArray(data)) return;
+        const byPlace: Record<string, string> = {};
+        for (const row of data as { id: string; place_id: string }[]) {
+          if (row?.id && row.place_id && !byPlace[row.place_id]) byPlace[row.place_id] = fotoUrl(row.id);
+        }
+        setFotoMie(byPlace);
+      })
+      .catch(() => { /* rete assente: restano le emoji */ });
+    return () => { alive = false; };
+  }, [userId]);
+
   const count = (tag: string) => all.filter((p) => hasStateOrTag(p.tags, tag)).length;
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   const collections = useMemo(() => summarizeCollections([...all].reverse(), 4), [all]);
@@ -180,6 +226,7 @@ export default function SalvatiLista({
     <section
       data-testid="salvati-lista"
       aria-label="I tuoi posti"
+      onScroll={onScroll}
       className={`absolute inset-0 z-30 flex flex-col overflow-y-auto overscroll-contain ${PAPER} pb-[var(--nav-height-mobile)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
     >
       <div className="mx-auto w-full max-w-md flex-1 px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
@@ -274,7 +321,7 @@ export default function SalvatiLista({
                   {scelti.map((s, i) => (
                     <li key={s.id} className={i > 0 ? `border-t ${LINE}` : ""}>
                       <button type="button" data-testid="chiedi-salvati-posto" onClick={() => onOpen(s.place, scelti.map((x) => x.id))} className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-black/[0.03]">
-                        <Miniatura place={s.place} size="h-12 w-12 text-[22px] rounded-[12px]" />
+                        <Miniatura place={s.place} foto={fotoMie[s.place.id]} size="h-12 w-12 text-[22px] rounded-[12px]" />
                         <span className="min-w-0 flex-1">
                           <span className={`${SERIF} block truncate text-[18px] font-medium leading-tight text-text`}>{s.place.name}</span>
                           <span className="mt-0.5 block text-[13px] leading-snug text-text-muted">{s.perche}</span>
@@ -386,7 +433,7 @@ export default function SalvatiLista({
                     onClick={() => onOpen(p, list.map((x) => x.id))}
                     className="flex min-h-[84px] w-full items-start gap-3 px-3 py-3 text-left transition-colors active:bg-black/[0.03]"
                   >
-                    <Miniatura place={p} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
+                    <Miniatura place={p} foto={fotoMie[p.id]} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
                     <span className="min-w-0 flex-1">
                       {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
                       <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
@@ -429,7 +476,16 @@ export default function SalvatiLista({
       {/* La mappa dei salvati: pulsante che resta in basso mentre si scorre (come "Map" in Places), così in
           alto restano solo "Stasera" e "+" (revisore 2/11). */}
       <div className="pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-5 lg:pb-6">
-        <button type="button" data-testid="salvati-lista-mappa" aria-label="Vedi sulla mappa" onClick={onMap} className="pointer-events-auto flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float active:scale-95">
+        <button
+          type="button"
+          data-testid="salvati-lista-mappa"
+          data-nascosto={mappaNascosta ? "true" : undefined}
+          aria-label="Vedi sulla mappa"
+          aria-hidden={mappaNascosta || undefined}
+          tabIndex={mappaNascosta ? -1 : undefined}
+          onClick={onMap}
+          className={`flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float transition-[transform,opacity] duration-200 active:scale-95 motion-reduce:transition-none ${mappaNascosta ? "translate-y-[calc(100%+1rem)] opacity-0" : "pointer-events-auto"}`}
+        >
           <MapIcon size={16} aria-hidden /> Sulla mappa
         </button>
       </div>

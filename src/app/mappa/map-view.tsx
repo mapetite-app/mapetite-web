@@ -33,7 +33,7 @@ import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento } from "@/lib/idee
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
-import { posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem } from "@/lib/pin-labels";
+import { labelRect, posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
@@ -1920,9 +1920,9 @@ export default function MapView({
       ? topPlaces.includes(place) || viewState.zoom >= 17
       : aiSearch !== null || mappaSalvati || viewState.zoom >= 14) || selected?.id === place.id;
     const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
-    // Sulla mappa dei salvati la card al centro sceglie per prima il posto del nome ma non lo impone: un nome
-    // sopra il segnalino vicino (revisore del 2/11) si nasconde, il nome c'è già nella card sotto.
-    const fissi = new Set([selected?.id, mappaSalvati ? null : focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
+    // Il segnalino scelto (la card al centro) ha sempre il nome, anche sulla mappa dei salvati (revisore del
+    // 2/11, terzo giro: senza nome non si capiva quale fosse); i segnalini vicini si scostano dal suo nome.
+    const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
     const items: MapItem[] = [...singoli].sort((a, b) => rank(a.id) - rank(b.id)).map((place) => {
       const big = selected?.id === place.id || focusId === place.id;
       const foto = pinPhotoIds.has(place.id) && !!venueDetails[place.id]?.photoRef;
@@ -1931,6 +1931,8 @@ export default function MapView({
         size: foto ? (big ? 56 : 44) : big ? 53 : 36,
         label: conNome(place) ? nomeLeggibile(pinName(place.name)) : null,
         fixed: fissi.has(place.id),
+        // Mappa dei salvati: il nome sempre a destra del segnalino, come Places (revisore del 2/11).
+        lato: mappaSalvati ? "destra" : undefined,
       };
     });
     // Con un salvato solo il nome c'è già nella pillola "📌 Nome" sopra le card (revisore del 2/11: lo stesso
@@ -1952,15 +1954,34 @@ export default function MapView({
     const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
     const proietta = (lat: number, lng: number) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; };
     let scost: Record<string, { dx: number; dy: number }> = {};
+    // Mappa dei salvati: il pallino blu è un ostacolo come un segnalino (i nomi non ci vanno sopra).
+    const tuSeiQui: MapItem | null = mappaSalvati && userPos ? { id: "tu-sei-qui", lat: userPos.lat, lng: userPos.lng, size: 20, anchor: "center" } : null;
     // Anche sulla mappa dei salvati (revisore del 2/11): due salvati vicini non si coprono.
     if (inRicerca || mappaSalvati) {
-      scost = separaSegnalini(items.map((it) => {
+      const fermi = items.filter((it) => it.id === selected?.id || it.id === focusId || it.id.startsWith("salvato-"));
+      // Sulla mappa dei salvati il nome del segnalino scelto è fisso: i segnalini vicini si scostano anche da
+      // lui (cerchi lungo la pillola) e dal pallino blu, così nessun nome sta sopra un segnalino.
+      const ostacoli: { id: string; x: number; y: number; size: number; fermo: true }[] = [];
+      if (mappaSalvati) {
+        for (const it of fermi) {
+          if (!it.label || !it.fixed) continue;
+          const q = proietta(it.lat, it.lng);
+          // Stesso lato che sceglierà posizionaEtichette: a destra, a sinistra se da destra uscirebbe dallo schermo.
+          let r = labelRect(it, q.x, q.y, "destra");
+          if (r.x2 + 4 > mapBox.w) r = labelRect(it, q.x, q.y, "sinistra");
+          const alto = r.y2 - r.y1;
+          for (let x = r.x1 + alto / 2, k = 0; x <= r.x2 - alto / 2 + 1; x += alto / 2, k++) ostacoli.push({ id: `nome-${it.id}-${k}`, x, y: (r.y1 + r.y2) / 2, size: alto, fermo: true });
+        }
+        if (tuSeiQui) { const q = proietta(tuSeiQui.lat, tuSeiQui.lng); ostacoli.push({ id: tuSeiQui.id, x: q.x, y: q.y, size: tuSeiQui.size, fermo: true }); }
+      }
+      scost = separaSegnalini([...ostacoli, ...items.map((it) => {
         const q = proietta(it.lat, it.lng);
         // Centro del disegno: i segnalini stanno sopra il punto, i gruppi sono centrati.
-        return { id: it.id, x: q.x, y: it.anchor === "center" ? q.y : q.y - it.size / 2, size: it.size, fermo: it.id === selected?.id || it.id === focusId || it.id.startsWith("salvato-") };
-      }));
+        return { id: it.id, x: q.x, y: it.anchor === "center" ? q.y : q.y - it.size / 2, size: it.size, fermo: fermi.includes(it) };
+      })]);
       for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
     }
+    if (tuSeiQui) items.push(tuSeiQui);
     const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
     // Risultati affollati (revisore del 2/11: le etichette si impilavano in colonna): al massimo 3 nomi, nell'ordine
     // della lista, più la card al centro e il selezionato. Con i segnalini distanti restano tutti quelli che ci stanno.
@@ -3671,7 +3692,8 @@ export default function MapView({
           </>
         )}
         {userPos && (
-          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
+          // Sulla mappa dei salvati il pallino blu sta sopra i segnalini (revisore del 2/11: il segnalino scelto lo copriva).
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 120 : 0 }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
               <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
               <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />

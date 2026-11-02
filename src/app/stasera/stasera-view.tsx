@@ -25,6 +25,8 @@ import {
 } from "@/lib/stasera";
 
 type Geo = "idle" | "cerco" | "ok" | "negata" | "assente";
+// Miniature sotto "Proponimi": due file da tre.
+const ANTEPRIMA_MAX = 6;
 type Pos = { lat: number; lng: number };
 
 // Lettura dei salvati come in /mappa (saved_places → places), più il verdetto già in cache
@@ -210,7 +212,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   );
   const collections = useMemo(() => collectionsOf(spots ?? []), [spots]);
   const cities = useMemo(() => citiesOf(spots ?? []), [spots]);
-  const matchCount = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)).length, [spots, choices]);
+  const matching = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)), [spots, choices]);
+  const matchCount = matching.length;
 
   const propose = () => {
     if (!spots) return;
@@ -386,6 +389,29 @@ export default function StaseraView({ userId }: { userId: string }) {
                   {matchCount === 1 ? "1 salvato" : `${matchCount} salvati`} con queste scelte
                 </p>
               </div>
+            )}
+            {/* Revisore 2/11, terzo giro: sotto il pulsante il 40% dello schermo era vuoto. Ora i salvati veri che
+                rispettano le scelte (emoji e nome), aggiornati a ogni tocco; un tocco apre il posto sulla mappa. */}
+            {matchCount > 0 && (
+              <section data-testid="stasera-anteprima" aria-label="I salvati con queste scelte" className="mt-3">
+                <ul className="grid grid-cols-3 gap-2">
+                  {matching.slice(0, ANTEPRIMA_MAX).map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        href={s.lat != null && s.lng != null ? `/mappa?salvato=${s.id}` : "/mappa?vista=salvati"}
+                        data-testid="stasera-anteprima-posto"
+                        className="flex h-full flex-col items-center gap-1.5 rounded-card border border-[#e8e2d8] bg-white px-2 pb-2.5 pt-3 text-center active:scale-[0.97]"
+                      >
+                        <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f3efe8] text-[22px] leading-none">{getCategoryEmoji(s.category, s.name)}</span>
+                        <span className="line-clamp-2 text-[12.5px] font-medium leading-tight text-text">{s.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {matchCount > ANTEPRIMA_MAX && (
+                  <p data-testid="stasera-anteprima-altri" className="mt-2 text-center text-xs text-text-muted">e altri {matchCount - ANTEPRIMA_MAX}</p>
+                )}
+              </section>
             )}
           </section>
         )}
