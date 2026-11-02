@@ -299,7 +299,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 
   return (
     // Stesso fondo beige di home e salvati (giro 1/11, D52).
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]" data-testid="importa-pagina">
+    <div className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f8f6f2] pb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0" data-testid="importa-pagina">
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-8">
       {benvenuto ? (
         <>
