@@ -1040,6 +1040,8 @@ export default function MapView({
   const ideaDue = momentHour == null ? null : secondaIdea(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
+  // Barra in uso (cursore dentro): la frase si scrive nel campo; fuori, con i risultati, si legge intera su 2 righe.
+  const [barFocus, setBarFocus] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie fino a 3
   // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
@@ -2614,19 +2616,29 @@ export default function MapView({
               ) : (
                 <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
               )}
-              <input
-                ref={barInputRef}
-                type="search"
-                enterKeyHint="search"
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                onFocus={() => setIdeasOpen(true)}
-                placeholder="Chiedi all'AI…"
-                aria-label="Chiedi all'AI: cosa cerchi?"
-                // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
-                // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
-                className="min-h-11 min-w-0 flex-1 text-ellipsis bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-              />
+              <span className="relative flex min-w-0 flex-1">
+                <input
+                  ref={barInputRef}
+                  type="search"
+                  enterKeyHint="search"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onFocus={() => { setIdeasOpen(true); setBarFocus(true); }}
+                  onBlur={() => setBarFocus(false)}
+                  placeholder="Chiedi all'AI…"
+                  aria-label="Chiedi all'AI: cosa cerchi?"
+                  // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
+                  // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
+                  className={`min-h-11 min-w-0 flex-1 text-ellipsis bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden ${!barFocus && aiSearch !== null && aiQuery ? "text-transparent" : ""}`}
+                />
+                {/* Con i risultati la richiesta si legge intera, su al massimo 2 righe dentro la stessa altezza
+                    della barra (revisore del 1/11: "cena romantica a Tra…"). Un tocco la riporta nel campo. */}
+                {!barFocus && aiSearch !== null && aiQuery && (
+                  <span aria-hidden data-testid="richiesta-intera" className="pointer-events-none absolute inset-0 flex items-center">
+                    <span className="line-clamp-2 text-[15px] font-sans leading-[18px] text-text">{aiQuery}</span>
+                  </span>
+                )}
+              </span>
               {voiceOn && aiQuery === "" && aiSearch === null && (
                 <VoiceButton
                   onError={setAiError}
