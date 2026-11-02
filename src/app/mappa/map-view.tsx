@@ -858,7 +858,8 @@ function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: s
     <>
       <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-base">{emoji}</span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block text-[15px] font-sans font-medium leading-tight text-text">{title}</span>
+        {/* Una riga sola (revisore del 2/11, r4): con i titoli su due righe il pannello copriva metà schermo. */}
+        <span className="block truncate text-[15px] font-sans font-medium leading-tight text-text">{title}</span>
         {sub && <span className="block truncate text-xs font-sans text-text-muted">{sub}</span>}
       </span>
       <ChevronRight size={16} aria-hidden className="shrink-0 text-text-muted" />
@@ -876,22 +877,29 @@ function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: s
   );
 }
 
-// Recenti ed esempi in una riga che scorre: occupano una riga sola invece di tre o quattro.
+// Recenti, Sorprendimi ed esempi in UNA fila che scorre (revisore del 2/11, r4: la fila era tagliata a destra e
+// sembrava rotta). Pillole più piccole, così se ne leggono due intere e l'inizio della terza, sotto una sfumatura
+// chiara che dice "scorri".
 function IdeaChips({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="mt-1">
+    <section data-testid="idee-fila" aria-label={title} className="mt-1">
       <div className="flex min-h-8 items-center justify-between px-2">
         <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
         {action}
       </div>
-      <div className="-mx-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,black_85%,transparent)]">{children}</div>
+      <div className="relative -mx-2">
+        <div className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
+        <span aria-hidden data-testid="idee-fila-sfumatura" className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-card bg-gradient-to-l from-surface to-transparent" />
+      </div>
     </section>
   );
 }
 
+const CHIP = "flex min-h-10 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
+
 function IdeaChip({ text, label, onClick, testId }: { text: string; label?: string; onClick: () => void; testId?: string }) {
   return (
-    <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className="flex min-h-11 max-w-[15rem] shrink-0 items-center rounded-pill border border-border bg-white px-3.5 text-sm font-sans text-text active:scale-95">
+    <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className={CHIP}>
       <span className="truncate">{text}</span>
     </button>
   );
@@ -1377,6 +1385,10 @@ export default function MapView({
   // vicino a un posto che volevi provare, la mappa te lo dice da sola. Una volta per apertura,
   // solo sulla mappa libera (non sopra una ricerca o una scheda).
   const welcomeExamples = cityNear(viewState.latitude, viewState.longitude) === "Milano" ? WELCOME_EXAMPLES_MILANO : WELCOME_EXAMPLES;
+  // Pannello Idee (revisore del 2/11, r4): 3 righe al massimo; Sorprendimi va nella fila quando la riga è di un'idea tua.
+  const recentiIdee = recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : [];
+  const sorprendimiInFila = !!(tasteSuggestion || savedSuggestion);
+  const sorprendimiHref = `/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`;
   const nearbyChecked = useRef(false);
   useEffect(() => {
     if (nearbyChecked.current || !userPos || savedPlaces.length === 0) return;
@@ -2918,9 +2930,10 @@ export default function MapView({
                 dicevano "aperto adesso"; src/lib/idee.ts): cosa fa per quest'ora, cosa c'è aperto vicino a te,
                 le tue idee (gusti, salvati) o Sorprendimi. "Stasera dove andiamo?" sta nei Salvati, accanto al
                 "+": qui sarebbe un doppione. "Parla con l'assistente" è già nella barra in basso. */}
-            <div className="px-2 pb-1 pt-1">
+            {/* Titolo e momento sulla stessa riga: il pannello resta basso (revisore del 2/11, r4). */}
+            <div className="flex items-baseline gap-2 px-2 pb-0.5 pt-1">
               <p className="font-title text-xl font-semibold leading-tight text-text">Idee</p>
-              {momentHour != null && <p data-testid="idee-contesto" className="text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
+              {momentHour != null && <p data-testid="idee-contesto" className="min-w-0 truncate text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
             </div>
             <IdeaGroup title="Adesso" hideTitle>
               {momentExample && (
@@ -2937,30 +2950,34 @@ export default function MapView({
                   <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
                 ) : null,
               ].filter(Boolean);
-              // Le 2 righe di "Adesso" più al massimo 2 qui (IDEE_MAX): le idee tue prima, "Sorprendimi" se resta posto.
+              // Le 2 righe di "Adesso" più 1 qui (IDEE_MAX = 3): la tua idea prima, altrimenti "Sorprendimi".
               const posto = IDEE_MAX - 2;
               return (<>
                 {mie.slice(0, posto)}
-                {mie.length < posto && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />}
+                {mie.length < posto && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={sorprendimiHref} />}
               </>); })()}
             </IdeaGroup>
-            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 ? (
-              <IdeaChips
-                title="Recenti"
-                action={
-                  <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
-                    Cancella
-                  </button>
-                }
-              >
-                {(JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
-                  <IdeaChip key={`r-${r}`} testId="recenti" label={`↻ ${r}`} text={`↻ ${r}`} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
-                ))}
-              </IdeaChips>
-            ) : null}
-            <IdeaChips title="Prova a chiedere">
+            {/* Una fila sola: Sorprendimi (se non è già una riga), l'idea dai salvati (se la riga è dei gusti), le ricerche recenti, poi gli esempi. */}
+            <IdeaChips
+              title="Prova a chiedere"
+              action={recentiIdee.length > 0 ? (
+                <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
+                  Cancella recenti
+                </button>
+              ) : undefined}
+            >
+              {sorprendimiInFila && (
+                <Link data-testid="mappa-sorprendimi" href={sorprendimiHref} className={CHIP}>🎲 Sorprendimi</Link>
+              )}
+              {/* Con gusti e salvati la riga è dei gusti: l'idea dai salvati resta a un tocco, qui. */}
+              {tasteSuggestion && savedSuggestion && (
+                <IdeaChip testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} text={`📌 ${savedSuggestion.label}`} onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+              )}
+              {recentiIdee.map((r) => (
+                <IdeaChip key={`r-${r}`} testId="recenti" label={`↻ ${r}`} text={`↻ ${r}`} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
+              ))}
               {welcomeExamples.map((ex) => (
-                <IdeaChip key={ex.query} label={ex.query} text={ex.title} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+                <IdeaChip key={ex.query} testId="idee-esempio" label={ex.query} text={ex.title} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
               ))}
             </IdeaChips>
           </div>
