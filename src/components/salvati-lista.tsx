@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Map as MapIcon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, UtensilsCrossed, X } from "lucide-react";
+import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
-import { categoryLabel } from "@/lib/category-label";
+import { cardFacts } from "@/components/bottom-sheet";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { hasStateOrTag, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
-import { summarizeCollections } from "@/lib/raccolte";
+import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 
@@ -38,34 +38,18 @@ function Miniatura({ place, size }: { place: Place; size: string }) {
   );
 }
 
-// Copertina di una raccolta (correzione del revisore, 1/11): bassa (64 px), con il mosaico delle emoji dei
-// primi posti a sinistra e il nome dentro, il numero piccolo accanto. Così la lista dei posti parte entro
-// i primi 330 px anche con 2–3 raccolte. Revisore 2/11: niente più un colore a caso per raccolta (il blu
-// era fuori marchio): un fondo beige con bordo per tutte, come le miniature dei posti; teal se accesa.
-function Copertina({ name, count, preview, on }: { name: string; count: number; preview: Place[]; on: boolean }) {
-  const tiles = preview.slice(0, 4);
-  const tile = on ? "bg-white/[0.14]" : "bg-white";
+// Copertina di una raccolta (revisore 2/11): una pillola nella stessa fila dei filtri (due file di chip prima
+// del primo posto erano troppe), con l'icona dell'occasione dedotta dal nome (iconeRaccolte), non l'emoji del
+// primo posto (due raccolte su quattro avevano gli spaghetti). Bianca come le altre pillole; teal se accesa.
+function Copertina({ name, count, icona, on }: { name: string; count: number; icona: string; on: boolean }) {
   return (
     <span
       data-testid="raccolta-copertina"
-      className={`flex h-16 w-full items-center gap-2 overflow-hidden rounded-[16px] border p-1.5 pr-3 ${on ? "border-brand bg-brand" : "border-[#e3dbcd] bg-[#f1ebe1]"}`}
+      className={`flex min-h-11 w-full items-center gap-2 rounded-pill border py-1 pl-1 pr-3.5 ${on ? "border-brand bg-brand" : "border-[#e3ddd2] bg-white"}`}
     >
-      <span aria-hidden className={`grid h-[44px] w-[44px] shrink-0 gap-[2px] overflow-hidden rounded-[11px] ${tiles.length >= 2 ? "grid-cols-2 grid-rows-2" : "grid-cols-1"}`}>
-        {tiles.length === 0 ? (
-          <span className={`flex items-center justify-center rounded-[11px] ${tile} text-[26px]`}>📍</span>
-        ) : (
-          tiles.map((t, i) => (
-            <span
-              key={t.id}
-              className={`flex items-center justify-center ${tile} ${tiles.length === 1 ? "rounded-[11px] text-[26px]" : `rounded-[6px] text-[13px] ${tiles.length === 2 || (tiles.length === 3 && i === 0) ? "row-span-2" : ""}`}`}
-            >
-              {getCategoryEmoji(t.category, t.name)}
-            </span>
-          ))
-        )}
-      </span>
+      <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[18px] leading-none ${on ? "bg-white/[0.14]" : "bg-[#f3efe8]"}`}>{icona}</span>
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <span className={`${SERIF} min-w-0 truncate text-[16px] font-medium leading-tight ${on ? "text-white" : "text-text"}`}>{tagDisplay(name)}</span>
+        <span className={`min-w-0 truncate text-[14px] ${on ? "font-semibold text-white" : "font-medium text-[#33373d]"}`}>{tagDisplay(name)}</span>
         <span className={`shrink-0 text-[12px] font-semibold ${on ? "text-white/75" : "text-text-muted"}`}>{count}</span>
       </span>
     </span>
@@ -156,6 +140,7 @@ export default function SalvatiLista({
   const count = (tag: string) => all.filter((p) => hasStateOrTag(p.tags, tag)).length;
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   const collections = useMemo(() => summarizeCollections([...all].reverse(), 4), [all]);
+  const icone = useMemo(() => iconeRaccolte(collections.map((c) => c.name)), [collections]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
   const kicker = useMemo(() => {
     const byCity = new globalThis.Map<string, number>();
@@ -195,24 +180,37 @@ export default function SalvatiLista({
     <section
       data-testid="salvati-lista"
       aria-label="I tuoi posti"
-      className={`absolute inset-0 z-30 overflow-y-auto overscroll-contain ${PAPER} pb-[calc(var(--nav-height-mobile)+7rem)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
+      className={`absolute inset-0 z-30 flex flex-col overflow-y-auto overscroll-contain ${PAPER} pb-[var(--nav-height-mobile)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
     >
-      <div className="mx-auto max-w-md px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
-        <p data-testid="salvati-lista-sopra" className="truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{kicker}</p>
+      <div className="mx-auto w-full max-w-md flex-1 px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
+        {/* Revisore 2/11: testata leggera. Sopra, il conteggio e l'ordine ("Recenti ▾") sulla stessa riga;
+            accanto al titolo solo "Stasera" (con la sua etichetta) e un solo "+"; la mappa è il pulsante
+            in basso, la ricerca la lente nella fila dei filtri. */}
+        <div className="flex h-5 items-center justify-between gap-3">
+          <p data-testid="salvati-lista-sopra" className="min-w-0 truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{kicker}</p>
+          {/* Ordine nel menu nativo del telefono: "Vicino" o "Recenti". Area toccabile alta 44 px senza alzare la riga. */}
+          <label className="relative -my-3 -mr-1 flex min-h-11 shrink-0 items-center text-[13px] font-medium text-[#4a4f55]">
+            <select
+              data-testid="salvati-ordine"
+              aria-label="Ordina"
+              value={sort}
+              onChange={(e) => { const k = e.target.value as "vicino" | "recenti"; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
+              className="min-h-11 appearance-none bg-transparent pl-2 pr-5 text-right focus:outline-none"
+            >
+              <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
+              <option value="recenti">Recenti</option>
+            </select>
+            <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-1 text-text-muted" />
+          </label>
+        </div>
         <header className="mt-1.5 flex items-center justify-between gap-3">
           <h1 className={`${SERIF} min-w-0 text-[34px] font-medium leading-none tracking-tight text-text`}>I tuoi posti</h1>
           <div className="flex shrink-0 gap-1.5">
-            <button type="button" aria-label="Cerca" aria-pressed={searching} onClick={() => { if (searching) { onQuery(""); setSearchOpen(false); } else setSearchOpen(true); }} className={`${iconBtn} ${searching ? "bg-brand text-white border-brand" : ""}`}>
-              <Search size={18} aria-hidden />
-            </button>
-            <button type="button" data-testid="salvati-lista-mappa" aria-label="Vedi sulla mappa" onClick={onMap} className={iconBtn}>
-              <MapIcon size={18} aria-hidden />
-            </button>
-            {/* "Stasera" è uno strumento, non un filtro (revisore 2/11): sta qui con le azioni, accanto al "+",
-                con la sua icona corallo; il nome intero lo dicono l'etichetta e il suggerimento. */}
-            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" title="Stasera dove andiamo?" className={`${iconBtn} border-[#f3c9bd] bg-white`}>
-              <UtensilsCrossed size={18} strokeWidth={2} aria-hidden className="text-accent" />
-              <span className="sr-only">Stasera</span>
+            {/* "Stasera" è uno strumento, non un filtro (revisore 2/11). Revisore 2/11 (quarto giro): forchetta e
+                coltello barrati si leggevano "niente cibo / chiuso": luna corallo e la parola scritta accanto. */}
+            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" title="Stasera dove andiamo?" className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#f3c9bd] bg-white pl-3 pr-3.5 text-[14px] font-medium text-text active:scale-95">
+              <Moon size={16} strokeWidth={2} aria-hidden className="text-accent" />
+              Stasera
             </Link>
             <Link href="/importa" aria-label="Aggiungi un posto" className={`${iconBtn} border-brand bg-brand text-white`}>
               <Plus size={20} aria-hidden />
@@ -292,10 +290,12 @@ export default function SalvatiLista({
 
         {/* Con una domanda e niente trovato per nome: solo la risposta (una cosa per schermata). */}
         {!soloRisposta && (<>
-        {/* Revisore 1/11 (terzo giro): una sola riga di comandi, scorrevole, prima delle raccolte: Filtri,
-            stati (senza "Ci sono stato" quando è 0) e l'ordine come una pillola sola "Recenti ▾".
-            Così il primo posto parte entro ~300 px anche con 2 raccolte. */}
-        <div data-testid="salvati-comandi" className="-mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+        {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
+            e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
+        <div data-testid="salvati-comandi" className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
+          <button type="button" aria-label="Cerca" aria-pressed={searching} onClick={() => { if (searching) { onQuery(""); setSearchOpen(false); } else setSearchOpen(true); }} className={`${iconBtn} ${searching ? "border-brand bg-brand text-white" : "bg-white"}`}>
+            {searching ? <X size={17} aria-hidden /> : <Search size={17} aria-hidden />}
+          </button>
           <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
             <SlidersHorizontal size={15} aria-hidden /> Filtri
             {filtersOn > 0 && (
@@ -320,43 +320,13 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
-          {/* Ordine in una pillola sola: il menu nativo del telefono sceglie "Vicino" o "Recenti". */}
-          <label className="relative flex min-h-11 shrink-0 items-center rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-[#33373d]">
-            <select
-              data-testid="salvati-ordine"
-              aria-label="Ordina"
-              value={sort}
-              onChange={(e) => { const k = e.target.value as "vicino" | "recenti"; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
-              className="min-h-11 appearance-none rounded-pill bg-transparent pl-3.5 pr-8 focus:outline-none"
-            >
-              <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
-              <option value="recenti">Recenti</option>
-            </select>
-            <ChevronDown size={15} aria-hidden className="pointer-events-none absolute right-3 text-text-muted" />
-          </label>
-        </div>
-
-        {/* Le raccolte come copertine basse (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima.
-            Niente titolo "Raccolte" né riga "N posti": la lista dei posti deve partire presto (revisore, 1/11). */}
-        {collections.length === 0 ? (
-          <Link
-            href="/profilo?raccolta=nuova"
-            aria-label="Nuova raccolta"
-            data-testid="raccolte-vuote"
-            className="mt-4 flex min-h-[64px] items-center gap-3 rounded-card border-[1.5px] border-dashed border-[#d6cec1] px-3 py-2.5 active:scale-[0.98]"
-          >
-            <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-white text-text-muted"><Plus size={20} /></span>
-            <span className="min-w-0 flex-1">
-              <span className={`${SERIF} block text-[17px] font-medium leading-tight text-text`}>Nuova raccolta</span>
-              <span className="block truncate text-[13px] text-text-muted">Cena a due, con gli amici, weekend…</span>
-            </span>
-          </Link>
-        ) : (
-          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="-mx-4 mt-2.5 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
-            {collections.map((c) => {
+          {/* Le raccolte nella stessa fila (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima;
+              senza raccolte resta solo lei, con l'invito scritto. */}
+          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="flex shrink-0 gap-2">
+            {collections.map((c, i) => {
               const on = activeTag === c.name;
               return (
-                <li key={c.name} className="min-w-[120px] max-w-[200px] shrink-0 snap-start">
+                <li key={c.name} className="max-w-[200px] shrink-0">
                   <button
                     type="button"
                     data-testid="raccolta-cerchio"
@@ -365,19 +335,24 @@ export default function SalvatiLista({
                     onClick={() => onTag(on ? null : c.name)}
                     className="block w-full text-left active:scale-[0.97]"
                   >
-                    <Copertina name={c.name} count={c.count} preview={c.preview} on={on} />
+                    <Copertina name={c.name} count={c.count} icona={icone[i]} on={on} />
                   </button>
                 </li>
               );
             })}
-            <li className="w-[60px] shrink-0 snap-start">
-              <Link href="/profilo?raccolta=nuova" aria-label="Nuova raccolta" className="flex h-16 w-full flex-col items-center justify-center gap-0.5 rounded-[16px] border-[1.5px] border-dashed border-[#c9c2b6] text-text-muted active:scale-[0.97]">
-                <Plus size={18} aria-hidden />
-                <span className="text-[12px] font-medium leading-none text-[#33373d]">Nuova</span>
+            <li className="shrink-0">
+              <Link
+                href="/profilo?raccolta=nuova"
+                aria-label="Nuova raccolta"
+                data-testid={collections.length === 0 ? "raccolte-vuote" : undefined}
+                className="flex min-h-11 items-center gap-1 rounded-pill border-[1.5px] border-dashed border-[#c9c2b6] px-3.5 text-[14px] font-medium text-[#33373d] active:scale-[0.97]"
+              >
+                <Plus size={15} aria-hidden className="text-text-muted" />
+                {collections.length === 0 ? "Nuova raccolta" : "Nuova"}
               </Link>
             </li>
           </ul>
-        )}
+        </div>
 
         {list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
@@ -394,9 +369,9 @@ export default function SalvatiLista({
         ) : (
           <ul data-testid="salvati-lista-posti" className={`mt-2.5 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
             {list.map((p, i) => {
-              const kind = categoryLabel(p.category);
-              const city = cityFromAddress(p.address);
-              const meta = [kind, city].filter(Boolean).join(" · ");
+              // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
+              // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
+              const meta = cardFacts(p, null, true);
               const dist = origin ? distanceLabel(origin, p) : null;
               const fonte = reels[p.id];
               const verdict = verdicts[p.id]?.verdict ?? null;
@@ -450,6 +425,13 @@ export default function SalvatiLista({
           </ul>
         )}
         </>)}
+      </div>
+      {/* La mappa dei salvati: pulsante che resta in basso mentre si scorre (come "Map" in Places), così in
+          alto restano solo "Stasera" e "+" (revisore 2/11). */}
+      <div className="pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-5 lg:pb-6">
+        <button type="button" data-testid="salvati-lista-mappa" aria-label="Vedi sulla mappa" onClick={onMap} className="pointer-events-auto flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float active:scale-95">
+          <MapIcon size={16} aria-hidden /> Sulla mappa
+        </button>
       </div>
     </section>
   );
