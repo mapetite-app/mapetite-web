@@ -23,8 +23,9 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
   if (h >= 11 && h < 15) return weekend ? "🍝 Pranzo della domenica in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";
   if (h >= 18 && h < 21) return day === 5 || day === 6 ? "🍸 Cocktail bar per iniziare la serata" : "🍹 Aperitivo con vista stasera";
-  if (h >= 21) return "🍷 Wine bar tranquillo per stasera";
-  return "🌙 Locale aperto adesso qui vicino";
+  if (h >= 21) return "🍷 Wine bar per il dopocena qui vicino";
+  // Di notte "aperto adesso" lo dice già la riga "Vicino a me, aperto adesso" (revisore del 2/11): qui da mangiare.
+  return "🍕 Da mangiare a tarda notte qui vicino";
 }
 
 // Meteo attuale da Open-Meteo (gratuito, senza chiave). Posizione arrotondata a ~10 km per

@@ -2,7 +2,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { firmaPer } from "@/lib/catalog-firme";
 
 // "Salva da Google Maps" lato telefono: chiede al server di trovare i locali dai link,
-// poi li aggiunge ai salvati dell'utente con lo stato "Da provare" ("📌 Voglio andarci"),
+// poi li aggiunge ai salvati dell'utente con lo stato "Da provare" ("📌 Da provare"),
 // come fa la scheda del locale (saved_places scritto dal browser, con le regole RLS).
 
 export type LinkPlace = { id: string; name: string };

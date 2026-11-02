@@ -10,6 +10,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
@@ -20,18 +21,19 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { hasStateOrTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
+import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
-import { labelsToHide, pinName } from "@/lib/pin-labels";
+import { labelRect, latoPrincipale, posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem, type Rect } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
@@ -42,6 +44,7 @@ import { surpriseFromMemory } from "@/lib/sorpresa";
 import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
+import { zoneDeiSalvati, zonaIniziale, type Zona } from "@/lib/salvati-zone";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
@@ -50,6 +53,13 @@ const isDesktop = () => typeof window !== "undefined" && window.matchMedia("(min
 
 // Risultati di una ricerca sempre visibili come pin singoli (mai raggruppati).
 const TOP_PINS = 5;
+// Dove sta il nome rispetto al segnalino (sempre in assoluto: il segnalino resta fermo sul punto).
+const LATO_ETICHETTA: Record<LabelSide, string> = {
+  sotto: "left-1/2 top-full mt-0.5 -translate-x-1/2",
+  destra: "left-full top-1/2 ml-[3px] -translate-y-1/2",
+  sinistra: "right-full top-1/2 mr-[3px] -translate-y-1/2",
+  sopra: "bottom-full left-1/2 mb-0.5 -translate-x-1/2",
+};
 
 // Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
@@ -99,7 +109,7 @@ function SaveModal({
   // Tag che l'utente ha già usato sugli altri salvati (oltre a quelli proposti).
   knownTags?: string[];
 }) {
-  // Variante stile Places (?beta=salva): foglio dal basso con "Voglio andarci / Ci sono stato".
+  // Variante stile Places (?beta=salva): foglio dal basso con "Da provare / Ci sono stato".
   const sheetOn = useOptIn("salva");
   // Nel foglio nuovo salvare vuol dire "voglio andarci" finché non si sceglie altro (come Places).
   const [selectedTags, setSelectedTags] = useState<string[]>(() =>
@@ -110,7 +120,7 @@ function SaveModal({
   const [error, setError] = useState(false);
 
   const toggleTag = (tag: string) => {
-    // "Voglio andarci" e "Ci sono stato" si escludono a vicenda, come nella scheda.
+    // "Da provare" e "Ci sono stato" si escludono a vicenda, come nella scheda.
     const other = tag === VISIT_WANT ? VISIT_DONE : tag === VISIT_DONE ? VISIT_WANT : null;
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev.filter((t) => t !== other), tag]
@@ -249,7 +259,7 @@ function SaveModal({
           <div className="mx-auto mb-3 h-1 w-10 rounded-pill bg-border" />
           <div className="flex items-center gap-3 border-b border-border pb-4">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-accent-light text-2xl">
-              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name)} />
+              <PlacePhoto photoRef={photoRef} alt="" width={500} className="h-full w-full object-cover" fallback={getCategoryEmoji(place.category, place.name, place.types)} />
             </span>
             <span className="min-w-0">
               <span className="block text-xs font-sans text-text-muted">{mode === "edit" ? "Tra i tuoi salvati" : "Salva"}</span>
@@ -258,7 +268,7 @@ function SaveModal({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-1 rounded-pill bg-brand/5 p-1" role="group" aria-label="Stato">
-            {([[VISIT_WANT, "📌 Voglio andarci"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
+            {([[VISIT_WANT, "📌 Da provare"], [VISIT_DONE, "✓ Ci sono stato"]] as const).map(([v, label]) => (
               <button
                 key={v}
                 type="button"
@@ -388,12 +398,13 @@ const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag). Il testo si
 // capisce anche come frase (4.5): "quel giapponese che avevo salvato a Milano".
-const savedText = (p: Place) => [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
+const savedText = (p: Place) => [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
   .filter(Boolean).join(" ");
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
   const base = list.filter((p) => {
-    if (tag !== null && !p.tags?.includes(tag)) return false;
+    // "Da provare" comprende i salvati senza stato (revisore 2/11): nessun terzo stato "Salvato".
+    if (tag !== null && !hasStateOrTag(p.tags, tag)) return false;
     if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
     return true;
   });
@@ -413,7 +424,7 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
   // Prima i salvati che rispondono a tutta la frase ("il giapponese di Milano"), poi quelli con più parole in comune.
   const whole = new Set(filtraSalvatiNaturale(list, query, savedText, (p) => p.tags).map((p) => p.id));
   const scored = list.map((p) => {
-    const text = [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
+    const text = [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
       .filter(Boolean).join(" ").toLocaleLowerCase("it");
     return { p, n: words.filter((w) => text.includes(w)).length + (whole.has(p.id) ? 100 : 0) };
   }).filter((x) => x.n > 0);
@@ -428,9 +439,13 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 const SIMILAR_MAX_METERS = 15_000;
 // "Sei vicino a un locale che volevi provare": entro ~10 minuti a piedi.
 const NEARBY_SAVED_METERS = 800;
+// Mappa dei salvati: zoom massimo a cui i segnalini si raggruppano (oltre, ognuno il suo, col nome).
+const SALVATI_GRUPPI_FINO_A = 12;
 // "Dai tuoi salvati" sopra i risultati: un salvato conta solo se è a meno di 20 km da dove si cerca.
 const DAL_SALVATI_METERS = 20_000;
-// Il "Voglio andarci" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
+// Fin dove un salvato scelto per la ricerca allarga la mappa (oltre resta fuori dall'inquadratura).
+const DAL_SALVATI_INQUADRA_METERS = 2_500;
+// Il "Da provare" più vicino entro NEARBY_SAVED_METERS (null se nessuno).
 function nearestWanted(places: Place[], here: { lat: number; lng: number }): { place: Place; meters: number } | null {
   return places
     .filter((p) => p.tags?.includes(VISIT_WANT))
@@ -533,6 +548,9 @@ export type Place = {
   note: string | null;
   rating: number | null;
   priceLevel: number | null;
+  // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
+  // generico ("restaurant"). I salvati non li hanno: la loro emoji resta quella di sempre.
+  types?: string[] | null;
 };
 
 function SaveButton({
@@ -599,7 +617,7 @@ function SaveButton({
         onClick={handleClick}
         disabled={isPending}
         aria-label={error ? "Errore durante il salvataggio. Riprova." : undefined}
-        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-success" : "bg-white/10"} disabled:opacity-60`}
+        className={`${ACTION_TILE} ${error ? "bg-error" : isSaved ? "bg-accent" : "bg-white/10"} disabled:opacity-60`}
       >
         <Bookmark size={18} aria-hidden fill={isSaved ? "currentColor" : "none"} />
         {isPending ? "..." : error ? "Riprova" : isSaved ? "Salvato" : "Salva"}
@@ -615,7 +633,7 @@ function SaveButton({
         disabled={isPending}
         className={
           isSaved
-            ? "min-h-11 rounded-pill bg-success px-4 text-sm font-display font-semibold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            ? "min-h-11 rounded-pill border border-accent bg-white px-4 text-sm font-display font-semibold text-accent hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
             : "min-h-11 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         }
       >
@@ -820,13 +838,16 @@ const WELCOME_EXAMPLES_MILANO = [
 ];
 
 // Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
-function IdeaGroup({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+// hideTitle (revisore 1/11: tre intestazioni per sei righe): il gruppo resta per i lettori di schermo, l'elenco è unico.
+function IdeaGroup({ title, action, children, hideTitle = false }: { title: string; action?: React.ReactNode; children: React.ReactNode; hideTitle?: boolean }) {
   return (
-    <section className="mt-1 first-of-type:mt-0">
-      <div className="flex min-h-8 items-center justify-between px-2">
-        <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
-        {action}
-      </div>
+    <section aria-label={title} className="mt-1 first-of-type:mt-0">
+      {hideTitle ? null : (
+        <div className="flex min-h-8 items-center justify-between px-2">
+          <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+          {action}
+        </div>
+      )}
       <ul className="flex flex-col">{children}</ul>
     </section>
   );
@@ -837,7 +858,8 @@ function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: s
     <>
       <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-base">{emoji}</span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block text-[15px] font-sans font-medium leading-tight text-text">{title}</span>
+        {/* Una riga sola (revisore del 2/11, r4): con i titoli su due righe il pannello copriva metà schermo. */}
+        <span className="block truncate text-[15px] font-sans font-medium leading-tight text-text">{title}</span>
         {sub && <span className="block truncate text-xs font-sans text-text-muted">{sub}</span>}
       </span>
       <ChevronRight size={16} aria-hidden className="shrink-0 text-text-muted" />
@@ -852,6 +874,34 @@ function IdeaRow({ emoji, title, sub, label, onClick, href, testId }: { emoji: s
         <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className={cls}>{inner}</button>
       )}
     </li>
+  );
+}
+
+// Recenti, Sorprendimi ed esempi in UNA fila che scorre (revisore del 2/11, r4: la fila era tagliata a destra e
+// sembrava rotta). Pillole più piccole, così se ne leggono due intere e l'inizio della terza, sotto una sfumatura
+// chiara che dice "scorri".
+function IdeaChips({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section data-testid="idee-fila" aria-label={title} className="mt-1">
+      <div className="flex min-h-8 items-center justify-between px-2">
+        <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">{title}</p>
+        {action}
+      </div>
+      <div className="relative -mx-2">
+        <div className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
+        <span aria-hidden data-testid="idee-fila-sfumatura" className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-card bg-gradient-to-l from-surface to-transparent" />
+      </div>
+    </section>
+  );
+}
+
+const CHIP = "flex min-h-10 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
+
+function IdeaChip({ text, label, onClick, testId }: { text: string; label?: string; onClick: () => void; testId?: string }) {
+  return (
+    <button type="button" data-testid={testId} aria-label={label} onClick={onClick} className={CHIP}>
+      <span className="truncate">{text}</span>
+    </button>
   );
 }
 
@@ -874,9 +924,11 @@ export default function MapView({
   // sostituisce venueDetails.
   const savedSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
+  // Misure della mappa a schermo, per tenere i nomi dei segnalini dentro il bordo (vedi latiEtichette).
+  const [mapBox, setMapBox] = useState<{ w: number; h: number } | null>(null);
   const mapRef = useRef(null);
   const [pendingSavePlaceId, setPendingSavePlaceId] = useState<string | null>(null);
-  // Stato scelto in scheda prima di aprire Salva ("Voglio andarci" / "Ci sono stato"); vuoto dal segnalibro.
+  // Stato scelto in scheda prima di aprire Salva ("Da provare" / "Ci sono stato"); vuoto dal segnalibro.
   const [pendingSaveTags, setPendingSaveTags] = useState<string[]>([]);
   // Salvato da aprire appena arrivano i salvati (link dal profilo: /mappa?salvato=UUID).
   const openSavedRef = useRef<string | null>(null);
@@ -896,6 +948,8 @@ export default function MapView({
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);
+  // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
+  const [zonaMappa, setZonaMappa] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -920,7 +974,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -998,6 +1052,8 @@ export default function MapView({
   const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
+  // Barra in uso (cursore dentro): la frase si scrive nel campo; fuori, con i risultati, si legge intera su 2 righe.
+  const [barFocus, setBarFocus] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie fino a 3
   // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
@@ -1122,18 +1178,16 @@ export default function MapView({
   // Il locale selezionato si deriva dall'overlay: cercato per id nella lista
   // attiva (con fallback su places/savedPlaces), mai duplicato in uno state.
   // Id del locale aperto, letto da loadVerdicts (che vive in una closure vecchia).
-  // Card su cui l'utente si è fermato: se ha già scorso i risultati, l'ordine non cambia più sotto le dita.
-  const focusedIdRef = useRef<string | null>(null);
-  useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
-  const aiFirstIdRef = useRef<string | null>(null);
-  const refocusFirst = useRef(false);
+  // Card già viste in questa ricerca (state al centro del carosello almeno una volta, la prima compresa):
+  // quando arrivano i verdetti il loro posto non cambia più (giro del 1/11, correzione 8: a 8 s la prima
+  // card era una, a 20 s un'altra, sotto il dito). Si riordinano solo quelle non ancora viste.
+  const seenIdsRef = useRef<{ search: number | null; ids: Set<string> }>({ search: null, ids: new Set() });
   useEffect(() => {
-    aiFirstIdRef.current = aiSearch?.risultati[0]?.id ?? null;
-    if (refocusFirst.current) {
-      refocusFirst.current = false;
-      if (aiFirstIdRef.current) setFocusedId(aiFirstIdRef.current);
-    }
-  }, [aiSearch]);
+    if (aiSearch == null) return;
+    const id = aiSearch.id ?? null;
+    if (seenIdsRef.current.search !== id) seenIdsRef.current = { search: id, ids: new Set() };
+    if (focusId && aiSearch.risultati.some((p) => p.id === focusId)) seenIdsRef.current.ids.add(focusId);
+  }, [aiSearch, focusId]);
   const openVenueIdRef = useRef<string | null>(null);
   useEffect(() => { openVenueIdRef.current = overlay.kind === "venue" ? overlay.placeId : null; }, [overlay]);
 
@@ -1190,7 +1244,11 @@ export default function MapView({
     // Place ID Google: cerco con entrambi, così note e tag compaiono sempre.
     const uuid = placeUuids[id];
     const savedVersion = savedPlaces.find((p) => p.id === id || (uuid != null && p.id === uuid));
-    return savedVersion ? { ...base, tags: savedVersion.tags, note: savedVersion.note } : base;
+    // Giro del 1/11: l'elenco generale (page.tsx) non ha voto né prezzo; quelli del salvato sì. Prima la scheda
+    // di Hostaria Del Moro (4,5 in archivio) mostrava solo "250 m".
+    return savedVersion
+      ? { ...base, tags: savedVersion.tags, note: savedVersion.note, rating: base.rating ?? savedVersion.rating, priceLevel: base.priceLevel ?? savedVersion.priceLevel }
+      : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
   const schedaAperta = selected != null;
@@ -1216,6 +1274,10 @@ export default function MapView({
   const savedControlsOn = view === "saved" && userId != null && savedPlaces.length > 0;
   // Lista dei salvati a tutto schermo: sopra la mappa finché non si tocca "Vedi sulla mappa".
   const salvatiListaOn = savedControlsOn && aiSearch === null && clusterPlaces === null && !salvatiMappa;
+  // Mappa dei salvati (revisore 2/11): un solo campo in alto, "Cerca nei salvati", al posto di "Chiedi all'AI"
+  // più "Cerca in N salvati"; sotto, le zone (Roma, Milano…) quando i salvati sono in più città.
+  const salvatiMappaOn = savedControlsOn && !salvatiListaOn && aiSearch === null;
+  const zoneSalvati = salvatiMappaOn ? zoneDeiSalvati(displayedPlaces) : [];
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -1242,7 +1304,7 @@ export default function MapView({
   }, [savedPlaces]);
   // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
   const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
-  const countTag = (t: string) => savedPlaces.filter((p) => p.tags?.includes(t)).length;
+  const countTag = (t: string) => savedPlaces.filter((p) => hasStateOrTag(p.tags, t)).length;
   const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
   const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
   const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
@@ -1299,15 +1361,22 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando cambia il locale aperto
   }, [selected?.id]);
 
-  // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Voglio andarci"
+  // Salvataggio in un tocco (voce 11f): il segnalibro salva subito come "📌 Da provare"
   // e mostra in basso "Salvato · Aggiungi nota". Se qualcosa va storto si apre la finestra di sempre.
   const [savedToast, setSavedToast] = useState<Place | null>(null);
   // "📌 A 300 m c'è X, che volevi provare" (come Mapstr, ma senza notifiche): quando l'utente tocca
-  // "La mia posizione" e un suo "Voglio andarci" è a due passi. Ritrova il locale nel momento giusto.
+  // "La mia posizione" e un suo "Da provare" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showNearby = (near: { place: Place; meters: number } | null) => {
+  const showNearby = (near: { place: Place; meters: number } | null, daSolo = false) => {
     if (!near) return;
+    // Giro del 1/11: l'avviso tornava a ogni apertura e copriva il fondo dello schermo. Da solo
+    // (all'apertura) una volta al giorno per posto; dal tasto "La mia posizione" sempre.
+    if (daSolo) {
+      const chiave = `mapetite.vicino.${near.place.id}`;
+      const oggi = new Date().toDateString();
+      try { if (localStorage.getItem(chiave) === oggi) return; localStorage.setItem(chiave, oggi); } catch { /* storage non disponibile */ }
+    }
     setNearbySaved(near);
     if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
     nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
@@ -1316,13 +1385,17 @@ export default function MapView({
   // vicino a un posto che volevi provare, la mappa te lo dice da sola. Una volta per apertura,
   // solo sulla mappa libera (non sopra una ricerca o una scheda).
   const welcomeExamples = cityNear(viewState.latitude, viewState.longitude) === "Milano" ? WELCOME_EXAMPLES_MILANO : WELCOME_EXAMPLES;
+  // Pannello Idee (revisore del 2/11, r4): 3 righe al massimo; Sorprendimi va nella fila quando la riga è di un'idea tua.
+  const recentiIdee = recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : [];
+  const sorprendimiInFila = !!(tasteSuggestion || savedSuggestion);
+  const sorprendimiHref = `/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`;
   const nearbyChecked = useRef(false);
   useEffect(() => {
     if (nearbyChecked.current || !userPos || savedPlaces.length === 0) return;
     nearbyChecked.current = true;
     if (aiSearch !== null) return;
     const near = nearestWanted(savedPlaces, userPos);
-    if (near) setTimeout(() => showNearby(near), 0);
+    if (near) setTimeout(() => showNearby(near, true), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showNearby cambia a ogni disegno; basta la prima posizione
   }, [userPos, savedPlaces]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1405,7 +1478,9 @@ export default function MapView({
       const { data, error } = await supabase
         .from("saved_places")
         .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
+        .order("created_at", { ascending: true });
 
       setLoadingSaved(false);
       setSavedLoaded(true);
@@ -1541,7 +1616,7 @@ export default function MapView({
     }
   };
 
-  // Stato del salvato come in Places ("Voglio andarci" / "Ci sono stato"): usa i tag già
+  // Stato del salvato come in Places ("Da provare" / "Ci sono stato"): usa i tag già
   // esistenti "Da provare" / "Già visitato", uno esclude l'altro; ritoccarlo lo toglie.
   const visitBusy = useRef(false);
   // pair: i due tag che si escludono (stato della visita, oppure "Com'era?").
@@ -1707,10 +1782,10 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
-      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null }));
+      const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
       const details: Record<string, VenueDetails> = {};
       for (const p of raw) {
         details[p.id] = {
@@ -1787,14 +1862,10 @@ export default function MapView({
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
 
-  // Nomi dei primi risultati senza sovrapposizioni: vince quello più in alto in lista.
-  const hiddenLabels = useMemo(() => {
-    if (topPlaces.length < 2) return new Set<string>();
-    const rank = (id: string) => (id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
-    const ordered = [...topPlaces].sort((a, b) => rank(a.id) - rank(b.id));
-    return labelsToHide(ordered.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, big: p.id === focusId })), viewState.zoom);
-  }, [topPlaces, carouselOrder, focusId, viewState.zoom]);
-
+  // Mappa dei salvati (revisore 2/11): i propri posti sono pochi e ognuno conta. Si raggruppano solo da
+  // lontano (sotto lo zoom 13, la città intera); dal quartiere in giù ogni salvato ha il suo segnalino e il
+  // nome (dove c'è spazio, vedi latiEtichette). Prima un "2" nascondeva il salvato più vicino anche a zoom 15.
+  const mappaSalvati = view === "saved" && aiSearch === null;
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
     const points = mapPlaces.filter((p) => !top.has(p.id)).map((place) => ({
@@ -1802,10 +1873,10 @@ export default function MapView({
       properties: { cluster: false, placeData: place },
       geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
     }));
-    const index = new Supercluster({ radius: 50, maxZoom: 20 });
+    const index = new Supercluster({ radius: mappaSalvati ? 40 : 50, maxZoom: mappaSalvati ? SALVATI_GRUPPI_FINO_A : 20 });
     index.load(points);
     return index;
-  }, [mapPlaces, topPlaces]);
+  }, [mapPlaces, topPlaces, mappaSalvati]);
 
   const roundedZoom = Math.ceil(viewState.zoom);
   const clusters = useMemo(() => {
@@ -1818,7 +1889,12 @@ export default function MapView({
       }));
     }
     const b = map.getBounds();
-    const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    // Riquadro allargato di mezza mappa per lato: a fine animazione (fitBounds) i limiti letti qui possono essere
+    // quelli di un fotogramma prima, e un salvato appena dentro il bordo (Kiko Sushi Bar, revisore del 2/11)
+    // restava senza segnalino finché non si muoveva la mappa. Più punti in lista non costano niente.
+    const mw = (b.getEast() - b.getWest()) / 2;
+    const mh = (b.getNorth() - b.getSouth()) / 2;
+    const bbox: [number, number, number, number] = [Math.max(-180, b.getWest() - mw), Math.max(-85, b.getSouth() - mh), Math.min(180, b.getEast() + mw), Math.min(85, b.getNorth() + mh)];
     return [
       ...clusterIndex.getClusters(bbox, roundedZoom),
       ...topPlaces.map((place) => ({
@@ -1828,6 +1904,161 @@ export default function MapView({
       })),
     ];
   }, [clusterIndex, roundedZoom, viewState.longitude, viewState.latitude, mapPlaces, topPlaces]);
+
+  // Piccoli segnalibri dei salvati in Esplora (?beta=pin-salvati), tranne quelli già sulla mappa.
+  const pinSalvatiVisti = savedPinsOn && view === "all"
+    ? (() => {
+        const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
+        return savedPlaces.filter((p) => !shown.has(p.id));
+      })()
+    : [];
+
+  // Nomi sulla mappa senza sovrapposizioni (revisore del 1/11): ogni segnalino è un ostacolo, il nome
+  // va sotto, a destra o a sinistra del suo; se non trova posto si nasconde (il segnalino resta).
+  // Sempre in vista: il selezionato, la card al centro e la prima card. La 2ª e la 3ª scelgono per prime
+  // il posto, ma se intorno è tutto pieno si nascondono anche loro: un nome sopra un segnalino è
+  // proprio il difetto da togliere. Calcolo a ogni disegno: pochi segnalini, nessun costo che si senta.
+  // Segnalini uno sopra l'altro dopo una ricerca (revisore del 1/11, 05c/05f): si scostano di pochi
+  // pixel (separaSegnalini), e i nomi si posizionano intorno al segnalino scostato.
+  // Sempre un valore: il Marker non torna a [0, 0] da solo se riceve undefined.
+  const scostamentoDi = (id: string): [number, number] => [scostamenti[id]?.dx ?? 0, scostamenti[id]?.dy ?? 0];
+  const { lati: latiEtichette, scost: scostamenti } = ((): { lati: Record<string, LabelSide>; scost: Record<string, { dx: number; dy: number }> } => {
+    const singoli = clusters.filter((c) => !c.properties.cluster).map((c) => c.properties.placeData as Place);
+    const inRicerca = aiSearch !== null && clusterPlaces === null;
+    // In ricerca i nomi sono dei primi 5; gli altri solo avvicinando oltre lo zoom dell'inquadratura (16).
+    // Sulla mappa dei salvati il nome c'è sempre quando c'è spazio (come i risultati e Albo 08): chi li ha salvati
+    // li riconosce dal nome, non dall'emoji. posizionaEtichette lo nasconde solo se coprirebbe altro.
+    const conNome = (place: Place) => (inRicerca
+      ? topPlaces.includes(place) || viewState.zoom >= 17
+      : aiSearch !== null || mappaSalvati || viewState.zoom >= 14) || selected?.id === place.id;
+    const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
+    // Il segnalino scelto (la card al centro) ha sempre il nome, anche sulla mappa dei salvati (revisore del
+    // 2/11, terzo giro: senza nome non si capiva quale fosse); i segnalini vicini si scostano dal suo nome.
+    const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
+    const items: MapItem[] = [...singoli].sort((a, b) => rank(a.id) - rank(b.id)).map((place) => {
+      const big = selected?.id === place.id || focusId === place.id;
+      const foto = pinPhotoIds.has(place.id) && !!venueDetails[place.id]?.photoRef;
+      return {
+        id: place.id, lat: place.lat, lng: place.lng,
+        size: foto ? (big ? 56 : 44) : big ? 53 : 36,
+        label: conNome(place) ? nomeLeggibile(pinName(place.name)) : null,
+        fixed: fissi.has(place.id),
+        // Mappa dei salvati: il nome sempre a destra del segnalino, come Places (revisore del 2/11).
+        lato: mappaSalvati ? "destra" : undefined,
+      };
+    });
+    // Con un salvato solo il nome c'è già nella pillola "📌 Nome" sopra le card (revisore del 2/11: lo stesso
+    // salvato si leggeva due volte): il segnalino resta senza nome. Con più salvati la pillola dice "2 dei
+    // tuoi salvati" e i nomi stanno sui segnalini.
+    for (const { place: p } of dalSalvatiVisti) items.push({ id: `dai-salvati-${p.id}`, lat: p.lat, lng: p.lng, size: 36, label: dalSalvatiVisti.length > 1 ? nomeLeggibile(pinName(p.name)) : null, extraW: 16 });
+    for (const c of clusters) {
+      if (!c.properties.cluster) continue;
+      const n = (c.properties as { point_count: number }).point_count;
+      const [lng, lat] = c.geometry.coordinates;
+      items.push({ id: `gruppo-${(c as { id: number }).id}`, lat, lng, size: 30 + (n / Math.max(1, displayedPlaces.length)) * 30, anchor: "center" });
+    }
+    for (const p of pinSalvatiVisti) items.push({ id: `salvato-${p.id}`, lat: p.lat, lng: p.lng, size: 28 });
+    // Posizioni a schermo dal centro della mappa e dalle sue misure: un nome non esce dal bordo.
+    if (!mapBox) return { lati: posizionaEtichette(items, viewState.zoom), scost: {} };
+    const pad = (viewState as { padding?: { top: number; bottom: number; left: number; right: number } }).padding;
+    const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
+    const cx = pad ? pad.left + (mapBox.w - pad.left - pad.right) / 2 : mapBox.w / 2;
+    const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
+    const proietta = (lat: number, lng: number) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; };
+    let scost: Record<string, { dx: number; dy: number }> = {};
+    // Mappa dei salvati: il pallino blu è un ostacolo come un segnalino (i nomi non ci vanno sopra).
+    const tuSeiQui: MapItem | null = mappaSalvati && userPos ? { id: "tu-sei-qui", lat: userPos.lat, lng: userPos.lng, size: 20, anchor: "center" } : null;
+    // Nome del segnalino scelto (revisore del 2/11, r4): sceglie per primo il lato più libero, attaccato al suo
+    // segnalino; gli altri segnalini si scostano da lui e gli altri nomi lo evitano.
+    const principaleId = selected?.id ?? (mappaSalvati ? null : focusId);
+    const principale = principaleId ? items.find((it) => it.id === principaleId && it.label) : undefined;
+    const ostacoliNome: Rect[] = [];
+    if (principale && (inRicerca || mappaSalvati)) {
+      const pp = proietta(principale.lat, principale.lng);
+      const altri = items.filter((it) => it !== principale).map((it) => ({ ...proietta(it.lat, it.lng), size: it.size, anchor: it.anchor }));
+      principale.lato = latoPrincipale(principale, pp, altri, mapBox);
+      // Con 14 px d'aria in più: un segnalino vicino al nome, anche senza toccarlo, sembrava il suo.
+      const r = labelRect(principale, pp.x, pp.y, principale.lato);
+      ostacoliNome.push({ x1: r.x1 - 14, y1: r.y1 - 14, x2: r.x2 + 14, y2: r.y2 + 14 });
+    }
+    // Anche sulla mappa dei salvati (revisore del 2/11): due salvati vicini non si coprono.
+    if (inRicerca || mappaSalvati) {
+      const fermi = items.filter((it) => it.id === selected?.id || it.id === focusId || it.id.startsWith("salvato-"));
+      // Sulla mappa dei salvati il nome del segnalino scelto è fisso: i segnalini vicini si scostano anche da
+      // lui (cerchi lungo la pillola) e dal pallino blu, così nessun nome sta sopra un segnalino.
+      const ostacoli: { id: string; x: number; y: number; size: number; fermo: true }[] = [];
+      if (mappaSalvati) {
+        for (const it of fermi) {
+          if (!it.label || !it.fixed) continue;
+          const q = proietta(it.lat, it.lng);
+          // Stesso lato che sceglierà posizionaEtichette: a destra, a sinistra se da destra uscirebbe dallo schermo.
+          let r = labelRect(it, q.x, q.y, "destra");
+          if (r.x2 + 4 > mapBox.w) r = labelRect(it, q.x, q.y, "sinistra");
+          const alto = r.y2 - r.y1;
+          for (let x = r.x1 + alto / 2, k = 0; x <= r.x2 - alto / 2 + 1; x += alto / 2, k++) ostacoli.push({ id: `nome-${it.id}-${k}`, x, y: (r.y1 + r.y2) / 2, size: alto, fermo: true });
+        }
+        if (tuSeiQui) { const q = proietta(tuSeiQui.lat, tuSeiQui.lng); ostacoli.push({ id: tuSeiQui.id, x: q.x, y: q.y, size: tuSeiQui.size, fermo: true }); }
+      }
+      scost = separaSegnalini([...ostacoli, ...items.map((it) => {
+        const q = proietta(it.lat, it.lng);
+        // Centro del disegno: i segnalini stanno sopra il punto, i gruppi sono centrati.
+        return { id: it.id, x: q.x, y: it.anchor === "center" ? q.y : q.y - it.size / 2, size: it.size, fermo: fermi.includes(it) };
+      })], 84, ostacoliNome);
+      for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
+    }
+    if (tuSeiQui) items.push(tuSeiQui);
+    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
+    // Risultati affollati (revisore del 2/11: le etichette si impilavano in colonna): al massimo 3 nomi, nell'ordine
+    // della lista, più la card al centro e il selezionato. Con i segnalini distanti restano tutti quelli che ci stanno.
+    if (inRicerca) {
+      const centri = items.filter((it) => it.label).map((it) => { const q = proietta(it.lat, it.lng); return { x: q.x + (it.dx ?? 0), y: q.y + (it.dy ?? 0) }; });
+      const affollati = centri.some((a, i) => centri.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < 64));
+      if (affollati) {
+        let nomi = 0;
+        // items è già in ordine di lista (selezionato, card al centro, poi la prima, la seconda…).
+        for (const it of items) {
+          if (!lati[it.id] || it.id.startsWith("dai-salvati-")) continue;
+          if (fissi.has(it.id) || nomi < 3) nomi++;
+          else delete lati[it.id];
+        }
+      }
+    }
+    return { lati, scost };
+  })();
+
+  // Frase sopra le card (revisore del 1/11): solo i dati che la ricerca ha capito e che sono veri;
+  // i conteggi (recensioni, poco conosciuti) li fa la lista sulle card che mostra (src/lib/frase-risultati.ts).
+  const frase = aiSearch !== null && view === "all" && clusterPlaces === null
+    ? {
+        categoria: aiSearch.filtri?.categoria ?? null,
+        zona: aiSearch.filtri?.zona ?? null,
+        vicino: aiSearch.filtri?.vicino_a_me === true,
+        simileA: aiSearch.simileA ?? null,
+        famosiDaParte: aiSearch.daParte?.turistici.length ?? 0,
+      }
+    : null;
+
+  // "‹ 2 di 8 ›" nella barra azioni della scheda: posizione del locale aperto tra i risultati (stesso ordine del
+  // carosello) e passaggio al vicino senza tornare alla lista.
+  const navScheda = (() => {
+    if (!selected) return null;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    return i < 0 || ids.length < 2 ? null : { pos: i + 1, total: ids.length };
+  })();
+  const vaiRisultato = (passo: number) => {
+    if (!selected) return;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    if (i < 0 || ids.length < 2) return;
+    const id = ids[(i + passo + ids.length) % ids.length];
+    const place = displayedPlaces.find((p) => p.id === id);
+    if (!place) return;
+    setFocusedId(id);
+    dispatch({ type: "OPEN_VENUE", placeId: id });
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+  };
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
@@ -1850,27 +2081,85 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number; sempre: { lat: number; lng: number }[]; salvati: boolean } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0) => {
+  // `sempre`: punti da mostrare comunque (i salvati scelti per la ricerca), mai trattati da lontanissimi.
+  // `salvati`: mappa dei salvati (revisore del 2/11: Kiko Sushi Bar, il più a sud, restava fuori). I propri posti
+  // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
+  // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom }; return; }
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
     pendingFitRef.current = null;
-    const lngs = list.map((p) => p.lng);
-    const lats = list.map((p) => p.lat);
+    // Un risultato lontanissimo dagli altri non allarga la mappa (revisore del 1/11, 05c: a tutta Roma).
+    const inquadrati = salvati ? list : [...puntiDaInquadrare(list), ...sempre];
+    const lngs = inquadrati.map((p) => p.lng);
+    const lats = inquadrati.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
+    // Parte libera sopra le card: barra in basso (64) + margine (12) + card (~200) + frase sopra le card
+    // (~52) + spazio per il nome sotto il segnalino (~30). Prima era metà schermo: con le card più basse
+    // i segnalini restavano schiacciati in alto.
+    const bottom = Math.min(Math.round(h * 0.5), 358) + extraBottom;
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom: Math.round(h * 0.5) + extraBottom, left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+        // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 40, right: salvati ? 64 : 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
     }
   };
+
+  // Mappa dei salvati per zone (revisore 2/11: con salvati a Roma e Milano inquadrava l'Italia intera con
+  // un solo gruppo). Si parte dalla zona dove sei (se hai salvati entro 30 km) o da quella con più salvati;
+  // margine in alto sotto il campo e le zone.
+  // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
+  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
+  const apriMappaSalvati = () => {
+    setSalvatiMappa(true);
+    const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
+    if (z) inquadraZona(z);
+    else fitToPlaces(displayedPlaces, 170, 0, [], true);
+  };
+  const cercaSalvati = (pill: boolean) => (
+    <input
+      type="search"
+      value={savedQuery}
+      onChange={(e) => {
+        const v = e.target.value;
+        setSavedQuery(v); setClusterPlaces(null);
+        // Dopo una pausa la mappa va sui salvati trovati ("il giapponese di Milano" da Roma).
+        if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
+        savedFitTimer.current = setTimeout(() => {
+          const found = filterSaved(savedPlaces, activeTag, activeCity, v);
+          if (v.trim() && found.length > 0) fitToPlaces(found, 170, 0, [], true);
+        }, 600);
+      }}
+      placeholder="Cerca nei salvati"
+      aria-label="Cerca tra i salvati"
+      className={pill
+        ? "min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        : "min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"}
+    />
+  );
+  // Torna alla lista dei salvati (la schermata principale di "Salvati").
+  const vediLista = (pill: boolean) => (
+    <button
+      type="button"
+      data-testid="salvati-vedi-lista"
+      aria-label="Vedi la lista"
+      onClick={() => setSalvatiMappa(false)}
+      className={pill
+        ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-brand shadow-float active:scale-95"
+        : "flex h-10 w-10 shrink-0 items-center justify-center rounded-btn border border-border bg-white text-brand active:scale-95"}
+    >
+      <ListIcon size={18} aria-hidden />
+    </button>
+  );
 
   // Ricerca AI in linguaggio naturale (primo tempo: lista Google; verdetti dopo).
   // center: per i link condivisi (?q=…&at=lat,lng), che cercano nel punto di chi ha condiviso.
@@ -1934,6 +2223,8 @@ export default function MapView({
     // "Altri come questo" non chiede ai salvati, nemmeno dall'effetto qui sopra (prova in produzione
     // del 1/11: "Dai tuoi salvati" riproponeva il posto da cui si era partiti).
     ricercaMondo.current = mondo && !opts.simile ? ticket : null;
+    // L'avviso "A 250 m c'è…" non torna a coprire la mappa quando si chiude la ricerca.
+    setNearbySaved(null);
     if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
     setLoadingVerdicts(false);
     setAiSearching(true);
@@ -1967,7 +2258,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -1984,6 +2275,7 @@ export default function MapView({
           note: null,
           rating: p.rating ?? null,
           priceLevel: p.priceLevel ?? null,
+          types: p.types ?? null,
         }));
         const details: Record<string, VenueDetails> = {};
         for (const p of raw) {
@@ -2166,28 +2458,34 @@ export default function MapView({
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
-        // Il fuoco sulla prima card (messo dal carosello, non dall'utente) non deve seguirla quando
-        // si riordina: il carosello scorreva fino in fondo, sul locale meno adatto, e la mappa con lui.
-        // Passa al nuovo primo appena la lista riordinata è sullo schermo (effetto su aiSearch).
-        if (Object.keys(livelli).length > 0 && openVenueIdRef.current == null && focusedIdRef.current != null && focusedIdRef.current === aiFirstIdRef.current) refocusFirst.current = true;
         setAiSearch((prev) => {
           if (!prev || prev.id !== id) return prev;
-          // Il locale aperto in questo momento resta (nel dubbio il locale resta): toglierlo
-          // chiudeva la scheda sotto le dita e lasciava solo la mappa.
-          let risultati = prev.risultati.filter((p) => !esclusi.has(p.id) || p.id === openVenueIdRef.current);
+          // Ordine fermo per le card già viste (correzione 8 del giro del 1/11): la prima card, quelle su
+          // cui l'utente si è fermato e tutte quelle prima. Da computer (lista verticale) e con la lista
+          // vecchia se ne vedono più insieme: le prime 3. Con la scheda aperta non si sposta niente
+          // (le frecce "‹ 2 di 8 ›" seguono l'ordine della lista).
+          const seen = seenIdsRef.current.search === id ? seenIdsRef.current.ids : new Set<string>();
+          const open = openVenueIdRef.current;
+          let fermi = isDesktop() || listVariant !== "b" ? 3 : 1;
+          prev.risultati.forEach((p, i) => { if (seen.has(p.id) || p.id === open) fermi = Math.max(fermi, i + 1); });
+          if (open != null) fermi = prev.risultati.length;
           // Se l'AI scartasse tutti i locali (sommando i gruppi) non si esclude niente: nel dubbio il locale resta.
-          if (risultati.length === 0) risultati = prev.risultati;
-          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni):
-          // "alto" in cima, "basso" in fondo, a parità resta l'ordine di Google. Solo se l'utente non ha
-          // ancora aperto o scorso le card. I locali già messi da parte (molto famosi, fuori tema)
-          // restano in fondo: il giudizio non li riporta su.
+          const fuori = prev.risultati.every((p) => esclusi.has(p.id)) ? new Set<string>() : esclusi;
+          const visti = prev.risultati.slice(0, fermi);
+          // Esclusioni approvate (Lorenzo 10/10): i locali chiaramente fuori tema non ancora visti spariscono
+          // come prima; quelli già visti restano al loro posto con "Poco in tema" sulla card (nessun salto).
+          const fuoriTema = visti.filter((p) => fuori.has(p.id)).map((p) => p.id);
+          if (fuoriTema.length > 0) console.info(`[ricerca] fuori tema lasciati al loro posto perché già visti: ${fuoriTema.join(", ")}`);
+          // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni), solo
+          // tra le card non ancora viste: "alto" prima, "basso" dopo, a parità resta l'ordine di Google.
+          // I locali già messi da parte (molto famosi, fuori tema) restano in fondo: il giudizio non li riporta su.
           const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? [])]);
-          const touched = openVenueIdRef.current != null || (focusedIdRef.current != null && focusedIdRef.current !== prev.risultati[0]?.id);
-          if (!touched) {
-            const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
-            risultati = risultati.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
-          }
-          return { ...prev, risultati };
+          const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
+          const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
+            .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
+          // Il numero nella pillola cala (12 → 10): lo si dice, con i nomi dietro la pillola (revisore del 1/11).
+          const tolti = prev.risultati.slice(fermi).filter((p) => fuori.has(p.id)).map((p) => p.name);
+          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])], tolti: [...new Set([...(prev.tolti ?? []), ...tolti])] };
         });
       }
     } catch {
@@ -2404,16 +2702,29 @@ export default function MapView({
   const dalSalvatiChiave = dalSalvatiVisti.map((d) => d.place.id).join(",");
   useEffect(() => {
     if (!dalSalvati || dalSalvatiVisti.length === 0 || inquadratoPer.current === dalSalvati.ticket || isDesktop()) return;
-    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number } } } | null)?.getMap?.();
+    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; isMoving: () => boolean; once: (ev: string, fn: () => void) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) return;
     inquadratoPer.current = dalSalvati.ticket;
+    const ticket = dalSalvati.ticket;
     const w = window.innerWidth, h = window.innerHeight;
-    // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
-    const fuori = dalSalvatiVisti.some(({ place }) => {
-      const pt = map.project([place.lng, place.lat]);
-      return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
-    });
-    if (fuori) fitToPlaces([...(aiSearch?.risultati ?? []), ...dalSalvatiVisti.map((d) => d.place)], 190, 60);
+    // Solo i salvati a due passi dai risultati spostano la mappa: un salvato a 4 km (Kiko Sushi Bar, giro
+    // del 1/11, D20) allargava la vista a mezza Roma e i risultati finivano ammassati sul bordo. Quelli più
+    // lontani restano nella riga "Dai tuoi salvati" e con il loro segnalino, fuori dall'inquadratura.
+    const risultati = aiSearch?.risultati ?? [];
+    const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= DAL_SALVATI_INQUADRA_METERS));
+    // Parte libera: sotto la barra in alto (190 px) e sopra riga + frase + card (come fitToPlaces, più 60 px di riga).
+    // Si guarda a mappa ferma: i salvati arrivano mentre la mappa sta ancora andando sui risultati, e a metà
+    // viaggio un salvato sembrava in vista per poi uscire quando la mappa si fermava più vicina.
+    const controlla = () => {
+      if (searchSeq.current !== ticket) return;
+      const fuori = vicini.some(({ place }) => {
+        const pt = map.project([place.lng, place.lat]);
+        return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
+      });
+      if (fuori) fitToPlaces(risultati, 190, 60, vicini.map((d) => d.place));
+    };
+    if (map.isMoving()) map.once("moveend", controlla);
+    else controlla();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
   }, [dalSalvatiChiave]);
 
@@ -2458,8 +2769,16 @@ export default function MapView({
           </div>
         )}
         {/* Riga icone: Concierge AI + Filtri (con ?beta=barra: campo "Cosa cerchi?" sempre visibile, come Places) */}
-        <div className="pointer-events-auto flex gap-2">
-          {barOn ? (
+        <div data-testid={salvatiMappaOn ? "salvati-filtri" : undefined} className="pointer-events-auto flex gap-2">
+          {salvatiMappaOn ? (
+            <>
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-2 shadow-float">
+                <Search size={17} className="shrink-0 text-text-muted" aria-hidden />
+                {cercaSalvati(true)}
+              </label>
+              {vediLista(true)}
+            </>
+          ) : barOn ? (
             <form
               data-testid="barra-ricerca"
               className="flex min-w-0 flex-1 items-center gap-2 rounded-pill bg-surface pl-3.5 pr-1 shadow-float"
@@ -2478,17 +2797,29 @@ export default function MapView({
               ) : (
                 <Sparkles size={18} className="shrink-0 text-accent" aria-hidden />
               )}
-              <input
-                ref={barInputRef}
-                type="search"
-                enterKeyHint="search"
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                onFocus={() => setIdeasOpen(true)}
-                placeholder="Chiedi all'AI…"
-                aria-label="Chiedi all'AI: cosa cerchi?"
-                className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-              />
+              <span className="relative flex min-w-0 flex-1">
+                <input
+                  ref={barInputRef}
+                  type="search"
+                  enterKeyHint="search"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onFocus={() => { setIdeasOpen(true); setBarFocus(true); }}
+                  onBlur={() => setBarFocus(false)}
+                  placeholder="Chiedi all'AI…"
+                  aria-label="Chiedi all'AI: cosa cerchi?"
+                  // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
+                  // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
+                  className={`min-h-11 min-w-0 flex-1 text-ellipsis bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden ${!barFocus && aiSearch !== null && aiQuery ? "text-transparent" : ""}`}
+                />
+                {/* Con i risultati la richiesta si legge intera, su al massimo 2 righe dentro la stessa altezza
+                    della barra (revisore del 1/11: "cena romantica a Tra…"). Un tocco la riporta nel campo. */}
+                {!barFocus && aiSearch !== null && aiQuery && (
+                  <span aria-hidden data-testid="richiesta-intera" className="pointer-events-none absolute inset-0 flex items-center">
+                    <span className="line-clamp-2 text-[15px] font-sans leading-[18px] text-text">{aiQuery}</span>
+                  </span>
+                )}
+              </span>
               {voiceOn && aiQuery === "" && aiSearch === null && (
                 <VoiceButton
                   onError={setAiError}
@@ -2591,7 +2922,7 @@ export default function MapView({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-display font-semibold text-text">{p.name}</span>
                   <span className="block truncate text-xs font-sans text-text-muted">
-                    {[p.tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : p.tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : null, cityFromAddress(p.address), p.note ? `“${p.note}”` : null].filter(Boolean).join(" · ")}
+                    {[p.tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : p.tags?.includes(VISIT_WANT) ? "📌 Da provare" : null, cityFromAddress(p.address), p.note ? `“${p.note}”` : null].filter(Boolean).join(" · ")}
                   </span>
                 </span>
               </button>
@@ -2629,45 +2960,60 @@ export default function MapView({
             data-testid="idee-pannello"
             className={`pointer-events-auto max-h-[calc(100dvh-14rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto rounded-card bg-surface p-2 shadow-float lg:w-auto lg:max-w-none ${ideasShown ? "" : "hidden"}`}
           >
-            <p className="px-2 pb-1 pt-1 font-title text-lg font-semibold text-brand">Ti suggeriamo</p>
-            <IdeaGroup title="Adesso">
+            {/* Al massimo 4 righe, ognuna con un significato diverso (revisore del 2/11: di notte tre righe
+                dicevano "aperto adesso"; src/lib/idee.ts): cosa fa per quest'ora, cosa c'è aperto vicino a te,
+                le tue idee (gusti, salvati) o Sorprendimi. "Stasera dove andiamo?" sta nei Salvati, accanto al
+                "+": qui sarebbe un doppione. "Parla con l'assistente" è già nella barra in basso. */}
+            {/* Titolo e momento sulla stessa riga: il pannello resta basso (revisore del 2/11, r4). */}
+            <div className="flex items-baseline gap-2 px-2 pb-0.5 pt-1">
+              <p className="font-title text-xl font-semibold leading-tight text-text">Idee</p>
+              {momentHour != null && <p data-testid="idee-contesto" className="min-w-0 truncate text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
+            </div>
+            <IdeaGroup title="Adesso" hideTitle>
               {momentExample && (
-                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
+                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={titoloMomento(momentExample)} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
-              <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
-              <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo che probabilmente ti piace" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />
-              {userId && savedPlaces.length > 0 && (
-                <IdeaRow testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
-              )}
+              <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub="Entro 1 km da te" onClick={searchNearNow} />
             </IdeaGroup>
-            <IdeaGroup title="Per te">
-              {tasteSuggestion && (
-                <IdeaRow testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
-              )}
-              {savedSuggestion && (
-                <IdeaRow testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
-              )}
-              <IdeaRow testId="mappa-assistente" emoji="💬" title="Parla con l'assistente" sub="Chiedi, affina, prenota" href="/assistente" />
+            <IdeaGroup title="Per te" hideTitle>
+              {(() => { const mie = [
+                tasteSuggestion ? (
+                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+                ) : null,
+                savedSuggestion ? (
+                  <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+                ) : null,
+              ].filter(Boolean);
+              // Le 2 righe di "Adesso" più 1 qui (IDEE_MAX = 3): la tua idea prima, altrimenti "Sorprendimi".
+              const posto = IDEE_MAX - 2;
+              return (<>
+                {mie.slice(0, posto)}
+                {mie.length < posto && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={sorprendimiHref} />}
+              </>); })()}
             </IdeaGroup>
-            {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
-              <IdeaGroup
-                title="Recenti"
-                action={
-                  <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
-                    Cancella
-                  </button>
-                }
-              >
-                {(JSON.parse(recentSearches) as string[]).slice(0, 3).map((r) => (
-                  <IdeaRow key={`r-${r}`} testId="recenti" label={`↻ ${r}`} emoji="↻" title={r} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
-                ))}
-              </IdeaGroup>
-            )}
-            <IdeaGroup title="Prova a chiedere">
-              {welcomeExamples.map((ex) => (
-                <IdeaRow key={ex.query} label={ex.query} emoji="🔎" title={ex.title} sub={ex.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+            {/* Una fila sola: Sorprendimi (se non è già una riga), l'idea dai salvati (se la riga è dei gusti), le ricerche recenti, poi gli esempi. */}
+            <IdeaChips
+              title="Prova a chiedere"
+              action={recentiIdee.length > 0 ? (
+                <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
+                  Cancella recenti
+                </button>
+              ) : undefined}
+            >
+              {sorprendimiInFila && (
+                <Link data-testid="mappa-sorprendimi" href={sorprendimiHref} className={CHIP}>🎲 Sorprendimi</Link>
+              )}
+              {/* Con gusti e salvati la riga è dei gusti: l'idea dai salvati resta a un tocco, qui. */}
+              {tasteSuggestion && savedSuggestion && (
+                <IdeaChip testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} text={`📌 ${savedSuggestion.label}`} onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+              )}
+              {recentiIdee.map((r) => (
+                <IdeaChip key={`r-${r}`} testId="recenti" label={`↻ ${r}`} text={`↻ ${r}`} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />
               ))}
-            </IdeaGroup>
+              {welcomeExamples.map((ex) => (
+                <IdeaChip key={ex.query} testId="idee-esempio" label={ex.query} text={ex.title} onClick={() => { setIdeasOpen(false); setAiQuery(ex.query); void runAISearch(ex.query); }} />
+              ))}
+            </IdeaChips>
           </div>
         )}
         {/* Pannello AI espandibile */}
@@ -2688,67 +3034,53 @@ export default function MapView({
             />
           </div>
         )}
-        {savedControlsOn && !salvatiListaOn && (
-          <div data-testid="salvati-filtri" className={`pointer-events-auto flex flex-col gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
-            {/* Una riga (Lorenzo 16/10, "il dono della sintesi"): cerca + "Stasera". Stato, città, raccolte e
-                ordine sono dietro "Filtri" in alto (col numero dei filtri accesi). */}
-            <div className="flex items-center gap-1.5">
-              <input
-                type="search"
-                value={savedQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSavedQuery(v); setClusterPlaces(null);
-                  // Dopo una pausa la mappa va sui salvati trovati ("il giapponese di Milano" da Roma).
-                  if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
-                  savedFitTimer.current = setTimeout(() => {
-                    const found = filterSaved(savedPlaces, activeTag, activeCity, v);
-                    if (v.trim() && found.length > 0) fitToPlaces(found, 150);
-                  }, 600);
-                }}
-                placeholder={`Cerca in ${savedPlaces.length} salvati`}
-                aria-label="Cerca tra i salvati"
-                className="min-h-10 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
-              />
-              {/* Il momento della scelta (VISIONE.md: "ritrovarlo nel momento giusto"): tre proposte dai tuoi salvati. */}
-              <Link
-                href="/stasera"
-                data-testid="vai-stasera"
-                aria-label="Stasera dove andiamo?"
-                className="flex min-h-10 shrink-0 items-center gap-1 rounded-btn bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
-              >
-                <span aria-hidden>🍽️</span> Stasera
-              </Link>
-              {/* Torna alla lista dei salvati (la schermata principale di "Salvati"). */}
-              <button
-                type="button"
-                data-testid="salvati-vedi-lista"
-                aria-label="Vedi la lista"
-                onClick={() => setSalvatiMappa(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn border border-border bg-white text-brand active:scale-95"
-              >
-                <ListIcon size={18} aria-hidden />
-              </button>
-            </div>
-            {/* I filtri accesi restano in vista: un tocco li toglie. */}
+        {savedControlsOn && !salvatiListaOn && !salvatiMappaOn && (
+          <div data-testid="salvati-filtri" className={`pointer-events-auto flex items-center gap-1.5 rounded-card border border-border bg-surface p-1.5 shadow-float ${barOn ? "mr-14 lg:mr-0" : ""}`}>
+            {cercaSalvati(false)}
+            {vediLista(false)}
+          </div>
+        )}
+        {/* Sotto il campo: le zone dei salvati (se sono in più città) e i filtri accesi, un tocco li toglie.
+            "Stasera" non sta più qui: è uno strumento, accanto al "+" nella lista (revisore 2/11). */}
+        {salvatiMappaOn && (zoneSalvati.length > 1 || activeTag !== null || activeCity !== null || savedNearestOn) && (
+          <div data-testid="salvati-sotto" className={`pointer-events-auto -ml-1 flex gap-1.5 overflow-x-auto py-1 pl-1 [scrollbar-width:none] ${barOn ? "mr-14 lg:mr-0" : ""}`}>
+            {zoneSalvati.length > 1 && (
+              <span role="group" aria-label="Zone dei salvati" data-testid="salvati-zone" className="flex shrink-0 gap-1.5">
+                {zoneSalvati.map((z) => {
+                  const on = zonaMappa === z.nome;
+                  return (
+                    <button
+                      key={z.nome}
+                      type="button"
+                      data-testid="salvati-zona"
+                      aria-pressed={on}
+                      onClick={() => inquadraZona(z)}
+                      className={`flex min-h-9 shrink-0 items-center gap-1 rounded-pill px-3 text-xs font-display font-semibold shadow-float active:scale-95 ${on ? "bg-brand text-white" : "bg-surface text-brand"}`}
+                    >
+                      {z.nome} <span className={on ? "text-white/75" : "text-text-muted"}>{z.posti.length}</span>
+                    </button>
+                  );
+                })}
+              </span>
+            )}
             {(activeTag !== null || activeCity !== null || savedNearestOn) && (
-              <div data-testid="salvati-attivi" className="-mx-1.5 flex gap-1.5 overflow-x-auto px-1.5 [scrollbar-width:none]">
-                {activeTag !== null && (
-                  <button type="button" onClick={() => { setActiveTag(null); clearAiSearch(); setClusterPlaces(null); }} aria-label={`Togli ${tagLabel(activeTag)}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    {tagLabel(activeTag)} <X size={12} aria-hidden />
-                  </button>
-                )}
-                {activeCity !== null && (
-                  <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    📍 {activeCity} <X size={12} aria-hidden />
-                  </button>
-                )}
-                {savedNearestOn && (
-                  <button type="button" onClick={() => setSavedNearest(false)} aria-label="Togli Più vicini" className={`shrink-0 ${CHIP_ACTIVE}`}>
-                    Più vicini <X size={12} aria-hidden />
-                  </button>
-                )}
-              </div>
+              <span data-testid="salvati-attivi" className="flex shrink-0 gap-1.5">
+                  {activeTag !== null && (
+                    <button type="button" onClick={() => { setActiveTag(null); clearAiSearch(); setClusterPlaces(null); }} aria-label={`Togli ${tagLabel(activeTag)}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      {tagLabel(activeTag)} <X size={12} aria-hidden />
+                    </button>
+                  )}
+                  {activeCity !== null && (
+                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      📍 {activeCity} <X size={12} aria-hidden />
+                    </button>
+                  )}
+                  {savedNearestOn && (
+                    <button type="button" onClick={() => setSavedNearest(false)} aria-label="Togli Più vicini" className={`shrink-0 ${CHIP_ACTIVE}`}>
+                      Più vicini <X size={12} aria-hidden />
+                    </button>
+                  )}
+              </span>
             )}
           </div>
         )}
@@ -2916,7 +3248,7 @@ export default function MapView({
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (aiQuery.trim()) void runAISearch(aiQuery.trim()); }
                 }}
                 placeholder="Cosa cerchi?"
-                className="font-title block w-full resize-none bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none"
+                className="font-sans block w-full resize-none bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none"
               />
               <div className="mt-1 flex items-center justify-between">
                 <button
@@ -3175,6 +3507,7 @@ export default function MapView({
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
+        onResize={(e) => { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }}
         onMoveEnd={(evt) => saveLastView({ lat: evt.viewState.latitude, lng: evt.viewState.longitude, zoom: evt.viewState.zoom })}
         onMoveStart={(evt) => {
           if (!(evt as { originalEvent?: unknown }).originalEvent) return;
@@ -3189,10 +3522,11 @@ export default function MapView({
         mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
         // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
         language="it"
-        onLoad={() => {
+        onLoad={(e) => {
           mapReadyRef.current = true;
+          { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }
           const pending = pendingFitRef.current;
-          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom);
+          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom, pending.sempre, pending.salvati);
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
@@ -3212,6 +3546,7 @@ export default function MapView({
                 longitude={lng}
                 latitude={lat}
                 anchor="center"
+                offset={scostamentoDi(`gruppo-${clusterId}`)}
                 onClick={(e) => {
                   e.originalEvent.stopPropagation();
                   const leaves = clusterIndex.getLeaves(clusterId, Infinity);
@@ -3224,6 +3559,7 @@ export default function MapView({
                 }}
               >
                 <div
+                  data-testid="pin-gruppo"
                   className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-accent"
                   style={{
                     width: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
@@ -3243,6 +3579,8 @@ export default function MapView({
               longitude={place.lng}
               latitude={place.lat}
               anchor="bottom"
+              // Scostato di pochi pixel se coprirebbe un segnalino più importante (separaSegnalini).
+              offset={scostamentoDi(place.id)}
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
@@ -3260,7 +3598,7 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
@@ -3269,44 +3607,52 @@ export default function MapView({
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
-                    className={`block overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
+                    role="img"
+                    aria-label={place.name}
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
                       selected?.id === place.id || focusId === place.id ? "h-14 w-14 border-accent" : "h-11 w-11 border-brand"
                     }`}
                   >
+                    {/* Emoji del tipo di locale sotto la foto: si vede subito e resta finché la foto non arriva
+                        (giro del 1/11: per secondi i segnalini erano cerchi bianchi vuoti). */}
+                    {/* Revisore del 2/11: la foto resta invisibile finché non è arrivata davvero; se non arriva
+                        (429, quota finita) il segnalino è l'emoji su fondo chiaro, come tutti gli altri. */}
+                    <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
-                      alt={place.name}
+                      alt=""
                       width={500}
-                      className="h-full w-full object-cover"
-                      fallback={<span className="flex h-full w-full items-center justify-center text-xl">{getCategoryEmoji(place.category, place.name)}</span>}
+                      revealOnLoad
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   </span>
                 ) : (
                   <span
                     role="img"
                     aria-label={place.category ?? "locale"}
-                    className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
+                    className={`relative flex items-center justify-center overflow-hidden rounded-full border-2 bg-white text-xl leading-none shadow-float transition-transform ${
                       selected?.id === place.id || focusId === place.id ? "h-12 w-12 scale-110 border-accent" : "h-9 w-9 border-brand"
                     }`}
                   >
                     {/* Pin a fuoco: miniatura della foto della card (stesso indirizzo = già in cache, nessuna chiamata in più). */}
-                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef ? (
+                    {getCategoryEmoji(place.category, place.name, place.types)}
+                    {/* Sopra l'emoji, che resta visibile finché la foto non è arrivata. */}
+                    {focusId === place.id && aiSearch !== null && carouselOrder.indexOf(place.id) > -1 && carouselOrder.indexOf(place.id) < PHOTO_CARDS && venueDetails[place.id]?.photoRef && (
                       <PlacePhoto
                         photoRef={venueDetails[place.id]?.photoRef}
                         alt=""
                         width={500}
-                        className="h-full w-full rounded-full object-cover"
-                        fallback={getCategoryEmoji(place.category, place.name)}
+                        revealOnLoad
+                        className="absolute inset-0 h-full w-full rounded-full object-cover"
                       />
-                    ) : (
-                      getCategoryEmoji(place.category, place.name)
                     )}
                   </span>
                 )}
-                {/* Dopo una ricerca il nome solo sui primi risultati: con 20 etichette si sovrapponevano. */}
-                {((aiSearch !== null && clusterPlaces === null ? (topPlaces.includes(place) && !hiddenLabels.has(place.id)) || viewState.zoom >= 16 : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id) && (
-                  <span className={`mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
-                    {pinName(place.name)}
+                {/* Nome solo dove non copre altri segnalini o nomi (vedi latiEtichette). In assoluto: mostrarlo
+                    o nasconderlo non sposta il segnalino, che resta fermo sul punto. */}
+                {latiEtichette[place.id] && (
+                  <span data-testid="etichetta-pin" data-lato={latiEtichette[place.id]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${LATO_ETICHETTA[latiEtichette[place.id]]} ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
+                    {nomeLeggibile(pinName(place.name))}
                   </span>
                 )}
               </div>
@@ -3324,25 +3670,26 @@ export default function MapView({
             longitude={p.lng}
             latitude={p.lat}
             anchor="bottom"
+            offset={scostamentoDi(`dai-salvati-${p.id}`)}
             style={{ zIndex: 1 }}
             onClick={(e) => { e.originalEvent.stopPropagation(); apriDaiSalvati(p, "pin"); }}
           >
-            <span data-testid="pin-dai-salvati" data-place={p.id} className="flex cursor-pointer flex-col items-center">
+            <span data-testid="pin-dai-salvati" data-place={p.id} className="relative flex cursor-pointer flex-col items-center">
               <span
                 aria-label={`${p.name}, dai tuoi salvati`}
                 className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-brand text-white shadow-float"
               >
                 <Bookmark size={16} fill="currentColor" aria-hidden />
               </span>
-              <span className="mt-0.5 max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card">
-                📌 {pinName(p.name)}
-              </span>
+              {latiEtichette[`dai-salvati-${p.id}`] && (
+                <span data-testid="etichetta-pin" data-lato={latiEtichette[`dai-salvati-${p.id}`]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card ${LATO_ETICHETTA[latiEtichette[`dai-salvati-${p.id}`]]}`}>
+                  📌 {nomeLeggibile(pinName(p.name))}
+                </span>
+              )}
             </span>
           </Marker>
         ))}
-        {savedPinsOn && view === "all" && (() => {
-          const shown = new Set([...mapPlaces.map((p) => resolveUuid(p.id) ?? p.id), ...dalSalvatiVisti.map((d) => d.place.id)]);
-          return savedPlaces.filter((p) => !shown.has(p.id)).map((p) => (
+        {pinSalvatiVisti.map((p) => (
             <Marker
               key={`salvato-${p.id}`}
               longitude={p.lng}
@@ -3359,8 +3706,7 @@ export default function MapView({
                 <Bookmark size={14} fill="currentColor" aria-hidden />
               </span>
             </Marker>
-          ));
-        })()}
+          ))}
         {/* Raggio dei Filtri (piano 2.1): cerchio leggero e la sua misura sul bordo, solo con i risultati dei Filtri. */}
         {radiusCircle && (
           <>
@@ -3376,7 +3722,8 @@ export default function MapView({
           </>
         )}
         {userPos && (
-          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: 0 }}>
+          // Sulla mappa dei salvati il pallino blu sta sopra i segnalini (revisore del 2/11: il segnalino scelto lo copriva).
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 120 : 0 }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
               <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
               <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
@@ -3388,37 +3735,17 @@ export default function MapView({
       {selected && (
         // Da computer la scheda si apre nel pannello a destra, al posto della lista (niente velo scuro).
         <div data-testid="scheda-pannello" className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40 lg:static lg:z-auto lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:items-stretch lg:justify-start lg:border-l lg:border-border lg:bg-bg" onClick={() => dispatch({ type: "CLOSE" })}>
-          {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
-          {(() => {
-            const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
-            const i = ids.indexOf(selected.id);
-            if (i < 0 || ids.length < 2) return null;
-            const go = (j: number) => {
-              const id = ids[(j + ids.length) % ids.length];
-              const place = displayedPlaces.find((p) => p.id === id);
-              if (!place) return;
-              setFocusedId(id);
-              dispatch({ type: "OPEN_VENUE", placeId: id });
-              const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-              if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
-            };
-            return (
-              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
-                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
-                <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
-                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
-              </div>
-            );
-          })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className="w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none">
+          {/* A tutto schermo come Places 05 (revisore del 2/11, r4): sopra resta solo la zona sicura del telefono,
+              niente striscia di mappa o di Salvati sfocati. Si chiude trascinando giù o con la X. */}
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`h-dvh w-full max-w-lg overflow-y-auto overscroll-contain bg-surface shadow-float lg:h-auto lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{
                 id: selected.id, name: selected.name, address: selected.address,
-                category: selected.category, rating: selected.rating,
+                category: selected.category, types: selected.types ?? null, rating: selected.rating,
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,
@@ -3444,6 +3771,11 @@ export default function MapView({
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
               onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
+              // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
+              // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.
+              nav={navScheda}
+              onNavPrev={() => vaiRisultato(-1)}
+              onNavNext={() => vaiRisultato(1)}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}
@@ -3532,8 +3864,9 @@ export default function MapView({
         />
       )}
 
-      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva). */}
-      {nearbySaved && !savedToast && !selected && (
+      {/* Con la scheda aperta l'avviso sale sopra la barra Salva/Percorso/Chiama/Sito (prima la copriva).
+          Mai sopra una ricerca, né mentre arriva né sui risultati: copriva metà della prima card (giro del 1/11, D18). */}
+      {nearbySaved && !savedToast && !selected && aiSearch === null && !aiSearching && view === "all" && (
         <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-3 lg:right-[var(--pannello)]" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
@@ -3545,6 +3878,9 @@ export default function MapView({
               className="min-h-10 shrink-0 rounded-pill bg-accent px-4 text-sm font-display font-semibold active:scale-95"
             >
               Apri
+            </button>
+            <button type="button" data-testid="vicino-salvato-chiudi" aria-label="Chiudi" onClick={() => setNearbySaved(null)} className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center text-white/80 active:scale-95">
+              <X size={16} aria-hidden />
             </button>
           </div>
         </div>
@@ -3628,7 +3964,7 @@ export default function MapView({
           onFilters={() => setSavedSheetOpen(true)}
           verdicts={venueDetails}
           hideOnDesktop={venueOpen}
-          onMap={() => { setSalvatiMappa(true); fitToPlaces(displayedPlaces, 150); }}
+          onMap={apriMappaSalvati}
           onOpen={(place, order) => {
             setCarouselOrder(order);
             setFocusedId(place.id);
@@ -3666,6 +4002,9 @@ export default function MapView({
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
           setAside={aiSearch?.daParte ?? null}
+          offTopic={aiSearch?.fuoriTema}
+          removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
+          frase={frase}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
@@ -3698,7 +4037,7 @@ export default function MapView({
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;
             if (!uuid || !savedIds.has(uuid)) return null;
-            return tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : tags?.includes(VISIT_WANT) ? "📌 Voglio andarci" : "📌 Salvato";
+            return tags?.includes(VISIT_DONE) ? "✓ Ci sono stato" : tags?.includes(VISIT_WANT) ? "📌 Da provare" : "📌 Salvato";
           }}
           // Già salvato: la scheda permette di modificarlo o rimuoverlo (vedi quickSave).
           onSave={aiSearch !== null && view === "all" ? (place) => { void quickSave(place); } : undefined}
@@ -3775,7 +4114,7 @@ export default function MapView({
                         onClick={() => {
                           const next = activeCity === city ? null : city;
                           setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
-                          fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150);
+                          fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150, 0, [], true);
                         }}
                         className={sheetChip(activeCity === city)}
                       >
@@ -3815,7 +4154,7 @@ export default function MapView({
               >
                 Tipo di locale, voto e prezzo <ChevronRight size={16} aria-hidden />
               </button>
-              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Voglio andarci". */}
+              {/* "Non so dove andare": sceglie a caso tra i salvati mostrati, prima quelli "Da provare". */}
               {pickOn && sheetShown.length >= 2 && (
                 <button
                   type="button"

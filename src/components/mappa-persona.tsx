@@ -6,7 +6,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { getCategoryEmoji } from "@/lib/emoji";
 
 // Mappa dei posti di una persona (profilo pubblico e /u/<handle>/mappa): pin con l'emoji del
-// tipo di locale, corallo se "Ci sono stato", teal se "Voglio andarci". Tocco sul pin: la
+// tipo di locale, corallo se "Ci sono stato", teal se "Da provare". Tocco sul pin: la
 // pagina pubblica del locale. Si carica solo nel browser (mappa-persona-lazy.tsx).
 
 export type MapSpot = { id: string; name: string; category: string | null; lat: number; lng: number; visited: boolean };

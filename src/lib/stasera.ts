@@ -6,7 +6,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { cityFromAddress } from "@/lib/city";
 import { isStateTag, OPINION_DISLIKE } from "@/lib/tags";
 
-export const STATE_WANT = "Da provare"; // si legge "📌 Voglio andarci"
+export const STATE_WANT = "Da provare"; // si legge "📌 Da provare"
 export const STATE_DONE = "Già visitato"; // si legge "✓ Ci sono stato"
 
 // "Vicino a me": entro 10 km in linea d'aria (una città, anche grande come Roma).
@@ -50,7 +50,7 @@ export type Choices = {
   occasion: string | null; // una raccolta dell'utente, null = Qualsiasi
   near: { lat: number; lng: number } | null; // null = Ovunque
   city: string | null; // città ricavata dall'indirizzo (es. "Roma"), null = tutte
-  onlyNew: boolean; // true = Mai provati (esclusi i "Ci sono stato")
+  onlyNew: boolean; // true = Da provare (esclusi i "Ci sono stato")
 };
 
 // Raccolte = tag dell'utente esclusi i due di stato, dalla più ricca.
@@ -88,7 +88,7 @@ export function matches(s: SavedSpot, c: Choices): boolean {
   return true;
 }
 
-// Livello: prima quelli in programma oggi ("Quando ci vai?"), poi i "Voglio andarci", poi i
+// Livello: prima quelli in programma oggi ("Quando ci vai?"), poi i "Da provare", poi i
 // salvati senza stato, poi i già visitati.
 function tier(s: SavedSpot, oggi: string): number {
   if (inProgramma(s, oggi) && !s.tags.includes(STATE_DONE)) return 3;

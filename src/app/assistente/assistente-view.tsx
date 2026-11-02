@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, BookmarkCheck, CalendarCheck, Map as MapIcon, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, BookmarkCheck, CalendarCheck, ChevronRight, Map as MapIcon, RotateCcw, X } from "lucide-react";
 import VenueSheet from "@/components/venue-sheet";
 import CommunityLocale from "@/components/community-locale";
 import AssistantPlaceCard, { type Card, type SaveState } from "./assistente-card";
 import SerataView, { chosenOf, type Serata, type SerataTappa } from "./serata-view";
 import BookingSheet from "@/components/booking-sheet";
 import UtileFeedback from "@/components/utile-feedback";
+import SalvatiBrevi from "@/components/salvati-brevi";
 import VoiceButton from "@/components/voice-button";
 import { followUpQuery } from "@/lib/follow-up";
 import { applyLocalRefine, localRefineOf } from "@/lib/assistant";
@@ -97,12 +98,14 @@ const patchMsg = (id: string, patch: Partial<BotMsg> | ((m: BotMsg) => Partial<B
   setConv((c) => ({ ...c, msgs: c.msgs.map((m) => (m.id === id && m.role === "assistant" ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m)) }));
 
 // ── Testi ──
+// Revisore 2/11: domande vere, scritte per intero come in "Prova a chiedere" della mappa. Niente
+// "Prenota domani" né "Altre idee: prenota" (revisore 2/11, quinto giro): la prenotazione automatica non
+// c'è, si prepara solo il messaggio per il locale. La serata a tappe invece c'è davvero e resta in vista.
 const EXAMPLES = [
-  { emoji: "🗓️", short: "Prenota domani", text: "Prenotami domani alle 21 per 2 con terrazza a Roma" },
-  { emoji: "🍝", short: "Trattoria vera", text: "Trattoria non turistica a Testaccio" },
-  { emoji: "🍸", short: "Aperitivo con vista", text: "Aperitivo con vista a Milano" },
-  { emoji: "🥞", short: "Brunch domenica", text: "Brunch domenica per 4 a Roma" },
-  { emoji: "🌙", short: "Serata a tappe", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
+  { emoji: "🍝", text: "Trattoria non turistica a Testaccio" },
+  { emoji: "🍸", text: "Aperitivo con vista a Milano" },
+  { emoji: "🥞", text: "Brunch domenica per 4 a Roma" },
+  { emoji: "🌙", text: "Organizzami sabato sera: aperitivo, cena, dopocena a Trastevere" },
 ];
 const REFINES: Ask[] = [
   { label: "Più economici", send: "più economici" },
@@ -547,7 +550,6 @@ const WANT = "Da provare";
 export default function AssistenteView({ userId }: { userId: string | null }) {
   const c = useSyncExternalStore(subscribe, getConv, () => EMPTY);
   const [input, setInput] = useState("");
-  const [moreIdeas, setMoreIdeas] = useState(false);
   // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
@@ -665,17 +667,13 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   };
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-bg md:min-h-[calc(100dvh-3.5rem)]">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-bg/95 px-4 py-2.5 backdrop-blur md:top-14">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Sparkles size={18} aria-hidden /></span>
-          <div className="min-w-0">
-            <h1 className="font-display text-base font-semibold leading-tight text-brand">Assistente Mapetite</h1>
-            <p className="truncate text-xs font-sans text-text-muted">Trova, filtra, prenota</p>
-          </div>
-        </div>
+    // Fondo carta come Salvati (revisore 1/11, terzo giro). Un solo titolo: niente barra "Assistente
+    // Mapetite" sopra il benvenuto; in alto a destra restano solo la mappa e, in conversazione, "Nuova".
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
+      <header data-testid="assistente-barra" className={`sticky top-0 z-20 flex items-center justify-end gap-2 px-4 pt-2 md:top-14 ${c.msgs.length > 0 ? "bg-[#f8f6f2]/95 pb-2 backdrop-blur" : ""}`}>
+        {c.msgs.length > 0 && <h1 className="sr-only">Assistente</h1>}
         <div className="flex items-center gap-1">
-          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full text-brand"><MapIcon size={18} /></Link>
+          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-brand"><MapIcon size={18} /></Link>
           {c.msgs.length > 0 && (
             <button
               type="button"
@@ -689,53 +687,33 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         </div>
       </header>
 
-      <div className="flex-1 px-4 pb-36 pt-4" data-testid="assistente-conversazione">
+      <div className={`flex-1 px-4 pb-36 ${c.msgs.length === 0 ? "flex flex-col pt-0" : "pt-2"}`} data-testid="assistente-conversazione">
         {c.msgs.length === 0 && (
-          <div data-testid="assistente-benvenuto" className="pt-6">
-            <p className="font-title text-3xl font-semibold leading-tight text-text">Ciao! Dimmi cosa cerchi.</p>
+          // Senza salvati il benvenuto sta al centro tra titolo e campo (niente vuoto enorme sotto);
+          // con i salvati sotto c'è "Riparti da qui": 2 "Da provare" veri (tutto in una schermata), i più vicini se la posizione è nota.
+          <div data-testid="assistente-benvenuto" className="my-auto py-4">
+            <h1 className="font-title text-[34px] font-medium leading-tight tracking-tight text-text">Ciao! Dimmi cosa cerchi.</h1>
             <p className="mt-2 text-[15px] font-sans leading-relaxed text-text-muted">
-              Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi, e se vuoi ti preparo la prenotazione.
+              Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi.
             </p>
-            {/* Lorenzo 16/10: poche chip brevi; la lista completa dietro "Altre idee". */}
-            <p className="mt-6 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Ti suggeriamo</p>
-            <div data-testid="assistente-esempi" className="mt-2 flex flex-wrap gap-2">
-              {EXAMPLES.slice(0, 3).map((e) => (
-                <button
-                  key={e.text}
-                  type="button"
-                  aria-label={e.text}
-                  onClick={() => submit(e.text)}
-                  className="flex min-h-10 items-center gap-1.5 rounded-pill border border-border bg-surface px-3.5 text-sm font-sans text-text active:scale-[0.98]"
-                >
-                  <span aria-hidden>{e.emoji}</span> {e.short}
-                </button>
+            <p className="mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Prova a chiedere</p>
+            <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
+              {EXAMPLES.map((e) => (
+                <li key={e.text}>
+                  <button
+                    type="button"
+                    aria-label={e.text}
+                    onClick={() => submit(e.text)}
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left text-[15px] font-sans leading-snug text-text active:bg-brand-light"
+                  >
+                    <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-lg">{e.emoji}</span>
+                    <span className="min-w-0 flex-1">“{e.text}”</span>
+                    <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+                  </button>
+                </li>
               ))}
-              <button
-                type="button"
-                data-testid="assistente-altre-idee"
-                aria-expanded={moreIdeas}
-                onClick={() => setMoreIdeas((v) => !v)}
-                className="flex min-h-10 items-center gap-1 rounded-pill border border-brand/30 bg-surface px-3.5 text-sm font-display font-semibold text-brand active:scale-[0.98]"
-              >
-                {moreIdeas ? "Meno idee" : "✨ Altre idee"}
-              </button>
-            </div>
-            {moreIdeas && (
-              <ul data-testid="assistente-idee" className="mt-3 flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-                {EXAMPLES.map((e) => (
-                  <li key={e.text}>
-                    <button
-                      type="button"
-                      onClick={() => submit(e.text)}
-                      className="flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] font-sans text-text active:bg-brand-light"
-                    >
-                      <span aria-hidden className="text-lg">{e.emoji}</span>
-                      <span className="min-w-0 flex-1">“{e.text}”</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            </ul>
+            <SalvatiBrevi userId={userId} titolo="Riparti da qui" testid="assistente-riparti" max={2} soloDaProvare pos={c.pos} className="mt-6" />
           </div>
         )}
 
@@ -919,7 +897,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
-            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Voglio andarci”
+            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”
           </p>
           <Link href={`/mappa?salvato=${savedToast.uuid}`} className="shrink-0 text-sm font-display font-semibold text-accent">
             Sulla mappa
@@ -930,17 +908,17 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       {/* Campo in basso, sopra la barra di navigazione: scrivi o detta. */}
       <form
         onSubmit={(e) => { e.preventDefault(); submit(input); }}
-        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-border bg-bg/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
+        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-[#e8e2d8] bg-[#f8f6f2]/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
       >
         {voiceError && <p role="status" className="mx-auto mb-1 max-w-lg px-1 text-xs font-sans text-error">{voiceError}</p>}
-        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-border bg-surface py-1 pl-4 pr-1 shadow-card">
+        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white py-1 pl-4 pr-1 shadow-card">
           <input
             data-testid="assistente-campo"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             enterKeyHint="send"
             maxLength={300}
-            placeholder={c.msgs.length === 0 ? "Scrivi o detta cosa cerchi…" : "Chiedi altro, es. “più economici”"}
+            placeholder={c.msgs.length === 0 ? "Chiedi all'AI…" : "Chiedi altro, es. “più economici”"}
             aria-label="Scrivi all'assistente"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none"
           />

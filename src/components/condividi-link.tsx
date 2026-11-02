@@ -20,7 +20,7 @@ export default function CondividiLink({
   path: string;
   title: string;
   text: string;
-  cosa: "profilo" | "mappa" | "raccolta" | "invito" | "gruppo";
+  cosa: "profilo" | "mappa" | "raccolta" | "invito" | "gruppo" | "locale";
   label?: string;
   variant?: "outline" | "solid";
   testId?: string;

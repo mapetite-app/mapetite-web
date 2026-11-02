@@ -30,6 +30,7 @@ export default function SchedaCarosello({
   fallback,
   overlay,
   heightClass = "h-56",
+  heightSenzaFoto,
 }: {
   photoRefs: string[];
   name: string;
@@ -41,20 +42,30 @@ export default function SchedaCarosello({
   fallback: ReactNode;
   overlay?: ReactNode; // chiudi / condividi sopra la foto
   heightClass?: string; // altezza della striscia (mockup A: più alta)
+  // Senza nessuna foto (manca o non arriva): intestazione bassa con l'emoji, il nome sale (revisore del 2/11, r4).
+  heightSenzaFoto?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [mapBroken, setMapBroken] = useState(false);
   // Anche la mappa parte solo quando la pagina diventa visibile (un tocco sui puntini o lo scorrimento).
   const [mapWanted, setMapWanted] = useState(false);
+  // Foto arrivate davvero: se non arrivano (quota finita, errore) al loro posto c'è l'emoji. Senza nessuna foto visibile
+  // niente contatore "1 / 2" sopra l'emoji (revisore del 2/11); la mappa resta a uno scorrimento.
+  const [caricate, setCaricate] = useState<string[]>([]);
+  const fotoVisibili = photoRefs.filter((r) => caricate.includes(r)).length;
+  // Foto che non arrivano (quota finita, 429): con tutte fallite (o nessuna) la striscia diventa un'intestazione bassa.
+  const [fallite, setFallite] = useState<string[]>([]);
+  const senzaFoto = photoRefs.every((r) => fallite.includes(r));
+  const altezza = senzaFoto && heightSenzaFoto ? heightSenzaFoto : heightClass;
   const mapUrl = mapBroken ? null : staticMapUrl(lat, lng);
   const photos = photoRefs.length > 0 ? photoRefs : [null];
   const slides = photos.length + (mapUrl ? 1 : 0);
   const mapIndex = mapUrl ? photos.length : -1;
 
   return (
-    <div className="relative" data-testid="scheda-carosello">
+    <div className="relative" data-testid="scheda-carosello" data-senza-foto={senzaFoto ? "true" : undefined}>
       <div
-        className={`flex ${heightClass} snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        className={`flex ${altezza} snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
         onScroll={(e) => {
           const el = e.currentTarget;
           const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
@@ -74,6 +85,8 @@ export default function SchedaCarosello({
                 priority={i === 0}
                 className="h-full w-full object-cover"
                 fallback={fallback}
+                onLoad={() => setCaricate((f) => (f.includes(ref) ? f : [...f, ref]))}
+                onFail={() => setFallite((f) => (f.includes(ref) ? f : [...f, ref]))}
                 credit={i === 0 ? credit : null}
                 creditClassName="absolute bottom-3 left-3"
               />
@@ -113,7 +126,7 @@ export default function SchedaCarosello({
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-card bg-gradient-to-b from-black/30 to-transparent" />
       {/* "1 / 2" in basso a destra (mockup A): un tocco porta alla pagina dopo (l'ultima torna alla prima). */}
       {/* Senza foto (emoji al posto della foto) il contatore non dice niente: la mappa resta a uno scorrimento (collaudo 23/10). */}
-      {slides > 1 && photoRefs.length > 0 && (
+      {slides > 1 && fotoVisibili > 0 && (
         <div className="absolute bottom-1 right-2" data-testid="carosello-puntini">
           <button
             type="button"

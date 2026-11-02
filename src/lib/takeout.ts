@@ -79,13 +79,13 @@ export function listNameFromFile(fileName: string): string {
 export function listMapping(lista: string): { stato: "Da provare" | null; tag: string | null; label: string } {
   const l = lista.toLowerCase();
   if (/want to go|vorrei andarci|voglio andarci|da visitare|luoghi salvati|saved places|starred|speciali|default list|elenco predefinito/.test(l)) {
-    return { stato: "Da provare", tag: null, label: "📌 Voglio andarci" };
+    return { stato: "Da provare", tag: null, label: "📌 Da provare" };
   }
   if (/favou?rite|preferit/.test(l)) return { stato: null, tag: "Preferiti", label: "📁 Preferiti" };
-  if (/travel plans|piani di viaggio|viagg/.test(l)) return { stato: "Da provare", tag: "Viaggi", label: "📌 Voglio andarci · 📁 Viaggi" };
+  if (/travel plans|piani di viaggio|viagg/.test(l)) return { stato: "Da provare", tag: "Viaggi", label: "📌 Da provare · 📁 Viaggi" };
   const tag = lista.trim().replace(/\s+/g, " ").slice(0, 24);
   const nice = tag.charAt(0).toUpperCase() + tag.slice(1);
-  return { stato: "Da provare", tag: nice || null, label: `📌 Voglio andarci${nice ? ` · 📁 ${nice}` : ""}` };
+  return { stato: "Da provare", tag: nice || null, label: `📌 Da provare${nice ? ` · 📁 ${nice}` : ""}` };
 }
 
 // CSV con virgolette ("…, ""…"", …") e a capo dentro i campi.

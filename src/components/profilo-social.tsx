@@ -81,7 +81,7 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
     <section id="profilo-pubblico" data-testid="profilo-social" className="mb-8 scroll-mt-4 rounded-card border border-border bg-white p-5 shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-title text-xl font-semibold text-brand">Profilo pubblico</h2>
+          <h2 className="font-title text-xl font-semibold text-text">Profilo pubblico</h2>
           <p className="mt-0.5 text-sm font-sans text-text-muted">Fatti trovare dagli amici e condividi la tua mappa.</p>
         </div>
         <span

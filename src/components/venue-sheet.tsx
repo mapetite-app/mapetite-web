@@ -14,6 +14,7 @@ import { mapetiteShareUrl } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { distanceLabel, walkMinutes } from "@/lib/distance";
@@ -46,6 +47,8 @@ export type Venue = {
   name: string;
   address: string | null;
   category: string | null;
+  // Tutti i tipi Google (solo dai risultati di ricerca): stessa emoji della card e del segnalino.
+  types?: string[] | null;
   rating: number | null;
   userRatingCount: number | null;
   priceLevel: number | null;
@@ -87,7 +90,7 @@ type VenueSheetProps = {
   onVisitStatus?: (status: "Da provare" | "Già visitato") => void; // solo per i locali salvati
   onOpinion?: (opinion: "Mi è piaciuto" | "Non fa per me") => void; // "Com'era?" dopo "Ci sono stato"
   googlePlaceId?: string | null; // Place ID Google (i salvati hanno l'UUID come id)
-  // Locale non ancora salvato: "📌 Voglio andarci / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
+  // Locale non ancora salvato: "📌 Da provare / ✓ Ci sono stato" aprono Salva con lo stato già scelto.
   onQuickSave?: (status: "Da provare" | "Già visitato") => void;
   // Prenotazione assistita: giorno, ora e persone già capiti (dall'assistente), da confermare.
   booking?: Partial<BookingDetails> | null;
@@ -103,6 +106,11 @@ type VenueSheetProps = {
   onBookingClosed?: () => void;
   // "Altri come questo" (proposta 27): solo per i salvati con 👍 o "Ci sono stato" (e non 👎).
   onAltriCome?: () => void;
+  // "‹ 2 di 8 ›" tra i risultati (revisore del 2/11, D28: la pillola galleggiava sopra la scheda): sta dentro
+  // la barra azioni in basso, la scheda prende tutto lo spazio.
+  nav?: { pos: number; total: number } | null;
+  onNavPrev?: () => void;
+  onNavNext?: () => void;
 };
 
 // "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
@@ -148,6 +156,9 @@ export default function VenueSheet({
   autoBook = false,
   onBookingClosed,
   onAltriCome,
+  nav = null,
+  onNavPrev,
+  onNavNext,
 }: VenueSheetProps) {
   const {
     name,
@@ -305,7 +316,7 @@ export default function VenueSheet({
   const variant = useVariant("scheda");
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
-  const emoji = getCategoryEmoji(category, name);
+  const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
     <ConfrontoFonti
@@ -409,7 +420,7 @@ export default function VenueSheet({
   ) : null;
 
   // "Le tue note": stato, Com'era, classifica, tag e nota del salvato. withStatus=false quando
-  // "Voglio andarci / Ci sono stato" stanno già nella riga delle azioni (scheda B).
+  // "Da provare / Ci sono stato" stanno già nella riga delle azioni (scheda B).
   // senzaFiletto: subito sotto il verdetto, che ha già il suo filetto (collaudo 22/10: doppio filetto nei salvati).
   const personalBlock = (withStatus: boolean, editorial = false, senzaFiletto = false) => (
     <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e3ddd2] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
@@ -418,7 +429,7 @@ export default function VenueSheet({
         </p>
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
-            {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
+            {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
               const on = personalTags?.includes(tag) ?? false;
               return (
                 <button
@@ -557,6 +568,23 @@ export default function VenueSheet({
     const googleLine = venue.editorialSummary?.trim() || (firstReview ? aFineFrase(firstReview) : null);
     // La frase è di Google o di una persona che ha scritto una recensione su Google: lo si dice (collaudo 23/10).
     const googleLabel = venue.editorialSummary?.trim() ? "Da Google" : "Da una recensione su Google";
+    // Blocco sopra la barra: punti forti (al massimo 4, su 2 righe) e 2 frasi delle recensioni Google già in
+    // scheda, tagliate a 140 caratteri a fine frase o a fine parola. Mai la recensione già in vista sotto il nome.
+    const puntiForti = goForChips.slice(0, 4);
+    const a140 = (t: string) => {
+      const pulito = t.replace(/\s+/g, " ").trim();
+      if (pulito.length <= 140) return pulito;
+      const cut = pulito.slice(0, 140);
+      const fine = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+      return fine >= 60 ? cut.slice(0, fine + 1) : `${cut.replace(/[\s,;:–-]+\S*$/, "")}…`;
+    };
+    const recensioneInVista = !venue.editorialSummary?.trim() && headline == null && !verdettoInArrivo ? firstReview : null;
+    const frasiRecensioni = [...new Set(
+      (selectedReviews ?? [])
+        .map((r) => r.text?.trim() ?? "")
+        .filter((t) => t.length >= 20 && t !== recensioneInVista)
+        .map(a140),
+    )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
       && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
@@ -635,10 +663,11 @@ export default function VenueSheet({
     // I nomi Google con la pubblicità dentro ("Trattoria Dal Cordaro (Roma) - Vino e Cucina romana dal 1922"):
     // in vista solo la parte prima di " - ", " | " o "(" (il nome intero resta in Info e nel titolo).
     // A 360px un nome su 3 righe spingeva "Orari, contatti, recensioni" sotto la barra (collaudo 23/10).
-    const nomeBreve = (() => {
+    // Nomi tutti in maiuscolo ("CASA ENCANTO ROMA", giro del 1/11): in minuscolo con le iniziali.
+    const nomeBreve = nomeLeggibile((() => {
       const m = name.split(/\s+[-–—|]\s+|\s*\(/)[0].trim();
       return m.length >= 3 && m.length < name.length ? m : name;
-    })();
+    })());
     const nameSize = nomeBreve.length > 30 ? "text-[24px]" : nomeBreve.length > 16 ? "text-[30px]" : "text-[40px]";
     const openDetails = () => {
       const next = !detailsOpen;
@@ -650,7 +679,8 @@ export default function VenueSheet({
     };
 
     return (
-      <div className={`relative flex flex-col rounded-card ${PAPER} shadow-float`}>
+      // min-h-full: a tutto schermo la barra azioni resta in fondo anche quando la scheda è corta.
+      <div className={`relative flex min-h-full flex-col rounded-card ${PAPER} shadow-float`}>
         <SchedaCarosello
           photoRefs={venue.photoRef ? [venue.photoRef] : []}
           name={name}
@@ -662,19 +692,27 @@ export default function VenueSheet({
           // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10);
           // a 375×667 (iPhone SE) ancora più bassa: con la pillola e un verdetto su 3 righe finiva sotto (collaudo 23/10).
           heightClass={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"}
-          fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
+          // Senza foto niente riquadro grigio da 220px con l'emoji piccola (revisore del 2/11, r4): intestazione bassa
+          // (120px più la zona sicura) con l'emoji su fondo del marchio, e il nome sale.
+          heightSenzaFoto={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-[calc(env(safe-area-inset-top,0px)+7.5rem)]"}
+          fallback={
+            <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-center justify-center bg-brand pt-[env(safe-area-inset-top,0px)]">
+              <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none">{emoji}</span>
+            </div>
+          }
           overlay={
             <>
+              {/* Tasti sotto la zona sicura: la scheda è a tutto schermo. */}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Chiudi"
-                className={`absolute left-4 top-4 ${roundBtn}`}
+                className={`absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] ${roundBtn}`}
               >
                 <X size={19} aria-hidden />
               </button>
               {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}
-              <div className="absolute right-4 top-4 flex gap-2" data-testid="azioni-scheda">
+              <div className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex gap-2" data-testid="azioni-scheda">
                 {shareOn && (
                   <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={roundBtn}>
                     <Share size={18} aria-hidden />
@@ -703,7 +741,7 @@ export default function VenueSheet({
               {kindLine.join(" · ")}
             </p>
           )}
-          <h2 title={nomeBreve !== name ? name : undefined} className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
+          <h2 title={nomeBreve.length < name.length ? name : undefined} className={`${SERIF} mt-2 ${nameSize} font-medium leading-[1.02] tracking-[-0.02em] text-[#141414]`}>
             {nomeBreve}
             {infoLocale && (
               <BadgeCheck data-testid="verificato-scheda" role="img" aria-label="Verificato dal titolare" size={20} className="ml-1.5 inline-block -translate-y-1 align-middle text-brand">
@@ -724,8 +762,8 @@ export default function VenueSheet({
               {aperto != null && (
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                   {rating != null && <span aria-hidden className="mr-1 font-normal text-[#4b5058]">·</span>}
-                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
-                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-brand" : "text-error"}`}>
+                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-brand" : "bg-error"}`} />
                     {riapre || chiude ? (aperto ? "Aperto" : "Chiuso") : aperto ? "Aperto ora" : "Chiuso ora"}
                   </span>
                   {(riapre || chiude) && (
@@ -839,7 +877,7 @@ export default function VenueSheet({
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (
           <div className="mx-[22px] mt-4 flex rounded-pill bg-bg p-1" data-testid="stato-rapido">
-            {([["Da provare", "Voglio andarci", "📌"], ["Già visitato", "Ci sono stato", "✓"]] as const).map(([tag, label, e]) => (
+            {([["Da provare", "Da provare", "📌"], ["Già visitato", "Ci sono stato", "✓"]] as const).map(([tag, label, e]) => (
               <button
                 key={tag}
                 type="button"
@@ -867,6 +905,37 @@ export default function VenueSheet({
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
         </button>
+
+        {/* Sopra la barra, a scheda chiusa: i punti forti e due frasi delle recensioni Google già caricate
+            (revisore del 2/11, r5: senza foto restava un terzo di schermo vuoto). Solo dati già presenti nella
+            scheda, nessuna chiamata in più; senza dati il blocco non c'è. Corto: al massimo 2 righe di pillole. */}
+        {!detailsOpen && (puntiForti.length > 0 || frasiRecensioni.length > 0) && (
+          <section data-testid="scheda-in-vista" className="mx-[22px] mt-1 pb-2">
+            {puntiForti.length > 0 && (
+              <div data-testid="scheda-punti-forti">
+                <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Per cosa andarci</p>
+                <div className="mt-2 flex max-h-[3.75rem] flex-wrap gap-1.5 overflow-hidden">
+                  {puntiForti.map((chip) => (
+                    <span key={chip} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
+                      <Check size={12} className="shrink-0" aria-hidden />
+                      <span className="truncate">{chip}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {frasiRecensioni.length > 0 && (
+              <div data-testid="scheda-frasi-recensioni" className={puntiForti.length > 0 ? "mt-4" : ""}>
+                <ul className="flex flex-col gap-2">
+                  {frasiRecensioni.map((f) => (
+                    <li key={f} className={`${SERIF} text-[15.5px] italic leading-snug text-[#3d4248]`}>«{f}»</li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[11.5px] font-sans text-text-muted">dalle recensioni Google</p>
+              </div>
+            )}
+          </section>
+        )}
 
         <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
           {/* Tre sezioni brevi: Info · Recensioni · In breve. */}
@@ -967,7 +1036,7 @@ export default function VenueSheet({
             <div className="mx-[22px] mt-2" data-testid="scheda-info">
               <div className="flex flex-col divide-y divide-border">
                 {/* Il nome intero di Google, quando sotto la foto c'è quello accorciato. */}
-                {nomeBreve !== name && (
+                {nomeBreve.length < name.length && (
                   <p data-testid="nome-intero" className="flex min-h-11 items-center gap-3 py-2 text-sm font-sans text-text">
                     <Store size={18} className="shrink-0 text-brand" aria-hidden />
                     <span className="min-w-0 flex-1">{name}</span>
@@ -1037,11 +1106,20 @@ export default function VenueSheet({
         {/* Barra teal arrotondata, staccata dal fondo (mockup A): Prenota (corallo, più larga) / Percorso /
             Salva, oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
             dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone). */}
+        <div aria-hidden className="flex-1" />
         <div
           data-testid="barra-azioni"
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
-          <div className="flex w-full items-center gap-2 rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
+          <div className="w-full rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
+          {nav && (
+            <div data-testid="scheda-nav" className="-mt-1 mb-1 flex items-center justify-between text-white">
+              <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">‹</button>
+              <span className="text-[13px] font-display font-semibold text-white/85">{nav.pos} di {nav.total}</span>
+              <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">›</button>
+            </div>
+          )}
+          <div className="flex w-full items-center gap-2">
             {lead === "prenota" && (
               <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`} style={{ flexGrow: 1.4 }}>
                 <CalendarCheck size={17} aria-hidden />
@@ -1071,6 +1149,7 @@ export default function VenueSheet({
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
             </a>
             {saveSlot}
+          </div>
           </div>
         </div>
         {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
@@ -1126,11 +1205,11 @@ export default function VenueSheet({
             aria-label={category ?? "locale"}
             className="text-4xl leading-none"
           >
-            {getCategoryEmoji(category, name)}
+            {getCategoryEmoji(category, name, venue.types)}
           </span>
         )}
         <h2 className={`${venue.photoRef ? "" : "mt-2 pr-24 "}font-title text-2xl font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[2.1rem]`}>
-          {name}
+          {nomeLeggibile(name)}
         </h2>
 
         {/* Come Places: "Città · distanza", poi tipo · voto · prezzo · aperto. */}
@@ -1170,7 +1249,7 @@ export default function VenueSheet({
               <span
                 className={
                   openNow
-                    ? "rounded-pill bg-success/15 px-2 py-0.5 text-xs font-display font-semibold text-success"
+                    ? "rounded-pill bg-brand/10 px-2 py-0.5 text-xs font-display font-semibold text-brand"
                     : "rounded-pill bg-error/10 px-2 py-0.5 text-xs font-display font-semibold text-error"
                 }
               >
@@ -1230,7 +1309,7 @@ export default function VenueSheet({
       {/* Non salvato: le due scelte di Places come primo passo del salvataggio. */}
       {!isSaved && onQuickSave && (
         <div className="mx-5 mt-4 flex gap-2" data-testid="stato-rapido">
-          {([["Da provare", "📌 Voglio andarci"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
+          {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => (
             <button
               key={tag}
               type="button"
@@ -1323,6 +1402,13 @@ export default function VenueSheet({
       <div
         className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+var(--nav-sporgenza))] backdrop-blur"
       >
+        {nav && (
+          <div data-testid="scheda-nav" className="order-last flex shrink-0 items-center text-brand">
+            <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-8 items-center justify-center text-lg active:scale-95">‹</button>
+            <span className="whitespace-nowrap text-xs font-display font-semibold">{nav.pos} di {nav.total}</span>
+            <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-8 items-center justify-center text-lg active:scale-95">›</button>
+          </div>
+        )}
         {saveSlot}
 
         <a

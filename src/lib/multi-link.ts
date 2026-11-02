@@ -1,6 +1,7 @@
 import { isGoogleMapsLink } from "@/lib/maps-link";
 import { placeHintFromText } from "@/lib/social-link";
 import { videoSourceOf } from "@/lib/video-caption";
+import { cityFromAddress } from "@/lib/city";
 
 // "Incolla più link" (piano 3.2): da un testo qualsiasi (chat di WhatsApp con sé stessi, una nota,
 // un elenco) si estraggono TUTTI i link e si dice di che tipo sono. Nessuna chiamata parte da qui.
@@ -64,10 +65,27 @@ export const KIND_LABEL: Record<LinkKind, string> = {
   altro: "Link",
 };
 
-/** "Salva i 7 riconosciuti" / "Salva gli 11 riconosciuti" / "Salva il locale riconosciuto". */
+/** "Salva tutti (7)" / "Salva questo posto". */
 export function saveLabel(n: number): string {
-  if (n === 1) return "Salva il locale riconosciuto";
+  return n === 1 ? "Salva questo posto" : `Salva tutti (${n})`;
+}
+
+/** Pulsante di un giro di lettura: "Leggi gli 8 posti" / "Leggi i primi 10" / "Leggi gli altri 4". */
+export function roundLabel(n: number, round: number, altri = false): string {
+  if (n === 1) return altri ? "Leggi l'ultimo" : "Leggi il posto";
+  if (n > round) return altri ? `Leggi altri ${round}` : `Leggi i primi ${round}`;
+  if (altri) return `Leggi gli altri ${n}`;
   // "gli" davanti ai numeri che si leggono con una vocale: otto, undici, ottanta…
-  const gli = String(n).startsWith("8") || n === 11;
-  return `Salva ${gli ? "gli" : "i"} ${n} riconosciuti`;
+  return `Leggi ${String(n).startsWith("8") || n === 11 ? "gli" : "i"} ${n} posti`;
+}
+
+/**
+ * Nome proposto per la raccolta dei posti appena importati: la città, se sono tutti della stessa
+ * ("Milano"), altrimenti la data ("Importati il 1/11"). Si può sempre cambiare prima del tocco.
+ */
+export function suggestCollectionName(addresses: (string | null | undefined)[], now: Date): string {
+  const cities = addresses.map((a) => cityFromAddress(a));
+  const first = cities[0];
+  if (first && cities.every((c) => c && c.toLocaleLowerCase("it") === first.toLocaleLowerCase("it"))) return first.slice(0, 24);
+  return `Importati il ${now.getDate()}/${now.getMonth() + 1}`;
 }

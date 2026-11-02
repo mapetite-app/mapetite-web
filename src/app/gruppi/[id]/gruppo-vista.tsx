@@ -148,7 +148,7 @@ export default function GruppoVista({
       <header className="mt-2 flex items-center gap-3">
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-accent-light text-3xl">{gruppo.emoji}</span>
         <div className="min-w-0 flex-1">
-          <h1 className="font-title text-2xl font-semibold leading-tight text-brand break-words">{gruppo.nome}</h1>
+          <h1 className="font-title text-2xl font-semibold leading-tight text-text break-words">{gruppo.nome}</h1>
           <p className="mt-0.5 text-sm text-text-muted" data-testid="gruppo-numeri">{numeriGruppo({ membri: membri.length || gruppo.membri, posti: posti.length })}</p>
         </div>
       </header>

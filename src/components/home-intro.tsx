@@ -91,7 +91,7 @@ function IlluRitrova() {
   return (
     <div className="mx-auto w-full max-w-xs">
       <div className="mb-3 flex rounded-pill bg-surface p-1 text-sm font-display font-semibold">
-        <span className="flex-1 rounded-pill bg-brand py-1.5 text-center text-white">📌 Voglio andarci</span>
+        <span className="flex-1 rounded-pill bg-brand py-1.5 text-center text-white">📌 Da provare</span>
         <span className="flex-1 py-1.5 text-center text-text-muted">✓ Ci sono stato</span>
       </div>
       <div
@@ -153,7 +153,7 @@ const SCREENS = [
   },
   {
     title: "Ritrovali quando devi scegliere",
-    text: "«Dove andiamo stasera?» Apri la tua mappa: Voglio andarci, Ci sono stato, le tue raccolte. Decidi in pochi secondi.",
+    text: "«Dove andiamo stasera?» Apri la tua mappa: Da provare, Ci sono stato, le tue raccolte. Decidi in pochi secondi.",
     Illu: IlluRitrova,
   },
   {
@@ -228,7 +228,7 @@ export default function HomeIntro({ loggedIn }: { loggedIn: boolean }) {
           <div className="mb-8">
             <Illu />
           </div>
-          <h2 id="intro-titolo" className="font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand">
+          <h2 id="intro-titolo" className="font-title text-[2rem] leading-tight text-brand">
             {title}
           </h2>
           <p className="mt-3 text-base leading-relaxed font-sans text-text-muted">{text}</p>

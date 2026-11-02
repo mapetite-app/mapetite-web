@@ -39,7 +39,7 @@ export default async function RaccoltaPage({ params }: Props) {
   if (!userId) {
     return (
       <main className="mx-auto max-w-md px-6 py-16 text-center">
-        <p className="font-display text-xl font-semibold text-brand">Le tue raccolte ti aspettano</p>
+        <p className="font-title text-2xl text-brand">Le tue raccolte ti aspettano</p>
         <p className="mt-2 text-sm text-text-muted">Accedi per aprire le tue raccolte.</p>
         <a href={`/login?next=${encodeURIComponent(`/raccolte/${encodeURIComponent(name ?? "")}`)}`} className="mt-4 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
           Accedi

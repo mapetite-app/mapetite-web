@@ -4,13 +4,15 @@ import { fraseDaRecensioni } from "@/lib/frase-recensione";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { nomeLeggibile } from "@/lib/nome-leggibile";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
+import { fraseRisultati } from "@/lib/frase-risultati";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
-import { isStateTag, sortTags, tagLabel } from "@/lib/tags";
+import { isStateTag, sortTags, STATE_TAGS, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
@@ -19,6 +21,8 @@ import { cityFromAddress } from "@/lib/city";
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
 const NO_MATCH = "Nessun locale con questi filtri: togline qualcuno.";
+// Margine sinistro del carosello dei risultati (px-4): prima card e pillola del titolo partono qui.
+const CAROSELLO_MARGINE = 16;
 
 export interface BottomSheetProps {
   places: Place[];
@@ -47,6 +51,9 @@ export interface BottomSheetProps {
   onHover?: (place: Place) => void;
   // Riporta al genitore l'ordine delle card mostrate (dopo filtri rapidi e "Più vicini").
   onOrder?: (ids: string[]) => void;
+  // Card già viste che l'AI giudica chiaramente fuori tema: restano al loro posto (l'ordine non salta)
+  // con "Poco in tema" al posto del 💎. Quelle non ancora viste sono già state tolte dalla lista.
+  offTopic?: readonly string[];
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
@@ -62,7 +69,7 @@ export interface BottomSheetProps {
   onRefine?: () => void;
   // Segnalibro sulle card B (solo risultati di ricerca): stato e azione dal genitore.
   isSaved?: (id: string) => boolean;
-  // Stato del locale già salvato ("📌 Voglio andarci" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
+  // Stato del locale già salvato ("📌 Da provare" / "✓ Ci sono stato" / "📌 Salvato"), mostrato sulla card.
   savedLabel?: (id: string) => string | null;
   // "Per te" dai salvati: nome di un tuo salvato simile (stesso tipo e prezzo), mostrato sulla card.
   similarTo?: (id: string) => string | null;
@@ -89,11 +96,16 @@ export interface BottomSheetProps {
   // "Dai tuoi salvati": fino a 3 salvati scelti dall'AI per la stessa frase, con il perché.
   fromSaved?: { place: Place; perche: string }[];
   onOpenSaved?: (place: Place) => void;
+  // Posti già contati nella pillola e poi tolti perché l'AI li giudica fuori tema (non ancora visti):
+  // la pillola dice "· 2 tolti" invece di passare da 12 a 10 senza spiegazione (revisore del 1/11).
+  removed?: readonly string[];
+  // Dati veri per la frase sopra le card (src/lib/frase-risultati.ts); null = nessuna frase.
+  frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number } | null;
 }
 
-// Una riga sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la sua
-// scheda; con due o tre si aprono le righe con il perché, preso solo dai dati della persona.
-function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Place; perche: string }[]; onOpen: (place: Place) => void; inline?: boolean }) {
+// "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
+// sua scheda; con due o tre si aprono le righe con il perché, preso solo dai dati della persona.
+function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { items: { place: Place; perche: string }[]; onOpen: (place: Place) => void; inline?: boolean; aligned?: boolean }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   const first = items[0];
@@ -113,8 +125,37 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       </span>
     </button>
   );
+  // Sopra il carosello (revisore del 1/11: riga + card coprivano metà mappa): una pillola alta 44 px,
+  // "📌 2 dei tuoi salvati" che al tocco apre le righe sopra di sé, oppure "📌 Nome" che apre la scheda.
+  // Il perché di un salvato solo resta per i lettori di schermo e nella scheda.
+  if (!inline) {
+    return (
+      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "mx-4 lg:mx-5" : "mx-3 lg:mx-5"}`}>
+        {many && open && (
+          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(100vw-2rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
+        )}
+        <button
+          type="button"
+          data-testid="dai-salvati-apri"
+          aria-expanded={many ? open : undefined}
+          aria-label={many ? `${items.length} dei tuoi salvati adatti a questa ricerca` : `Dai tuoi salvati: ${first.place.name}. ${first.perche}`}
+          onClick={() => { if (many) setOpen((v) => !v); else onOpen(first.place); }}
+          className={`flex min-h-11 max-w-[calc(100vw-1.5rem)] items-center gap-1.5 rounded-pill px-3.5 text-sm shadow-float active:scale-[0.98] lg:shadow-card ${many && open ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          <span aria-hidden>📌</span>
+          {many ? (
+            <span data-testid="dai-salvati-numero" className={`shrink-0 font-display font-semibold ${open ? "text-white" : "text-brand"}`}>{items.length} dei tuoi salvati</span>
+          ) : (
+            <span className="min-w-0 truncate font-display font-semibold text-brand">{first.place.name}</span>
+          )}
+          {!many && <span data-testid="dai-salvati-perche" className="sr-only">{first.perche}</span>}
+          <span aria-hidden className={`shrink-0 text-base leading-none transition-transform ${many ? (open ? "rotate-90 text-white/80" : "-rotate-90 text-text-muted") : "text-text-muted"}`}>›</span>
+        </button>
+      </div>
+    );
+  }
   return (
-    <div data-testid="dai-salvati" className={`pointer-events-auto ${inline ? "mb-2 rounded-card border border-border bg-white" : "mx-3 mb-2 w-fit max-w-[calc(100%-1.5rem)] rounded-card bg-surface shadow-float lg:mx-5 lg:max-w-[calc(100%-2.5rem)] lg:shadow-none"}`}>
+    <div data-testid="dai-salvati" className="pointer-events-auto mb-2 rounded-card border border-border bg-white">
       <button
         type="button"
         data-testid="dai-salvati-apri"
@@ -124,14 +165,22 @@ function DaiTuoiSalvati({ items, onOpen, inline = false }: { items: { place: Pla
       >
         <span aria-hidden>📌</span>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-baseline">
-            <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
-            <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
-            <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
-            {/* "e altri 2" resta sempre in vista: con un nome lungo si taglia il nome, non il numero. */}
-            {many && <span className="shrink-0 whitespace-pre font-sans text-text">{` e ${items.length === 2 ? "un altro" : `altri ${items.length - 1}`}`}</span>}
-          </span>
-          {/* Con un salvato solo il perché sta già qui, in una riga: il tocco apre la scheda. */}
+          {many ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <span data-testid="dai-salvati-numero" className="shrink-0 font-display font-semibold text-accent">{items.length} dei tuoi salvati</span>
+              <span aria-hidden className="flex shrink-0 -space-x-1.5">
+                {items.slice(0, 3).map((it) => (
+                  <span key={it.place.id} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-accent-light text-[13px] leading-none">{getCategoryEmoji(it.place.category, it.place.name)}</span>
+                ))}
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-baseline">
+              <span className="shrink-0 font-display font-semibold text-accent">Dai tuoi salvati</span>
+              <span aria-hidden className="mx-1.5 shrink-0 text-text-muted">·</span>
+              <span className="min-w-0 truncate font-sans text-text">{first.place.name}</span>
+            </span>
+          )}
           {!many && <span data-testid="dai-salvati-perche" className="block truncate text-xs font-sans text-text-muted">{first.perche}</span>}
         </span>
         <span aria-hidden className={`shrink-0 pl-1 text-text-muted transition-transform ${many && open ? "rotate-90" : ""}`}>›</span>
@@ -290,7 +339,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -340,16 +389,23 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // quella "a fuoco"; se il fuoco arriva da fuori (tocco su un pin) il carosello
   // scorre fino alla card.
   const carouselRef = useRef<HTMLUListElement>(null);
+  // Card con la foto arrivata davvero (revisore del 2/11): finché non arriva, o se non arriva (429),
+  // la card ha la copertina curata con l'emoji del tipo invece di metà card di sfumatura vuota.
+  const [conFoto, setConFoto] = useState<Record<string, true>>({});
   const hoveredId = useRef<string | null>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Carosello nuovo allineato a sinistra (revisore del 2/11, r4: partiva 60 px a destra): la card "a cui sei"
+  // è quella col bordo sinistro sul margine di 16 px; il vecchio resta centrato.
+  const allineataASinistra = pillSlot != null && title != null;
   const centeredId = () => {
     const ul = carouselRef.current;
     if (!ul) return null;
-    const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
+    const ulLeft = ul.getBoundingClientRect().left;
+    const mid = ulLeft + ul.clientWidth / 2;
     let best: { id: string; d: number } | null = null;
     for (const li of Array.from(ul.children) as HTMLElement[]) {
       const r = li.getBoundingClientRect();
-      const d = Math.abs(r.left + r.width / 2 - mid);
+      const d = allineataASinistra ? Math.abs(r.left - (ulLeft + CAROSELLO_MARGINE)) : Math.abs(r.left + r.width / 2 - mid);
       if (!best || d < best.d) best = { id: li.dataset.id ?? "", d };
     }
     return best?.id ?? null;
@@ -372,7 +428,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // ma non quando il fuoco arriva dal mouse sulla card stessa (la lista non deve scappare).
     if (li && window.matchMedia("(min-width: 1024px)").matches) { if (hoveredId.current !== focusedId) li.scrollIntoView({ block: "nearest", behavior: "smooth" }); return; }
     if (centeredId() === focusedId) return;
-    if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
+    if (li) ul.scrollTo({ left: allineataASinistra ? li.offsetLeft - CAROSELLO_MARGINE : li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
   }, [focusedId]);
   useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
   // Se l'ordine cambia (riordino per adattezza) mentre il carosello è sulla prima card, resta
@@ -587,6 +643,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           ].filter(Boolean).join(" ")}
         </p>
       )}
+      {removed.length > 0 && (
+        <p data-testid="tolti-fuori-tema" className="mt-1 text-xs font-sans text-text-muted">
+          🧭 Dopo aver letto le recensioni ho tolto {removed.length === 1 ? "un posto fuori tema" : `${removed.length} posti fuori tema`} ({removed.slice(0, 2).join(", ")}{removed.length > 2 ? "…" : ""})
+        </p>
+      )}
       <div className="mt-2 flex gap-2">
         {onRefine && (
           <button type="button" onClick={onRefine} className="flex min-h-9 items-center gap-1.5 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
@@ -624,6 +685,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
     const nuova = pillSlot != null && title != null;
+    const fraseOggi = nuova && frase ? fraseRisultati({
+      n: places.length,
+      posti: places,
+      ...frase,
+      // Quanti posti in lista hanno il requisito confermato dalle recensioni (i "✓" sulle card).
+      requisiti: places.reduce<Record<string, number>>((m, p) => { for (const x of details?.[p.id]?.requisiti ?? []) m[x.r] = (m[x.r] ?? 0) + 1; return m; }, {}),
+      gemme: gemsOn ? places.filter((p) => !(offTopic?.includes(p.id) ?? false) && isGem(p.rating, details?.[p.id]?.userRatingCount, p.name)).length : 0,
+      inArrivo: loadingVerdicts,
+    }) : null;
     const conteggio = loadingVerdicts
       ? "preparo i verdetti…"
       : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`;
@@ -645,6 +715,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
           )}
           <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          {removed.length > 0 && (
+            <span data-testid="tolti-pillola" className="shrink-0 font-sans font-normal text-text-muted">
+              <span aria-hidden className="mx-1.5">·</span>{removed.length} tolt{removed.length === 1 ? "o" : "i"}<span className="sr-only"> perché fuori tema</span>
+            </span>
+          )}
           {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
           {simileA && !headerOpen && (
             <span data-testid="simile-pillola" className="min-w-0 shrink truncate font-sans font-normal text-text"><span aria-hidden className="mx-1.5 text-text-muted">·</span>simili</span>
@@ -731,22 +806,40 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {title && headerOpen && optionsPanel}
         </div>}
         {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
-        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} />}
+        {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
+        {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
+            lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
+        {fraseOggi && (
+          // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
+          // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
+          <div data-testid="frase-risultati" className="pointer-events-none mx-4 mb-1.5 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
+            <p className="min-w-0 flex-1">
+              <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
+              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
+            </p>
+            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di {places.length}</span>
+          </div>
+        )}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[13vw] lg:gap-3" : "gap-3 px-3"}`}>
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "scroll-px-4 gap-2.5 px-4 lg:gap-3" : "gap-3 px-3"}`}>
           {places.map((place) => {
             const d = details?.[place.id];
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
-            const stato = savedMode ? (place.tags ?? []).find(isStateTag) : undefined;
-            const gem = !stato && !saved && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
+            // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
+            const stato = savedMode ? (place.tags ?? []).find(isStateTag) ?? STATE_TAGS[0] : undefined;
+            const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
+            const gem = !stato && !saved && !poco && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);
-              const facts = cardFacts({ ...place, category: null }, shownFrom, showCity);
+              // La distanza a parte: se la riga non ci sta va a capo nella riga nascosta (revisore del 2/11:
+              // "€€ · 600…" tagliato). Tipo, voto e prezzo restano sempre interi.
+              const facts = cardFacts({ ...place, category: null }, null, showCity);
+              const dist = shownFrom ? distanceLabel(shownFrom, place) : null;
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
               // Chip intere: prima quelle brevi (le frasi lunghe venivano tagliate), due solo se ci stanno insieme.
               const goFor = d?.goFor ?? [];
@@ -756,7 +849,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
               const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
-                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
+                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[calc(100vw-4.5rem)] max-w-sm shrink-0 snap-start transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
                     <button
                       type="button"
@@ -779,46 +872,59 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       onSelect(place);
                     }}
                     data-testid="card-risultato"
-                    // Altezza fissa: verdetto e chip che arrivano dopo non fanno saltare la card.
-                    className="relative flex h-[clamp(236px,32dvh,276px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-4 text-left text-white shadow-float active:scale-[0.99]"
+                    // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
+                    // insieme), circa 200 px; il contenuto sta in basso, sopra solo la foto (revisore del 1/11,
+                    // secondo giro: 260 px con il vuoto in alto e la card dopo appena visibile).
+                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
-                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
                     {i < PHOTO_CARDS && d?.photoRef && (
-                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
+                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} revealOnLoad onLoad={() => setConFoto((m) => (m[place.id] ? m : { ...m, [place.id]: true }))} className="absolute inset-0 h-full w-full object-cover" />
                     )}
-                    {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
-                    {(stato || saved || gem) && (
-                      <span className="absolute left-3 top-3.5">
+                    {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. Senza foto la copertina
+                        colorata resta viva (prima: metà card di marrone spento). */}
+                    <span aria-hidden className={`absolute inset-0 bg-gradient-to-t ${conFoto[place.id] ? "from-black/90 via-black/60 via-60% to-black/10" : "from-black/55 via-black/15 via-60% to-transparent"}`} />
+                    {/* In alto a sinistra l'emoji del tipo su fondo chiaro, la stessa del segnalino: si vede finché
+                        la foto non arriva e resta se non arriva. Accanto, l'eventuale etichetta (stato, 💎). */}
+                    <span className="absolute left-3 top-2.5 flex items-center gap-2">
+                      <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
+                      {(stato || saved || gem || poco) && (
+                      <span className="flex">
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" title="Secondo le recensioni non risponde a tutta la richiesta" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90 backdrop-blur-sm">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
-                    )}
+                      )}
+                    </span>
                     <span className="relative flex flex-col">
-                      <span data-testid="riga-fatti" className={`flex min-w-0 items-baseline text-[11px] font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
-                        <span className="truncate">
+                      <span data-testid="riga-fatti" className={`flex h-[1lh] min-w-0 flex-wrap items-baseline overflow-hidden text-[11px] leading-4 font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
+                        <span className="min-w-0 max-w-full truncate">
                           {cat && <span className="font-semibold uppercase tracking-[0.16em]">{cat}</span>}
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
+                        {dist && <span data-testid="distanza-card" className="shrink-0 whitespace-pre">{cat || facts ? " · " : ""}{dist}</span>}
                       </span>
-                      <span className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{place.name}</span>
-                      {(d?.openNow != null || similar || req.length > 0) && (
+                      <span data-testid="nome-card" className={`mt-1 ${d?.perTe ? "line-clamp-1" : "line-clamp-2"} font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
+                      {(d?.openNow != null || similar || req.length > 0 || (chips.length > 0 && !d?.perTe)) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
-                            <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
+                            // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
+                            <span data-testid="aperto-card" className="shrink-0 rounded-pill bg-white px-2.5 py-0.5 text-xs font-display font-semibold text-brand">Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
                             <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-white/20 px-2.5 py-0.5 text-xs font-display font-semibold text-white/90">Chiuso ora</span>
                           )}
                           {similar && (
-                            <span data-testid="simile-a" className="truncate text-xs font-sans font-semibold text-accent">✨ Come {similar}, che hai salvato</span>
+                            // Corta, così non si taglia ("✨ Come Hostaria Del …", revisore del 2/11): il nome del salvato
+                            // resta per chi legge con il lettore di schermo e al passaggio del mouse.
+                            <span data-testid="simile-a" title={`Come ${similar}, che hai salvato`} className="min-w-0 truncate text-xs font-sans font-semibold text-white/75">✨ Come un tuo salvato<span className="sr-only">: {similar}</span></span>
                           )}
                           {req.length > 0 && (
                             <span data-testid="requisiti-card" className="truncate text-xs font-sans font-semibold text-white/90" title="Confermato dalle recensioni">
@@ -826,10 +932,18 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                               {req.map((r, k) => <span key={r}>{k > 0 ? " · " : ""}<span aria-hidden className="text-[#7be0a8]">✓</span> {r}</span>)}
                             </span>
                           )}
+                          {/* Punti forti nella stessa riga (card più bassa): solo se non ci sono già i ✓ o "Come…". */}
+                          {!similar && req.length === 0 && chips.length > 0 && !d?.perTe && (
+                            <span data-testid="punti-forti" className="flex min-w-0 gap-1.5">
+                              {chips.map((c) => (
+                                <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
+                              ))}
+                            </span>
+                          )}
                         </span>
                       )}
-                      {/* Spazio del verdetto riservato (2 righe) fin dall'inizio. */}
-                      <span className="mt-1.5 block min-h-10">
+                      {/* Verdetto fino a 2 righe; mentre arriva, il segnaposto tiene le sue 2 righe. */}
+                      <span className="mt-1.5 block">
                         {d?.verdict ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
@@ -843,7 +957,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                       {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
                       {d?.perTe && (
-                        <span data-testid="per-te-card" className="mt-1 line-clamp-2 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
+                        <span data-testid="per-te-card" className="mt-1 line-clamp-1 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
                           {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
                           <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7" />
@@ -851,15 +965,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           Per te: {d.perTe}
                         </span>
                       )}
-                      {/* Con il "Per te" le chip restano nella scheda: la card ha un'altezza fissa. */}
-                      {chips.length > 0 && !d?.perTe && (
-                        <span data-testid="punti-forti" className="mt-2 flex min-w-0 gap-1.5">
-                          {chips.map((c) => (
-                            <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
-                          ))}
-                        </span>
-                      )}
-                      <span data-testid="posizione-card" className="mt-2 text-center text-[11px] font-sans text-white/70">{i + 1} di {places.length}</span>
+
                     </span>
                   </button>
                 </li>
@@ -889,7 +995,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
                       così si vede anche quando la foto non arriva (quota finita). */}
-                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name)}</span>
+                  <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-1 top-1 select-none text-[80px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                   {places.indexOf(place) < PHOTO_CARDS && d?.photoRef && (
                     <>
                       <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
@@ -898,23 +1004,25 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   )}
                   {/* Testo sopra la foto: senza "relative" la foto assoluta lo copre. */}
                   <span className="relative flex flex-1 flex-col">
-                    {(stato || saved || gem) && (
+                    {(stato || saved || gem || poco) && (
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
+                        ) : poco ? (
+                          <span data-testid="fuori-tema-card" className="rounded-pill bg-black/45 px-2 py-0.5 text-[10px] font-display font-semibold text-white/90">Poco in tema</span>
                         ) : (
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
                     )}
-                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem) ? "pr-11" : ""}`}>{place.name}</span>
+                    <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{nomeLeggibile(place.name)}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
-                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
+                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                       )}
                       {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                       {d?.openNow === false && (
@@ -922,7 +1030,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                     </span>
                     {similarTo?.(place.id) && (
-                      <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
+                      <span data-testid="simile-a" title={`Come ${similarTo(place.id)}, che hai salvato`} className="mt-1 truncate text-xs font-sans font-semibold text-white/75">✨ Come un tuo salvato<span className="sr-only">: {similarTo(place.id)}</span></span>
                     )}
                     {d?.verdict ? (
                       <span className="mt-1.5 block">
@@ -1038,7 +1146,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     alt={place.name}
                     width={200}
                     className="h-full w-full object-cover"
-                    fallback={getCategoryEmoji(place.category, place.name)}
+                    fallback={getCategoryEmoji(place.category, place.name, place.types)}
                   />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -1048,7 +1156,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
                     <span className="truncate">{metaLine(place, details?.[place.id], shownFrom, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
-                      <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
+                      <span className="shrink-0 rounded-pill bg-brand/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-brand">
                         Aperto ora
                       </span>
                     )}

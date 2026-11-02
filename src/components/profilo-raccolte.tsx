@@ -151,7 +151,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
 
   return (
     <section className="mb-10" data-testid="raccolte">
-      <h2 className="mb-3 font-title text-xl font-semibold text-brand">Le tue raccolte</h2>
+      <h2 className="mb-3 font-title text-xl font-semibold text-text">Le tue raccolte</h2>
       {notice && (
         <p role="status" data-testid="raccolte-avviso" className="mb-3 rounded-card bg-accent-light px-4 py-2.5 text-sm text-brand">
           {notice}
@@ -220,7 +220,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
           >
             <span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="min-w-0 truncate font-title text-lg font-semibold text-brand">{sheetTitle}</h3>
+              <h3 className="min-w-0 truncate font-title text-lg font-semibold text-text">{sheetTitle}</h3>
               <button type="button" onClick={close} disabled={busy} className="min-h-10 shrink-0 text-sm font-display font-semibold text-text-muted disabled:opacity-40">
                 Chiudi
               </button>

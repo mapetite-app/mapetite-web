@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel } from "@/lib/distance";
 import { track } from "@/lib/track";
-import { isStateTag } from "@/lib/tags";
+import { isStateTag, tagDisplay } from "@/lib/tags";
 import {
   STATE_DONE,
   STATE_WANT,
@@ -25,6 +25,9 @@ import {
 } from "@/lib/stasera";
 
 type Geo = "idle" | "cerco" | "ok" | "negata" | "assente";
+// Miniature sotto "Proponimi": una fila sola, al massimo tre più "+N" (revisore 2/11, sesto giro: due file
+// finivano sotto la barra in basso).
+const ANTEPRIMA_MAX = 3;
 type Pos = { lat: number; lng: number };
 
 // Lettura dei salvati come in /mappa (saved_places → places), più il verdetto già in cache
@@ -80,8 +83,8 @@ function Pill({ active, onClick, children, testId }: { active: boolean; onClick:
       aria-pressed={active}
       onClick={onClick}
       data-testid={testId}
-      className={`min-h-12 rounded-pill px-5 font-display text-[15px] font-semibold transition-[transform,background-color] duration-150 active:scale-[0.97] ${
-        active ? "bg-accent text-white shadow-float" : "border border-white/25 bg-white/10 text-white"
+      className={`min-h-12 rounded-pill px-5 text-[15px] font-medium transition-[transform,background-color] duration-150 active:scale-[0.97] ${
+        active ? "bg-brand text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"
       }`}
     >
       {children}
@@ -102,7 +105,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
   const mapHref = spot.lat != null && spot.lng != null ? `/mappa?salvato=${spot.id}` : "/mappa?vista=salvati";
 
   return (
-    <li data-testid="stasera-proposta" data-id={spot.id} className="rounded-card bg-white p-4 text-text shadow-float">
+    <li data-testid="stasera-proposta" data-id={spot.id} className="rounded-card border border-[#e8e2d8] bg-white p-4 text-text shadow-card">
       {/* Semplificare (18/10): nome e foto aprono il posto sulla mappa; sotto resta un solo pulsante, Percorso. */}
       <Link href={mapHref} data-testid="stasera-mappa" aria-label={`Apri ${spot.name} nella mappa`} className="flex items-start gap-3 active:opacity-80">
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-btn bg-accent-light text-3xl leading-none">
@@ -116,7 +119,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
               data-testid="stasera-stato"
               className={`mt-1.5 inline-block rounded-pill px-2.5 py-0.5 font-display text-xs font-semibold ${planned || want ? "bg-accent text-white" : "bg-surface text-text-muted"}`}
             >
-              {planned ? "📅 Avevi detto: ci vado" : want ? "📌 Voglio andarci" : "✓ Ci sono stato"}
+              {planned ? "📅 Avevi detto: ci vado" : want ? "📌 Da provare" : "✓ Ci sono stato"}
             </span>
           )}
         </div>
@@ -140,7 +143,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
       {raccolte.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {raccolte.map((t) => (
-            <span key={t} className="rounded-pill bg-accent-light px-2.5 py-0.5 font-display text-xs font-medium text-accent">{t}</span>
+            <span key={t} className="rounded-pill bg-[#f1ece3] px-2.5 py-0.5 font-display text-xs font-medium text-[#33373d]">{tagDisplay(t)}</span>
           ))}
         </div>
       )}
@@ -210,7 +213,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   );
   const collections = useMemo(() => collectionsOf(spots ?? []), [spots]);
   const cities = useMemo(() => citiesOf(spots ?? []), [spots]);
-  const matchCount = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)).length, [spots, choices]);
+  const matching = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)), [spots, choices]);
+  const matchCount = matching.length;
 
   const propose = () => {
     if (!spots) return;
@@ -239,66 +243,63 @@ export default function StaseraView({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const summary = [occasion ?? "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "mai provati" : "anche già visitati"].join(" · ");
+  const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato"].join(" · ");
 
   return (
-    <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-brand pb-[var(--nav-height-mobile)] text-white md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
+    <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f8f6f2] pb-[var(--nav-height-mobile)] text-text md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
       <div className="mx-auto max-w-md px-4 pb-32 pt-6">
-        <div className="mb-6 flex items-center justify-between">
-          <Link href="/profilo" aria-label="Torna al profilo" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl text-white/90 active:bg-white/10">
-            ←
-          </Link>
-          <span className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Dai tuoi salvati</span>
-          <span className="w-11" aria-hidden />
-        </div>
+        {/* Testata come Salvati (revisore 1/11, terzo giro): freccia, poi sopra-titolo e titolo allineati a sinistra. */}
+        <Link href="/profilo" aria-label="Torna al profilo" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-text active:bg-black/5">
+          <ArrowLeft size={22} aria-hidden />
+        </Link>
+        <p data-testid="stasera-sopra" className="mb-1.5 mt-1 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Dai tuoi salvati</p>
 
         {loadError ? (
           <div className="mt-16 text-center">
             <p className="font-display text-lg font-semibold">Non riesco a leggere i tuoi salvati.</p>
-            <p className="mt-1 text-sm text-white/75">Controlla la connessione e riprova.</p>
+            <p className="mt-1 text-sm text-text-muted">Controlla la connessione e riprova.</p>
             <button type="button" onClick={() => { setLoadError(false); load(); }} className="mt-4 min-h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-white">
               Riprova
             </button>
           </div>
         ) : spots === null ? (
           <div aria-busy="true" aria-label="Carico i tuoi salvati" className="space-y-4">
-            <div className="h-20 w-3/4 animate-pulse rounded-card bg-white/10" />
-            <div className="h-12 w-full animate-pulse rounded-pill bg-white/10" />
-            <div className="h-12 w-2/3 animate-pulse rounded-pill bg-white/10" />
+            <div className="h-20 w-3/4 animate-pulse rounded-card bg-black/[0.06]" />
+            <div className="h-12 w-full animate-pulse rounded-pill bg-black/[0.06]" />
+            <div className="h-12 w-2/3 animate-pulse rounded-pill bg-black/[0.06]" />
           </div>
         ) : spots.length === 0 ? (
-          <div data-testid="stasera-vuoto" className="mt-10 text-center">
-            <span aria-hidden className="text-5xl">🍽️</span>
-            <h1 className="mt-4 font-display text-[28px] font-bold leading-tight">Stasera dove andiamo?</h1>
-            <p className="mx-auto mt-3 max-w-xs text-[15px] text-white/80">
+          <div data-testid="stasera-vuoto">
+            <h1 className="font-title text-[36px] font-medium leading-[1.05] tracking-tight">Stasera dove andiamo?</h1>
+            <p className="mt-3 max-w-xs text-[15px] text-text-muted">
               Qui scegli tra i posti che hai salvato. Non ne hai ancora nessuno: cercane uno o porta qui quelli che hai già su Google Maps e Instagram.
             </p>
-            <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="mt-6 flex flex-col gap-2">
               <Link href="/mappa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill bg-accent font-display font-semibold text-white">
                 Cerca un locale
               </Link>
-              <Link href="/importa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill border border-white/30 font-display font-semibold text-white">
+              <Link href="/importa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill border border-[#ddd5c8] bg-white font-display font-semibold text-brand">
                 Importa i tuoi posti
               </Link>
             </div>
           </div>
         ) : proposals ? (
           <section aria-label="Proposte per stasera">
-            <h1 className="font-display text-[28px] font-bold leading-tight">
+            <h1 className="font-title text-[32px] font-medium leading-tight tracking-tight">
               {proposals.length === 1 ? "Ecco un'idea per stasera" : `Ecco ${proposals.length} idee per stasera`}
             </h1>
-            <p data-testid="stasera-riepilogo" className="mt-1 text-sm text-white/75">{summary}</p>
-            {restarted && <p data-testid="stasera-ricomincio" className="mt-2 text-sm text-white/90">Li hai visti tutti: ricomincio il giro.</p>}
+            <p data-testid="stasera-riepilogo" className="mt-1 text-sm text-text-muted">{summary}</p>
+            {restarted && <p data-testid="stasera-ricomincio" className="mt-2 text-sm text-text-muted">Li hai visti tutti: ricomincio il giro.</p>}
             <ul className="mt-5 space-y-3">
               {proposals.map((s) => (
                 <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} />
               ))}
             </ul>
-            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-brand from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
+            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-[#f8f6f2] from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
               <button
                 type="button"
                 onClick={() => setProposals(null)}
-                className="min-h-12 flex-1 rounded-pill border border-white/30 bg-brand font-display font-semibold text-white active:scale-[0.98]"
+                className="min-h-12 flex-1 rounded-pill border border-[#ddd5c8] bg-white font-display font-semibold text-brand active:scale-[0.98]"
               >
                 Cambia scelte
               </button>
@@ -316,21 +317,21 @@ export default function StaseraView({ userId }: { userId: string }) {
           </section>
         ) : (
           <section aria-label="Le tue scelte">
-            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Stasera dove andiamo?</h1>
-            <p className="mt-2 text-[15px] text-white/75">{spots.length === 1 ? "Tre tocchi e scegli: per ora hai un solo salvato." : `Tre tocchi e scegli tra i tuoi ${spots.length} salvati.`}</p>
+            <h1 className="font-title text-[36px] font-medium leading-[1.05] tracking-tight">Stasera dove andiamo?</h1>
+            <p className="mt-2 text-[15px] text-text-muted">{spots.length === 1 ? "Tre tocchi e scegli: per ora hai un solo salvato." : `Tre tocchi e scegli tra i tuoi ${spots.length} salvati.`}</p>
 
-            <h2 className="mb-2.5 mt-7 font-display text-sm font-semibold text-white/70">Che occasione?</h2>
+            <h2 className="mb-2.5 mt-7 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Che occasione?</h2>
             <div data-testid="stasera-occasione" className="flex flex-wrap gap-2">
               <Pill active={occasion === null} onClick={() => setOccasion(null)}>Qualsiasi</Pill>
               {collections.slice(0, 7).map((t) => (
-                <Pill key={t} active={occasion === t} onClick={() => setOccasion(occasion === t ? null : t)}>{t}</Pill>
+                <Pill key={t} active={occasion === t} onClick={() => setOccasion(occasion === t ? null : t)}>{tagDisplay(t)}</Pill>
               ))}
             </div>
             {collections.length === 0 && (
-              <p className="mt-2 text-xs text-white/60">Aggiungi tag ai tuoi salvati (es. Romantico, Con amici) per scegliere anche l&apos;occasione.</p>
+              <p className="mt-2 text-xs text-text-muted">Aggiungi tag ai tuoi salvati (es. Romantico, Con amici) per scegliere anche l&apos;occasione.</p>
             )}
 
-            <h2 className="mb-2.5 mt-6 font-display text-sm font-semibold text-white/70">Dove?</h2>
+            <h2 className="mb-2.5 mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Dove?</h2>
             <div data-testid="stasera-distanza" className="flex flex-wrap gap-2">
               <Pill active={wantNear} onClick={askPosition}>{geo === "cerco" ? "Cerco dove sei…" : "📍 Vicino a me"}</Pill>
               {cities.length > 1 && cities.slice(0, 3).map((c) => (
@@ -339,44 +340,44 @@ export default function StaseraView({ userId }: { userId: string }) {
               <Pill active={!wantNear && !city} onClick={() => { setWantNear(false); setCity(null); }}>Ovunque</Pill>
             </div>
             {geo === "negata" && (
-              <p data-testid="stasera-posizione-negata" role="status" className="mt-2 text-xs text-white/75">
+              <p data-testid="stasera-posizione-negata" role="status" className="mt-2 text-xs text-text-muted">
                 Non vedo dove sei: per «Vicino a me» consenti la posizione a Mapetite nelle impostazioni del browser. Intanto cerco ovunque.
               </p>
             )}
             {geo === "assente" && (
-              <p role="status" className="mt-2 text-xs text-white/75">Posizione non disponibile adesso: intanto cerco ovunque.</p>
+              <p role="status" className="mt-2 text-xs text-text-muted">Posizione non disponibile adesso: intanto cerco ovunque.</p>
             )}
 
-            <h2 className="mb-2.5 mt-6 font-display text-sm font-semibold text-white/70">Che voglia?</h2>
+            <h2 className="mb-2.5 mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Che voglia?</h2>
             <div data-testid="stasera-novita" className="flex flex-wrap gap-2">
-              <Pill active={onlyNew} onClick={() => setOnlyNew(true)}>📌 Mai provati</Pill>
-              <Pill active={!onlyNew} onClick={() => setOnlyNew(false)}>Anche già visitati</Pill>
+              <Pill active={onlyNew} onClick={() => setOnlyNew(true)}>📌 Da provare</Pill>
+              <Pill active={!onlyNew} onClick={() => setOnlyNew(false)}>Anche dove sono stato</Pill>
             </div>
 
             {matchCount === 0 ? (
-              <div data-testid="stasera-nessuno" className="mt-8 rounded-card bg-white/10 p-4">
+              <div data-testid="stasera-nessuno" className="mt-8 rounded-card border border-[#e8e2d8] bg-white p-4">
                 <p className="font-display font-semibold">Nessun salvato con queste scelte.</p>
-                <p className="mt-0.5 text-sm text-white/75">Allarga con un tocco:</p>
+                <p className="mt-0.5 text-sm text-text-muted">Allarga con un tocco:</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {occasion && (
-                    <button type="button" data-testid="stasera-allarga" onClick={() => setOccasion(null)} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
+                    <button type="button" data-testid="stasera-allarga" onClick={() => setOccasion(null)} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
                       Qualsiasi occasione
                     </button>
                   )}
                   {(choices.near || city) && (
-                    <button type="button" data-testid="stasera-allarga" onClick={() => { setWantNear(false); setCity(null); }} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
+                    <button type="button" data-testid="stasera-allarga" onClick={() => { setWantNear(false); setCity(null); }} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
                       Cerca ovunque
                     </button>
                   )}
                   {onlyNew && (
-                    <button type="button" data-testid="stasera-allarga" onClick={() => setOnlyNew(false)} className="min-h-11 rounded-pill bg-white px-4 font-display text-sm font-semibold text-brand">
-                      Anche già visitati
+                    <button type="button" data-testid="stasera-allarga" onClick={() => setOnlyNew(false)} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
+                      Anche dove sono stato
                     </button>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-brand from-70% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-4">
+              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-[#f8f6f2] from-70% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-4">
                 <button
                   type="button"
                   onClick={propose}
@@ -385,10 +386,43 @@ export default function StaseraView({ userId }: { userId: string }) {
                 >
                   {matchCount >= 3 ? "Proponimi 3 posti" : matchCount === 1 ? "Proponimi l'unico posto" : `Proponimi i ${matchCount} posti`}
                 </button>
-                <p data-testid="stasera-conteggio" className="mt-2 text-center text-xs text-white/60">
+                <p data-testid="stasera-conteggio" className="mt-2 text-center text-xs text-text-muted">
                   {matchCount === 1 ? "1 salvato" : `${matchCount} salvati`} con queste scelte
                 </p>
               </div>
+            )}
+            {/* Revisore 2/11, terzo giro: sotto il pulsante il 40% dello schermo era vuoto. Ora i salvati veri che
+                rispettano le scelte (emoji e nome), aggiornati a ogni tocco; un tocco apre il posto sulla mappa. */}
+            {matchCount > 0 && (
+              <section data-testid="stasera-anteprima" aria-label="I salvati con queste scelte" className="mt-3 pb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] md:pb-0">
+                <ul className="grid grid-cols-4 gap-2">
+                  {matching.slice(0, ANTEPRIMA_MAX).map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        href={s.lat != null && s.lng != null ? `/mappa?salvato=${s.id}` : "/mappa?vista=salvati"}
+                        data-testid="stasera-anteprima-posto"
+                        className="flex h-full flex-col items-center gap-1.5 rounded-card border border-[#e8e2d8] bg-white px-2 pb-2.5 pt-3 text-center active:scale-[0.97]"
+                      >
+                        <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f3efe8] text-[22px] leading-none">{getCategoryEmoji(s.category, s.name)}</span>
+                        <span className="line-clamp-2 text-[12.5px] font-medium leading-tight text-text">{s.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                  {matchCount > ANTEPRIMA_MAX && (
+                    <li>
+                      <Link
+                        href="/mappa?vista=salvati"
+                        data-testid="stasera-anteprima-altri"
+                        aria-label={`Altri ${matchCount - ANTEPRIMA_MAX} salvati`}
+                        className="flex h-full min-h-[92px] flex-col items-center justify-center gap-0.5 rounded-card border border-[#e8e2d8] bg-[#f3efe8] px-2 text-center active:scale-[0.97]"
+                      >
+                        <span className="font-title text-[22px] font-semibold leading-none text-brand">+{matchCount - ANTEPRIMA_MAX}</span>
+                        <span className="text-[12px] text-text-muted">altri</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              </section>
             )}
           </section>
         )}

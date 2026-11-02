@@ -81,7 +81,7 @@ export default function SerataView({ serata, savedIds, saving, bookingMode, onOp
                   </div>
                   {alts.length > 0 && (
                     <div className="mt-2">
-                      <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Oppure</p>
+                      <p className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Oppure</p>
                       <ul className="mt-1 flex flex-col gap-1.5">
                         {alts.map((a) => (
                           <li key={a.id} data-testid="serata-alternativa" className="flex items-center gap-2 rounded-card border border-border bg-surface py-1.5 pl-3 pr-1.5">

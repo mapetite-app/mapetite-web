@@ -15,7 +15,7 @@ export default function ProfiloRicerche() {
   return (
     <section className="mb-10" data-testid="profilo-ricerche">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-title text-xl font-semibold text-brand">Le tue ricerche</h2>
+        <h2 className="font-title text-xl font-semibold text-text">Le tue ricerche</h2>
         {recent.length > 0 && (
           <button
             type="button"

@@ -5,7 +5,7 @@ import AssistenteView from "./assistente-view";
 
 export const metadata: Metadata = {
   title: "Assistente · Mapetite",
-  description: "Chiedi come a un amico: trovo i locali giusti per te e ti preparo la prenotazione.",
+  description: "Chiedi come a un amico: trovo i locali giusti per te, non i più famosi.",
 };
 
 // Assistente Mapetite (piano 1.1 e 1.3): la ricerca diventa una conversazione.

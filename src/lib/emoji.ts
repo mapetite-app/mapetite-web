@@ -12,7 +12,9 @@ const EMOJI_RULES: [string[], string][] = [
   [["enotec", "wine"], "🍷"],
   [["burger", "hamburger", "panino", "paninote"], "🍔"],
   [["ramen", "noodle", "cines", "chinese", "thai", "asiatic", "asian", "korean", "corean", "vietnam"], "🍜"],
-  [["steak", "grill", "brace", "carne", "macelleria"], "🥩"],
+  // Churrascaria e barbecue (1/11): prima "CASA ENCANTO ROMA" (brasiliana) aveva gli spaghetti 🍝.
+  // Cambia solo i locali con queste parole nel tipo o nel nome (prima 🍝 o 🍺, ora 🥩).
+  [["steak", "grill", "brace", "carne", "macelleria", "churrasc", "barbecue", "brazilian", "argentinian"], "🥩"],
   // Cucine (14/10): prima un ristorante indiano, messicano o vegano aveva gli spaghetti 🍝.
   [["indian", "indiano", "curry"], "🍛"],
   [["mexican", "messican", "taco", "burrito"], "🌮"],
@@ -41,8 +43,24 @@ function matchRule(text: string): { index: number; emoji: string } | null {
   return null;
 }
 
-export function getCategoryEmoji(category: string | null, name?: string | null): string {
-  const catMatch = category ? matchRule(category) : null;
+// Tipi principali che non dicono che cucina è: in Italia quasi ogni locale è "restaurant" o "bar".
+const GENERIC_CATEGORIES = new Set(["restaurant", "bar", "food", "point_of_interest", "establishment", "meal_takeaway", "meal_delivery"]);
+// Regole che non aggiungono niente a un tipo generico ("restaurant" → 🍝, "bar"/"pub" → 🍺).
+const GENERIC_RULES = new Set(EMOJI_RULES.flatMap(([kw], i) => (kw.includes("restaurant") || kw.includes("bar") ? [i] : [])));
+
+// `types`: tutti i tipi Google del locale (solo nei risultati di ricerca). Servono quando il tipo
+// principale è generico: giro del 1/11, 12 risultati su 12 con 🍝, anche il sushi ("restaurant" con
+// "sushi_restaurant" tra gli altri tipi) e il cocktail bar. Senza `types` (i salvati, che non li hanno)
+// l'emoji resta quella di prima.
+export function getCategoryEmoji(category: string | null, name?: string | null, types?: readonly string[] | null): string {
+  let catMatch = category ? matchRule(category) : null;
+  if (types?.length && (category == null || GENERIC_CATEGORIES.has(category))) {
+    const hint = types
+      .map((t) => matchRule(t))
+      .filter((m): m is { index: number; emoji: string } => m != null && !GENERIC_RULES.has(m.index))
+      .sort((a, b) => a.index - b.index)[0];
+    if (hint && (catMatch == null || hint.index < catMatch.index)) catMatch = hint;
+  }
   const nameMatch = name ? matchRule(name) : null;
 
   if (catMatch && nameMatch) {

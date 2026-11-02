@@ -19,7 +19,7 @@ import { findPlaceId, placeEssentials, resolveShortLink } from "@/lib/maps-resol
 type Preview =
   | { stato: "riconosciuto"; chiamate: number; place: { id: string; name: string; address: string } }
   | { stato: "da_confermare"; chiamate: number; motivo: string; nome: string | null }
-  | { stato: "non_riconosciuto"; chiamate: number; motivo: string };
+  | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null };
 
 const NOT_READABLE = "Non riesco a leggere questo link di Google Maps.";
 const GOOGLE_DOWN = "Google non risponde in questo momento: riprova tra poco.";
@@ -66,7 +66,7 @@ async function preview(apiKey: string, link: string, budget: number): Promise<Pr
       if (budget < 1) return later(name);
       calls = 1;
       const id = await findPlaceId(apiKey, info.query ?? name, info.lat!, info.lng!);
-      if (!id) return { stato: "non_riconosciuto", chiamate: calls, motivo: `Non trovo "${name}" su Google.` };
+      if (!id) return { stato: "non_riconosciuto", chiamate: calls, motivo: `Non trovo "${name}" su Google.`, nome: name };
       const stored = await findOrCreatePlace({ googlePlaceId: id, name, address, lat: info.lat!, lng: info.lng! }, "link-preview", "link");
       return "error" in stored ? later(name, calls, stored.error) : ok(stored.place, calls, address);
     }
@@ -80,7 +80,7 @@ async function preview(apiKey: string, link: string, budget: number): Promise<Pr
     if (!id) {
       calls++;
       id = await findPlaceId(apiKey, text!);
-      if (!id) return { stato: "non_riconosciuto", chiamate: calls, motivo: `Non trovo "${name ?? text}" su Google.` };
+      if (!id) return { stato: "non_riconosciuto", chiamate: calls, motivo: `Non trovo "${name ?? text}" su Google.`, nome: name ?? text };
       const again = await findStoredPlace({ googlePlaceId: id });
       if (again) return ok(again, calls, address);
     }

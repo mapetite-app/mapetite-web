@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Users } from "lucide-react";
 import Avatar from "@/components/avatar";
-import SocialInArrivo from "@/components/social-in-arrivo";
+import AmiciIntanto from "./amici-intanto";
+import { loadMySaved } from "@/lib/raccolte-server";
 import { PostoCard } from "@/components/posto-persona";
 import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, viewerId } from "@/lib/social";
 import ScopritoriAmici from "./scopritori-amici";
@@ -20,9 +22,10 @@ export default async function AmiciPage() {
 
   if (!viewer) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center" data-testid="amici-accedi">
-        <p aria-hidden className="text-4xl">👥</p>
-        <p className="font-display text-xl font-semibold text-brand">I posti dei tuoi amici</p>
+      <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-4 bg-[#f8f6f2] px-6 text-center" data-testid="amici-accedi">
+        {/* Revisore 1/11 (terzo giro): icona a tratto teal al posto dell'emoji blu. */}
+        <span aria-hidden data-testid="amici-icona" className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-brand"><Users size={30} strokeWidth={1.6} /></span>
+        <p className="font-title text-2xl text-text">I posti dei tuoi amici</p>
         <p className="max-w-xs text-sm text-text-muted">Accedi per seguire gli amici e vedere dove sono stati e dove vogliono andare.</p>
         <div className="flex gap-2">
           <a href="/login?next=%2Famici" className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">Accedi</a>
@@ -44,15 +47,18 @@ export default async function AmiciPage() {
       <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
     </div>
   );
-  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-surface px-4 text-sm font-display font-semibold text-brand active:scale-95";
+  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-4 text-sm font-sans font-medium text-brand active:scale-95";
 
   return (
+    // Fondo carta come Salvati (revisore 1/11, terzo giro).
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
-      <h1 className="font-title text-3xl font-semibold text-brand">Amici</h1>
+      <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
 
       {feed.stato === "in-arrivo" ? (
-        <div className="mt-6"><SocialInArrivo /></div>
+        // Revisore 2/11: niente più "Gli amici arrivano presto" a tutta pagina: le cose vere che si fanno già.
+        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} />
       ) : (
         <>
           {/* Trova persone: la ricerca per nome, come "Search by name" di Places. */}
@@ -86,7 +92,7 @@ export default async function AmiciPage() {
 
           {feed.seguiti.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">
-              <h2 id="seguiti-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Chi segui · {feed.seguiti.length}</h2>
+              <h2 id="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Chi segui · {feed.seguiti.length}</h2>
               <ul data-testid="seguiti" className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
                 {feed.seguiti.map((p) => (
                   <li key={p.id} className="shrink-0">
@@ -103,16 +109,16 @@ export default async function AmiciPage() {
           {scopritori && <ScopritoriAmici amici={scopritori} mie={mieGemme} viewer={viewer} />}
 
           <section className="mt-6" aria-labelledby="attivita-titolo">
-            <h2 id="attivita-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Attività</h2>
+            <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
             {feed.seguiti.length === 0 ? (
-              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-border bg-surface p-5 text-center">
+              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e8e2d8] bg-white p-5 text-center">
                 <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
                 <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
                   Cerca un amico per nome in alto, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
                 </p>
               </div>
             ) : feed.attivita.length === 0 ? (
-              <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-border bg-surface p-5 text-center text-sm font-sans text-text-muted">
+              <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e8e2d8] bg-white p-5 text-center text-sm font-sans text-text-muted">
                 Chi segui non ha ancora salvato posti. Torna più tardi.
               </p>
             ) : (
@@ -150,6 +156,7 @@ export default async function AmiciPage() {
           {feed.seguiti.length > 0 && creatorSection}
         </>
       )}
+    </div>
     </div>
   );
 }

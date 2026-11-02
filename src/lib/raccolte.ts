@@ -63,6 +63,42 @@ export const placesLabel = (n: number) => `${n} ${n === 1 ? "locale" : "locali"}
 export function checkCollectionName(raw: string, existing: string[], current?: string): { tag: string } | { error: string } {
   const tag = normalizeTagName(raw, existing.filter((t) => t !== current));
   if (!tag) return { error: "Scrivi un nome per la raccolta." };
-  if (isStateTag(tag)) return { error: "Questo nome è già usato per lo stato del locale (Voglio andarci / Ci sono stato): scegline un altro." };
+  if (isStateTag(tag)) return { error: "Questo nome è già usato per lo stato del locale (Da provare / Ci sono stato): scegline un altro." };
   return { tag };
+}
+
+// Copertina di una raccolta (revisore 2/11): l'icona dell'occasione dedotta dal nome, non l'emoji del primo
+// posto (due raccolte su quattro avevano gli spaghetti). Ogni voce ha un'alternativa, così due raccolte
+// vicine non hanno la stessa icona; senza un'occasione riconoscibile, un'icona neutra di raccolta.
+const ICONE_OCCASIONE: [RegExp, string[]][] = [
+  [/romantic|coppia|a due|per due|amore|innamorat|anniversari|appuntament|san valentino/, ["❤️", "🕯️"]],
+  [/amic|gruppo|compagnia|ragazz|calcetto|addio al/, ["🍻", "🥂"]],
+  [/economic|low cost|budget|risparmi|spendere poco|poco prezzo|cheap/, ["💶", "🪙"]],
+  [/special|occasion|compleann|festa|festegg|lusso|stellat|gourmet/, ["✨", "🎉"]],
+  [/lavoro|business|clienti|colleg|ufficio|riunion/, ["💼", "🗂️"]],
+  [/famiglia|bambin|figli|genitori|mamma|papa|nonn|parenti/, ["👨‍👩‍👧", "🧸"]],
+  [/viagg|weekend|vacanz|gita|trip|fuori porta|estero/, ["🧳", "✈️"]],
+  [/aperitiv|cocktail|drink|dopo cena/, ["🍸", "🍹"]],
+  [/brunch|colazion/, ["🥐", "☕"]],
+  [/pizz/, ["🍕"]],
+  [/sushi|giappones/, ["🍣"]],
+  [/vino|enotec|wine/, ["🍷"]],
+  [/dolc|gelat|pasticc/, ["🍰", "🍦"]],
+  [/caff|coffee/, ["☕"]],
+  [/pranzo|veloce/, ["🥪"]],
+  [/cena/, ["🍽️"]],
+];
+const ICONE_NEUTRE = ["🔖", "📍", "⭐", "🗂️"];
+
+/** Icone delle copertine, nell'ordine dei nomi: mai la stessa di quella accanto, se si può evitare. */
+export function iconeRaccolte(names: string[]): string[] {
+  const out: string[] = [];
+  let neutra = 0;
+  for (const name of names) {
+    const key = name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const scelte = ICONE_OCCASIONE.find(([re]) => re.test(key))?.[1] ?? [ICONE_NEUTRE[neutra++ % ICONE_NEUTRE.length]];
+    const prima = out[out.length - 1];
+    out.push(scelte.find((i) => i !== prima && !out.includes(i)) ?? scelte.find((i) => i !== prima) ?? scelte[0]);
+  }
+  return out;
 }
