@@ -7309,6 +7309,20 @@ if (fakeUser) {
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  // Testo copiato da Google Maps senza link (piano 2b): nome e indirizzo → "Cercalo e salvalo", cercato solo al tocco.
+  {
+    const q0 = mSearchQ.length;
+    await campoLink(mp);
+    await mp.getByLabel("Link da incollare").fill("Roscioli Salumeria con Cucina\nVia dei Giubbonari, 21, 00186 Roma RM");
+    await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+    const tt = mp.getByTestId("incolla-testo");
+    await tt.waitFor({ timeout: 3000 }).catch(() => {});
+    ok(await tt.isVisible() && (await tt.textContent()).includes("Roscioli Salumeria con Cucina") && mSearchQ.length === q0 && (await mp.getByTestId("incolla-errore").count()) === 0, "testo copiato da Maps (nome e indirizzo): proposta 'Cercalo e salvalo', nessuna ricerca prima del tocco");
+    await mp.screenshot({ path: `${OUT}/importa-testo-maps.png`, caret: "initial" });
+    await mp.getByTestId("incolla-testo-cerca").click();
+    await mp.waitForTimeout(800);
+    ok(mSearchQ.length === q0 + 1 && /Roscioli Salumeria con Cucina, Via dei Giubbonari/.test(mSearchQ.at(-1) ?? ""), `testo copiato da Maps: al tocco una ricerca con nome e indirizzo ("${mSearchQ.at(-1)}")`);
+  }
 
   // Pochi link (2 di Google Maps): niente avviso, si leggono subito; raccolta proposta col nome della città.
   await mp.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/C01y\nhttps://maps.app.goo.gl/C02y");

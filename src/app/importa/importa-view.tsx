@@ -316,6 +316,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       <GoogleMapsCard
         userId={userId}
         onMulti={(text) => setMulti((m) => ({ text, n: (m?.n ?? 0) + 1 }))}
+        onSearch={searchByHand}
       />
       {/* "Come copio il link?": l'unica guida (prima c'erano anche la tessera e il pannello "Da Google Maps", doppioni). */}
       {userId && <SalvaDaTelefono defaultOpen={benvenuto} />}

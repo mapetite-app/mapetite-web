@@ -89,3 +89,21 @@ export function suggestCollectionName(addresses: (string | null | undefined)[], 
   if (first && cities.every((c) => c && c.toLocaleLowerCase("it") === first.toLocaleLowerCase("it"))) return first.slice(0, 24);
   return `Importati il ${now.getDate()}/${now.getMonth() + 1}`;
 }
+
+/**
+ * Testo copiato da Google Maps senza link (piano 2b): "Nome\nVia …, 00186 Roma RM". Diventa la proposta di
+ * ricerca "Nome, Via …" (mai cercata senza un tocco: costa una ricerca Google). Testi lunghi o con troppe
+ * righe (un messaggio qualsiasi negli appunti) o senza indirizzo non sono un posto: null.
+ */
+export function placeQueryFromText(text: string): { name: string; query: string } | null {
+  const lines = text.split(/\r?\n/).map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean);
+  if (lines.length === 0 || lines.length > 3 || text.length > 240) return null;
+  if (lines.some((l) => l.length > 90)) return null;
+  const name = lines[0].replace(/^[·•\-–]\s*/, "");
+  if (name.replace(/[^\p{L}]/gu, "").length < 3) return null;
+  const address = lines.slice(1).find((l) => /\d/.test(l) || /\b(via|viale|piazza|corso|largo|vicolo|strada)\b/i.test(l));
+  // Solo con una riga d'indirizzo: una frase sola ("ricordati la pizzeria di Marco") non è un posto copiato da Maps.
+  if (!address || address === lines[0]) return null;
+  const query = `${name}, ${address.replace(/,\s*Ital(ia|y)$/i, "")}`;
+  return { name: name.slice(0, 80), query: query.slice(0, 160) };
+}
