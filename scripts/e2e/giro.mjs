@@ -7322,6 +7322,8 @@ if (fakeUser) {
     await mp.getByTestId("incolla-testo-cerca").click();
     await mp.waitForTimeout(800);
     ok(mSearchQ.length === q0 + 1 && /Roscioli Salumeria con Cucina, Via dei Giubbonari/.test(mSearchQ.at(-1) ?? ""), `testo copiato da Maps: al tocco una ricerca con nome e indirizzo ("${mSearchQ.at(-1)}")`);
+    // Il campo si richiude dopo la proposta: lo si riapre per i controlli successivi.
+    await campoLink(mp);
   }
 
   // Pochi link (2 di Google Maps): niente avviso, si leggono subito; raccolta proposta col nome della città.
