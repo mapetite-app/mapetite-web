@@ -3335,10 +3335,15 @@ if (fakeUser) {
       const ov = (a, b) => a.left + 2 < b.right && b.left + 2 < a.right && a.top + 2 < b.bottom && b.top + 2 < a.bottom;
       const coperti = [];
       for (const l of document.querySelectorAll("[data-testid=etichetta-pin]")) { const lb = l.getBoundingClientRect(); for (const p of pins) if (p.el !== l.parentElement && ov(lb, p.b)) coperti.push(`${l.textContent.trim()} su ${p.id.slice(-2)}`); }
-      return { n: pins.length, fuori, coperti };
+      // Revisore del 2/11: "Santa Cocktail…" e "Forno Campo…" uno sopra l'altro.
+      const nomi = [...document.querySelectorAll("[data-testid=etichetta-pin]")].map((l) => ({ t: l.textContent.trim(), b: l.getBoundingClientRect() }));
+      const nomiSovrapposti = [];
+      nomi.forEach((a, i) => nomi.forEach((b, j) => { if (j > i && ov(a.b, b.b)) nomiSovrapposti.push(`${a.t} / ${b.t}`); }));
+      return { n: pins.length, fuori, coperti, nomiSovrapposti };
     });
     ok(m.n === 6 && m.fuori.length === 0, `mappa dei salvati: tutti i 6 salvati di Roma in vista, anche il più a sud (${m.n} segnalini${m.fuori.length ? ", fuori: " + m.fuori.join(",") : ""})`);
-    ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`); }
+    ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`);
+    ok(m.nomiSovrapposti.length === 0, `mappa dei salvati: nessun nome sopra un altro nome${m.nomiSovrapposti.length ? " — " + m.nomiSovrapposti.join("; ") : ""}`); }
   { const t = await tocchi(q3); ok(t.length === 0, `mappa dei salvati: nessun segnalino ne tocca un altro${t.length ? " — " + t.join(" ") : ""}`); }
   // Revisore 2/11 (terzo giro): nomi sempre dallo stesso lato (a destra; a sinistra solo sul bordo destro dello schermo),
   // il segnalino scelto ha sempre il nome, e nessun nome né segnalino copre il pallino blu.
