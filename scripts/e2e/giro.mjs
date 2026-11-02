@@ -8399,6 +8399,21 @@ if (fakeUser) {
   ok(droppedKeys(tev.filter((e) => e.props?.nome === "import_file")).length === 0, "file Takeout: le chiavi del segnale arrivano tutte al server");
   await tc.scrollIntoViewIfNeeded();
   await tp.screenshot({ path: `${OUT}/takeout-3-fatto.png`, caret: "initial" });
+  // Proposta 39: una lista con un nome suo ("Cene romantiche.csv") diventa una raccolta, mostrata come copertina nel "fatto".
+  {
+    const n0 = tins.length;
+    await tp.getByTestId("file-input").setInputFiles([
+      { name: "Cene romantiche.csv", mimeType: "text/csv", buffer: Buffer.from("Title,Note,URL,Tags,Comment\nOsteria Finta,,https://www.google.com/maps/place/Osteria+Finta/data=!4m2!3m1!1s0x0:0xAAA1,,\n") },
+    ]);
+    await tp.getByTestId("file-salva").click();
+    await tp.getByTestId("file-raccolte").waitFor({ timeout: 8000 }).catch(() => {});
+    const rac = tp.getByTestId("file-raccolta");
+    ok((await rac.count()) === 1 && (await rac.textContent()).includes("Cene romantiche") && (await rac.textContent()).includes("1") && (await rac.getAttribute("href")) === "/raccolte/Cene%20romantiche"
+      && tins.slice(n0).some((r) => JSON.stringify(r.tags) === '["Da provare","Cene romantiche"]'),
+      `file Takeout: la lista «Cene romantiche» diventa una raccolta, copertina con un tocco per aprirla (${await rac.count()})`);
+    await tp.getByTestId("file-fatto").scrollIntoViewIfNeeded();
+    await tp.screenshot({ path: `${OUT}/takeout-4-raccolte.png`, caret: "initial" });
+  }
   // File sbagliato: messaggio chiaro, niente schermata vuota.
   await tp.reload({ waitUntil: "networkidle" });
   await tp.getByTestId("file-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
