@@ -64,7 +64,7 @@ export default function ProfiloSezione({
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2 active:bg-surface [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-brand">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className={pannello ? "block font-title text-xl text-text" : "block font-display text-sm font-semibold text-text"}>{title}</span>
+          <span className={pannello ? "block font-title text-xl text-text" : "block font-sans text-[15px] font-medium text-text"}>{title}</span>
           {hint && <span className="block truncate text-xs font-sans font-normal text-text-muted">{hint}</span>}
         </span>
         {/* Una sola freccia in tutte le righe del profilo (revisore 1/11): ›, che gira verso il basso quando la riga è aperta. */}

@@ -11,7 +11,7 @@ import { spegniPerUscita } from "@/lib/push-client";
 // Da non collegati c'è solo il feedback. Sotto, discreto, "Elimina il mio account" (solo da collegati).
 // compatto: dentro "Impostazioni" del profilo, senza il grande spazio sopra.
 export default function ProfiloAccount({ loggedIn, compatto = false }: { loggedIn: boolean; compatto?: boolean }) {
-  const row = "flex min-h-14 w-full items-center gap-3 px-4 text-left font-display text-sm font-semibold active:bg-surface";
+  const row = "flex min-h-14 w-full items-center gap-3 px-4 text-left font-sans text-[15px] font-medium active:bg-surface";
   return (
     <>
       <section aria-label="Account" data-testid="profilo-account" className={`${compatto ? "mt-3" : "mt-10"} overflow-hidden rounded-card border border-border bg-white`}>

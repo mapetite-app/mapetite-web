@@ -1,7 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
+import { BookOpen, CalendarCheck, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -268,7 +268,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         <Link href="/onboarding" data-testid="invito-mappa-gusto" className="mb-5 flex min-h-16 items-center gap-3 rounded-card border border-[#f3c9bd] bg-white px-4 py-3 active:scale-[0.99]">
           <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={18} strokeWidth={1.75} /></span>
           <span className="min-w-0 flex-1">
-            <span className="block font-display text-sm font-semibold text-text">Fai la tua mappa del gusto</span>
+            <span className="block font-sans text-[15px] font-medium text-text">Fai la tua mappa del gusto</span>
             <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
           </span>
           <ChevronRight aria-hidden size={16} className="text-text-muted" />
@@ -277,7 +277,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
-        <h2 id="mie-cose-titolo" className="mb-2 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Le mie cose</h2>
+        <h2 id="mie-cose-titolo" className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Le mie cose</h2>
         <div className="grid grid-cols-3 gap-2">
           {/* Le raccolte si guardano nei Salvati, dove sono già copertine (revisore 1/11: era un doppione).
               Rinomina, unisci ed elimina restano in "Impostazioni" → "Gestisci le raccolte". */}
@@ -303,7 +303,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </Link>
           {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
           <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className={TILE_CLASS}>
-            <TileBody icon={<IdCard {...icon} />} label="Carta del gusto" sub="Da condividere" />
+            <TileBody icon={<IdCard {...icon} />} label="Il tuo gusto" sub="Da condividere" />
           </Link>
         </div>
       </section>
@@ -336,7 +336,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             <Link href="/me" data-testid="profilo-gusti-link" className={row}>
               <SlidersHorizontal {...icon} aria-hidden className="shrink-0 text-brand" />
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-semibold text-text">I tuoi gusti</span>
+                <span className="block font-sans text-[15px] font-medium text-text">I tuoi gusti</span>
                 <span className="block truncate text-xs text-text-muted">Mappa del gusto e preferenze</span>
               </span>
               <ChevronRight aria-hidden size={16} className="text-text-muted" />
@@ -345,11 +345,20 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             <a href="#raccolte" data-testid="profilo-gestisci-raccolte" className={row}>
               <FolderHeart {...icon} aria-hidden className="shrink-0 text-brand" />
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-semibold text-text">Gestisci le raccolte</span>
+                <span className="block font-sans text-[15px] font-medium text-text">Gestisci le raccolte</span>
                 <span className="block truncate text-xs text-text-muted">Rinomina, unisci, elimina</span>
               </span>
               <ChevronRight aria-hidden size={16} className="text-text-muted" />
             </a>
+            {/* Prenotazioni (revisore 2/11): la tessera in "Le mie cose" c'è solo quando ce n'è una; qui sempre. */}
+            <Link href="/prenotazioni" data-testid="profilo-prenotazioni-link" className={row}>
+              <CalendarCheck {...icon} aria-hidden className="shrink-0 text-brand" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-sans text-[15px] font-medium text-text">Prenotazioni</span>
+                <span className="block truncate text-xs text-text-muted">Le richieste fatte dalle schede</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="text-text-muted" />
+            </Link>
             {/* Memoria dei gusti dell'assistente (piano 1.4): vedere e cancellare. */}
             <ProfiloSezione id="gusti" icon={<Sparkles {...icon} />} title="Cosa so di te" hint="I gusti che l’assistente ricorda">
               <ProfiloGusti userId={user.id} />
@@ -411,7 +420,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
               <Store {...icon} aria-hidden className="shrink-0 text-brand" />
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-semibold text-text">Hai un locale?</span>
+                <span className="block font-sans text-[15px] font-medium text-text">Hai un locale?</span>
                 <span className="block truncate text-xs text-text-muted">Mapetite per i ristoratori</span>
               </span>
               <ChevronRight aria-hidden size={16} className="text-text-muted" />
