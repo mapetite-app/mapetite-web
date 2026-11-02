@@ -2513,6 +2513,8 @@ else {
         { created_at: "2026-09-15", tags: ["Con amici", "Già visitato"], note: null, places: pr("06", "Birreria Sei", "bar", "Via Tortona 15, 20144 Milano MI, Italy", 45.452, 9.165) },
       ],
       reviews: [{ id: "r1", rating: 5, comment: "Vista bellissima, cocktail ottimi.", created_at: "2026-10-01", places: { name: "Terrazza Uno" } }],
+      // Gusti del profilo (profiles.gusto/cuisines/occasions/price_range): le pillole "Il tuo gusto".
+      gusto: { gusto: { v: 2, zone: ["Trastevere"], su: ["trattoria", "enoteca"], giu: ["gourmet"], scoperta: "chicche" }, cuisines: ["romana_laziale"], occasions: ["cena_romantica"], atmospheres: ["intima"], price_range: "€€" },
     };
     await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
     await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -2528,7 +2530,18 @@ else {
       const cose = p.getByTestId("profilo-mie-cose");
       // Semplificare 5 (17/10): la carta del gusto è una tessera, le liste di gruppo stanno solo in Amici.
       // Revisore 2/11 (quarto giro): senza prenotazioni la tessera "Prenotazioni" non c'è (resta in Impostazioni): 5 tessere.
-      ok(await cose.isVisible() && (await cose.locator("a").count()) === 5 && (await cose.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await cose.getByTestId("profilo-gruppi").count()) === 0 && (await cose.getByTestId("profilo-prenotazioni").count()) === 0, `profilo: griglia 'Le mie cose' con 5 tessere (senza Prenotazioni vuota), carta del gusto compresa, senza liste di gruppo (${await cose.locator("a").count()})`);
+      // Revisore 2/11 (terzo giro): la carta del gusto non è più una tessera (doppione di "Il tuo gusto" sotto i numeri): 4 tessere.
+      ok(await cose.isVisible() && (await cose.locator("a").count()) === 4 && (await cose.getByTestId("profilo-carta-gusto").count()) === 0 && (await cose.getByTestId("profilo-gruppi").count()) === 0 && (await cose.getByTestId("profilo-prenotazioni").count()) === 0, `profilo: griglia 'Le mie cose' con 4 tessere (senza Prenotazioni vuota né la carta del gusto), senza liste di gruppo (${await cose.locator("a").count()})`);
+      // Revisore 2/11 (terzo giro): sotto i numeri "Il tuo gusto" con 3 pillole vere dal profilo (cucina, occasione, prezzo)
+      // che aprono la mappa del gusto; la carta da condividere è il link piccolo "Condividi". Il terzo inferiore non è vuoto.
+      { const gs = p.getByTestId("profilo-gusto");
+        const pill = (await gs.getByTestId("profilo-gusto-pillola").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+        const gb = await gs.boundingBox(); const nb = await p.getByTestId("guida-contatori").boundingBox();
+        ok(JSON.stringify(pill) === '["🍝 Romana","❤️ Cena romantica","€€ nella media"]' && (await gs.getByTestId("profilo-gusto-mappa").getAttribute("href")) === "/me" && (await gs.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && !!gb && !!nb && gb.y > nb.y + nb.height && gb.y - (nb.y + nb.height) < 20 && (await p.getByText("Il tuo gusto", { exact: true }).count()) === 1,
+          `profilo: 'Il tuo gusto' sotto i numeri con 3 pillole vere che aprono la mappa del gusto, 'Condividi' per la carta (${pill.join(" | ")})`);
+        const fondo = await p.evaluate(() => { const nav = [...document.querySelectorAll("nav")].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= innerHeight - 2 && r.height < 120)[0]; const el = document.querySelector("#altro")?.closest("div.rounded-card"); return { fine: Math.round(el?.getBoundingClientRect().bottom ?? 0), barra: Math.round(nav?.top ?? innerHeight) }; });
+        ok(fondo.fine >= 844 * 0.62, `profilo: il terzo inferiore non è vuoto (contenuto fino a ${fondo.fine} px, barra a ${fondo.barra})`);
+        await p.screenshot({ path: `${OUT}/s4-profilo.png`, caret: "initial" }); }
       // Revisore 1/11: la tessera "Raccolte" porta ai Salvati (lì le raccolte sono copertine), non a un doppione nel profilo.
       ok((await cose.getByTestId("tessera-raccolte").getAttribute("href")) === "/mappa?vista=salvati" && (await cose.getByTestId("tessera-raccolte").textContent()).includes("4") && (await cose.getByTestId("profilo-diario").getAttribute("href")) === "/profilo/diario" && (await p.getByTestId("profilo-prenotazioni-link").getAttribute("href")) === "/prenotazioni" && (await cose.getByTestId("profilo-importa").getAttribute("href")) === "/importa", "profilo: tessere Raccolte (4, ai Salvati) · Diario · Importa con i loro ingressi; Prenotazioni in Impostazioni");
       // Revisore 1/11: il sottotitolo di Importa non si taglia.
@@ -2543,12 +2556,12 @@ else {
         ok(!!n && n.dx >= 0 && n.dx <= 10 && n.dy <= 3, `profilo: il numero accanto al nome della tessera (${JSON.stringify(n)})`); }
       // Revisore 2/11 (quarto giro): tessere tutte alte uguali, titolo su una riga intero e alla stessa altezza nella fila.
       { const t = await cose.locator("a").evaluateAll((els) => els.map((a) => { const r = a.getBoundingClientRect(); const s = a.querySelector("[data-testid=tessera-titolo]"); const q = s?.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), dy: q ? Math.round(q.top - r.top) : -1, righe: q ? Math.round(q.height / parseFloat(getComputedStyle(s).lineHeight)) : 0, tagliato: s ? s.scrollWidth > s.clientWidth + 1 : true, testo: s?.textContent }; }));
-        ok(new Set(t.map((x) => x.h)).size === 1 && new Set(t.map((x) => x.dy)).size === 1 && t.every((x) => x.righe === 1 && !x.tagliato) && t.some((x) => x.testo === "Il tuo gusto"), `profilo: tessere alte uguali, titoli su una riga, interi e allineati (${JSON.stringify(t.map((x) => `${x.testo}:${x.h}/${x.dy}`))})`); }
+        ok(new Set(t.map((x) => x.h)).size === 1 && new Set(t.map((x) => x.dy)).size === 1 && t.every((x) => x.righe === 1 && !x.tagliato) && t.some((x) => x.testo === "Importa"), `profilo: tessere alte uguali, titoli su una riga, interi e allineati (${JSON.stringify(t.map((x) => `${x.testo}:${x.h}/${x.dy}`))})`); }
       // Revisore 1/11 (terzo giro): tessere vuote = un invito con il gesto da fare, mai "0" o "Nessuna".
       { ok(((await cose.getByTestId("profilo-diario").textContent()) ?? "").includes("2") && (await cose.getByTestId("profilo-diario").getByTestId("tessera-invito").count()) === 0, "profilo: Diario con 2 mostra il numero");
         // Revisore 2/11: titoli delle tessere in Inter medio, non Poppins grassetto accanto al serif dei numeri.
         const titoli = await cose.getByTestId("tessera-titolo").evaluateAll((els) => els.map((s) => { const c = getComputedStyle(s); return `${/Inter/i.test(c.fontFamily) && !/Poppins/i.test(c.fontFamily.split(",")[0]) ? "Inter" : c.fontFamily.split(",")[0]} ${c.fontWeight}`; }));
-        ok(titoli.length === 5 && titoli.every((x) => x === "Inter 500"), `profilo: titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
+        ok(titoli.length === 4 && titoli.every((x) => x === "Inter 500"), `profilo: titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
       // Stesso fondo carta di Salvati e Importa.
       ok(await p.locator("body").evaluate((m) => [...m.querySelectorAll("div")].some((d) => getComputedStyle(d).backgroundColor === "rgb(248, 246, 242)" && d.getBoundingClientRect().height > 600)), "profilo: fondo carta come Salvati");
       { const zero = { ...profilo, saved: profilo.saved.map((r) => ({ ...r, tags: (r.tags ?? []).filter((t) => t !== "Già visitato") })) };
@@ -7424,7 +7437,7 @@ else {
     await pg.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     const inv = pg.getByTestId("invito-mappa-gusto");
     const bx = await inv.boundingBox().catch(() => null);
-    ok(!!bx && bx.y < 400 && (await inv.getAttribute("href")) === "/onboarding", `profilo: senza mappa del gusto, l'invito a farla in cima (${Math.round(bx?.y ?? -1)})`);
+    ok(!!bx && bx.y < 400 && (await inv.getAttribute("href")) === "/onboarding" && (await pg.getByTestId("profilo-gusto").getByTestId("invito-mappa-gusto").count()) === 1 && (await pg.getByTestId("profilo-gusto-pillola").count()) === 0, `profilo: senza mappa del gusto, l'invito a farla in cima, dentro 'Il tuo gusto' (${Math.round(bx?.y ?? -1)})`);
     await pg.screenshot({ path: `${OUT}/profilo-invito-mappa-gusto.png`, caret: "initial" });
     await ictx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "lorenzo@example.com", saved: [], reviews: [] })), url: BASE }]);
     await pg.close(); }
@@ -8435,7 +8448,7 @@ else {
   g.on("pageerror", (e) => errors.push(e.message));
   await g.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   const entry = g.getByTestId("profilo-carta-gusto");
-  ok(await entry.isVisible() && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 1, "carta del gusto: ingresso compatto dentro 'Le mie cose'");
+  ok(await entry.isVisible() && (await g.getByTestId("profilo-gusto").getByTestId("profilo-carta-gusto").count()) === 1 && (await g.getByTestId("profilo-mie-cose").getByTestId("profilo-carta-gusto").count()) === 0, "carta del gusto: ingresso 'Condividi' dentro 'Il tuo gusto', non più una tessera");
   await entry.click();
   await g.waitForURL(/\/profilo\/gusto$/, { timeout: 8000 }).catch(() => {});
   const card = g.getByTestId("carta-gusto");

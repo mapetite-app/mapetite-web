@@ -22,6 +22,8 @@ import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
+import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES } from "@/lib/preferences";
+import { pulisciMappa, SCOPERTE, tipoDa } from "@/lib/mappa-gusto";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -63,16 +65,45 @@ function savedHref(filter?: { stato?: "voglio" | "fatto"; tag?: string }): strin
 // Solo in sviluppo con E2E_FAKE_USER: profilo finto letto dal cookie "e2e_profilo"
 // (scritto da scripts/e2e/giro.mjs), perché il test non può simulare le letture fatte dal server.
 // In produzione NODE_ENV è sempre "production" e questo ramo non si attiva.
-async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean; senzaGusto: boolean } | null> {
+type GustoRow = { gusto?: unknown; cuisines?: string[] | null; occasions?: string[] | null; atmospheres?: string[] | null; price_range?: string | null };
+
+async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean; senzaGusto: boolean; gusto: GustoRow | null } | null> {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = (await cookies()).get("e2e_profilo")?.value;
   if (!raw) return null;
   try {
     const data = JSON.parse(decodeURIComponent(raw));
-    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false, senzaGusto: data.senzaGusto === true };
+    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false, senzaGusto: data.senzaGusto === true, gusto: data.gusto && typeof data.gusto === "object" ? (data.gusto as GustoRow) : null };
   } catch {
     return null;
   }
+}
+
+// "Il tuo gusto" sotto i numeri (revisore 2/11, terzo giro: il profilo non raccontava chi sei): fino a 3 pillole
+// vere dal profilo, nell'ordine cucina, occasione, prezzo; se ne manca qualcuna, i tipi di posto con 👍 della
+// mappa del gusto, l'atmosfera e "famosi o chicche". Niente di dedotto o inventato.
+function pilloleGusto(g: GustoRow | null): { emoji: string; testo: string }[] {
+  if (!g) return [];
+  const mappa = pulisciMappa(g.gusto, () => true);
+  const cuisines = Array.isArray(g.cuisines) ? g.cuisines : [];
+  const occasions = Array.isArray(g.occasions) ? g.occasions : [];
+  const atmospheres = Array.isArray(g.atmospheres) ? g.atmospheres : [];
+  const out: { emoji: string; testo: string }[] = [];
+  const cucina = CUISINES.find((c) => cuisines.includes(c.value));
+  const tipi = mappa.su.map(tipoDa).filter((t): t is NonNullable<ReturnType<typeof tipoDa>> => t != null);
+  if (cucina) out.push({ emoji: cucina.emoji, testo: cucina.label });
+  else if (tipi[0]) out.push({ emoji: tipi[0].emoji, testo: tipi[0].titolo });
+  const occasione = OCCASIONS.find((o) => occasions.includes(o.value));
+  if (occasione) out.push({ emoji: occasione.emoji, testo: occasione.label });
+  const prezzo = PRICE_RANGES.find((r) => r.value === g.price_range);
+  if (prezzo) out.push({ emoji: "", testo: `${prezzo.value} ${prezzo.description.toLowerCase()}` });
+  const altre = [
+    ...tipi.slice(cucina ? 0 : 1).map((t) => ({ emoji: t.emoji, testo: t.titolo })),
+    ...ATMOSPHERES.filter((a) => atmospheres.includes(a.value)).map((a) => ({ emoji: a.emoji, testo: a.label })),
+    ...SCOPERTE.filter((x) => x.value === mappa.scoperta).map((x) => ({ emoji: "", testo: x.label })),
+  ];
+  for (const a of altre) if (out.length < 3 && !out.some((o) => o.testo === a.testo)) out.push(a);
+  return out.slice(0, 3);
 }
 
 function Stars({ rating }: { rating: number }) {
@@ -167,13 +198,24 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     if (!vErr) visite = new Map((vRaw ?? []).map((r) => [r.place_id as string, Number(r.visite)]));
   }
   // Mappa del gusto (sprint 25/10): chi si è registrato prima non l'ha fatta. Un invito, finché manca.
+  // Nella stessa lettura i gusti scelti (cucine, occasioni, prezzo) per le pillole "Il tuo gusto".
   let senzaGusto = false;
+  let gustoRow: GustoRow | null = null;
   if (fake) {
     senzaGusto = fake.senzaGusto;
+    gustoRow = fake.gusto;
   } else {
-    const { data: g, error: gErr } = await supabase.from("profiles").select("gusto").eq("id", user.id).maybeSingle();
-    senzaGusto = !gErr && !(g as { gusto?: unknown } | null)?.gusto;
+    const { data: g, error: gErr } = await supabase.from("profiles").select("gusto, cuisines, occasions, atmospheres, price_range").eq("id", user.id).maybeSingle();
+    if (!gErr) {
+      gustoRow = g as GustoRow | null;
+      senzaGusto = !gustoRow?.gusto;
+    } else {
+      // Senza la colonna gusto (migrazione 20261021_mappa_gusto non applicata): solo i gusti del primo accesso vecchio.
+      const { data: g2 } = await supabase.from("profiles").select("cuisines, occasions, atmospheres, price_range").eq("id", user.id).maybeSingle();
+      gustoRow = g2 as GustoRow | null;
+    }
   }
+  const pillole = pilloleGusto(gustoRow);
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
@@ -260,20 +302,47 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </nav>
-      </header>
 
-      {/* Mappa del gusto non ancora fatta: l'invito sta in cima, sotto nome e numeri (non chiuso in
-          Impostazioni), perché da lì ricerca, verdetti e "per te" parlano di chi usa l'app. */}
-      {senzaGusto && (
-        <Link href="/onboarding" data-testid="invito-mappa-gusto" className="mb-5 flex min-h-16 items-center gap-3 rounded-card border border-[#f3c9bd] bg-white px-4 py-3 active:scale-[0.99]">
-          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={18} strokeWidth={1.75} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-sans text-[15px] font-medium text-text">Fai la tua mappa del gusto</span>
-            <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
-          </span>
-          <ChevronRight aria-hidden size={16} className="text-text-muted" />
-        </Link>
-      )}
+        {/* Il tuo gusto (revisore 2/11, terzo giro): chi sei in tre pillole vere, un tocco apre la mappa del gusto.
+            È l'unico posto del gusto nell'app (in Amici solo un link piccolo): la carta da condividere è "Condividi". */}
+        <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mt-3 rounded-card border border-[#e8e2d8] bg-white px-4 pb-3 pt-2">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="gusto-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Il tuo gusto</h2>
+            <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className="-mr-2 flex min-h-11 items-center gap-1 px-2 text-[13px] font-medium text-brand">
+              <IdCard size={15} strokeWidth={1.75} aria-hidden /> Condividi
+            </Link>
+          </div>
+          {pillole.length > 0 && !senzaGusto ? (
+            <Link href="/me" data-testid="profilo-gusto-mappa" aria-label={`Il tuo gusto: ${pillole.map((x) => x.testo).join(", ")}. Apri la mappa del gusto`} className="flex min-h-11 items-center gap-2 active:opacity-70">
+              <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                {pillole.map((x) => (
+                  <span key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-8 items-center gap-1 rounded-pill bg-[#f3efe8] px-3 text-[13px] font-medium text-[#33373d]">
+                    {x.emoji && <span aria-hidden>{x.emoji}</span>}
+                    {x.testo}
+                  </span>
+                ))}
+              </span>
+              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+            </Link>
+          ) : senzaGusto ? (
+            // Mappa del gusto non ancora fatta: l'invito sta qui, sotto nome e numeri (non chiuso in Impostazioni),
+            // perché da lì ricerca, verdetti e "per te" parlano di chi usa l'app.
+            <Link href="/onboarding" data-testid="invito-mappa-gusto" className="flex min-h-12 items-center gap-3 active:opacity-70">
+              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={17} strokeWidth={1.75} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-sans text-[15px] font-medium text-text">Fai la tua mappa del gusto</span>
+                <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
+              </span>
+              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+            </Link>
+          ) : (
+            <Link href="/me" data-testid="profilo-gusto-mappa" className="flex min-h-11 items-center gap-2 text-[15px] font-medium text-text active:opacity-70">
+              <span className="min-w-0 flex-1">La tua mappa del gusto</span>
+              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+            </Link>
+          )}
+        </section>
+      </header>
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
@@ -301,10 +370,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           <Link href="/importa" data-testid="profilo-importa" className={TILE_CLASS}>
             <TileBody icon={<Download {...icon} />} label="Importa" sub="Link e file" />
           </Link>
-          {/* Carta del gusto: il proprio gusto in una card da condividere (solo dai propri salvati). */}
-          <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className={TILE_CLASS}>
-            <TileBody icon={<IdCard {...icon} />} label="Il tuo gusto" sub="Da condividere" />
-          </Link>
+          {/* La carta del gusto non è più una tessera: sta in "Il tuo gusto" sotto i numeri ("Condividi"). */}
         </div>
       </section>
 
