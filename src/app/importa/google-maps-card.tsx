@@ -91,6 +91,8 @@ export default function GoogleMapsCard({
       setResults(await saveFromLinks(value, userId));
       clearPendingLink();
       setDraft("");
+      // Revisore 2/11: dopo l'esito il campo vuoto con "Salva" spento non serve più.
+      setShowField(false);
     } catch (e) {
       setError(errorText(e));
     } finally {

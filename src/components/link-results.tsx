@@ -15,7 +15,7 @@ export default function LinkResults({ results, userId }: { results: LinkOutcome[
         </li>
       ))}
       {results.some((r) => r.lista) && (
-        <li><ListaRow count={results.filter((r) => r.lista).length} /></li>
+        <li><ListaRow count={results.filter((r) => r.lista).length} secondary /></li>
       )}
     </ul>
   );
@@ -101,19 +101,13 @@ function ErrorRow({ r }: { r: LinkOutcome }) {
 // Lista condivisa di Google Maps (piano 2a): non è un errore dell'utente, è un limite di Google.
 // Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome. Dopo il tocco
 // il riquadro si riduce a una riga (i passi si aprono più sotto, nella pagina).
-export function ListaRow({ count = 1, framed = true }: { count?: number; framed?: boolean }) {
+export function ListaRow({ count = 1, secondary = false }: { count?: number; secondary?: boolean }) {
   const [aperto, setAperto] = useState(false);
-  const box = framed ? "rounded-card border border-border bg-white p-4" : "";
-  if (aperto) {
-    return (
-      <p className={`${box} text-sm text-text-muted`} data-testid="link-lista">
-        <span aria-hidden>🗂️ </span>Passi aperti qui sotto ↓
-      </p>
-    );
-  }
+  // Dopo il tocco i passi si aprono più sotto e la pagina scorre lì: il riquadro sparisce (revisore 2/11).
+  if (aperto) return null;
   return (
-    <div className={box} data-testid="link-lista">
-      <p className="font-display text-base font-semibold text-text">
+    <div className="rounded-card border border-border bg-white p-4" data-testid="link-lista">
+      <p className="text-[15px] font-semibold text-text">
         <span aria-hidden>🗂️ </span>{count === 1 ? "È una lista di Google Maps" : `Sono ${count} liste di Google Maps`}
       </p>
       <p className="mt-1 text-sm text-text-muted">
@@ -123,7 +117,9 @@ export function ListaRow({ count = 1, framed = true }: { count?: number; framed?
         type="button"
         onClick={() => { setAperto(true); apriFileGoogle(); }}
         data-testid="link-lista-apri"
-        className="mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"
+        className={secondary
+          ? "mt-3 min-h-11 w-full rounded-pill border border-brand bg-white px-4 text-sm font-display font-semibold text-brand"
+          : "mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"}
       >
         Porta le tue liste
       </button>

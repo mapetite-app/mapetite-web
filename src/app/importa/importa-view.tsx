@@ -354,7 +354,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       </div>
 
       <div id={PANEL_ID.file} hidden={panel !== "file"} className="mt-4 scroll-mt-4">
-        <TakeoutCard userId={userId} />
+        <TakeoutCard userId={userId} titolo={false} />
       </div>
 
       <div hidden={panel !== "mano"} className="mt-4">

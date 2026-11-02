@@ -11,6 +11,7 @@ export default function RaccoltaCopertina({
   names = [],
   covers = true,
   compact = false,
+  riempi = false,
 }: {
   name: string;
   count: number;
@@ -18,6 +19,7 @@ export default function RaccoltaCopertina({
   names?: string[];
   covers?: boolean; // ?beta=-copertine: solo l'iniziale, come prima
   compact?: boolean; // pagina pubblica: cartelle più basse
+  riempi?: boolean; // con meno di 4 locali: un'emoji grande al centro invece delle caselle vuote (Importa, revisore 2/11)
 }) {
   const tiles = emojis.slice(0, 4);
   return (
@@ -27,7 +29,11 @@ export default function RaccoltaCopertina({
         className={`relative flex ${compact ? "h-20" : "h-[104px]"} items-stretch p-2`}
         style={{ backgroundColor: collectionColor(name) }}
       >
-        {covers ? (
+        {covers && riempi && tiles.length > 0 && tiles.length < 4 ? (
+          <span data-testid="raccolta-copertina" className="flex w-full items-center justify-center gap-2 text-[34px] leading-none">
+            {tiles.map((e, i) => <span key={i}>{e}</span>)}
+          </span>
+        ) : covers ? (
           <span data-testid="raccolta-copertina" className="grid w-full grid-cols-2 grid-rows-2 gap-1.5 pt-1.5">
             {tiles.map((e, i) => (
               <span key={i} className="flex items-center justify-center rounded-btn bg-white/15 text-[22px] leading-none">

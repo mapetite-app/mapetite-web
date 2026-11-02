@@ -376,7 +376,7 @@ export default function MultiLinkCard({
               <p className="text-base font-semibold text-text" data-testid="multi-fatto-riepilogo">
                 <span aria-hidden>✅ </span>
                 {[
-                  `Salvati ${savedCount}`,
+                  savedCount === 1 && savedNow.length === 1 ? `Salvato: ${savedNow[0].name}` : `Salvati ${savedCount}`,
                   gia > 0 && `Già nei tuoi posti ${gia}`,
                   nonTrovati > 0 && `Non ${nonTrovati === 1 ? "trovato" : "trovati"} ${nonTrovati}`,
                 ].filter(Boolean).join(" · ")}
@@ -439,9 +439,6 @@ export default function MultiLinkCard({
           )}
           {oltre > 0 && <p className="mt-3 text-xs text-text-muted">Altri {oltre} link restano fuori: incollali in un secondo giro.</p>}
 
-          {liste > 0 && (phase === "ready" || phase === "done") && (
-            <div className="mt-3"><ListaRow count={liste} /></div>
-          )}
           {phase === "done" && rows.length > 0 && (
             <p className="mt-4 text-sm font-semibold text-text" data-testid="multi-da-sistemare">
               Da sistemare: {rows.length === 1 ? "cercalo" : "cercali"} a mano, il nome è già scritto.
@@ -461,6 +458,10 @@ export default function MultiLinkCard({
                 />
               ))}
             </ul>
+          )}
+          {/* Liste di Google Maps: in fondo, come strada secondaria se c'è anche qualcosa da salvare (revisore 2/11). */}
+          {liste > 0 && (phase === "ready" || phase === "done") && (
+            <div className="mt-3"><ListaRow count={liste} secondary={toSave.length > 0 || savedCount > 0} /></div>
           )}
         </div>
       )}

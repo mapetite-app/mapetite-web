@@ -66,7 +66,7 @@ const STEPS: React.ReactNode[] = [
   <>Apri lo zip e carica qui <b>Saved Places.json</b> e i file <b>.csv</b> della cartella <b>Salvati</b> (uno per lista), anche tutti insieme: ogni lista diventa una raccolta.</>,
 ];
 
-export default function TakeoutCard({ userId }: { userId: string | null }) {
+export default function TakeoutCard({ userId, titolo = true }: { userId: string | null; titolo?: boolean }) {
   const [items, setItems] = useState<TakeoutItem[] | null>(null);
   const [skipped, setSkipped] = useState<TakeoutSkipped[]>([]);
   const [off, setOff] = useState<Set<string>>(new Set()); // zone escluse
@@ -209,6 +209,8 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
       setDone({ salvati, gia, attesa, persi });
       setRaccolte([...nate.current.values()].sort((a, b) => b.count - a.count));
       setPhase("done");
+      // L'esito in vista (revisore 2/11: restava sotto la piega).
+      window.setTimeout(() => document.getElementById("file-esito")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
       trackFeature("import_file", { contesto: "salvati", risultati: salvati, stato: attesa ? "in_attesa" : "completo" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Qualcosa è andato storto, riprova.");
@@ -235,10 +237,13 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
 
   return (
     <section className="rounded-card border border-border bg-white p-5" data-testid="importa-file">
-      <h2 className="font-title text-xl text-text">
-        <span aria-hidden>🗂️ </span>Tutti i salvati di Google Maps
-      </h2>
-      <p className="mt-1 text-sm text-text-muted">Tutti i posti che hai salvato in Google Maps, in un colpo solo. Il file resta nel telefono.</p>
+      {/* Dentro "Altri modi" il titolo c'è già sulla riga che apre il pannello (revisore 2/11: niente doppione). */}
+      {titolo && (
+        <h2 className="font-title text-xl text-text">
+          <span aria-hidden>🗂️ </span>Tutti i salvati di Google Maps
+        </h2>
+      )}
+      <p className={`${titolo ? "mt-1 " : ""}text-sm text-text-muted`}>Tutti i posti che hai salvato in Google Maps, in un colpo solo. Il file resta nel telefono.</p>
 
       {!userId ? (
         <p className="mt-4 text-sm text-text-muted">
@@ -284,14 +289,16 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
           {phase === "ready" && items && (
             <div className="mt-4" data-testid="file-anteprima">
               <p className="text-base font-semibold text-text" data-testid="file-riepilogo">
-                Trovati {items.length} {items.length === 1 ? "posto" : "posti"}
+                {items.length === 1 ? "Trovato 1 posto" : `Trovati ${items.length} posti`}
                 {zones.length > 0 && ": "}
                 {zones.slice(0, 3).map(([z, n], i) => (
-                  <span key={z}>{i ? ", " : ""}{n} {z === SENZA_POSIZIONE ? "senza posizione" : `a ${z}`}</span>
+                  <span key={z}>{i ? ", " : ""}{n} {z === SENZA_POSIZIONE ? "dalle liste" : `a ${z}`}</span>
                 ))}
                 {zones.length > 3 && "…"}
               </p>
 
+              {/* Una zona sola: niente scelta (revisore 2/11: un filtro per un solo gruppo è rumore). */}
+              {zones.length > 1 && (<>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Scegli le zone">
                 {zones.map(([z, n]) => {
                   const on = !off.has(z);
@@ -304,7 +311,7 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
                       data-testid="file-zona"
                       className={`min-h-10 rounded-pill border px-3 text-sm font-medium ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-text-muted"}`}
                     >
-                      {z} · {n}
+                      {z === SENZA_POSIZIONE ? "Dalle liste" : z} · {n}
                     </button>
                   );
                 })}
@@ -313,10 +320,11 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
                 <button type="button" className="min-h-10 text-brand underline" onClick={() => setOff(new Set())}>Tutti</button>
                 <button type="button" className="min-h-10 text-brand underline" onClick={() => setOff(new Set(zones.map(([z]) => z)))}>Nessuno</button>
               </div>
+              </>)}
 
               <ul className="mt-2 space-y-1 text-xs text-text-muted" data-testid="file-liste">
                 {[...new Set(chosen.map((it) => it.lista))].slice(0, 5).map((l) => (
-                  <li key={l}>«{l}» → {listMapping(l).label}</li>
+                  <li key={l}>«{l}» → {listMapping(l).tag && listMapping(l).tag !== "Viaggi" && listMapping(l).tag !== "Preferiti" ? "diventa una raccolta" : listMapping(l).label}</li>
                 ))}
               </ul>
 
@@ -328,8 +336,8 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
               )}
 
               {noCoords > 0 && (
-                <p className="mt-3 rounded-btn bg-accent/10 px-3 py-2 text-xs text-text" data-testid="file-avviso-csv">
-                  {noCoords} {noCoords === 1 ? "posto non ha" : "posti non hanno"} la posizione nel file: ne cerco su Google al massimo {MAX_CALLS} ora, gli altri li completi da qui un gruppo al giorno.
+                <p className="mt-3 text-xs text-text-muted" data-testid="file-avviso-csv">
+                  La posizione dei posti delle liste la cerco io su Google: al massimo {MAX_CALLS} ora, gli altri domani.
                 </p>
               )}
 
@@ -361,9 +369,9 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
 
           {phase === "done" && (
             <>
-              <div className="mt-4 rounded-card border border-success/30 bg-success/10 p-4 text-center" data-testid="file-fatto">
-                <p className="font-display text-lg font-semibold text-text">
-                  {done.salvati > 0 ? `Salvati ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
+              <div id="file-esito" className="mt-4 scroll-mt-4 rounded-card bg-success/10 px-4 py-3" data-testid="file-fatto">
+                <p className="text-[15px] font-semibold text-text">
+                  <span aria-hidden>✅ </span>{done.salvati > 0 ? `${done.salvati === 1 ? "Salvato" : "Salvati"} ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
                   {[done.gia ? `${done.gia} li avevi già` : "", done.attesa ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
@@ -379,14 +387,12 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
                 // (revisore 2/11: niente tre livelli annidati). Una raccolta sola: "Apri la raccolta" è l'azione principale.
                 <div className="mt-4" data-testid="file-raccolte">
                   <p className="text-sm font-semibold text-text">{raccolte.length === 1 ? "La tua raccolta" : `Le tue ${raccolte.length} raccolte`}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-3">
-                    {raccolte.slice(0, 6).map((r) => (
-                      <Link key={r.tag} href={collectionPath(r.tag)} className="block" data-testid="file-raccolta">
-                        <RaccoltaCopertina name={r.tag} count={r.count} emojis={r.emojis} compact />
+                  {raccolte.length === 1 ? (
+                    <div className="mt-2 flex items-center gap-4">
+                      <Link href={collectionPath(raccolte[0].tag)} className="block w-40 shrink-0" data-testid="file-raccolta">
+                        <RaccoltaCopertina name={raccolte[0].tag} count={raccolte[0].count} emojis={raccolte[0].emojis} compact riempi />
                       </Link>
-                    ))}
-                    {raccolte.length === 1 && (
-                      <div className="flex flex-col justify-center gap-2">
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <Link href={collectionPath(raccolte[0].tag)} className="inline-flex min-h-12 items-center justify-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white" data-testid="file-raccolta-apri">
                           Apri la raccolta
                         </Link>
@@ -394,8 +400,16 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
                           Sulla mappa
                         </Link>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      {raccolte.slice(0, 6).map((r) => (
+                        <Link key={r.tag} href={collectionPath(r.tag)} className="block" data-testid="file-raccolta">
+                          <RaccoltaCopertina name={r.tag} count={r.count} emojis={r.emojis} compact riempi />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                   {raccolte.length > 1 && (
                     <Link href="/mappa?vista=salvati" className="mt-3 flex min-h-12 w-full items-center justify-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
                       Vedili sulla mappa

@@ -8408,7 +8408,7 @@ if (fakeUser) {
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await tp.getByTestId("importa-tessera-file").click();
   const tc = tp.getByTestId("importa-file");
-  ok(await tc.getByText("Tutti i salvati di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
+  ok(await tc.getByText("Tutti i posti che hai salvato in Google Maps").isVisible() && (await tc.locator("h2").count()) === 0 && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, senza il titolo doppio della riga, i passi si aprono solo a richiesta");
   await tp.getByTestId("file-aiuto").click();
   const passi = await tp.getByTestId("file-passi").textContent();
   ok(passi.includes("takeout.google.com") && passi.includes("Saved Places.json") && (await tp.getByTestId("file-passi").locator("li").count()) === 3 && (await tp.getByRole("link", { name: "takeout.google.com" }).getAttribute("href")) === "https://takeout.google.com/", "file Takeout: 3 passi con il link a takeout.google.com");
@@ -8419,7 +8419,7 @@ if (fakeUser) {
   ]);
   await tp.getByTestId("file-anteprima").waitFor({ timeout: 5000 }).catch(() => {});
   const ries = (await tp.getByTestId("file-riepilogo").textContent().catch(() => "")).replace(/\s+/g, " ");
-  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 senza posizione", `file Takeout: anteprima per città ("${ries}")`);
+  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 dalle liste", `file Takeout: anteprima per città ("${ries}")`);
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
   ok(scart.includes("Lasciati fuori 3") && scart.includes("albergo") && scart.includes("museo"), `file Takeout: hotel, museo e punto senza nome lasciati fuori e detti ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();
