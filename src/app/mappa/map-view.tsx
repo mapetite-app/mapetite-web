@@ -29,7 +29,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
-import { contestoIdee, percheMomento, secondaIdea } from "@/lib/idee";
+import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
@@ -1040,8 +1040,6 @@ export default function MapView({
     return () => { alive = false; };
   }, []);
   const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
-  // Seconda idea dello stesso momento nel pannello Idee (src/lib/idee.ts).
-  const ideaDue = momentHour == null ? null : secondaIdea(new Date(), weather);
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   // Barra in uso (cursore dentro): la frase si scrive nel campo; fuori, con i risultati, si legge intera su 2 righe.
@@ -2875,27 +2873,22 @@ export default function MapView({
             data-testid="idee-pannello"
             className={`pointer-events-auto max-h-[calc(100dvh-14rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto rounded-card bg-surface p-2 shadow-float lg:w-auto lg:max-w-none ${ideasShown ? "" : "hidden"}`}
           >
-            {/* Ordinato (Lorenzo, 1/11: "troppe e randomiche"): il momento con il suo contesto, poi al massimo
-                3 idee tue, poi le recenti (o gli esempi per chi non ha ancora cercato) in una riga sola.
-                "Parla con l'assistente" è già nella barra in basso: niente doppione. */}
+            {/* Al massimo 4 righe, ognuna con un significato diverso (revisore del 2/11: di notte tre righe
+                dicevano "aperto adesso"; src/lib/idee.ts): cosa fa per quest'ora, cosa c'è aperto vicino a te,
+                le tue idee (gusti, salvati) o Sorprendimi. "Stasera dove andiamo?" sta nei Salvati, accanto al
+                "+": qui sarebbe un doppione. "Parla con l'assistente" è già nella barra in basso. */}
             <div className="px-2 pb-1 pt-1">
               <p className="font-title text-xl font-semibold leading-tight text-text">Idee</p>
               {momentHour != null && <p data-testid="idee-contesto" className="text-xs font-sans text-text-muted">{contestoIdee(new Date(), weather)}</p>}
             </div>
             <IdeaGroup title="Adesso" hideTitle>
               {momentExample && (
-                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={momentExample.replace(/^\S+\s/, "")} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
+                <IdeaRow testId="suggerimento-momento" emoji={momentExample.split(" ")[0]} title={titoloMomento(momentExample)} sub={percheMomento(new Date(), weather)} onClick={() => { const q = momentExample.replace(/^\S+\s/, ""); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
               )}
-              {ideaDue && (
-                <IdeaRow testId="suggerimento-momento-2" label={ideaDue.query} emoji={ideaDue.emoji} title={ideaDue.title} sub={ideaDue.sub} onClick={() => { setIdeasOpen(false); setAiQuery(ideaDue.query); void runAISearch(ideaDue.query); }} />
-              )}
-              <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub={nearNowQuery(new Date()).sub} onClick={searchNearNow} />
+              <IdeaRow testId="vicino-adesso" emoji="📍" title="Vicino a me, aperto adesso" sub="Entro 1 km da te" onClick={searchNearNow} />
             </IdeaGroup>
             <IdeaGroup title="Per te" hideTitle>
               {(() => { const mie = [
-                userId && savedPlaces.length > 0 ? (
-                  <IdeaRow key="stasera" testId="idee-stasera" emoji="🍽️" title="Stasera dove andiamo?" sub="Tre proposte dai tuoi salvati" href="/stasera" />
-                ) : null,
                 tasteSuggestion ? (
                   <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
                 ) : null,
@@ -2903,10 +2896,11 @@ export default function MapView({
                   <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
                 ) : null,
               ].filter(Boolean);
-              // Al massimo 3 righe: le idee tue prima, "Sorprendimi" solo se resta posto.
+              // Le 2 righe di "Adesso" più al massimo 2 qui (IDEE_MAX): le idee tue prima, "Sorprendimi" se resta posto.
+              const posto = IDEE_MAX - 2;
               return (<>
-                {mie}
-                {mie.length < 3 && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />}
+                {mie.slice(0, posto)}
+                {mie.length < posto && <IdeaRow testId="mappa-sorprendimi" emoji="🎲" title="Sorprendimi" sub="Un posto nuovo adatto a te" href={`/sorprendimi?da=mappa&lat=${viewState.latitude.toFixed(4)}&lng=${viewState.longitude.toFixed(4)}`} />}
               </>); })()}
             </IdeaGroup>
             {recentOn && (JSON.parse(recentSearches) as string[]).length > 0 ? (

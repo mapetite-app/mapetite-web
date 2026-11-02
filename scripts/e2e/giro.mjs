@@ -199,10 +199,10 @@ await idee(page);
   // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
   ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
-    ok(adesso === 3 && perTe >= 1 && perTe <= 3 && righe <= 6, `Idee: al massimo 6 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
+    ok(adesso === 2 && perTe >= 1 && perTe <= 2 && righe <= 4, `Idee: al massimo 4 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
   { const es = pan.locator("section").filter({ hasText: /^Prova a chiedere/ }).getByRole("button"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
     ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
-  ok(((await pan.getByTestId("suggerimento-momento-2").textContent()) ?? "") !== ((await pan.getByTestId("suggerimento-momento").textContent()) ?? ""), "Idee: la seconda idea del momento è diversa dalla prima");
+  ok((await pan.getByTestId("idee-stasera").count()) === 0 && (await pan.getByTestId("suggerimento-momento-2").count()) === 0, "Idee: niente 'Stasera dove andiamo?' (sta nei Salvati) né una seconda idea dello stesso momento");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
@@ -1609,6 +1609,33 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
   ok(txt.includes(atteso), `suggerimento col meteo: "${txt}" contiene "${atteso}"`);
   await wctx.close();
 }
+// Idee in ogni fascia oraria (revisore del 2/11: di notte "Locale aperto adesso qui vicino", "Cocktail bar aperto"
+// e "Vicino a me, aperto adesso" dicevano la stessa cosa): al massimo 4 righe, nessun significato ripetuto,
+// niente "Stasera dove andiamo?". Orologio fisso, meteo simulato (nessun costo).
+{
+  const CONCETTI = { vicino: /vicin|qui intorno/i, "aperto ora": /aper(to|ti|ta) (adesso|ora)|a quest'ora/i, drink: /cocktail|drink|\bpub\b/i, colazione: /colazion|cornett|brunch/i, pranzo: /pranz/i, cena: /\bcena\b/i, aperitivo: /aperitiv/i, gelato: /gelat/i, vino: /wine|\bvino\b|enotec/i, trattoria: /trattori/i, dolci: /pasticc|merenda|\bdolc/i, pizza: /pizz/i, stasera: /stasera dove/i };
+  const casi = [["03:00", null], ["05:30", null], ["08:00", null], ["13:00", null], ["16:30", null], ["19:30", null], ["22:00", null], ["23:30", null],
+    ["08:00", { temperature_2m: 9, precipitation: 3, weather_code: 63 }], ["13:00", { temperature_2m: 26, precipitation: 0, weather_code: 1 }], ["19:30", { temperature_2m: 6, precipitation: 0, weather_code: 2 }], ["21:30", { temperature_2m: 12, precipitation: 2, weather_code: 61 }]];
+  const ictx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await ictx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  for (const [ora, meteo] of casi) {
+    await ictx.unroute("**/api.open-meteo.com/**").catch(() => {});
+    await ictx.route("**/api.open-meteo.com/**", (r) => (meteo ? r.fulfill({ json: { current: meteo } }) : r.fulfill({ status: 503, body: "" })));
+    const ip = await ictx.newPage();
+    await ip.addInitScript(() => { try { sessionStorage.clear(); } catch { /* ignorato */ } });
+    await ip.clock.setFixedTime(new Date(`2026-11-02T${ora}:00`));
+    await ip.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await ip.waitForTimeout(400);
+    await idee(ip);
+    const righe = (await ip.getByTestId("idee-pannello").locator("li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+    const doppi = Object.entries(CONCETTI).filter(([, re]) => righe.filter((r) => re.test(r)).length > 1).map(([k]) => k);
+    const nome = `${ora}${meteo ? (meteo.precipitation > 0 ? " pioggia" : ` ${meteo.temperature_2m}°`) : ""}`;
+    ok(righe.length <= 4 && doppi.length === 0 && (await ip.getByTestId("idee-stasera").count()) === 0, `Idee alle ${nome}: ${righe.length} righe, nessun doppione${doppi.length ? " (ripetuti: " + doppi.join(", ") + ")" : ""} — ${righe.join(" | ")}`);
+    await ip.close();
+  }
+  await ictx.close();
+}
 // Per i ristoratori (piano 8.3b): pagina pubblica con i tre piani, il modulo di richiesta e l'esempio del pannello.
 { const r = await page.goto(`${BASE}/per-i-ristoratori`, { waitUntil: "networkidle" });
   ok(r?.status() === 200 && (await page.getByTestId("piano").count()) === 3 && (await page.getByTestId("rivendica").getAttribute("href")) === "/per-i-ristoratori/rivendica" && (await page.getByTestId("pannello-demo").getAttribute("href")) === "/ristoratore/demo", "per i ristoratori: tre piani, 'Rivendica il tuo locale' porta al modulo e c'è il pannello d'esempio");
@@ -1772,6 +1799,8 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  // Revisore del 2/11: con i salvati "Stasera dove andiamo?" era nelle Idee e nei Salvati. Ora solo nei Salvati.
+  ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 4, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 4 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
   // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie tra i salvati
   // in parallelo; restano solo quelli veri e vicini a dove si cerca (Caffè Milano no: si cerca a Roma).
   { const chiesti = [];
