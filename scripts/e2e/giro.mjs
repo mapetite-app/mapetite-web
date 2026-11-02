@@ -48,6 +48,13 @@ const SYNTH = {
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
+// Il campo per incollare un link a mano (revisore 2/11, quinto giro: niente più "Scrivi o incolla a mano"):
+// compare quando "Incolla" non trova niente negli appunti.
+const campoLink = async (pg) => {
+  await pg.evaluate(() => navigator.clipboard.writeText("")).catch(() => {});
+  await pg.getByTestId("importa-google").getByTestId("importa-incolla").click();
+  await pg.getByTestId("importa-google").getByLabel("Link da incollare").waitFor({ timeout: 3000 });
+};
 // Pannello "Ti suggeriamo" (Lorenzo 16/10): sulla mappa i suggerimenti stanno dietro il pulsante "Idee".
 async function idee(pg) {
   const pan = pg.getByTestId("idee-pannello");
@@ -1537,6 +1544,23 @@ ok(await page.getByTestId("importa-incolla").isVisible() && (await page.getByRol
 { const tiles = await page.getByTestId("importa-tessere").getByRole("button").allTextContents();
   ok(tiles.length === 3 && ["Da uno screenshot", "Scrivi il nome", "Tutti i salvati di Google Maps"].every((t, i) => tiles[i]?.includes(t)), `importa: 3 righe Da uno screenshot · Scrivi il nome · Tutti i salvati di Google Maps (${tiles.length})`); }
 ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page.getByText("Da file di Google", { exact: true }).count()) === 0, "importa: niente tessera 'Da Google Maps' (doppione di Incolla, giro D50) né 'Da file di Google' (D51)");
+// Revisore 2/11 (quinto giro): "Scrivi o incolla a mano" nel riquadro era un doppione di "Scrivi il nome" (resta solo
+// la riga; il campo per i link compare da solo se Incolla non legge gli appunti). Righe "Altri modi" in Inter medio
+// color inchiostro, non Poppins teal. "Ultimi aggiunti": solo con salvati veri (qui zero salvati: non compare).
+{ const look = await page.getByTestId("importa-tessera-titolo").evaluateAll((els) => els.map((e) => { const c = getComputedStyle(e); return { f: c.fontFamily.split(",")[0].replace(/"/g, ""), w: c.fontWeight, col: c.color }; }));
+  ok(look.length === 3 && look.every((x) => /Inter/i.test(x.f) && x.w === "500" && x.col !== "rgb(26, 60, 64)") && (await page.getByRole("button", { name: "Scrivi o incolla a mano" }).count()) === 0 && (await page.getByTestId("importa-ultimi").count()) === 0, `importa: righe 'Altri modi' in Inter medio inchiostro, niente 'Scrivi o incolla a mano', niente 'Ultimi aggiunti' senza salvati (${JSON.stringify(look[0])})`); }
+{ const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16 } });
+  await page.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [pr(1, "Trattoria Milanese Uno", "restaurant", null), pr(2, "Bar Due", "bar", ["Già visitato"]), pr(3, "Gelateria Tre", "ice_cream_shop", ["Da provare"])] }));
+  await page.reload({ waitUntil: "networkidle" });
+  const ult = page.getByTestId("importa-ultimi");
+  await ult.waitFor({ timeout: 6000 }).catch(() => {});
+  const righe = await ult.getByTestId("importa-ultimi-riga").allTextContents().catch(() => []);
+  const href = await ult.getByTestId("importa-ultimi-riga").first().getAttribute("href").catch(() => null);
+  const tl = await page.getByTestId("importa-tessere").boundingBox(); const ub = await ult.boundingBox().catch(() => null);
+  ok(righe.length === 3 && righe[0].includes("Trattoria Milanese Uno") && righe[1].includes("Bar Due") && href === "/mappa?salvato=00000000-0000-4000-8000-000000000301" && !!tl && !!ub && ub.y > tl.y + tl.height, `importa: 'Ultimi aggiunti' con gli ultimi 3 salvati veri sotto 'Altri modi', un tocco apre la scheda (${righe.join(" | ")})`);
+  await page.screenshot({ path: `${OUT}/19b-importa-ultimi.png`, fullPage: true, caret: "initial" });
+  await page.unroute("**/rest/v1/saved_places**");
+  await page.reload({ waitUntil: "networkidle" }); }
 { const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
   const rh = await page.getByTestId("importa-tessera-shot").boundingBox();
   ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 - 64 && rh && rh.height <= 72, `importa: Incolla grande sopra 'Altri modi', righe compatte, tutto sopra la barra (${Math.round(inc?.height ?? 0)}px, righe ${Math.round(rh?.height ?? 0)}px, fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
@@ -3407,7 +3431,7 @@ if (!fakeUser) {
   // Instagram incollato con un nome nel testo: l'AI legge il testo, una ricerca, "È questo?" se il nome non combacia.
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   const gcard = mp.getByTestId("importa-google");
-  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
+  await campoLink(mp);
   await gcard.getByLabel("Link da incollare").fill("Pizzeria Bella a Roma 🍕 https://www.instagram.com/reel/ABC123/?igsh=xyz");
   const sI = mSearch.length;
   const wI = mWrites.length;
@@ -3444,7 +3468,7 @@ if (!fakeUser) {
   // TikTok incollato: si legge il video da solo e si salva se combacia (nessun tocco in più).
   await mp.evaluate(() => sessionStorage.clear());
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
+  await campoLink(mp);
   await gcard.getByLabel("Link da incollare").fill("https://vm.tiktok.com/ZMabc123/");
   const sT = mSearch.length;
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
@@ -3454,7 +3478,7 @@ if (!fakeUser) {
   await gcard.getByTestId("reel-salvato").scrollIntoViewIfNeeded();
   await mp.screenshot({ path: `${OUT}/39-importa-da-tiktok.png`, caret: "initial" });
   await mp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-  await gcard.getByRole("button", { name: "Scrivi o incolla a mano" }).click();
+  await campoLink(mp);
   await gcard.getByLabel("Link da incollare").fill("https://www.youtube.com/shorts/abcDEF");
   await gcard.getByRole("button", { name: "Salva", exact: true }).click();
   await gcard.getByTestId("reel-salvato").waitFor({ timeout: 6000 }).catch(() => {});
@@ -6971,7 +6995,7 @@ if (fakeUser) {
   await mc.getByRole("button", { name: "Incolla altri link" }).click();
   ok((await mc.count()) === 0, "incolla più link: 'Incolla altri link' torna all'unico Incolla");
   const n0 = previews.length;
-  await mp.getByTestId("importa-google").getByRole("button", { name: "Scrivi o incolla a mano" }).click();
+  await campoLink(mp);
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");

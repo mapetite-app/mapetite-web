@@ -8,6 +8,7 @@ import SalvaDaTelefono from "./salva-da-telefono";
 import ManualAddCard from "./manual-add-card";
 import MultiLinkCard from "./multi-link-card";
 import TakeoutCard from "./takeout-card";
+import SalvatiBrevi from "@/components/salvati-brevi";
 import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
 import { addReel } from "@/lib/community-write";
@@ -325,7 +326,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
           >
             <span aria-hidden className="text-2xl leading-none">{t.icon}</span>
             <span className="min-w-0 flex-1">
-              <span className="block font-display text-[15px] font-semibold leading-tight text-brand">{t.title}</span>
+              {/* Revisore 2/11 (quinto giro): righe in Inter medio color inchiostro, non Poppins teal. */}
+              <span data-testid="importa-tessera-titolo" className="block font-sans text-[15px] font-medium leading-tight text-text">{t.title}</span>
               <span className="block truncate text-xs text-text-muted">{t.text}</span>
             </span>
             <span aria-hidden className={`text-lg text-text-muted transition-transform ${panel === t.id ? "rotate-90" : ""}`}>›</span>
@@ -524,6 +526,10 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         </p>
       )}
       </section>
+
+      {/* Revisore 2/11 (quinto giro): la metà sotto era vuota. Gli ultimi 3 salvati veri (un tocco apre la
+          scheda); senza salvati, senza accesso o senza rete non compare niente. */}
+      <SalvatiBrevi userId={userId} titolo="Ultimi aggiunti" testid="importa-ultimi" max={3} className="mt-8" />
     </div>
     </div>
   );

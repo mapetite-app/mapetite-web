@@ -134,7 +134,9 @@ export default function GoogleMapsCard({
             Google Maps, un reel o una chat di link
           </p>
 
-          {(showField || pending) ? (
+          {/* Revisore 2/11 (quinto giro): niente più "Scrivi o incolla a mano" qui (sembrava "Scrivi il nome" in
+              Altri modi): il campo compare da solo quando "Incolla" non riesce a leggere gli appunti. */}
+          {(showField || pending) && (
             <div className="mt-3 space-y-2">
               <textarea
                 value={text}
@@ -153,14 +155,6 @@ export default function GoogleMapsCard({
                 Salva
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowField(true)}
-              className="mt-1 min-h-11 w-full text-center text-sm text-white/80 underline"
-            >
-              Scrivi o incolla a mano
-            </button>
           )}
 
           {error && <p className="mt-3 rounded-btn bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
