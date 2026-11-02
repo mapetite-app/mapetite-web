@@ -3637,10 +3637,10 @@ else {
   // carta del gusto) e "in arrivo" piccolo in fondo. Senza posti visitati la sezione "Da consigliare" non c'è.
   { const intanto = sp.getByTestId("amici-intanto");
     ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0, "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
-    const nota = sp.getByTestId("amici-in-arrivo");
-    const fs = await nota.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-    const ib = await intanto.getByTestId("amici-carta-gusto").boundingBox(); const nb = await nota.boundingBox();
-    ok(/in arrivo/.test((await nota.textContent()) ?? "") && fs <= 13 && !!ib && !!nb && nb.y > ib.y, `amici: 'in arrivo' è una riga piccola in fondo (${fs}px)`);
+    // Revisore 2/11 (quarto giro): niente riga "in arrivo", niente indirizzo grezzo, titolo dell'invito senza Poppins.
+    { const t = (await intanto.innerText()) ?? "";
+      const font = await intanto.getByTestId("invita-amico").locator("p").first().evaluate((el) => `${getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "")} ${getComputedStyle(el).fontWeight}`);
+      ok((await sp.getByTestId("amici-in-arrivo").count()) === 0 && !/in arrivo/i.test(t) && !t.includes("/invito/") && t.includes("Il tuo link d'invito") && /Inter/i.test(font) && !/Poppins/i.test(font), `amici: niente 'in arrivo', link d'invito scritto in parole, titolo in Inter (${font})`); }
     const bg = await sp.getByTestId("amici").evaluate((el) => getComputedStyle(el.parentElement).backgroundColor);
     ok(!((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(248, 246, 242)", `amici: niente emoji 👥, fondo carta (${bg})`); }
   // Con posti visitati: "Da consigliare", prima quelli che ti sono piaciuti, mai quelli che "non fanno per te";
@@ -7142,7 +7142,8 @@ else {
   pp.on("pageerror", (e) => errors.push(e.message));
   await pp.goto(`${BASE}/profilo#invita`, { waitUntil: "networkidle" });
   ok((await pp.getByTestId("invito-mappa-gusto").count()) === 0, "profilo: con la mappa del gusto già fatta, nessun invito a farla");
-  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/lorenzo", `profilo: 'Invita un amico' con il proprio link (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  // Revisore 2/11 (quarto giro): si legge "Il tuo link d'invito", non l'indirizzo grezzo (che resta in data-path).
+  ok((await pp.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/lorenzo" && ((await pp.getByTestId("invita-amico-link").textContent()) ?? "").trim() === "Il tuo link d'invito" && ((await pp.getByTestId("invita-amico-condividi").textContent()) ?? "").includes("Condividi"), `profilo: 'Invita un amico' con il proprio link, scritto in parole (${await pp.getByTestId("invita-amico-link").getAttribute("data-path")})`);
   await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico.png`, caret: "initial" });
   // Mappa del gusto (sprint 25/10): chi si è registrato prima riceve l'invito a farla, in cima al profilo.
@@ -7168,7 +7169,7 @@ else {
   // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
   await ictx.clearCookies({ name: "e2e_social" });
   await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
-  ok((await pp.getByTestId("invita-amico-link").textContent()) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").textContent()})`);
+  ok((await pp.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").getAttribute("data-path")})`);
   await ictx.close();
 
   // Pannello: arrivi e registrazioni per codice; chi arriva anonimo e poi si registra conta una volta.

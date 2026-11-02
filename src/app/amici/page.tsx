@@ -47,7 +47,7 @@ export default async function AmiciPage() {
       <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
     </div>
   );
-  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-4 text-sm font-display font-semibold text-brand active:scale-95";
+  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-4 text-sm font-sans font-medium text-brand active:scale-95";
 
   return (
     // Fondo carta come Salvati (revisore 1/11, terzo giro).
@@ -92,7 +92,7 @@ export default async function AmiciPage() {
 
           {feed.seguiti.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">
-              <h2 id="seguiti-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Chi segui · {feed.seguiti.length}</h2>
+              <h2 id="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Chi segui · {feed.seguiti.length}</h2>
               <ul data-testid="seguiti" className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
                 {feed.seguiti.map((p) => (
                   <li key={p.id} className="shrink-0">
@@ -109,7 +109,7 @@ export default async function AmiciPage() {
           {scopritori && <ScopritoriAmici amici={scopritori} mie={mieGemme} viewer={viewer} />}
 
           <section className="mt-6" aria-labelledby="attivita-titolo">
-            <h2 id="attivita-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Attività</h2>
+            <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
             {feed.seguiti.length === 0 ? (
               <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e8e2d8] bg-white p-5 text-center">
                 <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>

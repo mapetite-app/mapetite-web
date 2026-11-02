@@ -25,7 +25,7 @@ export default function ScopritoriAmici({ amici, mie, viewer }: { amici: Scoprit
   return (
     <section className="mt-6" aria-labelledby="scopritori-titolo" data-testid="scopritori-amici">
       <TracciaFunzione nome="scopritori_amici_vista" />
-      <h2 id="scopritori-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">💎 Scopritori tra i tuoi amici</h2>
+      <h2 id="scopritori-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">💎 Scopritori tra i tuoi amici</h2>
       <p className="mt-0.5 text-xs text-text-muted">Chi trova più posti poco conosciuti. Provarli vale doppio.</p>
       <ol className="mt-2 divide-y divide-border rounded-card border border-border bg-white">
         {top.map((r) => {

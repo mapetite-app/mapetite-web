@@ -697,7 +697,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
             </p>
             {/* Revisore 2/11: tre domande intere in un riquadro, come "Prova a chiedere" della mappa; le altre
                 (prenotazione, serata a tappe) si aggiungono sotto con "Altre idee". */}
-            <p className="mt-6 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Prova a chiedere</p>
+            <p className="mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Prova a chiedere</p>
             <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
               {EXAMPLES.slice(0, moreIdeas ? EXAMPLES.length : PRIME).map((e, i) => (
                 <li key={e.text} data-testid={i >= PRIME ? "assistente-idea-in-piu" : undefined}>

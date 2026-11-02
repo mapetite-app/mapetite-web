@@ -11,7 +11,7 @@ import type { MySavedRow } from "@/lib/raccolte-server";
 // Amici quando la parte social non c'è ancora (revisore 2/11: "Gli amici arrivano presto" era un vicolo
 // cieco in una demo). Solo cose vere che funzionano già: il proprio link d'invito, i posti dove sei stato
 // da mandare a un amico (pagina pubblica /locali/<UUID>, si apre anche senza account) e la carta del gusto.
-// "Seguire gli amici" resta una riga piccola in fondo, senza promesse.
+// Revisore 2/11 (quarto giro): niente più la riga "Seguire gli amici: in arrivo" (una promessa in una demo).
 const DONE = STATE_TAGS[1];
 const MAX_CONSIGLI = 5;
 
@@ -28,11 +28,11 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
 
       {consigli.length > 0 && (
         <section aria-labelledby="consigli-titolo" className="-mt-3">
-          <h2 id="consigli-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Da consigliare</h2>
+          <h2 id="consigli-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Da consigliare</h2>
           <p className="mt-0.5 text-sm text-text-muted">Posti dove sei stato: mandane uno a chi esce con te.</p>
           <ul data-testid="amici-consigli" className="mt-2 divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
             {consigli.map((r) => {
-              const meta = [categoryLabel(r.category), cityFromAddress(r.address)].filter(Boolean).join(" · ");
+              const meta = [categoryLabel(r.category, r.name), cityFromAddress(r.address)].filter(Boolean).join(" · ");
               const piaciuto = r.tags.includes(OPINION_LIKE);
               return (
                 <li key={r.placeId} data-testid="amici-consiglio" className="flex items-center gap-3 px-3 py-2.5">
@@ -70,7 +70,6 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
         <ChevronRight aria-hidden size={16} className="text-text-muted" />
       </Link>
 
-      <p data-testid="amici-in-arrivo" className="mt-6 text-center text-xs text-text-muted">Seguire gli amici e vedere dove vanno: in arrivo.</p>
     </div>
   );
 }
