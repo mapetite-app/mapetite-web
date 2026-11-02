@@ -58,7 +58,7 @@ async function previewLink(link: string, budget: number): Promise<Preview> {
 const STEPS: React.ReactNode[] = [
   <>Apri <a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">takeout.google.com</a>, tocca <b>Deseleziona tutto</b> e scegli solo <b>Salvati</b> e <b>Maps (i tuoi luoghi)</b>.</>,
   <>Tocca <b>Passaggio successivo</b> → <b>Crea esportazione</b>. Google ti manda un’email con il file, di solito in pochi minuti.</>,
-  <>Apri lo zip: nella cartella <b>Salvati</b> c’è un file <b>.csv</b> per ogni lista. Caricali qui, anche tutti insieme: ogni lista diventa una raccolta.</>,
+  <>Apri lo zip e carica qui <b>Saved Places.json</b> e i file <b>.csv</b> della cartella <b>Salvati</b> (uno per lista), anche tutti insieme: ogni lista diventa una raccolta.</>,
 ];
 
 export default function TakeoutCard({ userId }: { userId: string | null }) {
