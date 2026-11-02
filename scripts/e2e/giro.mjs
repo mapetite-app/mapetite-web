@@ -92,6 +92,26 @@ async function apriOpzioni(pg) {
   await pg.getByTestId("opzioni-ricerca").click();
   await pan.waitFor({ timeout: 3000 });
 }
+// Inquadratura dopo una ricerca (revisore del 1/11, 05c/05f): segnalini dei risultati nella parte libera della mappa
+// (sotto la pillola "N posti", sopra la frase e le card) e nessun segnalino sopra un altro. `esclusi`: id lontanissimi
+// che non devono allargare la mappa.
+async function inquadratura(pg, esclusi = []) {
+  return pg.evaluate((esclusi) => {
+    const pill = document.querySelector("[data-testid=opzioni-ricerca]")?.getBoundingClientRect();
+    const sopra = (document.querySelector("[data-testid=frase-risultati]") ?? document.querySelector("ul.snap-x"))?.getBoundingClientRect();
+    const pins = [...document.querySelectorAll("[data-testid=pin]")].filter((e) => !esclusi.includes(e.dataset.place)).map((e) => ({ id: e.dataset.place, r: (e.firstElementChild ?? e).getBoundingClientRect() }));
+    const fuori = pins.filter(({ r }) => r.top < (pill?.bottom ?? 0) || r.bottom > (sopra?.top ?? 844) || r.left < 0 || r.right > window.innerWidth).map((p) => p.id);
+    const sovrapposti = [];
+    pins.forEach((a, i) => pins.forEach((b, j) => {
+      if (j <= i) return;
+      const ca = { x: a.r.left + a.r.width / 2, y: a.r.top + a.r.height / 2 }, cb = { x: b.r.left + b.r.width / 2, y: b.r.top + b.r.height / 2 };
+      // Più di un terzo del più piccolo coperto: si legge come un grumo.
+      if (Math.hypot(ca.x - cb.x, ca.y - cb.y) < (a.r.width + b.r.width) / 2 - Math.min(a.r.width, b.r.width) / 3) sovrapposti.push(`${a.id}/${b.id}`);
+    }));
+    const ys = pins.map((p) => p.r.top), xs = pins.map((p) => p.r.left);
+    return { n: pins.length, fuori, sovrapposti, altezza: Math.round(Math.max(...ys) - Math.min(...ys)), larghezza: Math.round(Math.max(...xs) - Math.min(...xs)), libera: Math.round((sopra?.top ?? 844) - (pill?.bottom ?? 0)) };
+  }, esclusi);
+}
 // Chiavi dei segnali che /api/events conserva (le altre le scarta in silenzio): lette dal codice
 // del server, così un segnale con una chiave sbagliata non sembra arrivato quando non lo è.
 const SERVER_PROP_KEYS = [...(readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8").match(/const PROP_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
@@ -860,8 +880,12 @@ await page.waitForTimeout(1500);
   const top = ["Folla 1", "Folla 2", "Folla 3", "Folla 4", "Folla 5"];
   const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
-  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length < 5, `mappa affollata: pin uno sopra l'altro, resta solo il nome del primo (${labels.filter(Boolean).join(", ")})`);
+  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
+  // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
+  const q = await inquadratura(page, ["F11"]);
+  ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);
+  ok(q.altezza >= 40 || q.larghezza >= 40, `mappa affollata: mappa vicina ai risultati, non a tutta Roma (gruppo largo ${q.larghezza}x${q.altezza} px)`);
   ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Folla 1"), "mappa affollata: il pin della prima card è visibile ed evidenziato");
   await shot("05c-mappa-affollata");
 }
@@ -1099,6 +1123,10 @@ if (shared) {
   });
   ok(urti.out.length === 0 && urti.nomi.length >= 2, `mappa: nessun nome sopra un altro nome o un altro segnalino, dentro lo schermo (${urti.nomi.join(", ")}${urti.out.length ? " — " + urti.out.join("; ") : ""})`);
   ok(urti.nomi.includes("Casa Encanto Roma"), "mappa: il nome della prima card resta sempre in vista");
+  // Revisore del 1/11 (05f): i 12 risultati in pochi isolati riempiono la parte libera e non si sovrappongono.
+  { const q = await inquadratura(page);
+    ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 8, `mappa: i ${q.n} segnalini stanno nella parte libera e non si coprono${q.fuori.length ? " (fuori: " + q.fuori.join(",") + ")" : ""}${q.sovrapposti.length ? " (sovrapposti: " + q.sovrapposti.join(" ") + ")" : ""}`);
+    ok(q.altezza >= q.libera * 0.4 || q.larghezza >= 390 * 0.5, `mappa: il gruppo usa la parte libera (${q.larghezza}x${q.altezza} px su ${q.libera} px liberi)`); }
   const font = await page.locator("ul.snap-x li[data-id=T1]").getByTestId("nome-card").evaluate((el) => getComputedStyle(el).fontFamily);
   ok(/newsreader/i.test(font), `card: il nome del locale in serif (Newsreader) come in Salvati e nella scheda (${font.slice(0, 40)})`);
   await shot("05f-ter-nomi-mappa");

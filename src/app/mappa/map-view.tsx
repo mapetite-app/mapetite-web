@@ -33,7 +33,7 @@ import { contestoIdee, percheMomento, secondaIdea } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
-import { posizionaEtichette, pinName, project as projectMercator, type LabelSide, type MapItem } from "@/lib/pin-labels";
+import { posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
@@ -1887,11 +1887,16 @@ export default function MapView({
   // Sempre in vista: il selezionato, la card al centro e la prima card. La 2ª e la 3ª scelgono per prime
   // il posto, ma se intorno è tutto pieno si nascondono anche loro: un nome sopra un segnalino è
   // proprio il difetto da togliere. Calcolo a ogni disegno: pochi segnalini, nessun costo che si senta.
-  const latiEtichette: Record<string, LabelSide> = (() => {
+  // Segnalini uno sopra l'altro dopo una ricerca (revisore del 1/11, 05c/05f): si scostano di pochi
+  // pixel (separaSegnalini), e i nomi si posizionano intorno al segnalino scostato.
+  // Sempre un valore: il Marker non torna a [0, 0] da solo se riceve undefined.
+  const scostamentoDi = (id: string): [number, number] => [scostamenti[id]?.dx ?? 0, scostamenti[id]?.dy ?? 0];
+  const { lati: latiEtichette, scost: scostamenti } = ((): { lati: Record<string, LabelSide>; scost: Record<string, { dx: number; dy: number }> } => {
     const singoli = clusters.filter((c) => !c.properties.cluster).map((c) => c.properties.placeData as Place);
     const inRicerca = aiSearch !== null && clusterPlaces === null;
+    // In ricerca i nomi sono dei primi 5; gli altri solo avvicinando oltre lo zoom dell'inquadratura (16).
     const conNome = (place: Place) => (inRicerca
-      ? topPlaces.includes(place) || viewState.zoom >= 16
+      ? topPlaces.includes(place) || viewState.zoom >= 17
       : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id;
     const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
     const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
@@ -1914,16 +1919,22 @@ export default function MapView({
     }
     for (const p of pinSalvatiVisti) items.push({ id: `salvato-${p.id}`, lat: p.lat, lng: p.lng, size: 28 });
     // Posizioni a schermo dal centro della mappa e dalle sue misure: un nome non esce dal bordo.
-    if (!mapBox) return posizionaEtichette(items, viewState.zoom);
+    if (!mapBox) return { lati: posizionaEtichette(items, viewState.zoom), scost: {} };
     const pad = (viewState as { padding?: { top: number; bottom: number; left: number; right: number } }).padding;
     const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
     const cx = pad ? pad.left + (mapBox.w - pad.left - pad.right) / 2 : mapBox.w / 2;
     const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
-    return posizionaEtichette(items, viewState.zoom, {
-      project: (lat, lng) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; },
-      w: mapBox.w,
-      h: mapBox.h,
-    });
+    const proietta = (lat: number, lng: number) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; };
+    let scost: Record<string, { dx: number; dy: number }> = {};
+    if (inRicerca) {
+      scost = separaSegnalini(items.map((it) => {
+        const q = proietta(it.lat, it.lng);
+        // Centro del disegno: i segnalini stanno sopra il punto, i gruppi sono centrati.
+        return { id: it.id, x: q.x, y: it.anchor === "center" ? q.y : q.y - it.size / 2, size: it.size, fermo: it.id === selected?.id || it.id === focusId || it.id.startsWith("salvato-") };
+      }));
+      for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
+    }
+    return { lati: posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h }), scost };
   })();
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
@@ -1947,22 +1958,30 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number; sempre: { lat: number; lng: number }[] } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0) => {
+  // `sempre`: punti da mostrare comunque (i salvati scelti per la ricerca), mai trattati da lontanissimi.
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = []) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom }; return; }
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre }; return; }
     pendingFitRef.current = null;
-    const lngs = list.map((p) => p.lng);
-    const lats = list.map((p) => p.lat);
+    // Un risultato lontanissimo dagli altri non allarga la mappa (revisore del 1/11, 05c: a tutta Roma).
+    const inquadrati = [...puntiDaInquadrare(list), ...sempre];
+    const lngs = inquadrati.map((p) => p.lng);
+    const lats = inquadrati.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
+    // Parte libera sopra le card: barra in basso (64) + margine (12) + card (~200) + frase sopra le card
+    // (~52) + spazio per il nome sotto il segnalino (~30). Prima era metà schermo: con le card più basse
+    // i segnalini restavano schiacciati in alto.
+    const bottom = Math.min(Math.round(h * 0.5), 358) + extraBottom;
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom: Math.round(h * 0.5) + extraBottom, left: 40, right: 40 }, maxZoom: 15, duration: 900 },
+        // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: 40, right: 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -2508,21 +2527,29 @@ export default function MapView({
   const dalSalvatiChiave = dalSalvatiVisti.map((d) => d.place.id).join(",");
   useEffect(() => {
     if (!dalSalvati || dalSalvatiVisti.length === 0 || inquadratoPer.current === dalSalvati.ticket || isDesktop()) return;
-    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number } } } | null)?.getMap?.();
+    const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; isMoving: () => boolean; once: (ev: string, fn: () => void) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) return;
     inquadratoPer.current = dalSalvati.ticket;
+    const ticket = dalSalvati.ticket;
     const w = window.innerWidth, h = window.innerHeight;
     // Solo i salvati a due passi dai risultati spostano la mappa: un salvato a 4 km (Kiko Sushi Bar, giro
     // del 1/11, D20) allargava la vista a mezza Roma e i risultati finivano ammassati sul bordo. Quelli più
     // lontani restano nella riga "Dai tuoi salvati" e con il loro segnalino, fuori dall'inquadratura.
     const risultati = aiSearch?.risultati ?? [];
     const vicini = dalSalvatiVisti.filter(({ place }) => risultati.some((r) => distanceMeters(r, place) <= DAL_SALVATI_INQUADRA_METERS));
-    // Parte libera: sotto la barra in alto (190 px) e sopra riga + card (metà schermo più 60 px di riga).
-    const fuori = vicini.some(({ place }) => {
-      const pt = map.project([place.lng, place.lat]);
-      return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h * 0.5 - 60;
-    });
-    if (fuori) fitToPlaces([...risultati, ...vicini.map((d) => d.place)], 190, 60);
+    // Parte libera: sotto la barra in alto (190 px) e sopra riga + frase + card (come fitToPlaces, più 60 px di riga).
+    // Si guarda a mappa ferma: i salvati arrivano mentre la mappa sta ancora andando sui risultati, e a metà
+    // viaggio un salvato sembrava in vista per poi uscire quando la mappa si fermava più vicina.
+    const controlla = () => {
+      if (searchSeq.current !== ticket) return;
+      const fuori = vicini.some(({ place }) => {
+        const pt = map.project([place.lng, place.lat]);
+        return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
+      });
+      if (fuori) fitToPlaces(risultati, 190, 60, vicini.map((d) => d.place));
+    };
+    if (map.isMoving()) map.once("moveend", controlla);
+    else controlla();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando arrivano i salvati scelti
   }, [dalSalvatiChiave]);
 
@@ -3319,7 +3346,7 @@ export default function MapView({
           mapReadyRef.current = true;
           { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }
           const pending = pendingFitRef.current;
-          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom);
+          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom, pending.sempre);
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
@@ -3339,6 +3366,7 @@ export default function MapView({
                 longitude={lng}
                 latitude={lat}
                 anchor="center"
+                offset={scostamentoDi(`gruppo-${clusterId}`)}
                 onClick={(e) => {
                   e.originalEvent.stopPropagation();
                   const leaves = clusterIndex.getLeaves(clusterId, Infinity);
@@ -3370,6 +3398,8 @@ export default function MapView({
               longitude={place.lng}
               latitude={place.lat}
               anchor="bottom"
+              // Scostato di pochi pixel se coprirebbe un segnalino più importante (separaSegnalini).
+              offset={scostamentoDi(place.id)}
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
@@ -3453,6 +3483,7 @@ export default function MapView({
             longitude={p.lng}
             latitude={p.lat}
             anchor="bottom"
+            offset={scostamentoDi(`dai-salvati-${p.id}`)}
             style={{ zIndex: 1 }}
             onClick={(e) => { e.originalEvent.stopPropagation(); apriDaiSalvati(p, "pin"); }}
           >
