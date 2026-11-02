@@ -360,30 +360,50 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
           )}
 
           {phase === "done" && (
-            <div className="mt-4 rounded-card border border-success/30 bg-success/10 p-4 text-center" data-testid="file-fatto">
-              <p className="font-display text-lg font-semibold text-text">
-                {done.salvati > 0 ? `Salvati ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
-              </p>
-              <p className="mt-1 text-xs text-text-muted">
-                {[done.gia ? `${done.gia} li avevi già` : "", done.attesa ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
-              </p>
+            <>
+              <div className="mt-4 rounded-card border border-success/30 bg-success/10 p-4 text-center" data-testid="file-fatto">
+                <p className="font-display text-lg font-semibold text-text">
+                  {done.salvati > 0 ? `Salvati ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">
+                  {[done.gia ? `${done.gia} li avevi già` : "", done.attesa ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
+                </p>
+                {raccolte.length === 0 && (
+                  <Link href="/mappa?vista=salvati" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+                    Vedili sulla mappa
+                  </Link>
+                )}
+              </div>
               {raccolte.length > 0 && (
-                // Proposta 39: le liste di Google diventate raccolte, come copertine (un tocco per aprirle).
-                <div className="mt-4 text-left" data-testid="file-raccolte">
+                // Proposta 39: le liste di Google diventate raccolte, come copertine fuori dal riquadro dell'esito
+                // (revisore 2/11: niente tre livelli annidati). Una raccolta sola: "Apri la raccolta" è l'azione principale.
+                <div className="mt-4" data-testid="file-raccolte">
                   <p className="text-sm font-semibold text-text">{raccolte.length === 1 ? "La tua raccolta" : `Le tue ${raccolte.length} raccolte`}</p>
-                  <div className="-mx-1 mt-2 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
-                    {raccolte.slice(0, 8).map((r) => (
-                      <Link key={r.tag} href={collectionPath(r.tag)} className="block w-36 shrink-0 snap-start" data-testid="file-raccolta">
-                        <RaccoltaCopertina name={r.tag} count={r.count} emojis={r.emojis} names={r.names} compact />
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    {raccolte.slice(0, 6).map((r) => (
+                      <Link key={r.tag} href={collectionPath(r.tag)} className="block" data-testid="file-raccolta">
+                        <RaccoltaCopertina name={r.tag} count={r.count} emojis={r.emojis} compact />
                       </Link>
                     ))}
+                    {raccolte.length === 1 && (
+                      <div className="flex flex-col justify-center gap-2">
+                        <Link href={collectionPath(raccolte[0].tag)} className="inline-flex min-h-12 items-center justify-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white" data-testid="file-raccolta-apri">
+                          Apri la raccolta
+                        </Link>
+                        <Link href="/mappa?vista=salvati" className="inline-flex min-h-11 items-center justify-center text-sm font-semibold text-brand underline">
+                          Sulla mappa
+                        </Link>
+                      </div>
+                    )}
                   </div>
+                  {raccolte.length > 1 && (
+                    <Link href="/mappa?vista=salvati" className="mt-3 flex min-h-12 w-full items-center justify-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
+                      Vedili sulla mappa
+                    </Link>
+                  )}
                 </div>
               )}
-              <Link href="/mappa?vista=salvati" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
-                Vedili sulla mappa
-              </Link>
-            </div>
+            </>
           )}
 
           {queued > 0 && phase !== "saving" && phase !== "ready" && (

@@ -9,11 +9,14 @@ import { apriFileGoogle } from "@/lib/apri-file-google";
 export default function LinkResults({ results, userId }: { results: LinkOutcome[]; userId: string }) {
   return (
     <ul className="space-y-3" data-testid="link-esiti">
-      {results.map((r, i) => (
+      {results.filter((r) => !r.lista).map((r, i) => (
         <li key={`${r.link}-${i}`}>
-          {r.place && !r.error ? <SavedRow r={r} userId={userId} /> : r.lista ? <ListaRow /> : <ErrorRow r={r} />}
+          {r.place && !r.error ? <SavedRow r={r} userId={userId} /> : <ErrorRow r={r} />}
         </li>
       ))}
+      {results.some((r) => r.lista) && (
+        <li><ListaRow count={results.filter((r) => r.lista).length} /></li>
+      )}
     </ul>
   );
 }
@@ -96,19 +99,29 @@ function ErrorRow({ r }: { r: LinkOutcome }) {
 }
 
 // Lista condivisa di Google Maps (piano 2a): non è un errore dell'utente, è un limite di Google.
-// Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome.
-export function ListaRow() {
+// Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome. Dopo il tocco
+// il riquadro si riduce a una riga (i passi si aprono più sotto, nella pagina).
+export function ListaRow({ count = 1, framed = true }: { count?: number; framed?: boolean }) {
+  const [aperto, setAperto] = useState(false);
+  const box = framed ? "rounded-card border border-border bg-white p-4" : "";
+  if (aperto) {
+    return (
+      <p className={`${box} text-sm text-text-muted`} data-testid="link-lista">
+        <span aria-hidden>🗂️ </span>Passi aperti qui sotto ↓
+      </p>
+    );
+  }
   return (
-    <div className="rounded-card border border-border bg-white p-4" data-testid="link-lista">
+    <div className={box} data-testid="link-lista">
       <p className="font-display text-base font-semibold text-text">
-        <span aria-hidden>🗂️ </span>È una lista di Google Maps
+        <span aria-hidden>🗂️ </span>{count === 1 ? "È una lista di Google Maps" : `Sono ${count} liste di Google Maps`}
       </p>
       <p className="mt-1 text-sm text-text-muted">
-        Google non la fa leggere da fuori. Scarica le tue liste da Google (2 minuti) e caricale qui: ognuna diventa una raccolta con lo stesso nome. Vale per le liste create da te.
+        Google non le fa leggere da fuori. Scarica le tue liste da Google (2 minuti) e caricale qui: ognuna diventa una raccolta con lo stesso nome. Vale per le liste create da te.
       </p>
       <button
         type="button"
-        onClick={apriFileGoogle}
+        onClick={() => { setAperto(true); apriFileGoogle(); }}
         data-testid="link-lista-apri"
         className="mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"
       >

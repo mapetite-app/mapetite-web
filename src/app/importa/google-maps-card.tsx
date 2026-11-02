@@ -2,7 +2,7 @@
 
 import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from "react";
 import Link from "next/link";
-import LinkResults from "@/components/link-results";
+import LinkResults, { ListaRow } from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 import { extractMapsLinks } from "@/lib/maps-link";
 import { extractAllLinks, placeQueryFromText } from "@/lib/multi-link";
@@ -194,7 +194,10 @@ export default function GoogleMapsCard({
               <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
-          {results && <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}
+          {results && (results.every((r) => r.lista)
+            // Solo liste di Google Maps: il riquadro della lista da solo, senza una seconda cornice attorno.
+            ? <div className="mt-4"><ListaRow count={results.length} /></div>
+            : <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>)}
         </>
       )}
     </section>

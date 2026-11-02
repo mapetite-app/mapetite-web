@@ -58,6 +58,9 @@ export function titoloBreve(frase: string): string {
   if (pezzi.length === 0) return frase;
   const primo = /^(ristorante|locale)$/i.test(pezzi[0]) && pezzi[1] ? pezzi[1] : pezzi[0];
   const parole = primo.split(/\s+/);
-  const breve = parole.length > 3 ? parole.slice(0, 3).join(" ") : primo;
+  let corte = parole.length > 3 ? parole.slice(0, 3) : parole;
+  // Mai una preposizione in fondo ("Pizza napoletana a"): si toglie (revisore 2/11).
+  while (corte.length > 1 && /^(a|ad|di|da|in|con|su|per|tra|fra|al|allo|alla|ai|agli|alle|del|della|dei|nel|nella|sul|sulla|e|o)$/i.test(corte[corte.length - 1])) corte = corte.slice(0, -1);
+  const breve = corte.length === parole.length ? primo : corte.join(" ");
   return breve.charAt(0).toUpperCase() + breve.slice(1);
 }

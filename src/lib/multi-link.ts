@@ -101,7 +101,8 @@ export function placeQueryFromText(text: string): { name: string; query: string 
   if (lines.some((l) => l.length > 90)) return null;
   const name = lines[0].replace(/^[·•\-–]\s*/, "");
   if (name.replace(/[^\p{L}]/gu, "").length < 3) return null;
-  const address = lines.slice(1).find((l) => /\d/.test(l) || /\b(via|viale|piazza|corso|largo|vicolo|strada)\b/i.test(l));
+  // Indirizzo vero: un CAP a 5 cifre o una parola da via/piazza (revisore 2/11: "Comprare latte\n2 litri" non è un posto).
+  const address = lines.slice(1).find((l) => /\b\d{5}\b/.test(l) || /\b(via|viale|piazza|piazzale|corso|largo|vicolo|strada|lungotevere|borgo|calle|street|rue)\b/i.test(l));
   // Solo con una riga d'indirizzo: una frase sola ("ricordati la pizzeria di Marco") non è un posto copiato da Maps.
   if (!address || address === lines[0]) return null;
   const query = `${name}, ${address.replace(/,\s*Ital(ia|y)$/i, "")}`;

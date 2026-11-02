@@ -8,7 +8,7 @@ import { isStateTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath } from "@/lib/raccolte";
 import { extractAllLinks, KIND_LABEL, roundLabel, saveLabel, suggestCollectionName, type FoundLink } from "@/lib/multi-link";
 import { trackFeature } from "@/lib/track";
-import { apriFileGoogle } from "@/lib/apri-file-google";
+import { ListaRow } from "@/components/link-results";
 
 // "Incolla più link" (piano 3.2, rifatto il 1/11): si incolla un testo con tanti link (la chat di
 // WhatsApp con sé stessi, una nota, più link di Google Maps), si vede l'elenco dei posti trovati,
@@ -299,7 +299,8 @@ export default function MultiLinkCard({
   const nonTrovati = count(["non_riconosciuto", "errore"]) - liste;
   const daConfermare = count(["da_confermare"]);
   // Dopo il salvataggio l'elenco mostra solo quello che resta da sistemare.
-  const rows = phase === "done" ? (items ?? []).filter((it) => !["salvato", "gia_salvato", "doppione"].includes(it.stato)) : items ?? [];
+  // Le liste di Google Maps non sono righe: un solo riquadro sopra l'elenco (revisore 2/11).
+  const rows = (phase === "done" ? (items ?? []).filter((it) => !["salvato", "gia_salvato", "doppione"].includes(it.stato)) : items ?? []).filter((it) => !it.lista);
 
   if (!userId || (!items && !error)) return null;
 
@@ -323,7 +324,7 @@ export default function MultiLinkCard({
   return (
     <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-white p-5" data-testid="importa-multi">
       <h2 className="font-title text-xl text-text">
-        {phase === "done" ? "Fatto" : mapsCount === total && total > 0 ? `${total} posti da Google Maps` : "I link che hai incollato"}
+        {phase === "done" ? "Fatto" : mapsCount === total && total > 0 && liste === 0 ? `${total} posti da Google Maps` : "I link che hai incollato"}
       </h2>
       {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="multi-errore">{error}</p>}
 
@@ -353,7 +354,8 @@ export default function MultiLinkCard({
           {phase === "ready" && (
             <p className="text-sm text-text" data-testid="multi-riepilogo">
               {[
-                `${toSave.length} da salvare`,
+                (toSave.length > 0 || liste === 0) && `${toSave.length} da salvare`,
+                liste > 0 && `${liste} ${liste === 1 ? "lista" : "liste"} di Google Maps`,
                 gia > 0 && `${gia} già nei tuoi posti`,
                 nonTrovati > 0 && `${nonTrovati} non ${nonTrovati === 1 ? "trovato" : "trovati"}`,
                 daConfermare > 0 && `${daConfermare} da guardare`,
@@ -437,6 +439,9 @@ export default function MultiLinkCard({
           )}
           {oltre > 0 && <p className="mt-3 text-xs text-text-muted">Altri {oltre} link restano fuori: incollali in un secondo giro.</p>}
 
+          {liste > 0 && (phase === "ready" || phase === "done") && (
+            <div className="mt-3"><ListaRow count={liste} /></div>
+          )}
           {phase === "done" && rows.length > 0 && (
             <p className="mt-4 text-sm font-semibold text-text" data-testid="multi-da-sistemare">
               Da sistemare: {rows.length === 1 ? "cercalo" : "cercali"} a mano, il nome è già scritto.
@@ -529,12 +534,6 @@ function Row({
           {it.kind !== "maps" && it.hint && (
             <button type="button" onClick={() => onSearch(it.hint!)} disabled={busy} className={pill}>Cerca “{it.hint}”</button>
           )}
-        </div>
-      )}
-      {it.lista && (
-        // Lista condivisa di Google Maps (piano 2a): una strada sola, il file di Google.
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={apriFileGoogle} className={pill} data-testid="multi-lista-apri">Porta le tue liste</button>
         </div>
       )}
       {notFound && !it.lista && (

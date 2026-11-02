@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { findOrCreatePlace, type StoredPlace } from "@/lib/places-store";
 import { extractMapsLinks, isMapsListUrl, LISTA_MSG, isShortMapsLink, parseMapsUrl, unwrapConsent } from "@/lib/maps-link";
-import { findPlaceId, placeEssentials, resolveShortLink } from "@/lib/maps-resolve";
+import { findPlaceBasic, findPlaceId, placeEssentials, resolveShortLink } from "@/lib/maps-resolve";
 
 // "Salva da Google Maps": l'utente condivide (o incolla) uno o più link di Google Maps.
 // Dal link si leggono nome e coordinate; il Place ID arriva da UNA Text Search che chiede
@@ -43,9 +43,15 @@ async function resolveOne(apiKey: string, link: string, fallbackName: string | n
     if (!text && !info.placeId) return { link, error: NO_COORDS };
     let full;
     try {
-      const id = info.placeId ?? (await findPlaceId(apiKey, text!));
+      let id = info.placeId;
+      if (id) {
+        full = await placeEssentials(apiKey, id);
+      } else {
+        // Una sola Text Search con posizione e indirizzo (come link-preview), invece di ID + Place Details.
+        const found = await findPlaceBasic(apiKey, text!);
+        if (found) { id = found.id; full = found; }
+      }
       if (!id) return { link, error: `Non trovo "${name ?? text}" su Google. Prova con un altro link.` };
-      full = await placeEssentials(apiKey, id);
       if (!full) return { link, error: NO_COORDS };
       const stored = await findOrCreatePlace(
         { googlePlaceId: id, name: full.name ?? name ?? text!, address: full.address, lat: full.lat, lng: full.lng },

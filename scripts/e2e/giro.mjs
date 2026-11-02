@@ -3506,6 +3506,28 @@ if (fakeUser) {
       await lp2.goto(`${BASE}/importa?file=aiuto`, { waitUntil: "networkidle" });
       await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
       ok(await lp2.getByTestId("file-passi").isVisible() && !lp2.url().includes("file=aiuto"), "/importa?file=aiuto: passi del file di Google aperti, indirizzo ripulito");
+      // Più liste incollate insieme: un solo riquadro "Sono 2 liste", nessuna riga "non trovato", conteggio dei posti senza le liste.
+      await lctx2.route("**/api/places/link-preview", (route) => {
+        const b = route.request().postDataJSON() ?? {};
+        return route.fulfill({ json: String(b.link).includes("LISTA")
+          ? { stato: "non_riconosciuto", chiamate: 0, motivo: "È una lista di Google Maps: Google non la fa leggere da fuori. Portala con il file di Google, in 2 minuti.", lista: true }
+          : { stato: "riconosciuto", chiamate: 0, place: { id: "00000000-0000-4000-8000-000000000881", name: "Bar Lista", address: "Via Roma 1, Roma" } } });
+      });
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/LISTA1\nhttps://maps.app.goo.gl/LISTA2\nhttps://maps.app.goo.gl/POSTO1");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      const lmc = lp2.getByTestId("importa-multi");
+      await lmc.getByTestId("multi-riepilogo").waitFor({ timeout: 6000 }).catch(() => {});
+      const lriep = await lmc.getByTestId("multi-riepilogo").textContent().catch(() => "");
+      ok((await lmc.getByTestId("link-lista").count()) === 1 && (await lmc.getByTestId("link-lista").textContent()).includes("Sono 2 liste") && (await lmc.locator('[data-stato="non_riconosciuto"]').count()) === 0 && lriep.includes("1 da salvare") && lriep.includes("2 liste"),
+        `più liste incollate: un solo riquadro 'Sono 2 liste', nessun 'non trovato' ("${lriep}")`);
+      await lmc.screenshot({ path: `${OUT}/importa-liste-multi.png` });
+      // Una nota qualsiasi su due righe non è un posto copiato da Maps.
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("Comprare latte\n2 litri");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      await lp2.getByTestId("incolla-errore").waitFor({ timeout: 3000 }).catch(() => {});
+      ok((await lp2.getByTestId("incolla-testo").count()) === 0 && await lp2.getByTestId("incolla-errore").isVisible(), "nota su due righe ('Comprare latte / 2 litri'): non è un posto, resta 'Non vedo un link'");
       await lctx2.close();
     }
 
