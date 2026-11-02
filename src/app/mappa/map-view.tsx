@@ -29,7 +29,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
-import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento } from "@/lib/idee";
+import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento, titoloBreve } from "@/lib/idee";
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
@@ -2963,10 +2963,10 @@ export default function MapView({
             <IdeaGroup title="Per te" hideTitle>
               {(() => { const mie = [
                 tasteSuggestion ? (
-                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={tasteSuggestion} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={titoloBreve(tasteSuggestion)} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
                 ) : null,
                 savedSuggestion ? (
-                  <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={savedSuggestion.label} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+                  <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={titoloBreve(savedSuggestion.label)} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
                 ) : null,
               ].filter(Boolean);
               // Le 2 righe di "Adesso" più 1 qui (IDEE_MAX = 3): la tua idea prima, altrimenti "Sorprendimi".
@@ -2990,7 +2990,7 @@ export default function MapView({
               )}
               {/* Con gusti e salvati la riga è dei gusti: l'idea dai salvati resta a un tocco, qui. */}
               {tasteSuggestion && savedSuggestion && (
-                <IdeaChip testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} text={`📌 ${savedSuggestion.label}`} onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
+                <IdeaChip testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} text={`📌 ${titoloBreve(savedSuggestion.label)}`} onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
               )}
               {recentiIdee.map((r) => (
                 <IdeaChip key={`r-${r}`} testId="recenti" label={`↻ ${r}`} text={`↻ ${r}`} onClick={() => { setIdeasOpen(false); setAiQuery(r); void runAISearch(r); }} />

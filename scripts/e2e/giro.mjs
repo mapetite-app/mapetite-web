@@ -1866,6 +1866,9 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  // Revisore del 2/11: il titolo della terza idea non stava in una riga a 390 px. Ora 1-3 parole, intero.
+  { const t = await p.getByTestId("suggerimento-per-te").locator("span.truncate").first().evaluate((el) => ({ t: el.textContent, intero: el.scrollWidth <= el.clientWidth }));
+    ok(t.t === "Cena romantica" && t.intero, `Idee: titolo breve della tua idea, intero in una riga ('${t.t}')`); }
   // Revisore del 2/11: con i salvati "Stasera dove andiamo?" era nelle Idee e nei Salvati. Ora solo nei Salvati.
   ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 3, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 3 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
   // Con un'idea tua la riga è sua: Sorprendimi resta a un tocco, nella fila dei suggerimenti (r4).

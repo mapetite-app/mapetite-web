@@ -47,3 +47,17 @@ export function percheMomento(now: Date, weather: Weather | null): string {
 export function titoloMomento(frase: string): string {
   return frase.replace(/^\S+\s/, "").replace(/,?\s+qui vicino$/, "");
 }
+
+// Titolo breve di un'idea nel pannello (revisore del 2/11: "Cena romantica, cucina romana, atmosfera intima"
+// non stava in una riga a 390 px). Solo il primo pezzo della frase, 1-3 parole; se il primo pezzo è generico
+// ("Ristorante", "Locale") si usa il secondo. La ricerca e l'etichetta per chi non vede usano la frase intera.
+// "Cena romantica, cucina romana, atmosfera intima" → "Cena romantica"; "Ristorante, cucina giapponese" →
+// "Cucina giapponese"; "Bar a Roma, fuori dai soliti giri" → "Bar a Roma".
+export function titoloBreve(frase: string): string {
+  const pezzi = frase.split(/,\s*/).map((x) => x.trim()).filter(Boolean);
+  if (pezzi.length === 0) return frase;
+  const primo = /^(ristorante|locale)$/i.test(pezzi[0]) && pezzi[1] ? pezzi[1] : pezzi[0];
+  const parole = primo.split(/\s+/);
+  const breve = parole.length > 3 ? parole.slice(0, 3).join(" ") : primo;
+  return breve.charAt(0).toUpperCase() + breve.slice(1);
+}
