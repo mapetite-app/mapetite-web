@@ -804,7 +804,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
         {fraseOggi && (
-          <div data-testid="frase-risultati" className="pointer-events-none mb-1.5 flex items-end gap-3 pl-[15vw] pr-4 lg:px-5 [text-shadow:0_0_2px_#fff,0_0_6px_#fff,0_0_10px_#fff]">
+          // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
+          // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
+          <div data-testid="frase-risultati" className="pointer-events-none mb-1.5 ml-[15vw] mr-3 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
               {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
