@@ -147,13 +147,20 @@ export function posizionaEtichette(
 // spostamento torna a zero da solo. I segnalini "fermi" (selezionato, card al centro) non si muovono.
 export type Segnalino = { id: string; x: number; y: number; size: number; fermo?: boolean };
 
-export function separaSegnalini(items: Segnalino[], max = 28): Record<string, { dx: number; dy: number }> {
-  const GAP = 3;
+// Revisore del 2/11 (Spirito di Vino sotto Da Enzo, colonna di segnalini in 05c): con al massimo 28 px
+// lo spostamento non bastava e i segnalini restavano a contatto. Ora si cerca il punto libero più vicino
+// fino a `max` px (anelli ogni 4 px, 24 direzioni), con un filo di aria (GAP) tra i bordi: a qualsiasi
+// zoom i segnalini non si toccano. Il calcolo si rifà a ogni disegno, quindi avvicinando la mappa lo
+// spostamento cala da solo fino a zero.
+export function separaSegnalini(items: Segnalino[], max = 84): Record<string, { dx: number; dy: number }> {
+  const GAP = 6;
   const out: Record<string, { dx: number; dy: number }> = {};
   const placed: { x: number; y: number; r: number }[] = [];
   const urto = (x: number, y: number, r: number) =>
     placed.reduce((n, p) => n + Math.max(0, r + p.r + GAP - Math.hypot(x - p.x, y - p.y)), 0);
-  for (const it of items) {
+  // I fermi per primi: gli altri si scostano da loro, mai il contrario.
+  const ordine = [...items.filter((it) => it.fermo), ...items.filter((it) => !it.fermo)];
+  for (const it of ordine) {
     const r = it.size / 2;
     let best = { x: it.x, y: it.y, n: urto(it.x, it.y, r) };
     if (!it.fermo && best.n > 0) {
@@ -163,10 +170,10 @@ export function separaSegnalini(items: Segnalino[], max = 28): Record<string, { 
         return m == null || d < m.d ? { x: p.x, y: p.y, d } : m;
       }, null);
       const a0 = vicino && vicino.d > 0.5 ? Math.atan2(it.y - vicino.y, it.x - vicino.x) : 0;
-      outer: for (let raggio = 6; raggio <= max; raggio += 6) {
-        for (let k = 0; k < 12; k++) {
-          // Angoli alternati intorno alla direzione di partenza: 0, +30°, -30°, +60°, …
-          const a = a0 + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6);
+      outer: for (let raggio = 4; raggio <= max; raggio += 4) {
+        for (let k = 0; k < 24; k++) {
+          // Angoli alternati intorno alla direzione di partenza: 0, +15°, -15°, +30°, …
+          const a = a0 + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 12);
           const x = it.x + Math.cos(a) * raggio;
           const y = it.y + Math.sin(a) * raggio;
           const n = urto(x, y, r);

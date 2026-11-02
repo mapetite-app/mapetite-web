@@ -830,7 +830,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);
-              const facts = cardFacts({ ...place, category: null }, shownFrom, showCity);
+              // La distanza a parte: se la riga non ci sta va a capo nella riga nascosta (revisore del 2/11:
+              // "€€ · 600…" tagliato). Tipo, voto e prezzo restano sempre interi.
+              const facts = cardFacts({ ...place, category: null }, null, showCity);
+              const dist = shownFrom ? distanceLabel(shownFrom, place) : null;
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
               // Chip intere: prima quelle brevi (le frasi lunghe venivano tagliate), due solo se ci stanno insieme.
               const goFor = d?.goFor ?? [];
@@ -894,24 +897,28 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                     </span>
                     <span className="relative flex flex-col">
-                      <span data-testid="riga-fatti" className={`flex min-w-0 items-baseline text-[11px] font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
-                        <span className="truncate">
+                      <span data-testid="riga-fatti" className={`flex h-[1lh] min-w-0 flex-wrap items-baseline overflow-hidden text-[11px] leading-4 font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
+                        <span className="min-w-0 max-w-full truncate">
                           {cat && <span className="font-semibold uppercase tracking-[0.16em]">{cat}</span>}
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
+                        {dist && <span data-testid="distanza-card" className="shrink-0 whitespace-pre">{cat || facts ? " · " : ""}{dist}</span>}
                       </span>
                       <span data-testid="nome-card" className={`mt-1 ${d?.perTe ? "line-clamp-1" : "line-clamp-2"} font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
                       {(d?.openNow != null || similar || req.length > 0 || (chips.length > 0 && !d?.perTe)) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
-                            <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
+                            // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
+                            <span data-testid="aperto-card" className="shrink-0 rounded-pill bg-white px-2.5 py-0.5 text-xs font-display font-semibold text-brand">Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
                             <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-white/20 px-2.5 py-0.5 text-xs font-display font-semibold text-white/90">Chiuso ora</span>
                           )}
                           {similar && (
-                            <span data-testid="simile-a" className="truncate text-xs font-sans font-semibold text-accent">✨ Come {similar}, che hai salvato</span>
+                            // Corta, così non si taglia ("✨ Come Hostaria Del …", revisore del 2/11): il nome del salvato
+                            // resta per chi legge con il lettore di schermo e al passaggio del mouse.
+                            <span data-testid="simile-a" title={`Come ${similar}, che hai salvato`} className="min-w-0 truncate text-xs font-sans font-semibold text-accent">✨ Come un tuo salvato<span className="sr-only">: {similar}</span></span>
                           )}
                           {req.length > 0 && (
                             <span data-testid="requisiti-card" className="truncate text-xs font-sans font-semibold text-white/90" title="Confermato dalle recensioni">
@@ -1009,7 +1016,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
-                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
+                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                       )}
                       {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                       {d?.openNow === false && (
@@ -1017,7 +1024,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                     </span>
                     {similarTo?.(place.id) && (
-                      <span data-testid="simile-a" className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come {similarTo(place.id)}, che hai salvato</span>
+                      <span data-testid="simile-a" title={`Come ${similarTo(place.id)}, che hai salvato`} className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come un tuo salvato<span className="sr-only">: {similarTo(place.id)}</span></span>
                     )}
                     {d?.verdict ? (
                       <span className="mt-1.5 block">
@@ -1143,7 +1150,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
                     <span className="truncate">{metaLine(place, details?.[place.id], shownFrom, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
-                      <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
+                      <span className="shrink-0 rounded-pill bg-brand/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-brand">
                         Aperto ora
                       </span>
                     )}

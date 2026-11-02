@@ -106,6 +106,11 @@ type VenueSheetProps = {
   onBookingClosed?: () => void;
   // "Altri come questo" (proposta 27): solo per i salvati con 👍 o "Ci sono stato" (e non 👎).
   onAltriCome?: () => void;
+  // "‹ 2 di 8 ›" tra i risultati (revisore del 2/11, D28: la pillola galleggiava sopra la scheda): sta dentro
+  // la barra azioni in basso, la scheda prende tutto lo spazio.
+  nav?: { pos: number; total: number } | null;
+  onNavPrev?: () => void;
+  onNavNext?: () => void;
 };
 
 // "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
@@ -151,6 +156,9 @@ export default function VenueSheet({
   autoBook = false,
   onBookingClosed,
   onAltriCome,
+  nav = null,
+  onNavPrev,
+  onNavNext,
 }: VenueSheetProps) {
   const {
     name,
@@ -728,8 +736,8 @@ export default function VenueSheet({
               {aperto != null && (
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                   {rating != null && <span aria-hidden className="mr-1 font-normal text-[#4b5058]">·</span>}
-                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
-                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-brand" : "text-error"}`}>
+                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-brand" : "bg-error"}`} />
                     {riapre || chiude ? (aperto ? "Aperto" : "Chiuso") : aperto ? "Aperto ora" : "Chiuso ora"}
                   </span>
                   {(riapre || chiude) && (
@@ -1045,7 +1053,15 @@ export default function VenueSheet({
           data-testid="barra-azioni"
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
-          <div className="flex w-full items-center gap-2 rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
+          <div className="w-full rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
+          {nav && (
+            <div data-testid="scheda-nav" className="-mt-1 mb-1 flex items-center justify-between text-white">
+              <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">‹</button>
+              <span className="text-[13px] font-display font-semibold text-white/85">{nav.pos} di {nav.total}</span>
+              <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">›</button>
+            </div>
+          )}
+          <div className="flex w-full items-center gap-2">
             {lead === "prenota" && (
               <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`} style={{ flexGrow: 1.4 }}>
                 <CalendarCheck size={17} aria-hidden />
@@ -1075,6 +1091,7 @@ export default function VenueSheet({
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
             </a>
             {saveSlot}
+          </div>
           </div>
         </div>
         {/* Spazio sotto la barra: la nav mobile copre il fondo della scheda. */}
@@ -1174,7 +1191,7 @@ export default function VenueSheet({
               <span
                 className={
                   openNow
-                    ? "rounded-pill bg-success/15 px-2 py-0.5 text-xs font-display font-semibold text-success"
+                    ? "rounded-pill bg-brand/10 px-2 py-0.5 text-xs font-display font-semibold text-brand"
                     : "rounded-pill bg-error/10 px-2 py-0.5 text-xs font-display font-semibold text-error"
                 }
               >
@@ -1327,6 +1344,13 @@ export default function VenueSheet({
       <div
         className="sticky bottom-[var(--nav-height-mobile)] z-10 mt-5 flex items-center gap-2 border-t border-border bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+var(--nav-sporgenza))] backdrop-blur"
       >
+        {nav && (
+          <div data-testid="scheda-nav" className="order-last flex shrink-0 items-center text-brand">
+            <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-8 items-center justify-center text-lg active:scale-95">‹</button>
+            <span className="whitespace-nowrap text-xs font-display font-semibold">{nav.pos} di {nav.total}</span>
+            <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-8 items-center justify-center text-lg active:scale-95">›</button>
+          </div>
+        )}
         {saveSlot}
 
         <a

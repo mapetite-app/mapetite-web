@@ -1877,7 +1877,12 @@ export default function MapView({
       }));
     }
     const b = map.getBounds();
-    const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    // Riquadro allargato di mezza mappa per lato: a fine animazione (fitBounds) i limiti letti qui possono essere
+    // quelli di un fotogramma prima, e un salvato appena dentro il bordo (Kiko Sushi Bar, revisore del 2/11)
+    // restava senza segnalino finché non si muoveva la mappa. Più punti in lista non costano niente.
+    const mw = (b.getEast() - b.getWest()) / 2;
+    const mh = (b.getNorth() - b.getSouth()) / 2;
+    const bbox: [number, number, number, number] = [Math.max(-180, b.getWest() - mw), Math.max(-85, b.getSouth() - mh), Math.min(180, b.getEast() + mw), Math.min(85, b.getNorth() + mh)];
     return [
       ...clusterIndex.getClusters(bbox, roundedZoom),
       ...topPlaces.map((place) => ({
@@ -1915,7 +1920,9 @@ export default function MapView({
       ? topPlaces.includes(place) || viewState.zoom >= 17
       : aiSearch !== null || mappaSalvati || viewState.zoom >= 14) || selected?.id === place.id;
     const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
-    const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
+    // Sulla mappa dei salvati la card al centro sceglie per prima il posto del nome ma non lo impone: un nome
+    // sopra il segnalino vicino (revisore del 2/11) si nasconde, il nome c'è già nella card sotto.
+    const fissi = new Set([selected?.id, mappaSalvati ? null : focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
     const items: MapItem[] = [...singoli].sort((a, b) => rank(a.id) - rank(b.id)).map((place) => {
       const big = selected?.id === place.id || focusId === place.id;
       const foto = pinPhotoIds.has(place.id) && !!venueDetails[place.id]?.photoRef;
@@ -1945,7 +1952,8 @@ export default function MapView({
     const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
     const proietta = (lat: number, lng: number) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; };
     let scost: Record<string, { dx: number; dy: number }> = {};
-    if (inRicerca) {
+    // Anche sulla mappa dei salvati (revisore del 2/11): due salvati vicini non si coprono.
+    if (inRicerca || mappaSalvati) {
       scost = separaSegnalini(items.map((it) => {
         const q = proietta(it.lat, it.lng);
         // Centro del disegno: i segnalini stanno sopra il punto, i gruppi sono centrati.
@@ -1984,6 +1992,28 @@ export default function MapView({
       }
     : null;
 
+  // "‹ 2 di 8 ›" nella barra azioni della scheda: posizione del locale aperto tra i risultati (stesso ordine del
+  // carosello) e passaggio al vicino senza tornare alla lista.
+  const navScheda = (() => {
+    if (!selected) return null;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    return i < 0 || ids.length < 2 ? null : { pos: i + 1, total: ids.length };
+  })();
+  const vaiRisultato = (passo: number) => {
+    if (!selected) return;
+    const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
+    const i = ids.indexOf(selected.id);
+    if (i < 0 || ids.length < 2) return;
+    const id = ids[(i + passo + ids.length) % ids.length];
+    const place = displayedPlaces.find((p) => p.id === id);
+    if (!place) return;
+    setFocusedId(id);
+    dispatch({ type: "OPEN_VENUE", placeId: id });
+    const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
+    if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
+  };
+
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
@@ -2005,17 +2035,20 @@ export default function MapView({
   // e sotto barra di ricerca + "Esplora / I miei salvati" (pin alti ~50 px sopra il punto).
   // Mappa non ancora caricata (link condiviso aperto a freddo: i risultati arrivano prima
   // della mappa): l'inquadratura si fa appena la mappa è pronta (onLoad).
-  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number; sempre: { lat: number; lng: number }[] } | null>(null);
+  const pendingFitRef = useRef<{ list: { lat: number; lng: number }[]; top: number; extraBottom: number; sempre: { lat: number; lng: number }[]; salvati: boolean } | null>(null);
   // Non map.loaded(): torna false anche mentre si scaricano i riquadri dopo ogni spostamento.
   const mapReadyRef = useRef(false);
   // `sempre`: punti da mostrare comunque (i salvati scelti per la ricerca), mai trattati da lontanissimi.
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = []) => {
+  // `salvati`: mappa dei salvati (revisore del 2/11: Kiko Sushi Bar, il più a sud, restava fuori). I propri posti
+  // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
+  // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
-    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre }; return; }
+    if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
     pendingFitRef.current = null;
     // Un risultato lontanissimo dagli altri non allarga la mappa (revisore del 1/11, 05c: a tutta Roma).
-    const inquadrati = [...puntiDaInquadrare(list), ...sempre];
+    const inquadrati = salvati ? list : [...puntiDaInquadrare(list), ...sempre];
     const lngs = inquadrati.map((p) => p.lng);
     const lats = inquadrati.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -2028,7 +2061,7 @@ export default function MapView({
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
         // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: 40, right: 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 40, right: salvati ? 64 : 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -2039,12 +2072,12 @@ export default function MapView({
   // un solo gruppo). Si parte dalla zona dove sei (se hai salvati entro 30 km) o da quella con più salvati;
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
-  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170); };
+  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
   const apriMappaSalvati = () => {
     setSalvatiMappa(true);
     const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
     if (z) inquadraZona(z);
-    else fitToPlaces(displayedPlaces, 170);
+    else fitToPlaces(displayedPlaces, 170, 0, [], true);
   };
   const cercaSalvati = (pill: boolean) => (
     <input
@@ -2057,7 +2090,7 @@ export default function MapView({
         if (savedFitTimer.current) clearTimeout(savedFitTimer.current);
         savedFitTimer.current = setTimeout(() => {
           const found = filterSaved(savedPlaces, activeTag, activeCity, v);
-          if (v.trim() && found.length > 0) fitToPlaces(found, 170);
+          if (v.trim() && found.length > 0) fitToPlaces(found, 170, 0, [], true);
         }, 600);
       }}
       placeholder="Cerca nei salvati"
@@ -2987,7 +3020,7 @@ export default function MapView({
                     </button>
                   )}
                   {activeCity !== null && (
-                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
                       📍 {activeCity} <X size={12} aria-hidden />
                     </button>
                   )}
@@ -3442,7 +3475,7 @@ export default function MapView({
           mapReadyRef.current = true;
           { const c = e.target.getContainer(); setMapBox({ w: c.clientWidth, h: c.clientHeight }); }
           const pending = pendingFitRef.current;
-          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom, pending.sempre);
+          if (pending) fitToPlaces(pending.list, pending.top, pending.extraBottom, pending.sempre, pending.salvati);
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
@@ -3650,30 +3683,8 @@ export default function MapView({
       {selected && (
         // Da computer la scheda si apre nel pannello a destra, al posto della lista (niente velo scuro).
         <div data-testid="scheda-pannello" className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40 lg:static lg:z-auto lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:items-stretch lg:justify-start lg:border-l lg:border-border lg:bg-bg" onClick={() => dispatch({ type: "CLOSE" })}>
-          {/* "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello). */}
-          {(() => {
-            const ids = carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id);
-            const i = ids.indexOf(selected.id);
-            if (i < 0 || ids.length < 2) return null;
-            const go = (j: number) => {
-              const id = ids[(j + ids.length) % ids.length];
-              const place = displayedPlaces.find((p) => p.id === id);
-              if (!place) return;
-              setFocusedId(id);
-              dispatch({ type: "OPEN_VENUE", placeId: id });
-              const map = (mapRef.current as { getMap?: () => { flyTo: (opts: { center: [number, number]; zoom: number }) => void } } | null)?.getMap?.();
-              if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 15) });
-            };
-            return (
-              <div data-testid="scheda-nav" onClick={(e) => e.stopPropagation()} className="mb-2 flex items-center gap-1 rounded-pill bg-surface p-1 shadow-float lg:mx-5 lg:mb-3 lg:self-start lg:shadow-none">
-                <button type="button" onClick={() => go(i - 1)} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">‹</button>
-                <span className="min-w-16 text-center text-sm font-display font-semibold text-brand">{i + 1} di {ids.length}</span>
-                <button type="button" onClick={() => go(i + 1)} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-brand active:scale-95">›</button>
-              </div>
-            );
-          })()}
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg ${(carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).length >= 2 && (carouselOrder.length > 0 ? carouselOrder : displayedPlaces.map((p) => p.id)).includes(selected.id) ? "max-h-[calc(100dvh-6rem)]" : "max-h-[92dvh]"} overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}
@@ -3706,6 +3717,11 @@ export default function MapView({
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
               onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
+              // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
+              // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.
+              nav={navScheda}
+              onNavPrev={() => vaiRisultato(-1)}
+              onNavNext={() => vaiRisultato(1)}
               rankSlot={userId && resolveUuid(selected.id) ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}
@@ -4044,7 +4060,7 @@ export default function MapView({
                         onClick={() => {
                           const next = activeCity === city ? null : city;
                           setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
-                          fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150);
+                          fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150, 0, [], true);
                         }}
                         className={sheetChip(activeCity === city)}
                       >
