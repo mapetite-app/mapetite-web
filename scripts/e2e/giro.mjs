@@ -3184,6 +3184,11 @@ if (fakeUser) {
   await q3.getByTestId("barra-azioni").waitFor({ timeout: 4000 });
   await q3.waitForTimeout(1200);
   ok((await q3.getByTestId("carosello-contatore").count()) === 0, "scheda: senza foto visibili niente contatore '1 / 2' sopra l'emoji");
+  // Revisore del 2/11 (r4): senza foto un riquadro grigio di 220 px con l'emoji piccola; la scheda lasciava 110 px di mappa sopra.
+  { const s = await q3.evaluate(() => { const c = document.querySelector("[data-testid=scheda-carosello]"); const t = document.querySelector("[data-testid=scheda-trascinabile]").getBoundingClientRect(); const e = document.querySelector("[data-testid=scheda-intestazione-emoji]");
+      return { senza: c?.dataset.senzaFoto === "true", h: Math.round(c?.getBoundingClientRect().height ?? -1), fondo: e ? getComputedStyle(e).backgroundColor : "", nome: Math.round(document.querySelector("[data-testid=scheda-trascinabile] h2").getBoundingClientRect().top), top: Math.round(t.top), alta: Math.round(t.height) }; });
+    ok(s.senza && s.h <= 130 && s.fondo === "rgb(26, 60, 64)" && s.nome < 200, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
+    ok(s.top <= 0 && s.alta >= 843, `scheda: a tutto schermo come Places, in alto solo la zona sicura (da ${s.top} px, alta ${s.alta})`); }
   { const n = await q3.evaluate(() => { const nav = document.querySelector("[data-testid=scheda-nav]"); const sheet = document.querySelector("[data-testid=scheda-trascinabile]")?.getBoundingClientRect();
       return { dentro: !!nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1) }; });
     ok(n.dentro && n.testo?.replace(/\s/g, "") === "‹1di5›", `scheda: '‹ 1 di 5 ›' dentro la barra azioni in basso, non sopra la scheda (${n.testo})`); }

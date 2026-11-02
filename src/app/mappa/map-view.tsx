@@ -3701,7 +3701,9 @@ export default function MapView({
         // Da computer la scheda si apre nel pannello a destra, al posto della lista (niente velo scuro).
         <div data-testid="scheda-pannello" className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/40 lg:static lg:z-auto lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:items-stretch lg:justify-start lg:border-l lg:border-border lg:bg-bg" onClick={() => dispatch({ type: "CLOSE" })}>
           {/* key: con ‹ › la scheda nuova riparte dall'inizio (foto e nome), non dal punto in cui era scorsa la precedente. */}
-          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-card bg-surface shadow-float lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
+          {/* A tutto schermo come Places 05 (revisore del 2/11, r4): sopra resta solo la zona sicura del telefono,
+              niente striscia di mappa o di Salvati sfocati. Si chiude trascinando giù o con la X. */}
+          <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`h-dvh w-full max-w-lg overflow-y-auto overscroll-contain bg-surface shadow-float lg:h-auto lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
               origin={userPos ?? searchOrigin}

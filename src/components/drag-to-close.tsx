@@ -44,7 +44,7 @@ export default function DragToClose({ onClose, className, children }: { onClose:
     >
       {/* maniglia: fa capire che si può trascinare */}
       {/* Assoluta, non "sticky": scorrendo restava ferma sopra nome e testo (collaudo 23/10). */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-4 justify-center pt-1.5 lg:hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-[env(safe-area-inset-top,0px)] z-20 flex h-4 justify-center pt-1.5 lg:hidden">
         <span className="h-1 w-10 rounded-pill bg-black/20" />
       </div>
       {children}
