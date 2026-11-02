@@ -15,6 +15,7 @@ import { addReel } from "@/lib/community-write";
 import { reelSourceOf } from "@/lib/reel";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 import { screenshotForUpload } from "@/lib/screenshot-upload";
+import { APRI_FILE_EVENT } from "@/lib/apri-file-google";
 
 type ImportResult = {
   nome: string | null;
@@ -90,6 +91,22 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("hashchange", fromHash);
+    };
+  }, []);
+
+  // Lista di Google Maps incollata (piano 2a): si apre il file di Google con i passi in vista. Da un'altra
+  // pagina si arriva con /importa?file=aiuto e l'evento lo rilancia qui (lo ascolta anche TakeoutCard).
+  useEffect(() => {
+    const open = () => openPanel("file");
+    window.addEventListener(APRI_FILE_EVENT, open);
+    let t: number | undefined;
+    if (new URLSearchParams(window.location.search).get("file") === "aiuto") {
+      window.history.replaceState(null, "", window.location.pathname);
+      t = window.setTimeout(() => window.dispatchEvent(new Event(APRI_FILE_EVENT)), 0);
+    }
+    return () => {
+      window.removeEventListener(APRI_FILE_EVENT, open);
+      window.clearTimeout(t);
     };
   }, []);
 

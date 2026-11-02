@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { saveNote, type LinkOutcome } from "@/lib/save-from-link";
+import { apriFileGoogle } from "@/lib/apri-file-google";
 
 // Esito di "Salva da Google Maps": una riga per link, con "Apri sulla mappa" e "Aggiungi nota".
 export default function LinkResults({ results, userId }: { results: LinkOutcome[]; userId: string }) {
@@ -10,7 +11,7 @@ export default function LinkResults({ results, userId }: { results: LinkOutcome[
     <ul className="space-y-3" data-testid="link-esiti">
       {results.map((r, i) => (
         <li key={`${r.link}-${i}`}>
-          {r.place && !r.error ? <SavedRow r={r} userId={userId} /> : <ErrorRow r={r} />}
+          {r.place && !r.error ? <SavedRow r={r} userId={userId} /> : r.lista ? <ListaRow /> : <ErrorRow r={r} />}
         </li>
       ))}
     </ul>
@@ -90,6 +91,29 @@ function ErrorRow({ r }: { r: LinkOutcome }) {
     <div className="rounded-card bg-error/10 p-4 text-sm text-error" data-testid="link-errore">
       <p>{r.place ? `${r.place.name}: ` : ""}{r.error}</p>
       <p className="mt-1 break-all text-xs opacity-80">{r.link}</p>
+    </div>
+  );
+}
+
+// Lista condivisa di Google Maps (piano 2a): non è un errore dell'utente, è un limite di Google.
+// Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome.
+export function ListaRow() {
+  return (
+    <div className="rounded-card border border-border bg-white p-4" data-testid="link-lista">
+      <p className="font-display text-base font-semibold text-text">
+        <span aria-hidden>🗂️ </span>È una lista di Google Maps
+      </p>
+      <p className="mt-1 text-sm text-text-muted">
+        Google non la fa leggere da fuori. Scarica le tue liste da Google (2 minuti) e caricale qui: ognuna diventa una raccolta con lo stesso nome. Vale per le liste create da te.
+      </p>
+      <button
+        type="button"
+        onClick={apriFileGoogle}
+        data-testid="link-lista-apri"
+        className="mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"
+      >
+        Porta le tue liste
+      </button>
     </div>
   );
 }

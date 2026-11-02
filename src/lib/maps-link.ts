@@ -44,6 +44,20 @@ export function extractMapsLinks(text: string): string[] {
   return found;
 }
 
+// Lista condivisa di Google Maps ("Condividi lista"): /maps/placelists/list/<id> o, nei link più vecchi,
+// "/maps/@/data=…!11m…!2s<id>". Google non la lascia leggere senza aprire la pagina (scraping, vietato):
+// non si cerca niente, si spiega come portare le liste con il file di Google (Takeout).
+export const LISTA_MSG = "È una lista di Google Maps: Google non la fa leggere da fuori. Portala con il file di Google, in 2 minuti.";
+
+export function isMapsListUrl(input: string | URL): boolean {
+  let u: URL;
+  try { u = unwrapConsent(typeof input === "string" ? new URL(input) : input); } catch { return false; }
+  if (!isGoogleMapsLink(u) || isShortMapsLink(u)) return false;
+  if (/\/maps\/placelists\//.test(u.pathname)) return true;
+  if (/\/maps\/place\//.test(u.pathname)) return false;
+  return /!11m\d+!2s[A-Za-z0-9_-]{6,}/.test(decode(u.pathname + u.search));
+}
+
 // Pagina di consenso dei cookie (Europa): il link vero è nel parametro "continue".
 export function unwrapConsent(u: URL): URL {
   if (!u.hostname.startsWith("consent.")) return u;

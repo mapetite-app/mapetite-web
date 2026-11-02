@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { APRI_FILE_EVENT } from "@/lib/apri-file-google";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { trackFeature } from "@/lib/track";
@@ -57,7 +58,7 @@ async function previewLink(link: string, budget: number): Promise<Preview> {
 const STEPS: React.ReactNode[] = [
   <>Apri <a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">takeout.google.com</a>, tocca <b>Deseleziona tutto</b> e scegli solo <b>Salvati</b> e <b>Maps (i tuoi luoghi)</b>.</>,
   <>Tocca <b>Passaggio successivo</b> → <b>Crea esportazione</b>. Google ti manda un’email con il file, di solito in pochi minuti.</>,
-  <>Apri lo zip e carica qui <b>Saved Places.json</b> o i file <b>.csv</b> delle tue liste (anche più insieme).</>,
+  <>Apri lo zip: nella cartella <b>Salvati</b> c’è un file <b>.csv</b> per ogni lista. Caricali qui, anche tutti insieme: ogni lista diventa una raccolta.</>,
 ];
 
 export default function TakeoutCard({ userId }: { userId: string | null }) {
@@ -72,6 +73,12 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
   const [now] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
   const queued = useSyncExternalStore(subscribeQueue, queueLength, () => 0);
+  // Arrivati da una lista di Google Maps incollata: i passi per scaricare il file già aperti.
+  useEffect(() => {
+    const open = () => setHelp(true);
+    window.addEventListener(APRI_FILE_EVENT, open);
+    return () => window.removeEventListener(APRI_FILE_EVENT, open);
+  }, []);
 
   const onFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;

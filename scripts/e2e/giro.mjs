@@ -3452,6 +3452,35 @@ if (fakeUser) {
     ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
     await nctx.close();
 
+    // Lista condivisa di Google Maps (piano 2a): niente "errore", una strada sola verso il file di Google.
+    {
+      const lctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: [] });
+      await lctx2.route("**/rest/v1/saved_places**", (route) => route.fulfill({ status: 201, json: [] }));
+      await lctx2.route("**/api/places/from-link", (route) => route.fulfill({ json: { risultati: [
+        { link: "https://maps.app.goo.gl/LISTA1", error: "È una lista di Google Maps: Google non la fa leggere da fuori. Portala con il file di Google, in 2 minuti.", lista: true },
+      ] } }));
+      const lp2 = await lctx2.newPage();
+      lp2.on("pageerror", (e) => errors.push(e.message));
+      await lp2.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+      await lp2.getByRole("button", { name: "Incolla un link", exact: true }).click();
+      await lp2.getByLabel("Link da incollare").fill("Guarda la mia lista «Cene Roma» https://maps.app.goo.gl/LISTA1");
+      await lp2.getByRole("button", { name: "Salva", exact: true }).click();
+      const lr2 = lp2.getByTestId("link-lista");
+      await lr2.waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await lr2.isVisible() && (await lp2.getByTestId("link-errore").count()) === 0 && (await lr2.textContent()).includes("ognuna diventa una raccolta"), "lista di Google Maps incollata: riquadro 'È una lista', non un errore rosso");
+      await lp2.screenshot({ path: `${OUT}/importa-lista-google.png`, caret: "initial" });
+      await lp2.getByTestId("link-lista-apri").click();
+      await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await lp2.getByTestId("file-passi").isVisible() && await lp2.getByTestId("importa-file").isVisible(), "lista di Google Maps: 'Porta le tue liste' apre il file di Google con i passi già aperti");
+      await lp2.waitForTimeout(400);
+      await lp2.screenshot({ path: `${OUT}/importa-lista-passi.png`, caret: "initial" });
+      // Da un'altra pagina (es. Condividi): /importa?file=aiuto apre lo stesso pannello.
+      await lp2.goto(`${BASE}/importa?file=aiuto`, { waitUntil: "networkidle" });
+      await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await lp2.getByTestId("file-passi").isVisible() && !lp2.url().includes("file=aiuto"), "/importa?file=aiuto: passi del file di Google aperti, indirizzo ripulito");
+      await lctx2.close();
+    }
+
     // Condividi da Google Maps (Android): la pagina salva subito.
     const before = apiCalls.length;
     await lp.goto(`${BASE}/importa/condividi?title=Bar%20Rossi&text=${encodeURIComponent("Bar Rossi\nVia Roma 1\nhttps://maps.app.goo.gl/AAA111")}`, { waitUntil: "networkidle" });

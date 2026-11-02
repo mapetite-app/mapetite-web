@@ -8,6 +8,7 @@ import { isStateTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath } from "@/lib/raccolte";
 import { extractAllLinks, KIND_LABEL, roundLabel, saveLabel, suggestCollectionName, type FoundLink } from "@/lib/multi-link";
 import { trackFeature } from "@/lib/track";
+import { apriFileGoogle } from "@/lib/apri-file-google";
 
 // "Incolla più link" (piano 3.2, rifatto il 1/11): si incolla un testo con tanti link (la chat di
 // WhatsApp con sé stessi, una nota, più link di Google Maps), si vede l'elenco dei posti trovati,
@@ -36,12 +37,13 @@ type Item = FoundLink & {
   place?: Place;
   motivo?: string;
   nome?: string | null;
+  lista?: boolean;
 };
 
 type Preview =
   | { stato: "riconosciuto"; chiamate: number; place: Place }
   | { stato: "da_confermare"; chiamate: number; motivo: string; nome: string | null }
-  | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null };
+  | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null; lista?: boolean };
 
 async function previewLink(link: string, budget: number): Promise<Preview> {
   try {
@@ -117,7 +119,7 @@ export default function MultiLinkCard({
   // Esito di un link di Google Maps: già salvato o doppione di un altro link della lista?
   const settle = (url: string, r: Preview) => {
     if (r.stato !== "riconosciuto") {
-      patch(url, { stato: r.stato, motivo: r.motivo, nome: r.nome ?? null });
+      patch(url, { stato: r.stato, motivo: r.motivo, nome: r.nome ?? null, ...(r.stato === "non_riconosciuto" && r.lista ? { lista: true } : {}) });
       return;
     }
     if (savedIds.current.has(r.place.id)) return patch(url, { stato: "gia_salvato", place: r.place });
@@ -293,7 +295,8 @@ export default function MultiLinkCard({
   const mapsCount = items?.filter((it) => it.kind === "maps").length ?? 0;
   const later = count(["dopo"]);
   const gia = count(["gia_salvato"]);
-  const nonTrovati = count(["non_riconosciuto", "errore"]);
+  const liste = items?.filter((it) => it.lista).length ?? 0;
+  const nonTrovati = count(["non_riconosciuto", "errore"]) - liste;
   const daConfermare = count(["da_confermare"]);
   // Dopo il salvataggio l'elenco mostra solo quello che resta da sistemare.
   const rows = phase === "done" ? (items ?? []).filter((it) => !["salvato", "gia_salvato", "doppione"].includes(it.stato)) : items ?? [];
@@ -493,10 +496,10 @@ function Row({
   onReadVideo: () => void;
   busy: boolean;
 }) {
-  const badge = BADGE[it.stato];
+  const badge = it.lista ? { label: "Lista", cls: "bg-brand/10 text-brand" } : BADGE[it.stato];
   // Prima della lettura il nome è il testo scritto accanto al link nella chat, se c'è.
   const guess = it.nome ?? it.hint;
-  const title = it.place?.name ?? guess ?? KIND_LABEL[it.kind];
+  const title = it.lista ? "Lista di Google Maps" : it.place?.name ?? guess ?? KIND_LABEL[it.kind];
   const sub = it.place ? (displayAddress(it.place.address) || "Posizione dal link di Google Maps") : shortUrl(it.url);
   const pill = "min-h-10 max-w-full truncate rounded-pill border border-brand bg-white px-3 text-xs font-display font-semibold text-brand disabled:opacity-60";
   const notFound = it.stato === "non_riconosciuto" || it.stato === "errore";
@@ -528,7 +531,13 @@ function Row({
           )}
         </div>
       )}
-      {notFound && (
+      {it.lista && (
+        // Lista condivisa di Google Maps (piano 2a): una strada sola, il file di Google.
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" onClick={apriFileGoogle} className={pill} data-testid="multi-lista-apri">Porta le tue liste</button>
+        </div>
+      )}
+      {notFound && !it.lista && (
         // Non trovato: si cerca a mano, con il nome già scritto se lo conosciamo (dal link o dalla chat).
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" onClick={() => onSearch(guess ?? "")} disabled={busy} className={pill} data-testid="multi-cerca">
