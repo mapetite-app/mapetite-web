@@ -3893,7 +3893,8 @@ else {
   // Revisore 2/11: niente più vicolo cieco "Gli amici arrivano presto": cose vere che funzionano già (invito,
   // carta del gusto) e "in arrivo" piccolo in fondo. Senza posti visitati la sezione "Da consigliare" non c'è.
   { const intanto = sp.getByTestId("amici-intanto");
-    ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0, "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
+    ok(await intanto.isVisible() && (await sp.getByTestId("social-in-arrivo").count()) === 0 && await intanto.getByTestId("invita-amico").isVisible() && (await intanto.getByTestId("amici-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await intanto.getByTestId("amici-consigli").count()) === 0 && await intanto.getByTestId("amici-carta-gusto").evaluate((a) => a.getBoundingClientRect().height <= 48 && !a.querySelector("svg.lucide-id-card") && parseFloat(getComputedStyle(a).fontSize) <= 14) && !/Il tuo gusto|La tua carta del gusto/.test(await intanto.innerText()), "amici (parte social non pronta): invito e carta del gusto al posto di 'arrivano presto'; senza visite niente 'Da consigliare'");
+    await sp.screenshot({ path: `${OUT}/s4-amici.png`, fullPage: true, caret: "initial" });
     // Revisore 2/11 (quarto giro): niente riga "in arrivo", niente indirizzo grezzo, titolo dell'invito senza Poppins.
     { const t = (await intanto.innerText()) ?? "";
       const font = await intanto.getByTestId("invita-amico").locator("p").first().evaluate((el) => `${getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "")} ${getComputedStyle(el).fontWeight}`);
