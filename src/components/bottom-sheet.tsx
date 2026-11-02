@@ -8,6 +8,7 @@ import { nomeLeggibile } from "@/lib/nome-leggibile";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
+import { fraseRisultati } from "@/lib/frase-risultati";
 import { categoryLabel } from "@/lib/category-label";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import PlacePhoto from "@/components/place-photo";
@@ -96,6 +97,8 @@ export interface BottomSheetProps {
   // Posti già contati nella pillola e poi tolti perché l'AI li giudica fuori tema (non ancora visti):
   // la pillola dice "· 2 tolti" invece di passare da 12 a 10 senza spiegazione (revisore del 1/11).
   removed?: readonly string[];
+  // Dati veri per la frase sopra le card (src/lib/frase-risultati.ts); null = nessuna frase.
+  frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number } | null;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -125,9 +128,9 @@ function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { it
   // Il perché di un salvato solo resta per i lettori di schermo e nella scheda.
   if (!inline) {
     return (
-      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "ml-[13vw] mr-3 lg:mx-5" : "mx-3 lg:mx-5"}`}>
+      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "ml-[15vw] mr-3 lg:mx-5" : "mx-3 lg:mx-5"}`}>
         {many && open && (
-          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(87vw-0.75rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
+          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(85vw-0.75rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
         )}
         <button
           type="button"
@@ -334,7 +337,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [] }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -673,6 +676,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
     const nuova = pillSlot != null && title != null;
+    const fraseOggi = nuova && frase ? fraseRisultati({
+      n: places.length,
+      posti: places,
+      ...frase,
+      // Quanti posti in lista hanno il requisito confermato dalle recensioni (i "✓" sulle card).
+      requisiti: places.reduce<Record<string, number>>((m, p) => { for (const x of details?.[p.id]?.requisiti ?? []) m[x.r] = (m[x.r] ?? 0) + 1; return m; }, {}),
+      gemme: gemsOn ? places.filter((p) => !(offTopic?.includes(p.id) ?? false) && isGem(p.rating, details?.[p.id]?.userRatingCount, p.name)).length : 0,
+      inArrivo: loadingVerdicts,
+    }) : null;
     const conteggio = loadingVerdicts
       ? "preparo i verdetti…"
       : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`;
@@ -786,10 +798,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         </div>}
         {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
+        {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
+            lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
+        {fraseOggi && (
+          <div data-testid="frase-risultati" className="pointer-events-none mb-1.5 flex items-end gap-3 pl-[15vw] pr-4 lg:px-5 [text-shadow:0_0_2px_#fff,0_0_6px_#fff,0_0_10px_#fff]">
+            <p className="min-w-0 flex-1">
+              <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
+              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
+            </p>
+            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di {places.length}</span>
+          </div>
+        )}
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[13vw] lg:gap-3" : "gap-3 px-3"}`}>
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[15vw] lg:gap-3" : "gap-3 px-3"}`}>
           {places.map((place) => {
             const d = details?.[place.id];
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
@@ -811,7 +834,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
               const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
-                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[74vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
+                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[70vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
                     <button
                       type="button"
@@ -835,9 +858,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     }}
                     data-testid="card-risultato"
                     // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
-                    // insieme), con un minimo; il contenuto sta in basso, sopra resta solo la foto. Prima era
-                    // fissa e alta: con un verdetto corto metà card era vuota (revisore del 1/11).
-                    className="relative flex h-full min-h-[clamp(212px,28dvh,240px)] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-2.5 pt-16 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
+                    // insieme), circa 200 px; il contenuto sta in basso, sopra solo la foto (revisore del 1/11,
+                    // secondo giro: 260 px con il vuoto in alto e la card dopo appena visibile).
+                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-10 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
                     <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
@@ -866,8 +889,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {facts && <span>{cat ? " · " : ""}{facts}</span>}
                         </span>
                       </span>
-                      <span data-testid="nome-card" className={`mt-1 line-clamp-2 font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
-                      {(d?.openNow != null || similar || req.length > 0) && (
+                      <span data-testid="nome-card" className={`mt-1 ${d?.perTe ? "line-clamp-1" : "line-clamp-2"} font-title font-semibold leading-[1.08] ${place.name.length > 22 ? "text-[22px] in-data-[titoli=serif]:text-2xl" : "text-[26px] max-[379px]:text-[22px] in-data-[titoli=serif]:text-[28px]"}`}>{nomeLeggibile(place.name)}</span>
+                      {(d?.openNow != null || similar || req.length > 0 || (chips.length > 0 && !d?.perTe)) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
                             <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
@@ -883,6 +906,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                             <span data-testid="requisiti-card" className="truncate text-xs font-sans font-semibold text-white/90" title="Confermato dalle recensioni">
                               <span className="sr-only">Confermato dalle recensioni: </span>
                               {req.map((r, k) => <span key={r}>{k > 0 ? " · " : ""}<span aria-hidden className="text-[#7be0a8]">✓</span> {r}</span>)}
+                            </span>
+                          )}
+                          {/* Punti forti nella stessa riga (card più bassa): solo se non ci sono già i ✓ o "Come…". */}
+                          {!similar && req.length === 0 && chips.length > 0 && !d?.perTe && (
+                            <span data-testid="punti-forti" className="flex min-w-0 gap-1.5">
+                              {chips.map((c) => (
+                                <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
+                              ))}
                             </span>
                           )}
                         </span>
@@ -902,7 +933,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                       {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
                       {d?.perTe && (
-                        <span data-testid="per-te-card" className="mt-1 line-clamp-2 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
+                        <span data-testid="per-te-card" className="mt-1 line-clamp-1 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
                           {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
                           <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7" />
@@ -910,15 +941,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           Per te: {d.perTe}
                         </span>
                       )}
-                      {/* Con il "Per te" le chip restano nella scheda: la card ha un'altezza fissa. */}
-                      {chips.length > 0 && !d?.perTe && (
-                        <span data-testid="punti-forti" className="mt-2 flex min-w-0 gap-1.5">
-                          {chips.map((c) => (
-                            <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
-                          ))}
-                        </span>
-                      )}
-                      <span data-testid="posizione-card" className="mt-2 text-center text-[11px] font-sans text-white/70">{i + 1} di {places.length}</span>
+
                     </span>
                   </button>
                 </li>

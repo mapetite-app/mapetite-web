@@ -1939,6 +1939,18 @@ export default function MapView({
     return { lati: posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h }), scost };
   })();
 
+  // Frase sopra le card (revisore del 1/11): solo i dati che la ricerca ha capito e che sono veri;
+  // i conteggi (recensioni, poco conosciuti) li fa la lista sulle card che mostra (src/lib/frase-risultati.ts).
+  const frase = aiSearch !== null && view === "all" && clusterPlaces === null
+    ? {
+        categoria: aiSearch.filtri?.categoria ?? null,
+        zona: aiSearch.filtri?.zona ?? null,
+        vicino: aiSearch.filtri?.vicino_a_me === true,
+        simileA: aiSearch.simileA ?? null,
+        famosiDaParte: aiSearch.daParte?.turistici.length ?? 0,
+      }
+    : null;
+
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
@@ -3845,6 +3857,7 @@ export default function MapView({
           setAside={aiSearch?.daParte ?? null}
           offTopic={aiSearch?.fuoriTema}
           removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
+          frase={frase}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}

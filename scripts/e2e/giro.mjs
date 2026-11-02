@@ -334,8 +334,9 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 // Il perché e i tag escono dalla card e restano nella scheda (controllato in 7-ter).
 // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro"): sulla card tornano fino a 2 punti forti, solo dai goFor veri.
 ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) === 0, "card: il perché non è sulla card (sta nella scheda)");
-ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").textContent()) === "tramonto" && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale");
-ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' in fondo alla card");
+// Card più bassa (revisore del 1/11, secondo giro): i punti forti stanno nella riga di "Aperto ora", solo dove non ci sono già i ✓.
+ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").count()) === 0 && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale (dove non ci sono già i ✓ delle recensioni)");
+ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' sopra le card, accanto alla frase (la card resta bassa)");
 { const m = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((lis) => lis.map((li) => {
     const card = li.querySelector("[data-testid=card-risultato]");
     // offsetHeight: l'altezza vera, senza il rimpicciolimento delle card di lato.
@@ -343,14 +344,38 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
       verdetto: card.querySelectorAll("[data-testid=etichetta-verdetto], [data-testid=riga-google], [data-testid=segnaposto-verdetto]").length, fatti: card.querySelectorAll("[data-testid=riga-fatti]").length,
       righeFatti: (() => { const r = card.querySelector("[data-testid=riga-fatti]"); return r ? Math.round(r.getBoundingClientRect().height / parseFloat(getComputedStyle(r).lineHeight)) : 0; })() };
   }));
-  // Revisore del 1/11: altezza della card più piena (minimo 212–240 px), niente metà card vuota.
-  ok(m.length >= 2 && m.every((c) => c.h >= 212 && c.h <= 290 && c.h === m[0].h), `card nuova: a foto piena, alta e tutte uguali (${m.map((c) => c.h + "px").join(", ")})`);
+  // Revisore del 1/11 (secondo giro): card di circa 200 px (prima 260, con il vuoto in alto), tutte uguali.
+  ok(m.length >= 2 && m.every((c) => c.h >= 170 && c.h <= 210 && c.h === m[0].h), `card nuova: a foto piena, alta al massimo 210 px e tutte uguali (${m.map((c) => c.h + "px").join(", ")})`);
   ok(m.every((c) => c.verdetto === 1), `card: il verdetto (o la riga Google) c'è su ogni card (${m.map((c) => c.id + ":" + c.verdetto).join(", ")})`);
   ok(m.every((c) => c.segnali <= 1 && c.fatti === 1 && c.righeFatti === 1), `card: UNA riga di fatti e al massimo un segnale (${m.map((c) => c.id + ":" + c.segnali).join(", ")})`); }
 { const pill = await page.getByTestId("opzioni-ricerca").evaluate((el) => { const r = el.getBoundingClientRect(); const bar = document.querySelector("[data-testid=barra-ricerca]").getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), h: Math.round(r.height), sottoBarra: r.top >= bar.bottom - 1 && r.top < bar.bottom + 30, testo: el.querySelector("[data-testid=conteggio-risultati]").textContent.trim() }; });
   ok(pill.sottoBarra && pill.left <= 20 && pill.h >= 44 && pill.h <= 48 && /^\d+ posti$/.test(pill.testo), `lista nuova: pillola '${pill.testo}' sotto la barra, a sinistra (${pill.left},${pill.top}, alta ${pill.h}px)`);
   const sopra = await page.locator("[data-testid=lista-risultati] .rounded-card").evaluateAll((els) => els.filter((e) => !e.closest("ul")).length);
   ok(sopra === 0 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `lista nuova: nessuna intestazione sopra le card; "Ho capito" e Affina dietro la pillola`); }
+// Frase sopra le card (revisore del 1/11, "Rome essentials" di Places): solo dati veri. Qui la ricerca ha capito
+// "bar", zona "Roma"; 2 posti in lista (P2 tolto), "rooftop" confermato dalle recensioni in 1 (P1).
+{ const fr = await page.getByTestId("frase-risultati").innerText().catch(() => "");
+  const [titolo, dettaglio] = [await page.getByTestId("frase-titolo").innerText().catch(() => ""), ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ")];
+  const n = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count();
+  ok(titolo === `${["", "Un", "Due", "Tre"][n]} bar a Roma`, `frase sopra le card: numero, tipo e zona capiti dalla ricerca ('${titolo}')`);
+  // Ogni pezzo del dettaglio è uno di quelli costruiti dai dati (src/lib/frase-risultati.ts): niente aggettivi della richiesta attribuiti a tutti.
+  const pezzi = dettaglio.split(" · ").filter(Boolean);
+  ok(pezzi.length >= 1 && pezzi.every((x) => /^(Rooftop|Romantico) secondo le recensioni: 1 su \d+$|^\d+ poco conosciut[ieoa]$|^Tutti poco conosciuti$|^Senza i locali più famosi$/i.test(x)) && /rooftop secondo le recensioni: 1 su 2/i.test(dettaglio) && !/romantic[io] a|bar romantic/i.test(fr), `frase sopra le card: il dettaglio viene solo dalle recensioni e dai dati Google ('${dettaglio}')`);
+  const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=frase-risultati]").getBoundingClientRect(); const c = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: c.top, h: f.height }; });
+  ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
+// La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
+// i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
+{ const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
+  const R = { name: "Da Enzo", category: "restaurant", types: ["italian_restaurant", "restaurant"] }, B = { name: "Santa Cocktail Club", category: "cocktail_bar", types: ["cocktail_bar", "bar", "restaurant"] };
+  const sp = (x) => (x ?? "").replace(/\u00a0/g, " ");
+  ok(fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, R] }).titolo === "Due ristoranti a Trastevere" && fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, B] }).titolo === "Due posti a Trastevere", "frase: 'ristoranti' solo se lo sono tutti per Google, altrimenti 'posti'");
+  ok(fraseRisultati({ n: 3, requisiti: { romantico: 2 }, inArrivo: true }).dettaglio === null && sp(fraseRisultati({ n: 3, requisiti: { romantico: 2 } }).dettaglio) === "Romantico secondo le recensioni: 2 su 3", "frase: i conteggi dalle recensioni solo a verdetti arrivati");
+  ok(sp(fraseRisultati({ n: 4, gemme: 1, famosiDaParte: 2 }).dettaglio) === "1 poco conosciuto · senza i locali più famosi" && fraseRisultati({ n: 0 }) === null && fraseRisultati({ n: 1, zona: "<b>x</b>" }).titolo === "Un posto", "frase: poco conosciuti e famosi messi da parte solo dai dati; niente frase senza posti; zona strana ignorata"); }
+{ const vis = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").nth(1).evaluate((li) => Math.round(window.innerWidth - li.getBoundingClientRect().left));
+  ok(vis >= 32 && vis <= 56, `carosello: la card dopo si vede per circa 40 px (${vis} px)`); }
+// Barra (revisore del 1/11: "cena romantica a Tra…"): con i risultati la richiesta si legge intera su al massimo 2 righe, senza alzare la barra.
+{ const b = await page.evaluate(() => { const bar = document.querySelector("[data-testid=barra-ricerca]").getBoundingClientRect(); const t = document.querySelector("[data-testid=richiesta-intera] span"); return { barH: bar.height, testo: t?.textContent ?? "", righe: t ? Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)) : 0, intero: t ? t.scrollHeight <= t.clientHeight + 1 : false }; });
+  ok(b.testo === "Rooftop romantico per due a Roma" && b.righe >= 1 && b.righe <= 2 && b.intero && b.barH <= 52, `barra: la richiesta si legge intera su ${b.righe} righe, barra alta ${Math.round(b.barH)} px`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
 // Mockup A (21/10): "✨ 3 posti · rooftop" (solo i requisiti: tipo e zona no) e "✓ rooftop · ✓ romantico" sulla card confermata.
 { const cap = await page.getByTestId("capito-pillola").innerText().catch(() => "");
