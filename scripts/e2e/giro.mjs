@@ -3176,6 +3176,40 @@ if (fakeUser) {
   await q3.getByRole("button", { name: "Locale successivo" }).click();
   await q3.locator("h2", { hasText: "Spirito di Vino" }).waitFor({ timeout: 4000 }).then(() => ok(true, "scheda: '›' nella barra apre il risultato dopo"), () => ok(false, "scheda: '›' nella barra apre il risultato dopo"));
   await q3.keyboard.press("Escape");
+  // Lista dei salvati (revisore 2/11, terzo giro): nessuna foto Google chiesta, la foto scattata dall'utente (foto_locali)
+  // al posto dell'emoji quando c'è; "Sulla mappa" sparisce mentre si scorre in giù e torna appena ci si ferma o si risale.
+  { const FOTO_ID = "11111111-1111-4111-8111-111111111111";
+    await c3.route("**/rest/v1/foto_locali**", (r) => r.fulfill({ json: [{ id: FOTO_ID, place_id: "00000000-0000-4000-8000-000000000301" }] }));
+    await c3.route("**/api/foto-utenti/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#b5653a"/><circle cx="60" cy="64" r="34" fill="#f2d6a2"/></svg>' }));
+    let fotoGoogle = 0;
+    q3.on("request", (rq) => { if (rq.url().includes("/api/places/photo")) fotoGoogle++; });
+    await q3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await vaiSalvati(q3);
+    const L3 = q3.getByTestId("salvati-lista");
+    await L3.getByTestId("salvato-riga").first().waitFor({ timeout: 6000 });
+    fotoGoogle = 0;
+    await L3.getByTestId("salvato-foto-mia").first().waitFor({ timeout: 4000 }).catch(() => {});
+    await q3.waitForTimeout(600);
+    const foto = await L3.getByTestId("salvato-foto-mia").evaluateAll((els) => els.map((e) => ({ src: e.getAttribute("src"), w: e.naturalWidth, riga: e.closest("[data-testid=salvato-riga]")?.textContent ?? "" })));
+    ok(foto.length === 1 && foto[0].src === `/api/foto-utenti/${FOTO_ID}` && foto[0].w > 0 && foto[0].riga.includes("Hostaria Del Moro") && (await L3.getByTestId("salvato-riga").count()) === 6 && fotoGoogle === 0,
+      `salvati lista: la foto dell'utente al posto dell'emoji solo dove c'è, nessuna foto Google chiesta (${JSON.stringify(foto.map((f) => f.riga.slice(0, 18)))}, foto Google ${fotoGoogle})`);
+    await q3.screenshot({ path: `${OUT}/s4-salvati-lista.png`, caret: "initial" });
+    const btn = L3.getByTestId("salvati-lista-mappa");
+    const vis = async () => btn.evaluate((e) => ({ nascosto: e.dataset.nascosto === "true", op: Number(getComputedStyle(e).opacity) }));
+    ok(!(await vis()).nascosto, "salvati lista: 'Sulla mappa' in vista da fermi");
+    await q3.mouse.move(195, 480);
+    await q3.mouse.wheel(0, 160);
+    await q3.waitForTimeout(260);
+    const giu = await vis();
+    const scorso = await L3.evaluate((el) => el.scrollTop);
+    await q3.screenshot({ path: `${OUT}/s4-salvati-lista-scorri.png`, caret: "initial" });
+    ok(scorso > 24 && giu.nascosto && giu.op < 0.2, `salvati lista: scorrendo in giù 'Sulla mappa' sparisce e non copre l'ultima riga (scorso ${scorso} px, opacità ${giu.op})`);
+    await q3.waitForTimeout(700);
+    ok(!(await vis()).nascosto && (await btn.evaluate((e) => getComputedStyle(e).pointerEvents)) !== "none", "salvati lista: fermi, 'Sulla mappa' torna e si tocca");
+    await q3.mouse.wheel(0, 160); await q3.waitForTimeout(150);
+    await q3.mouse.wheel(0, -80); await q3.waitForTimeout(150);
+    ok(!(await vis()).nascosto, "salvati lista: risalendo 'Sulla mappa' torna subito");
+    await L3.evaluate((el) => { el.scrollTop = 0; }); await q3.waitForTimeout(600); }
   // Mappa dei salvati: inquadra tutti i salvati di Roma (anche Kiko Sushi Bar, il più a sud), nessun nome sopra un altro segnalino.
   await q3.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await vaiSalvatiMappa(q3);
@@ -3193,7 +3227,27 @@ if (fakeUser) {
     ok(m.n === 6 && m.fuori.length === 0, `mappa dei salvati: tutti i 6 salvati di Roma in vista, anche il più a sud (${m.n} segnalini${m.fuori.length ? ", fuori: " + m.fuori.join(",") : ""})`);
     ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`); }
   { const t = await tocchi(q3); ok(t.length === 0, `mappa dei salvati: nessun segnalino ne tocca un altro${t.length ? " — " + t.join(" ") : ""}`); }
+  // Revisore 2/11 (terzo giro): nomi sempre dallo stesso lato (a destra; a sinistra solo sul bordo destro dello schermo),
+  // il segnalino scelto ha sempre il nome, e nessun nome né segnalino copre il pallino blu.
+  { const e = await q3.evaluate(() => {
+      const ov = (a, b) => a.left + 1 < b.right && b.left + 1 < a.right && a.top + 1 < b.bottom && b.top + 1 < a.bottom;
+      const labels = [...document.querySelectorAll("[data-testid=pin] [data-testid=etichetta-pin]")].map((l) => ({ t: l.textContent.trim(), lato: l.dataset.lato, b: l.getBoundingClientRect() }));
+      const foc = document.querySelector("[data-testid=pin][data-focused=true]");
+      const tuEl = document.querySelector("[data-testid=tu-sei-qui]");
+      const tu = tuEl?.getBoundingClientRect();
+      const sopraTu = tu ? document.elementFromPoint(tu.left + tu.width / 2, tu.top + tu.height / 2) : null;
+      return {
+        lati: labels.map((l) => `${l.t}:${l.lato}`),
+        sinistraFuoriBordo: labels.filter((l) => l.lato === "sinistra").every((l) => l.b.right + l.b.width + 60 > innerWidth),
+        focNome: foc?.querySelector("[data-testid=etichetta-pin]")?.textContent?.trim() ?? null,
+        tu: !!tu, nomiSulTu: tu ? labels.filter((l) => ov(l.b, tu)).map((l) => l.t) : [], tuInVista: !tu || !!sopraTu?.closest("[data-testid=tu-sei-qui]"),
+      };
+    });
+    ok(e.lati.length >= 4 && e.lati.every((x) => /:(destra|sinistra)$/.test(x)) && e.sinistraFuoriBordo, `mappa dei salvati: i nomi sempre a destra del segnalino (a sinistra solo sul bordo) (${e.lati.join(", ")})`);
+    ok(!!e.focNome, `mappa dei salvati: il segnalino scelto (card al centro) ha sempre il nome (${e.focNome})`);
+    ok(e.tu && e.nomiSulTu.length === 0 && e.tuInVista, `mappa dei salvati: il pallino blu in vista, sopra i segnalini e senza nomi sopra (${e.tu ? (e.nomiSulTu.join(",") || "libero") : "pallino assente"})`); }
   await q3.screenshot({ path: `${OUT}/r3-salvati-mappa.png` });
+  await q3.screenshot({ path: `${OUT}/s4-salvati-mappa.png`, caret: "initial" });
   await c3.close();
 }
 
