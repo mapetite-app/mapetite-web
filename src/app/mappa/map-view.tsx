@@ -1920,7 +1920,10 @@ export default function MapView({
         fixed: fissi.has(place.id),
       };
     });
-    for (const { place: p } of dalSalvatiVisti) items.push({ id: `dai-salvati-${p.id}`, lat: p.lat, lng: p.lng, size: 36, label: nomeLeggibile(pinName(p.name)), extraW: 16 });
+    // Con un salvato solo il nome c'è già nella pillola "📌 Nome" sopra le card (revisore del 2/11: lo stesso
+    // salvato si leggeva due volte): il segnalino resta senza nome. Con più salvati la pillola dice "2 dei
+    // tuoi salvati" e i nomi stanno sui segnalini.
+    for (const { place: p } of dalSalvatiVisti) items.push({ id: `dai-salvati-${p.id}`, lat: p.lat, lng: p.lng, size: 36, label: dalSalvatiVisti.length > 1 ? nomeLeggibile(pinName(p.name)) : null, extraW: 16 });
     for (const c of clusters) {
       if (!c.properties.cluster) continue;
       const n = (c.properties as { point_count: number }).point_count;

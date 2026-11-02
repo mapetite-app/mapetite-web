@@ -1790,7 +1790,9 @@ else {
       // Il nome sta in assoluto accanto al segnalino: si misura l'insieme di segnalino e nome (se c'è).
       const b = await pins.first().evaluate((el) => { const rs = [el, ...el.querySelectorAll("[data-testid=etichetta-pin]")].map((e) => e.getBoundingClientRect()); const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top)); return { x, y, width: Math.max(...rs.map((r) => r.right)) - x, height: Math.max(...rs.map((r) => r.bottom)) - y }; }).catch(() => null);
       const riga = await ds.boundingBox();
-      ok(!!b && !!riga && b.x >= 0 && b.x + b.width <= 390 && b.y >= 0 && b.y + b.height <= riga.y, `dai tuoi salvati: il segnalino si vede tutto, nome compreso, sopra la riga (${JSON.stringify(b && { x: Math.round(b.x), y: Math.round(b.y), h: Math.round(b.height) })}, riga a ${Math.round(riga?.y ?? 0)})`); }
+      ok(!!b && !!riga && b.x >= 0 && b.x + b.width <= 390 && b.y >= 0 && b.y + b.height <= riga.y, `dai tuoi salvati: il segnalino si vede tutto, nome compreso, sopra la riga (${JSON.stringify(b && { x: Math.round(b.x), y: Math.round(b.y), h: Math.round(b.height) })}, riga a ${Math.round(riga?.y ?? 0)})`);
+      // Revisore del 2/11: lo stesso salvato si leggeva due volte (nome sul segnalino + pillola "📌 Osteria Due").
+      ok((await pins.first().getByTestId("etichetta-pin").count()) === 0, "dai tuoi salvati: con un salvato solo il nome sta nella pillola, il segnalino è senza nome"); }
     await p.getByTestId("dai-salvati-apri").click();
     await p.getByTestId("scheda-pannello").waitFor({ timeout: 5000 });
     ok(await p.getByTestId("scheda-pannello").getByText("Osteria Due").first().isVisible(), "dai tuoi salvati: con un salvato solo il tocco apre la sua scheda");
