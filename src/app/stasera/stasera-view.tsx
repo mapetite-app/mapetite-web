@@ -25,8 +25,9 @@ import {
 } from "@/lib/stasera";
 
 type Geo = "idle" | "cerco" | "ok" | "negata" | "assente";
-// Miniature sotto "Proponimi": due file da tre.
-const ANTEPRIMA_MAX = 6;
+// Miniature sotto "Proponimi": una fila sola, al massimo tre più "+N" (revisore 2/11, sesto giro: due file
+// finivano sotto la barra in basso).
+const ANTEPRIMA_MAX = 3;
 type Pos = { lat: number; lng: number };
 
 // Lettura dei salvati come in /mappa (saved_places → places), più il verdetto già in cache
@@ -393,8 +394,8 @@ export default function StaseraView({ userId }: { userId: string }) {
             {/* Revisore 2/11, terzo giro: sotto il pulsante il 40% dello schermo era vuoto. Ora i salvati veri che
                 rispettano le scelte (emoji e nome), aggiornati a ogni tocco; un tocco apre il posto sulla mappa. */}
             {matchCount > 0 && (
-              <section data-testid="stasera-anteprima" aria-label="I salvati con queste scelte" className="mt-3">
-                <ul className="grid grid-cols-3 gap-2">
+              <section data-testid="stasera-anteprima" aria-label="I salvati con queste scelte" className="mt-3 pb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] md:pb-0">
+                <ul className="grid grid-cols-4 gap-2">
                   {matching.slice(0, ANTEPRIMA_MAX).map((s) => (
                     <li key={s.id}>
                       <Link
@@ -407,10 +408,20 @@ export default function StaseraView({ userId }: { userId: string }) {
                       </Link>
                     </li>
                   ))}
+                  {matchCount > ANTEPRIMA_MAX && (
+                    <li>
+                      <Link
+                        href="/mappa?vista=salvati"
+                        data-testid="stasera-anteprima-altri"
+                        aria-label={`Altri ${matchCount - ANTEPRIMA_MAX} salvati`}
+                        className="flex h-full min-h-[92px] flex-col items-center justify-center gap-0.5 rounded-card border border-[#e8e2d8] bg-[#f3efe8] px-2 text-center active:scale-[0.97]"
+                      >
+                        <span className="font-title text-[22px] font-semibold leading-none text-brand">+{matchCount - ANTEPRIMA_MAX}</span>
+                        <span className="text-[12px] text-text-muted">altri</span>
+                      </Link>
+                    </li>
+                  )}
                 </ul>
-                {matchCount > ANTEPRIMA_MAX && (
-                  <p data-testid="stasera-anteprima-altri" className="mt-2 text-center text-xs text-text-muted">e altri {matchCount - ANTEPRIMA_MAX}</p>
-                )}
               </section>
             )}
           </section>

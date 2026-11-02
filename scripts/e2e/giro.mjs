@@ -2022,8 +2022,9 @@ else {
       const mb = await L.getByTestId("salvati-lista-mappa").boundingBox(); const nav = await p.locator("nav").filter({ has: p.getByRole("link", { name: "Salvati" }) }).first().boundingBox();
       ok(!!mb && !!nav && mb.y + mb.height <= nav.y && mb.y > 600 && ((await L.getByTestId("salvati-lista-mappa").textContent()) ?? "").includes("Sulla mappa"), `salvati lista: 'Sulla mappa' è un pulsante in basso, sopra la barra (y ${Math.round(mb?.y ?? 0)}, barra a ${Math.round(nav?.y ?? 0)})`);
       // Revisore 2/11 (quinto giro): in fondo alla lista c'è lo spazio del pulsante, così l'ultimo posto non resta mai coperto.
-      { const fondo = await L.evaluate(async (el) => { const prima = el.scrollTop; el.scrollTop = el.scrollHeight; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); const b = el.querySelector("[data-testid=salvati-lista-mappa]").getBoundingClientRect(); const rows = [...el.querySelectorAll("[data-testid=salvato-riga]")]; const last = rows[rows.length - 1].getBoundingClientRect(); el.scrollTop = prima; return { ultima: Math.round(last.bottom), pulsante: Math.round(b.top) }; });
-        ok(fondo.ultima <= fondo.pulsante, `salvati lista: in fondo l'ultimo posto finisce sopra 'Sulla mappa' (${fondo.ultima} ≤ ${fondo.pulsante})`); }
+      { const fondo = await L.evaluate(async (el) => { const prima = el.scrollTop; el.scrollTop = el.scrollHeight; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); const b = el.querySelector("[data-testid=salvati-lista-mappa]").getBoundingClientRect(); const rows = [...el.querySelectorAll("[data-testid=salvato-riga]")]; const lastEl = rows[rows.length - 1]; const last = lastEl.getBoundingClientRect(); const stato = lastEl.querySelector("[data-testid=stato-lista]")?.getBoundingClientRect(); const verd = lastEl.querySelector("[data-testid=salvato-verdetto], [data-testid=salvato-nota]")?.getBoundingClientRect(); const sfuma = getComputedStyle(el.querySelector("[data-testid=salvati-lista-mappa]").parentElement).backgroundImage; el.scrollTop = prima; return { ultima: Math.round(last.bottom), stato: Math.round(stato?.bottom ?? 9999), verdetto: Math.round(verd?.bottom ?? 0), pulsante: Math.round(b.top), sfuma: sfuma.includes("gradient") }; });
+        // Revisore 2/11 (sesto giro): verdetto e stato dell'ultima riga stanno sopra il pulsante con almeno 16 px; a riposo una sfumatura carta dietro il pulsante.
+        ok(fondo.ultima <= fondo.pulsante && fondo.stato + 16 <= fondo.pulsante && fondo.verdetto + 16 <= fondo.pulsante && fondo.sfuma, `salvati lista: in fondo verdetto e stato dell'ultimo posto sopra 'Sulla mappa' di almeno 16 px, con la sfumatura (${JSON.stringify(fondo)})`); }
       // Le raccolte stanno nella stessa fila dei filtri (scorrevole): ci sono anche se partono fuori schermo a destra.
       ok((await L.getByTestId("raccolta-cerchio").count()) >= 2, `salvati lista: le raccolte dell'utente nella fila dei Salvati (${await L.getByTestId("raccolta-cerchio").count()})`); }
     const righe = L.getByTestId("salvato-riga");
@@ -2565,11 +2566,16 @@ else {
       ok(await cose.isVisible() && (await cose.locator("a").count()) === 4 && (await cose.getByTestId("profilo-carta-gusto").count()) === 0 && (await cose.getByTestId("profilo-gruppi").count()) === 0 && (await cose.getByTestId("profilo-prenotazioni").count()) === 0, `profilo: griglia 'Le mie cose' con 4 tessere (senza Prenotazioni vuota né la carta del gusto), senza liste di gruppo (${await cose.locator("a").count()})`);
       // Revisore 2/11 (terzo giro): sotto i numeri "Il tuo gusto" con 3 pillole vere dal profilo (cucina, occasione, prezzo)
       // che aprono la mappa del gusto; la carta da condividere è il link piccolo "Condividi". Il terzo inferiore non è vuoto.
+      // Revisore 2/11 (sesto giro): la scheda era vuota (solo un link doppione). Ora 4 pillole vere (cucina, occasione,
+      // atmosfera, prezzo), "Modifica" e "Condividi" sulla riga del titolo, niente link sotto; i numeri compatti sotto il nome.
       { const gs = p.getByTestId("profilo-gusto");
         const pill = (await gs.getByTestId("profilo-gusto-pillola").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
-        const gb = await gs.boundingBox(); const nb = await p.getByTestId("guida-contatori").boundingBox();
-        ok(JSON.stringify(pill) === '["🍝 Romana","❤️ Cena romantica","€€ nella media"]' && (await gs.getByTestId("profilo-gusto-mappa").getAttribute("href")) === "/me" && (await gs.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && !!gb && !!nb && gb.y > nb.y + nb.height && gb.y - (nb.y + nb.height) < 20 && (await p.getByText("Il tuo gusto", { exact: true }).count()) === 1,
-          `profilo: 'Il tuo gusto' sotto i numeri con 3 pillole vere che aprono la mappa del gusto, 'Condividi' per la carta (${pill.join(" | ")})`);
+        const gb = await gs.boundingBox(); const nb = await p.getByTestId("guida-contatori").boundingBox(); const hb = await p.locator("h1").first().boundingBox();
+        const tb = await gs.locator("h2").boundingBox(); const mb = await gs.getByTestId("profilo-gusto-mappa").boundingBox(); const cb = await gs.getByTestId("profilo-carta-gusto").boundingBox();
+        ok(JSON.stringify(pill) === '["🍝 Romana","❤️ Cena romantica","🕯️ Intima","€€ nella media"]' && (await gs.getByTestId("profilo-gusto-mappa").textContent())?.trim() === "Modifica" && (await gs.getByTestId("profilo-gusto-mappa").getAttribute("href")) === "/me" && (await gs.getByTestId("profilo-carta-gusto").getAttribute("href")) === "/profilo/gusto" && (await gs.locator("a").count()) === 2 && (await gs.getByText("La tua mappa del gusto").count()) === 0 && !!tb && !!mb && !!cb && Math.abs((mb.y + mb.height / 2) - (tb.y + tb.height / 2)) < 8 && Math.abs((cb.y + cb.height / 2) - (tb.y + tb.height / 2)) < 8 && (await p.getByText("Il tuo gusto", { exact: true }).count()) === 1,
+          `profilo: 'Il tuo gusto' con 4 pillole vere, 'Modifica' e 'Condividi' sulla riga del titolo, niente link doppione (${pill.join(" | ")})`);
+        ok(!!gb && !!nb && !!hb && nb.y >= hb.y + hb.height - 2 && nb.y + nb.height <= gb.y && nb.height <= 50 && (await p.getByTestId("guida-contatori").evaluate((el) => !!el.closest("header"))) && gb.height > nb.height,
+          `profilo: i numeri compatti nell'intestazione sotto il nome, il gusto è il blocco principale (numeri ${Math.round(nb?.height ?? -1)} px, gusto ${Math.round(gb?.height ?? -1)} px)`);
         const fondo = await p.evaluate(() => { const nav = [...document.querySelectorAll("nav")].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= innerHeight - 2 && r.height < 120)[0]; const el = document.querySelector("#altro")?.closest("div.rounded-card"); return { fine: Math.round(el?.getBoundingClientRect().bottom ?? 0), barra: Math.round(nav?.top ?? innerHeight) }; });
         ok(fondo.fine >= 844 * 0.62, `profilo: il terzo inferiore non è vuoto (contenuto fino a ${fondo.fine} px, barra a ${fondo.barra})`);
         await p.screenshot({ path: `${OUT}/s4-profilo.png`, caret: "initial" }); }
@@ -2904,20 +2910,28 @@ else {
     const anteprima = async () => sq.getByTestId("stasera-anteprima-posto").allInnerTexts().catch(() => []);
     { const nomi = await anteprima();
       const bb = await sq.getByTestId("stasera-proponi").boundingBox(); const ab = await sq.getByTestId("stasera-anteprima").boundingBox().catch(() => null);
-      ok(nomi.length === 6 && ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"].every((n) => nomi.some((t) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
-        `stasera: sotto il pulsante le miniature dei 6 salvati che rispettano le scelte (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+      // Revisore 2/11 (sesto giro): due file finivano sotto la barra in basso. Ora una fila: 3 miniature e "+N".
+      const sei = ["Terrazza Uno", "Enoteca Tre", "Forno Quattro", "Caffè Milano", "Pizzeria Sette", "Sushi Otto"];
+      const altri = sq.getByTestId("stasera-anteprima-altri");
+      ok(nomi.length === 3 && nomi.every((t) => sei.some((n) => t.includes(n))) && !nomi.some((t) => /Osteria Due|Birreria Sei/.test(t)) && (await altri.textContent())?.replace(/\s+/g, "").startsWith("+3") && (await altri.getAttribute("href")) === "/mappa?vista=salvati" && !!bb && !!ab && ab.y >= bb.y + bb.height && (await sq.getByTestId("stasera-anteprima-posto").first().getAttribute("href"))?.startsWith("/mappa?salvato="),
+        `stasera: sotto il pulsante 3 miniature dei salvati che rispettano le scelte più '+3' (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`);
+      // In fondo alla pagina la fila delle miniature resta tutta sopra la barra in basso.
+      await sq.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await sq.waitForTimeout(300);
+      const f = await sq.evaluate(() => { const ul = document.querySelector("[data-testid=stasera-anteprima] ul").getBoundingClientRect(); const nav = [...document.querySelectorAll("nav")].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= innerHeight - 2 && r.height < 120)[0]; return { fine: Math.round(ul.bottom), barra: Math.round(nav?.top ?? innerHeight), file: new Set([...document.querySelectorAll("[data-testid=stasera-anteprima] li")].map((li) => Math.round(li.getBoundingClientRect().top))).size }; });
+      ok(f.file === 1 && f.fine <= f.barra - 8, `stasera: miniature su una fila, sopra la barra in basso (${JSON.stringify(f)})`);
+      await sq.evaluate(() => window.scrollTo(0, 0)); }
     await sq.screenshot({ path: `${OUT}/s4-stasera.png`, caret: "initial" });
     // Città dei salvati come scelta rapida (più di una città): Roma = 5 mai provati
     const dove = await sq.getByTestId("stasera-distanza").getByRole("button").allTextContents();
     ok(dove.join("|") === "📍 Vicino a me|Roma|Milano|Ovunque", `stasera: 'Dove?' con le città dei salvati (${dove.join(" | ")})`);
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Roma" }).click();
     ok((await sq.getByTestId("stasera-conteggio").textContent())?.startsWith("5 salvati"), "stasera: 'Roma' tiene solo i salvati di Roma");
-    { const nomi = await anteprima(); ok(nomi.length === 5 && !nomi.some((t) => t.includes("Caffè Milano")), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length}, senza Caffè Milano)`); }
+    { const nomi = await anteprima(); ok(nomi.length === 3 && !nomi.some((t) => t.includes("Caffè Milano")) && (await sq.getByTestId("stasera-anteprima-altri").textContent())?.replace(/\s+/g, "").startsWith("+2"), `stasera: con 'Roma' le miniature si aggiornano subito (${nomi.length} più '+2', senza Caffè Milano)`); }
     await sq.getByTestId("stasera-distanza").getByRole("button", { name: "Ovunque" }).click();
     // Romantico: 2 posti
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Romantico" }).click();
     ok((await sq.getByTestId("stasera-proponi").textContent()) === "Proponimi i 2 posti", "stasera: con 'Romantico' restano 2 posti");
-    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")), `stasera: con 'Romantico' 2 miniature (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
+    { const nomi = await anteprima(); ok(nomi.length === 2 && nomi.some((t) => t.includes("Terrazza Uno")) && nomi.some((t) => t.includes("Enoteca Tre")) && (await sq.getByTestId("stasera-anteprima-altri").count()) === 0, `stasera: con 'Romantico' 2 miniature, niente '+N' (${nomi.map((t) => t.replace(/\s+/g, " ").trim()).join(" | ")})`); }
     // Festa + Da provare: nessuno → si allarga con un tocco
     await sq.getByTestId("stasera-occasione").getByRole("button", { name: "Festa" }).click();
     ok(await sq.getByTestId("stasera-nessuno").isVisible() && (await sq.getByTestId("stasera-proponi").count()) === 0 && (await sq.getByTestId("stasera-anteprima").count()) === 0, "stasera: nessun salvato con queste scelte → avviso, niente pulsante né miniature");

@@ -474,8 +474,10 @@ export default function SalvatiLista({
         </>)}
       </div>
       {/* La mappa dei salvati: pulsante che resta in basso mentre si scorre (come "Map" in Places), così in
-          alto restano solo "Stasera" e "+" (revisore 2/11). */}
-      <div className="pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-5 lg:pb-6">
+          alto restano solo "Stasera" e "+" (revisore 2/11). Revisore 2/11, sesto giro: copriva verdetto e stato
+          dell'ultima riga. Sotto la lista resta uno spazio pari al pulsante + 16 px (pt-4), così in fondo l'ultima
+          riga sta tutta sopra; a riposo una sfumatura carta dietro il pulsante, niente testo che ci passa sotto. */}
+      <div className={`pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-4 lg:pb-6 ${mappaNascosta ? "" : "bg-gradient-to-t from-[#f8f6f2] from-55% to-transparent"}`}>
         <button
           type="button"
           data-testid="salvati-lista-mappa"
