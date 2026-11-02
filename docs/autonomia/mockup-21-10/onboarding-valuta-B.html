@@ -1,0 +1,30 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:#0b1719;color:#fff}
+.bg{position:absolute;inset:0;--es:170px}
+.bg::after{top:36%}
+.fade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,23,25,.55) 0%,rgba(11,23,25,0) 22%,rgba(11,23,25,0) 42%,rgba(11,23,25,.85) 66%,#0b1719 82%);z-index:2}
+.pr{position:absolute;top:58px;left:16px;right:16px;display:flex;gap:4px;z-index:5}
+.pr i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.25)}
+.pr i.on{background:var(--accent)}
+.lab{position:absolute;top:74px;left:16px;right:16px;display:flex;justify-content:space-between;font-size:12.5px;color:rgba(255,255,255,.75);z-index:5}
+.txt{position:absolute;left:20px;right:20px;top:470px;z-index:5}
+.k{font-size:10.5px;color:rgba(255,255,255,.75)}
+.txt b{display:block;font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:-.02em;line-height:1.05;margin-top:6px}
+.tag{display:inline-flex;margin-top:10px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);font-size:12px;font-weight:600}
+.q{position:absolute;left:0;right:0;top:644px;text-align:center;font-family:var(--display);font-weight:500;font-size:19px;z-index:5}
+.act{position:absolute;left:16px;right:16px;bottom:74px;display:flex;gap:12px;z-index:5}
+.act div{flex:1;height:62px;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--display);font-weight:600;font-size:17px}
+.act .no{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
+.act .si{background:var(--accent);box-shadow:0 10px 30px rgba(255,107,74,.45)}
+.sk{position:absolute;left:0;right:0;bottom:38px;text-align:center;font-size:13.5px;color:rgba(255,255,255,.6);z-index:5}
+</style></head><body><div class="screen">
+<div class="bg ph ph-pizza" data-e="🍕"></div><div class="fade"></div>
+<div data-sb="dark"></div>
+<div class="pr"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<div class="lab"><span>La tua mappa del gusto</span><span>4 di 10</span></div>
+<div class="txt"><div class="caps k">Pizzeria · Trastevere · €</div><b>Forno Trastevere 14</b><span class="tag">Famosissimo</span></div>
+<div class="q">Ci andresti?</div>
+<div class="act"><div class="no">👎 No</div><div class="si">👍 Sì</div></div>
+<div class="sk">Non lo conosco</div>
+<div class="home-ind l"></div>
+</div><script src="base.js"></script></body></html>

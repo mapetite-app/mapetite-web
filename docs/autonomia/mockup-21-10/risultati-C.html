@@ -1,0 +1,63 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.map{position:absolute;inset:0}
+.search{position:absolute;top:54px;left:16px;right:72px;height:52px;background:#fff;border-radius:26px;box-shadow:0 6px 20px rgba(0,0,0,.10);display:flex;align-items:center;gap:10px;padding:0 16px;font-family:var(--display);font-size:15.5px;font-weight:500;color:var(--brand);white-space:nowrap}
+.search .x{margin-left:auto;color:#8a8f98;font-size:18px}
+.flt{position:absolute;top:54px;right:16px;width:52px;height:52px;border-radius:50%;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.10);display:grid;place-items:center;color:var(--brand);font-size:22px}
+.got{position:absolute;top:116px;left:16px;background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.08);display:flex;gap:7px;align-items:center;color:var(--text)}
+.got b{font-weight:600;color:var(--brand)}
+.got .sep{color:#c4c4c4}
+.pin{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px}
+.pin .ph,.pin .crop{width:44px;height:44px;border-radius:50%;border:3px solid var(--brand);box-shadow:0 4px 10px rgba(0,0,0,.18);--es:24px}
+.pin span{white-space:nowrap;background:#fff;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:600;font-family:var(--display);color:var(--brand);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.pin.on .crop{width:60px;height:60px;border:3px solid var(--accent)}
+.pin.on span{color:var(--accent)}
+.car{position:absolute;left:0;right:0;bottom:96px;height:372px}
+.card{position:absolute;top:0;width:310px;height:372px;left:40px;border-radius:24px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.28)}
+.card.side{width:290px;height:340px;top:16px;opacity:.95}
+.card{background:#0f1a1c}.card .crop{position:absolute;left:0;right:0;top:0;height:240px}
+.card .g{position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,26,28,0) 22%,rgba(15,26,28,.7) 48%,#0f1a1c 66%)}
+.card .in{position:absolute;left:18px;right:18px;bottom:16px;color:#fff}
+.sv{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);display:grid;place-items:center;color:#fff;font-size:18px;background:rgba(0,0,0,.18);z-index:3}
+.nm{font-family:var(--display);font-weight:600;font-size:27px;line-height:1.08;letter-spacing:-.01em;margin:6px 0 9px}
+.meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(255,255,255,.8)}
+.vd{margin-top:11px;font-size:14px;line-height:1.38;display:flex;gap:7px}
+.pt{margin-top:7px;font-size:13px;color:#ffb3a1;display:flex;gap:7px;font-weight:500}
+.chips{display:flex;gap:6px;margin-top:11px}
+.chips span{border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:500}
+.cnt{position:absolute;right:18px;top:20px;font-size:12px;color:rgba(255,255,255,.75);font-weight:500;z-index:3;display:none}
+.of{text-align:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,.6)}
+
+.ans{position:absolute;top:116px;left:16px;right:16px;background:var(--paper);border-radius:18px;padding:14px 16px 13px;box-shadow:0 8px 24px rgba(0,0,0,.10);border:1px solid #ece6dc}
+.ans .k{display:flex;align-items:center;gap:6px;color:var(--brand);font-size:10.5px}
+.ans p{font-family:var(--serif);font-size:20px;line-height:1.22;margin-top:6px;color:#1c1c1e;letter-spacing:-.005em}
+.ans p em{font-style:italic;color:var(--brand)}
+.ans .af{position:absolute;right:16px;top:13px;font-size:12.5px;font-weight:600;color:var(--accent)}
+.nm{font-family:var(--serif);font-weight:500;font-size:32px;letter-spacing:-.01em}
+.car{height:350px}.card{height:350px}
+</style></head><body><div class="screen">
+<div class="map" data-map="paper" data-seed="11" data-river=".1" data-labels=""></div>
+<div data-sb=""></div>
+<div class="search"><i data-i="spark" class="spark"></i>Rooftop romantico per due<span class="x"><i data-i="x"></i></span></div>
+<div class="flt"><i data-i="filter"></i></div>
+<div class="ans"><div class="k caps"><i data-i="spark" class="spark"></i>Mapetite · 12 posti</div><span class="af">Affina</span><p>Rooftop romantici, <em>senza la calca</em>. Ho tolto quelli rumorosi e da aperitivo.</p></div>
+<div class="pin on" style="left:150px;top:232px"><div data-crop="pin1"></div><span>Terrazza Gianicolo</span></div>
+<div class="pin" style="left:300px;top:226px"><div data-crop="pin2"></div><span>Altana Monti</span></div>
+<div class="pin" style="left:30px;top:300px"><div data-crop="pin3"></div><span>Salotto 42</span></div>
+<div class="pin" style="left:280px;top:318px"><div data-crop="pin4"></div><span>Belvedere Celio</span></div>
+<div class="car">
+ <div class="card side" style="left:-262px"><div data-crop="roof-left"></div><div class="g"></div></div>
+ <div class="card side" style="left:362px"><div data-crop="roof-right"></div><div class="g"></div></div>
+ <div class="card"><div data-crop="roof-main"></div><div class="g"></div>
+  <div class="sv"><i data-i="bookmark"></i></div>
+  <div class="in">
+   <div class="caps" style="color:rgba(255,255,255,.75)">Rooftop bar · €€€</div>
+   <div class="nm">Terrazza Gianicolo</div>
+   <div class="meta"><span class="ok-pill">Aperto ora</span>650 m da te</div>
+   <div class="vd" style="font-family:var(--serif);font-size:16.5px;font-style:italic"><span>“Tramonto sulle cupole, tavoli lontani tra loro.”</span></div>
+   <div class="pt"><span>Per te: vista e silenzio, come piace a te</span></div>
+   <div class="chips"><span>Vista cupole</span><span>Tavoli per due</span></div>
+   <div class="of">1 di 12</div>
+  </div></div>
+</div>
+<div data-tabs="Mappa"></div><div class="home-ind"></div>
+</div><script src="base.js"></script></body></html>
