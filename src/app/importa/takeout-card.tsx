@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { APRI_FILE_EVENT } from "@/lib/apri-file-google";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase/client-lazy";
+import RaccoltaCopertina from "@/components/raccolta-copertina";
+import { collectionPath } from "@/lib/raccolte";
+import { getCategoryEmoji } from "@/lib/emoji";
 import { trackFeature } from "@/lib/track";
 import {
   kmzToKml, listMapping, parseTakeout, zoneCounts, SENZA_POSIZIONE,
@@ -24,6 +27,8 @@ const LAST_KEY = "mapetite.takeout.ultimo-completamento";
 const DAY = 20 * 60 * 60 * 1000;
 
 type Pending = { name: string; url: string; tags: string[]; note: string | null };
+// Raccolta nata dal file (una per lista): posti davvero salvati con quel nome, per le copertine del "fatto".
+type Nata = { tag: string; count: number; emojis: string[]; names: string[] };
 type Preview =
   | { stato: "riconosciuto"; chiamate: number; place: { id: string } }
   | { stato: "da_confermare" | "non_riconosciuto"; chiamate: number };
@@ -72,6 +77,8 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
   const [help, setHelp] = useState(false);
   const [now] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
+  const nate = useRef<Map<string, Nata>>(new Map());
+  const [raccolte, setRaccolte] = useState<Nata[]>([]);
   const queued = useSyncExternalStore(subscribeQueue, queueLength, () => 0);
   // Arrivati da una lista di Google Maps incollata: i passi per scaricare il file già aperti.
   useEffect(() => {
@@ -119,11 +126,21 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
   const toggle = (z: string) => setOff((s) => { const n = new Set(s); if (n.has(z)) n.delete(z); else n.add(z); return n; });
 
   // Salva le righe in saved_places saltando quelle già salvate (il vincolo unico fermerebbe tutto il gruppo).
-  const insertSaved = async (rows: { place_id: string; tags: string[]; note: string | null }[], savedIds: Set<string>) => {
+  const insertSaved = async (rows: { place_id: string; tags: string[]; note: string | null; name?: string }[], savedIds: Set<string>) => {
     const fresh = rows.filter((r) => !savedIds.has(r.place_id) && (savedIds.add(r.place_id), true));
     if (fresh.length === 0) return { ok: 0, gia: rows.length };
-    const { error: e } = await (await browserClient()).from("saved_places").insert(fresh.map((r) => ({ user_id: userId, ...r })));
+    const { error: e } = await (await browserClient()).from("saved_places").insert(fresh.map((r) => ({ user_id: userId, place_id: r.place_id, tags: r.tags, note: r.note })));
     if (e) throw new Error("Non sono riuscito a salvare tutti i posti. Riprova: quelli già salvati non si doppiano.");
+    // Raccolte nate dal file: si contano solo i posti salvati davvero con quel nome (mai una stima).
+    for (const r of fresh) {
+      const tag = r.tags.find((t) => t !== "Da provare");
+      if (!tag) continue;
+      const n = nate.current.get(tag) ?? { tag, count: 0, emojis: [], names: [] };
+      n.count++;
+      if (r.name && n.names.length < 3) n.names.push(r.name);
+      if (r.name && n.emojis.length < 4) n.emojis.push(getCategoryEmoji(null, r.name));
+      nate.current.set(tag, n);
+    }
     return { ok: fresh.length, gia: rows.length - fresh.length };
   };
 
@@ -144,7 +161,7 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
       const r = await previewLink(p.url, budget);
       calls += r.chiamate;
       if (r.stato === "riconosciuto") {
-        const s = await insertSaved([{ place_id: r.place.id, tags: p.tags, note: p.note }], savedIds);
+        const s = await insertSaved([{ place_id: r.place.id, tags: p.tags, note: p.note, name: p.name }], savedIds);
         ok += s.ok; gia += s.gia;
       } else if (r.stato === "da_confermare") rest.push(p);
       else persi++;
@@ -157,6 +174,7 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
     setPhase("saving");
     setError(null);
     setProgress(0);
+    nate.current = new Map();
     let salvati = 0, gia = 0, persi = 0;
     try {
       const savedIds = await loadSavedIds();
@@ -170,9 +188,9 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error ?? "Qualcosa è andato storto, riprova.");
-        const rows: { place_id: string; tags: string[]; note: string | null }[] = [];
+        const rows: { place_id: string; tags: string[]; note: string | null; name?: string }[] = [];
         (data.risultati as ({ id?: string } | null)[] ?? []).forEach((r, j) => {
-          if (r?.id) rows.push({ place_id: r.id, tags: tagsOf(chunk[j]), note: chunk[j].note });
+          if (r?.id) rows.push({ place_id: r.id, tags: tagsOf(chunk[j]), note: chunk[j].note, name: chunk[j].name });
           else persi++;
         });
         const s = await insertSaved(rows, savedIds);
@@ -189,6 +207,7 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
         stampRun();
       }
       setDone({ salvati, gia, attesa, persi });
+      setRaccolte([...nate.current.values()].sort((a, b) => b.count - a.count));
       setPhase("done");
       trackFeature("import_file", { contesto: "salvati", risultati: salvati, stato: attesa ? "in_attesa" : "completo" });
     } catch (e) {
@@ -200,11 +219,13 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
   const completeQueue = async () => {
     if (!userId) return;
     setPhase("saving");
+    nate.current = new Map();
     const savedIds = await loadSavedIds();
     const r = await resolveLinks(readQueue(), savedIds);
     writeQueue(r.rest);
     stampRun();
     setDone({ salvati: r.ok, gia: r.gia, attesa: r.rest.length, persi: r.persi });
+    setRaccolte([...nate.current.values()].sort((a, b) => b.count - a.count));
     setPhase("done");
     trackFeature("import_file", { contesto: "completati", risultati: r.ok });
   };
@@ -346,6 +367,19 @@ export default function TakeoutCard({ userId }: { userId: string | null }) {
               <p className="mt-1 text-xs text-text-muted">
                 {[done.gia ? `${done.gia} li avevi già` : "", done.attesa ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
               </p>
+              {raccolte.length > 0 && (
+                // Proposta 39: le liste di Google diventate raccolte, come copertine (un tocco per aprirle).
+                <div className="mt-4 text-left" data-testid="file-raccolte">
+                  <p className="text-sm font-semibold text-text">{raccolte.length === 1 ? "La tua raccolta" : `Le tue ${raccolte.length} raccolte`}</p>
+                  <div className="-mx-1 mt-2 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
+                    {raccolte.slice(0, 8).map((r) => (
+                      <Link key={r.tag} href={collectionPath(r.tag)} className="block w-36 shrink-0 snap-start" data-testid="file-raccolta">
+                        <RaccoltaCopertina name={r.tag} count={r.count} emojis={r.emojis} names={r.names} compact />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Link href="/mappa?vista=salvati" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
                 Vedili sulla mappa
               </Link>
