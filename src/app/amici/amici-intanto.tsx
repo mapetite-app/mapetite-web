@@ -24,7 +24,7 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
 
   return (
     <div data-testid="amici-intanto" className="mt-5">
-      <InvitaAmico userId={userId} handle={null} />
+      <InvitaAmico userId={userId} handle={null} vuoto />
 
       {consigli.length > 0 && (
         <section aria-labelledby="consigli-titolo" className="-mt-3">
@@ -41,7 +41,7 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
                       {getCategoryEmoji(r.category, r.name)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-title text-[17px] font-medium leading-tight text-text">{r.name}</span>
+                      <span className="line-clamp-2 font-title text-[17px] font-medium leading-tight text-text">{r.name}</span>
                       <span className="block truncate text-[13px] text-text-muted">{[meta, piaciuto ? "👍 ti è piaciuto" : null].filter(Boolean).join(" · ")}</span>
                     </span>
                   </Link>

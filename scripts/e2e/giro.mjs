@@ -3694,14 +3694,21 @@ else {
     // Revisore 2/11 (quarto giro): niente riga "in arrivo", niente indirizzo grezzo, titolo dell'invito senza Poppins.
     { const t = (await intanto.innerText()) ?? "";
       const font = await intanto.getByTestId("invita-amico").locator("p").first().evaluate((el) => `${getComputedStyle(el).fontFamily.split(",")[0].replace(/"/g, "")} ${getComputedStyle(el).fontWeight}`);
-      ok((await sp.getByTestId("amici-in-arrivo").count()) === 0 && !/in arrivo/i.test(t) && !t.includes("/invito/") && t.includes("Il tuo link d'invito") && /Inter/i.test(font) && !/Poppins/i.test(font), `amici: niente 'in arrivo', link d'invito scritto in parole, titolo in Inter (${font})`); }
+      ok((await sp.getByTestId("amici-in-arrivo").count()) === 0 && !/in arrivo/i.test(t) && !t.includes("/invito/") && t.includes("Il tuo link d'invito") && /Inter/i.test(font) && !/Poppins/i.test(font), `amici: niente 'in arrivo', link d'invito scritto in parole, titolo in Inter (${font})`);
+      // Revisore 2/11 (quinto giro): stato vuoto curato, l'invito in evidenza (pulsante corallo a tutta larghezza),
+      // nessuna promessa su funzioni che non ci sono ("vedrai qui", "presto").
+      const inv = intanto.getByTestId("invita-amico");
+      const btn = await inv.getByTestId("invita-amico-condividi").boundingBox();
+      const card = await inv.boundingBox();
+      const btnBg = await inv.getByTestId("invita-amico-condividi").evaluate((el) => getComputedStyle(el).backgroundColor);
+      ok((await inv.getAttribute("data-vuoto")) === "1" && t.includes("Nessun amico qui, per ora") && !/vedrai|presto/i.test(t) && !!btn && !!card && btn.width >= card.width - 48 && btnBg === "rgb(255, 107, 74)" && (await inv.getByTestId("invita-amico-link").getAttribute("data-path"))?.startsWith("/invito/"), `amici: stato vuoto curato con l'invito a tutta larghezza (${Math.round(btn?.width ?? 0)}/${Math.round(card?.width ?? 0)} px, ${btnBg})`); }
     const bg = await sp.getByTestId("amici").evaluate((el) => getComputedStyle(el.parentElement).backgroundColor);
     ok(!((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(248, 246, 242)", `amici: niente emoji 👥, fondo carta (${bg})`); }
   // Con posti visitati: "Da consigliare", prima quelli che ti sono piaciuti, mai quelli che "non fanno per te";
   // ognuno porta alla pagina pubblica del locale e si manda con un tocco.
   { const sav = (id, name, category, tags, created_at) => ({ created_at, tags, note: null, places: { id: `00000000-0000-4000-8000-0000000007${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } });
     await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", reviews: [], saved: [
-      sav("01", "Osteria Visitata", "restaurant", ["Già visitato"], "2026-10-20"),
+      sav("01", "L'Elementare - Trastevere", "restaurant", ["Già visitato"], "2026-10-20"),
       sav("02", "Bar Piaciuto", "bar", ["Già visitato", "Mi è piaciuto"], "2026-10-01"),
       sav("03", "Pizzeria No", "restaurant", ["Già visitato", "Non fa per me"], "2026-10-25"),
       sav("04", "Da Provare Uno", "restaurant", ["Da provare"], "2026-10-26"),
@@ -3709,7 +3716,10 @@ else {
     await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
     const righe = sp.getByTestId("amici-consiglio");
     const nomi = (await righe.locator("a .font-title").allTextContents()).map((t) => t.trim());
-    ok(nomi.join("|") === "Bar Piaciuto|Osteria Visitata" && (await righe.first().locator("a").first().getAttribute("href")) === "/locali/00000000-0000-4000-8000-000000000702" && (await righe.first().getByTestId("amici-consiglio-manda").count()) === 1, `amici: 'Da consigliare' con i posti visitati, prima quelli piaciuti, senza 'Non fa per me' né i 'Da provare' (${nomi.join(" | ")})`);
+    // Revisore 2/11 (quinto giro): il nome va su due righe, mai tagliato ("L'Elementare - Trast…").
+    const tagliati = await righe.locator("a .font-title").evaluateAll((els) => els.filter((e) => e.scrollHeight > e.clientHeight + 1 || getComputedStyle(e).textOverflow === "ellipsis").length);
+    ok(tagliati === 0, `amici: i nomi da consigliare su due righe, nessuno tagliato (${tagliati})`);
+    ok(nomi.join("|") === "Bar Piaciuto|L'Elementare - Trastevere" && (await righe.first().locator("a").first().getAttribute("href")) === "/locali/00000000-0000-4000-8000-000000000702" && (await righe.first().getByTestId("amici-consiglio-manda").count()) === 1, `amici: 'Da consigliare' con i posti visitati, prima quelli piaciuti, senza 'Non fa per me' né i 'Da provare' (${nomi.join(" | ")})`);
     if (process.env.AMICI_SHOT) await sp.screenshot({ path: process.env.AMICI_SHOT, caret: "initial" });
     await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]); }
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
