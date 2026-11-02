@@ -93,6 +93,9 @@ export interface BottomSheetProps {
   // "Dai tuoi salvati": fino a 3 salvati scelti dall'AI per la stessa frase, con il perché.
   fromSaved?: { place: Place; perche: string }[];
   onOpenSaved?: (place: Place) => void;
+  // Posti già contati nella pillola e poi tolti perché l'AI li giudica fuori tema (non ancora visti):
+  // la pillola dice "· 2 tolti" invece di passare da 12 a 10 senza spiegazione (revisore del 1/11).
+  removed?: readonly string[];
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -331,7 +334,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [] }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -628,6 +631,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           ].filter(Boolean).join(" ")}
         </p>
       )}
+      {removed.length > 0 && (
+        <p data-testid="tolti-fuori-tema" className="mt-1 text-xs font-sans text-text-muted">
+          🧭 Dopo aver letto le recensioni ho tolto {removed.length === 1 ? "un posto fuori tema" : `${removed.length} posti fuori tema`} ({removed.slice(0, 2).join(", ")}{removed.length > 2 ? "…" : ""})
+        </p>
+      )}
       <div className="mt-2 flex gap-2">
         {onRefine && (
           <button type="button" onClick={onRefine} className="flex min-h-9 items-center gap-1.5 rounded-pill bg-brand px-3 text-xs font-display font-semibold text-white active:scale-95">
@@ -686,6 +694,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
           )}
           <span data-testid="conteggio-risultati" className="shrink-0">{`${places.length} ${places.length === 1 ? "posto" : "posti"}`}</span>
+          {removed.length > 0 && (
+            <span data-testid="tolti-pillola" className="shrink-0 font-sans font-normal text-text-muted">
+              <span aria-hidden className="mx-1.5">·</span>{removed.length} tolt{removed.length === 1 ? "o" : "i"}<span className="sr-only"> perché fuori tema</span>
+            </span>
+          )}
           {/* Mockup A (21/10): accanto al numero cosa ha capito l'AI, in chiaro e senza aprire niente. */}
           {simileA && !headerOpen && (
             <span data-testid="simile-pillola" className="min-w-0 shrink truncate font-sans font-normal text-text"><span aria-hidden className="mx-1.5 text-text-muted">·</span>simili</span>

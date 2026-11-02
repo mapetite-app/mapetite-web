@@ -926,6 +926,11 @@ await page.unroute("**/api/search");
   ok(await page.getByText("Vista vera sui tetti di Roma.").first().isVisible() && (await page.getByText("Cocktail curati sul tetto.").count()) === 0 && (await page.locator("ul").getByText("Pub Fuori Tema").count()) === 1, "verdetti a gruppi: il primo arriva senza aspettare gli altri (escluso ancora in lista)");
   await page.getByText("Cocktail curati sul tetto.").first().waitFor({ timeout: 6000 }).catch(() => {});
   ok(await page.getByText("Cocktail curati sul tetto.").first().isVisible() && (await page.locator("ul").getByText("Pub Fuori Tema").count()) === 0, "verdetti a gruppi: poi arrivano gli altri e l'escluso sparisce");
+  // Revisore del 1/11: il numero non cala sotto gli occhi senza spiegazione (3 → 2): la pillola dice "· 1 tolto".
+  { const c = (await page.getByTestId("conteggio-risultati").textContent())?.trim(); const t = (await page.getByTestId("tolti-pillola").textContent().catch(() => ""))?.replace(/\s+/g, " ").trim();
+    ok(c === "2 posti" && /^·\s?1 tolto perché fuori tema$/.test(t ?? ""), `verdetti a gruppi: il posto tolto è detto nella pillola ('${c}' '${t}')`);
+    await apriOpzioni(page);
+    ok(/ho tolto un posto fuori tema \(Pub Fuori Tema\)/.test((await page.getByTestId("tolti-fuori-tema").textContent().catch(() => "")) ?? ""), "verdetti a gruppi: dietro la pillola, quale posto è stato tolto e perché"); }
   await page.unroute("**/api/search/synthesis");
   await page.unroute("**/api/search");
 }
@@ -962,6 +967,7 @@ await page.unroute("**/api/search");
   const dopo = await ordineCard();
   ok(scorso.join(",") === "P1,P2,P3" && dopo.join(",") === "P1,P2,P3", `ordine fermo: le card già scorse non cambiano posto (${scorso.join(",")} → ${dopo.join(",")})`);
   ok((await page.locator("li[data-id=P2]").getByTestId("fuori-tema-card").textContent().catch(() => "")) === "Poco in tema" && (await page.getByTestId("fuori-tema-card").count()) === 1, "fuori tema già visto: resta al suo posto con 'Poco in tema' (gli altri senza)");
+  ok((await page.getByTestId("conteggio-risultati").textContent())?.trim() === "3 posti" && (await page.getByTestId("tolti-pillola").count()) === 0, "fuori tema già visto: il numero resta 3, niente 'tolti' (nessun posto sparito)");
   await shot("05f-ordine-fermo");
   await page.unroute("**/api/search/synthesis");
 }

@@ -960,7 +960,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[] } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -2312,7 +2312,9 @@ export default function MapView({
           const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
           const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
             .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
-          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])] };
+          // Il numero nella pillola cala (12 → 10): lo si dice, con i nomi dietro la pillola (revisore del 1/11).
+          const tolti = prev.risultati.slice(fermi).filter((p) => fuori.has(p.id)).map((p) => p.name);
+          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])], tolti: [...new Set([...(prev.tolti ?? []), ...tolti])] };
         });
       }
     } catch {
@@ -3842,6 +3844,7 @@ export default function MapView({
           capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
           setAside={aiSearch?.daParte ?? null}
           offTopic={aiSearch?.fuoriTema}
+          removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
           onOrder={setCarouselOrder}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
