@@ -568,6 +568,23 @@ export default function VenueSheet({
     const googleLine = venue.editorialSummary?.trim() || (firstReview ? aFineFrase(firstReview) : null);
     // La frase è di Google o di una persona che ha scritto una recensione su Google: lo si dice (collaudo 23/10).
     const googleLabel = venue.editorialSummary?.trim() ? "Da Google" : "Da una recensione su Google";
+    // Blocco sopra la barra: punti forti (al massimo 4, su 2 righe) e 2 frasi delle recensioni Google già in
+    // scheda, tagliate a 140 caratteri a fine frase o a fine parola. Mai la recensione già in vista sotto il nome.
+    const puntiForti = goForChips.slice(0, 4);
+    const a140 = (t: string) => {
+      const pulito = t.replace(/\s+/g, " ").trim();
+      if (pulito.length <= 140) return pulito;
+      const cut = pulito.slice(0, 140);
+      const fine = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+      return fine >= 60 ? cut.slice(0, fine + 1) : `${cut.replace(/[\s,;:–-]+\S*$/, "")}…`;
+    };
+    const recensioneInVista = !venue.editorialSummary?.trim() && headline == null && !verdettoInArrivo ? firstReview : null;
+    const frasiRecensioni = [...new Set(
+      (selectedReviews ?? [])
+        .map((r) => r.text?.trim() ?? "")
+        .filter((t) => t.length >= 20 && t !== recensioneInVista)
+        .map(a140),
+    )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
       && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
@@ -888,6 +905,37 @@ export default function VenueSheet({
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
         </button>
+
+        {/* Sopra la barra, a scheda chiusa: i punti forti e due frasi delle recensioni Google già caricate
+            (revisore del 2/11, r5: senza foto restava un terzo di schermo vuoto). Solo dati già presenti nella
+            scheda, nessuna chiamata in più; senza dati il blocco non c'è. Corto: al massimo 2 righe di pillole. */}
+        {!detailsOpen && (puntiForti.length > 0 || frasiRecensioni.length > 0) && (
+          <section data-testid="scheda-in-vista" className="mx-[22px] mt-1 pb-2">
+            {puntiForti.length > 0 && (
+              <div data-testid="scheda-punti-forti">
+                <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Per cosa andarci</p>
+                <div className="mt-2 flex max-h-[3.75rem] flex-wrap gap-1.5 overflow-hidden">
+                  {puntiForti.map((chip) => (
+                    <span key={chip} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
+                      <Check size={12} className="shrink-0" aria-hidden />
+                      <span className="truncate">{chip}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {frasiRecensioni.length > 0 && (
+              <div data-testid="scheda-frasi-recensioni" className={puntiForti.length > 0 ? "mt-4" : ""}>
+                <ul className="flex flex-col gap-2">
+                  {frasiRecensioni.map((f) => (
+                    <li key={f} className={`${SERIF} text-[15.5px] italic leading-snug text-[#3d4248]`}>«{f}»</li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[11.5px] font-sans text-text-muted">dalle recensioni Google</p>
+              </div>
+            )}
+          </section>
+        )}
 
         <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
           {/* Tre sezioni brevi: Info · Recensioni · In breve. */}
