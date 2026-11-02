@@ -57,6 +57,8 @@ export type MapItem = {
   label?: string | null; // nome da mostrare; null o assente = nessun nome
   extraW?: number; // larghezza in più del nome (es. "📌 ")
   fixed?: boolean; // nome sempre in vista
+  dx?: number; // spostamento a schermo del segnalino (vedi separaSegnalini)
+  dy?: number;
 };
 
 export type LabelSide = "sotto" | "destra" | "sinistra" | "sopra";
@@ -97,7 +99,10 @@ export function posizionaEtichette(
   zoom: number,
   schermo?: { project: (lat: number, lng: number) => { x: number; y: number }; w: number; h: number },
 ): Record<string, LabelSide> {
-  const pts = items.map((it) => (schermo ? schermo.project(it.lat, it.lng) : project(it.lat, it.lng, zoom)));
+  const pts = items.map((it) => {
+    const q = schermo ? schermo.project(it.lat, it.lng) : project(it.lat, it.lng, zoom);
+    return { x: q.x + (it.dx ?? 0), y: q.y + (it.dy ?? 0) };
+  });
   const fuori = (r: Rect) => !!schermo && (r.x1 - SLACK < 0 || r.x2 + SLACK > schermo.w || r.y1 < 0 || r.y2 > schermo.h);
   const icons = items.map((it, i) => iconRect(it, pts[i].x, pts[i].y));
   const placed: Rect[] = [];
@@ -132,4 +137,68 @@ export function posizionaEtichette(
     }
   });
   return out;
+}
+
+// Segnalini uno sopra l'altro (revisore del 1/11, 05c e 05f: undici risultati in pochi isolati erano
+// un grumo da cui non si capiva quale fosse quale). Allo zoom attuale, ogni segnalino che copre uno più
+// importante si sposta di poco (al massimo `max` px) nel primo punto libero intorno, allontanandosi da
+// chi copre. Il punto vero resta quello di Google: è solo il disegno a schermo che si scosta, come il
+// "ventaglio" delle mappe quando due locali stanno nello stesso palazzo. Avvicinando la mappa lo
+// spostamento torna a zero da solo. I segnalini "fermi" (selezionato, card al centro) non si muovono.
+export type Segnalino = { id: string; x: number; y: number; size: number; fermo?: boolean };
+
+export function separaSegnalini(items: Segnalino[], max = 28): Record<string, { dx: number; dy: number }> {
+  const GAP = 3;
+  const out: Record<string, { dx: number; dy: number }> = {};
+  const placed: { x: number; y: number; r: number }[] = [];
+  const urto = (x: number, y: number, r: number) =>
+    placed.reduce((n, p) => n + Math.max(0, r + p.r + GAP - Math.hypot(x - p.x, y - p.y)), 0);
+  for (const it of items) {
+    const r = it.size / 2;
+    let best = { x: it.x, y: it.y, n: urto(it.x, it.y, r) };
+    if (!it.fermo && best.n > 0) {
+      // Direzione di partenza: lontano dal segnalino più vicino (se coincidono, verso destra).
+      const vicino = placed.reduce<{ x: number; y: number; d: number } | null>((m, p) => {
+        const d = Math.hypot(it.x - p.x, it.y - p.y);
+        return m == null || d < m.d ? { x: p.x, y: p.y, d } : m;
+      }, null);
+      const a0 = vicino && vicino.d > 0.5 ? Math.atan2(it.y - vicino.y, it.x - vicino.x) : 0;
+      outer: for (let raggio = 6; raggio <= max; raggio += 6) {
+        for (let k = 0; k < 12; k++) {
+          // Angoli alternati intorno alla direzione di partenza: 0, +30°, -30°, +60°, …
+          const a = a0 + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6);
+          const x = it.x + Math.cos(a) * raggio;
+          const y = it.y + Math.sin(a) * raggio;
+          const n = urto(x, y, r);
+          if (n < best.n - 0.5) best = { x, y, n };
+          if (n === 0) break outer;
+        }
+      }
+    }
+    placed.push({ x: best.x, y: best.y, r });
+    const dx = Math.round(best.x - it.x);
+    const dy = Math.round(best.y - it.y);
+    if (dx !== 0 || dy !== 0) out[it.id] = { dx, dy };
+  }
+  return out;
+}
+
+// Inquadratura dopo una ricerca (revisore del 1/11, 05c: un risultato a 8 km allargava la mappa a tutta
+// Roma e gli altri undici finivano in un grumo). Un punto lontanissimo dagli altri (oltre 3 volte la
+// distanza tipica dal centro del gruppo, e comunque oltre 1 km) non allarga la mappa: resta nella lista
+// e con il suo segnalino. Con meno di 4 punti, o se gli "anomali" fossero tanti, si inquadra tutto.
+export function puntiDaInquadrare<T extends { lat: number; lng: number }>(list: T[]): T[] {
+  if (list.length < 4) return list;
+  const mediana = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const c = { lat: mediana(list.map((p) => p.lat)), lng: mediana(list.map((p) => p.lng)) };
+  const k = Math.cos((c.lat * Math.PI) / 180);
+  const metri = (p: { lat: number; lng: number }) => Math.hypot(p.lat - c.lat, (p.lng - c.lng) * k) * 111_320;
+  const d = list.map(metri);
+  const soglia = Math.max(3 * mediana(d), 1000);
+  const tenuti = list.filter((_, i) => d[i] <= soglia);
+  return tenuti.length >= Math.ceil(list.length * 0.75) ? tenuti : list;
 }

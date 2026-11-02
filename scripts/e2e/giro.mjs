@@ -92,6 +92,26 @@ async function apriOpzioni(pg) {
   await pg.getByTestId("opzioni-ricerca").click();
   await pan.waitFor({ timeout: 3000 });
 }
+// Inquadratura dopo una ricerca (revisore del 1/11, 05c/05f): segnalini dei risultati nella parte libera della mappa
+// (sotto la pillola "N posti", sopra la frase e le card) e nessun segnalino sopra un altro. `esclusi`: id lontanissimi
+// che non devono allargare la mappa.
+async function inquadratura(pg, esclusi = []) {
+  return pg.evaluate((esclusi) => {
+    const pill = document.querySelector("[data-testid=opzioni-ricerca]")?.getBoundingClientRect();
+    const sopra = (document.querySelector("[data-testid=frase-risultati]") ?? document.querySelector("ul.snap-x"))?.getBoundingClientRect();
+    const pins = [...document.querySelectorAll("[data-testid=pin]")].filter((e) => !esclusi.includes(e.dataset.place)).map((e) => ({ id: e.dataset.place, r: (e.firstElementChild ?? e).getBoundingClientRect() }));
+    const fuori = pins.filter(({ r }) => r.top < (pill?.bottom ?? 0) || r.bottom > (sopra?.top ?? 844) || r.left < 0 || r.right > window.innerWidth).map((p) => p.id);
+    const sovrapposti = [];
+    pins.forEach((a, i) => pins.forEach((b, j) => {
+      if (j <= i) return;
+      const ca = { x: a.r.left + a.r.width / 2, y: a.r.top + a.r.height / 2 }, cb = { x: b.r.left + b.r.width / 2, y: b.r.top + b.r.height / 2 };
+      // Più di un terzo del più piccolo coperto: si legge come un grumo.
+      if (Math.hypot(ca.x - cb.x, ca.y - cb.y) < (a.r.width + b.r.width) / 2 - Math.min(a.r.width, b.r.width) / 3) sovrapposti.push(`${a.id}/${b.id}`);
+    }));
+    const ys = pins.map((p) => p.r.top), xs = pins.map((p) => p.r.left);
+    return { n: pins.length, fuori, sovrapposti, altezza: Math.round(Math.max(...ys) - Math.min(...ys)), larghezza: Math.round(Math.max(...xs) - Math.min(...xs)), libera: Math.round((sopra?.top ?? 844) - (pill?.bottom ?? 0)) };
+  }, esclusi);
+}
 // Chiavi dei segnali che /api/events conserva (le altre le scarta in silenzio): lette dal codice
 // del server, così un segnale con una chiave sbagliata non sembra arrivato quando non lo è.
 const SERVER_PROP_KEYS = [...(readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8").match(/const PROP_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
@@ -314,8 +334,9 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 // Il perché e i tag escono dalla card e restano nella scheda (controllato in 7-ter).
 // Lista nuova (Lorenzo 18/10, variante B "Carosello scuro"): sulla card tornano fino a 2 punti forti, solo dai goFor veri.
 ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) === 0, "card: il perché non è sulla card (sta nella scheda)");
-ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").textContent()) === "tramonto" && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale");
-ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' in fondo alla card");
+// Card più bassa (revisore del 1/11, secondo giro): i punti forti stanno nella riga di "Aperto ora", solo dove non ci sono già i ✓.
+ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").count()) === 0 && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale (dove non ci sono già i ✓ delle recensioni)");
+ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' sopra le card, accanto alla frase (la card resta bassa)");
 { const m = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((lis) => lis.map((li) => {
     const card = li.querySelector("[data-testid=card-risultato]");
     // offsetHeight: l'altezza vera, senza il rimpicciolimento delle card di lato.
@@ -323,14 +344,38 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("posizione-card")
       verdetto: card.querySelectorAll("[data-testid=etichetta-verdetto], [data-testid=riga-google], [data-testid=segnaposto-verdetto]").length, fatti: card.querySelectorAll("[data-testid=riga-fatti]").length,
       righeFatti: (() => { const r = card.querySelector("[data-testid=riga-fatti]"); return r ? Math.round(r.getBoundingClientRect().height / parseFloat(getComputedStyle(r).lineHeight)) : 0; })() };
   }));
-  // Revisore del 1/11: altezza della card più piena (minimo 212–240 px), niente metà card vuota.
-  ok(m.length >= 2 && m.every((c) => c.h >= 212 && c.h <= 290 && c.h === m[0].h), `card nuova: a foto piena, alta e tutte uguali (${m.map((c) => c.h + "px").join(", ")})`);
+  // Revisore del 1/11 (secondo giro): card di circa 200 px (prima 260, con il vuoto in alto), tutte uguali.
+  ok(m.length >= 2 && m.every((c) => c.h >= 170 && c.h <= 210 && c.h === m[0].h), `card nuova: a foto piena, alta al massimo 210 px e tutte uguali (${m.map((c) => c.h + "px").join(", ")})`);
   ok(m.every((c) => c.verdetto === 1), `card: il verdetto (o la riga Google) c'è su ogni card (${m.map((c) => c.id + ":" + c.verdetto).join(", ")})`);
   ok(m.every((c) => c.segnali <= 1 && c.fatti === 1 && c.righeFatti === 1), `card: UNA riga di fatti e al massimo un segnale (${m.map((c) => c.id + ":" + c.segnali).join(", ")})`); }
 { const pill = await page.getByTestId("opzioni-ricerca").evaluate((el) => { const r = el.getBoundingClientRect(); const bar = document.querySelector("[data-testid=barra-ricerca]").getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), h: Math.round(r.height), sottoBarra: r.top >= bar.bottom - 1 && r.top < bar.bottom + 30, testo: el.querySelector("[data-testid=conteggio-risultati]").textContent.trim() }; });
   ok(pill.sottoBarra && pill.left <= 20 && pill.h >= 44 && pill.h <= 48 && /^\d+ posti$/.test(pill.testo), `lista nuova: pillola '${pill.testo}' sotto la barra, a sinistra (${pill.left},${pill.top}, alta ${pill.h}px)`);
   const sopra = await page.locator("[data-testid=lista-risultati] .rounded-card").evaluateAll((els) => els.filter((e) => !e.closest("ul")).length);
   ok(sopra === 0 && (await page.getByTestId("ho-capito").count()) === 0 && (await page.getByRole("button", { name: "Affina" }).count()) === 0, `lista nuova: nessuna intestazione sopra le card; "Ho capito" e Affina dietro la pillola`); }
+// Frase sopra le card (revisore del 1/11, "Rome essentials" di Places): solo dati veri. Qui la ricerca ha capito
+// "bar", zona "Roma"; 2 posti in lista (P2 tolto), "rooftop" confermato dalle recensioni in 1 (P1).
+{ const fr = await page.getByTestId("frase-risultati").innerText().catch(() => "");
+  const [titolo, dettaglio] = [await page.getByTestId("frase-titolo").innerText().catch(() => ""), ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ")];
+  const n = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count();
+  ok(titolo === `${["", "Un", "Due", "Tre"][n]} bar a Roma`, `frase sopra le card: numero, tipo e zona capiti dalla ricerca ('${titolo}')`);
+  // Ogni pezzo del dettaglio è uno di quelli costruiti dai dati (src/lib/frase-risultati.ts): niente aggettivi della richiesta attribuiti a tutti.
+  const pezzi = dettaglio.split(" · ").filter(Boolean);
+  ok(pezzi.length >= 1 && pezzi.every((x) => /^(Rooftop|Romantico) secondo le recensioni: 1 su \d+$|^\d+ poco conosciut[ieoa]$|^Tutti poco conosciuti$|^Senza i locali più famosi$/i.test(x)) && /rooftop secondo le recensioni: 1 su 2/i.test(dettaglio) && !/romantic[io] a|bar romantic/i.test(fr), `frase sopra le card: il dettaglio viene solo dalle recensioni e dai dati Google ('${dettaglio}')`);
+  const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=frase-risultati]").getBoundingClientRect(); const c = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: c.top, h: f.height }; });
+  ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
+// La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
+// i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
+{ const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
+  const R = { name: "Da Enzo", category: "restaurant", types: ["italian_restaurant", "restaurant"] }, B = { name: "Santa Cocktail Club", category: "cocktail_bar", types: ["cocktail_bar", "bar", "restaurant"] };
+  const sp = (x) => (x ?? "").replace(/\u00a0/g, " ");
+  ok(fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, R] }).titolo === "Due ristoranti a Trastevere" && fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, B] }).titolo === "Due posti a Trastevere", "frase: 'ristoranti' solo se lo sono tutti per Google, altrimenti 'posti'");
+  ok(fraseRisultati({ n: 3, requisiti: { romantico: 2 }, inArrivo: true }).dettaglio === null && sp(fraseRisultati({ n: 3, requisiti: { romantico: 2 } }).dettaglio) === "Romantico secondo le recensioni: 2 su 3", "frase: i conteggi dalle recensioni solo a verdetti arrivati");
+  ok(sp(fraseRisultati({ n: 4, gemme: 1, famosiDaParte: 2 }).dettaglio) === "1 poco conosciuto · senza i locali più famosi" && fraseRisultati({ n: 0 }) === null && fraseRisultati({ n: 1, zona: "<b>x</b>" }).titolo === "Un posto", "frase: poco conosciuti e famosi messi da parte solo dai dati; niente frase senza posti; zona strana ignorata"); }
+{ const vis = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").nth(1).evaluate((li) => Math.round(window.innerWidth - li.getBoundingClientRect().left));
+  ok(vis >= 32 && vis <= 56, `carosello: la card dopo si vede per circa 40 px (${vis} px)`); }
+// Barra (revisore del 1/11: "cena romantica a Tra…"): con i risultati la richiesta si legge intera su al massimo 2 righe, senza alzare la barra.
+{ const b = await page.evaluate(() => { const bar = document.querySelector("[data-testid=barra-ricerca]").getBoundingClientRect(); const t = document.querySelector("[data-testid=richiesta-intera] span"); return { barH: bar.height, testo: t?.textContent ?? "", righe: t ? Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)) : 0, intero: t ? t.scrollHeight <= t.clientHeight + 1 : false }; });
+  ok(b.testo === "Rooftop romantico per due a Roma" && b.righe >= 1 && b.righe <= 2 && b.intero && b.barH <= 52, `barra: la richiesta si legge intera su ${b.righe} righe, barra alta ${Math.round(b.barH)} px`); }
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdetto").textContent()) === "Il verdetto Mapetite", "card: il verdetto ha la sua etichetta 'Il verdetto Mapetite'");
 // Mockup A (21/10): "✨ 3 posti · rooftop" (solo i requisiti: tipo e zona no) e "✓ rooftop · ✓ romantico" sulla card confermata.
 { const cap = await page.getByTestId("capito-pillola").innerText().catch(() => "");
@@ -860,8 +905,12 @@ await page.waitForTimeout(1500);
   const top = ["Folla 1", "Folla 2", "Folla 3", "Folla 4", "Folla 5"];
   const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
-  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length < 5, `mappa affollata: pin uno sopra l'altro, resta solo il nome del primo (${labels.filter(Boolean).join(", ")})`);
+  ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
+  // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
+  const q = await inquadratura(page, ["F11"]);
+  ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);
+  ok(q.altezza >= 40 || q.larghezza >= 40, `mappa affollata: mappa vicina ai risultati, non a tutta Roma (gruppo largo ${q.larghezza}x${q.altezza} px)`);
   ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Folla 1"), "mappa affollata: il pin della prima card è visibile ed evidenziato");
   await shot("05c-mappa-affollata");
 }
@@ -902,6 +951,11 @@ await page.unroute("**/api/search");
   ok(await page.getByText("Vista vera sui tetti di Roma.").first().isVisible() && (await page.getByText("Cocktail curati sul tetto.").count()) === 0 && (await page.locator("ul").getByText("Pub Fuori Tema").count()) === 1, "verdetti a gruppi: il primo arriva senza aspettare gli altri (escluso ancora in lista)");
   await page.getByText("Cocktail curati sul tetto.").first().waitFor({ timeout: 6000 }).catch(() => {});
   ok(await page.getByText("Cocktail curati sul tetto.").first().isVisible() && (await page.locator("ul").getByText("Pub Fuori Tema").count()) === 0, "verdetti a gruppi: poi arrivano gli altri e l'escluso sparisce");
+  // Revisore del 1/11: il numero non cala sotto gli occhi senza spiegazione (3 → 2): la pillola dice "· 1 tolto".
+  { const c = (await page.getByTestId("conteggio-risultati").textContent())?.trim(); const t = (await page.getByTestId("tolti-pillola").textContent().catch(() => ""))?.replace(/\s+/g, " ").trim();
+    ok(c === "2 posti" && /^·\s?1 tolto perché fuori tema$/.test(t ?? ""), `verdetti a gruppi: il posto tolto è detto nella pillola ('${c}' '${t}')`);
+    await apriOpzioni(page);
+    ok(/ho tolto un posto fuori tema \(Pub Fuori Tema\)/.test((await page.getByTestId("tolti-fuori-tema").textContent().catch(() => "")) ?? ""), "verdetti a gruppi: dietro la pillola, quale posto è stato tolto e perché"); }
   await page.unroute("**/api/search/synthesis");
   await page.unroute("**/api/search");
 }
@@ -938,6 +992,7 @@ await page.unroute("**/api/search");
   const dopo = await ordineCard();
   ok(scorso.join(",") === "P1,P2,P3" && dopo.join(",") === "P1,P2,P3", `ordine fermo: le card già scorse non cambiano posto (${scorso.join(",")} → ${dopo.join(",")})`);
   ok((await page.locator("li[data-id=P2]").getByTestId("fuori-tema-card").textContent().catch(() => "")) === "Poco in tema" && (await page.getByTestId("fuori-tema-card").count()) === 1, "fuori tema già visto: resta al suo posto con 'Poco in tema' (gli altri senza)");
+  ok((await page.getByTestId("conteggio-risultati").textContent())?.trim() === "3 posti" && (await page.getByTestId("tolti-pillola").count()) === 0, "fuori tema già visto: il numero resta 3, niente 'tolti' (nessun posto sparito)");
   await shot("05f-ordine-fermo");
   await page.unroute("**/api/search/synthesis");
 }
@@ -1099,6 +1154,10 @@ if (shared) {
   });
   ok(urti.out.length === 0 && urti.nomi.length >= 2, `mappa: nessun nome sopra un altro nome o un altro segnalino, dentro lo schermo (${urti.nomi.join(", ")}${urti.out.length ? " — " + urti.out.join("; ") : ""})`);
   ok(urti.nomi.includes("Casa Encanto Roma"), "mappa: il nome della prima card resta sempre in vista");
+  // Revisore del 1/11 (05f): i 12 risultati in pochi isolati riempiono la parte libera e non si sovrappongono.
+  { const q = await inquadratura(page);
+    ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 8, `mappa: i ${q.n} segnalini stanno nella parte libera e non si coprono${q.fuori.length ? " (fuori: " + q.fuori.join(",") + ")" : ""}${q.sovrapposti.length ? " (sovrapposti: " + q.sovrapposti.join(" ") + ")" : ""}`);
+    ok(q.altezza >= q.libera * 0.4 || q.larghezza >= 390 * 0.5, `mappa: il gruppo usa la parte libera (${q.larghezza}x${q.altezza} px su ${q.libera} px liberi)`); }
   const font = await page.locator("ul.snap-x li[data-id=T1]").getByTestId("nome-card").evaluate((el) => getComputedStyle(el).fontFamily);
   ok(/newsreader/i.test(font), `card: il nome del locale in serif (Newsreader) come in Salvati e nella scheda (${font.slice(0, 40)})`);
   await shot("05f-ter-nomi-mappa");
