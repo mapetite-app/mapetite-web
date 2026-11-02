@@ -21,6 +21,8 @@ import { cityFromAddress } from "@/lib/city";
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
 const NO_MATCH = "Nessun locale con questi filtri: togline qualcuno.";
+// Margine sinistro del carosello dei risultati (px-4): prima card e pillola del titolo partono qui.
+const CAROSELLO_MARGINE = 16;
 
 export interface BottomSheetProps {
   places: Place[];
@@ -128,9 +130,9 @@ function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { it
   // Il perché di un salvato solo resta per i lettori di schermo e nella scheda.
   if (!inline) {
     return (
-      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "ml-[15vw] mr-3 lg:mx-5" : "mx-3 lg:mx-5"}`}>
+      <div data-testid="dai-salvati" className={`pointer-events-auto mb-2 flex flex-col items-start gap-1.5 ${aligned ? "mx-4 lg:mx-5" : "mx-3 lg:mx-5"}`}>
         {many && open && (
-          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(85vw-0.75rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
+          <div data-testid="dai-salvati-righe" className={`${aligned ? "w-[min(calc(100vw-2rem),22rem)]" : "w-[min(calc(100vw-1.5rem),22rem)]"} rounded-card bg-surface p-1.5 shadow-float lg:w-full lg:shadow-none`}>{items.map(row)}</div>
         )}
         <button
           type="button"
@@ -392,14 +394,18 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const [conFoto, setConFoto] = useState<Record<string, true>>({});
   const hoveredId = useRef<string | null>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Carosello nuovo allineato a sinistra (revisore del 2/11, r4: partiva 60 px a destra): la card "a cui sei"
+  // è quella col bordo sinistro sul margine di 16 px; il vecchio resta centrato.
+  const allineataASinistra = pillSlot != null && title != null;
   const centeredId = () => {
     const ul = carouselRef.current;
     if (!ul) return null;
-    const mid = ul.getBoundingClientRect().left + ul.clientWidth / 2;
+    const ulLeft = ul.getBoundingClientRect().left;
+    const mid = ulLeft + ul.clientWidth / 2;
     let best: { id: string; d: number } | null = null;
     for (const li of Array.from(ul.children) as HTMLElement[]) {
       const r = li.getBoundingClientRect();
-      const d = Math.abs(r.left + r.width / 2 - mid);
+      const d = allineataASinistra ? Math.abs(r.left - (ulLeft + CAROSELLO_MARGINE)) : Math.abs(r.left + r.width / 2 - mid);
       if (!best || d < best.d) best = { id: li.dataset.id ?? "", d };
     }
     return best?.id ?? null;
@@ -422,7 +428,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // ma non quando il fuoco arriva dal mouse sulla card stessa (la lista non deve scappare).
     if (li && window.matchMedia("(min-width: 1024px)").matches) { if (hoveredId.current !== focusedId) li.scrollIntoView({ block: "nearest", behavior: "smooth" }); return; }
     if (centeredId() === focusedId) return;
-    if (li) ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
+    if (li) ul.scrollTo({ left: allineataASinistra ? li.offsetLeft - CAROSELLO_MARGINE : li.offsetLeft - (ul.clientWidth - li.clientWidth) / 2, behavior: "smooth" });
   }, [focusedId]);
   useEffect(() => () => { if (scrollTimer.current) clearTimeout(scrollTimer.current); }, []);
   // Se l'ordine cambia (riordino per adattezza) mentre il carosello è sulla prima card, resta
@@ -806,7 +812,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
-          <div data-testid="frase-risultati" className="pointer-events-none mb-1.5 ml-[15vw] mr-3 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
+          <div data-testid="frase-risultati" className="pointer-events-none mx-4 mb-1.5 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
               {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
@@ -817,7 +823,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {places.length === 0 && (
           <p className="pointer-events-auto mx-3 mb-3 rounded-card bg-surface px-4 py-3 text-center text-sm text-text-muted shadow-float lg:mx-5 lg:shadow-none">{NO_MATCH}</p>
         )}
-        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "gap-2.5 px-[15vw] lg:gap-3" : "gap-3 px-3"}`}>
+        <ul ref={carouselRef} onScroll={onCarouselScroll} className={`pointer-events-auto flex snap-x snap-mandatory overflow-x-auto pb-3 [scrollbar-width:none] lg:flex-col lg:snap-none lg:overflow-visible lg:px-5 ${nuova ? "scroll-px-4 gap-2.5 px-4 lg:gap-3" : "gap-3 px-3"}`}>
           {places.map((place) => {
             const d = details?.[place.id];
             // Un solo segnale sulla card: il tuo stato di salvataggio, altrimenti il 💎 (il nostro differenziatore).
@@ -843,7 +849,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
               const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
-                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[70vw] max-w-sm shrink-0 snap-center transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
+                <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[calc(100vw-4.5rem)] max-w-sm shrink-0 snap-start transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
                     <button
                       type="button"

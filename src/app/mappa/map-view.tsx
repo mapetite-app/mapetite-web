@@ -33,7 +33,7 @@ import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento } from "@/lib/idee
 import { tasteQuery } from "@/lib/preferences";
 import { overlayReducer, type Overlay, type OverlayAction } from "@/lib/panel-state";
 import { track, trackFeature } from "@/lib/track";
-import { posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem } from "@/lib/pin-labels";
+import { labelRect, latoPrincipale, posizionaEtichette, pinName, project as projectMercator, puntiDaInquadrare, separaSegnalini, type LabelSide, type MapItem, type Rect } from "@/lib/pin-labels";
 import { cityNear } from "@/lib/named-city";
 import { prefetchIntent, intentFor } from "@/lib/intent-prefetch";
 import { loginToSaveUrl, rememberPendingSave, takePendingSave } from "@/lib/pending-save";
@@ -1964,13 +1964,26 @@ export default function MapView({
     const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
     const proietta = (lat: number, lng: number) => { const q = projectMercator(lat, lng, viewState.zoom); return { x: q.x - centro.x + cx, y: q.y - centro.y + cy }; };
     let scost: Record<string, { dx: number; dy: number }> = {};
+    // Nome del segnalino scelto (revisore del 2/11, r4): sceglie per primo il lato più libero, attaccato al suo
+    // segnalino; gli altri segnalini si scostano da lui e gli altri nomi lo evitano.
+    const principaleId = selected?.id ?? (mappaSalvati ? null : focusId);
+    const principale = principaleId ? items.find((it) => it.id === principaleId && it.label) : undefined;
+    const ostacoli: Rect[] = [];
+    if (principale && (inRicerca || mappaSalvati)) {
+      const pp = proietta(principale.lat, principale.lng);
+      const altri = items.filter((it) => it !== principale).map((it) => ({ ...proietta(it.lat, it.lng), size: it.size, anchor: it.anchor }));
+      principale.lato = latoPrincipale(principale, pp, altri, mapBox);
+      // Con 14 px d'aria in più: un segnalino vicino al nome, anche senza toccarlo, sembrava il suo.
+      const r = labelRect(principale, pp.x, pp.y, principale.lato);
+      ostacoli.push({ x1: r.x1 - 14, y1: r.y1 - 14, x2: r.x2 + 14, y2: r.y2 + 14 });
+    }
     // Anche sulla mappa dei salvati (revisore del 2/11): due salvati vicini non si coprono.
     if (inRicerca || mappaSalvati) {
       scost = separaSegnalini(items.map((it) => {
         const q = proietta(it.lat, it.lng);
         // Centro del disegno: i segnalini stanno sopra il punto, i gruppi sono centrati.
         return { id: it.id, x: q.x, y: it.anchor === "center" ? q.y : q.y - it.size / 2, size: it.size, fermo: it.id === selected?.id || it.id === focusId || it.id.startsWith("salvato-") };
-      }));
+      }), 84, ostacoli);
       for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
     }
     const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });

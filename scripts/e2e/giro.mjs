@@ -3158,6 +3158,20 @@ if (fakeUser) {
   await q3.locator("ul.snap-x li[data-id=E1]").waitFor({ timeout: 8000 });
   await q3.waitForTimeout(2500);
   { const t = await tocchi(q3); ok(t.length === 0, `segnalini: nessuno tocca un altro dopo l'inquadratura (Spirito di Vino accanto a Da Enzo)${t.length ? " — " + t.join(" ") : ""}`); }
+  // Revisore del 2/11 (r4): carosello e pillola "Cinque posti a Trastevere" partivano 60 px a destra.
+  { const a = await q3.evaluate(() => ({ card: Math.round(document.querySelector("ul.snap-x li[data-id]").getBoundingClientRect().left), frase: Math.round(document.querySelector("[data-testid=frase-risultati]")?.getBoundingClientRect().left ?? -1) }));
+    ok(Math.abs(a.card - 16) <= 2 && Math.abs(a.frase - 16) <= 2, `risultati: prima card e pillola del titolo sul margine di 16 px (card ${a.card}, pillola ${a.frase})`); }
+  // r4: "Da Enzo al 29" (scelto) finiva tra Spirito di Vino e un altro segnalino e sembrava loro. Il nome del
+  // scelto è attaccato al suo segnalino e nessun altro segnalino gli sta vicino.
+  { const e = await q3.evaluate(() => {
+      const pin = document.querySelector("[data-testid=pin][data-focused=true]"); const lab = pin?.querySelector("[data-testid=etichetta-pin]");
+      if (!pin || !lab) return null;
+      const l = lab.getBoundingClientRect(); const mio = (pin.firstElementChild ?? pin).getBoundingClientRect();
+      const dist = (b) => Math.hypot(Math.max(0, b.left - l.right, l.left - b.right), Math.max(0, b.top - l.bottom, l.top - b.bottom));
+      const altri = [...document.querySelectorAll("[data-testid=pin]")].filter((x) => x !== pin).map((x) => ({ id: x.dataset.place, d: Math.round(dist((x.firstElementChild ?? x).getBoundingClientRect())) }));
+      return { nome: lab.textContent.trim(), mio: Math.round(dist(mio)), vicino: altri.sort((a, b) => a.d - b.d)[0] ?? { id: "-", d: 999 } };
+    });
+    ok(!!e && e.nome === "Da Enzo al 29" && e.mio <= 6 && e.vicino.d >= 12, `mappa: il nome del segnalino scelto è attaccato al suo (${e?.mio} px) e lontano dagli altri (il più vicino, ${e?.vicino.id}, a ${e?.vicino.d} px)`); }
   for (const passo of [1, 2, 3]) {
     await q3.mouse.move(195, 330);
     await q3.mouse.wheel(0, 500);
