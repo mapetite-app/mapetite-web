@@ -5,7 +5,7 @@
 
 export type LabelPin = { id: string; lat: number; lng: number; name: string; big?: boolean };
 
-type Rect = { x1: number; y1: number; x2: number; y2: number };
+export type Rect = { x1: number; y1: number; x2: number; y2: number };
 
 const LABEL_H = 22; // altezza della pillola col nome (text-[11px] + padding)
 const LABEL_MAX_W = 110; // max-w-[110px] (bordo compreso)
@@ -59,6 +59,10 @@ export type MapItem = {
   fixed?: boolean; // nome sempre in vista
   dx?: number; // spostamento a schermo del segnalino (vedi separaSegnalini)
   dy?: number;
+  // Un lato solo (mappa dei salvati, revisore del 2/11: nomi a volte sotto, a volte sopra o di lato
+  // non si leggevano come una mappa ordinata): il nome sta sempre lì; l'altro lato orizzontale solo
+  // se da lì uscirebbe dallo schermo. Se il posto è occupato il nome si nasconde (tranne i fissi).
+  lato?: LabelSide;
 };
 
 export type LabelSide = "sotto" | "destra" | "sinistra" | "sopra";
@@ -75,7 +79,8 @@ function iconRect(it: MapItem, x: number, y: number): Rect {
     : { x1: x - r, x2: x + r, y1: y - it.size - ICON_MARGIN, y2: y + ICON_MARGIN };
 }
 
-function labelRect(it: MapItem, x: number, y: number, side: LabelSide): Rect {
+/** Riquadro a schermo del nome di `it` sul lato dato (x, y = punto del segnalino, già scostato). */
+export function labelRect(it: MapItem, x: number, y: number, side: LabelSide): Rect {
   const w = Math.min(LABEL_MAX_W, labelWidth(it.label ?? "") + (it.extraW ?? 0));
   const r = it.size / 2;
   const cy = it.anchor === "center" ? y : y - r; // centro del segnalino
@@ -125,7 +130,9 @@ export function posizionaEtichette(
     if (!it.fixed && coperto(i)) return;
     const { x, y } = pts[i];
     let best: { side: LabelSide; rect: Rect; n: number } | null = null;
-    for (const side of sides) {
+    const opposto: LabelSide | null = it.lato === "destra" ? "sinistra" : it.lato === "sinistra" ? "destra" : it.lato === "sotto" ? "sopra" : it.lato === "sopra" ? "sotto" : null;
+    const prova = it.lato ? (fuori(labelRect(it, x, y, it.lato)) && opposto ? [opposto] : [it.lato]) : sides;
+    for (const side of prova) {
       const rect = labelRect(it, x, y, side);
       const n = urti(rect, i) + (fuori(rect) ? 10_000 : 0);
       if (n === 0) { best = { side, rect, n }; break; }
