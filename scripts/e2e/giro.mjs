@@ -1549,8 +1549,11 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
 // color inchiostro, non Poppins teal. "Ultimi aggiunti": solo con salvati veri (qui zero salvati: non compare).
 { const look = await page.getByTestId("importa-tessera-titolo").evaluateAll((els) => els.map((e) => { const c = getComputedStyle(e); return { f: c.fontFamily.split(",")[0].replace(/"/g, ""), w: c.fontWeight, col: c.color }; }));
   ok(look.length === 3 && look.every((x) => /Inter/i.test(x.f) && x.w === "500" && x.col !== "rgb(26, 60, 64)") && (await page.getByRole("button", { name: "Scrivi o incolla a mano" }).count()) === 0 && (await page.getByTestId("importa-ultimi").count()) === 0, `importa: righe 'Altri modi' in Inter medio inchiostro, niente 'Scrivi o incolla a mano', niente 'Ultimi aggiunti' senza salvati (${JSON.stringify(look[0])})`); }
-{ const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16 } });
+{ const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16, google_place_id: `GM${n}` } });
   await page.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [pr(1, "Trattoria Milanese Uno", "restaurant", null), pr(2, "Bar Due", "bar", ["Già visitato"]), pr(3, "Gelateria Tre", "ice_cream_shop", ["Da provare"])] }));
+  // Verdetto già in archivio solo per il primo (revisore 2/11, terzo giro): gli altri restano senza, mai inventati.
+  let synthUrl = "";
+  await page.route("**/rest/v1/place_synthesis**", (r) => { synthUrl = r.request().url(); return r.fulfill({ json: [{ place_id: "GM1", verdict: "Cotoletta vera, sala di quartiere." }] }); });
   await page.reload({ waitUntil: "networkidle" });
   const ult = page.getByTestId("importa-ultimi");
   await ult.waitFor({ timeout: 6000 }).catch(() => {});
@@ -1558,7 +1561,13 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
   const href = await ult.getByTestId("importa-ultimi-riga").first().getAttribute("href").catch(() => null);
   const tl = await page.getByTestId("importa-tessere").boundingBox(); const ub = await ult.boundingBox().catch(() => null);
   ok(righe.length === 3 && righe[0].includes("Trattoria Milanese Uno") && righe[1].includes("Bar Due") && href === "/mappa?salvato=00000000-0000-4000-8000-000000000301" && !!tl && !!ub && ub.y > tl.y + tl.height, `importa: 'Ultimi aggiunti' con gli ultimi 3 salvati veri sotto 'Altri modi', un tocco apre la scheda (${righe.join(" | ")})`);
+  { const stati = (await ult.getByTestId("importa-ultimi-stato").allTextContents()).map((t) => t.replace("📌", "").trim());
+    const v = ult.getByTestId("importa-ultimi-verdetto");
+    const it = await v.first().evaluate((e) => getComputedStyle(e).fontStyle).catch(() => "");
+    ok(JSON.stringify(stati.map((t) => t.trim())) === '["Da provare","Ci sono stato","Da provare"]' && (await v.count()) === 1 && (await v.first().textContent()) === "Cotoletta vera, sala di quartiere." && it === "italic" && (await ult.getByTestId("importa-ultimi-riga").first().getByTestId("importa-ultimi-verdetto").count()) === 1 && /in\.\(.*GM1/.test(decodeURIComponent(synthUrl)),
+      `importa: 'Ultimi aggiunti' con lo stato su ogni riga e il verdetto in corsivo solo dove c'è in archivio (${stati.join(" | ")}, ${await v.count()} verdetti, ${it})`); }
   await page.screenshot({ path: `${OUT}/19b-importa-ultimi.png`, fullPage: true, caret: "initial" });
+  await page.unroute("**/rest/v1/place_synthesis**");
   await page.unroute("**/rest/v1/saved_places**");
   await page.reload({ waitUntil: "networkidle" }); }
 { const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
@@ -4806,9 +4815,10 @@ else {
     ok(!!eb && eb.height >= 200 && !!bb && !!fb && bb.y > 60 && fb.y - (bb.y + bb.height) < 260, `assistente: esempi al centro, senza vuoto enorme sotto (benvenuto da ${Math.round(bb?.y ?? 0)} a ${Math.round((bb?.y ?? 0) + (bb?.height ?? 0))} px, campo a ${Math.round(fb?.y ?? 0)})`);
     ok((await ap.getByTestId("assistente-riparti").count()) === 0, "assistente: senza salvati niente 'Riparti da qui' (mai righe inventate)"); }
   // Con salvati veri: "Riparti da qui" mostra 2 "Da provare" (mai i "Ci sono stato"); un tocco apre la scheda.
-  { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${10 + n}`, places: { id: `00000000-0000-4000-8000-00000000020${n}`, name, category, address: "Via del Moro 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.47 } });
+  { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${10 + n}`, places: { id: `00000000-0000-4000-8000-00000000020${n}`, name, category, address: "Via del Moro 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.47, google_place_id: `GA${n}` } });
     const righe = [pr(1, "Osteria Uno Da Provare", "restaurant", ["Da provare"]), pr(2, "Pizzeria Due Visitata", "pizzeria", ["Già visitato"]), pr(3, "Bar Tre", "bar", null), pr(4, "Forno Quattro", "bakery", ["Romantico"]), pr(5, "Enoteca Cinque", "wine_bar", ["Da provare"])];
     await ap.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: righe }));
+    await ap.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "GA1", verdict: "Carbonara seria in un vicolo tranquillo." }] }));
     await ap.reload({ waitUntil: "networkidle" });
     const rip = ap.getByTestId("assistente-riparti");
     await rip.waitFor({ timeout: 6000 }).catch(() => {});
@@ -4818,7 +4828,13 @@ else {
     const campo = await ap.getByTestId("assistente-campo").boundingBox();
     ok(nomi.length === 2 && !nomi.some((t) => t.includes("Visitata")) && nomi[0].includes("Osteria Uno") && nomi[1].includes("Bar Tre") && /^\/mappa\?salvato=[0-9a-f-]{36}$/.test(href ?? ""), `assistente: 'Riparti da qui' con 2 'Da provare' veri (mai i 'Ci sono stato'), un tocco apre la scheda (${nomi.join(" | ")}, ${href})`);
     ok(!!ultima && !!campo && ultima.y + ultima.height <= campo.y, `assistente: 'Riparti da qui' tutto sopra il campo, senza scorrere (fine ${Math.round((ultima?.y ?? 0) + (ultima?.height ?? 0))} px, campo ${Math.round(campo?.y ?? 0)})`);
+    { const stati = (await rip.getByTestId("assistente-riparti-stato").allTextContents()).map((t) => t.replace("📌", "").trim());
+      const v = rip.getByTestId("assistente-riparti-verdetto");
+      const it = await v.first().evaluate((e) => getComputedStyle(e).fontStyle).catch(() => "");
+      ok(stati.length === 2 && stati.every((t) => t.trim() === "Da provare") && (await v.count()) === 1 && (await v.first().textContent()) === "Carbonara seria in un vicolo tranquillo." && it === "italic", `assistente: 'Riparti da qui' con lo stato e il verdetto in corsivo già in archivio (${stati.join(" | ")}, ${await v.count()} verdetti)`); }
     await ashot("50b-assistente-riparti");
+    await ap.screenshot({ path: `${OUT}/s4-assistente.png`, caret: "initial" });
+    await ap.unroute("**/rest/v1/place_synthesis**");
     await ap.unroute("**/rest/v1/saved_places**");
     await ap.reload({ waitUntil: "networkidle" }); }
   { const f = await ap.getByTestId("assistente-campo").boundingBox(); ok(!!f && f.y + f.height <= 844 - 64, `assistente: il campo sta sopra la barra di navigazione (${Math.round((f?.y ?? 0) + (f?.height ?? 0))} px)`); }
