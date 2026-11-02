@@ -908,7 +908,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(d?.openNow != null || similar || req.length > 0 || (chips.length > 0 && !d?.perTe)) && (
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
-                            <span className="shrink-0 rounded-pill bg-success px-2.5 py-0.5 text-xs font-display font-semibold text-white">Aperto ora</span>
+                            // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
+                            <span data-testid="aperto-card" className="shrink-0 rounded-pill bg-white px-2.5 py-0.5 text-xs font-display font-semibold text-brand">Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
@@ -1015,7 +1016,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
                       <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
                       {d?.openNow === true && (
-                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />Aperto ora</span>
+                        <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                       )}
                       {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                       {d?.openNow === false && (
@@ -1149,7 +1150,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
                     <span className="truncate">{metaLine(place, details?.[place.id], shownFrom, showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
-                      <span className="shrink-0 rounded-pill bg-success/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-success">
+                      <span className="shrink-0 rounded-pill bg-brand/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-brand">
                         Aperto ora
                       </span>
                     )}

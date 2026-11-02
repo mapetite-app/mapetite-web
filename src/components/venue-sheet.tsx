@@ -736,8 +736,8 @@ export default function VenueSheet({
               {aperto != null && (
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                   {rating != null && <span aria-hidden className="mr-1 font-normal text-[#4b5058]">·</span>}
-                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-success" : "text-error"}`}>
-                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-success" : "bg-error"}`} />
+                  <span data-testid="stato-apertura" className={`inline-flex items-center gap-1.5 font-semibold ${aperto ? "text-brand" : "text-error"}`}>
+                    <span aria-hidden className={`h-[7px] w-[7px] rounded-full ${aperto ? "bg-brand" : "bg-error"}`} />
                     {riapre || chiude ? (aperto ? "Aperto" : "Chiuso") : aperto ? "Aperto ora" : "Chiuso ora"}
                   </span>
                   {(riapre || chiude) && (
@@ -1191,7 +1191,7 @@ export default function VenueSheet({
               <span
                 className={
                   openNow
-                    ? "rounded-pill bg-success/15 px-2 py-0.5 text-xs font-display font-semibold text-success"
+                    ? "rounded-pill bg-brand/10 px-2 py-0.5 text-xs font-display font-semibold text-brand"
                     : "rounded-pill bg-error/10 px-2 py-0.5 text-xs font-display font-semibold text-error"
                 }
               >
