@@ -79,9 +79,9 @@ async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; re
   }
 }
 
-// "Il tuo gusto" sotto i numeri (revisore 2/11, terzo giro: il profilo non raccontava chi sei): fino a 3 pillole
-// vere dal profilo, nell'ordine cucina, occasione, prezzo; se ne manca qualcuna, i tipi di posto con 👍 della
-// mappa del gusto, l'atmosfera e "famosi o chicche". Niente di dedotto o inventato.
+// "Il tuo gusto" (revisore 2/11, sesto giro): fino a 4 pillole vere dal profilo, nell'ordine cucina, occasione,
+// atmosfera, prezzo; se ne manca qualcuna, i tipi di posto con 👍 della mappa del gusto, le zone e "famosi o
+// chicche". Niente di dedotto o inventato.
 function pilloleGusto(g: GustoRow | null): { emoji: string; testo: string }[] {
   if (!g) return [];
   const mappa = pulisciMappa(g.gusto, () => true);
@@ -95,15 +95,17 @@ function pilloleGusto(g: GustoRow | null): { emoji: string; testo: string }[] {
   else if (tipi[0]) out.push({ emoji: tipi[0].emoji, testo: tipi[0].titolo });
   const occasione = OCCASIONS.find((o) => occasions.includes(o.value));
   if (occasione) out.push({ emoji: occasione.emoji, testo: occasione.label });
+  const atmosfera = ATMOSPHERES.find((a) => atmospheres.includes(a.value));
+  if (atmosfera) out.push({ emoji: atmosfera.emoji, testo: atmosfera.label });
   const prezzo = PRICE_RANGES.find((r) => r.value === g.price_range);
   if (prezzo) out.push({ emoji: "", testo: `${prezzo.value} ${prezzo.description.toLowerCase()}` });
   const altre = [
     ...tipi.slice(cucina ? 0 : 1).map((t) => ({ emoji: t.emoji, testo: t.titolo })),
-    ...ATMOSPHERES.filter((a) => atmospheres.includes(a.value)).map((a) => ({ emoji: a.emoji, testo: a.label })),
+    ...mappa.zone.map((z) => ({ emoji: "📍", testo: z })),
     ...SCOPERTE.filter((x) => x.value === mappa.scoperta).map((x) => ({ emoji: "", testo: x.label })),
   ];
-  for (const a of altre) if (out.length < 3 && !out.some((o) => o.testo === a.testo)) out.push(a);
-  return out.slice(0, 3);
+  for (const a of altre) if (out.length < 4 && !out.some((o) => o.testo === a.testo)) out.push(a);
+  return out.slice(0, 4);
 }
 
 function Stars({ rating }: { rating: number }) {
@@ -278,71 +280,71 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
           Tutto il resto sta in "Impostazioni" in fondo, chiusa. Una sola "Impostazioni" (revisore, 1/11):
           l'ingranaggio in alto apriva la stessa riga, era un doppione. */}
-      <header className="mb-5">
-        <div className="flex items-center gap-3">
-          <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
-            {initial}
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-title text-[28px] leading-tight text-text">{name}</h1>
-            <p className="truncate text-xs text-text-muted">{user.email}</p>
-          </div>
+      {/* Intestazione (revisore 2/11, sesto giro): chi sei e i tre numeri compatti sotto il nome, come Places.
+          Il blocco principale sotto è "Il tuo gusto"; poi "Le mie cose". L'email sta in Impostazioni → account. */}
+      <header className="mb-4 flex items-center gap-3">
+        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand font-title text-2xl font-semibold text-white">
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-title text-[28px] leading-tight text-text">{name}</h1>
+          {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
+          <nav aria-label="La mia guida" data-testid="guida-contatori" className="-ml-1 flex flex-wrap items-center text-[13px] text-text-muted">
+            {counters.map((c, i) => (
+              <Link
+                key={c.id}
+                href={c.href}
+                data-testid={`guida-${c.id}`}
+                className="flex min-h-11 items-center gap-1 px-1 active:opacity-70"
+              >
+                <span className="font-semibold text-text">{c.value}</span>
+                <span className="lowercase">{c.label}</span>
+                {i < counters.length - 1 && <span aria-hidden className="pl-1 text-[#c9c2b6]">·</span>}
+              </Link>
+            ))}
+          </nav>
         </div>
-        {/* La mia guida: numeri toccabili, ognuno apre la mappa sui salvati già filtrati. */}
-        <nav aria-label="La mia guida" data-testid="guida-contatori" className="mt-4 grid grid-cols-3 divide-x divide-[#e8e2d8] rounded-card border border-[#e8e2d8] bg-white">
-          {counters.map((c) => (
-            <Link
-              key={c.id}
-              href={c.href}
-              data-testid={`guida-${c.id}`}
-              className="flex min-h-[64px] flex-col items-center justify-center gap-1 px-1 py-2 text-center active:bg-white"
-            >
-              <span className="font-title text-2xl font-semibold leading-none text-brand">{c.value}</span>
-              <span className="text-[11px] font-display leading-tight text-text-muted">{c.label}</span>
-            </Link>
-          ))}
-        </nav>
+      </header>
 
-        {/* Il tuo gusto (revisore 2/11, terzo giro): chi sei in tre pillole vere, un tocco apre la mappa del gusto.
-            È l'unico posto del gusto nell'app (in Amici solo un link piccolo): la carta da condividere è "Condividi". */}
-        <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mt-3 rounded-card border border-[#e8e2d8] bg-white px-4 pb-3 pt-2">
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="gusto-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Il tuo gusto</h2>
-            <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className="-mr-2 flex min-h-11 items-center gap-1 px-2 text-[13px] font-medium text-brand">
-              <IdCard size={15} strokeWidth={1.75} aria-hidden /> Condividi
-            </Link>
-          </div>
-          {pillole.length > 0 && !senzaGusto ? (
-            <Link href="/me" data-testid="profilo-gusto-mappa" aria-label={`Il tuo gusto: ${pillole.map((x) => x.testo).join(", ")}. Apri la mappa del gusto`} className="flex min-h-11 items-center gap-2 active:opacity-70">
-              <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-                {pillole.map((x) => (
-                  <span key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-8 items-center gap-1 rounded-pill bg-[#f3efe8] px-3 text-[13px] font-medium text-[#33373d]">
-                    {x.emoji && <span aria-hidden>{x.emoji}</span>}
-                    {x.testo}
-                  </span>
-                ))}
-              </span>
-              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
-            </Link>
-          ) : senzaGusto ? (
-            // Mappa del gusto non ancora fatta: l'invito sta qui, sotto nome e numeri (non chiuso in Impostazioni),
-            // perché da lì ricerca, verdetti e "per te" parlano di chi usa l'app.
-            <Link href="/onboarding" data-testid="invito-mappa-gusto" className="flex min-h-12 items-center gap-3 active:opacity-70">
-              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={17} strokeWidth={1.75} /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-sans text-[15px] font-medium text-text">Fai la tua mappa del gusto</span>
-                <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
-              </span>
-              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
-            </Link>
-          ) : (
-            <Link href="/me" data-testid="profilo-gusto-mappa" className="flex min-h-11 items-center gap-2 text-[15px] font-medium text-text active:opacity-70">
-              <span className="min-w-0 flex-1">La tua mappa del gusto</span>
-              <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+      {/* Il tuo gusto (revisore 2/11, sesto giro): il blocco principale del profilo. Fino a 4 pillole vere dal
+          profilo; "Modifica" apre la mappa del gusto, "Condividi" la carta. Niente link doppione sotto. */}
+      <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mb-6 rounded-card border border-[#e8e2d8] bg-white px-4 pb-4 pt-2 shadow-card">
+        <div className="flex items-center gap-1">
+          <h2 id="gusto-titolo" className="min-w-0 flex-1 font-title text-[22px] leading-tight text-text">Il tuo gusto</h2>
+          {!senzaGusto && (
+            <Link href="/me" data-testid="profilo-gusto-mappa" aria-label="Modifica il tuo gusto" className="flex min-h-11 items-center px-2 text-[13px] font-medium text-brand active:opacity-70">
+              Modifica
             </Link>
           )}
-        </section>
-      </header>
+          <Link href="/profilo/gusto" data-testid="profilo-carta-gusto" className="-mr-2 flex min-h-11 items-center gap-1 px-2 text-[13px] font-medium text-brand active:opacity-70">
+            <IdCard size={15} strokeWidth={1.75} aria-hidden /> Condividi
+          </Link>
+        </div>
+        {senzaGusto ? (
+          // Mappa del gusto non ancora fatta: l'invito sta qui, in cima (non chiuso in Impostazioni),
+          // perché da lì ricerca, verdetti e "per te" parlano di chi usa l'app.
+          <Link href="/onboarding" data-testid="invito-mappa-gusto" className="flex min-h-12 items-center gap-3 active:opacity-70">
+            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent"><Sparkles size={17} strokeWidth={1.75} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-sans text-[15px] font-medium text-text">Fai la tua mappa del gusto</span>
+              <span className="block truncate text-xs text-text-muted">1 minuto: da lì ricerca e verdetti parlano di te</span>
+            </span>
+            <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
+          </Link>
+        ) : pillole.length > 0 ? (
+          <ul aria-label="I tuoi gusti" className="mt-1 flex flex-wrap gap-2">
+            {pillole.map((x) => (
+              <li key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-[#f3efe8] px-3.5 text-[14px] font-medium text-[#33373d]">
+                {x.emoji && <span aria-hidden>{x.emoji}</span>}
+                {x.testo}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          // Mappa fatta ma senza scelte leggibili: una frase sola, il gesto è "Modifica" sulla riga del titolo.
+          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">Nessuna preferenza scelta: tocca Modifica per aggiungerle.</p>
+        )}
+      </section>
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
@@ -492,6 +494,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
               <ChevronRight aria-hidden size={16} className="text-text-muted" />
             </Link>
             <div className="border-t border-border px-4 pb-4">
+              {user.email && <p data-testid="profilo-email" className="truncate pt-3 text-xs text-text-muted">Accesso come {user.email}</p>}
               <ProfiloAccount loggedIn compatto />
             </div>
           </div>
