@@ -3501,17 +3501,22 @@ export default function MapView({
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
+                    role="img"
+                    aria-label={place.name}
                     className={`relative flex items-center justify-center overflow-hidden rounded-full border-[3px] bg-white shadow-float transition-[width,height] ${
                       selected?.id === place.id || focusId === place.id ? "h-14 w-14 border-accent" : "h-11 w-11 border-brand"
                     }`}
                   >
                     {/* Emoji del tipo di locale sotto la foto: si vede subito e resta finché la foto non arriva
                         (giro del 1/11: per secondi i segnalini erano cerchi bianchi vuoti). */}
+                    {/* Revisore del 2/11: la foto resta invisibile finché non è arrivata davvero; se non arriva
+                        (429, quota finita) il segnalino è l'emoji su fondo chiaro, come tutti gli altri. */}
                     <span aria-hidden data-testid="pin-emoji" className="text-xl leading-none">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     <PlacePhoto
                       photoRef={venueDetails[place.id]?.photoRef}
-                      alt={place.name}
+                      alt=""
                       width={500}
+                      revealOnLoad
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   </span>
@@ -3531,6 +3536,7 @@ export default function MapView({
                         photoRef={venueDetails[place.id]?.photoRef}
                         alt=""
                         width={500}
+                        revealOnLoad
                         className="absolute inset-0 h-full w-full rounded-full object-cover"
                       />
                     )}

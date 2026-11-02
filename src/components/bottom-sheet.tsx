@@ -387,6 +387,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // quella "a fuoco"; se il fuoco arriva da fuori (tocco su un pin) il carosello
   // scorre fino alla card.
   const carouselRef = useRef<HTMLUListElement>(null);
+  // Card con la foto arrivata davvero (revisore del 2/11): finché non arriva, o se non arriva (429),
+  // la card ha la copertina curata con l'emoji del tipo invece di metà card di sfumatura vuota.
+  const [conFoto, setConFoto] = useState<Record<string, true>>({});
   const hoveredId = useRef<string | null>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const centeredId = () => {
@@ -861,17 +864,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
                     // insieme), circa 200 px; il contenuto sta in basso, sopra solo la foto (revisore del 1/11,
                     // secondo giro: 260 px con il vuoto in alto e la card dopo appena visibile).
-                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-10 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
+                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
-                    <span aria-hidden data-testid="copertina" className="pointer-events-none absolute right-2 top-12 select-none text-[96px] leading-none opacity-25">{getCategoryEmoji(place.category, place.name, place.types)}</span>
                     {i < PHOTO_CARDS && d?.photoRef && (
-                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} className="absolute inset-0 h-full w-full object-cover" />
+                      <PlacePhoto photoRef={d.photoRef} alt="" width={500} revealOnLoad onLoad={() => setConFoto((m) => (m[place.id] ? m : { ...m, [place.id]: true }))} className="absolute inset-0 h-full w-full object-cover" />
                     )}
-                    {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. */}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 via-60% to-black/10" />
-                    {(stato || saved || gem || poco) && (
-                      <span className="absolute left-3 top-3.5">
+                    {/* Sfumatura scura sotto il testo: si legge anche su foto chiare. Senza foto la copertina
+                        colorata resta viva (prima: metà card di marrone spento). */}
+                    <span aria-hidden className={`absolute inset-0 bg-gradient-to-t ${conFoto[place.id] ? "from-black/90 via-black/60 via-60% to-black/10" : "from-black/55 via-black/15 via-60% to-transparent"}`} />
+                    {/* In alto a sinistra l'emoji del tipo su fondo chiaro, la stessa del segnalino: si vede finché
+                        la foto non arriva e resta se non arriva. Accanto, l'eventuale etichetta (stato, 💎). */}
+                    <span className="absolute left-3 top-2.5 flex items-center gap-2">
+                      <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
+                      {(stato || saved || gem || poco) && (
+                      <span className="flex">
                         {stato ? (
                           <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
                         ) : saved ? (
@@ -882,7 +889,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           <span data-testid="gemma" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">💎 Poco conosciuto</span>
                         )}
                       </span>
-                    )}
+                      )}
+                    </span>
                     <span className="relative flex flex-col">
                       <span data-testid="riga-fatti" className={`flex min-w-0 items-baseline text-[11px] font-sans text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${onSave ? "pr-12" : ""}`}>
                         <span className="truncate">

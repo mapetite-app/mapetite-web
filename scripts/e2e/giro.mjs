@@ -1437,6 +1437,26 @@ await shot("20-pin-foto");
   await shot("20b-pin-attesa-foto");
   await page.unroute("**/api/places/photo**");
 }
+// Foto che non arrivano (revisore del 2/11, in produzione 429 per quota finita): ogni segnalino è l'emoji su
+// fondo chiaro, niente disco pieno né icona rotta; ogni card ha la copertina con l'emoji, non metà card vuota.
+{
+  await page.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: { error: "Foto sospese per oggi." } }));
+  await page.goto(`${BASE}/mappa?pin=b`, { waitUntil: "networkidle" });
+  await page.evaluate(() => { try { localStorage.removeItem("mapetite.foto"); } catch { /* */ } });
+  await (await esempio(page)).click();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 });
+  await page.waitForTimeout(800);
+  const pins = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => {
+    const img = e.querySelector("img");
+    const disco = e.firstElementChild;
+    return { id: e.dataset.place, emoji: (e.querySelector("[data-testid=pin-emoji]")?.textContent ?? disco?.textContent ?? "").trim(), fotoVisibile: !!img && getComputedStyle(img).opacity !== "0", fondo: disco ? getComputedStyle(disco).backgroundColor : "" };
+  }));
+  ok(pins.length >= 2 && pins.every((x) => /\p{Extended_Pictographic}/u.test(x.emoji) && !x.fotoVisibile && x.fondo === "rgb(255, 255, 255)"), `foto non arrivate: tutti i segnalini con l'emoji su fondo chiaro (${pins.map((x) => `${x.id} ${x.emoji}${x.fotoVisibile ? " +foto" : ""}`).join(", ")})`);
+  const cop = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((li) => { const c = li.querySelector("[data-testid=copertina]"); return !!c && c.getBoundingClientRect().width > 0 && /\p{Extended_Pictographic}/u.test(c.textContent ?? ""); }));
+  ok(cop.length >= 2 && cop.every(Boolean), `foto non arrivate: ogni card ha la copertina con l'emoji del tipo (${cop.filter(Boolean).length} su ${cop.length})`);
+  await shot("20c-senza-foto");
+  await page.unroute("**/api/places/photo**");
+}
 await page.goto(`${BASE}/mappa?pin=a`, { waitUntil: "networkidle" });
 
 // 7-septies. Haiku non risponde: la lista Google resta, sparisce "preparo i verdetti"
