@@ -924,7 +924,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {similar && (
                             // Corta, così non si taglia ("✨ Come Hostaria Del …", revisore del 2/11): il nome del salvato
                             // resta per chi legge con il lettore di schermo e al passaggio del mouse.
-                            <span data-testid="simile-a" title={`Come ${similar}, che hai salvato`} className="min-w-0 truncate text-xs font-sans font-semibold text-accent">✨ Come un tuo salvato<span className="sr-only">: {similar}</span></span>
+                            <span data-testid="simile-a" title={`Come ${similar}, che hai salvato`} className="min-w-0 truncate text-xs font-sans font-semibold text-white/75">✨ Come un tuo salvato<span className="sr-only">: {similar}</span></span>
                           )}
                           {req.length > 0 && (
                             <span data-testid="requisiti-card" className="truncate text-xs font-sans font-semibold text-white/90" title="Confermato dalle recensioni">
@@ -1030,7 +1030,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                     </span>
                     {similarTo?.(place.id) && (
-                      <span data-testid="simile-a" title={`Come ${similarTo(place.id)}, che hai salvato`} className="mt-1 truncate text-xs font-sans font-semibold text-accent">✨ Come un tuo salvato<span className="sr-only">: {similarTo(place.id)}</span></span>
+                      <span data-testid="simile-a" title={`Come ${similarTo(place.id)}, che hai salvato`} className="mt-1 truncate text-xs font-sans font-semibold text-white/75">✨ Come un tuo salvato<span className="sr-only">: {similarTo(place.id)}</span></span>
                     )}
                     {d?.verdict ? (
                       <span className="mt-1.5 block">
