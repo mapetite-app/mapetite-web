@@ -907,6 +907,9 @@ await page.waitForTimeout(1500);
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
   ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
   ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
+  // Revisore del 2/11: con i segnalini vicini i nomi si impilavano in colonna. Nome solo sui primi 3 (e sulla card al centro).
+  { const nomi = await page.getByTestId("etichetta-pin").allInnerTexts();
+    ok(nomi.length <= 3 && nomi.every((n) => /^Folla [123]$/.test(n.trim())), `mappa affollata: nomi solo sui primi 3 (${nomi.join(", ")})`); }
   // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
   const q = await inquadratura(page, ["F11"]);
   ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);

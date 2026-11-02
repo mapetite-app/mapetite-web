@@ -1947,7 +1947,23 @@ export default function MapView({
       }));
       for (const it of items) { const o = scost[it.id]; if (o) { it.dx = o.dx; it.dy = o.dy; } }
     }
-    return { lati: posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h }), scost };
+    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
+    // Risultati affollati (revisore del 2/11: le etichette si impilavano in colonna): al massimo 3 nomi, nell'ordine
+    // della lista, più la card al centro e il selezionato. Con i segnalini distanti restano tutti quelli che ci stanno.
+    if (inRicerca) {
+      const centri = items.filter((it) => it.label).map((it) => { const q = proietta(it.lat, it.lng); return { x: q.x + (it.dx ?? 0), y: q.y + (it.dy ?? 0) }; });
+      const affollati = centri.some((a, i) => centri.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < 64));
+      if (affollati) {
+        let nomi = 0;
+        // items è già in ordine di lista (selezionato, card al centro, poi la prima, la seconda…).
+        for (const it of items) {
+          if (!lati[it.id] || it.id.startsWith("dai-salvati-")) continue;
+          if (fissi.has(it.id) || nomi < 3) nomi++;
+          else delete lati[it.id];
+        }
+      }
+    }
+    return { lati, scost };
   })();
 
   // Frase sopra le card (revisore del 1/11): solo i dati che la ricerca ha capito e che sono veri;
