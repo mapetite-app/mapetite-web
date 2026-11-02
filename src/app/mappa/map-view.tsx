@@ -398,7 +398,7 @@ const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag). Il testo si
 // capisce anche come frase (4.5): "quel giapponese che avevo salvato a Milano".
-const savedText = (p: Place) => [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
+const savedText = (p: Place) => [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
   .filter(Boolean).join(" ");
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
@@ -424,7 +424,7 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
   // Prima i salvati che rispondono a tutta la frase ("il giapponese di Milano"), poi quelli con più parole in comune.
   const whole = new Set(filtraSalvatiNaturale(list, query, savedText, (p) => p.tags).map((p) => p.id));
   const scored = list.map((p) => {
-    const text = [p.name, categoryLabel(p.category), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
+    const text = [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel)]
       .filter(Boolean).join(" ").toLocaleLowerCase("it");
     return { p, n: words.filter((w) => text.includes(w)).length + (whole.has(p.id) ? 100 : 0) };
   }).filter((x) => x.n > 0);
@@ -439,6 +439,8 @@ function savedMatches(list: Place[], query: string, max = 3): Place[] {
 const SIMILAR_MAX_METERS = 15_000;
 // "Sei vicino a un locale che volevi provare": entro ~10 minuti a piedi.
 const NEARBY_SAVED_METERS = 800;
+// Mappa dei salvati: zoom massimo a cui i segnalini si raggruppano (oltre, ognuno il suo, col nome).
+const SALVATI_GRUPPI_FINO_A = 12;
 // "Dai tuoi salvati" sopra i risultati: un salvato conta solo se è a meno di 20 km da dove si cerca.
 const DAL_SALVATI_METERS = 20_000;
 // Fin dove un salvato scelto per la ricerca allarga la mappa (oltre resta fuori dall'inquadratura).
@@ -1850,6 +1852,10 @@ export default function MapView({
     return mapPlaces.filter((p) => ids.has(p.id));
   }, [mapPlaces, topKey]);
 
+  // Mappa dei salvati (revisore 2/11): i propri posti sono pochi e ognuno conta. Si raggruppano solo da
+  // lontano (sotto lo zoom 13, la città intera); dal quartiere in giù ogni salvato ha il suo segnalino e il
+  // nome (dove c'è spazio, vedi latiEtichette). Prima un "2" nascondeva il salvato più vicino anche a zoom 15.
+  const mappaSalvati = view === "saved" && aiSearch === null;
   const clusterIndex = useMemo(() => {
     const top = new Set(topPlaces.map((p) => p.id));
     const points = mapPlaces.filter((p) => !top.has(p.id)).map((place) => ({
@@ -1857,10 +1863,10 @@ export default function MapView({
       properties: { cluster: false, placeData: place },
       geometry: { type: "Point" as const, coordinates: [place.lng, place.lat] },
     }));
-    const index = new Supercluster({ radius: 50, maxZoom: 20 });
+    const index = new Supercluster({ radius: mappaSalvati ? 40 : 50, maxZoom: mappaSalvati ? SALVATI_GRUPPI_FINO_A : 20 });
     index.load(points);
     return index;
-  }, [mapPlaces, topPlaces]);
+  }, [mapPlaces, topPlaces, mappaSalvati]);
 
   const roundedZoom = Math.ceil(viewState.zoom);
   const clusters = useMemo(() => {
@@ -1905,9 +1911,11 @@ export default function MapView({
     const singoli = clusters.filter((c) => !c.properties.cluster).map((c) => c.properties.placeData as Place);
     const inRicerca = aiSearch !== null && clusterPlaces === null;
     // In ricerca i nomi sono dei primi 5; gli altri solo avvicinando oltre lo zoom dell'inquadratura (16).
+    // Sulla mappa dei salvati il nome c'è sempre quando c'è spazio (come i risultati e Albo 08): chi li ha salvati
+    // li riconosce dal nome, non dall'emoji. posizionaEtichette lo nasconde solo se coprirebbe altro.
     const conNome = (place: Place) => (inRicerca
       ? topPlaces.includes(place) || viewState.zoom >= 17
-      : aiSearch !== null || viewState.zoom >= 14) || selected?.id === place.id;
+      : aiSearch !== null || mappaSalvati || viewState.zoom >= 14) || selected?.id === place.id;
     const rank = (id: string) => (id === selected?.id ? -2 : id === focusId ? -1 : carouselOrder.indexOf(id) === -1 ? 999 : carouselOrder.indexOf(id));
     const fissi = new Set([selected?.id, focusId, ...(inRicerca ? carouselOrder.slice(0, 1) : [])].filter((x): x is string => !!x));
     const items: MapItem[] = [...singoli].sort((a, b) => rank(a.id) - rank(b.id)).map((place) => {
@@ -3454,6 +3462,7 @@ export default function MapView({
                 }}
               >
                 <div
+                  data-testid="pin-gruppo"
                   className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-accent"
                   style={{
                     width: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,

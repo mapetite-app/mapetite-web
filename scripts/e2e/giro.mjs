@@ -2023,7 +2023,13 @@ else {
     await zone.filter({ hasText: "Roma" }).click();
     await p.waitForTimeout(1000);
     const zb = await zone.first().boundingBox();
-    ok(!!zb && !!box && zb.y >= box.y + box.height && zb.y + zb.height <= 140, `salvati mappa: le zone stanno subito sotto il campo (y ${Math.round(zb?.y ?? 0)})`); }
+    ok(!!zb && !!box && zb.y >= box.y + box.height && zb.y + zb.height <= 140, `salvati mappa: le zone stanno subito sotto il campo (y ${Math.round(zb?.y ?? 0)})`);
+    // Revisore 2/11 (quarto giro): sulla mappa dei salvati ogni segnalino ha il nome (come i risultati e Albo 08) e
+    // dal quartiere in giù nessun "2" nasconde un salvato: si raggruppa solo da lontano (zoom sotto 13).
+    { const z = await zoom();
+      const pins = await p.evaluate(() => [...document.querySelectorAll("[data-testid=pin]")].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.top > 0 && r.bottom < innerHeight && r.left > -10 && r.right < innerWidth + 10; }).map((e) => ({ id: e.dataset.place, nome: e.querySelector("[data-testid=etichetta-pin]")?.textContent ?? null })));
+      const gruppi = await p.getByTestId("pin-gruppo").count();
+      ok((z === null || z >= 13 ? gruppi === 0 : true) && pins.length >= 2 && pins.every((x) => !!x.nome), `salvati mappa: segnalini col nome, nessun gruppo a zoom ${z} (${JSON.stringify(pins.map((x) => x.nome))}, gruppi ${gruppi})`); } }
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   { const fs = p.getByTestId("salvati-foglio");
     ok(await fs.getByRole("button", { name: "📍 Roma · 2" }).isVisible(), "città: chip Roma · 2 (nel foglio Filtri)");
