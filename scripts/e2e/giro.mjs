@@ -1573,6 +1573,9 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
 { const inc = await page.getByTestId("importa-incolla").boundingBox(); const tl = await page.getByTestId("importa-tessere").boundingBox();
   const rh = await page.getByTestId("importa-tessera-shot").boundingBox();
   ok(inc && tl && inc.y < tl.y && inc.height >= 56 && tl.y + tl.height <= 844 - 64 && rh && rh.height <= 72, `importa: Incolla grande sopra 'Altri modi', righe compatte, tutto sopra la barra (${Math.round(inc?.height ?? 0)}px, righe ${Math.round(rh?.height ?? 0)}px, fino a ${Math.round((tl?.y ?? 0) + (tl?.height ?? 0))})`); }
+// Revisore 2/11 (terzo giro): il pulsante corallo da solo sul fondo carta, niente riquadro scuro attorno; il sottotitolo sotto.
+{ const g = await page.evaluate(() => { const card = document.querySelector("[data-testid=importa-google]"); const b = document.querySelector("[data-testid=importa-incolla]").getBoundingClientRect(); const f = document.querySelector("[data-testid=importa-incolla-fonti]"); return { bg: getComputedStyle(card).backgroundColor, btn: getComputedStyle(document.querySelector("[data-testid=importa-incolla]")).backgroundColor, sotto: Math.round(f.getBoundingClientRect().top - b.bottom), col: getComputedStyle(f).color }; });
+  ok(g.bg === "rgba(0, 0, 0, 0)" && g.btn === "rgb(255, 107, 74)" && g.sotto >= 0 && g.sotto < 16 && g.col !== "rgb(255, 255, 255)" && !g.col.startsWith("rgba(255, 255, 255"), `importa: 'Incolla un link' corallo da solo sul fondo chiaro, sottotitolo grigio subito sotto (${JSON.stringify(g)})`); }
 { const look = await page.evaluate(() => ({ h1: getComputedStyle(document.querySelector("h1")).fontFamily, bg: getComputedStyle(document.querySelector("[data-testid=importa-pagina]")).backgroundColor }));
   ok(/newsreader/i.test(look.h1) && look.bg === "rgb(248, 246, 242)", `importa: titolo nel serif e fondo beige di home e salvati (giro D7, D52) (${look.h1.slice(0, 30)}, ${look.bg})`); }
 ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
@@ -1581,6 +1584,8 @@ ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getB
 await page.getByTestId("importa-tessera-mano").click();
 ok(await page.getByTestId("importa-mano").isVisible() && !(await page.getByText("Scegli uno screenshot").isVisible()), "importa: un pannello alla volta ('A mano' chiude lo screenshot)");
 await shot("19-importa");
+await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+await page.screenshot({ path: `${OUT}/s4-importa.png`, caret: "initial" });
 
 // 7b. Feedback dei tester: email precompilata con pagina e telefono.
 // Dal piano 6.4 sta nel profilo (sezione "Account"), anche da non collegati; non più nella barra.

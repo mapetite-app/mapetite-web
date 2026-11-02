@@ -105,14 +105,16 @@ export default function GoogleMapsCard({
   useImperativeHandle(ref, () => ({ paste: () => void pasteFromClipboard() }));
 
   return (
-    <section id="importa-google-card" className="scroll-mt-4 rounded-card bg-brand p-5 text-white shadow-float" data-testid="importa-google">
+    // Revisore 2/11, terzo giro: niente più riquadro scuro attorno al pulsante (pesava): il pulsante corallo da
+    // solo sul fondo carta della pagina, con il sottotitolo sotto.
+    <section id="importa-google-card" className="scroll-mt-4 text-text" data-testid="importa-google">
       {!userId ? (
-        <>
+        <div className="rounded-card border border-[#e8e2d8] bg-white p-5">
           <p className="font-display text-lg font-semibold">📋 Incolla un link</p>
-          <p className="mt-1 text-sm text-white/80">
-            <Link href="/login?next=%2Fimporta" className="font-semibold text-white underline">Accedi</Link> per salvare i locali.
+          <p className="mt-1 text-sm text-text-muted">
+            <Link href="/login?next=%2Fimporta" className="font-semibold text-brand underline">Accedi</Link> per salvare i locali.
           </p>
-        </>
+        </div>
       ) : (
         <>
           {pending && draft === null && (
@@ -130,7 +132,7 @@ export default function GoogleMapsCard({
           >
             {busy ? "Salvo..." : "Incolla un link"}
           </button>
-          <p className="mt-2 text-center text-xs text-white/80" data-testid="importa-incolla-fonti">
+          <p className="mt-2 text-center text-[13px] text-text-muted" data-testid="importa-incolla-fonti">
             Google Maps, un reel o una chat di link
           </p>
 
@@ -144,27 +146,27 @@ export default function GoogleMapsCard({
                 rows={3}
                 placeholder={"https://maps.app.goo.gl/…\nAnche una chat piena di link"}
                 aria-label="Link da incollare"
-                className="w-full rounded-btn border border-white/30 bg-white px-3 py-2 text-base text-text focus:outline-none"
+                className="w-full rounded-btn border border-[#ddd5c8] bg-white px-3 py-2 text-base text-text focus:border-brand focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => save(text)}
                 disabled={busy || !text.trim()}
-                className="min-h-11 w-full rounded-pill border border-white/60 px-4 text-sm font-display font-semibold text-white disabled:opacity-60"
+                className="min-h-11 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white disabled:opacity-60"
               >
                 Salva
               </button>
             </div>
           )}
 
-          {error && <p className="mt-3 rounded-btn bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
+          {error && <p className="mt-3 rounded-btn border border-[#e8e2d8] bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
           {reel && (
-            // Fondo bianco senza margini interni: le card del reel restano leggibili sul teal, senza card dentro card.
-            <div className="mt-4 overflow-hidden rounded-card bg-white text-text">
+            // Fondo bianco senza margini interni, con il filo come le altre card della pagina.
+            <div className="mt-4 overflow-hidden rounded-card border border-[#e8e2d8] bg-white text-text">
               <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
-          {results && <div className="mt-4 rounded-card bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}
+          {results && <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}
         </>
       )}
     </section>
