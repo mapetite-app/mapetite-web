@@ -8089,7 +8089,8 @@ else {
         const coperti = new Set();
         const guarda = (soloFissi) => {
           for (const el of document.querySelectorAll("a[href], button, input, textarea, select, [role=button]")) {
-            if (nav.contains(el) || el.closest(".mapboxgl-map") || (soloFissi && !fisso(el))) continue;
+            // Contenuti di un <details> chiuso (Impostazioni del profilo) non si vedono: non contano.
+            if (nav.contains(el) || el.closest(".mapboxgl-map") || (soloFissi && !fisso(el)) || !el.checkVisibility()) continue;
             const b = el.getBoundingClientRect();
             if (b.width < 2 || b.height < 2 || b.bottom <= 0 || b.top >= innerHeight || getComputedStyle(el).visibility === "hidden") continue;
             const y = Math.min(b.bottom - 3, innerHeight - 1);
