@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { BookOpen, CalendarCheck, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
-import { TILE_CLASS, TileBody } from "@/components/profilo-tessera";
+import { GRIGLIA_CLASS, TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
 import BookingReminder from "@/components/booking-reminder";
 import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
@@ -278,14 +278,14 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">
         <h2 id="mie-cose-titolo" className="mb-2 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Le mie cose</h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className={GRIGLIA_CLASS}>
           {/* Le raccolte si guardano nei Salvati, dove sono già copertine (revisore 1/11: era un doppione).
               Rinomina, unisci ed elimina restano in "Impostazioni" → "Gestisci le raccolte". */}
           <Link href={raccolteCount === 0 ? "/profilo?raccolta=nuova" : savedHref()} data-testid="tessera-raccolte" className={TILE_CLASS}>
             <TileBody icon={<FolderHeart {...icon} />} label="Raccolte" count={raccolteCount} sub="Per occasione" invito="Crea la prima" />
           </Link>
           <Link href="/profilo/diario" data-testid="profilo-diario" className={TILE_CLASS}>
-            <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub={`${doneCount} ${doneCount === 1 ? "provato" : "provati"}`} invito="Segna il primo posto" />
+            <TileBody icon={<BookOpen {...icon} />} label="Diario" count={doneCount} sub="Posti provati" invito="Segna il primo posto" />
           </Link>
           {ranks ? (
             <a href="#classifica" data-testid="tessera-classifica" className={TILE_CLASS}>

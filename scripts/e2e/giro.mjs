@@ -2503,7 +2503,13 @@ else {
       // Revisore 1/11: il sottotitolo di Importa non si taglia.
       { const sub = await cose.getByTestId("profilo-importa").locator(".truncate").last().evaluate((el) => ({ t: el.textContent, tagliato: el.scrollWidth > el.clientWidth + 1 }));
         ok(sub.t === "Link e file" && !sub.tagliato, `profilo: tessera Importa con 'Link e file' intero (${JSON.stringify(sub)})`); }
-      { const sz = await cose.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 100 && h >= 88), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      { const sz = await cose.locator("a").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })); ok(sz.every(([w, h]) => w >= 150 && h >= 60), `profilo: tessere grandi abbastanza per il pollice (${JSON.stringify(sz)})`); }
+      // Revisore 2/11 (quinto giro): niente buco nella griglia (5 tessere: l'ultima a tutta larghezza) e il numero
+      // accanto al nome, sulla stessa riga ("Raccolte 4"), non piccolo in alto a destra.
+      { const g = await cose.locator("a").evaluateAll((els) => { const box = els[0].parentElement.getBoundingClientRect(); const rs = els.map((e) => e.getBoundingClientRect()); const ultima = rs[rs.length - 1]; const righe = new Map(); for (const r of rs) righe.set(Math.round(r.top), (righe.get(Math.round(r.top)) ?? 0) + Math.round(r.width)); return { piene: [...righe.values()].every((w) => w >= box.width - 12), ultima: Math.round(ultima.width), griglia: Math.round(box.width) }; });
+        ok(g.piene, `profilo: griglia 'Le mie cose' senza buchi, ogni fila piena (${JSON.stringify(g)})`);
+        const n = await cose.getByTestId("tessera-raccolte").evaluate((a) => { const t = a.querySelector("[data-testid=tessera-titolo]").getBoundingClientRect(); const q = a.querySelector("[data-testid=tessera-numero]")?.getBoundingClientRect(); return q ? { dx: Math.round(q.left - t.right), dy: Math.round(Math.abs(q.bottom - t.bottom)) } : null; });
+        ok(!!n && n.dx >= 0 && n.dx <= 10 && n.dy <= 3, `profilo: il numero accanto al nome della tessera (${JSON.stringify(n)})`); }
       // Revisore 2/11 (quarto giro): tessere tutte alte uguali, titolo su una riga intero e alla stessa altezza nella fila.
       { const t = await cose.locator("a").evaluateAll((els) => els.map((a) => { const r = a.getBoundingClientRect(); const s = a.querySelector("[data-testid=tessera-titolo]"); const q = s?.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), dy: q ? Math.round(q.top - r.top) : -1, righe: q ? Math.round(q.height / parseFloat(getComputedStyle(s).lineHeight)) : 0, tagliato: s ? s.scrollWidth > s.clientWidth + 1 : true, testo: s?.textContent }; }));
         ok(new Set(t.map((x) => x.h)).size === 1 && new Set(t.map((x) => x.dy)).size === 1 && t.every((x) => x.righe === 1 && !x.tagliato) && t.some((x) => x.testo === "Il tuo gusto"), `profilo: tessere alte uguali, titoli su una riga, interi e allineati (${JSON.stringify(t.map((x) => `${x.testo}:${x.h}/${x.dy}`))})`); }
@@ -6354,7 +6360,7 @@ else {
       ok((await pf.getByTestId("posti-fissi-condividi").count()) === 0, "posti fissi: senza profilo pubblico niente 'Proponi' (il link non porterebbe ai posti)");
       await pf.scrollIntoViewIfNeeded().catch(() => {});
       await d.screenshot({ path: `${OUT}/49b-posti-fissi.png`, caret: "initial" }); }
-    ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.textContent()).includes("5 provati"), "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
+    ok(await card.isVisible() && (await card.getAttribute("href")) === "/profilo/diario" && (await card.getByTestId("tessera-numero").textContent()) === "5", "diario: nel profilo la tessera 'Diario' con il numero dei posti provati");
     await card.click();
     await d.waitForURL(/\/profilo\/diario/, { timeout: 8000 }).catch(() => {});
     await d.getByTestId("diario-mese").first().waitFor({ timeout: 8000 }).catch(() => {});
