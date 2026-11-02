@@ -30,6 +30,7 @@ export default function SchedaCarosello({
   fallback,
   overlay,
   heightClass = "h-56",
+  heightSenzaFoto,
 }: {
   photoRefs: string[];
   name: string;
@@ -41,6 +42,8 @@ export default function SchedaCarosello({
   fallback: ReactNode;
   overlay?: ReactNode; // chiudi / condividi sopra la foto
   heightClass?: string; // altezza della striscia (mockup A: più alta)
+  // Senza nessuna foto (manca o non arriva): intestazione bassa con l'emoji, il nome sale (revisore del 2/11, r4).
+  heightSenzaFoto?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [mapBroken, setMapBroken] = useState(false);
@@ -50,15 +53,19 @@ export default function SchedaCarosello({
   // niente contatore "1 / 2" sopra l'emoji (revisore del 2/11); la mappa resta a uno scorrimento.
   const [caricate, setCaricate] = useState<string[]>([]);
   const fotoVisibili = photoRefs.filter((r) => caricate.includes(r)).length;
+  // Foto che non arrivano (quota finita, 429): con tutte fallite (o nessuna) la striscia diventa un'intestazione bassa.
+  const [fallite, setFallite] = useState<string[]>([]);
+  const senzaFoto = photoRefs.every((r) => fallite.includes(r));
+  const altezza = senzaFoto && heightSenzaFoto ? heightSenzaFoto : heightClass;
   const mapUrl = mapBroken ? null : staticMapUrl(lat, lng);
   const photos = photoRefs.length > 0 ? photoRefs : [null];
   const slides = photos.length + (mapUrl ? 1 : 0);
   const mapIndex = mapUrl ? photos.length : -1;
 
   return (
-    <div className="relative" data-testid="scheda-carosello">
+    <div className="relative" data-testid="scheda-carosello" data-senza-foto={senzaFoto ? "true" : undefined}>
       <div
-        className={`flex ${heightClass} snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        className={`flex ${altezza} snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-t-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
         onScroll={(e) => {
           const el = e.currentTarget;
           const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
@@ -79,6 +86,7 @@ export default function SchedaCarosello({
                 className="h-full w-full object-cover"
                 fallback={fallback}
                 onLoad={() => setCaricate((f) => (f.includes(ref) ? f : [...f, ref]))}
+                onFail={() => setFallite((f) => (f.includes(ref) ? f : [...f, ref]))}
                 credit={i === 0 ? credit : null}
                 creditClassName="absolute bottom-3 left-3"
               />

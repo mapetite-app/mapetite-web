@@ -62,7 +62,7 @@ export type MapItem = {
   // Un lato solo (mappa dei salvati, revisore del 2/11: nomi a volte sotto, a volte sopra o di lato
   // non si leggevano come una mappa ordinata): il nome sta sempre lì; l'altro lato orizzontale solo
   // se da lì uscirebbe dallo schermo. Se il posto è occupato il nome si nasconde (tranne i fissi).
-  lato?: LabelSide;
+  lato?: LabelSide; // anche il nome del selezionato (latoPrincipale): lato già scelto
 };
 
 export type LabelSide = "sotto" | "destra" | "sinistra" | "sopra";
@@ -136,14 +136,39 @@ export function posizionaEtichette(
       const rect = labelRect(it, x, y, side);
       const n = urti(rect, i) + (fuori(rect) ? 10_000 : 0);
       if (n === 0) { best = { side, rect, n }; break; }
-      if (it.fixed && (best == null || n < best.n)) best = { side, rect, n };
+      if ((it.fixed || it.lato) && (best == null || n < best.n)) best = { side, rect, n };
     }
-    if (best && (best.n === 0 || it.fixed)) {
+    if (best && (best.n === 0 || it.fixed || it.lato)) {
       out[it.id] = best.side;
       placed.push(best.rect);
     }
   });
   return out;
+}
+
+// Nome del segnalino scelto (revisore del 2/11, r4: "Da Enzo al 29" finiva tra altri due segnalini e sembrava
+// loro). Il suo nome sceglie per primo il lato con meno segnalini intorno (a parità: sotto, destra, sinistra,
+// sopra; mai fuori dallo schermo) e resta attaccato al suo segnalino; poi gli altri segnalini si scostano
+// dal nome (separaSegnalini con `ostacoli`) e gli altri nomi lo evitano (posizionaEtichette).
+export function latoPrincipale(
+  it: MapItem,
+  p: { x: number; y: number },
+  altri: { x: number; y: number; size: number; anchor?: "bottom" | "center" }[],
+  schermo?: { w: number; h: number },
+): LabelSide {
+  const area = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) * Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  // Un segnalino a meno di 10 px dal nome conta già: il nome sembrerebbe suo.
+  const largo = (r: Rect, m: number): Rect => ({ x1: r.x1 - m, y1: r.y1 - m, x2: r.x2 + m, y2: r.y2 + m });
+  const icone = altri.map((a) => iconRect({ id: "", lat: 0, lng: 0, size: a.size, anchor: a.anchor }, a.x, a.y));
+  let best: { side: LabelSide; n: number } | null = null;
+  for (const side of ["sotto", "destra", "sinistra", "sopra"] as LabelSide[]) {
+    const r = labelRect(it, p.x, p.y, side);
+    const fuori = !!schermo && (r.x1 - SLACK < 0 || r.x2 + SLACK > schermo.w || r.y1 < 0 || r.y2 > schermo.h);
+    const n = icone.reduce((t, ic) => t + area(largo(r, 10), ic), 0) + (fuori ? 1e6 : 0);
+    if (best == null || n < best.n) best = { side, n };
+    if (n === 0) break;
+  }
+  return best!.side;
 }
 
 // Segnalini uno sopra l'altro (revisore del 1/11, 05c e 05f: undici risultati in pochi isolati erano
@@ -159,12 +184,20 @@ export type Segnalino = { id: string; x: number; y: number; size: number; fermo?
 // fino a `max` px (anelli ogni 4 px, 24 direzioni), con un filo di aria (GAP) tra i bordi: a qualsiasi
 // zoom i segnalini non si toccano. Il calcolo si rifà a ogni disegno, quindi avvicinando la mappa lo
 // spostamento cala da solo fino a zero.
-export function separaSegnalini(items: Segnalino[], max = 84): Record<string, { dx: number; dy: number }> {
+// `ostacoli`: riquadri da lasciare liberi (il nome del segnalino scelto): chi li tocca si scosta come da un segnalino.
+export function separaSegnalini(items: Segnalino[], max = 84, ostacoli: Rect[] = []): Record<string, { dx: number; dy: number }> {
   const GAP = 6;
   const out: Record<string, { dx: number; dy: number }> = {};
   const placed: { x: number; y: number; r: number }[] = [];
+  // Quanto un cerchio entra in un riquadro (allargato del raggio e del filo d'aria): la via d'uscita più corta.
+  const dentro = (x: number, y: number, r: number, q: Rect) => {
+    const m = r + GAP;
+    if (x <= q.x1 - m || x >= q.x2 + m || y <= q.y1 - m || y >= q.y2 + m) return 0;
+    return Math.min(x - (q.x1 - m), q.x2 + m - x, y - (q.y1 - m), q.y2 + m - y);
+  };
   const urto = (x: number, y: number, r: number) =>
-    placed.reduce((n, p) => n + Math.max(0, r + p.r + GAP - Math.hypot(x - p.x, y - p.y)), 0);
+    placed.reduce((n, p) => n + Math.max(0, r + p.r + GAP - Math.hypot(x - p.x, y - p.y)), 0)
+    + ostacoli.reduce((n, q) => n + dentro(x, y, r, q), 0);
   // I fermi per primi: gli altri si scostano da loro, mai il contrario.
   const ordine = [...items.filter((it) => it.fermo), ...items.filter((it) => !it.fermo)];
   for (const it of ordine) {
@@ -172,7 +205,8 @@ export function separaSegnalini(items: Segnalino[], max = 84): Record<string, { 
     let best = { x: it.x, y: it.y, n: urto(it.x, it.y, r) };
     if (!it.fermo && best.n > 0) {
       // Direzione di partenza: lontano dal segnalino più vicino (se coincidono, verso destra).
-      const vicino = placed.reduce<{ x: number; y: number; d: number } | null>((m, p) => {
+      const centri = [...placed, ...ostacoli.filter((q) => dentro(it.x, it.y, r, q) > 0).map((q) => ({ x: (q.x1 + q.x2) / 2, y: (q.y1 + q.y2) / 2 }))];
+      const vicino = centri.reduce<{ x: number; y: number; d: number } | null>((m, p) => {
         const d = Math.hypot(it.x - p.x, it.y - p.y);
         return m == null || d < m.d ? { x: p.x, y: p.y, d } : m;
       }, null);

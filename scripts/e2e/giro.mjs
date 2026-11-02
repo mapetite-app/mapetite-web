@@ -205,10 +205,22 @@ await idee(page);
   ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && (await pan.getByTestId("mappa-assistente").count()) === 0, "Idee: Sorprendimi c'è, 'Parla con l'assistente' no (è già nella barra in basso)");
   // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
   ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
+  // Revisore del 2/11 (r4): il pannello copriva metà schermo. Al massimo 3 righe (titoli su una riga) più UNA fila.
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
-    ok(adesso === 2 && perTe >= 1 && perTe <= 2 && righe <= 4, `Idee: al massimo 4 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
-  { const es = pan.locator("section").filter({ hasText: /^Prova a chiedere/ }).getByRole("button"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
-    ok(n === 4 && ys.size === 1, `Idee: 'Prova a chiedere' in una riga sola (${n} esempi, ${ys.size} righe)`); }
+    ok(adesso === 2 && perTe === 1 && righe <= 3, `Idee: al massimo 3 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
+  { const es = pan.getByTestId("idee-fila").getByTestId("idee-esempio"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
+    ok(n === 4 && ys.size === 1 && (await pan.getByTestId("idee-fila").count()) === 1, `Idee: 'Prova a chiedere' in una fila sola (${n} esempi, ${ys.size} righe)`); }
+  { const g = await pan.evaluate((el) => {
+      const p = el.getBoundingClientRect(); const fila = el.querySelector("[data-testid=idee-fila] .overflow-x-auto"); const chips = [...fila.children].map((c) => c.getBoundingClientRect());
+      const titoli = [...el.querySelectorAll("li")].map((li) => li.querySelector("span.min-w-0 > span")).filter(Boolean).map((t) => Math.round(t.getBoundingClientRect().height));
+      const sf = el.querySelector("[data-testid=idee-fila-sfumatura]"); const bg = sf ? getComputedStyle(sf).backgroundImage : "";
+      return { h: Math.round(p.height), bottom: Math.round(p.bottom), intere: chips.filter((c) => c.left >= p.left - 0.5 && c.right <= p.right + 0.5).length, titoli, sfumatura: /gradient/.test(bg) };
+    });
+    ok(g.h <= 300 && g.bottom <= 844 / 2 && g.titoli.every((t) => t <= 22), `Idee: pannello basso, sopra metà schermo, titoli su una riga (${g.h} px, fino a ${g.bottom} px, titoli ${g.titoli.join("/")} px)`);
+    ok(g.intere >= 2 && g.sfumatura, `Idee: nella fila almeno due suggerimenti interi, poi una sfumatura chiara che invita a scorrere (${g.intere} interi)`); }
+  // "Per le 2:04" suonava meccanico (r4): sotto l'idea del momento una frase per fascia, senza orario.
+  { const sub = (await pan.getByTestId("suggerimento-momento").innerText()).split("\n").map((x) => x.trim()).filter(Boolean)[1] ?? "";
+    ok(!/\d{1,2}:\d{2}/.test(sub) && !/^Per le /.test(sub) && sub.length > 0, `Idee: sotto l'idea del momento una frase umana, senza orario ('${sub}')`); }
   ok((await pan.getByTestId("idee-stasera").count()) === 0 && (await pan.getByTestId("suggerimento-momento-2").count()) === 0, "Idee: niente 'Stasera dove andiamo?' (sta nei Salvati) né una seconda idea dello stesso momento");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
 ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
@@ -1648,7 +1660,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
   await wctx.close();
 }
 // Idee in ogni fascia oraria (revisore del 2/11: di notte "Locale aperto adesso qui vicino", "Cocktail bar aperto"
-// e "Vicino a me, aperto adesso" dicevano la stessa cosa): al massimo 4 righe, nessun significato ripetuto,
+// e "Vicino a me, aperto adesso" dicevano la stessa cosa): al massimo 3 righe (r4), nessun significato ripetuto,
 // niente "Stasera dove andiamo?". Orologio fisso, meteo simulato (nessun costo).
 {
   const CONCETTI = { vicino: /vicin|qui intorno/i, "aperto ora": /aper(to|ti|ta) (adesso|ora)|a quest'ora/i, drink: /cocktail|drink|\bpub\b/i, colazione: /colazion|cornett|brunch/i, pranzo: /pranz/i, cena: /\bcena\b/i, aperitivo: /aperitiv/i, gelato: /gelat/i, vino: /wine|\bvino\b|enotec/i, trattoria: /trattori/i, dolci: /pasticc|merenda|\bdolc/i, pizza: /pizz/i, stasera: /stasera dove/i };
@@ -1669,7 +1681,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
     const righe = (await ip.getByTestId("idee-pannello").locator("li").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
     const doppi = Object.entries(CONCETTI).filter(([, re]) => righe.filter((r) => re.test(r)).length > 1).map(([k]) => k);
     const nome = `${ora}${meteo ? (meteo.precipitation > 0 ? " pioggia" : ` ${meteo.temperature_2m}°`) : ""}`;
-    ok(righe.length <= 4 && doppi.length === 0 && (await ip.getByTestId("idee-stasera").count()) === 0, `Idee alle ${nome}: ${righe.length} righe, nessun doppione${doppi.length ? " (ripetuti: " + doppi.join(", ") + ")" : ""} — ${righe.join(" | ")}`);
+    ok(righe.length <= 3 && doppi.length === 0 && (await ip.getByTestId("idee-stasera").count()) === 0 && !/\b\d{1,2}:\d{2}\b/.test(righe[0] ?? ""), `Idee alle ${nome}: ${righe.length} righe, nessun doppione, nessun orario${doppi.length ? " (ripetuti: " + doppi.join(", ") + ")" : ""} — ${righe.join(" | ")}`);
     await ip.close();
   }
   await ictx.close();
@@ -1838,7 +1850,12 @@ else {
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
   // Revisore del 2/11: con i salvati "Stasera dove andiamo?" era nelle Idee e nei Salvati. Ora solo nei Salvati.
-  ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 4, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 4 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
+  ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 3, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 3 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
+  // Con un'idea tua la riga è sua: Sorprendimi resta a un tocco, nella fila dei suggerimenti (r4).
+  ok(await p.getByTestId("idee-fila").getByTestId("mappa-sorprendimi").count() === 1, "Idee con gusti: Sorprendimi nella fila dei suggerimenti");
+  // Con gusti e salvati la riga è dei gusti; l'idea dai salvati, se c'è, sta nella fila (mai una quarta riga).
+  { const tot = await p.getByTestId("suggerimento-salvati").count(); const inFila = await p.getByTestId("idee-fila").getByTestId("suggerimento-salvati").count();
+    ok(tot === inFila, `Idee con gusti: l'idea dai salvati (se c'è) nella fila, non come riga in più (${tot} in tutto, ${inFila} nella fila)`); }
   // "Dai tuoi salvati" accanto alla ricerca nel mondo (proposta 33 dalla home): l'AI sceglie tra i salvati
   // in parallelo; restano solo quelli veri e vicini a dove si cerca (Caffè Milano no: si cerca a Roma).
   { const chiesti = [];
@@ -3178,6 +3195,20 @@ if (fakeUser) {
   await q3.locator("ul.snap-x li[data-id=E1]").waitFor({ timeout: 8000 });
   await q3.waitForTimeout(2500);
   { const t = await tocchi(q3); ok(t.length === 0, `segnalini: nessuno tocca un altro dopo l'inquadratura (Spirito di Vino accanto a Da Enzo)${t.length ? " — " + t.join(" ") : ""}`); }
+  // Revisore del 2/11 (r4): carosello e pillola "Cinque posti a Trastevere" partivano 60 px a destra.
+  { const a = await q3.evaluate(() => ({ card: Math.round(document.querySelector("ul.snap-x li[data-id]").getBoundingClientRect().left), frase: Math.round(document.querySelector("[data-testid=frase-risultati]")?.getBoundingClientRect().left ?? -1) }));
+    ok(Math.abs(a.card - 16) <= 2 && Math.abs(a.frase - 16) <= 2, `risultati: prima card e pillola del titolo sul margine di 16 px (card ${a.card}, pillola ${a.frase})`); }
+  // r4: "Da Enzo al 29" (scelto) finiva tra Spirito di Vino e un altro segnalino e sembrava loro. Il nome del
+  // scelto è attaccato al suo segnalino e nessun altro segnalino gli sta vicino.
+  { const e = await q3.evaluate(() => {
+      const pin = document.querySelector("[data-testid=pin][data-focused=true]"); const lab = pin?.querySelector("[data-testid=etichetta-pin]");
+      if (!pin || !lab) return null;
+      const l = lab.getBoundingClientRect(); const mio = (pin.firstElementChild ?? pin).getBoundingClientRect();
+      const dist = (b) => Math.hypot(Math.max(0, b.left - l.right, l.left - b.right), Math.max(0, b.top - l.bottom, l.top - b.bottom));
+      const altri = [...document.querySelectorAll("[data-testid=pin]")].filter((x) => x !== pin).map((x) => ({ id: x.dataset.place, d: Math.round(dist((x.firstElementChild ?? x).getBoundingClientRect())) }));
+      return { nome: lab.textContent.trim(), mio: Math.round(dist(mio)), vicino: altri.sort((a, b) => a.d - b.d)[0] ?? { id: "-", d: 999 } };
+    });
+    ok(!!e && e.nome === "Da Enzo al 29" && e.mio <= 6 && e.vicino.d >= 12, `mappa: il nome del segnalino scelto è attaccato al suo (${e?.mio} px) e lontano dagli altri (il più vicino, ${e?.vicino.id}, a ${e?.vicino.d} px)`); }
   for (const passo of [1, 2, 3]) {
     await q3.mouse.move(195, 330);
     await q3.mouse.wheel(0, 500);
@@ -3204,6 +3235,11 @@ if (fakeUser) {
   await q3.getByTestId("barra-azioni").waitFor({ timeout: 4000 });
   await q3.waitForTimeout(1200);
   ok((await q3.getByTestId("carosello-contatore").count()) === 0, "scheda: senza foto visibili niente contatore '1 / 2' sopra l'emoji");
+  // Revisore del 2/11 (r4): senza foto un riquadro grigio di 220 px con l'emoji piccola; la scheda lasciava 110 px di mappa sopra.
+  { const s = await q3.evaluate(() => { const c = document.querySelector("[data-testid=scheda-carosello]"); const t = document.querySelector("[data-testid=scheda-trascinabile]").getBoundingClientRect(); const e = document.querySelector("[data-testid=scheda-intestazione-emoji]");
+      return { senza: c?.dataset.senzaFoto === "true", h: Math.round(c?.getBoundingClientRect().height ?? -1), fondo: e ? getComputedStyle(e).backgroundColor : "", nome: Math.round(document.querySelector("[data-testid=scheda-trascinabile] h2").getBoundingClientRect().top), top: Math.round(t.top), alta: Math.round(t.height) }; });
+    ok(s.senza && s.h <= 130 && s.fondo === "rgb(26, 60, 64)" && s.nome < 200, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
+    ok(s.top <= 0 && s.alta >= 843, `scheda: a tutto schermo come Places, in alto solo la zona sicura (da ${s.top} px, alta ${s.alta})`); }
   { const n = await q3.evaluate(() => { const nav = document.querySelector("[data-testid=scheda-nav]"); const sheet = document.querySelector("[data-testid=scheda-trascinabile]")?.getBoundingClientRect();
       return { dentro: !!nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1) }; });
     ok(n.dentro && n.testo?.replace(/\s/g, "") === "‹1di5›", `scheda: '‹ 1 di 5 ›' dentro la barra azioni in basso, non sopra la scheda (${n.testo})`); }

@@ -662,7 +662,8 @@ export default function VenueSheet({
     };
 
     return (
-      <div className={`relative flex flex-col rounded-card ${PAPER} shadow-float`}>
+      // min-h-full: a tutto schermo la barra azioni resta in fondo anche quando la scheda è corta.
+      <div className={`relative flex min-h-full flex-col rounded-card ${PAPER} shadow-float`}>
         <SchedaCarosello
           photoRefs={venue.photoRef ? [venue.photoRef] : []}
           name={name}
@@ -674,19 +675,27 @@ export default function VenueSheet({
           // A 360px la foto più bassa: "Orari, contatti, recensioni" resta sopra la barra (collaudo 22/10);
           // a 375×667 (iPhone SE) ancora più bassa: con la pillola e un verdetto su 3 righe finiva sotto (collaudo 23/10).
           heightClass={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"}
-          fallback={<div className="flex h-full w-full items-center justify-center bg-brand/10 text-6xl">{emoji}</div>}
+          // Senza foto niente riquadro grigio da 220px con l'emoji piccola (revisore del 2/11, r4): intestazione bassa
+          // (120px più la zona sicura) con l'emoji su fondo del marchio, e il nome sale.
+          heightSenzaFoto={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-[calc(env(safe-area-inset-top,0px)+7.5rem)]"}
+          fallback={
+            <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-center justify-center bg-brand pt-[env(safe-area-inset-top,0px)]">
+              <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none">{emoji}</span>
+            </div>
+          }
           overlay={
             <>
+              {/* Tasti sotto la zona sicura: la scheda è a tutto schermo. */}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Chiudi"
-                className={`absolute left-4 top-4 ${roundBtn}`}
+                className={`absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] ${roundBtn}`}
               >
                 <X size={19} aria-hidden />
               </button>
               {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}
-              <div className="absolute right-4 top-4 flex gap-2" data-testid="azioni-scheda">
+              <div className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex gap-2" data-testid="azioni-scheda">
                 {shareOn && (
                   <button type="button" onClick={share} aria-label={`Condividi ${name}`} className={roundBtn}>
                     <Share size={18} aria-hidden />
@@ -1049,6 +1058,7 @@ export default function VenueSheet({
         {/* Barra teal arrotondata, staccata dal fondo (mockup A): Prenota (corallo, più larga) / Percorso /
             Salva, oppure Chiama / Percorso / Salva dove non si prenota. Sta sopra la barra in basso
             dell'app (--nav-height-mobile, che comprende già il bordo sicuro dell'iPhone). */}
+        <div aria-hidden className="flex-1" />
         <div
           data-testid="barra-azioni"
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
