@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, SlidersHorizontal, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
@@ -137,6 +137,25 @@ export default function SalvatiLista({
     return () => { alive = false; };
   }, [userId]);
 
+  // "Sulla mappa" sparisce mentre si scorre verso il basso e torna quando ci si ferma o si risale, come le
+  // barre di Places (revisore 2/11, terzo giro: copriva la nota e l'etichetta dell'ultima riga in vista).
+  const [mappaNascosta, setMappaNascosta] = useState(false);
+  const scorri = useRef<{ y: number; timer: ReturnType<typeof setTimeout> | null }>({ y: 0, timer: null });
+  useEffect(() => {
+    const s = scorri.current;
+    return () => { if (s.timer) clearTimeout(s.timer); };
+  }, []);
+  const onScroll = (e: React.UIEvent<HTMLElement>) => {
+    const y = e.currentTarget.scrollTop;
+    const s = scorri.current;
+    const d = y - s.y;
+    s.y = y;
+    if (d > 2 && y > 24) setMappaNascosta(true);
+    else if (d < -2) setMappaNascosta(false);
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = setTimeout(() => setMappaNascosta(false), 450);
+  };
+
   const count = (tag: string) => all.filter((p) => hasStateOrTag(p.tags, tag)).length;
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   const collections = useMemo(() => summarizeCollections([...all].reverse(), 4), [all]);
@@ -180,6 +199,7 @@ export default function SalvatiLista({
     <section
       data-testid="salvati-lista"
       aria-label="I tuoi posti"
+      onScroll={onScroll}
       className={`absolute inset-0 z-30 flex flex-col overflow-y-auto overscroll-contain ${PAPER} pb-[var(--nav-height-mobile)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
     >
       <div className="mx-auto w-full max-w-md flex-1 px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
@@ -429,7 +449,16 @@ export default function SalvatiLista({
       {/* La mappa dei salvati: pulsante che resta in basso mentre si scorre (come "Map" in Places), così in
           alto restano solo "Stasera" e "+" (revisore 2/11). */}
       <div className="pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-5 lg:pb-6">
-        <button type="button" data-testid="salvati-lista-mappa" aria-label="Vedi sulla mappa" onClick={onMap} className="pointer-events-auto flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float active:scale-95">
+        <button
+          type="button"
+          data-testid="salvati-lista-mappa"
+          data-nascosto={mappaNascosta ? "true" : undefined}
+          aria-label="Vedi sulla mappa"
+          aria-hidden={mappaNascosta || undefined}
+          tabIndex={mappaNascosta ? -1 : undefined}
+          onClick={onMap}
+          className={`flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float transition-[transform,opacity] duration-200 active:scale-95 motion-reduce:transition-none ${mappaNascosta ? "translate-y-[calc(100%+1rem)] opacity-0" : "pointer-events-auto"}`}
+        >
           <MapIcon size={16} aria-hidden /> Sulla mappa
         </button>
       </div>
