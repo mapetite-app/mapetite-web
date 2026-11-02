@@ -16,6 +16,28 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 2/11/2026 (notte, sessione 22:06, CEO che chiude — solo ciò che si vede aprendo l'app, piano fino all'8/11)
+
+### 38. Posti delle liste completati gratis dal catalogo, prima di Google
+- **Problema:** `PROBLEMI.md` 17: i .csv delle liste di Google non hanno la posizione; oggi si completano 10 al giorno (quota), una lista di 60 posti richiede 6 giorni.
+- **Cosa fa:** prima di spendere una chiamata, il posto della lista si cerca nel catalogo di Mapetite per nome e città (dal nome del file o dalle altre righe della stessa lista): se c'è un solo locale con quel nome nella città, si salva subito, gratis. Solo i casi dubbi vanno a Google.
+- **Da dove nasce:** Mapstr apre i file di Google ma non dice come completa i posti senza posizione ([Mapstr](https://mapstr.com/fonctionnalites/importer-des-adresses)); noi abbiamo un catalogo che cresce con ogni utente.
+- **Valore per l'utente:** la lista arriva intera subito, non a rate.
+- **Valore per il ristoratore:** nessuno diretto; più salvati = più domanda misurata nel pannello.
+- **Sforzo:** S/M (ricerca per nome normalizzato in `places`, solo corrispondenze uniche).
+- **Costo Google/Haiku:** in meno (ogni posto già noto risparmia 1 chiamata).
+- **Stato proposto:** PRONTA.
+
+### 39. Dopo il file di Google: "Ecco le tue raccolte" come copertine
+- **Problema:** dopo l'import si vede solo "Salvati 23": non si capisce che le liste sono diventate raccolte.
+- **Cosa fa:** al posto del riepilogo, le raccolte nate dal file (una per lista) come copertine piccole con nome e numero di posti, un tocco per aprirle; sotto "Vedili sulla mappa".
+- **Da dove nasce:** Places e Mapstr mostrano le raccolte come copertine; nessuno le mostra subito dopo l'import.
+- **Valore per l'utente:** capisce in un colpo d'occhio che i suoi anni di liste sono arrivati, ordinati.
+- **Valore per il ristoratore:** nessuno diretto.
+- **Sforzo:** S (riusa le copertine dei Salvati).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
 ## 1/11/2026 (notte, sessione 03:06, CEO che chiude)
 
 ### 36. "Ti ricordi di disdire?" il giorno prima, solo per chi tende a dimenticare

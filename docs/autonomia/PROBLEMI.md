@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 30/10/2026 (notte).
+Ultimo aggiornamento: 2/11/2026 (notte).
 
 ---
 
@@ -191,3 +191,10 @@ Ultimo aggiornamento: 30/10/2026 (notte).
 - **DAVVERO, in futuro:** promemoria la sera prima con "Ci vai? Sì / Non più" (proposta 36) e "Avvisami se si libera" per riempire il tavolo liberato (proposta 37). La caparra resta DA DECIDERE LORENZO.
 - **Primo passo:** proposta 36, S, nessun costo.
 
+
+## 17. Anni di posti salvati in Google Maps chiusi dentro Google — 2/11 notte
+- **Chi lo ha:** il cliente, proprio quando prova un'app nuova: se non porta i suoi posti, l'app resta vuota e la abbandona.
+- **Quanto pesa:** Google non offre un modo per esportare una lista condivisa verso un'altra app: la strada ufficiale è Takeout ("Salvati"), che esporta solo le liste create da te, un file .csv per lista ([guida Google](https://support.google.com/maps/answer/7280933), [gotoapplemaps, 2026](https://gotoapplemaps.pages.dev/guides/export-google-maps-saved-places/)). Per i link delle liste esistono solo programmi che leggono la pagina di Google ([Apify](https://apify.com/automation-lab/google-maps-shared-list-scraper)), in contrasto con i termini di Google. Mapstr apre i file kml/kmz/json/csv di Google ([Mapstr](https://mapstr.com/fonctionnalites/importer-des-adresses)). Numero di persone con liste su Google: dato non trovato.
+- **OGGI nell'app:** da stanotte un link di lista incollato non dà più "non trovato" (o peggio, un posto a caso cercato col titolo della lista): spiega in una riga perché e apre il file di Google con i passi; ogni lista del file diventa una raccolta con il suo nome. I posti delle liste senza posizione costano ora 1 chiamata invece di 2: 10 per volta invece di 5.
+- **DAVVERO, in futuro:** completare i posti delle liste senza chiamate (catalogo Mapetite che cresce: più utenti, più posti già noti a costo zero); se Google aprisse un'API per le liste, leggerle dal link.
+- **Primo passo:** misurare quante liste incollate (`[from-link]` con lista nel log di Vercel) e quanti file caricati dopo (`import_file`), team.
