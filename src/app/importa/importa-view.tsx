@@ -74,10 +74,22 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     setFlashShot(true);
     window.setTimeout(() => setFlashShot(false), 2000);
   };
+  const waitResults = useRef<number | undefined>(undefined);
   const searchByHand = (q: string) => {
     setManualReq((r) => ({ q, n: (r?.n ?? 0) + 1 }));
     openPanel("mano");
+    // Quando arrivano i risultati (o il "non trovo") li si porta in vista sopra la barra in basso
+    // (revisore 3/11: dopo "Cercalo e salvalo" restavano sotto la barra). Si aspetta al massimo 12 secondi.
+    window.clearInterval(waitResults.current);
+    const t0 = Date.now();
+    waitResults.current = window.setInterval(() => {
+      const el = document.querySelector<HTMLElement>('#a-mano [data-testid="mano-risultati"], #a-mano [data-testid="mano-nessuno"]');
+      if (!el && Date.now() - t0 < 12000) return;
+      window.clearInterval(waitResults.current);
+      el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 150);
   };
+  useEffect(() => () => window.clearInterval(waitResults.current), []);
 
   // Link da fuori (/importa#da-screenshot, /importa#a-mano): si apre il pannello giusto.
   useEffect(() => {
@@ -357,7 +369,8 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         <TakeoutCard userId={userId} titolo={false} />
       </div>
 
-      <div hidden={panel !== "mano"} className="mt-4">
+      {/* Margine sotto i risultati quando li si porta in vista: restano sopra la barra in basso. */}
+      <div hidden={panel !== "mano"} className="mt-4 [&_[data-testid=mano-nessuno]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)] [&_[data-testid=mano-risultati]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)]">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
       </div>
 
