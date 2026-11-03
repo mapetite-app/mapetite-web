@@ -3495,7 +3495,7 @@ if (fakeUser) {
       await lp2.getByRole("button", { name: "Salva", exact: true }).click();
       const lr2 = lp2.getByTestId("link-lista");
       await lr2.waitFor({ timeout: 4000 }).catch(() => {});
-      ok(await lr2.isVisible() && (await lp2.getByTestId("link-errore").count()) === 0 && (await lr2.textContent()).includes("ognuna diventa una raccolta"), "lista di Google Maps incollata: riquadro 'È una lista', non un errore rosso");
+      ok(await lr2.isVisible() && (await lp2.getByTestId("link-errore").count()) === 0 && /Scaricala da Google e caricala qui: diventa una raccolta/.test(await lr2.textContent()), "lista di Google Maps incollata: riquadro 'È una lista', non un errore rosso");
       await lp2.screenshot({ path: `${OUT}/importa-lista-google.png`, caret: "initial" });
       await lp2.getByTestId("link-lista-apri").click();
       await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
