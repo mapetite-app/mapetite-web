@@ -3533,13 +3533,35 @@ if (fakeUser) {
       const lriep = await lmc.getByTestId("multi-riepilogo").textContent().catch(() => "");
       ok((await lmc.getByTestId("link-lista").count()) === 1 && (await lmc.getByTestId("link-lista").textContent()).includes("Sono 2 liste") && (await lmc.locator('[data-stato="non_riconosciuto"]').count()) === 0 && lriep.includes("1 da salvare") && lriep.includes("2 liste"),
         `più liste incollate: un solo riquadro 'Sono 2 liste', nessun 'non trovato' ("${lriep}")`);
+      ok((await lmc.getByTestId("link-lista").getAttribute("class")).includes("border-t"), "liste e un posto: la riga della lista senza cornice, staccata da un divisore");
       await lmc.screenshot({ path: `${OUT}/importa-liste-multi.png` });
+      // Solo liste incollate: il riquadro della lista da solo, senza cornice, titolo né riepilogo attorno (revisore 3/11).
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/LISTA3\nhttps://maps.app.goo.gl/LISTA4");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      await lmc.locator("h2").waitFor({ state: "detached", timeout: 6000 }).catch(() => {});
+      ok((await lmc.getByTestId("link-lista").count()) === 1 && (await lmc.getByTestId("link-lista").textContent()).includes("Sono 2 liste") && (await lmc.locator("h2").count()) === 0 && (await lmc.getByTestId("multi-riepilogo").count()) === 0,
+        "solo liste incollate: un solo riquadro 'Sono 2 liste', senza titolo né riepilogo attorno");
+      await lmc.screenshot({ path: `${OUT}/importa-solo-liste.png` });
       // Una nota qualsiasi su due righe non è un posto copiato da Maps.
       await campoLink(lp2);
       await lp2.getByLabel("Link da incollare").fill("Comprare latte\n2 litri");
       await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
       await lp2.getByTestId("incolla-errore").waitFor({ timeout: 3000 }).catch(() => {});
       ok((await lp2.getByTestId("incolla-testo").count()) === 0 && await lp2.getByTestId("incolla-errore").isVisible(), "nota su due righe ('Comprare latte / 2 litri'): non è un posto, resta 'Non vedo un link'");
+      // Promemoria con un indirizzo o una "via" qualsiasi: non sono posti (revisore 3/11). Nome e via su una riga sì.
+      for (const [testo, posto] of [
+        ["Ricordati di chiamare Marco\nVia libera domani", false],
+        ["Riunione ore 15\nPiazza Affari 6, 20123 Milano", false],
+        ["Da Enzo al 29\nVia dei Vascellari, 29, 00153 Roma RM", true],
+        ["Roscioli · Via dei Giubbonari 21 Roma", true],
+      ]) {
+        await campoLink(lp2);
+        await lp2.getByLabel("Link da incollare").fill(testo);
+        await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+        await lp2.getByTestId(posto ? "incolla-testo" : "incolla-errore").waitFor({ timeout: 3000 }).catch(() => {});
+        ok((await lp2.getByTestId("incolla-testo").count() === 1) === posto, `testo senza link "${testo.replace(/\n/g, " / ")}": ${posto ? "sembra un posto" : "non è un posto"}`);
+      }
       await lctx2.close();
     }
 
@@ -8431,9 +8453,11 @@ if (fakeUser) {
   ]);
   await tp.getByTestId("file-anteprima").waitFor({ timeout: 5000 }).catch(() => {});
   const ries = (await tp.getByTestId("file-riepilogo").textContent().catch(() => "")).replace(/\s+/g, " ");
-  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 dalle liste", `file Takeout: anteprima per città ("${ries}")`);
+  // Con più zone i numeri stanno solo sui chip (revisore 3/11: niente doppione nel titolo).
+  const zchips = (await tc.getByTestId("file-zona").allTextContents()).join("|");
+  ok(ries === "Trovati 5 posti" && zchips === "Roma · 2|Milano · 1|Dalle liste · 2", `file Takeout: titolo corto, città sui chip ("${ries}" · ${zchips})`);
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
-  ok(scart.includes("Lasciati fuori 3") && scart.includes("albergo") && scart.includes("museo"), `file Takeout: hotel, museo e punto senza nome lasciati fuori e detti ("${scart.slice(0, 80)}")`);
+  ok(scart.includes("Lasciati fuori 3 (") && scart.includes("albergo") && scart.includes("museo") && scart.includes("senza nome") && !scart.includes("non sono locali"), `file Takeout: hotel, museo e punto senza nome lasciati fuori, con le ragioni vere ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();
   ok(liste.includes("«Want to go» → 📌 Da provare") && liste.includes("«Luoghi salvati» → 📌 Da provare"), `file Takeout: lista di Google → stato in Mapetite (${liste})`);
   ok((await tp.getByTestId("file-avviso-csv").textContent()).includes("al massimo 10"), "file Takeout: avviso sui posti dei .csv senza posizione (al massimo 10 ricerche)");
@@ -8473,6 +8497,11 @@ if (fakeUser) {
     ok((await rac.count()) === 1 && (await rac.textContent()).includes("Cene romantiche") && (await rac.textContent()).includes("1") && (await rac.getAttribute("href")) === "/raccolte/Cene%20romantiche"
       && tins.slice(n0).some((r) => JSON.stringify(r.tags) === '["Da provare","Cene romantiche"]'),
       `file Takeout: la lista «Cene romantiche» diventa una raccolta, copertina con un tocco per aprirla (${await rac.count()})`);
+    // Una raccolta sola: copertina sopra a tutta larghezza, "Apri la raccolta" sotto su una riga (revisore 3/11).
+    const cb = await rac.boundingBox();
+    const ab = await tp.getByTestId("file-raccolta-apri").boundingBox();
+    ok(cb && ab && cb.y + cb.height <= ab.y && Math.abs(cb.width - ab.width) < 2 && ab.height < 56, `file Takeout: una raccolta sola, copertina sopra e 'Apri la raccolta' a tutta larghezza su una riga (${ab?.width}×${ab?.height})`);
+    ok((await tp.getByTestId("file-intro").count()) === 0, "file Takeout: a lavoro fatto la frase introduttiva sparisce");
     await tp.getByTestId("file-fatto").scrollIntoViewIfNeeded();
     await tp.screenshot({ path: `${OUT}/takeout-4-raccolte.png`, caret: "initial" });
   }
