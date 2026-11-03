@@ -1,6 +1,6 @@
 // Controlli della lettura dei link di Google Maps (nessuna chiamata, nessun costo).
 //   node --experimental-strip-types scripts/e2e/maps-link.mjs
-import { extractMapsLinks, parseMapsUrl, isShortMapsLink, isGoogleMapsLink } from "../../src/lib/maps-link.ts";
+import { extractMapsLinks, parseMapsUrl, isShortMapsLink, isGoogleMapsLink, isMapsListUrl } from "../../src/lib/maps-link.ts";
 
 let failed = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); if (!cond) failed++; };
@@ -46,6 +46,14 @@ ok(p7.name === "Roscioli Salumeria con Cucina" && p7.lat === 41.8936529, "pagina
 
 const p8 = parseMapsUrl("https://www.google.com/maps/place/X/@0,0,3z");
 ok(p8.lat === null, "coordinate 0,0 scartate");
+
+// Liste condivise (piano 2a): riconosciute, senza confonderle con un locale.
+ok(isMapsListUrl("https://www.google.com/maps/placelists/list/2Vq8bX3kQ1aLm9Zp0RtYwA?g_ep=CAISDTI1&g_st=ic"), "lista /maps/placelists/list/ riconosciuta");
+ok(isMapsListUrl("https://www.google.com/maps/@/data=!3m1!4b1!4m3!11m2!2sAbCdEfGh12_-xyz!3e3"), "lista nel formato vecchio (!11m…!2s) riconosciuta");
+ok(isMapsListUrl("https://consent.google.com/ml?continue=" + encodeURIComponent("https://www.google.com/maps/placelists/list/ABCDEF123") + "&gl=IT"), "lista dietro la pagina del consenso");
+ok(!isMapsListUrl(full), "link di un locale: non è una lista");
+ok(!isMapsListUrl("https://maps.app.goo.gl/AbCdEf12345"), "link corto non ancora aperto: non si decide");
+ok(!isMapsListUrl("https://evil.com/maps/placelists/list/ABCDEF123"), "sito non Google: non è una lista");
 
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

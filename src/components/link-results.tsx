@@ -3,16 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { saveNote, type LinkOutcome } from "@/lib/save-from-link";
+import { apriFileGoogle } from "@/lib/apri-file-google";
 
 // Esito di "Salva da Google Maps": una riga per link, con "Apri sulla mappa" e "Aggiungi nota".
 export default function LinkResults({ results, userId }: { results: LinkOutcome[]; userId: string }) {
   return (
     <ul className="space-y-3" data-testid="link-esiti">
-      {results.map((r, i) => (
+      {results.filter((r) => !r.lista).map((r, i) => (
         <li key={`${r.link}-${i}`}>
           {r.place && !r.error ? <SavedRow r={r} userId={userId} /> : <ErrorRow r={r} />}
         </li>
       ))}
+      {results.some((r) => r.lista) && (
+        <li><ListaRow count={results.filter((r) => r.lista).length} secondary /></li>
+      )}
     </ul>
   );
 }
@@ -90,6 +94,39 @@ function ErrorRow({ r }: { r: LinkOutcome }) {
     <div className="rounded-card bg-error/10 p-4 text-sm text-error" data-testid="link-errore">
       <p>{r.place ? `${r.place.name}: ` : ""}{r.error}</p>
       <p className="mt-1 break-all text-xs opacity-80">{r.link}</p>
+    </div>
+  );
+}
+
+// Lista condivisa di Google Maps (piano 2a): non è un errore dell'utente, è un limite di Google.
+// Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome. Dopo il tocco
+// il riquadro si riduce a una riga (i passi si aprono più sotto, nella pagina).
+// `piatta`: dentro un altro riquadro (il "Fatto" di più link) niente cornice, solo un divisore sopra.
+export function ListaRow({ count = 1, secondary = false, piatta = false }: { count?: number; secondary?: boolean; piatta?: boolean }) {
+  const [aperto, setAperto] = useState(false);
+  // Dopo il tocco i passi si aprono più sotto e la pagina scorre lì: il riquadro sparisce (revisore 2/11).
+  if (aperto) return null;
+  return (
+    <div className={piatta ? "border-t border-border pt-4" : "rounded-card border border-border bg-white p-4"} data-testid="link-lista">
+      <p className="text-[15px] font-semibold text-text">
+        <span aria-hidden>🗂️ </span>{count === 1 ? "È una lista di Google Maps" : `Sono ${count} liste di Google Maps`}
+      </p>
+      <p className="mt-1 text-sm text-text-muted">
+        {/* "Vale per le liste create da te" sta nei passi del file (revisore 3/11: qui troppo testo). */}
+        {count === 1
+          ? "Google non la lascia leggere. Scaricala da Google e caricala qui: diventa una raccolta."
+          : "Google non le lascia leggere. Scaricale da Google e caricale qui: ognuna diventa una raccolta."}
+      </p>
+      <button
+        type="button"
+        onClick={() => { setAperto(true); apriFileGoogle(); }}
+        data-testid="link-lista-apri"
+        className={secondary
+          ? "mt-3 min-h-11 w-full rounded-pill border border-brand bg-white px-4 text-sm font-display font-semibold text-brand"
+          : "mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"}
+      >
+        Porta le tue liste
+      </button>
     </div>
   );
 }

@@ -136,9 +136,11 @@ export function posizionaEtichette(
       const rect = labelRect(it, x, y, side);
       const n = urti(rect, i) + (fuori(rect) ? 10_000 : 0);
       if (n === 0) { best = { side, rect, n }; break; }
-      if ((it.fixed || it.lato) && (best == null || n < best.n)) best = { side, rect, n };
+      if (it.fixed && (best == null || n < best.n)) best = { side, rect, n };
     }
-    if (best && (best.n === 0 || it.fixed || it.lato)) {
+    // Con un lato solo (mappa dei salvati) un nome che tocca un altro nome o segnalino si nasconde (revisore del
+    // 2/11: "Santa Cocktail…" sopra "Forno Campo…", "Bar San Cal…" sotto un segnalino): prima restava comunque.
+    if (best && (best.n === 0 || it.fixed)) {
       out[it.id] = best.side;
       placed.push(best.rect);
     }

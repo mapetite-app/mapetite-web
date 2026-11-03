@@ -587,6 +587,16 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Bar Tre").first().waitFor({ timeout: 5000 });
 ok((await page.getByTestId("gemma").count()) >= 1, "gemme: restano accese su questo telefono");
+// Revisore del 2/11: se sono tutti poco conosciuti lo dice la frase sopra le card, una volta sola; niente 💎 su ogni card.
+await page.unroute("**/api/search");
+{ const tutte = [mk("G1", "Osteria Uno", 41.9, 12.49), mk("G2", "Trattoria Due", 41.901, 12.492), mk("G3", "Cantina Tre", 41.902, 12.494)].map((x) => ({ ...x, rating: 4.7, userRatingCount: 120 }));
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(500);
+  const dett = ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ");
+  ok(/Tutti poco conosciuti/.test(dett) && (await page.locator("ul.snap-x").getByTestId("gemma").count()) === 0, `gemme: tutti poco conosciuti → detto una volta sopra le card, nessun 💎 sulle card ('${dett}')`); }
 await page.unroute("**/api/search");
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
@@ -913,7 +923,7 @@ ok(noPhotos && (await page.locator("ul").getByText("🍺").count()) >= 1, "foto:
 ok((await page.locator("ul li[data-id=P3]").getByText("🍸").count()) >= 1 && (await page.locator("ul li[data-id=P3]").getByText("🍺").count()) === 0, "emoji: un cocktail bar ha 🍸, non il boccale di birra");
 photoMode = "ok";
 
-// 5c. Mappa affollata: i primi 5 risultati sempre come pin con nome, gli altri raggruppati o senza nome
+// 5c. Mappa affollata: i primi 5 risultati sempre come pin, i nomi dove ci stanno
 searchMode = "folla";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
@@ -925,10 +935,17 @@ await page.waitForTimeout(1500);
   const pinIds = await page.getByTestId("pin").evaluateAll((els) => els.map((e) => e.getAttribute("data-place")));
   ok(["F1", "F2", "F3", "F4", "F5"].every((id) => pinIds.includes(id)), "mappa affollata: i primi 5 risultati hanno il loro pin (mai dentro un cerchio)");
   ok(labels.includes("Folla 1") && labels.filter((l) => top.includes(l)).length >= 1, `mappa affollata: almeno il nome del primo in vista (${labels.filter(Boolean).join(", ")})`);
-  ok(!labels.some((l) => /Folla (6|7|8|9|10)\b/.test(l)), "mappa affollata: gli altri locali senza nome (niente etichette sovrapposte)");
-  // Revisore del 2/11: con i segnalini vicini i nomi si impilavano in colonna. Nome solo sui primi 3 (e sulla card al centro).
-  { const nomi = await page.getByTestId("etichetta-pin").allInnerTexts();
-    ok(nomi.length <= 3 && nomi.every((n) => /^Folla [123]$/.test(n.trim())), `mappa affollata: nomi solo sui primi 3 (${nomi.join(", ")})`); }
+  // Revisore del 2/11 (ottavo giro): nomi su tutti i segnalini quando lo spazio lo consente, mai uno sopra l'altro
+  // né sopra un altro segnalino (prima: al massimo 3 nomi).
+  { const u = await page.evaluate(() => {
+      const ov = (a, b) => a.left + 2 < b.right && b.left + 2 < a.right && a.top + 2 < b.bottom && b.top + 2 < a.bottom;
+      const nomi = [...document.querySelectorAll("[data-testid=etichetta-pin]")].map((e) => ({ t: e.textContent.trim(), b: e.getBoundingClientRect(), own: e.parentElement }));
+      const icone = [...document.querySelectorAll("[data-testid=pin], [data-testid=pin-dai-salvati], [data-testid=pin-salvato]")].map((e) => ({ el: e, b: (e.firstElementChild ?? e).getBoundingClientRect() }));
+      const out = [];
+      nomi.forEach((l, i) => { nomi.forEach((m, j) => { if (j > i && ov(l.b, m.b)) out.push(`${l.t} / ${m.t}`); }); icone.forEach((ic) => { if (ic.el !== l.own && ov(l.b, ic.b)) out.push(`${l.t} sul segnalino ${ic.el.dataset.place}`); }); });
+      return { nomi: nomi.map((l) => l.t), out };
+    });
+    ok(u.out.length === 0 && u.nomi.length >= 1, `mappa affollata: i nomi che ci stanno, nessuno sopra un altro nome o segnalino (${u.nomi.join(", ")}${u.out.length ? " — " + u.out.join("; ") : ""})`); }
   // Revisore del 1/11 (05c): "Folla Lontano" a 8 km non allarga la mappa a tutta Roma; i 10 vicini non sono un grumo.
   const q = await inquadratura(page, ["F11"]);
   ok(q.fuori.length === 0 && q.sovrapposti.length === 0 && q.n >= 5, `mappa affollata: segnalini nella parte libera e separati, il lontanissimo non allarga la mappa (${q.n} segnalini${q.fuori.length ? ", fuori: " + q.fuori.join(",") : ""}${q.sovrapposti.length ? ", sovrapposti: " + q.sovrapposti.join(" ") : ""})`);
@@ -1579,6 +1596,9 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
     ok(JSON.stringify(stati.map((t) => t.trim())) === '["Da provare","Ci sono stato","Da provare"]' && (await v.count()) === 1 && (await v.first().textContent()) === "Cotoletta vera, sala di quartiere." && it === "italic" && (await ult.getByTestId("importa-ultimi-riga").first().getByTestId("importa-ultimi-verdetto").count()) === 1 && /in\.\(.*GM1/.test(decodeURIComponent(synthUrl)),
       `importa: 'Ultimi aggiunti' con lo stato su ogni riga e il verdetto in corsivo solo dove c'è in archivio (${stati.join(" | ")}, ${await v.count()} verdetti, ${it})`); }
   await page.screenshot({ path: `${OUT}/19b-importa-ultimi.png`, fullPage: true, caret: "initial" });
+  // Revisore del 2/11: sotto il contenuto si vedeva il bianco. Il fondo beige arriva in fondo alla pagina.
+  { const f = await page.evaluate(() => { const r = document.querySelector("[data-testid=importa-pagina]").getBoundingClientRect(); return { fondo: Math.round(r.bottom + scrollY), doc: document.documentElement.scrollHeight }; });
+    ok(f.fondo >= f.doc - 1, `importa: il fondo beige copre tutta l'altezza (fino a ${f.fondo} px su ${f.doc})`); }
   await page.unroute("**/rest/v1/place_synthesis**");
   await page.unroute("**/rest/v1/saved_places**");
   await page.reload({ waitUntil: "networkidle" }); }
@@ -1849,6 +1869,9 @@ else {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  // Revisore del 2/11: il titolo della terza idea non stava in una riga a 390 px. Ora 1-3 parole, intero.
+  { const t = await p.getByTestId("suggerimento-per-te").locator("span.truncate").first().evaluate((el) => ({ t: el.textContent, intero: el.scrollWidth <= el.clientWidth }));
+    ok(t.t === "Cena romantica" && t.intero, `Idee: titolo breve della tua idea, intero in una riga ('${t.t}')`); }
   // Revisore del 2/11: con i salvati "Stasera dove andiamo?" era nelle Idee e nei Salvati. Ora solo nei Salvati.
   ok((await p.getByTestId("idee-stasera").count()) === 0 && (await p.getByTestId("idee-pannello").locator("li").count()) <= 3, `Idee con gusti e salvati: niente 'Stasera dove andiamo?', al massimo 3 righe (${await p.getByTestId("idee-pannello").locator("li").count()})`);
   // Con un'idea tua la riga è sua: Sorprendimi resta a un tocco, nella fila dei suggerimenti (r4).
@@ -3335,10 +3358,15 @@ if (fakeUser) {
       const ov = (a, b) => a.left + 2 < b.right && b.left + 2 < a.right && a.top + 2 < b.bottom && b.top + 2 < a.bottom;
       const coperti = [];
       for (const l of document.querySelectorAll("[data-testid=etichetta-pin]")) { const lb = l.getBoundingClientRect(); for (const p of pins) if (p.el !== l.parentElement && ov(lb, p.b)) coperti.push(`${l.textContent.trim()} su ${p.id.slice(-2)}`); }
-      return { n: pins.length, fuori, coperti };
+      // Revisore del 2/11: "Santa Cocktail…" e "Forno Campo…" uno sopra l'altro.
+      const nomi = [...document.querySelectorAll("[data-testid=etichetta-pin]")].map((l) => ({ t: l.textContent.trim(), b: l.getBoundingClientRect() }));
+      const nomiSovrapposti = [];
+      nomi.forEach((a, i) => nomi.forEach((b, j) => { if (j > i && ov(a.b, b.b)) nomiSovrapposti.push(`${a.t} / ${b.t}`); }));
+      return { n: pins.length, fuori, coperti, nomiSovrapposti };
     });
     ok(m.n === 6 && m.fuori.length === 0, `mappa dei salvati: tutti i 6 salvati di Roma in vista, anche il più a sud (${m.n} segnalini${m.fuori.length ? ", fuori: " + m.fuori.join(",") : ""})`);
-    ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`); }
+    ok(m.coperti.length === 0, `mappa dei salvati: nessun nome sopra un altro segnalino${m.coperti.length ? " — " + m.coperti.join("; ") : ""}`);
+    ok(m.nomiSovrapposti.length === 0, `mappa dei salvati: nessun nome sopra un altro nome${m.nomiSovrapposti.length ? " — " + m.nomiSovrapposti.join("; ") : ""}`); }
   { const t = await tocchi(q3); ok(t.length === 0, `mappa dei salvati: nessun segnalino ne tocca un altro${t.length ? " — " + t.join(" ") : ""}`); }
   // Revisore 2/11 (terzo giro): nomi sempre dallo stesso lato (a destra; a sinistra solo sul bordo destro dello schermo),
   // il segnalino scelto ha sempre il nome, e nessun nome né segnalino copre il pallino blu.
@@ -3451,6 +3479,79 @@ if (fakeUser) {
     await np.getByTestId("link-errore").waitFor({ timeout: 4000 });
     ok(await np.getByTestId("link-salvato").isVisible() && await np.getByText(/Non riesco a leggere il link/).isVisible(), "incolla a mano: un link salvato e uno con errore in italiano");
     await nctx.close();
+
+    // Lista condivisa di Google Maps (piano 2a): niente "errore", una strada sola verso il file di Google.
+    {
+      const lctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: [] });
+      await lctx2.route("**/rest/v1/saved_places**", (route) => route.fulfill({ status: 201, json: [] }));
+      await lctx2.route("**/api/places/from-link", (route) => route.fulfill({ json: { risultati: [
+        { link: "https://maps.app.goo.gl/LISTA1", error: "È una lista di Google Maps: Google non la fa leggere da fuori. Portala con il file di Google, in 2 minuti.", lista: true },
+      ] } }));
+      const lp2 = await lctx2.newPage();
+      lp2.on("pageerror", (e) => errors.push(e.message));
+      await lp2.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+      await lp2.getByRole("button", { name: "Incolla un link", exact: true }).click();
+      await lp2.getByLabel("Link da incollare").fill("Guarda la mia lista «Cene Roma» https://maps.app.goo.gl/LISTA1");
+      await lp2.getByRole("button", { name: "Salva", exact: true }).click();
+      const lr2 = lp2.getByTestId("link-lista");
+      await lr2.waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await lr2.isVisible() && (await lp2.getByTestId("link-errore").count()) === 0 && /Scaricala da Google e caricala qui: diventa una raccolta/.test(await lr2.textContent()), "lista di Google Maps incollata: riquadro 'È una lista', non un errore rosso");
+      await lp2.screenshot({ path: `${OUT}/importa-lista-google.png`, caret: "initial" });
+      await lp2.getByTestId("link-lista-apri").click();
+      await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await lp2.getByTestId("file-passi").isVisible() && await lp2.getByTestId("importa-file").isVisible(), "lista di Google Maps: 'Porta le tue liste' apre il file di Google con i passi già aperti");
+      await lp2.waitForTimeout(400);
+      await lp2.screenshot({ path: `${OUT}/importa-lista-passi.png`, caret: "initial" });
+      // Da un'altra pagina (es. Condividi): /importa?file=aiuto apre lo stesso pannello.
+      await lp2.goto(`${BASE}/importa?file=aiuto`, { waitUntil: "networkidle" });
+      await lp2.getByTestId("file-passi").waitFor({ timeout: 3000 }).catch(() => {});
+      ok(await lp2.getByTestId("file-passi").isVisible() && !lp2.url().includes("file=aiuto"), "/importa?file=aiuto: passi del file di Google aperti, indirizzo ripulito");
+      // Più liste incollate insieme: un solo riquadro "Sono 2 liste", nessuna riga "non trovato", conteggio dei posti senza le liste.
+      await lctx2.route("**/api/places/link-preview", (route) => {
+        const b = route.request().postDataJSON() ?? {};
+        return route.fulfill({ json: String(b.link).includes("LISTA")
+          ? { stato: "non_riconosciuto", chiamate: 0, motivo: "È una lista di Google Maps: Google non la fa leggere da fuori. Portala con il file di Google, in 2 minuti.", lista: true }
+          : { stato: "riconosciuto", chiamate: 0, place: { id: "00000000-0000-4000-8000-000000000881", name: "Bar Lista", address: "Via Roma 1, Roma" } } });
+      });
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/LISTA1\nhttps://maps.app.goo.gl/LISTA2\nhttps://maps.app.goo.gl/POSTO1");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      const lmc = lp2.getByTestId("importa-multi");
+      await lmc.getByTestId("multi-riepilogo").waitFor({ timeout: 6000 }).catch(() => {});
+      const lriep = await lmc.getByTestId("multi-riepilogo").textContent().catch(() => "");
+      ok((await lmc.getByTestId("link-lista").count()) === 1 && (await lmc.getByTestId("link-lista").textContent()).includes("Sono 2 liste") && (await lmc.locator('[data-stato="non_riconosciuto"]').count()) === 0 && lriep.includes("1 da salvare") && lriep.includes("2 liste"),
+        `più liste incollate: un solo riquadro 'Sono 2 liste', nessun 'non trovato' ("${lriep}")`);
+      ok((await lmc.getByTestId("link-lista").getAttribute("class")).includes("border-t"), "liste e un posto: la riga della lista senza cornice, staccata da un divisore");
+      await lmc.screenshot({ path: `${OUT}/importa-liste-multi.png` });
+      // Solo liste incollate: il riquadro della lista da solo, senza cornice, titolo né riepilogo attorno (revisore 3/11).
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/LISTA3\nhttps://maps.app.goo.gl/LISTA4");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      await lmc.locator("h2").waitFor({ state: "detached", timeout: 6000 }).catch(() => {});
+      ok((await lmc.getByTestId("link-lista").count()) === 1 && (await lmc.getByTestId("link-lista").textContent()).includes("Sono 2 liste") && (await lmc.locator("h2").count()) === 0 && (await lmc.getByTestId("multi-riepilogo").count()) === 0,
+        "solo liste incollate: un solo riquadro 'Sono 2 liste', senza titolo né riepilogo attorno");
+      await lmc.screenshot({ path: `${OUT}/importa-solo-liste.png` });
+      // Una nota qualsiasi su due righe non è un posto copiato da Maps.
+      await campoLink(lp2);
+      await lp2.getByLabel("Link da incollare").fill("Comprare latte\n2 litri");
+      await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+      await lp2.getByTestId("incolla-errore").waitFor({ timeout: 3000 }).catch(() => {});
+      ok((await lp2.getByTestId("incolla-testo").count()) === 0 && await lp2.getByTestId("incolla-errore").isVisible(), "nota su due righe ('Comprare latte / 2 litri'): non è un posto, resta 'Non vedo un link'");
+      // Promemoria con un indirizzo o una "via" qualsiasi: non sono posti (revisore 3/11). Nome e via su una riga sì.
+      for (const [testo, posto] of [
+        ["Ricordati di chiamare Marco\nVia libera domani", false],
+        ["Riunione ore 15\nPiazza Affari 6, 20123 Milano", false],
+        ["Da Enzo al 29\nVia dei Vascellari, 29, 00153 Roma RM", true],
+        ["Roscioli · Via dei Giubbonari 21 Roma", true],
+      ]) {
+        await campoLink(lp2);
+        await lp2.getByLabel("Link da incollare").fill(testo);
+        await lp2.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+        await lp2.getByTestId(posto ? "incolla-testo" : "incolla-errore").waitFor({ timeout: 3000 }).catch(() => {});
+        ok((await lp2.getByTestId("incolla-testo").count() === 1) === posto, `testo senza link "${testo.replace(/\n/g, " / ")}": ${posto ? "sembra un posto" : "non è un posto"}`);
+      }
+      await lctx2.close();
+    }
 
     // Condividi da Google Maps (Android): la pagina salva subito.
     const before = apiCalls.length;
@@ -7280,6 +7381,22 @@ if (fakeUser) {
   await mp.getByLabel("Link da incollare").fill("ricordati la pizzeria di Marco");
   await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
   ok(await mp.getByTestId("incolla-errore").isVisible() && (await mp.getByTestId("incolla-errore").textContent()).includes("Non vedo un link") && previews.length === n0, "incolla più link: testo senza link spiegato, nessuna chiamata");
+  // Testo copiato da Google Maps senza link (piano 2b): nome e indirizzo → "Cercalo e salvalo", cercato solo al tocco.
+  {
+    const q0 = mSearchQ.length;
+    await campoLink(mp);
+    await mp.getByLabel("Link da incollare").fill("Roscioli Salumeria con Cucina\nVia dei Giubbonari, 21, 00186 Roma RM");
+    await mp.getByTestId("importa-google").getByRole("button", { name: "Salva", exact: true }).click();
+    const tt = mp.getByTestId("incolla-testo");
+    await tt.waitFor({ timeout: 3000 }).catch(() => {});
+    ok(await tt.isVisible() && (await tt.textContent()).includes("Roscioli Salumeria con Cucina") && mSearchQ.length === q0 && (await mp.getByTestId("incolla-errore").count()) === 0, "testo copiato da Maps (nome e indirizzo): proposta 'Cercalo e salvalo', nessuna ricerca prima del tocco");
+    await mp.screenshot({ path: `${OUT}/importa-testo-maps.png`, caret: "initial" });
+    await mp.getByTestId("incolla-testo-cerca").click();
+    await mp.waitForTimeout(800);
+    ok(mSearchQ.length === q0 + 1 && /Roscioli Salumeria con Cucina, Via dei Giubbonari/.test(mSearchQ.at(-1) ?? ""), `testo copiato da Maps: al tocco una ricerca con nome e indirizzo ("${mSearchQ.at(-1)}")`);
+    // Il campo si richiude dopo la proposta: lo si riapre per i controlli successivi.
+    await campoLink(mp);
+  }
 
   // Pochi link (2 di Google Maps): niente avviso, si leggono subito; raccolta proposta col nome della città.
   await mp.getByLabel("Link da incollare").fill("https://maps.app.goo.gl/C01y\nhttps://maps.app.goo.gl/C02y");
@@ -8313,7 +8430,7 @@ if (fakeUser) {
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
   await tp.getByTestId("importa-tessera-file").click();
   const tc = tp.getByTestId("importa-file");
-  ok(await tc.getByText("Tutti i salvati di Google Maps").isVisible() && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, i passi si aprono solo a richiesta");
+  ok(await tc.getByText("Tutti i posti che hai salvato in Google Maps").isVisible() && (await tc.locator("h2").count()) === 0 && await tc.getByRole("button", { name: "Scegli il file" }).isVisible() && (await tp.getByTestId("file-passi").count()) === 0, "file Takeout: card pulita, senza il titolo doppio della riga, i passi si aprono solo a richiesta");
   await tp.getByTestId("file-aiuto").click();
   const passi = await tp.getByTestId("file-passi").textContent();
   ok(passi.includes("takeout.google.com") && passi.includes("Saved Places.json") && (await tp.getByTestId("file-passi").locator("li").count()) === 3 && (await tp.getByRole("link", { name: "takeout.google.com" }).getAttribute("href")) === "https://takeout.google.com/", "file Takeout: 3 passi con il link a takeout.google.com");
@@ -8324,9 +8441,11 @@ if (fakeUser) {
   ]);
   await tp.getByTestId("file-anteprima").waitFor({ timeout: 5000 }).catch(() => {});
   const ries = (await tp.getByTestId("file-riepilogo").textContent().catch(() => "")).replace(/\s+/g, " ");
-  ok(ries === "Trovati 5 posti: 2 a Roma, 1 a Milano, 2 senza posizione", `file Takeout: anteprima per città ("${ries}")`);
+  // Con più zone i numeri stanno solo sui chip (revisore 3/11: niente doppione nel titolo).
+  const zchips = (await tc.getByTestId("file-zona").allTextContents()).join("|");
+  ok(ries === "Trovati 5 posti" && zchips === "Roma · 2|Milano · 1|Dalle liste · 2", `file Takeout: titolo corto, città sui chip ("${ries}" · ${zchips})`);
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
-  ok(scart.includes("Lasciati fuori 3") && scart.includes("albergo") && scart.includes("museo"), `file Takeout: hotel, museo e punto senza nome lasciati fuori e detti ("${scart.slice(0, 80)}")`);
+  ok(scart.includes("Lasciati fuori 3 (") && scart.includes("albergo") && scart.includes("museo") && scart.includes("senza nome") && !scart.includes("non sono locali"), `file Takeout: hotel, museo e punto senza nome lasciati fuori, con le ragioni vere ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();
   ok(liste.includes("«Want to go» → 📌 Da provare") && liste.includes("«Luoghi salvati» → 📌 Da provare"), `file Takeout: lista di Google → stato in Mapetite (${liste})`);
   ok((await tp.getByTestId("file-avviso-csv").textContent()).includes("al massimo 10"), "file Takeout: avviso sui posti dei .csv senza posizione (al massimo 10 ricerche)");
@@ -8347,13 +8466,34 @@ if (fakeUser) {
   for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
   ok(tins.length === 3 && tins.every((r) => r.user_id === process.env.E2E_FAKE_USER && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Da provare, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
   const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
-  ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
+  // Revisore 3/11: "da completare" non si ripete, lo dice il riquadro della coda subito sotto.
+  ok(fatto.includes("Salvati 3 posti") && !fatto.includes("da completare"), `file Takeout: esito chiaro, senza doppione della coda ("${fatto}")`);
   const coda = await tp.getByTestId("file-coda").textContent().catch(() => "");
   ok(coda.includes("1 posto aspetta la posizione") && coda.includes("Altri domani"), `file Takeout: il posto senza posizione resta da completare, un gruppo al giorno ("${coda}")`);
   ok(tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "letti" && e.props.risultati === 5) && tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "salvati" && e.props.risultati === 3), "file Takeout: tracciato 'import_file' (letti e salvati)");
   ok(droppedKeys(tev.filter((e) => e.props?.nome === "import_file")).length === 0, "file Takeout: le chiavi del segnale arrivano tutte al server");
   await tc.scrollIntoViewIfNeeded();
   await tp.screenshot({ path: `${OUT}/takeout-3-fatto.png`, caret: "initial" });
+  // Proposta 39: una lista con un nome suo ("Cene romantiche.csv") diventa una raccolta, mostrata come copertina nel "fatto".
+  {
+    const n0 = tins.length;
+    await tp.getByTestId("file-input").setInputFiles([
+      { name: "Cene romantiche.csv", mimeType: "text/csv", buffer: Buffer.from("Title,Note,URL,Tags,Comment\nOsteria Finta,,https://www.google.com/maps/place/Osteria+Finta/data=!4m2!3m1!1s0x0:0xAAA1,,\n") },
+    ]);
+    await tp.getByTestId("file-salva").click();
+    await tp.getByTestId("file-raccolte").waitFor({ timeout: 8000 }).catch(() => {});
+    const rac = tp.getByTestId("file-raccolta");
+    ok((await rac.count()) === 1 && (await rac.textContent()).includes("Cene romantiche") && (await rac.textContent()).includes("1") && (await rac.getAttribute("href")) === "/raccolte/Cene%20romantiche"
+      && tins.slice(n0).some((r) => JSON.stringify(r.tags) === '["Da provare","Cene romantiche"]'),
+      `file Takeout: la lista «Cene romantiche» diventa una raccolta, copertina con un tocco per aprirla (${await rac.count()})`);
+    // Una raccolta sola: copertina sopra a tutta larghezza, "Apri la raccolta" sotto su una riga (revisore 3/11).
+    const cb = await rac.boundingBox();
+    const ab = await tp.getByTestId("file-raccolta-apri").boundingBox();
+    ok(cb && ab && cb.y + cb.height <= ab.y && Math.abs(cb.width - ab.width) < 2 && ab.height < 56, `file Takeout: una raccolta sola, copertina sopra e 'Apri la raccolta' a tutta larghezza su una riga (${ab?.width}×${ab?.height})`);
+    ok((await tp.getByTestId("file-intro").count()) === 0, "file Takeout: a lavoro fatto la frase introduttiva sparisce");
+    await tp.getByTestId("file-fatto").scrollIntoViewIfNeeded();
+    await tp.screenshot({ path: `${OUT}/takeout-4-raccolte.png`, caret: "initial" });
+  }
   // File sbagliato: messaggio chiaro, niente schermata vuota.
   await tp.reload({ waitUntil: "networkidle" });
   await tp.getByTestId("file-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });

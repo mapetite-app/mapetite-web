@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 30/10/2026 (notte).
+Ultimo aggiornamento: 2/11/2026 (notte).
 
 ---
 
@@ -190,4 +190,19 @@ Ultimo aggiornamento: 30/10/2026 (notte).
 - **OGGI nell'app:** "Non vado più" in un tocco con il messaggio già scritto; il locale vede i "tavoli liberati per tempo"; "di parola" nel messaggio di prenotazione. Da stanotte il riquadro del pannello è più leggibile (periodo scritto una volta, numero + 2–3 parole).
 - **DAVVERO, in futuro:** promemoria la sera prima con "Ci vai? Sì / Non più" (proposta 36) e "Avvisami se si libera" per riempire il tavolo liberato (proposta 37). La caparra resta DA DECIDERE LORENZO.
 - **Primo passo:** proposta 36, S, nessun costo.
+
+
+## 17. Anni di posti salvati in Google Maps chiusi dentro Google — 2/11 notte
+- **Chi lo ha:** il cliente, proprio quando prova un'app nuova: se non porta i suoi posti, l'app resta vuota e la abbandona.
+- **Quanto pesa:** Google non offre un modo per esportare una lista condivisa verso un'altra app: la strada ufficiale è Takeout ("Salvati"), che esporta solo le liste create da te, un file .csv per lista ([guida Google](https://support.google.com/maps/answer/7280933), [gotoapplemaps, 2026](https://gotoapplemaps.pages.dev/guides/export-google-maps-saved-places/)). Per i link delle liste esistono solo programmi che leggono la pagina di Google ([Apify](https://apify.com/automation-lab/google-maps-shared-list-scraper)), in contrasto con i termini di Google. Mapstr apre i file kml/kmz/json/csv di Google ([Mapstr](https://mapstr.com/fonctionnalites/importer-des-adresses)). Numero di persone con liste su Google: dato non trovato.
+- **OGGI nell'app:** da stanotte un link di lista incollato non dà più "non trovato" (o peggio, un posto a caso cercato col titolo della lista): spiega in una riga perché e apre il file di Google con i passi; ogni lista del file diventa una raccolta con il suo nome. I posti delle liste senza posizione costano ora 1 chiamata invece di 2: 10 per volta invece di 5.
+- **DAVVERO, in futuro:** completare i posti delle liste senza chiamate (catalogo Mapetite che cresce: più utenti, più posti già noti a costo zero); se Google aprisse un'API per le liste, leggerle dal link.
+- **Primo passo:** misurare quante liste incollate (`[from-link]` con lista nel log di Vercel) e quanti file caricati dopo (`import_file`), team.
+
+## 18. Salvo tanti posti ma al momento della scelta non li ritrovo — 3/11 notte
+- **Chi lo ha:** il cliente con molti salvati (decine di posti in più città), proprio nel momento "dove andiamo stasera?".
+- **Quanto pesa:** le app del settore descrivono lo stesso ciclo "vedo, salvo, dimentico, non lo ritrovo" ([NomNomad](https://nomnomadwebpage.pages.dev/blog/posts/never-lose-a-restaurant-spot), fonte di parte, senza dati). Mapstr ordina la lista per distanza o per data ([recensione Mapstr](https://tara-anbudaiyan.squarespace.com/mapstr-app-review)); Beli tiene "da provare" e "ci sono stato" su lista e mappa ([Spoon University](https://spoonuniversity.com/lifestyle/beli-the-new-app-personalizing-restaurant-reviews-and-recommendations)). Quante persone non riaprono mai i salvati: dato non trovato.
+- **OGGI nell'app:** da stanotte nei Salvati la ricerca è sempre in vista ("Cerca nei tuoi posti o chiedi…"), c'è l'ordine "Preferiti" (prima i 👍, i 👎 in fondo), le raccolte si vedono senza scorrere, la distanza sparisce per i posti di un'altra città e sulla mappa chi c'è stato ha la spunta.
+- **DAVVERO, in futuro:** "Aperto ora" sui salvati (servono gli orari: proposta 41) e i salvati che si propongono da soli quando sei vicino (proposta 6, avvisi).
+- **Primo passo:** misurare quante ricerche nei salvati partono ora che il campo è in vista (`chiedi_salvati` e ricerche per nome nel pannello numeri), team.
 

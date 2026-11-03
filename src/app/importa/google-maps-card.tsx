@@ -2,10 +2,10 @@
 
 import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from "react";
 import Link from "next/link";
-import LinkResults from "@/components/link-results";
+import LinkResults, { ListaRow } from "@/components/link-results";
 import { clearPendingLink, readPendingLink, saveFromLinks, type LinkOutcome } from "@/lib/save-from-link";
 import { extractMapsLinks } from "@/lib/maps-link";
-import { extractAllLinks } from "@/lib/multi-link";
+import { extractAllLinks, placeQueryFromText } from "@/lib/multi-link";
 import { findSocialLink } from "@/lib/social-link";
 import ReelSave from "@/components/reel-save";
 import { trackFeature } from "@/lib/track";
@@ -24,9 +24,12 @@ function errorText(e: unknown): string {
 export default function GoogleMapsCard({
   userId,
   onMulti,
+  onSearch,
   ref,
 }: {
   userId: string | null;
+  // Testo copiato da Google Maps senza link (nome e indirizzo): proposta di ricerca, cercata solo al tocco.
+  onSearch?: (q: string) => void;
   // Tanti link misti (chat, nota): li legge la lista di MultiLinkCard.
   onMulti?: (text: string) => void;
   // "Incolla il link copiato" della guida in cima (SalvaDaTelefono) usa lo stesso percorso.
@@ -41,12 +44,22 @@ export default function GoogleMapsCard({
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
   // Reel incollato: il numero fa ripartire la lettura se si incolla di nuovo.
   const [reel, setReel] = useState<{ text: string; n: number } | null>(null);
+  const [guess, setGuess] = useState<{ name: string; query: string } | null>(null);
   const text = draft ?? pending ?? "";
 
   const save = async (value: string) => {
     if (!userId) return;
     setReel(null);
+    setGuess(null);
     if (!HAS_LINK.test(value)) {
+      const g = onSearch ? placeQueryFromText(value) : null;
+      if (g) {
+        setError(null);
+        setResults(null);
+        setShowField(false);
+        setGuess(g);
+        return;
+      }
       setShowField(true);
       setError("Non vedo un link. Nell'app tocca Condividi → Copia link, poi torna qui.");
       return;
@@ -78,6 +91,8 @@ export default function GoogleMapsCard({
       setResults(await saveFromLinks(value, userId));
       clearPendingLink();
       setDraft("");
+      // Revisore 2/11: dopo l'esito il campo vuoto con "Salva" spento non serve più.
+      setShowField(false);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -159,6 +174,21 @@ export default function GoogleMapsCard({
             </div>
           )}
 
+          {guess && onSearch && (
+            // Testo copiato da Google Maps (nome e indirizzo, senza link): un tocco e lo cerco.
+            <div className="mt-3 rounded-card border border-[#e8e2d8] bg-white p-4" data-testid="incolla-testo">
+              <p className="text-sm text-text-muted">Non c’è un link, ma sembra un posto:</p>
+              <p className="mt-0.5 truncate font-display text-base font-semibold text-text">{guess.name}</p>
+              <button
+                type="button"
+                onClick={() => { onSearch(guess.query); setGuess(null); setDraft(""); trackFeature("import_link", { contesto: "testo" }); }}
+                data-testid="incolla-testo-cerca"
+                className="mt-3 min-h-12 w-full rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white"
+              >
+                Cercalo e salvalo
+              </button>
+            </div>
+          )}
           {error && <p className="mt-3 rounded-btn border border-[#e8e2d8] bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
           {reel && (
             // Fondo bianco senza margini interni, con il filo come le altre card della pagina.
@@ -166,7 +196,10 @@ export default function GoogleMapsCard({
               <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
-          {results && <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>}
+          {results && (results.every((r) => r.lista)
+            // Solo liste di Google Maps: il riquadro della lista da solo, senza una seconda cornice attorno.
+            ? <div className="mt-4"><ListaRow count={results.length} /></div>
+            : <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>)}
         </>
       )}
     </section>

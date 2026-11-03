@@ -694,6 +694,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       gemme: gemsOn ? places.filter((p) => !(offTopic?.includes(p.id) ?? false) && isGem(p.rating, details?.[p.id]?.userRatingCount, p.name)).length : 0,
       inArrivo: loadingVerdicts,
     }) : null;
+    // Se la frase sopra le card dice già "Tutti poco conosciuti", il 💎 non si ripete su ogni card (revisore del 2/11).
+    const gemmeInTesta = !!fraseOggi?.dettaglio && /tutti\s+poco\s+conosciut/i.test(fraseOggi.dettaglio);
     const conteggio = loadingVerdicts
       ? "preparo i verdetti…"
       : title || heading ? `${places.length} ${places.length === 1 ? "posto" : "posti"}` : `${places.length} ${places.length === 1 ? "risultato" : "risultati"}`;
@@ -832,7 +834,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
             const stato = savedMode ? (place.tags ?? []).find(isStateTag) ?? STATE_TAGS[0] : undefined;
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
-            const gem = !stato && !saved && !poco && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
+            const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);

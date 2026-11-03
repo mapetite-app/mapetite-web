@@ -11,6 +11,8 @@ export type LinkOutcome = {
   place?: LinkPlace;
   error?: string;
   alreadySaved?: boolean;
+  // Lista condivisa di Google Maps: non si legge, si propone il file di Google.
+  lista?: boolean;
 };
 
 export const PENDING_LINK_KEY = "mapetite-link-google-in-attesa";
@@ -38,7 +40,7 @@ export async function saveFromLinks(text: string, userId: string, title?: string
   const supabase = await browserClient();
   const out: LinkOutcome[] = [];
   for (const r of (data.risultati ?? []) as LinkOutcome[]) {
-    if (!r.place) { out.push({ link: r.link, error: r.error ?? "Link non valido." }); continue; }
+    if (!r.place) { out.push({ link: r.link, error: r.error ?? "Link non valido.", ...(r.lista ? { lista: true } : {}) }); continue; }
     const place = { id: r.place.id, name: r.place.name };
     const { error } = await supabase
       .from("saved_places")

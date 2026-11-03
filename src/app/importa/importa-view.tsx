@@ -15,6 +15,7 @@ import { addReel } from "@/lib/community-write";
 import { reelSourceOf } from "@/lib/reel";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
 import { screenshotForUpload } from "@/lib/screenshot-upload";
+import { APRI_FILE_EVENT } from "@/lib/apri-file-google";
 
 type ImportResult = {
   nome: string | null;
@@ -73,10 +74,22 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     setFlashShot(true);
     window.setTimeout(() => setFlashShot(false), 2000);
   };
+  const waitResults = useRef<number | undefined>(undefined);
   const searchByHand = (q: string) => {
     setManualReq((r) => ({ q, n: (r?.n ?? 0) + 1 }));
     openPanel("mano");
+    // Quando arrivano i risultati (o il "non trovo") li si porta in vista sopra la barra in basso
+    // (revisore 3/11: dopo "Cercalo e salvalo" restavano sotto la barra). Si aspetta al massimo 12 secondi.
+    window.clearInterval(waitResults.current);
+    const t0 = Date.now();
+    waitResults.current = window.setInterval(() => {
+      const el = document.querySelector<HTMLElement>('#a-mano [data-testid="mano-risultati"], #a-mano [data-testid="mano-nessuno"]');
+      if (!el && Date.now() - t0 < 12000) return;
+      window.clearInterval(waitResults.current);
+      el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 150);
   };
+  useEffect(() => () => window.clearInterval(waitResults.current), []);
 
   // Link da fuori (/importa#da-screenshot, /importa#a-mano): si apre il pannello giusto.
   useEffect(() => {
@@ -90,6 +103,22 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("hashchange", fromHash);
+    };
+  }, []);
+
+  // Lista di Google Maps incollata (piano 2a): si apre il file di Google con i passi in vista. Da un'altra
+  // pagina si arriva con /importa?file=aiuto e l'evento lo rilancia qui (lo ascolta anche TakeoutCard).
+  useEffect(() => {
+    const open = () => openPanel("file");
+    window.addEventListener(APRI_FILE_EVENT, open);
+    let t: number | undefined;
+    if (new URLSearchParams(window.location.search).get("file") === "aiuto") {
+      window.history.replaceState(null, "", window.location.pathname);
+      t = window.setTimeout(() => window.dispatchEvent(new Event(APRI_FILE_EVENT)), 0);
+    }
+    return () => {
+      window.removeEventListener(APRI_FILE_EVENT, open);
+      window.clearTimeout(t);
     };
   }, []);
 
@@ -282,7 +311,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 
   return (
     // Stesso fondo beige di home e salvati (giro 1/11, D52).
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]" data-testid="importa-pagina">
+    <div className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f8f6f2] pb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0" data-testid="importa-pagina">
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-8">
       {benvenuto ? (
         <>
@@ -299,6 +328,7 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       <GoogleMapsCard
         userId={userId}
         onMulti={(text) => setMulti((m) => ({ text, n: (m?.n ?? 0) + 1 }))}
+        onSearch={searchByHand}
       />
       {/* "Come copio il link?": l'unica guida (prima c'erano anche la tessera e il pannello "Da Google Maps", doppioni). */}
       {userId && <SalvaDaTelefono defaultOpen={benvenuto} />}
@@ -336,10 +366,11 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
       </div>
 
       <div id={PANEL_ID.file} hidden={panel !== "file"} className="mt-4 scroll-mt-4">
-        <TakeoutCard userId={userId} />
+        <TakeoutCard userId={userId} titolo={false} />
       </div>
 
-      <div hidden={panel !== "mano"} className="mt-4">
+      {/* Margine sotto i risultati quando li si porta in vista: restano sopra la barra in basso. */}
+      <div hidden={panel !== "mano"} className="mt-4 [&_[data-testid=mano-nessuno]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)] [&_[data-testid=mano-risultati]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)]">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
       </div>
 

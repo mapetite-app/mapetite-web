@@ -91,3 +91,36 @@ export async function findPlaceId(apiKey: string, textQuery: string, lat?: numbe
   const data: { places?: { id?: string }[] } = await res.json();
   return data.places?.[0]?.id ?? null;
 }
+
+// Link senza coordinate né Place ID (righe .csv delle liste di Google, "?q=Nome"): UNA Text Search che chiede
+// ID, nome, indirizzo e posizione (fascia "Text Search Pro", 5.000 gratuite al mese) invece di due chiamate
+// (ID + Place Details). Conta 1 nella quota Text Search (50/giorno): a parità di quota, il doppio dei posti.
+export async function findPlaceBasic(apiKey: string, textQuery: string): Promise<{ id: string; name: string | null; address: string; lat: number; lng: number } | null> {
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      // Solo campi Pro (niente recensioni, voti, orari). Non aggiungere campi qui.
+      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
+    },
+    body: JSON.stringify({ textQuery, pageSize: 1, languageCode: "it" }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) {
+    console.error("[from-link] Text Search (Pro) errore", res.status, (await res.text()).slice(0, 300));
+    throw new Error("google");
+  }
+  const data: { places?: { id?: string; displayName?: { text?: string }; formattedAddress?: string; location?: { latitude?: number; longitude?: number } }[] } = await res.json();
+  const p = data.places?.[0];
+  const lat = p?.location?.latitude;
+  const lng = p?.location?.longitude;
+  if (!p?.id || typeof lat !== "number" || typeof lng !== "number") return null;
+  return {
+    id: p.id,
+    name: p.displayName?.text?.trim() || null,
+    address: (p.formattedAddress ?? "").replace(/,\s*Ital(ia|y)$/i, ""),
+    lat,
+    lng,
+  };
+}

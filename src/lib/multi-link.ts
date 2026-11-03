@@ -89,3 +89,48 @@ export function suggestCollectionName(addresses: (string | null | undefined)[], 
   if (first && cities.every((c) => c && c.toLocaleLowerCase("it") === first.toLocaleLowerCase("it"))) return first.slice(0, 24);
   return `Importati il ${now.getDate()}/${now.getMonth() + 1}`;
 }
+
+/**
+ * Testo copiato da Google Maps senza link (piano 2b): "Nome\nVia …, 00186 Roma RM". Diventa la proposta di
+ * ricerca "Nome, Via …" (mai cercata senza un tocco: costa una ricerca Google). Testi lunghi o con troppe
+ * righe (un messaggio qualsiasi negli appunti) o senza indirizzo non sono un posto: null.
+ */
+export function placeQueryFromText(text: string): { name: string; query: string } | null {
+  let lines = text.split(/\r?\n/).map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean);
+  if (lines.length === 0 || lines.length > 3 || text.length > 240) return null;
+  if (lines.some((l) => l.length > 90)) return null;
+  // Una riga sola "Roscioli · Via dei Giubbonari 21 Roma": nome e indirizzo separati da un punto o un trattino.
+  if (lines.length === 1) {
+    const m = lines[0].match(/^(.+?)\s+[·•|–—-]\s+(.+)$/);
+    if (m) lines = [m[1], m[2]];
+  }
+  const name = lines[0].replace(/^[·•\-–]\s*/, "");
+  if (name.replace(/[^\p{L}]/gu, "").length < 3) return null;
+  // Un promemoria non è un posto (revisore 3/11: "Riunione ore 15 / Piazza Affari 6, 20123 Milano").
+  if (NOT_A_NAME.test(name) || /\bore\s*\d|\b\d{1,2}:\d{2}\b/i.test(name)) return null;
+  // Indirizzo vero: un CAP a 5 cifre, oppure tipo di via + nome con la maiuscola + numero civico
+  // (revisore 2/11: "Comprare latte\n2 litri"; 3/11: "Via libera domani" non è un indirizzo).
+  const address = lines.slice(1).find(isAddressLine);
+  // Solo con una riga d'indirizzo: una frase sola ("ricordati la pizzeria di Marco") non è un posto copiato da Maps.
+  if (!address || address === lines[0]) return null;
+  const query = `${name}, ${address.replace(/,\s*Ital(ia|y)$/i, "")}`;
+  return { name: name.slice(0, 80), query: query.slice(0, 160) };
+}
+
+// Prime righe che sono cose da fare, non nomi di locali.
+const NOT_A_NAME = /^(ricordati|ricordarsi|ricorda|ricordami|chiamare|chiama|telefonare|comprare|compra|riunione|appuntamento|prendere|prendi|pagare|paga|ritirare|ritira|portare|mandare|manda|scrivere|scrivi|fare|todo|to do|promemoria)\b/i;
+const STREET = /\b(via|viale|v\.le|piazza|p\.za|piazzale|corso|c\.so|largo|vicolo|strada|lungotevere|borgo|calle|salita|rue|street)\s+(.+)$/i;
+const PARTICLE = /^(dei|degli|delle|del|della|dello|di|de|da|al|alla|ai|agli|alle|e)$/i;
+
+export function isAddressLine(line: string): boolean {
+  if (/\b\d{5}\b/.test(line)) return true;
+  const m = line.match(STREET);
+  if (!m) return false;
+  const words = m[2].split(/[\s,]+/).filter(Boolean);
+  let i = 0;
+  while (i < words.length && PARTICLE.test(words[i])) i++;
+  // "d'Azeglio", "dell'Orso": conta la lettera dopo l'apostrofo.
+  const first = (words[i] ?? "").replace(/^(d|dell|dall|all|sull|nell)['’]/i, "");
+  if (!/^\p{Lu}/u.test(first)) return false;
+  return words.slice(i + 1).some((w) => /^\d{1,4}[a-zA-Z]?(\/[a-zA-Z0-9]+)?$/.test(w));
+}

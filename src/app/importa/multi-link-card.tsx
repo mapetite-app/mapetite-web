@@ -8,6 +8,7 @@ import { isStateTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath } from "@/lib/raccolte";
 import { extractAllLinks, KIND_LABEL, roundLabel, saveLabel, suggestCollectionName, type FoundLink } from "@/lib/multi-link";
 import { trackFeature } from "@/lib/track";
+import { ListaRow } from "@/components/link-results";
 
 // "Incolla più link" (piano 3.2, rifatto il 1/11): si incolla un testo con tanti link (la chat di
 // WhatsApp con sé stessi, una nota, più link di Google Maps), si vede l'elenco dei posti trovati,
@@ -36,12 +37,13 @@ type Item = FoundLink & {
   place?: Place;
   motivo?: string;
   nome?: string | null;
+  lista?: boolean;
 };
 
 type Preview =
   | { stato: "riconosciuto"; chiamate: number; place: Place }
   | { stato: "da_confermare"; chiamate: number; motivo: string; nome: string | null }
-  | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null };
+  | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null; lista?: boolean };
 
 async function previewLink(link: string, budget: number): Promise<Preview> {
   try {
@@ -117,7 +119,7 @@ export default function MultiLinkCard({
   // Esito di un link di Google Maps: già salvato o doppione di un altro link della lista?
   const settle = (url: string, r: Preview) => {
     if (r.stato !== "riconosciuto") {
-      patch(url, { stato: r.stato, motivo: r.motivo, nome: r.nome ?? null });
+      patch(url, { stato: r.stato, motivo: r.motivo, nome: r.nome ?? null, ...(r.stato === "non_riconosciuto" && r.lista ? { lista: true } : {}) });
       return;
     }
     if (savedIds.current.has(r.place.id)) return patch(url, { stato: "gia_salvato", place: r.place });
@@ -293,10 +295,12 @@ export default function MultiLinkCard({
   const mapsCount = items?.filter((it) => it.kind === "maps").length ?? 0;
   const later = count(["dopo"]);
   const gia = count(["gia_salvato"]);
-  const nonTrovati = count(["non_riconosciuto", "errore"]);
+  const liste = items?.filter((it) => it.lista).length ?? 0;
+  const nonTrovati = count(["non_riconosciuto", "errore"]) - liste;
   const daConfermare = count(["da_confermare"]);
   // Dopo il salvataggio l'elenco mostra solo quello che resta da sistemare.
-  const rows = phase === "done" ? (items ?? []).filter((it) => !["salvato", "gia_salvato", "doppione"].includes(it.stato)) : items ?? [];
+  // Le liste di Google Maps non sono righe: un solo riquadro sopra l'elenco (revisore 2/11).
+  const rows = (phase === "done" ? (items ?? []).filter((it) => !["salvato", "gia_salvato", "doppione"].includes(it.stato)) : items ?? []).filter((it) => !it.lista);
 
   if (!userId || (!items && !error)) return null;
 
@@ -317,10 +321,20 @@ export default function MultiLinkCard({
     </button>
   );
 
+  // Solo liste di Google Maps: il riquadro della lista da solo, senza cornice, titolo né riepilogo attorno
+  // (revisore 3/11: cornice dentro cornice e lo stesso messaggio tre volte), come in google-maps-card.
+  if (items && !error && total > 0 && liste === total && (phase === "ready" || phase === "done")) {
+    return (
+      <div id="importa-multi" className="mt-4 scroll-mt-4" data-testid="importa-multi">
+        <ListaRow count={liste} />
+      </div>
+    );
+  }
+
   return (
     <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-white p-5" data-testid="importa-multi">
       <h2 className="font-title text-xl text-text">
-        {phase === "done" ? "Fatto" : mapsCount === total && total > 0 ? `${total} posti da Google Maps` : "I link che hai incollato"}
+        {phase === "done" ? "Fatto" : mapsCount === total && total > 0 && liste === 0 ? `${total} posti da Google Maps` : "I link che hai incollato"}
       </h2>
       {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="multi-errore">{error}</p>}
 
@@ -350,7 +364,8 @@ export default function MultiLinkCard({
           {phase === "ready" && (
             <p className="text-sm text-text" data-testid="multi-riepilogo">
               {[
-                `${toSave.length} da salvare`,
+                (toSave.length > 0 || liste === 0) && `${toSave.length} da salvare`,
+                liste > 0 && `${liste} ${liste === 1 ? "lista" : "liste"} di Google Maps`,
                 gia > 0 && `${gia} già nei tuoi posti`,
                 nonTrovati > 0 && `${nonTrovati} non ${nonTrovati === 1 ? "trovato" : "trovati"}`,
                 daConfermare > 0 && `${daConfermare} da guardare`,
@@ -371,7 +386,7 @@ export default function MultiLinkCard({
               <p className="text-base font-semibold text-text" data-testid="multi-fatto-riepilogo">
                 <span aria-hidden>✅ </span>
                 {[
-                  `Salvati ${savedCount}`,
+                  savedCount === 1 && savedNow.length === 1 ? `Salvato: ${savedNow[0].name}` : `Salvati ${savedCount}`,
                   gia > 0 && `Già nei tuoi posti ${gia}`,
                   nonTrovati > 0 && `Non ${nonTrovati === 1 ? "trovato" : "trovati"} ${nonTrovati}`,
                 ].filter(Boolean).join(" · ")}
@@ -454,6 +469,11 @@ export default function MultiLinkCard({
               ))}
             </ul>
           )}
+          {/* Liste di Google Maps: in fondo, come strada secondaria se c'è anche qualcosa da salvare (revisore 2/11),
+              senza cornice ma staccate da un divisore: niente terzo livello annidato (revisore 3/11). */}
+          {liste > 0 && (phase === "ready" || phase === "done") && (
+            <div className="mt-4"><ListaRow count={liste} secondary={toSave.length > 0 || savedCount > 0} piatta /></div>
+          )}
         </div>
       )}
     </section>
@@ -493,10 +513,10 @@ function Row({
   onReadVideo: () => void;
   busy: boolean;
 }) {
-  const badge = BADGE[it.stato];
+  const badge = it.lista ? { label: "Lista", cls: "bg-brand/10 text-brand" } : BADGE[it.stato];
   // Prima della lettura il nome è il testo scritto accanto al link nella chat, se c'è.
   const guess = it.nome ?? it.hint;
-  const title = it.place?.name ?? guess ?? KIND_LABEL[it.kind];
+  const title = it.lista ? "Lista di Google Maps" : it.place?.name ?? guess ?? KIND_LABEL[it.kind];
   const sub = it.place ? (displayAddress(it.place.address) || "Posizione dal link di Google Maps") : shortUrl(it.url);
   const pill = "min-h-10 max-w-full truncate rounded-pill border border-brand bg-white px-3 text-xs font-display font-semibold text-brand disabled:opacity-60";
   const notFound = it.stato === "non_riconosciuto" || it.stato === "errore";
@@ -528,7 +548,7 @@ function Row({
           )}
         </div>
       )}
-      {notFound && (
+      {notFound && !it.lista && (
         // Non trovato: si cerca a mano, con il nome già scritto se lo conosciamo (dal link o dalla chat).
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" onClick={() => onSearch(guess ?? "")} disabled={busy} className={pill} data-testid="multi-cerca">
