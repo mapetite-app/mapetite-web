@@ -8479,7 +8479,8 @@ if (fakeUser) {
   for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
   ok(tins.length === 3 && tins.every((r) => r.user_id === process.env.E2E_FAKE_USER && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Da provare, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
   const fatto = await tp.getByTestId("file-fatto").textContent().catch(() => "");
-  ok(fatto.includes("Salvati 3 posti") && fatto.includes("1 da completare"), `file Takeout: esito chiaro ("${fatto}")`);
+  // Revisore 3/11: "da completare" non si ripete, lo dice il riquadro della coda subito sotto.
+  ok(fatto.includes("Salvati 3 posti") && !fatto.includes("da completare"), `file Takeout: esito chiaro, senza doppione della coda ("${fatto}")`);
   const coda = await tp.getByTestId("file-coda").textContent().catch(() => "");
   ok(coda.includes("1 posto aspetta la posizione") && coda.includes("Altri domani"), `file Takeout: il posto senza posizione resta da completare, un gruppo al giorno ("${coda}")`);
   ok(tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "letti" && e.props.risultati === 5) && tev.some((e) => e.props?.nome === "import_file" && e.props.contesto === "salvati" && e.props.risultati === 3), "file Takeout: tracciato 'import_file' (letti e salvati)");

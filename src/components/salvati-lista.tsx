@@ -103,7 +103,7 @@ export default function SalvatiLista({
   onFilters: () => void;
   verdicts: Record<string, { verdict?: string | null }>;
   onOpen: (place: Place, order: string[]) => void;
-  onMap: () => void;
+  onMap: (order: string[]) => void;
   hideOnDesktop?: boolean;
 }) {
   // Ordine visibile (giro 1/11): "Vicino" se la posizione è nota, altrimenti "Recenti". Si cambia con un tocco.
@@ -344,8 +344,9 @@ export default function SalvatiLista({
         {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
             e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
         <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
-          <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
-            <SlidersHorizontal size={15} aria-hidden /> Filtri
+          <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-brand active:scale-95 ${filtersOn > 0 ? "px-3.5" : "w-11"}`}>
+            {/* Revisore 3/11 (quarto): senza filtri accesi solo l'icona, così le raccolte entrano nello schermo. */}
+            <SlidersHorizontal size={15} aria-hidden />{filtersOn > 0 && " Filtri"}
             {filtersOn > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 font-display text-[11px] font-bold text-white">{filtersOn}</span>
             )}
@@ -362,7 +363,7 @@ export default function SalvatiLista({
                 type="button"
                 aria-pressed={p.on}
                 onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-                className={`min-h-11 shrink-0 rounded-pill px-4 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
+                className={`min-h-11 shrink-0 rounded-pill px-3.5 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
               >
                 {p.n === null ? p.label : `${p.label} ${p.n}`}
               </button>
@@ -460,6 +461,10 @@ export default function SalvatiLista({
                           {liked && (
                             <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>👍 Piaciuto</span>
                           )}
+                          {/* Revisore 3/11: con "Preferiti" il 👎 va in fondo; il chip dice perché. */}
+                          {!liked && p.tags?.includes(OPINION_DISLIKE) && (
+                            <span data-testid="salvato-non-piaciuto" className={`${chip} bg-[#f1efeb] text-[#6b7075]`}>👎 Non per me</span>
+                          )}
                           {fonte && (
                             <span data-testid="salvato-provenienza" className={`${chip} bg-[#f1ece3] font-medium text-[#33373d]`}>
                               <SquarePlay size={12} aria-hidden className="text-accent" /> {FONTE_LABEL[fonte]}
@@ -487,7 +492,7 @@ export default function SalvatiLista({
           aria-label="Vedi sulla mappa"
           aria-hidden={mappaNascosta || undefined}
           tabIndex={mappaNascosta ? -1 : undefined}
-          onClick={onMap}
+          onClick={() => onMap(list.map((x) => x.id))}
           className={`flex min-h-11 items-center gap-1.5 rounded-pill bg-brand px-4 text-[14px] font-semibold text-white shadow-float transition-[transform,opacity] duration-200 active:scale-95 motion-reduce:transition-none ${mappaNascosta ? "translate-y-[calc(100%+1rem)] opacity-0" : "pointer-events-auto"}`}
         >
           <MapIcon size={16} aria-hidden /> Sulla mappa

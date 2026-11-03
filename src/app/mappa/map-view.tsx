@@ -2105,8 +2105,18 @@ export default function MapView({
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
   const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
-  const apriMappaSalvati = () => {
+  // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
+  // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
+  const apriMappaSalvati = (order?: string[]) => {
     setSalvatiMappa(true);
+    if (order && order.length > 0) { setCarouselOrder(order); setFocusedId(order[0]); }
+    if (userPos && order && order.length > 0) {
+      const byId: Record<string, Place> = Object.fromEntries(displayedPlaces.map((p) => [p.id, p]));
+      const vicini = order.map((id) => byId[id]).filter((p): p is Place => !!p)
+        .sort((a, b) => distanceMeters(userPos, a) - distanceMeters(userPos, b)).slice(0, 5)
+        .filter((p) => distanceMeters(userPos, p) < 50_000);
+      if (vicini.length > 0) { fitToPlaces(vicini, 170, 0, [userPos], true); return; }
+    }
     const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
     if (z) inquadraZona(z);
     else fitToPlaces(displayedPlaces, 170, 0, [], true);

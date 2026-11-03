@@ -113,7 +113,9 @@ export function ListaRow({ count = 1, secondary = false, piatta = false }: { cou
       </p>
       <p className="mt-1 text-sm text-text-muted">
         {/* "Vale per le liste create da te" sta nei passi del file (revisore 3/11: qui troppo testo). */}
-        Google non le lascia leggere. Scaricale da Google e caricale qui: ognuna diventa una raccolta.
+        {count === 1
+          ? "Google non la lascia leggere. Scaricala da Google e caricala qui: diventa una raccolta."
+          : "Google non le lascia leggere. Scaricale da Google e caricale qui: ognuna diventa una raccolta."}
       </p>
       <button
         type="button"

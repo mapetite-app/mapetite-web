@@ -404,7 +404,7 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
                   <span aria-hidden>✅ </span>{done.salvati > 0 ? `${done.salvati === 1 ? "Salvato" : "Salvati"} ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  {[done.gia ? `${done.gia} li avevi già` : "", done.attesa ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
+                  {[done.gia ? `${done.gia} li avevi già` : "", done.attesa && queued === 0 ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
                 </p>
                 {raccolte.length === 0 && (
                   <Link href="/mappa?vista=salvati" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
@@ -453,14 +453,18 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
           {queued > 0 && phase !== "saving" && phase !== "ready" && (
             <div className="mt-4 flex items-center gap-3 rounded-btn border border-border bg-white px-3 py-3" data-testid="file-coda">
               <p className="min-w-0 flex-1 text-sm text-text">{queued} {queued === 1 ? "posto aspetta" : "posti aspettano"} la posizione</p>
-              <button
-                type="button"
-                onClick={completeQueue}
-                disabled={!canComplete}
-                className="min-h-11 shrink-0 rounded-pill border border-brand bg-white px-3 text-sm font-display font-semibold text-brand disabled:opacity-60"
-              >
-                {canComplete ? `Completa i prossimi` : "Altri domani"}
-              </button>
+              {/* Revisore 3/11 (quarto): l'esito sopra non lo ripete; "Altri domani" è un'informazione, non un pulsante spento. */}
+              {canComplete ? (
+                <button
+                  type="button"
+                  onClick={completeQueue}
+                  className="min-h-11 shrink-0 rounded-pill border border-brand bg-white px-3 text-sm font-display font-semibold text-brand"
+                >
+                  Completa i prossimi
+                </button>
+              ) : (
+                <span className="shrink-0 text-sm text-text-muted">Altri domani</span>
+              )}
             </div>
           )}
 
