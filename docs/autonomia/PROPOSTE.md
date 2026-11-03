@@ -16,6 +16,33 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 3/11/2026 (notte, sessione 03:05, CEO che chiude — solo ciò che si vede aprendo l'app, piano fino all'8/11)
+
+### 40. "Da provare da mesi": i salvati dimenticati tornano su
+- **Problema:** `PROBLEMI.md` 18: i posti salvati mesi fa scivolano in fondo e non si riaprono più.
+- **Cosa fa:** nei Salvati, quando ci sono posti "Da provare" salvati da più di 60 giorni, una riga sola sopra la lista: "3 posti aspettano da mesi" che accende il filtro. Nella riga del posto, al posto della distanza se lontano, "salvato a luglio".
+- **Da dove nasce:** Mapstr e Beli ordinano per data ma non riportano su i dimenticati ([recensione Mapstr](https://tara-anbudaiyan.squarespace.com/mapstr-app-review)).
+- **Valore per l'utente:** ritrova i posti che aveva voglia di provare, senza cercarli.
+- **Valore per il ristoratore:** domanda dormiente che si riaccende (misurabile nel pannello).
+- **Sforzo:** S (data di salvataggio già presente, `created_at`).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 41. "Aperto ora" sui salvati
+- **Problema:** il revisore del 3/11 non ha trovato "Aperto ora" nei Salvati: i salvati non hanno gli orari.
+- **Cosa fa:** filtro rapido "Aperto ora" nella fila dei Salvati, con gli orari letti da Google solo per i posti della città in cui sei, una volta al giorno.
+- **Valore per l'utente:** "dove andiamo adesso?" risolto tra i propri posti, in un tocco.
+- **Sforzo:** M.
+- **Costo Google/Haiku:** Place Details con gli orari per ogni salvato della zona: con 30 salvati a Roma sono fino a 30 chiamate al giorno per utente, oltre la quota di 50. Si regge solo con una cache del giorno condivisa tra utenti (permessa: è dato di servizio, non contenuto) o leggendo gli orari solo al tocco del filtro.
+- **Stato proposto:** DA DECIDERE LORENZO — **Domanda:** "Aperto ora" sui salvati vale qualche chiamata Google al giorno in più (dentro i 20 €/mese)?
+
+### 42. Copertine delle raccolte a mosaico nella fila dei Salvati
+- **Problema:** le raccolte nei Salvati sono pillole con un'icona; Places e Albo mostrano una copertina con i posti.
+- **Cosa fa:** fila separata di copertine 2×2 con le emoji (o le foto proprie) dei primi 4 posti, sotto la ricerca; la fila dei filtri resta solo per lo stato.
+- **Sforzo:** S (`summarizeCollections` dà già l'anteprima).
+- **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (con un revisore di design, la fila in più deve stare entro 160 px dal primo posto).
+
 ## 2/11/2026 (notte, sessione 22:06, CEO che chiude — solo ciò che si vede aprendo l'app, piano fino all'8/11)
 
 ### 38. Posti delle liste completati gratis dal catalogo, prima di Google

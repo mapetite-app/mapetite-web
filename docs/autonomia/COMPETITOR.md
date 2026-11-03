@@ -184,6 +184,9 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 ### Controllo del 2/11 notte (CEO che chiude, 2 ricerche, solo import da Google)
 - **Mapstr:** importa i file di Google (kml, kmz, json, csv) aprendoli nell'app; non dice come scegliere una singola lista ([Mapstr](https://mapstr.com/fonctionnalites/importer-des-adresses)). Mapetite fa lo stesso dal telefono, sceglie per zona e trasforma ogni lista in raccolta.
 - **Link delle liste condivise:** nessuna app li legge in modo ufficiale; solo programmi che leggono la pagina di Google ([Apify](https://apify.com/automation-lab/google-maps-shared-list-scraper), [gist](https://gist.github.com/ForceGT/bbb9423e2d23e9639672a390933eb710)), contrari ai termini. Noi non lo facciamo: il link di una lista porta al file di Google.
+### Controllo del 3/11 notte (CEO che chiude, 3 ricerche, solo Salvati)
+- **Mapstr:** tag liberi come filtri, lista ordinabile per distanza o per data di aggiunta ([recensione](https://tara-anbudaiyan.squarespace.com/mapstr-app-review)); nessuna fonte conferma un filtro "aperto ora", anche se ha gli orari dei posti. Noi da stanotte: "Vicino", "Recenti" e "Preferiti" (dai tuoi 👍).
+- **Beli:** "da provare" e "ci sono stato" come liste e mappa con i segnalini in classifica ([Spoon University](https://spoonuniversity.com/lifestyle/beli-the-new-app-personalizing-restaurant-reviews-and-recommendations), [App Store](https://apps.apple.com/us/app/-/id1478375386)); un ordine per distanza della lista "da provare" non risulta. Noi: stato sul segnalino (spunta) e ordine per vicinanza.
 
 ## In sintesi: dove nessuno arriva
 1. **Ricerca su tutta Google + verdetto onesto per ogni posto**: Places e Corner cercano solo tra i propri posti; Google ordina per fama.
