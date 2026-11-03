@@ -948,6 +948,9 @@ export default function MapView({
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);
+  // Ordine della lista dei salvati portato sulla mappa (revisore 3/11, quinto): le card seguono la lista
+  // invece di essere riordinate dal carosello.
+  const [ordineLista, setOrdineLista] = useState<string[] | null>(null);
   // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
   const [zonaMappa, setZonaMappa] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
@@ -1278,6 +1281,13 @@ export default function MapView({
   // più "Cerca in N salvati"; sotto, le zone (Roma, Milano…) quando i salvati sono in più città.
   const salvatiMappaOn = savedControlsOn && !salvatiListaOn && aiSearch === null;
   const zoneSalvati = salvatiMappaOn ? zoneDeiSalvati(displayedPlaces) : [];
+  // Le card seguono l'ordine della lista solo sulla mappa dei salvati, senza ricerca né gruppo aperto.
+  const ordineListaOn = salvatiMappaOn && clusterPlaces === null && ordineLista != null;
+  // I posti non presenti nella lista (es. trovati dopo con la ricerca) vanno in fondo, nel loro ordine.
+  const posLista = ordineListaOn && ordineLista ? new globalThis.Map(ordineLista.map((id, i) => [id, i])) : null;
+  const salvatiInOrdine = posLista
+    ? [...displayedPlaces].sort((a, b) => (posLista.get(a.id) ?? 1e9) - (posLista.get(b.id) ?? 1e9))
+    : displayedPlaces;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -2107,15 +2117,30 @@ export default function MapView({
   const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
   // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
   // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
+  // Revisore 3/11 (quinto): se il primo della lista è lontano (oltre 50 km, es. ordine "Recenti" con un
+  // posto di Milano da Roma) la mappa va sulla sua zona, non sui vicini: card e mappa parlano dello stesso posto.
   const apriMappaSalvati = (order?: string[]) => {
     setSalvatiMappa(true);
+    const byId: Record<string, Place> = Object.fromEntries(displayedPlaces.map((p) => [p.id, p]));
+    const primo = order && order.length > 0 ? byId[order[0]] : undefined;
+    setOrdineLista(order && order.length > 0 ? order : null);
     if (order && order.length > 0) { setCarouselOrder(order); setFocusedId(order[0]); }
-    if (userPos && order && order.length > 0) {
-      const byId: Record<string, Place> = Object.fromEntries(displayedPlaces.map((p) => [p.id, p]));
-      const vicini = order.map((id) => byId[id]).filter((p): p is Place => !!p)
-        .sort((a, b) => distanceMeters(userPos, a) - distanceMeters(userPos, b)).slice(0, 5)
-        .filter((p) => distanceMeters(userPos, p) < 50_000);
-      if (vicini.length > 0) { fitToPlaces(vicini, 170, 0, [userPos], true); return; }
+    if (primo) {
+      if (userPos && distanceMeters(userPos, primo) < 50_000) {
+        const vicini = order!.map((id) => byId[id]).filter((p): p is Place => !!p)
+          .filter((p) => distanceMeters(userPos, p) < 50_000)
+          .sort((a, b) => distanceMeters(userPos, a) - distanceMeters(userPos, b)).slice(0, 5);
+        // Il primo della lista resta sempre dentro l'inquadratura.
+        if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
+        fitToPlaces(vicini, 170, 0, [userPos], true);
+        return;
+      }
+      const zona = zoneDeiSalvati(displayedPlaces).find((z) => z.posti.some((p) => p.id === primo.id));
+      if (zona) setZonaMappa(zona.nome);
+      const citta = cityFromAddress(primo.address);
+      const stessaCitta = citta ? displayedPlaces.filter((p) => cityFromAddress(p.address) === citta) : [];
+      fitToPlaces(zona?.posti ?? (stessaCitta.length > 0 ? stessaCitta : [primo]), 170, 0, [], true);
+      return;
     }
     const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
     if (z) inquadraZona(z);
@@ -3980,7 +4005,7 @@ export default function MapView({
 
       {overlay.kind === "list" && !salvatiListaOn && (
         <BottomSheet
-          places={clusterPlaces ?? displayedPlaces}
+          places={clusterPlaces ?? salvatiInOrdine}
           // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
           details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
           savedMode={view === "saved" && aiSearch === null}
@@ -3993,7 +4018,7 @@ export default function MapView({
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
-          nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
+          nearest={view === "saved" && aiSearch === null ? savedNearestOn && !ordineListaOn : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
