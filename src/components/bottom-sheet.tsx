@@ -358,6 +358,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const quickFiltersOn = useBeta("filtri-lista") && details != null && !savedMode;
   // "Più vicini" anche nei salvati ("cosa ho salvato qui vicino?"), se c'è un punto da cui misurare.
   const shownFrom = distanceOrigin === undefined ? origin : distanceOrigin;
+  // Nei salvati la distanza oltre 50 km non si mostra (come nella lista): "480 km" da Roma a Milano non aiuta.
+  const distDa = (place: Place) => shownFrom && (!savedMode || distanceMeters(shownFrom, place) < 50_000) ? shownFrom : null;
   const nearestOn = nearest === undefined && origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
@@ -832,7 +834,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
-            const stato = savedMode ? (place.tags ?? []).find(isStateTag) ?? STATE_TAGS[0] : undefined;
+            // Revisore 3/11 (sesto): prima lo stato (Da provare / Ci sono stato), poi il 👍/👎 accanto, come nella lista.
+            const stato = savedMode ? (place.tags ?? []).find((t) => (STATE_TAGS as readonly string[]).includes(t)) ?? ((place.tags ?? []).some(isStateTag) ? STATE_TAGS[1] : STATE_TAGS[0]) : undefined;
+            const parere = savedMode ? (place.tags?.includes("Non fa per me") ? " · 👎" : place.tags?.includes("Mi è piaciuto") ? " · 👍" : "") : "";
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
@@ -841,7 +845,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               // La distanza a parte: se la riga non ci sta va a capo nella riga nascosta (revisore del 2/11:
               // "€€ · 600…" tagliato). Tipo, voto e prezzo restano sempre interi.
               const facts = cardFacts({ ...place, category: null }, null, showCity);
-              const dist = shownFrom ? distanceLabel(shownFrom, place) : null;
+              const da = distDa(place);
+              const dist = da ? distanceLabel(da, place) : null;
               // Punti forti solo da goFor veri (mai testo generico): se mancano, nessuna chip.
               // Chip intere: prima quelle brevi (le frasi lunghe venivano tagliate), due solo se ci stanno insieme.
               const goFor = d?.goFor ?? [];
@@ -893,7 +898,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -1010,7 +1015,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -1022,7 +1027,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     )}
                     <span className={`mt-auto pt-3 line-clamp-2 font-title font-semibold leading-tight ${place.name.length > 24 ? "text-lg in-data-[titoli=serif]:text-xl" : "text-xl in-data-[titoli=serif]:text-2xl"} ${onSave && !(stato || saved || gem || poco) ? "pr-11" : ""}`}>{nomeLeggibile(place.name)}</span>
                     <span data-testid="riga-fatti" className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-sans text-white/80">
-                      <span className="truncate">{cardFacts(place, shownFrom, showCity)}</span>
+                      <span className="truncate">{cardFacts(place, distDa(place), showCity)}</span>
                       {d?.openNow === true && (
                         <span className="flex shrink-0 items-center gap-1"><span aria-hidden>·</span><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                       )}
@@ -1156,7 +1161,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     {place.name}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-sans text-text-muted">
-                    <span className="truncate">{metaLine(place, details?.[place.id], shownFrom, showCity)}</span>
+                    <span className="truncate">{metaLine(place, details?.[place.id], distDa(place), showCity)}</span>
                     {details?.[place.id]?.openNow === true && (
                       <span className="shrink-0 rounded-pill bg-brand/10 px-1.5 py-0.5 text-[10px] font-display font-medium text-brand">
                         Aperto ora

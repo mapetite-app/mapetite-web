@@ -206,3 +206,10 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **DAVVERO, in futuro:** "Aperto ora" sui salvati (servono gli orari: proposta 41) e i salvati che si propongono da soli quando sei vicino (proposta 6, avvisi).
 - **Primo passo:** misurare quante ricerche nei salvati partono ora che il campo è in vista (`chiedi_salvati` e ricerche per nome nel pannello numeri), team.
 
+## 19. Il posto salvato ha chiuso (o la mappa lo dà chiuso per errore) — 4/11 notte
+- **Chi lo ha:** entrambi. Il cliente apre un salvato di mesi fa e trova la saracinesca abbassata; il ristoratore aperto perde clienti se una mappa lo segna "chiuso definitivamente" per errore.
+- **Quanto pesa:** nel 2020 a Padova Google dava "chiuso definitivamente" ristoranti aperti, con segnalazioni anche da Milano, Roma e Napoli ([Dissapore](https://www.dissapore.com/notizie/ristoranti-chiusi-definitivamente-a-padova-per-google-il-coronavirus-non-passera/)); nel 2024 Apple Maps ha dato per chiuso un ristorante australiano aperto ([Yahoo News](https://ca.news.yahoo.com/apple-maps-error-showed-restaurant-131045554.html)). In Italia nel 2024 29.097 chiusure contro 10.719 aperture (Rapporto Fipe 2025, già al punto 6). Quanti salvati diventano posti chiusi: dato non trovato.
+- **OGGI nell'app:** nessun segnale sui salvati chiusi; da stanotte almeno i "Da provare" vecchi tornano su ("aspettano da mesi"), così ci si accorge prima.
+- **DAVVERO, in futuro:** stato del locale (aperto, chiuso per sempre, chiuso temporaneamente) sul segnalino e sulla riga, letto da Google solo quando il posto passa già da Google (proposta 45).
+- **Primo passo:** contare quanti salvati hanno già uno stato di chiusura nei dati Google letti finora (team).
+

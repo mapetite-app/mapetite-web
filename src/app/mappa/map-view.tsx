@@ -15,6 +15,7 @@ import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, wit
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
 import AnswerArticle from "@/components/answer-article";
+import { vernicaMappaCalda, type MappaVernice } from "@/lib/mappa-calda";
 import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@/components/bottom-sheet";
 import SalvatiLista from "@/components/salvati-lista";
 import PlacePhoto from "@/components/place-photo";
@@ -24,7 +25,7 @@ import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { hasStateOrTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -520,8 +521,7 @@ function logSavedError(error: { message?: string }) {
 
 // Mappa più pulita (RIFERIMENTI-DESIGN: niente mappa affollata di punti non pertinenti):
 // nasconde le etichette dei punti d'interesse Mapbox (hotel, chiese, negozi), restano strade e quartieri.
-type MapStyleApi = {
-  getStyle: () => { layers?: { id: string }[] } | undefined;
+type MapStyleApi = MappaVernice & {
   getLayoutProperty: (id: string, k: string) => unknown;
   setLayoutProperty: (id: string, k: string, v: string) => void;
 };
@@ -546,6 +546,8 @@ export type Place = {
   lng: number;
   tags: string[] | null;
   note: string | null;
+  // Solo nei salvati: quando è stato salvato (saved_places.created_at), per "aspettano da mesi" (proposta 40).
+  savedAt?: string | null;
   rating: number | null;
   priceLevel: number | null;
   // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
@@ -948,6 +950,9 @@ export default function MapView({
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);
+  // Ordine della lista dei salvati portato sulla mappa (revisore 3/11, quinto): le card seguono la lista
+  // invece di essere riordinate dal carosello.
+  const [ordineLista, setOrdineLista] = useState<string[] | null>(null);
   // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
   const [zonaMappa, setZonaMappa] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
@@ -982,19 +987,20 @@ export default function MapView({
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   // true quando l'utente sposta la mappa a mano dopo una ricerca → "Cerca in quest'area".
   const [movedSinceSearch, setMovedSinceSearch] = useState(false);
-  // Mappa chiara (grigia stile Places) per tutti dal 17/10; ?mappa=standard torna a quella colorata e resta sul telefono.
+  // Mappa calda (area 4e, 3/11) per tutti: la chiara con colori caldi (src/lib/mappa-calda.ts).
+  // ?mappa=chiara torna alla grigia del 17/10, ?mappa=standard a quella colorata; la scelta resta sul telefono.
   const mapVariant = useSyncExternalStore(
     () => () => {},
     () => {
       const v = new URLSearchParams(window.location.search).get("mappa");
       try {
-        if (v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
-        return window.localStorage.getItem("mapetite.mappa") ?? "chiara";
+        if (v === "calda" || v === "chiara" || v === "standard") window.localStorage.setItem("mapetite.mappa", v);
+        return window.localStorage.getItem("mapetite.mappa") ?? "calda";
       } catch {
-        return v ?? "chiara";
+        return v ?? "calda";
       }
     },
-    () => "chiara",
+    () => "calda",
   );
   // Variante grafica della lista risultati (voce 5): scelta di Lorenzo 11/10 = B
   // (carosello). ?lista=a riporta la variante A finché non la si rimuove.
@@ -1278,6 +1284,13 @@ export default function MapView({
   // più "Cerca in N salvati"; sotto, le zone (Roma, Milano…) quando i salvati sono in più città.
   const salvatiMappaOn = savedControlsOn && !salvatiListaOn && aiSearch === null;
   const zoneSalvati = salvatiMappaOn ? zoneDeiSalvati(displayedPlaces) : [];
+  // Le card seguono l'ordine della lista solo sulla mappa dei salvati, senza ricerca né gruppo aperto.
+  const ordineListaOn = salvatiMappaOn && clusterPlaces === null && ordineLista != null;
+  // I posti non presenti nella lista (es. trovati dopo con la ricerca) vanno in fondo, nel loro ordine.
+  const posLista = ordineListaOn && ordineLista ? new globalThis.Map(ordineLista.map((id, i) => [id, i])) : null;
+  const salvatiInOrdine = posLista
+    ? [...displayedPlaces].sort((a, b) => (posLista.get(a.id) ?? 1e9) - (posLista.get(b.id) ?? 1e9))
+    : displayedPlaces;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -1305,7 +1318,8 @@ export default function MapView({
   // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
   const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
   const countTag = (t: string) => savedPlaces.filter((p) => hasStateOrTag(p.tags, t)).length;
-  const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+  // Revisore 3/11: 👍/👎 sono giudizi, non raccolte (la lista li esclude già).
+  const sheetCollections = sortTags(availableTags).filter((t) => !isStateTag(t));
   const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
   const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
   const sheetSection = "mt-4 mb-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted";
@@ -1477,7 +1491,7 @@ export default function MapView({
       const supabase = await browserClient();
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
+        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
         .eq("user_id", userId)
         // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
         .order("created_at", { ascending: true });
@@ -1491,14 +1505,14 @@ export default function MapView({
 
       const uuidMap: Record<string, string> = {}; // Google Place ID -> UUID interno
       const fetched = (data ?? [])
-        .map((row) => {
+        .map((row): Place | null => {
           // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
           const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null }) | null;
           if (!raw || raw.lat == null || raw.lng == null) return null;
           const { google_place_id, price_level, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
           // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
-          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null };
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
         })
         .filter((p): p is Place => p !== null);
 
@@ -2104,8 +2118,34 @@ export default function MapView({
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
   const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
-  const apriMappaSalvati = () => {
+  // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
+  // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
+  // Revisore 3/11 (quinto): se il primo della lista è lontano (oltre 50 km, es. ordine "Recenti" con un
+  // posto di Milano da Roma) la mappa va sulla sua zona, non sui vicini: card e mappa parlano dello stesso posto.
+  const apriMappaSalvati = (order?: string[]) => {
     setSalvatiMappa(true);
+    const byId: Record<string, Place> = Object.fromEntries(displayedPlaces.map((p) => [p.id, p]));
+    const primo = order && order.length > 0 ? byId[order[0]] : undefined;
+    setOrdineLista(order && order.length > 0 ? order : null);
+    if (order && order.length > 0) { setCarouselOrder(order); setFocusedId(order[0]); }
+    if (primo) {
+      if (userPos && distanceMeters(userPos, primo) < 50_000) {
+        const vicini = order!.map((id) => byId[id]).filter((p): p is Place => !!p)
+          // Revisore 3/11 (settimo): i primi 5 vicini nell'ordine della lista (che ha già i 👎 in fondo),
+          // così le card in vista sono quelle inquadrate.
+          .filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 5);
+        // Il primo della lista resta sempre dentro l'inquadratura.
+        if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
+        fitToPlaces(vicini, 170, 0, [userPos], true);
+        return;
+      }
+      const zona = zoneDeiSalvati(displayedPlaces).find((z) => z.posti.some((p) => p.id === primo.id));
+      if (zona) setZonaMappa(zona.nome);
+      const citta = cityFromAddress(primo.address);
+      const stessaCitta = citta ? displayedPlaces.filter((p) => cityFromAddress(p.address) === citta) : [];
+      fitToPlaces(zona?.posti ?? (stessaCitta.length > 0 ? stessaCitta : [primo]), 170, 0, [], true);
+      return;
+    }
     const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
     if (z) inquadraZona(z);
     else fitToPlaces(displayedPlaces, 170, 0, [], true);
@@ -2124,7 +2164,7 @@ export default function MapView({
           if (v.trim() && found.length > 0) fitToPlaces(found, 170, 0, [], true);
         }, 600);
       }}
-      placeholder="Cerca nei salvati"
+      placeholder="Cerca nei tuoi posti"
       aria-label="Cerca tra i salvati"
       className={pill
         ? "min-h-11 min-w-0 flex-1 bg-transparent text-base font-sans text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -3504,7 +3544,7 @@ export default function MapView({
         // mai sopra barra, pulsanti e card della pagina.
         // gridColumn/gridRow contano solo da computer (griglia lg): la mappa occupa la colonna di sinistra.
         style={{ width: "100%", height: "100%", isolation: "isolate", gridColumn: 1, gridRow: "1 / span 2" }}
-        mapStyle={mapVariant === "chiara" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/streets-v12"}
+        mapStyle={mapVariant === "standard" ? "mapbox://styles/mapbox/streets-v12" : "mapbox://styles/mapbox/light-v11"}
         // Nomi di città e quartieri in italiano ("Roma", non "Rome"): senza, Mapbox usa l'inglese.
         language="it"
         onLoad={(e) => {
@@ -3515,7 +3555,9 @@ export default function MapView({
         }}
         onStyleData={() => {
           const map = (mapRef.current as { getMap?: () => MapStyleApi } | null)?.getMap?.();
-          if (map) hidePoiLabels(map);
+          if (!map) return;
+          hidePoiLabels(map);
+          if (mapVariant === "calda") vernicaMappaCalda(map);
         }}
         onClick={() => { setClusterPlaces(null); setFilterError(null); dispatch({ type: "CLOSE" }); }}
       >
@@ -3588,7 +3630,13 @@ export default function MapView({
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? "stato" : "provare") : undefined}
               >
+                {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
+                    "Da provare" resta il segnalino semplice. Si capisce lo stato senza aprire la card. */}
+                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (
+                  <span data-testid="pin-stato" aria-label="Ci sono stato" className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
+                )}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
@@ -3636,7 +3684,7 @@ export default function MapView({
                 {/* Nome solo dove non copre altri segnalini o nomi (vedi latiEtichette). In assoluto: mostrarlo
                     o nasconderlo non sposta il segnalino, che resta fermo sul punto. */}
                 {latiEtichette[place.id] && (
-                  <span data-testid="etichetta-pin" data-lato={latiEtichette[place.id]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${LATO_ETICHETTA[latiEtichette[place.id]]} ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
+                  <span data-testid="etichetta-pin" data-lato={latiEtichette[place.id]} className={`absolute w-max max-w-[148px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold shadow-card ${LATO_ETICHETTA[latiEtichette[place.id]]} ${listNew && pinPhotoIds.has(place.id) && (focusId === place.id || selected?.id === place.id) ? "text-accent" : "text-brand"}`}>
                     {nomeLeggibile(pinName(place.name))}
                   </span>
                 )}
@@ -3667,7 +3715,7 @@ export default function MapView({
                 <Bookmark size={16} fill="currentColor" aria-hidden />
               </span>
               {latiEtichette[`dai-salvati-${p.id}`] && (
-                <span data-testid="etichetta-pin" data-lato={latiEtichette[`dai-salvati-${p.id}`]} className={`absolute w-max max-w-[110px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card ${LATO_ETICHETTA[latiEtichette[`dai-salvati-${p.id}`]]}`}>
+                <span data-testid="etichetta-pin" data-lato={latiEtichette[`dai-salvati-${p.id}`]} className={`absolute w-max max-w-[148px] truncate rounded-pill bg-white/95 px-2 py-0.5 text-[11px] font-display font-semibold text-brand shadow-card ${LATO_ETICHETTA[latiEtichette[`dai-salvati-${p.id}`]]}`}>
                   📌 {nomeLeggibile(pinName(p.name))}
                 </span>
               )}
@@ -3963,7 +4011,7 @@ export default function MapView({
 
       {overlay.kind === "list" && !salvatiListaOn && (
         <BottomSheet
-          places={clusterPlaces ?? displayedPlaces}
+          places={clusterPlaces ?? salvatiInOrdine}
           // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
           details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
           savedMode={view === "saved" && aiSearch === null}
@@ -3976,12 +4024,12 @@ export default function MapView({
           origin={view === "saved" ? userPos : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
-          nearest={view === "saved" && aiSearch === null ? savedNearestOn : undefined}
+          nearest={view === "saved" && aiSearch === null ? savedNearestOn && !ordineListaOn : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
-            ? `I tuoi salvati${activeCity ? ` · ${activeCity}` : ""}`
+            ? `I tuoi posti${activeCity ? ` · ${activeCity}` : ""}`
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
