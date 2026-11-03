@@ -24,7 +24,7 @@ import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { hasStateOrTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -1305,7 +1305,8 @@ export default function MapView({
   // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
   const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
   const countTag = (t: string) => savedPlaces.filter((p) => hasStateOrTag(p.tags, t)).length;
-  const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+  // Revisore 3/11: 👍/👎 sono giudizi, non raccolte (la lista li esclude già).
+  const sheetCollections = sortTags(availableTags).filter((t) => !isStateTag(t));
   const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
   const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
   const sheetSection = "mt-4 mb-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted";
@@ -2104,8 +2105,18 @@ export default function MapView({
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
   const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
-  const apriMappaSalvati = () => {
+  // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
+  // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
+  const apriMappaSalvati = (order?: string[]) => {
     setSalvatiMappa(true);
+    if (order && order.length > 0) { setCarouselOrder(order); setFocusedId(order[0]); }
+    if (userPos && order && order.length > 0) {
+      const byId: Record<string, Place> = Object.fromEntries(displayedPlaces.map((p) => [p.id, p]));
+      const vicini = order.map((id) => byId[id]).filter((p): p is Place => !!p)
+        .sort((a, b) => distanceMeters(userPos, a) - distanceMeters(userPos, b)).slice(0, 5)
+        .filter((p) => distanceMeters(userPos, p) < 50_000);
+      if (vicini.length > 0) { fitToPlaces(vicini, 170, 0, [userPos], true); return; }
+    }
     const z = zonaIniziale(zoneDeiSalvati(displayedPlaces), userPos);
     if (z) inquadraZona(z);
     else fitToPlaces(displayedPlaces, 170, 0, [], true);
@@ -3588,7 +3599,13 @@ export default function MapView({
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? "stato" : "provare") : undefined}
               >
+                {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
+                    "Da provare" resta il segnalino semplice. Si capisce lo stato senza aprire la card. */}
+                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (
+                  <span data-testid="pin-stato" aria-label="Ci sono stato" className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
+                )}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
