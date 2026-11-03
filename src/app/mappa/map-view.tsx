@@ -2131,8 +2131,9 @@ export default function MapView({
     if (primo) {
       if (userPos && distanceMeters(userPos, primo) < 50_000) {
         const vicini = order!.map((id) => byId[id]).filter((p): p is Place => !!p)
-          .filter((p) => distanceMeters(userPos, p) < 50_000)
-          .sort((a, b) => distanceMeters(userPos, a) - distanceMeters(userPos, b)).slice(0, 5);
+          // Revisore 3/11 (settimo): i primi 5 vicini nell'ordine della lista (che ha già i 👎 in fondo),
+          // così le card in vista sono quelle inquadrate.
+          .filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 5);
         // Il primo della lista resta sempre dentro l'inquadratura.
         if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
         fitToPlaces(vicini, 170, 0, [userPos], true);

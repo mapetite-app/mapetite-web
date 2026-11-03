@@ -398,17 +398,6 @@ export default function SalvatiLista({
                 </li>
               );
             })}
-            <li className="shrink-0">
-              <Link
-                href="/profilo?raccolta=nuova"
-                aria-label="Nuova raccolta"
-                data-testid={collections.length === 0 ? "raccolte-vuote" : undefined}
-                className="flex min-h-11 items-center gap-1 rounded-pill border-[1.5px] border-dashed border-[#c9c2b6] px-3.5 text-[14px] font-medium text-[#33373d] active:scale-[0.97]"
-              >
-                <Plus size={15} aria-hidden className="text-text-muted" />
-                {collections.length === 0 ? "Nuova raccolta" : "Nuova"}
-              </Link>
-            </li>
           </ul>
           {/* Revisore 3/11 (sesto): gli stati dopo le raccolte, con la parola ("📌 Da provare 8"): le raccolte
               entrano per prime nello schermo e lo stato si capisce senza indovinare il simbolo. */}
@@ -429,6 +418,18 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
+          {/* Revisore 3/11 (settimo): "Nuova" in fondo alla fila, dopo gli stati. */}
+          <div className="shrink-0">
+            <Link
+              href="/profilo?raccolta=nuova"
+              aria-label="Nuova raccolta"
+              data-testid={collections.length === 0 ? "raccolte-vuote" : undefined}
+              className="flex min-h-11 items-center gap-1 rounded-pill border-[1.5px] border-dashed border-[#c9c2b6] px-3.5 text-[14px] font-medium text-[#33373d] active:scale-[0.97]"
+            >
+              <Plus size={15} aria-hidden className="text-text-muted" />
+              {collections.length === 0 ? "Nuova raccolta" : "Nuova"}
+            </Link>
+          </div>
         </div>
 
         {(daMesi.size > 0 && !searching) && (
@@ -443,7 +444,7 @@ export default function SalvatiLista({
             <span className="min-w-0 flex-1 truncate">
               {soloMesi ? "Aspettano da mesi" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
             </span>
-            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-accent">Vedi</span>}
+            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-brand">Vedi</span>}
           </button>
         )}
 
