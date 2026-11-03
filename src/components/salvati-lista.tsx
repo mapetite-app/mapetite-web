@@ -204,14 +204,30 @@ export default function SalvatiLista({
   // "Preferiti" (revisore 3/11, area 3d): prima i 👍, poi gli altri "Ci sono stato", poi i da provare
   // dal più recente; i 👎 in fondo. Solo segnali dati dalla persona, nessuna fama.
   const sort = ordine ?? (origin ? "vicino" : "recenti");
+  // "Aspettano da mesi" (PROPOSTE.md 40, PROBLEMI.md 18): i "Da provare" salvati da oltre 60 giorni
+  // tornano su con una riga sola; un tocco li mostra da soli. Solo la data di salvataggio, costo zero.
+  const [adesso] = useState(() => Date.now());
+  const [soloMesi, setSoloMesi] = useState(false);
+  const daMesi = useMemo(() => new Set(all.filter((p) => !p.tags?.includes(DONE) && p.savedAt && adesso - Date.parse(p.savedAt) > 60 * 86_400_000).map((p) => p.id)), [all, adesso]);
+  const daQuando = (p: Place) => {
+    if (!daMesi.has(p.id) || !p.savedAt) return null;
+    const d = new Date(p.savedAt);
+    const mese = d.toLocaleDateString("it-IT", { month: "long" });
+    return new Date(adesso).getFullYear() === d.getFullYear() ? mese : `${mese} ${d.getFullYear()}`;
+  };
+  const shownMesi = useMemo(() => (soloMesi ? shown.filter((p) => daMesi.has(p.id)) : shown), [shown, soloMesi, daMesi]);
   const list = useMemo(() => {
-    if (sort === "vicino" && origin) return [...shown].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
+    // Revisore 3/11 (sesto): anche con "Vicino" i 👎 vanno in fondo (mai primo un posto che non fa per te).
+    if (sort === "vicino" && origin) {
+      const giu = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 1 : 0);
+      return [...shownMesi].sort((a, b) => giu(a) - giu(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
+    }
     if (sort === "preferiti") {
       const peso = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 3 : p.tags?.includes(OPINION_LIKE) ? 0 : p.tags?.includes(DONE) ? 1 : 2);
-      return [...shown].reverse().sort((a, b) => peso(a) - peso(b));
+      return [...shownMesi].reverse().sort((a, b) => peso(a) - peso(b));
     }
-    return sort === "recenti" ? [...shown].reverse() : shown;
-  }, [shown, origin, sort]);
+    return sort === "recenti" ? [...shownMesi].reverse() : shownMesi;
+  }, [shownMesi, origin, sort]);
   const searching = query !== "";
   const domanda = searching && sembraDomanda(query);
   // La risposta vale solo per la domanda scritta adesso.
@@ -223,9 +239,9 @@ export default function SalvatiLista({
   // così le raccolte entrano nello schermo già alla prima occhiata.
   // Revisore 3/11 (quinto): pillole compatte ("📌 8", "✓ 6", le stesse icone dello stato sulle righe);
   // l'etichetta intera resta per lo screen reader e come suggerimento.
-  const pills: { label: string; n: number | null; on: boolean; tag: string | null }[] = [
-    { label: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
-    { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
+  const pills: { label: string; short: string; n: number | null; on: boolean; tag: string | null }[] = [
+    { label: "Da provare", short: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
+    { label: "Ci sono stato", short: "Visti", n: count(DONE), on: activeTag === DONE, tag: DONE },
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
   ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
   const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ddd5c8] text-text active:scale-95";
@@ -244,7 +260,7 @@ export default function SalvatiLista({
         <div className="flex h-5 items-center justify-between gap-3">
           <p data-testid="salvati-lista-sopra" className="min-w-0 truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
             {/* Mentre si cerca: quanti ne trova su quanti (revisore 3/11, quinto), non il totale con le città. */}
-            {searching && !soloRisposta ? `${list.length} di ${all.length} ${all.length === 1 ? "posto" : "posti"}` : kicker}
+            {(searching || soloMesi || activeTag !== null || activeCity !== null || filtersOn > 0) && !soloRisposta ? `${list.length} di ${all.length} ${all.length === 1 ? "posto" : "posti"}` : kicker}
           </p>
           {/* Ordine nel menu nativo del telefono: "Vicino" o "Recenti". Area toccabile alta 44 px senza alzare la riga. */}
           <label className="relative -my-3 -mr-1 flex min-h-11 shrink-0 items-center text-[13px] font-medium text-[#4a4f55]">
@@ -362,23 +378,6 @@ export default function SalvatiLista({
               <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
             </button>
           )}
-          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-1.5">
-            {pills.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                data-testid="salvati-stato-pillola"
-                aria-pressed={p.on}
-                aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
-                title={p.label}
-                onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
-              >
-                {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
-                {p.n}
-              </button>
-            ))}
-          </div>
           {/* Le raccolte nella stessa fila (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima;
               senza raccolte resta solo lei, con l'invito scritto. */}
           <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="flex shrink-0 gap-1.5">
@@ -411,7 +410,42 @@ export default function SalvatiLista({
               </Link>
             </li>
           </ul>
+          {/* Revisore 3/11 (sesto): gli stati dopo le raccolte, con la parola ("📌 Da provare 8"): le raccolte
+              entrano per prime nello schermo e lo stato si capisce senza indovinare il simbolo. */}
+          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-1.5">
+            {pills.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                data-testid="salvati-stato-pillola"
+                aria-pressed={p.on}
+                aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
+                title={p.label}
+                onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
+                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
+              >
+                {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
+                {p.short} {p.n}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {(daMesi.size > 0 && !searching) && (
+          <button
+            type="button"
+            data-testid="salvati-da-mesi"
+            aria-pressed={soloMesi}
+            onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
+            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#f1ece3] font-medium text-[#33373d]"}`}
+          >
+            <span aria-hidden className="text-[15px] leading-none">⏳</span>
+            <span className="min-w-0 flex-1 truncate">
+              {soloMesi ? "Aspettano da mesi" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
+            </span>
+            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-accent">Vedi</span>}
+          </button>
+        )}
 
         {list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
@@ -419,7 +453,7 @@ export default function SalvatiLista({
             <p className="mt-1 text-sm text-text-muted">Cambia la ricerca o i filtri.</p>
             <button
               type="button"
-              onClick={() => { onTag(null); onQuery(""); if (activeCity !== null) onClearCity(); }}
+              onClick={() => { onTag(null); onQuery(""); setSoloMesi(false); if (activeCity !== null) onClearCity(); }}
               className="mt-4 min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
             >
               Mostra tutti
@@ -436,6 +470,7 @@ export default function SalvatiLista({
               const fonte = reels[p.id];
               const verdict = verdicts[p.id]?.verdict ?? null;
               const done = p.tags?.includes(DONE);
+              const daMese = daQuando(p);
               const liked = p.tags?.includes(OPINION_LIKE);
               const chip = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
               return (
@@ -467,6 +502,7 @@ export default function SalvatiLista({
                           <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
                             {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <span aria-hidden className="text-[10px] leading-none">📌</span>}
                             {done ? "Ci sono stato" : "Da provare"}
+                            {daMese && <span data-testid="salvato-da-mesi" className="font-medium">da {daMese}</span>}
                           </span>
                           {liked && (
                             <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>{tagLabel(OPINION_LIKE)}</span>

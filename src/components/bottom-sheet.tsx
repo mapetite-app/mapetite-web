@@ -834,7 +834,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Aperto/chiuso è un fatto: sta in fondo alla riga dei fatti, come nella scheda.
             const saved = onSave ? savedLabel?.(place.id) ?? null : null;
             // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
-            const stato = savedMode ? (place.tags ?? []).find(isStateTag) ?? STATE_TAGS[0] : undefined;
+            // Revisore 3/11 (sesto): prima lo stato (Da provare / Ci sono stato), poi il 👍/👎 accanto, come nella lista.
+            const stato = savedMode ? (place.tags ?? []).find((t) => (STATE_TAGS as readonly string[]).includes(t)) ?? ((place.tags ?? []).some(isStateTag) ? STATE_TAGS[1] : STATE_TAGS[0]) : undefined;
+            const parere = savedMode ? (place.tags?.includes("Non fa per me") ? " · 👎" : place.tags?.includes("Mi è piaciuto") ? " · 👍" : "") : "";
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
             if (nuova) {
@@ -896,7 +898,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -1013,7 +1015,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}</span>
+                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
