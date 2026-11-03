@@ -24,7 +24,7 @@ import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
-import { hasStateOrTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -1305,7 +1305,8 @@ export default function MapView({
   // Foglio "Filtri" dei salvati: cosa mostra e come si accendono i filtri.
   const sheetShown = filterSaved(savedPlaces, activeTag, activeCity, savedQuery);
   const countTag = (t: string) => savedPlaces.filter((p) => hasStateOrTag(p.tags, t)).length;
-  const sheetCollections = sortTags(availableTags).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE);
+  // Revisore 3/11: 👍/👎 sono giudizi, non raccolte (la lista li esclude già).
+  const sheetCollections = sortTags(availableTags).filter((t) => !isStateTag(t));
   const pickTag = (t: string | null) => { setActiveTag(t); clearAiSearch(); setClusterPlaces(null); setFilterError(null); };
   const sheetChip = (on: boolean) => `shrink-0 ${on ? CHIP_ON : CHIP_CITY}`;
   const sheetSection = "mt-4 mb-1.5 text-xs font-display font-semibold uppercase tracking-wide text-text-muted";
@@ -3588,7 +3589,13 @@ export default function MapView({
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? "stato" : "provare") : undefined}
               >
+                {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
+                    "Da provare" resta il segnalino semplice. Si capisce lo stato senza aprire la card. */}
+                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (
+                  <span data-testid="pin-stato" aria-label="Ci sono stato" className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
+                )}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"

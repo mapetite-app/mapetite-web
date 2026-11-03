@@ -9,7 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { cardFacts } from "@/components/bottom-sheet";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { hasStateOrTag, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
+import { hasStateOrTag, OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
 import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
@@ -26,6 +26,7 @@ import { fotoUrl } from "@/lib/foto-utenti";
 // la foto scattata dall'utente quando c'è (foto_locali, già nostra).
 
 const [WANT, DONE] = STATE_TAGS;
+type Ordine = "vicino" | "recenti" | "preferiti";
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f8f6f2]";
 const LINE = "border-[#e8e2d8]";
@@ -105,9 +106,8 @@ export default function SalvatiLista({
   onMap: () => void;
   hideOnDesktop?: boolean;
 }) {
-  const [searchOpen, setSearchOpen] = useState(false);
   // Ordine visibile (giro 1/11): "Vicino" se la posizione è nota, altrimenti "Recenti". Si cambia con un tocco.
-  const [ordine, setOrdine] = useState<"vicino" | "recenti" | null>(null);
+  const [ordine, setOrdine] = useState<Ordine | null>(null);
   // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
   // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
   type Risposta = { q: string; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
@@ -200,22 +200,27 @@ export default function SalvatiLista({
   }, [all]);
   // Per vicinanza quando la posizione è nota (mai chiesta da sola: la chiede il tocco su "Vicino");
   // "Recenti" = dall'ultimo salvato (map-view li legge dal più vecchio al più nuovo).
+  // "Preferiti" (revisore 3/11, area 3d): prima i 👍, poi gli altri "Ci sono stato", poi i da provare
+  // dal più recente; i 👎 in fondo. Solo segnali dati dalla persona, nessuna fama.
   const sort = ordine ?? (origin ? "vicino" : "recenti");
-  const list = useMemo(
-    () => (sort === "vicino" && origin ? [...shown].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b)) : sort === "recenti" ? [...shown].reverse() : shown),
-    [shown, origin, sort],
-  );
-  const searching = searchOpen || query !== "";
+  const list = useMemo(() => {
+    if (sort === "vicino" && origin) return [...shown].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
+    if (sort === "preferiti") {
+      const peso = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 3 : p.tags?.includes(OPINION_LIKE) ? 0 : p.tags?.includes(DONE) ? 1 : 2);
+      return [...shown].reverse().sort((a, b) => peso(a) - peso(b));
+    }
+    return sort === "recenti" ? [...shown].reverse() : shown;
+  }, [shown, origin, sort]);
+  const searching = query !== "";
   const domanda = searching && sembraDomanda(query);
   // La risposta vale solo per la domanda scritta adesso.
   const attuale = domanda && risposta?.q === query.trim() ? risposta : null;
   // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
   const soloRisposta = domanda && list.length === 0 && activeTag === null && activeCity === null;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
-  const stateOn = activeTag === WANT || activeTag === DONE;
+  // Revisore 3/11: niente "Tutti" (è lo stato quando nessun filtro è acceso; un secondo tocco spegne):
+  // così le raccolte entrano nello schermo già alla prima occhiata.
   const pills: { label: string; n: number | null; on: boolean; tag: string | null }[] = [
-    // "Tutti" senza numero: il totale è già sopra il titolo ("3 posti · Roma").
-    { label: "Tutti", n: null, on: !stateOn && !collections.some((c) => c.name === activeTag), tag: null },
     { label: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
     { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
@@ -241,11 +246,12 @@ export default function SalvatiLista({
               data-testid="salvati-ordine"
               aria-label="Ordina"
               value={sort}
-              onChange={(e) => { const k = e.target.value as "vicino" | "recenti"; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
+              onChange={(e) => { const k = e.target.value as Ordine; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
               className="min-h-11 appearance-none bg-transparent pl-2 pr-5 text-right focus:outline-none"
             >
               <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
               <option value="recenti">Recenti</option>
+              <option value="preferiti">Preferiti</option>
             </select>
             <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-1 text-text-muted" />
           </label>
@@ -265,26 +271,24 @@ export default function SalvatiLista({
           </div>
         </header>
 
-        {searching && (
-          <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-4 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
-            <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
-            <input
-              type="search"
-              autoFocus={query === ""}
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              enterKeyHint="search"
-              placeholder="Nome, zona o una domanda…"
-              aria-label="Cerca nei tuoi posti"
-              className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-            />
-            {query !== "" && (
-              <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-11 w-11 items-center justify-center text-text-muted">
-                <X size={16} aria-hidden />
-              </button>
-            )}
-          </form>
-        )}
+        {/* Revisore 3/11 (area 3f): la ricerca sempre in vista, come la barra della mappa; si scrive al tocco. */}
+        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-4 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
+          <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            enterKeyHint="search"
+            placeholder="Cerca nei tuoi posti o chiedi…"
+            aria-label="Cerca nei tuoi posti"
+            className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query !== "" && (
+            <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-11 w-11 items-center justify-center text-text-muted">
+              <X size={16} aria-hidden />
+            </button>
+          )}
+        </form>
 
         {domanda && (
           <section data-testid="chiedi-salvati" aria-live="polite" className="mt-3">
@@ -340,9 +344,6 @@ export default function SalvatiLista({
         {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
             e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
         <div data-testid="salvati-comandi" className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
-          <button type="button" aria-label="Cerca" aria-pressed={searching} onClick={() => { if (searching) { onQuery(""); setSearchOpen(false); } else setSearchOpen(true); }} className={`${iconBtn} ${searching ? "border-brand bg-brand text-white" : "bg-white"}`}>
-            {searching ? <X size={17} aria-hidden /> : <Search size={17} aria-hidden />}
-          </button>
           <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
             <SlidersHorizontal size={15} aria-hidden /> Filtri
             {filtersOn > 0 && (
@@ -407,7 +408,7 @@ export default function SalvatiLista({
             <p className="mt-1 text-sm text-text-muted">Cambia la ricerca o i filtri.</p>
             <button
               type="button"
-              onClick={() => { onTag(null); onQuery(""); setSearchOpen(false); if (activeCity !== null) onClearCity(); }}
+              onClick={() => { onTag(null); onQuery(""); if (activeCity !== null) onClearCity(); }}
               className="mt-4 min-h-11 rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white active:scale-95"
             >
               Mostra tutti
@@ -419,7 +420,8 @@ export default function SalvatiLista({
               // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
               // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
               const meta = cardFacts(p, null, true);
-              const dist = origin ? distanceLabel(origin, p) : null;
+              // Revisore 3/11: oltre 50 km la distanza non serve ("474,6 km"); resta la città, intera.
+              const dist = origin && distanceMeters(origin, p) < 50_000 ? distanceLabel(origin, p) : null;
               const fonte = reels[p.id];
               const verdict = verdicts[p.id]?.verdict ?? null;
               const done = p.tags?.includes(DONE);
