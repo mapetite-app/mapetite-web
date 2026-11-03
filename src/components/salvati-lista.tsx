@@ -9,7 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { cardFacts } from "@/components/bottom-sheet";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { hasStateOrTag, OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, tagDisplay } from "@/lib/tags";
+import { hasStateOrTag, OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, tagDisplay, tagLabel } from "@/lib/tags";
 import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
@@ -54,9 +54,10 @@ function Copertina({ name, count, icona, on }: { name: string; count: number; ic
   return (
     <span
       data-testid="raccolta-copertina"
-      className={`flex min-h-11 w-full items-center gap-2 rounded-pill border py-1 pl-1 pr-3.5 ${on ? "border-brand bg-brand" : "border-[#e3ddd2] bg-white"}`}
+      className={`flex min-h-11 w-full items-center gap-1.5 rounded-pill border px-3 ${on ? "border-brand bg-brand" : "border-[#e3ddd2] bg-white"}`}
     >
-      <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[18px] leading-none ${on ? "bg-white/[0.14]" : "bg-[#f3efe8]"}`}>{icona}</span>
+      {/* Revisore 3/11 (quinto): emoji in linea, senza cerchio, così a 390 px entrano almeno due raccolte. */}
+      <span aria-hidden className="shrink-0 text-[16px] leading-none">{icona}</span>
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
         <span className={`min-w-0 truncate text-[14px] ${on ? "font-semibold text-white" : "font-medium text-[#33373d]"}`}>{tagDisplay(name)}</span>
         <span className={`shrink-0 text-[12px] font-semibold ${on ? "text-white/75" : "text-text-muted"}`}>{count}</span>
@@ -220,6 +221,8 @@ export default function SalvatiLista({
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   // Revisore 3/11: niente "Tutti" (è lo stato quando nessun filtro è acceso; un secondo tocco spegne):
   // così le raccolte entrano nello schermo già alla prima occhiata.
+  // Revisore 3/11 (quinto): pillole compatte ("📌 8", "✓ 6", le stesse icone dello stato sulle righe);
+  // l'etichetta intera resta per lo screen reader e come suggerimento.
   const pills: { label: string; n: number | null; on: boolean; tag: string | null }[] = [
     { label: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
     { label: "Ci sono stato", n: count(DONE), on: activeTag === DONE, tag: DONE },
@@ -239,7 +242,10 @@ export default function SalvatiLista({
             accanto al titolo solo "Stasera" (con la sua etichetta) e un solo "+"; la mappa è il pulsante
             in basso, la ricerca la lente nella fila dei filtri. */}
         <div className="flex h-5 items-center justify-between gap-3">
-          <p data-testid="salvati-lista-sopra" className="min-w-0 truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{kicker}</p>
+          <p data-testid="salvati-lista-sopra" className="min-w-0 truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+            {/* Mentre si cerca: quanti ne trova su quanti (revisore 3/11, quinto), non il totale con le città. */}
+            {searching && !soloRisposta ? `${list.length} di ${all.length} ${all.length === 1 ? "posto" : "posti"}` : kicker}
+          </p>
           {/* Ordine nel menu nativo del telefono: "Vicino" o "Recenti". Area toccabile alta 44 px senza alzare la riga. */}
           <label className="relative -my-3 -mr-1 flex min-h-11 shrink-0 items-center text-[13px] font-medium text-[#4a4f55]">
             <select
@@ -343,7 +349,7 @@ export default function SalvatiLista({
         {!soloRisposta && (<>
         {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
             e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
-        <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
+        <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
           <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-brand active:scale-95 ${filtersOn > 0 ? "px-3.5" : "w-11"}`}>
             {/* Revisore 3/11 (quarto): senza filtri accesi solo l'icona, così le raccolte entrano nello schermo. */}
             <SlidersHorizontal size={15} aria-hidden />{filtersOn > 0 && " Filtri"}
@@ -356,22 +362,26 @@ export default function SalvatiLista({
               <span className="truncate">{activeCity}</span> <X size={12} aria-hidden className="shrink-0" />
             </button>
           )}
-          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-2">
+          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-1.5">
             {pills.map((p) => (
               <button
                 key={p.label}
                 type="button"
+                data-testid="salvati-stato-pillola"
                 aria-pressed={p.on}
+                aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
+                title={p.label}
                 onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-                className={`min-h-11 shrink-0 rounded-pill px-3.5 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
+                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
               >
-                {p.n === null ? p.label : `${p.label} ${p.n}`}
+                {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
+                {p.n}
               </button>
             ))}
           </div>
           {/* Le raccolte nella stessa fila (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima;
               senza raccolte resta solo lei, con l'invito scritto. */}
-          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="flex shrink-0 gap-2">
+          <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="flex shrink-0 gap-1.5">
             {collections.map((c, i) => {
               const on = activeTag === c.name;
               return (
@@ -459,11 +469,11 @@ export default function SalvatiLista({
                             {done ? "Ci sono stato" : "Da provare"}
                           </span>
                           {liked && (
-                            <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>👍 Piaciuto</span>
+                            <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>{tagLabel(OPINION_LIKE)}</span>
                           )}
                           {/* Revisore 3/11: con "Preferiti" il 👎 va in fondo; il chip dice perché. */}
                           {!liked && p.tags?.includes(OPINION_DISLIKE) && (
-                            <span data-testid="salvato-non-piaciuto" className={`${chip} bg-[#f1efeb] text-[#6b7075]`}>👎 Non per me</span>
+                            <span data-testid="salvato-non-piaciuto" className={`${chip} bg-[#f1efeb] text-[#6b7075]`}>{tagLabel(OPINION_DISLIKE)}</span>
                           )}
                           {fonte && (
                             <span data-testid="salvato-provenienza" className={`${chip} bg-[#f1ece3] font-medium text-[#33373d]`}>
@@ -484,6 +494,8 @@ export default function SalvatiLista({
           alto restano solo "Stasera" e "+" (revisore 2/11). Revisore 2/11, sesto giro: copriva verdetto e stato
           dell'ultima riga. Sotto la lista resta uno spazio pari al pulsante + 16 px (pt-4), così in fondo l'ultima
           riga sta tutta sopra; a riposo una sfumatura carta dietro il pulsante, niente testo che ci passa sotto. */}
+      {/* Con la sola risposta di "Chiedi ai tuoi posti" la lista è vuota: niente mappa vuota (revisore 3/11, quinto). */}
+      {!soloRisposta && (
       <div className={`pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-4 lg:pb-6 ${mappaNascosta ? "" : "bg-gradient-to-t from-[#f8f6f2] from-55% to-transparent"}`}>
         <button
           type="button"
@@ -498,6 +510,7 @@ export default function SalvatiLista({
           <MapIcon size={16} aria-hidden /> Sulla mappa
         </button>
       </div>
+      )}
     </section>
   );
 }
