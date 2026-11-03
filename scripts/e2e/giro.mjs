@@ -1999,7 +1999,8 @@ else {
     // Revisore 2/11: un salvato senza stato conta come "Da provare" (qui tutti e 3), niente terzo stato "Salvato".
     // Revisore 3/11: niente "Tutti" (è lo stato senza filtri), così le raccolte entrano nello schermo.
     // Revisore 3/11 (quinto): pillole compatte "📌 3" (etichetta intera "Da provare, 3" per lo screen reader).
-    ok((await st.getByRole("button").allTextContents()).join("|") === "📌3" && (await st.getByRole("button", { name: "Da provare, 3" }).getAttribute("aria-pressed")) === "false" && (await st.getByRole("button", { name: "Da provare, 3" }).getAttribute("title")) === "Da provare", "salvati lista: filtro compatto '📌 3' (Da provare, anche i salvati senza stato), senza 'Tutti' né 'Ci sono stato 0'");
+    // Revisore 3/11 (sesto): con la parola ("📌Da provare 3") e dopo le raccolte.
+    ok((await st.getByRole("button").allTextContents()).join("|") === "📌Da provare 3" && (await st.getByRole("button", { name: "Da provare, 3" }).getAttribute("aria-pressed")) === "false" && (await st.getByRole("button", { name: "Da provare, 3" }).getAttribute("title")) === "Da provare", "salvati lista: filtro '📌 Da provare 3' (Da provare, anche i salvati senza stato), senza 'Tutti' né 'Ci sono stato 0'");
     // Revisore 3/11 (3f): la ricerca è sempre in vista sotto il titolo, senza lente nella fila e senza fuoco all'apertura.
     { const cerca = L.getByLabel("Cerca nei tuoi posti"); const fb = await cerca.boundingBox();
       ok(await cerca.isVisible() && (await cerca.getAttribute("placeholder")) === "Cerca nei tuoi posti o chiedi…" && !!fb && fb.y < 200 && !(await cerca.evaluate((el) => el === document.activeElement)) && (await L.getByTestId("salvati-comandi").getByRole("button", { name: "Cerca", exact: true }).count()) === 0, `salvati lista: ricerca sempre visibile in alto (y ${Math.round(fb?.y ?? -1)}), niente lente nella fila`);
@@ -2168,7 +2169,7 @@ else {
   // "Chiedi all'AI"), torna alla lista e "Filtri"; sotto, le zone dei salvati (Roma, Milano) per passare da una all'altra.
   { const box = await p.getByTestId("salvati-filtri").boundingBox();
     const campi = await p.getByTestId("pannello-ricerca").locator("input").evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).map((e) => e.getAttribute("placeholder")));
-    ok(!!box && box.height < 60 && await p.getByTestId("salvati-vedi-lista").isVisible() && await p.getByLabel("Cerca tra i salvati").isVisible() && JSON.stringify(campi) === '["Cerca nei salvati"]' && (await p.getByTestId("barra-ricerca").count()) === 0, `salvati: una sola riga in alto con un solo campo 'Cerca nei salvati' (alta ${Math.round(box?.height ?? 0)} px, campi ${JSON.stringify(campi)})`);
+    ok(!!box && box.height < 60 && await p.getByTestId("salvati-vedi-lista").isVisible() && await p.getByLabel("Cerca tra i salvati").isVisible() && JSON.stringify(campi) === '["Cerca nei tuoi posti"]' && (await p.getByTestId("barra-ricerca").count()) === 0, `salvati: una sola riga in alto con un solo campo 'Cerca nei salvati' (alta ${Math.round(box?.height ?? 0)} px, campi ${JSON.stringify(campi)})`);
     ok((await p.getByRole("button", { name: "Filtri", exact: true }).count()) === 1 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un solo pulsante 'Filtri', senza numero se nessun filtro è acceso");
     ok((await p.getByTestId("vai-stasera").count()) === 0, "salvati: sulla mappa niente 'Stasera' (sta nella lista, accanto al '+')");
     // Zone: Roma (2) accesa all'apertura, Milano (1) a un tocco. La mappa inquadra la città, non l'Italia intera.
@@ -2245,7 +2246,7 @@ else {
   // Semplificare 5 (17/10): intestazione dei salvati corta, Condividi come icona e niente "3 posti" ripetuto.
   { const sh = p.getByTestId("condividi-lista"); const bb = await sh.boundingBox();
     ok((await sh.getAttribute("aria-label")) === "Condividi questa lista" && !((await sh.textContent()) ?? "").includes("Condividi") && !!bb && bb.width <= 40, `salvati: 'Condividi' è un'icona (${Math.round(bb?.width ?? 0)}px)`);
-    ok(((await p.getByTestId("conteggio-risultati").boundingBox())?.width ?? 0) <= 1 && ((await p.getByLabel("Cerca tra i salvati").getAttribute("placeholder").catch(() => "")) ?? "") === "Cerca nei salvati", "salvati: nessun numero ripetuto, il campo dice 'Cerca nei salvati' (il totale sta sopra il titolo della lista)"); }
+    ok(((await p.getByTestId("conteggio-risultati").boundingBox())?.width ?? 0) <= 1 && ((await p.getByLabel("Cerca tra i salvati").getAttribute("placeholder").catch(() => "")) ?? "") === "Cerca nei tuoi posti", "salvati: nessun numero ripetuto, il campo dice 'Cerca nei salvati' (il totale sta sopra il titolo della lista)"); }
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
@@ -2269,7 +2270,7 @@ else {
   await p.getByRole("button", { name: "📍 Milano · 1" }).click();
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   ok((await p.locator("ul.snap-x li").count()) === 1 && await p.locator("ul.snap-x").getByText("Caffè Milano").isVisible(), "filtro Milano: solo Caffè Milano");
-  ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi salvati · Milano", "salvati: intestazione 'I tuoi salvati · Milano'");
+  ok((await p.getByTestId("intestazione-lista").textContent()) === "I tuoi posti · Milano", "salvati: intestazione 'I tuoi posti · Milano'");
   ok(!(await p.locator("ul.snap-x li").first().textContent()).includes("· Milano"), "filtro Milano: la città non si ripete sulla card (è già nel titolo)");
   ok((await p.getByRole("button", { name: "Aperto ora" }).count()) === 0 && (await p.getByRole("button", { name: "Voto 4,5+" }).count()) === 0, "salvati: niente filtri rapidi (mancano orari e voti)");
   // L'animazione della mappa può durare un po' (di più se la macchina è carica): si aspetta fino a 8 s.
@@ -2441,6 +2442,39 @@ else {
   // veniva interrotto (ERR_ABORTED / timeout, visto anche sul codice di partenza il 15/10).
   await p.waitForLoadState("networkidle").catch(() => {});
   await p.waitForTimeout(500);
+
+  // Proposta 40 "aspettano da mesi" e revisore 3/11 (sesto): con "Vicino" un 👎 non è mai primo.
+  { const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8935, longitude: 12.472 } });
+    await gctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    const pz = (n, name, lat, lng) => ({ id: `00000000-0000-4000-8000-0000000004${n}`, name, category: "restaurant", address: "Via di Prova 1, 00186 Roma RM, Italy", lat, lng, google_place_id: `GM${n}`, rating: 4.4, price_level: 2 });
+    const rowsM = [
+      { created_at: "2026-07-02T10:00:00Z", tags: ["Da provare"], note: null, places: pz("01", "Osteria Vecchia", 41.9, 12.48) },
+      { created_at: "2026-07-20T10:00:00Z", tags: ["Già visitato"], note: null, places: pz("02", "Bar Visto", 41.901, 12.481) },
+      { created_at: "2026-10-30T10:00:00Z", tags: ["Già visitato", "Non fa per me"], note: null, places: pz("03", "Caffè No", 41.8936, 12.4721) },
+      { created_at: "2026-10-31T10:00:00Z", tags: ["Da provare"], note: null, places: pz("04", "Pizzeria Nuova", 41.896, 12.475) },
+    ];
+    await gctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rowsM.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rowsM }));
+    const pm = await gctx.newPage();
+    await pm.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+    const Lm = pm.getByTestId("salvati-lista");
+    await Lm.waitFor({ timeout: 8000 }).catch(() => {});
+    await pm.waitForTimeout(1200);
+    const mesi = Lm.getByTestId("salvati-da-mesi");
+    ok(await mesi.isVisible().catch(() => false) && (await mesi.textContent())?.includes("1 posto aspetta da mesi"), `da mesi: una riga '1 posto aspetta da mesi' (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
+    const chipMese = Lm.getByTestId("salvato-da-mesi");
+    ok((await chipMese.count()) === 1 && (await chipMese.textContent())?.trim() === "da luglio", `da mesi: sulla riga 'Da provare da luglio' (${await chipMese.count()})`);
+    const nomi = async () => (await Lm.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents());
+    const ordine = await Lm.getByTestId("salvati-ordine").inputValue().catch(() => "");
+    const primi = await nomi();
+    ok(ordine === "vicino" && primi[0] !== "Caffè No" && primi[primi.length - 1] === "Caffè No", `vicino: il 👎 più vicino va in fondo, non primo (${ordine}: ${primi.join(", ")})`);
+    await mesi.click().catch(() => {});
+    await pm.waitForTimeout(300);
+    ok(JSON.stringify(await nomi()) === '["Osteria Vecchia"]' && (await Lm.getByTestId("salvati-lista-sopra").textContent())?.trim() === "1 di 4 posti" && (await mesi.getAttribute("aria-pressed")) === "true", `da mesi: un tocco mostra solo chi aspetta, sopra '1 di 4 posti' (${(await nomi()).join(", ")})`);
+    await pm.screenshot({ path: `${OUT}/11j-salvati-da-mesi.png` });
+    await mesi.click().catch(() => {});
+    await pm.waitForTimeout(300);
+    ok((await nomi()).length === 4, "da mesi: un secondo tocco torna a tutti");
+    await gctx.close(); }
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
   await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-lista").waitFor({ timeout: 5000 }).then(() => ok(true, "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
