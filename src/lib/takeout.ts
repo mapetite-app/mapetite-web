@@ -17,6 +17,7 @@ export type TakeoutItem = {
   url: string | null; // link di Google Maps del file (serve ai .csv, che non hanno coordinate)
   note: string | null;
   lista: string; // nome della lista di Google ("Want to go", "Favourite places"…)
+  altreListe: string[]; // lo stesso posto anche in altre liste (o altri file): diventa anche quelle raccolte
   zona: string; // "Roma", "Milano", altra città, "Altre zone" o SENZA_POSIZIONE
 };
 export type TakeoutSkipped = { name: string; motivo: string };
@@ -220,7 +221,8 @@ export async function kmzToKml(buf: ArrayBuffer): Promise<string | null> {
   return null;
 }
 
-export function parseTakeout(fileName: string, text: string, seen = new Set<string>()): TakeoutParse {
+// `seen` passa da un file all'altro: lo stesso posto resta una riga sola, con l'elenco di tutte le sue liste.
+export function parseTakeout(fileName: string, text: string, seen = new Map<string, TakeoutItem | null>()): TakeoutParse {
   const lista = listNameFromFile(fileName);
   let raws: Raw[] = [];
   let formato: TakeoutParse["formato"] = "sconosciuto";
@@ -239,14 +241,21 @@ export function parseTakeout(fileName: string, text: string, seen = new Set<stri
     const why = notFoodReason(r.name);
     if (why) { scartati.push({ name: r.name, motivo: why }); continue; }
     const key = r.lat != null ? `${r.name.toLowerCase()}|${r.lat.toFixed(4)}|${r.lng!.toFixed(4)}` : `${r.name.toLowerCase()}|${r.url ?? ""}`;
-    if (seen.has(key)) continue; // stesso posto in due liste o due file: una volta sola
-    seen.add(key);
-    if (r.lat == null && !r.url) { scartati.push({ name: r.name, motivo: "senza posizione" }); continue; }
-    items.push({
+    if (seen.has(key)) {
+      // Stesso posto in due liste o due file: una riga sola, ma con i nomi di tutte le liste
+      // (revisore 3/11: la seconda lista si perdeva e non diventava raccolta).
+      const prev = seen.get(key);
+      if (prev && prev.lista !== r.lista && !prev.altreListe.includes(r.lista)) prev.altreListe.push(r.lista);
+      continue;
+    }
+    if (r.lat == null && !r.url) { seen.set(key, null); scartati.push({ name: r.name, motivo: "senza posizione" }); continue; }
+    const item: TakeoutItem = {
       key, name: r.name.slice(0, 200), address: r.address.slice(0, 300), lat: r.lat, lng: r.lng,
       googlePlaceId: r.placeId && PLACE_ID.test(r.placeId) ? r.placeId : null,
-      url: r.url, note: r.note, lista: r.lista, zona: zonaOf(r.address, r.lat, r.lng),
-    });
+      url: r.url, note: r.note, lista: r.lista, altreListe: [], zona: zonaOf(r.address, r.lat, r.lng),
+    };
+    seen.set(key, item);
+    items.push(item);
   }
   return { items, scartati, formato };
 }
