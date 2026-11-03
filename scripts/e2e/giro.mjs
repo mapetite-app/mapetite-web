@@ -2035,7 +2035,8 @@ else {
       // Revisore 2/11: un solo fondo per tutte le copertine (beige con bordo, niente blu fuori marchio); teal se accesa.
       { const fondi = await cop.evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
         ok(fondi.length === 2 && new Set(fondi).size === 1 && fondi[0] === "rgb(255, 255, 255)", `salvati lista: raccolte tutte dello stesso fondo bianco, come le altre pillole (${[...new Set(fondi)].join(", ")})`); }
-      const nuova = L.getByTestId("salvati-raccolte").locator("li").last().getByRole("link", { name: "Nuova raccolta" });
+      // Revisore 3/11 (settimo): "Nuova" è l'ultima della fila, dopo raccolte e stati.
+      const nuova = L.getByTestId("salvati-comandi").locator(":scope > *").last().getByRole("link", { name: "Nuova raccolta" });
       // In fondo alla fila scorrevole: scorrendo la fila arriva intera nello schermo.
       await nuova.evaluate((el) => el.scrollIntoView({ inline: "end", block: "nearest" }));
       const nb = await nuova.boundingBox();
