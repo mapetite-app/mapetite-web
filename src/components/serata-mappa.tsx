@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Map, { Layer, Marker, Source, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { vernicaMappaCalda, type MappaVernice } from "@/lib/mappa-calda";
 
 // Mini mappa della serata a tappe (piano 1.2): pin numerati nell'ordine delle tappe e la linea
 // del percorso (in linea d'aria: il percorso vero lo calcola Google Maps). Si carica solo nel
@@ -44,6 +45,8 @@ export default function SerataMappa({ stops, className = "" }: { stops: SerataSt
         initialViewState={{ bounds: bounds(stops), fitBoundsOptions: { padding: 44, maxZoom: 17 } }}
         style={{ width: "100%", height: "100%", isolation: "isolate" }}
         mapStyle="mapbox://styles/mapbox/light-v11"
+        // Stessi colori caldi della mappa principale (area 4e).
+        onLoad={(e) => vernicaMappaCalda(e.target as unknown as MappaVernice)}
         language="it"
         attributionControl={false}
         cooperativeGestures

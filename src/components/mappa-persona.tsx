@@ -4,6 +4,7 @@ import Link from "next/link";
 import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { vernicaMappaCalda, type MappaVernice } from "@/lib/mappa-calda";
 
 // Mappa dei posti di una persona (profilo pubblico e /u/<handle>/mappa): pin con l'emoji del
 // tipo di locale, corallo se "Ci sono stato", teal se "Da provare". Tocco sul pin: la
@@ -30,6 +31,8 @@ export default function MappaPersona({ spots, className = "" }: { spots: MapSpot
         initialViewState={{ bounds: bounds(spots), fitBoundsOptions: { padding: 36, maxZoom: 15 } }}
         style={{ width: "100%", height: "100%", isolation: "isolate" }}
         mapStyle="mapbox://styles/mapbox/light-v11"
+        // Stessi colori caldi della mappa principale (area 4e).
+        onLoad={(e) => vernicaMappaCalda(e.target as unknown as MappaVernice)}
         language="it"
         attributionControl={false}
         cooperativeGestures
