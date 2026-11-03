@@ -234,7 +234,7 @@ export default function SalvatiLista({
       onScroll={onScroll}
       className={`absolute inset-0 z-30 flex flex-col overflow-y-auto overscroll-contain ${PAPER} pb-[var(--nav-height-mobile)] lg:left-auto lg:w-[var(--pannello)] lg:border-l lg:border-border ${hideOnDesktop ? "lg:hidden" : ""}`}
     >
-      <div className="mx-auto w-full max-w-md flex-1 px-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <div className="mx-auto w-full max-w-md flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
         {/* Revisore 2/11: testata leggera. Sopra, il conteggio e l'ordine ("Recenti ▾") sulla stessa riga;
             accanto al titolo solo "Stasera" (con la sua etichetta) e un solo "+"; la mappa è il pulsante
             in basso, la ricerca la lente nella fila dei filtri. */}
@@ -256,8 +256,8 @@ export default function SalvatiLista({
             <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-1 text-text-muted" />
           </label>
         </div>
-        <header className="mt-1.5 flex items-center justify-between gap-3">
-          <h1 className={`${SERIF} min-w-0 text-[34px] font-medium leading-none tracking-tight text-text`}>I tuoi posti</h1>
+        <header className="mt-1 flex items-center justify-between gap-3">
+          <h1 className={`${SERIF} min-w-0 text-[31px] font-medium leading-none tracking-tight text-text`}>I tuoi posti</h1>
           <div className="flex shrink-0 gap-1.5">
             {/* "Stasera" è uno strumento, non un filtro (revisore 2/11). Revisore 2/11 (quarto giro): forchetta e
                 coltello barrati si leggevano "niente cibo / chiuso": luna corallo e la parola scritta accanto. */}
@@ -272,7 +272,7 @@ export default function SalvatiLista({
         </header>
 
         {/* Revisore 3/11 (area 3f): la ricerca sempre in vista, come la barra della mappa; si scrive al tocco. */}
-        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-4 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
+        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-3 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
           <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
           <input
             type="search"
@@ -281,10 +281,10 @@ export default function SalvatiLista({
             enterKeyHint="search"
             placeholder="Cerca nei tuoi posti o chiedi…"
             aria-label="Cerca nei tuoi posti"
-            className="min-h-11 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-10 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {query !== "" && (
-            <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-11 w-11 items-center justify-center text-text-muted">
+            <button type="button" aria-label="Cancella" onClick={() => onQuery("")} className="flex h-10 w-11 items-center justify-center text-text-muted">
               <X size={16} aria-hidden />
             </button>
           )}
@@ -343,7 +343,7 @@ export default function SalvatiLista({
         {!soloRisposta && (<>
         {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
             e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
-        <div data-testid="salvati-comandi" className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
+        <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
           <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className="relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-3.5 text-[14px] font-medium text-brand active:scale-95">
             <SlidersHorizontal size={15} aria-hidden /> Filtri
             {filtersOn > 0 && (
@@ -415,7 +415,7 @@ export default function SalvatiLista({
             </button>
           </div>
         ) : (
-          <ul data-testid="salvati-lista-posti" className={`mt-2.5 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+          <ul data-testid="salvati-lista-posti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
             {list.map((p, i) => {
               // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
               // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
