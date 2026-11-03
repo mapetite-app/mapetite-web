@@ -8,7 +8,7 @@ export type LabelPin = { id: string; lat: number; lng: number; name: string; big
 export type Rect = { x1: number; y1: number; x2: number; y2: number };
 
 const LABEL_H = 22; // altezza della pillola col nome (text-[11px] + padding)
-const LABEL_MAX_W = 110; // max-w-[110px] (bordo compreso)
+const LABEL_MAX_W = 148; // max-w-[148px] (revisore 3/11, sesto: "Gelateria del T…" tagliato con 110) (bordo compreso)
 const GAP = 2;
 const SLACK = 4; // pochi pixel di bordo che si toccano non danno fastidio
 
