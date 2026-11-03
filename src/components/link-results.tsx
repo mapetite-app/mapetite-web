@@ -101,17 +101,19 @@ function ErrorRow({ r }: { r: LinkOutcome }) {
 // Lista condivisa di Google Maps (piano 2a): non è un errore dell'utente, è un limite di Google.
 // Una strada sola: il file di Google, dove ogni lista diventa una raccolta con il suo nome. Dopo il tocco
 // il riquadro si riduce a una riga (i passi si aprono più sotto, nella pagina).
-export function ListaRow({ count = 1, secondary = false }: { count?: number; secondary?: boolean }) {
+// `piatta`: dentro un altro riquadro (il "Fatto" di più link) niente cornice, solo un divisore sopra.
+export function ListaRow({ count = 1, secondary = false, piatta = false }: { count?: number; secondary?: boolean; piatta?: boolean }) {
   const [aperto, setAperto] = useState(false);
   // Dopo il tocco i passi si aprono più sotto e la pagina scorre lì: il riquadro sparisce (revisore 2/11).
   if (aperto) return null;
   return (
-    <div className="rounded-card border border-border bg-white p-4" data-testid="link-lista">
+    <div className={piatta ? "border-t border-border pt-4" : "rounded-card border border-border bg-white p-4"} data-testid="link-lista">
       <p className="text-[15px] font-semibold text-text">
         <span aria-hidden>🗂️ </span>{count === 1 ? "È una lista di Google Maps" : `Sono ${count} liste di Google Maps`}
       </p>
       <p className="mt-1 text-sm text-text-muted">
-        Google non le fa leggere da fuori. Scarica le tue liste da Google (2 minuti) e caricale qui: ognuna diventa una raccolta con lo stesso nome. Vale per le liste create da te.
+        {/* "Vale per le liste create da te" sta nei passi del file (revisore 3/11: qui troppo testo). */}
+        Google non le lascia leggere. Scaricale da Google e caricale qui: ognuna diventa una raccolta.
       </p>
       <button
         type="button"

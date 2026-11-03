@@ -321,6 +321,16 @@ export default function MultiLinkCard({
     </button>
   );
 
+  // Solo liste di Google Maps: il riquadro della lista da solo, senza cornice, titolo né riepilogo attorno
+  // (revisore 3/11: cornice dentro cornice e lo stesso messaggio tre volte), come in google-maps-card.
+  if (items && !error && total > 0 && liste === total && (phase === "ready" || phase === "done")) {
+    return (
+      <div id="importa-multi" className="mt-4 scroll-mt-4" data-testid="importa-multi">
+        <ListaRow count={liste} />
+      </div>
+    );
+  }
+
   return (
     <section id="importa-multi" className="mt-4 scroll-mt-4 rounded-card border border-border bg-white p-5" data-testid="importa-multi">
       <h2 className="font-title text-xl text-text">
@@ -459,9 +469,10 @@ export default function MultiLinkCard({
               ))}
             </ul>
           )}
-          {/* Liste di Google Maps: in fondo, come strada secondaria se c'è anche qualcosa da salvare (revisore 2/11). */}
+          {/* Liste di Google Maps: in fondo, come strada secondaria se c'è anche qualcosa da salvare (revisore 2/11),
+              senza cornice ma staccate da un divisore: niente terzo livello annidato (revisore 3/11). */}
           {liste > 0 && (phase === "ready" || phase === "done") && (
-            <div className="mt-3"><ListaRow count={liste} secondary={toSave.length > 0 || savedCount > 0} /></div>
+            <div className="mt-4"><ListaRow count={liste} secondary={toSave.length > 0 || savedCount > 0} piatta /></div>
           )}
         </div>
       )}
