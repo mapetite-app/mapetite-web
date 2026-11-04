@@ -93,5 +93,6 @@ await p.keyboard.press("Escape").catch(() => {});
 await p.waitForTimeout(500);
 const pill = p.getByTestId("pillola-risultati");
 if (await pill.count()) { await pill.first().click(); await p.waitForTimeout(800); await shot("05-pillola-aperta"); }
+console.log(`'Come un tuo salvato' su ${await p.locator("ul.snap-x").getByTestId("simile-a").count()} card`);
 console.log(errors.length ? `ERRORI: ${errors.join(" | ")}` : "nessun errore");
 await browser.close();

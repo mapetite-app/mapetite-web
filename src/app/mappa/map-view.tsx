@@ -454,7 +454,19 @@ function nearestWanted(places: Place[], here: { lat: number; lng: number }): { p
     .filter((x) => x.meters <= NEARBY_SAVED_METERS)
     .sort((a, b) => a.meters - b.meters)[0] ?? null;
 }
-function similarSaved(place: Place, saved: Place[]): string | null {
+// Terzo revisore 4/11: con solo tipo e prezzo quasi ogni trattoria "somigliava" a una trattoria salvata e
+// "✨ Come un tuo salvato" stava su tutte le card, cioè non diceva niente. Ora resta solo sui SIMILI_MAX
+// risultati più vicini a un tuo salvato (gli altri card restano senza).
+const SIMILI_MAX = 2;
+function similiInLista(places: Place[], saved: Place[]): globalThis.Map<string, string> {
+  const tutti = places
+    .map((p) => ({ id: p.id, m: similarSavedMatch(p, saved) }))
+    .filter((x): x is { id: string; m: { name: string; d: number } } => x.m != null)
+    .sort((a, b) => a.m.d - b.m.d)
+    .slice(0, SIMILI_MAX);
+  return new globalThis.Map(tutti.map((x) => [x.id, x.m.name]));
+}
+function similarSavedMatch(place: Place, saved: Place[]): { name: string; d: number } | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
   let best: { name: string; d: number } | null = null;
@@ -465,7 +477,7 @@ function similarSaved(place: Place, saved: Place[]): string | null {
     if (d > SIMILAR_MAX_METERS) continue;
     if (!best || d < best.d) best = { name: s.name, d };
   }
-  return best?.name ?? null;
+  return best;
 }
 
 // Nome confrontabile ("Da Cesare al Casaletto" = "da cesare al casaletto"), senza accenti e punteggiatura.
@@ -4138,11 +4150,10 @@ export default function MapView({
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           // "Altri come questo": il titolo dice già "come chi"; sulle card restano i ✓ con la prova.
-          similarTo={aiSearch !== null && view === "all" && !aiSearch.simileA && savedPlaces.length > 0 ? (id) => {
-            if (isPlaceSaved(id)) return null;
-            const place = displayedPlaces.find((p) => p.id === id);
-            return place ? similarSaved(place, savedPlaces) : null;
-          } : undefined}
+          similarTo={aiSearch !== null && view === "all" && !aiSearch.simileA && savedPlaces.length > 0 ? (() => {
+            const simili = similiInLista(displayedPlaces.filter((p) => !isPlaceSaved(p.id)), savedPlaces);
+            return (id: string) => simili.get(id) ?? null;
+          })() : undefined}
           savedLabel={(id) => {
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;

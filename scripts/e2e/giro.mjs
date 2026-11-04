@@ -2651,6 +2651,7 @@ else {
   { const sim = await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), txt: el.textContent, title: el.title, intera: el.scrollWidth <= el.clientWidth + 1 }));
     ok(sim.vis === "✨ Come un tuo salvato" && sim.txt.includes("Terrazza Uno") && sim.title === "Come Terrazza Uno, che hai salvato" && sim.intera, `per te: 'Come un tuo salvato' intera su un bar simile, il nome nel lettore di schermo (${sim.vis} | ${sim.title})`); }
   ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("simile-a").count()) === 0, "per te: niente indicazione se il tipo è diverso (cocktail bar)");
+  ok((await p.locator("ul.snap-x").getByTestId("simile-a").count()) <= 2, "per te: 'Come un tuo salvato' al massimo su 2 card (4/11: prima su tutte, non diceva niente)");
   await p.screenshot({ path: `${OUT}/28-per-te-simile.png`, caret: "initial" });
   await p.unroute("**/api/search/synthesis");
 
