@@ -2546,6 +2546,7 @@ else {
     ok((await pc.getByTestId("scheda-chiuso").textContent().catch(() => ""))?.trim() === "Secondo Google ha chiuso", "ha chiuso: la scheda dice 'Secondo Google ha chiuso'");
     ok(await pc.getByTestId("scheda-simili-chiuso").isVisible().catch(() => false), "ha chiuso: nella scheda 'Simili qui vicino'");
     ok((await pc.getByTestId("recensione-google").count()) === 0, "ha chiuso: nella scheda niente 'lascia due righe su Google'");
+    ok(!(await pc.getByTestId("scheda-percorso").isVisible().catch(() => false)), "ha chiuso: nella scheda niente percorso a piedi");
     // Revisore 4/11 sera: anche sulla mappa dei salvati il chiuso si vede (pillola sulla card, segnalino più chiaro).
     await pc.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
     await pc.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});

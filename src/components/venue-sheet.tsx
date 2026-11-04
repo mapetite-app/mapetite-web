@@ -1160,7 +1160,9 @@ export default function VenueSheet({
               target="_blank"
               rel="noopener noreferrer"
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
-              className={TILE}
+              // Revisore 4/11 sera: niente percorso verso un posto che ha chiuso per sempre.
+              className={`${TILE} ${venue.businessStatus === "CLOSED_PERMANENTLY" ? "hidden" : ""}`}
+              data-testid="scheda-percorso"
             >
               {walk != null ? <Footprints size={17} aria-hidden className="shrink-0" /> : <Navigation size={17} aria-hidden className="shrink-0" />}
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>
