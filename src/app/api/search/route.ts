@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { ricordaStato } from "@/lib/stato-locale";
 import { compattaOrari } from "@/lib/orari";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
@@ -302,6 +303,15 @@ export async function POST(request: Request) {
       console.error("[search/route] Google Places error:", err);
       if (isQuota(err)) return quotaResponse();
       return NextResponse.json({ error: "La ricerca non è disponibile in questo momento: riprova tra poco." }, { status: 503 });
+    }
+    // Proposta 45 (4/11): lo stato letto da Google si ricorda sui locali già in archivio (dopo la risposta),
+    // e un locale chiuso per sempre non si propone: consigliarlo sarebbe un consiglio falso.
+    const visti = risultati;
+    after(() => ricordaStato(visti));
+    const chiusi = risultati.filter((p) => p.businessStatus === "CLOSED_PERMANENTLY");
+    if (chiusi.length > 0 && chiusi.length < risultati.length) {
+      risultati = risultati.filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY");
+      console.log(`[search-chiusi] tolti perché chiusi per sempre secondo Google: ${JSON.stringify(chiusi.map((p) => p.name))}`);
     }
     // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
     // (un pub per la colazione) vanno in fondo, mai esclusi.

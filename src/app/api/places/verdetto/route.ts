@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { ricordaStato } from "@/lib/stato-locale";
 import { fetchPlaceDetails } from "@/lib/google-places";
 import { getSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
 
   const place = await fetchPlaceDetails(placeId).catch((err) => { console.error("[verdetto] Google:", err); return null; });
   if (!place) return NextResponse.json({ error: "Dati del locale non disponibili." }, { status: 502 });
+  after(() => ricordaStato([place]));
   void recordEvent({ type: "funzione", userId, googlePlaceId: placeId, props: { nome: "verdetto_salvato" } });
 
   const s = (await getSynthesis([place], "", userId, { soloVerdetto: true }).catch(() => ({})) as Record<string, { verdict: string; synthesis: string; tags: string[]; goFor: string[]; dontExpect: string[] }>)[placeId];
