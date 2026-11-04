@@ -649,7 +649,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     return [...n.values()].map((v): [string, number] => [v.label, v.ids.size]).sort((a, b) => b[1] - a[1]).slice(0, 3);
   })();
   const optionsPanel = title ? (
-    <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
+    <div data-testid="opzioni-pannello" className={`mb-2 mr-3 ${pillSlot && !onOpenArticle ? "" : "mt-1 border-t border-border pt-2"}`}>
       {understood.length > 0 && (
         <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
       )}

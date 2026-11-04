@@ -2231,10 +2231,10 @@ else {
     await fs.getByRole("button", { name: "📌 Da provare · 3" }).click();
     ok((await fs.getByTestId("salvati-mostra").textContent()) === "Mostra 3 posti", "foglio Filtri: il pulsante dice quanti posti mostrerà");
     await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
-    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 3 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
+    ok((await p.getByTestId("salvati-filtri-attivi").textContent()) === "1" && (await p.locator("ul.snap-x li").count()) === 2 && await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible(), "salvati: 'Filtri' mostra 1 filtro acceso e il filtro resta in vista");
     ok((await p.locator("ul.snap-x li").first().getByTestId("stato-card").textContent()) === "📌 Da provare", "card salvato: lo stato in alto ('📌 Da provare')");
     await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).click();
-    ok((await p.locator("ul.snap-x li").count()) === 3 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un tocco sul filtro acceso lo toglie"); }
+    ok((await p.locator("ul.snap-x li").count()) === 2 && (await p.getByTestId("salvati-filtri-attivi").count()) === 0, "salvati: un tocco sul filtro acceso lo toglie (zona Roma: 2 card)"); }
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("salvati-tipo").click();
   await p.getByRole("button", { name: "Ristoranti" }).click();
@@ -2265,7 +2265,10 @@ else {
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
-  ok((await p.locator("ul.snap-x li").count()) === 3, "tutti i salvati in lista (3)");
+  // Area 4 (4/11): la zona accesa filtra le card. Si apre su Milano (il primo della lista); con Roma le 2 di Roma.
+  const zonaRoma = async () => { const z = p.getByTestId("salvati-zona").filter({ hasText: "Roma" }); if (await z.count()) { await z.click(); await p.waitForTimeout(500); } };
+  await zonaRoma();
+  ok((await p.locator("ul.snap-x li").count()) === 2, "tutti i salvati di Roma in lista (2)");
   // Semplificare 5 (17/10): intestazione dei salvati corta, Condividi come icona e niente "3 posti" ripetuto.
   { const sh = p.getByTestId("condividi-lista"); const bb = await sh.boundingBox();
     ok((await sh.getAttribute("aria-label")) === "Condividi questa lista" && !((await sh.textContent()) ?? "").includes("Condividi") && !!bb && bb.width <= 40, `salvati: 'Condividi' è un'icona (${Math.round(bb?.width ?? 0)}px)`);
@@ -2273,10 +2276,10 @@ else {
   await p.evaluate(() => { window.__sharedList = null; navigator.share = async (d) => { window.__sharedList = d; }; });
   await p.getByTestId("condividi-lista").click();
   { const t = await p.evaluate(() => window.__sharedList?.text ?? "");
-    ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 3, "salvati: 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
+    ok(t.startsWith("I miei posti su Mapetite") && t.includes("• Terrazza Uno") && !t.includes("Tavolo sulla terrazza") && t.includes("query_place_id=G1") && (t.match(/• /g) ?? []).length === 2 && !t.includes("Caffè Milano"), "salvati (zona Roma): 'Condividi' manda la lista con i link Google Maps, senza le note private"); }
   { const card = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await card.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible(), "salvati: la card mostra il verdetto Mapetite già in cache");
-    ok((await card.textContent()).includes("€€ · Roma"), "salvati: la card dice la città (salvati di più città)");
+    ok(!(await card.textContent()).includes("€€ · Roma"), "salvati: con la zona Roma accesa la card non ripete la città (sta nel titolo)");
     await card.scrollIntoViewIfNeeded();
     await p.waitForTimeout(600);
     await p.screenshot({ path: `${OUT}/11b-salvati-verdetto.png`, caret: "initial" });
@@ -2286,6 +2289,7 @@ else {
     await p.getByTestId("titolo-risposta").waitFor({ timeout: 5000 });
     await vaiSalvatiMappa(p);
     await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
+    await zonaRoma();
     const again = p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" });
     ok(await again.getByText("Aperitivo lento sui tetti, lontano dalla folla.").isVisible({ timeout: 3000 }).catch(() => false), "salvati: il verdetto resta anche dopo una ricerca"); }
   await p.screenshot({ path: `${OUT}/11-salvati.png`, caret: "initial" });

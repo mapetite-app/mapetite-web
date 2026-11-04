@@ -1862,14 +1862,24 @@ export default function MapView({
     aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
   // Revisore 4/11: accesi o spenti i filtri rapidi, la mappa si riadatta ai posti rimasti (prima con tre
   // filtri restava in vista un solo segnalino su 4). Solo al cambio dei filtri, non a ogni disegno.
+  // Secondo revisore 4/11: si inquadra quando il carosello ha già il nuovo ordine (con "Più vicini" la prima card
+  // non è la prima della ricerca), tenendo sempre dentro la prima card.
   const filtriChiave = [...quickFilters].sort().join(",");
   const filtriVisti = useRef(filtriChiave);
+  const ordineChiave = carouselOrder.join(",");
+  const daInquadrare = useRef(false);
   useEffect(() => {
     if (filtriVisti.current === filtriChiave) return;
     filtriVisti.current = filtriChiave;
-    if (aiSearch !== null && mapPlaces.length > 0) fitToPlaces(mapPlaces, 224, 0, mapPlaces.slice(0, 1));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando cambiano i filtri rapidi
+    daInquadrare.current = true;
   }, [filtriChiave]);
+  useEffect(() => {
+    if (!daInquadrare.current) return;
+    daInquadrare.current = false;
+    const primo = mapPlaces.find((p) => p.id === carouselOrder[0]) ?? mapPlaces[0];
+    if (aiSearch !== null && primo) fitToPlaces(mapPlaces, 224, 0, [primo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- quando il carosello ha l'ordine nuovo dopo un filtro
+  }, [ordineChiave]);
 
   // Variante pin con foto (?pin=b, stile Places): solo per i locali che hanno già la foto nella
   // card (le prime 6 della lista B), con lo stesso indirizzo immagine → nessuna foto in più da pagare.
@@ -2081,6 +2091,9 @@ export default function MapView({
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
     if (!map || typeof window === "undefined") return;
+    // Secondo revisore 4/11: mentre la mappa si sta già inquadrando (filtri, ricerca) non la si sposta di nuovo:
+    // lo spostamento sulla card annullava l'inquadratura e la prima card finiva fuori schermo.
+    if ((map as unknown as { isMoving?: () => boolean }).isMoving?.()) return;
     const pt = map.project([place.lng, place.lat]);
     // Da computer la lista è a fianco, non sopra la mappa: basta che il pin sia nella mappa.
     if (isDesktop()) {
@@ -2126,7 +2139,7 @@ export default function MapView({
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
         // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 40, right: salvati ? 64 : 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 48, right: salvati ? 64 : 48 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
