@@ -42,6 +42,8 @@ export interface BottomSheetProps {
   // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
   quick?: ReadonlySet<QuickFilter>;
   onToggleQuick?: (f: QuickFilter) => void;
+  // "Più vicini" acceso o spento (4/11): la mappa si riadatta come con gli altri filtri rapidi.
+  onNearestToggle?: () => void;
   // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
   title?: string | null;
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
@@ -339,7 +341,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -588,7 +590,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <button
           type="button"
           aria-pressed={nearestFirst}
-          onClick={() => setNearestFirst((v) => !v)}
+          onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
           className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${nearestFirst ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
         >
           Più vicini
@@ -617,7 +619,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <button
           type="button"
           aria-pressed={nearestFirst}
-          onClick={() => setNearestFirst((v) => !v)}
+          onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
           className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${nearestFirst ? "bg-brand text-white" : "bg-surface text-text"}`}
         >
           Più vicini

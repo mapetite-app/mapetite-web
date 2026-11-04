@@ -1309,6 +1309,12 @@ export default function MapView({
     setZonaVicinaVista(zonaVicina);
     if (zonaVicina) setZonaMappa(zonaVicina);
   }
+  // La mappa va sulla città accesa da "Più vicini" (terzo revisore 4/11: cambiavano solo pillola e card).
+  useEffect(() => {
+    const z = zonaVicinaVista ? zoneSalvati.find((x) => x.nome === zonaVicinaVista) : null;
+    if (z && userPos) fitToPlaces(z.posti.filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 8).concat(z.posti.slice(0, 1)), 170, 0, [userPos], true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando "Più vicini" cambia città
+  }, [zonaVicinaVista]);
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
     + (aiSearch?.filtri != null ? countActive(filters) : 0);
 
@@ -1887,7 +1893,7 @@ export default function MapView({
     if (!daInquadrare.current) return;
     daInquadrare.current = false;
     const primo = mapPlaces.find((p) => p.id === carouselOrder[0]) ?? mapPlaces[0];
-    if (aiSearch !== null && primo) fitToPlaces(mapPlaces, 224, 0, [primo]);
+    if (aiSearch !== null && primo) fitToPlaces(mapPlaces, 236, 0, [primo]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- quando il carosello ha l'ordine nuovo dopo un filtro
   }, [ordineChiave]);
 
@@ -2114,8 +2120,12 @@ export default function MapView({
     }
     const { innerWidth: w, innerHeight: h } = window;
     // 224: sotto barra, pillola e riga dei filtri rapidi (revisore 4/11: a 140 un segnalino sotto i filtri contava "in vista").
-    if (pt.x > 30 && pt.x < w - 30 && pt.y > (aiSearch !== null ? 224 : 170) && pt.y < h * 0.5) return;
-    map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
+    // Fascia libera: sotto barra e pillole, sopra le card (~290 px con la barra in basso). Il segnalino va al
+    // centro della fascia, non in alto (terzo revisore 4/11: gli altri uscivano dallo schermo).
+    const alto = aiSearch !== null ? 236 : 190;
+    const basso = h - 300;
+    if (pt.x > 30 && pt.x < w - 30 && pt.y > alto && pt.y < basso) return;
+    map.easeTo({ center: [place.lng, place.lat], offset: [0, Math.round((alto + basso) / 2 - h / 2)], duration: 500 });
   };
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
@@ -2130,7 +2140,7 @@ export default function MapView({
   // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
   // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
   // top 224 (area 4c, 4/11): sotto barra, pillola "N posti" e riga dei filtri rapidi.
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 224, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 236, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
@@ -2391,7 +2401,7 @@ export default function MapView({
       setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
       // Il primo risultato (la prima card) resta sempre in vista, anche se è lontano dagli altri (4/11:
       // "Da Cesare al Casaletto" a 2,9 km era la card a fuoco senza segnalino sulla mappa).
-      fitToPlaces(places, 224, 0, places.slice(0, 1));
+      fitToPlaces(places, 236, 0, places.slice(0, 1));
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
@@ -2802,7 +2812,7 @@ export default function MapView({
         return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
       });
       // Revisore 4/11: anche qui la prima card resta in vista (prima, con i salvati, finiva fuori schermo).
-      if (fuori) fitToPlaces(risultati, 224, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
+      if (fuori) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -4138,6 +4148,7 @@ export default function MapView({
           // Da computer: il mouse su una card accende il suo pin, senza spostare la mappa.
           onHover={(place) => setFocusedId(place.id)}
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
+          onNearestToggle={() => { daInquadrare.current = true; }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);

@@ -2359,6 +2359,8 @@ else {
   });
   await p.getByLabel("Cerca tra i salvati").fill("");
   // Le card seguono l'ordine della lista (Recenti: Caffè Milano prima): si apre Terrazza Uno per nome.
+  // Con la posizione a Milano è accesa Milano (4/11): si passa a Roma.
+  { const z = p.getByTestId("salvati-zona").filter({ hasText: "Roma" }); if (await z.count()) { await z.click(); await p.waitForTimeout(500); } }
   await p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" }).first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
