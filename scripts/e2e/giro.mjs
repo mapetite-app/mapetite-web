@@ -2544,6 +2544,7 @@ else {
     await Lc.getByTestId("salvato-riga").filter({ hasText: "Osteria Chiusa" }).click().catch(() => {});
     await pc.getByTestId("scheda-chiuso").waitFor({ timeout: 5000 }).catch(() => {});
     ok((await pc.getByTestId("scheda-chiuso").textContent().catch(() => ""))?.trim() === "Secondo Google ha chiuso", "ha chiuso: la scheda dice 'Secondo Google ha chiuso'");
+    ok(await pc.getByTestId("scheda-simili-chiuso").isVisible().catch(() => false), "ha chiuso: nella scheda 'Simili qui vicino'");
     await pc.screenshot({ path: `${OUT}/11m-scheda-ha-chiuso.png` });
     await cctx.close(); }
 

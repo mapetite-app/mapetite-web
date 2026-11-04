@@ -3916,6 +3916,7 @@ export default function MapView({
               onBookAlternative={(id, details) => { setPendingBooking({ placeId: id, details }); dispatch({ type: "OPEN_VENUE", placeId: id }); }}
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
+              onSimiliChiuso={selected.businessStatus === "CLOSED_PERMANENTLY" ? () => altriCome(selected) : undefined}
               onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
               // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
               // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.

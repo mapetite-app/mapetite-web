@@ -108,6 +108,8 @@ type VenueSheetProps = {
   onBookingClosed?: () => void;
   // "Altri come questo" (proposta 27): solo per i salvati con 👍 o "Ci sono stato" (e non 👎).
   onAltriCome?: () => void;
+  // Proposta 45: dalla scheda di un posto che ha chiuso, la stessa ricerca di "Altri come questo".
+  onSimiliChiuso?: () => void;
   // "‹ 2 di 8 ›" tra i risultati (revisore del 2/11, D28: la pillola galleggiava sopra la scheda): sta dentro
   // la barra azioni in basso, la scheda prende tutto lo spazio.
   nav?: { pos: number; total: number } | null;
@@ -158,6 +160,7 @@ export default function VenueSheet({
   autoBook = false,
   onBookingClosed,
   onAltriCome,
+  onSimiliChiuso,
   nav = null,
   onNavPrev,
   onNavNext,
@@ -753,9 +756,16 @@ export default function VenueSheet({
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
           {(venue.businessStatus === "CLOSED_PERMANENTLY" || venue.businessStatus === "CLOSED_TEMPORARILY") && (
-            <p data-testid="scheda-chiuso" className="mt-2 inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
-              {venue.businessStatus === "CLOSED_PERMANENTLY" ? "Secondo Google ha chiuso" : "Secondo Google è chiuso per ora"}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p data-testid="scheda-chiuso" className="inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
+                {venue.businessStatus === "CLOSED_PERMANENTLY" ? "Secondo Google ha chiuso" : "Secondo Google è chiuso per ora"}
+              </p>
+              {venue.businessStatus === "CLOSED_PERMANENTLY" && onSimiliChiuso && (
+                <button type="button" data-testid="scheda-simili-chiuso" onClick={onSimiliChiuso} className="min-h-[32px] rounded-pill border border-black/10 bg-white px-3 text-[12.5px] font-semibold font-sans text-brand active:bg-black/[0.04]">
+                  Simili qui vicino ›
+                </button>
+              )}
+            </div>
           )}
           {/* UNA riga: "● Aperto ora · 650 m · fino alle 01:00" (orari Google se ci sono, mai inventati). */}
           {(aperto != null || distance || rating != null) && (
