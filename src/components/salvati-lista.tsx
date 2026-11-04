@@ -493,9 +493,7 @@ export default function SalvatiLista({
                     onClick={() => onOpen(p, list.map((x) => x.id))}
                     className="flex min-h-[84px] w-full items-start gap-3 px-3 py-3 text-left transition-colors active:bg-black/[0.03]"
                   >
-                    <span className={haChiuso ? "opacity-45 grayscale" : undefined}>
-                      <Miniatura place={p} foto={fotoMie[p.id]} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
-                    </span>
+                    <Miniatura place={p} foto={fotoMie[p.id]} size={`mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]${haChiuso ? " opacity-45 grayscale" : ""}`} />
                     <span className={`min-w-0 flex-1 ${haChiuso ? "opacity-70" : ""}`}>
                       {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
                       <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
