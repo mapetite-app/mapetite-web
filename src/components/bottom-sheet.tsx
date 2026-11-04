@@ -597,6 +597,35 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     </div>
   );
 
+  // Area 4c del piano (4/11, come i filtri sotto la barra di Google Maps e Places): nella lista nuova i filtri
+  // rapidi stanno in vista, in una riga sotto la pillola "N posti", non più dietro la pillola. Un tocco filtra
+  // card e segnalini insieme; la pillola tiene solo "Ho capito", Affina e Condividi.
+  const filtriInVista = (quickFiltersOn || nearestOn) && (
+    <div data-testid="filtri-mappa" className="pointer-events-auto -ml-3 -mr-[4.25rem] flex basis-[calc(100%+5rem)] gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&>button]:shrink-0 lg:hidden">
+      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={quick.has(k)}
+          onClick={() => toggleQuick(k)}
+          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${quick.has(k) ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          {label}
+        </button>
+      ))}
+      {nearestOn && (
+        <button
+          type="button"
+          aria-pressed={nearestFirst}
+          onClick={() => setNearestFirst((v) => !v)}
+          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${nearestFirst ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          Più vicini
+        </button>
+      )}
+    </div>
+  );
+
   // "Ho capito", locali messi da parte, Affina e Condividi: dietro "⋯" (lista di prima) o dietro la
   // pillola "N posti" (lista nuova). Nella lista nuova ci stanno anche i filtri rapidi.
   // Quante card hanno ogni requisito confermato dalle recensioni (chiave B: l'AI che si vede).
@@ -734,20 +763,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             </span>
           )}
           <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>
-          {(quick.size > 0 || nearestFirst) && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
         </button>
         {headerOpen && (
           <div className="absolute left-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),24rem)] rounded-card bg-surface p-3 pb-1 shadow-float">
-            {(quickFiltersOn || nearestOn || onOpenArticle) && <div className="mb-1">{quickChips}</div>}
+            {onOpenArticle && <div className="mb-1">{quickChips}</div>}
             {optionsPanel}
           </div>
         )}
       </div>,
       pillSlot,
     );
+    const filtriPortale = nuova && pillSlot && filtriInVista ? createPortal(filtriInVista, pillSlot) : null;
     return (
       <>
       {pill}
+      {filtriPortale}
       <div
         data-testid="lista-risultati"
         className="pointer-events-none absolute left-0 right-0 z-10 lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-border lg:pb-5"
@@ -809,7 +839,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           </div>
           {title && headerOpen && optionsPanel}
         </div>}
-        {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
+        {(nuova ? !headerOpen && (onOpenArticle || (!pillSlot && (quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
@@ -836,6 +866,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
             // Revisore 3/11 (sesto): prima lo stato (Da provare / Ci sono stato), poi il 👍/👎 accanto, come nella lista.
             const stato = savedMode ? (place.tags ?? []).find((t) => (STATE_TAGS as readonly string[]).includes(t)) ?? ((place.tags ?? []).some(isStateTag) ? STATE_TAGS[1] : STATE_TAGS[0]) : undefined;
+            // Area 4a (4/11): con 👎 la pillola è grigia, non corallo (il corallo chiama "vai qui").
             const parere = savedMode ? (place.tags?.includes("Non fa per me") ? " · 👎" : place.tags?.includes("Mi è piaciuto") ? " · 👍" : "") : "";
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
@@ -898,7 +929,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
+                          <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -1015,7 +1046,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
+                          <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (

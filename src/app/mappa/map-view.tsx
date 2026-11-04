@@ -1288,9 +1288,15 @@ export default function MapView({
   const ordineListaOn = salvatiMappaOn && clusterPlaces === null && ordineLista != null;
   // I posti non presenti nella lista (es. trovati dopo con la ricerca) vanno in fondo, nel loro ordine.
   const posLista = ordineListaOn && ordineLista ? new globalThis.Map(ordineLista.map((id, i) => [id, i])) : null;
-  const salvatiInOrdine = posLista
+  const salvatiOrdinati = posLista
     ? [...displayedPlaces].sort((a, b) => (posLista.get(a.id) ?? 1e9) - (posLista.get(b.id) ?? 1e9))
     : displayedPlaces;
+  // Area 4 (4/11): la pillola della città accesa ("Roma 12") filtra davvero. Prima spostava solo la mappa e le
+  // card restavano di tutte le città: sembrava un filtro ma non filtrava. Ora card e mappa sono della stessa zona.
+  const zonaAccesa = zoneSalvati.length > 1 && clusterPlaces === null ? zoneSalvati.find((z) => z.nome === zonaMappa) ?? null : null;
+  const salvatiInOrdine = zonaAccesa
+    ? (() => { const ids = new Set(zonaAccesa.posti.map((p) => p.id)); return salvatiOrdinati.filter((p) => ids.has(p.id)); })()
+    : salvatiOrdinati;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
@@ -1867,9 +1873,11 @@ export default function MapView({
   // Dopo una ricerca i primi risultati (e il pin della card al centro) non finiscono mai
   // dentro un cerchio "2"/"3": prima i più adatti restavano nascosti mentre quelli spostati
   // in fondo (es. i locali di massa nelle ricerche "non turistiche") avevano il nome in vista.
+  // Mappa dei salvati (4/11): il posto della card a fuoco non finisce mai in un "2" (prima Hey Kids, prima card,
+  // stava dentro un gruppo a zoom di città).
   const topIds = aiSearch !== null && clusterPlaces === null
     ? [...(carouselOrder.length > 0 ? carouselOrder : mapPlaces.map((p) => p.id)).slice(0, TOP_PINS), ...(focusId ? [focusId] : [])]
-    : [];
+    : view === "saved" && clusterPlaces === null && focusId ? [focusId] : [];
   const topKey = topIds.join(",");
   const topPlaces = useMemo(() => {
     const ids = new Set(topKey ? topKey.split(",") : []);
@@ -2087,7 +2095,8 @@ export default function MapView({
   // `salvati`: mappa dei salvati (revisore del 2/11: Kiko Sushi Bar, il più a sud, restava fuori). I propri posti
   // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
   // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
+  // top 224 (area 4c, 4/11): sotto barra, pillola "N posti" e riga dei filtri rapidi.
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 224, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
@@ -2117,7 +2126,14 @@ export default function MapView({
   // un solo gruppo). Si parte dalla zona dove sei (se hai salvati entro 30 km) o da quella con più salvati;
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
-  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
+  // La card a fuoco è la prima della zona nell'ordine della lista (le card ora sono solo di quella zona).
+  const inquadraZona = (z: Zona<Place>) => {
+    setZonaMappa(z.nome);
+    const ids = new Set(z.posti.map((p) => p.id));
+    const primo = (ordineLista ?? []).find((id) => ids.has(id)) ?? z.posti[0]?.id;
+    if (primo) setFocusedId(primo);
+    fitToPlaces(z.posti, 170, 0, [], true);
+  };
   // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
   // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
   // Revisore 3/11 (quinto): se il primo della lista è lontano (oltre 50 km, es. ordine "Recenti" con un
@@ -2136,6 +2152,9 @@ export default function MapView({
           .filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 5);
         // Il primo della lista resta sempre dentro l'inquadratura.
         if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
+        // La zona del primo resta accesa (4/11): prima nessuna pillola era accesa e le card erano di tutte le città.
+        const zonaPrimo = zoneDeiSalvati(displayedPlaces).find((z) => z.posti.some((p) => p.id === primo.id));
+        if (zonaPrimo) setZonaMappa(zonaPrimo.nome);
         fitToPlaces(vicini, 170, 0, [userPos], true);
         return;
       }
@@ -2336,7 +2355,9 @@ export default function MapView({
       // e cercando "a Milano" con la mappa su Roma ogni card diceva "479 km".
       const nearAt = places.filter((p) => distanceMeters(at, p) < 20_000).length;
       setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
-      fitToPlaces(places);
+      // Il primo risultato (la prima card) resta sempre in vista, anche se è lontano dagli altri (4/11:
+      // "Da Cesare al Casaletto" a 2,9 km era la card a fuoco senza segnalino sulla mappa).
+      fitToPlaces(places, 224, 0, places.slice(0, 1));
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
@@ -2746,7 +2767,7 @@ export default function MapView({
         const pt = map.project([place.lng, place.lat]);
         return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
       });
-      if (fuori) fitToPlaces(risultati, 190, 60, vicini.map((d) => d.place));
+      if (fuori) fitToPlaces(risultati, 224, 60, vicini.map((d) => d.place));
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -2961,7 +2982,7 @@ export default function MapView({
         {/* Seconda riga (Lorenzo 16/10: schermo più libero): UN solo accesso
             a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. A destra resta
             libero il posto del pulsante "La mia posizione". */}
-        <div className={`flex items-center gap-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
+        <div className={`flex flex-wrap items-center gap-x-2 gap-y-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
           {/* Niente più "Esplora / I miei salvati" (Lorenzo 18/10, chi apre l'app la prima volta): era un
               doppione della barra in basso, dove "Salvati" e "Mappa" fanno la stessa cosa. */}
           {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
@@ -3625,18 +3646,22 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && place.tags?.includes(OPINION_DISLIKE))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
-                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? "stato" : "provare") : undefined}
+                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? (place.tags?.includes(OPINION_DISLIKE) ? "no" : "stato") : "provare") : undefined}
               >
                 {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
                     "Da provare" resta il segnalino semplice. Si capisce lo stato senza aprire la card. */}
-                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (
-                  <span data-testid="pin-stato" aria-label="Ci sono stato" className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
-                )}
+                {/* Area 4a (4/11): chi c'è stato e non gli è piaciuto ha 👎 su fondo grigio e il segnalino più chiaro,
+                    come i "Chiuso ora" dei risultati: si vede che è lì, ma non chiama l'occhio come i 👍. */}
+                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (place.tags?.includes(OPINION_DISLIKE) ? (
+                  <span data-testid="pin-stato" data-giudizio="no" aria-label="Ci sono stato, non fa per me" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-stone-200 text-[10px] leading-none shadow-card">👎</span>
+                ) : (
+                  <span data-testid="pin-stato" aria-label={place.tags?.includes(OPINION_LIKE) ? "Ci sono stato, mi è piaciuto" : "Ci sono stato"} className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
+                ))}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
@@ -4015,7 +4040,7 @@ export default function MapView({
           // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
           details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
           savedMode={view === "saved" && aiSearch === null}
-          showCity={view === "saved" && aiSearch === null && activeCity === null}
+          showCity={view === "saved" && aiSearch === null && activeCity === null && !zonaAccesa}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
@@ -4029,7 +4054,7 @@ export default function MapView({
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
-            ? `I tuoi posti${activeCity ? ` · ${activeCity}` : ""}`
+            ? `I tuoi posti${activeCity ? ` · ${activeCity}` : zonaAccesa ? ` · ${zonaAccesa.nome}` : ""}`
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
