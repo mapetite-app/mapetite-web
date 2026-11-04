@@ -623,6 +623,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           Più vicini
         </button>
       )}
+      {/* Margine in fondo alla riga: l'ultimo filtro non tocca il bordo dello schermo (revisore 4/11). */}
+      <span aria-hidden className="w-3 shrink-0" />
     </div>
   );
 

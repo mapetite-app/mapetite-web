@@ -237,6 +237,9 @@ export default function SalvatiLista({
   const nRaccolta = raccolta ? all.filter((p) => p.tags?.includes(raccolta)).length : 0;
   // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
   const soloRisposta = domanda && list.length === 0 && activeTag === null && activeCity === null;
+  // Revisore 4/11: con una domanda e nessun posto per nome conta solo la risposta dell'AI (anche con una raccolta
+  // accesa): niente "Nessun posto qui" sotto la risposta né "0 di 14 posti" in testa.
+  const rispostaAI = domanda && list.length === 0;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
   // Revisore 3/11: niente "Tutti" (è lo stato quando nessun filtro è acceso; un secondo tocco spegne):
   // così le raccolte entrano nello schermo già alla prima occhiata.
@@ -263,7 +266,7 @@ export default function SalvatiLista({
         <div className="flex h-5 items-center justify-between gap-3">
           <p data-testid="salvati-lista-sopra" className="min-w-0 truncate font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
             {/* Mentre si cerca: quanti ne trova su quanti (revisore 3/11, quinto), non il totale con le città. */}
-            {(searching || soloMesi || activeTag !== null || activeCity !== null || filtersOn > 0) && !soloRisposta ? `${list.length} di ${all.length} ${all.length === 1 ? "posto" : "posti"}` : kicker}
+            {(searching || soloMesi || activeTag !== null || activeCity !== null || filtersOn > 0) && !rispostaAI ? `${list.length} di ${all.length} ${all.length === 1 ? "posto" : "posti"}` : kicker}
           </p>
           {/* Ordine nel menu nativo del telefono: "Vicino" o "Recenti". Area toccabile alta 44 px senza alzare la riga. */}
           <label className="relative -my-3 -mr-1 flex min-h-11 shrink-0 items-center text-[13px] font-medium text-[#4a4f55]">
@@ -451,7 +454,7 @@ export default function SalvatiLista({
           </button>
         )}
 
-        {list.length === 0 ? (
+        {list.length === 0 && rispostaAI ? null : list.length === 0 ? (
           <div data-testid="salvati-lista-vuota" className={`mt-3 rounded-card border ${LINE} bg-white p-6 text-center`}>
             <p className={`${SERIF} text-xl font-medium text-text`}>Nessun posto qui</p>
             <p className="mt-1 text-sm text-text-muted">Cambia la ricerca o i filtri.</p>

@@ -22,7 +22,7 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
@@ -1860,6 +1860,16 @@ export default function MapView({
   const quickOn = useBeta("filtri-lista");
   const mapPlaces =
     aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
+  // Revisore 4/11: accesi o spenti i filtri rapidi, la mappa si riadatta ai posti rimasti (prima con tre
+  // filtri restava in vista un solo segnalino su 4). Solo al cambio dei filtri, non a ogni disegno.
+  const filtriChiave = [...quickFilters].sort().join(",");
+  const filtriVisti = useRef(filtriChiave);
+  useEffect(() => {
+    if (filtriVisti.current === filtriChiave) return;
+    filtriVisti.current = filtriChiave;
+    if (aiSearch !== null && mapPlaces.length > 0) fitToPlaces(mapPlaces, 224, 0, mapPlaces.slice(0, 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando cambiano i filtri rapidi
+  }, [filtriChiave]);
 
   // Variante pin con foto (?pin=b, stile Places): solo per i locali che hanno già la foto nella
   // card (le prime 6 della lista B), con lo stesso indirizzo immagine → nessuna foto in più da pagare.
@@ -2080,7 +2090,8 @@ export default function MapView({
       return;
     }
     const { innerWidth: w, innerHeight: h } = window;
-    if (pt.x > 30 && pt.x < w - 30 && pt.y > 140 && pt.y < h * 0.5) return;
+    // 224: sotto barra, pillola e riga dei filtri rapidi (revisore 4/11: a 140 un segnalino sotto i filtri contava "in vista").
+    if (pt.x > 30 && pt.x < w - 30 && pt.y > (aiSearch !== null ? 224 : 170) && pt.y < h * 0.5) return;
     map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
   };
 
@@ -2767,7 +2778,8 @@ export default function MapView({
         const pt = map.project([place.lng, place.lat]);
         return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
       });
-      if (fuori) fitToPlaces(risultati, 224, 60, vicini.map((d) => d.place));
+      // Revisore 4/11: anche qui la prima card resta in vista (prima, con i salvati, finiva fuori schermo).
+      if (fuori) fitToPlaces(risultati, 224, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -3608,7 +3620,7 @@ export default function MapView({
               >
                 <div
                   data-testid="pin-gruppo"
-                  className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-accent"
+                  className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-white"
                   style={{
                     width: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
                     height: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
@@ -3658,7 +3670,7 @@ export default function MapView({
                 {/* Area 4a (4/11): chi c'è stato e non gli è piaciuto ha 👎 su fondo grigio e il segnalino più chiaro,
                     come i "Chiuso ora" dei risultati: si vede che è lì, ma non chiama l'occhio come i 👍. */}
                 {mappaSalvati && place.tags?.includes(VISIT_DONE) && (place.tags?.includes(OPINION_DISLIKE) ? (
-                  <span data-testid="pin-stato" data-giudizio="no" aria-label="Ci sono stato, non fa per me" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-stone-200 text-[10px] leading-none shadow-card">👎</span>
+                  <span data-testid="pin-stato" data-giudizio="no" aria-label="Ci sono stato, non fa per me" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-stone-600 text-white shadow-card"><ThumbsDown size={11} strokeWidth={2.5} aria-hidden /></span>
                 ) : (
                   <span data-testid="pin-stato" aria-label={place.tags?.includes(OPINION_LIKE) ? "Ci sono stato, mi è piaciuto" : "Ci sono stato"} className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
                 ))}
@@ -3781,7 +3793,7 @@ export default function MapView({
         )}
         {userPos && (
           // Sulla mappa dei salvati il pallino blu sta sopra i segnalini (revisore del 2/11: il segnalino scelto lo copriva).
-          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 120 : 0 }}>
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 60 : 0 }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
               <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
               <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
