@@ -2090,6 +2090,8 @@ export default function MapView({
     // "N dei tuoi salvati" (circa 52 px sopra le card); il nome si sposta di lato o si nasconde.
     const vietate: Rect[] = [];
     if (mappaSalvati && !isDesktop()) vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 128 });
+    // Testata sopra le card ("I tuoi posti · Roma", "Otto posti a Trastevere"): niente nomi lì sotto (terzo revisore 4/11 sera).
+    if ((mappaSalvati || inRicerca) && !isDesktop()) vietate.push({ x1: 0, y1: mapBox.h - 300, x2: mapBox.w, y2: mapBox.h });
     if (inRicerca && !isDesktop()) {
       vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 196 });
       // La pillola sta subito sotto la parte libera della mappa (stessa misura di fitToPlaces): ~498–542 px su 844.
@@ -2143,6 +2145,15 @@ export default function MapView({
     const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
     const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
     return projectMercator(p.lat, p.lng, viewState.zoom).y - centro.y + cy < limite;
+  };
+  // Revisore 4/11 sera (terzo): anche sulla mappa dei salvati (sotto campo e città, ~128 px) e, in entrambe, nella
+  // fascia della testata sopra le card ("I tuoi posti · Roma", "Otto posti a Trastevere") un segnalino non si disegna.
+  const nascostoDallaBarra = (place: Place) => {
+    if (focusId === place.id || selected?.id === place.id || !mapBox) return false;
+    if (aiSearch === null && !mappaSalvati) return false;
+    const dy = scostamenti[place.id]?.dy ?? 0;
+    if (sottoLaBarra(place, (aiSearch !== null ? 200 : 128) - dy)) return true;
+    return !sottoLaBarra(place, mapBox.h - 262 - dy) && !isDesktop();
   };
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
@@ -3739,9 +3750,9 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && focusId !== place.id && selected?.id !== place.id && sottoLaBarra(place, 200 - (scostamenti[place.id]?.dy ?? 0)) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${nascostoDallaBarra(place) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
-                data-sotto-barra={aiSearch !== null && sottoLaBarra(place, 200 - (scostamenti[place.id]?.dy ?? 0)) ? "true" : undefined}
+                data-sotto-barra={nascostoDallaBarra(place) ? "true" : undefined}
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
@@ -3926,7 +3937,7 @@ export default function MapView({
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
               onSimiliChiuso={selected.businessStatus === "CLOSED_PERMANENTLY" ? () => altriCome(selected) : undefined}
-              onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
+              onAltriCome={selected.businessStatus !== "CLOSED_PERMANENTLY" && piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
               // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
               // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.
               nav={navScheda}
