@@ -403,9 +403,17 @@ ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("etichetta-verdet
 { const r1 = await page.locator("ul.snap-x li[data-id=P1]").getByTestId("requisiti-card").innerText().catch(() => "");
   const r3 = await page.locator("ul.snap-x li[data-id=P3]").getByTestId("requisiti-card").count();
   ok(/✓ rooftop · ✓ romantico/.test(r1) && r3 === 0, `card: '✓ rooftop · ✓ romantico' solo dove le recensioni li confermano ('${r1.replace(/\n/g, " ")}', altri: ${r3})`); }
-ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filtri rapidi non stanno sempre sopra le card (sono dietro la pillola)");
+ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filtri rapidi non stanno sopra le card (stanno sotto la pillola, in alto)");
+// Area 4c (4/11): filtri rapidi in vista sotto la pillola, come Google Maps; non più dietro la pillola.
+{ const fm = page.getByTestId("filtri-mappa"); const pb = await page.getByTestId("opzioni-ricerca").boundingBox(); const fb = await fm.boundingBox();
+  const nomi = await fm.getByRole("button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+  ok(await fm.isVisible() && JSON.stringify(nomi.slice(0, 3)) === '["Aperto ora","Fino a €€","Voto 4,5+"]' && !!pb && !!fb && fb.y >= pb.y + pb.height && fb.y + fb.height <= 175, `mappa: filtri rapidi in vista sotto la pillola (${nomi.join(", ")}, y ${Math.round(fb?.y ?? 0)})`);
+  // Il primo segnalino in alto sta sotto la riga dei filtri (l'inquadratura ne tiene conto).
+  await page.waitForTimeout(1200);
+  const altoPin = await page.evaluate(() => Math.min(...[...document.querySelectorAll("[data-testid=pin]")].map((e) => e.getBoundingClientRect().top)));
+  ok(!!fb && altoPin >= fb.y + fb.height - 4, `mappa: nessun segnalino sotto la riga dei filtri (primo in alto a ${Math.round(altoPin)}, filtri fino a ${Math.round((fb?.y ?? 0) + (fb?.height ?? 0))})`); }
 await apriOpzioni(page);
-ok((await page.getByTestId("filtri-lista").count()) === 1 && await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).isVisible(), "lista B: filtri rapidi presenti toccando la pillola");
+ok((await page.getByTestId("opzioni-pannello").getByRole("button", { name: "Aperto ora" }).count()) === 0, "pillola: i filtri rapidi non sono ripetuti dentro la pillola");
 ok(await page.getByRole("button", { name: "Affina" }).isVisible() && await page.getByRole("button", { name: "Condividi questa ricerca" }).isVisible(), "pillola: apre Affina e Condividi");
 await shot("05-pillola-aperta");
 // Tocco fuori simulato (un tocco vero sulla mappa chiuderebbe anche la ricerca).
@@ -465,8 +473,7 @@ await (await esempio(page)).click();
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
 const firstCard = () => page.locator("ul.snap-x li").first().getAttribute("data-id");
 ok((await firstCard()) === "P1", "ordine iniziale: prima Terrazza Uno (la più adatta)");
-await apriOpzioni(page);
-await page.getByRole("button", { name: "Più vicini" }).click();
+await page.getByTestId("filtri-mappa").getByRole("button", { name: "Più vicini" }).click();
 ok((await firstCard()) === "P3", "'Più vicini': prima Rooftop Tre (200 m)");
 await page.waitForTimeout(300);
 ok((await page.locator("[data-testid=pin][data-focused=true]").innerText()).includes("Rooftop Tre"), "'Più vicini': il pin evidenziato segue la prima card");
@@ -501,12 +508,10 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await page.getByText("Rooftop Tre").first().waitFor({ timeout: 5000 });
 await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
-await apriOpzioni(page);
-await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).click();
+await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).click();
 ok((await page.locator("ul").getByText("Rooftop Tre").count()) === 0 && (await page.locator("ul").getByText("Terrazza Uno").count()) > 0, "filtri rapidi: 'Aperto ora' nasconde i locali chiusi");
 ok((await page.getByTestId("pin").filter({ hasText: "Rooftop Tre" }).count()) === 0, "filtri rapidi: anche il pin del locale chiuso sparisce dalla mappa");
-await page.getByTestId("filtri-lista").getByRole("button", { name: "Aperto ora" }).click();
-await page.getByTestId("opzioni-ricerca").click(); // chiude le opzioni (coprono la mappa sotto la barra)
+await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).click();
 // sposto la mappa a mano: compare "Cerca in quest'area"
 await page.mouse.move(195, 300); await page.mouse.down(); await page.mouse.move(80, 200, { steps: 8 }); await page.mouse.up();
 await page.getByRole("button", { name: "Cerca in quest'area" }).waitFor({ timeout: 3000 });
@@ -2145,6 +2150,19 @@ else {
         await er.getByRole("button", { name: "Riprova" }).click();
         ok(await L.getByTestId("chiedi-salvati-posto").first().waitFor({ timeout: 3000 }).then(() => true, () => false) && n === 2, `chiedi ai tuoi posti: 'Riprova' rifà la stessa domanda (${n} chiamate)`);
         await p.unroute("**/api/salvati/chiedi"); }
+      // Proposta 44 (4/11): con una raccolta accesa si chiede solo a quella ("Chiedi a Romantico").
+      { let body = null;
+        await p.route("**/api/salvati/chiedi", (r) => { body = r.request().postDataJSON(); return r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000001", perche: "Hai scritto: tavolo sulla terrazza." }] } }); });
+        await L.getByLabel("Cerca nei tuoi posti").fill("");
+        await L.locator("[data-testid=raccolta-cerchio][aria-label^='Romantico']").first().click();
+        await L.getByLabel("Cerca nei tuoi posti").fill("dove andiamo sabato sera?");
+        const vai = L.getByTestId("chiedi-salvati-vai");
+        ok(((await vai.textContent().catch(() => "")) ?? "").includes("Chiedi a Romantico"), `chiedi a una raccolta: con 'Romantico' acceso il pulsante dice 'Chiedi a Romantico' (${(await vai.textContent().catch(() => "")) ?? ""})`);
+        await vai.click();
+        await L.getByTestId("chiedi-salvati-posto").first().waitFor({ timeout: 3000 }).catch(() => {});
+        ok(body?.raccolta === "romantico" && body?.domanda === "dove andiamo sabato sera?" && ((await L.getByTestId("chiedi-salvati").textContent().catch(() => "")) ?? "").includes("Da Romantico"), `chiedi a una raccolta: la domanda va solo alla raccolta e la risposta lo dice (${JSON.stringify(body)})`);
+        await p.unroute("**/api/salvati/chiedi");
+        await L.locator("[data-testid=raccolta-cerchio][aria-label^='Romantico']").first().click(); }
       await L.getByLabel("Cerca nei tuoi posti").fill("sushi"); }
     await L.getByRole("button", { name: "Mostra tutti" }).click();
     ok((await righe.count()) === 3, "salvati lista: 'Mostra tutti' azzera la ricerca");
@@ -2179,10 +2197,14 @@ else {
     // Revisore 3/11 (quinto): la mappa parte dal primo della lista (senza posizione "Recenti": Caffè Milano), non dai
     // vicini né dalla zona più piena; il carosello segue l'ordine della lista.
     ok(await stato() === "Roma 2|Milano 1*", `salvati mappa: zone Roma e Milano, aperta sulla zona del primo della lista (Milano) (${await stato()})`);
+    // Area 4 (4/11): la zona accesa filtra davvero (prima spostava solo la mappa): card e titolo sono di Milano.
     { const carte = await p.locator("ul.snap-x li").evaluateAll((els) => els.map((e) => e.textContent ?? ""));
-      ok(carte.length === 3 && nomiLista.length === 3 && carte[0].includes("Caffè Milano") && nomiLista.every((n, i) => carte[i].includes(n)), `salvati mappa: le card seguono l'ordine della lista (${nomiLista.join(" | ")})`); }
+      ok(carte.length === 1 && carte[0].includes("Caffè Milano") && (await p.getByTestId("intestazione-lista").textContent()) === "I tuoi posti · Milano", `salvati mappa: con 'Milano' acceso le card sono solo di Milano (${carte.length}) e il titolo lo dice`); }
     await zone.filter({ hasText: "Roma" }).click();
     ok(await stato() === "Roma 2*|Milano 1", `salvati mappa: un tocco su 'Roma' accende Roma (${await stato()})`);
+    { const carte = await p.locator("ul.snap-x li").evaluateAll((els) => els.map((e) => e.textContent ?? ""));
+      const romaLista = nomiLista.filter((n) => n !== "Caffè Milano");
+      ok(carte.length === 2 && romaLista.every((n, i) => carte[i].includes(n)) && !carte.some((c) => c.includes("· Roma")), `salvati mappa: con 'Roma' le card di Roma nell'ordine della lista, senza ripetere la città (${romaLista.join(" | ")})`); }
     const visibili = async () => p.evaluate(() => [...document.querySelectorAll(".mapboxgl-marker")].filter((m) => { const r = m.getBoundingClientRect(); return r.width > 0 && r.top > 0 && r.bottom < innerHeight && r.left > -10 && r.right < innerWidth + 10; }).length);
     const zoom = async () => p.evaluate(() => { try { return JSON.parse(localStorage.getItem("mapetite.vista") ?? "null")?.zoom ?? null; } catch { return null; } });
     await p.waitForTimeout(1300);
@@ -2475,6 +2497,16 @@ else {
     await mesi.click().catch(() => {});
     await pm.waitForTimeout(300);
     ok((await nomi()).length === 4, "da mesi: un secondo tocco torna a tutti");
+    // Area 4a (4/11): sulla mappa dei salvati il 👎 si distingue dal ✓ (pollice giù, segnalino più chiaro).
+    await Lm.getByTestId("salvati-lista-mappa").click().catch(() => {});
+    await pm.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).catch(() => {});
+    await pm.waitForTimeout(1500);
+    { const st = await pm.evaluate(() => [...document.querySelectorAll("[data-testid=pin][data-stato]")].map((e) => ({ s: e.getAttribute("data-stato"), g: e.querySelector("[data-testid=pin-stato]")?.getAttribute("data-giudizio") ?? null, chiaro: e.className.includes("opacity-60"), f: e.getAttribute("data-focused") })));
+      const no = st.filter((x) => x.s === "no"), si = st.filter((x) => x.s === "stato");
+      ok(no.length === 1 && no[0].g === "no" && (no[0].chiaro || no[0].f === "true") && si.length === 1 && si[0].g === null && !si[0].chiaro, `mappa salvati: il 👎 ha il pollice giù ed è più chiaro, il ✓ resta pieno (${JSON.stringify(st)})`); }
+    { const carta = pm.locator("ul.snap-x li").filter({ hasText: "Caffè No" }).getByTestId("stato-card");
+      ok(/👎/.test((await carta.textContent().catch(() => "")) ?? "") && /bg-stone/.test((await carta.getAttribute("class").catch(() => "")) ?? ""), "mappa salvati: sulla card del 👎 la pillola è grigia, non corallo"); }
+    await pm.screenshot({ path: `${OUT}/11k-mappa-salvati-no.png` });
     await gctx.close(); }
 
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati

@@ -24,14 +24,14 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google prova "Nascondi/Mostra sulla mappa" per i salvati ([Android Authority](https://androidauthority.com/google-maps-list-hide-apk-teardown-3697285)); Mapstr passa tra "mia mappa" e "suggerimenti". Noi in una pillola sola.
 - **Valore per l'utente:** in un tocco vede solo i posti scelti da lui. **Per il ristoratore:** separa "visto tra i salvati" da "visto in una ricerca".
 - **Sforzo:** S (prima controllare che `?beta=pin-salvati` non faccia già lo stesso). **Costo:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **4/11: DA RIVEDERE** — i salvati sulla mappa generale li ha scartati Lorenzo il 14/10 (BACKLOG 11c: "solo in I miei salvati, mai sulla mappa generale"); sulla mappa dei risultati ci sono già i segnalini "Dai tuoi salvati" scelti per la ricerca. Non si fa senza un sì di Lorenzo.
 
 ### 44. "Chiedi a questa raccolta", con le risposte come segnalini
 - **Problema:** `PROBLEMI.md` 18: dentro una raccolta non si può chiedere "quale per domenica a pranzo?".
 - **Cosa fa:** con una raccolta accesa, la ricerca dei Salvati diventa "Chiedi a Romantico…": l'AI sceglie solo tra i posti della raccolta, con il perché dalle recensioni già lette.
 - **Da dove nasce:** Google prova "Chiedi" dentro le liste, ma Ask Maps non c'è in Italia e capisce solo l'inglese. Noi riusiamo "Chiedi ai tuoi posti" (33).
 - **Sforzo:** S. **Costo:** zero Google, una chiamata Haiku per domanda (come oggi).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 4/11 notte** (lista dei Salvati: con una raccolta accesa "Chiedi a Romantico"; il server legge solo i salvati con quel tag). Le risposte come segnalini sulla mappa: non ancora.
 
 ### 45. "Ha chiuso?" sui salvati
 - **Problema:** `PROBLEMI.md` 19.
