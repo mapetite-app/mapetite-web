@@ -3374,10 +3374,12 @@ if (fakeUser) {
         dist: dist == null ? "nessuna" : dist.top >= r.bottom - 1 ? "nascosta" : dist.right <= r.right - pad + 1 ? "intera" : "tagliata", testo: testa.textContent };
     });
     ok(f.intera && f.righe === 1 && f.dist !== "tagliata", `card: riga dei fatti intera su una riga, la distanza c'è solo se ci sta (${f.testo} · distanza ${f.dist})`); }
-  { const s = await card.getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), intera: el.scrollWidth <= el.clientWidth + 1, nome: el.textContent.includes("Hostaria Del Moro") }));
+  // 4/11: "Come un tuo salvato" solo sulle 2 card più vicine a un salvato: si guarda la prima che ce l'ha.
+  const cardSim = q3.locator("ul.snap-x li[data-id]").filter({ has: q3.getByTestId("simile-a") }).first();
+  { const s = await cardSim.getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), intera: el.scrollWidth <= el.clientWidth + 1, nome: el.textContent.includes("Hostaria Del Moro") }));
     ok(s.vis === "✨ Come un tuo salvato" && s.intera && s.nome, `card: 'Come un tuo salvato' intera, il nome del salvato per il lettore di schermo (${s.vis})`); }
   // Revisore del 2/11 (r5): troppo corallo sulla card. Corallo solo su "Poco conosciuto"; "Come un tuo salvato" in bianco attenuato.
-  { const c = await card.getByTestId("simile-a").evaluate((el) => getComputedStyle(el).color);
+  { const c = await cardSim.getByTestId("simile-a").evaluate((el) => getComputedStyle(el).color);
     ok(/^rgba\(255, 255, 255, 0\.[5-9]|^oklab\(0\.99\d* [-0-9.e]+ [-0-9.e]+ \/ 0\.[5-9]/.test(c), `card: 'Come un tuo salvato' in bianco attenuato, non corallo (${c})`); }
   { const a = await card.getByTestId("aperto-card").evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, c: getComputedStyle(el).color }));
     ok(a.bg === "rgb(255, 255, 255)" && a.c === "rgb(26, 60, 64)", `card: 'Aperto ora' bianco e teal, niente verde fuori marchio (${a.bg} / ${a.c})`); }
