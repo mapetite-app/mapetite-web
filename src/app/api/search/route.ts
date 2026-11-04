@@ -52,6 +52,9 @@ const quotaResponse = () =>
   );
 
 export async function POST(request: Request) {
+  // Tempi per fase (area 5b, 4/11): una riga [search-tempi] nei log di Vercel per ogni ricerca del mondo.
+  const t0 = Date.now();
+  const tempi: Record<string, number> = {};
   const body = await request.json().catch(() => null);
   const query = body?.query;
   const source: "world" | "saved" =
@@ -148,6 +151,8 @@ export async function POST(request: Request) {
     const preIntent = searchIntent === "natural" && body?.intentQuery === query.trim() ? sanitizeIntent(body?.intent) : null;
     if (preIntent) console.log(`[search-intent] già capito mentre si scriveva: "${query.trim().slice(0, 60)}"`);
     const intent = searchIntent === "natural" ? preIntent ?? await extractSearchIntent(query.trim()) : null;
+    tempi.intento = Date.now() - t0;
+    if (preIntent) tempi.intento_gia_capito = 1;
     if (intent) {
       filtri = {
         categoria: intent.tipo,
@@ -243,7 +248,9 @@ export async function POST(request: Request) {
         // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
         sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
       };
+      const tG = Date.now();
       risultati = await searchGooglePlaces(queryGoogle, opzioni);
+      tempi.google = Date.now() - tG;
       googleCalls++;
       // Quartiere noto con pochi risultati: Google legge il nome del quartiere come parte dell'insegna
       // ("bar cozy quartiere Moscova Milano" → 4 bar, 3 con "Moscova" nel nome: Lorenzo, 17/10). Allora
@@ -700,6 +707,9 @@ ESEMPI (input → output atteso):
     });
   }
 
+  if (source === "world") {
+    console.log(`[search-tempi] ${JSON.stringify({ q: query.trim().slice(0, 60), fase: fastPhase ? "fast" : "completa", ...tempi, google_chiamate: googleCalls, totale: Date.now() - t0 })}`);
+  }
   return NextResponse.json({
     risultati: risultatiFinali,
     filtri_usati: filtri,
