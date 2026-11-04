@@ -2086,7 +2086,15 @@ export default function MapView({
     if (tuSeiQui) items.push(tuSeiQui);
     // Niente più tetto di 3 nomi (revisore del 2/11): ogni nome che non tocca altri nomi o segnalini resta,
     // nell'ordine della lista (selezionato, card al centro, poi la prima, la seconda…).
-    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
+    // Revisore 4/11 sera: in ricerca nessun nome sotto la riga dei filtri (in alto) né sotto la pillola
+    // "N dei tuoi salvati" (circa 52 px sopra le card); il nome si sposta di lato o si nasconde.
+    const vietate: Rect[] = [];
+    if (inRicerca && !isDesktop()) {
+      vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 196 });
+      // La pillola sta subito sotto la parte libera della mappa (stessa misura di fitToPlaces): ~498–542 px su 844.
+      if (dalSalvatiVisti.length > 0) { const giu = mapBox.h - Math.min(Math.round(mapBox.h * 0.5), 358); vietate.push({ x1: 0, y1: giu - 4, x2: mapBox.w, y2: giu + 60 }); }
+    }
+    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h, vietate });
     return { lati, scost };
   })();
 
@@ -2174,7 +2182,10 @@ export default function MapView({
     // Parte libera sopra le card: barra in basso (64) + margine (12) + card (~200) + frase sopra le card
     // (~52) + spazio per il nome sotto il segnalino (~30). Prima era metà schermo: con le card più basse
     // i segnalini restavano schiacciati in alto.
-    const bottom = Math.min(Math.round(h * 0.5), 358) + extraBottom;
+    // Revisore 4/11 sera: con la pillola "N dei tuoi salvati" sopra le card servono 60 px in più sotto,
+    // a ogni inquadratura (anche dopo un filtro), altrimenti la pillola copriva il nome della prima card.
+    const conPillola = !salvati && aiSearch !== null && dalSalvatiVisti.length > 0;
+    const bottom = Math.min(Math.round(h * 0.5), 358) + (conPillola ? Math.max(extraBottom, 60) : extraBottom);
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
@@ -2828,12 +2839,16 @@ export default function MapView({
     // viaggio un salvato sembrava in vista per poi uscire quando la mappa si fermava più vicina.
     const controlla = () => {
       if (searchSeq.current !== ticket) return;
+      // Revisore 4/11 sera: sotto i 236 px (non 190) il segnalino finiva tra i filtri rapidi.
       const fuori = vicini.some(({ place }) => {
         const pt = map.project([place.lng, place.lat]);
-        return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
+        return pt.x < 30 || pt.x > w - 30 || pt.y < 236 || pt.y > h - Math.min(h * 0.5, 358) - 60;
       });
-      // Revisore 4/11: anche qui la prima card resta in vista (prima, con i salvati, finiva fuori schermo).
-      if (fuori) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
+      // Revisore 4/11 sera: la pillola "N dei tuoi salvati" (~52 px sopra le card) copriva il nome della prima
+      // card quando stava in basso: si rifà l'inquadratura con 60 px in più sotto anche in quel caso.
+      const primo = risultati[0];
+      const primoCoperto = !!primo && (() => { const pt = map.project([primo.lng, primo.lat]); return pt.y > h - Math.min(h * 0.5, 358) - 60 - 34; })();
+      if (fuori || primoCoperto) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -3788,7 +3803,13 @@ export default function MapView({
         {/* "Dai tuoi salvati" (minore del collaudo del 30/10): i salvati scelti per questa ricerca hanno il
             loro segnalino, così si vede dove sono rispetto ai risultati. Segnalibro pieno color brand (il corallo è
             "selezionato"), sotto i risultati; la mappa si allarga per mostrarli (effetto sopra il return). */}
-        {dalSalvatiVisti.map(({ place: p }) => (
+        {dalSalvatiVisti.filter(({ place: p }) => {
+          // Revisore 4/11 sera: un salvato che cade sotto la barra in alto (campo, conteggio, filtri rapidi)
+          // non si disegna lì in mezzo; resta nella pillola "N dei tuoi salvati" e torna spostando la mappa.
+          if (isDesktop()) return true;
+          const m = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { y: number } } } | null)?.getMap?.();
+          try { return !m || m.project([p.lng, p.lat]).y >= 200; } catch { return true; }
+        }).map(({ place: p }) => (
           <Marker
             key={`dai-salvati-${p.id}`}
             longitude={p.lng}
