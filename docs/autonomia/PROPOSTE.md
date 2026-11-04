@@ -38,6 +38,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Cosa fa:** quando un salvato passa già da Google (scheda, ricerca, "Altri come questo"), si tiene anche lo stato (aperto, chiuso per sempre, chiuso temporaneamente). Chiuso per sempre: grigio sulla mappa e nella lista, "Ha chiuso · simili qui vicino", in fondo. Mai cancellato da solo.
 - **Sforzo:** S/M (colonna nuova, stile del segnalino). **Costo:** zero chiamate in più (`businessStatus` è un campo base; va verificato che non cambi la fascia di prezzo delle chiamate già fatte).
 - **Stato proposto:** PRONTA, solo nella versione senza chiamate in più.
+- **Stato:** FATTA il 4/11 sera (branch `claude/busy-mendel-wnyqkh`), senza chiamate in più. Manca "simili qui vicino".
 
 ## 3/11/2026 (notte, sessione 03:05, CEO che chiude — solo ciò che si vede aprendo l'app, piano fino all'8/11)
 
