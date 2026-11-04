@@ -9,7 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { cardFacts } from "@/components/bottom-sheet";
 import { cityFromAddress } from "@/lib/city";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
-import { hasStateOrTag, OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, tagDisplay, tagLabel } from "@/lib/tags";
+import { hasStateOrTag, isStateTag, OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, tagDisplay, tagLabel } from "@/lib/tags";
 import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
@@ -111,20 +111,22 @@ export default function SalvatiLista({
   const [ordine, setOrdine] = useState<Ordine | null>(null);
   // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
   // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
-  type Risposta = { q: string; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
+  // Proposta 44 (4/11): con una raccolta accesa ("Romantico") si chiede solo a quella raccolta.
+  type Risposta = { q: string; raccolta: string | null; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
   const [risposta, setRisposta] = useState<Risposta | null>(null);
+  const raccolta = activeTag !== null && !isStateTag(activeTag) ? activeTag : null;
   const chiedi = async () => {
     const q = query.trim();
-    if (!sembraDomanda(q) || (risposta?.q === q && risposta.stato !== "errore")) return;
-    setRisposta({ q, stato: "cerco", scelti: [] });
+    if (!sembraDomanda(q) || (risposta?.q === q && risposta.raccolta === raccolta && risposta.stato !== "errore")) return;
+    setRisposta({ q, raccolta, stato: "cerco", scelti: [] });
     try {
-      const r = await fetch("/api/salvati/chiedi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domanda: q }) });
+      const r = await fetch("/api/salvati/chiedi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(raccolta ? { domanda: q, raccolta } : { domanda: q }) });
       const j = await r.json().catch(() => ({}));
       const scelti = r.ok && Array.isArray(j.scelti) ? (j.scelti as { id: string; perche: string }[]) : [];
-      setRisposta((cur) => (cur?.q !== q ? cur : r.ok ? { q, stato: "ok", scelti } : { q, stato: "errore", scelti: [], msg: typeof j.error === "string" ? j.error : "Non sono riuscito a rispondere: riprova." }));
-      trackFeature("chiedi_salvati", { stato: r.ok ? (scelti.length ? "trovati" : "nessuno") : "errore", n: scelti.length });
+      setRisposta((cur) => (cur?.q !== q || cur.raccolta !== raccolta ? cur : r.ok ? { q, raccolta, stato: "ok", scelti } : { q, raccolta, stato: "errore", scelti: [], msg: typeof j.error === "string" ? j.error : "Non sono riuscito a rispondere: riprova." }));
+      trackFeature("chiedi_salvati", { stato: r.ok ? (scelti.length ? "trovati" : "nessuno") : "errore", n: scelti.length, ...(raccolta ? { raccolta: "si" } : {}) });
     } catch {
-      setRisposta((cur) => (cur?.q !== q ? cur : { q, stato: "errore", scelti: [], msg: "Sei offline: riprova tra poco." }));
+      setRisposta((cur) => (cur?.q !== q || cur.raccolta !== raccolta ? cur : { q, raccolta, stato: "errore", scelti: [], msg: "Sei offline: riprova tra poco." }));
     }
   };
   // Reel e video collegati ai salvati (contenuti_locali, solo i propri): da dove arriva il posto.
@@ -231,7 +233,8 @@ export default function SalvatiLista({
   const searching = query !== "";
   const domanda = searching && sembraDomanda(query);
   // La risposta vale solo per la domanda scritta adesso.
-  const attuale = domanda && risposta?.q === query.trim() ? risposta : null;
+  const attuale = domanda && risposta?.q === query.trim() && risposta.raccolta === raccolta ? risposta : null;
+  const nRaccolta = raccolta ? all.filter((p) => p.tags?.includes(raccolta)).length : 0;
   // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
   const soloRisposta = domanda && list.length === 0 && activeTag === null && activeCity === null;
   const scelti = (attuale?.scelti ?? []).map((s) => ({ ...s, place: all.find((p) => p.id === s.id) })).filter((s): s is typeof s & { place: Place } => !!s.place);
@@ -318,11 +321,11 @@ export default function SalvatiLista({
               // Con risultati per nome (es. "Da Enzo al 29") il pulsante resta secondario: non copre la lista.
               <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className={`flex min-h-11 w-full items-center gap-2 rounded-pill px-4 text-left text-sm font-display font-semibold active:scale-[0.98] ${list.length === 0 || query.includes("?") ? "bg-accent text-white" : "border border-[#ddd5c8] bg-white text-accent"}`}>
                 <Sparkles size={16} aria-hidden className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate">Chiedi ai tuoi posti</span>
+                <span className="min-w-0 flex-1 truncate">{raccolta ? `Chiedi a ${tagLabel(raccolta)}` : "Chiedi ai tuoi posti"}</span>
               </button>
             ) : attuale.stato === "cerco" ? (
               <p data-testid="chiedi-salvati-cerco" className="flex min-h-11 items-center gap-2 px-1 text-sm text-text-muted">
-                <Sparkles size={16} aria-hidden className="animate-pulse text-accent" /> Guardo tra i tuoi {Math.min(all.length, MAX_POSTI)} posti…
+                <Sparkles size={16} aria-hidden className="animate-pulse text-accent" /> {raccolta ? `Guardo tra i ${nRaccolta} posti di ${tagLabel(raccolta)}…` : `Guardo tra i tuoi ${Math.min(all.length, MAX_POSTI)} posti…`}
               </p>
             ) : attuale.stato === "errore" ? (
               <div data-testid="chiedi-salvati-errore" className={`rounded-card border ${LINE} bg-white p-4`}>
@@ -333,7 +336,7 @@ export default function SalvatiLista({
               </div>
             ) : scelti.length === 0 ? (
               <div data-testid="chiedi-salvati-nessuno" className={`rounded-card border ${LINE} bg-white p-4`}>
-                <p className="text-sm text-text">Tra i tuoi posti nessuno fa al caso.</p>
+                <p className="text-sm text-text">{raccolta ? `In ${tagLabel(raccolta)} nessuno fa al caso.` : "Tra i tuoi posti nessuno fa al caso."}</p>
                 <Link href={`/assistente?q=${encodeURIComponent(query.trim())}`} className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-95">
                   Cercane uno nuovo
                 </Link>
@@ -341,7 +344,7 @@ export default function SalvatiLista({
             ) : (
               <>
                 <h2 className="flex items-center gap-1.5 px-1 font-display text-xs font-semibold uppercase tracking-[0.12em] text-accent">
-                  <Sparkles size={13} aria-hidden /> Tra i tuoi posti
+                  <Sparkles size={13} aria-hidden /> {raccolta ? `Da ${tagLabel(raccolta)}` : "Tra i tuoi posti"}
                 </h2>
                 <ul data-testid="chiedi-salvati-scelti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
                   {scelti.map((s, i) => (
