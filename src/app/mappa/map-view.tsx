@@ -1299,6 +1299,16 @@ export default function MapView({
     : salvatiOrdinati;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
+  // Giro 4/11: con "Più vicini" acceso si accende la città dove sei (a Milano con Roma accesa le card restavano di Roma).
+  const zonaVicina = savedNearestOn && userPos && zoneSalvati.length > 1
+    ? [...zoneSalvati].sort((a, b) => Math.min(...a.posti.map((p) => distanceMeters(userPos, p))) - Math.min(...b.posti.map((p) => distanceMeters(userPos, p))))[0]?.nome ?? null
+    : null;
+  // Aggiornata durante il disegno (schema di React "stato che segue una prop"), non in un effetto.
+  const [zonaVicinaVista, setZonaVicinaVista] = useState<string | null>(null);
+  if (zonaVicina !== zonaVicinaVista) {
+    setZonaVicinaVista(zonaVicina);
+    if (zonaVicina) setZonaMappa(zonaVicina);
+  }
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
     + (aiSearch?.filtri != null ? countActive(filters) : 0);
 

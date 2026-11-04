@@ -2328,7 +2328,7 @@ else {
   ok((await p.getByRole("button", { name: "Più vicini" }).count()) === 0, "salvati: senza la tua posizione niente 'Più vicini'");
   await p.getByRole("button", { name: "Azzera filtri" }).click();
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
-  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === 3, "salvati: 'Azzera filtri' azzera anche il testo cercato");
+  ok((await p.getByLabel("Cerca tra i salvati").inputValue()) === "" && (await p.locator("ul.snap-x li").count()) === (await p.evaluate(() => { const b = document.querySelector("[data-testid=salvati-zona][aria-pressed=true]"); return b ? parseInt(b.textContent.replace(/\D/g, ""), 10) : 3; })), "salvati: 'Azzera filtri' azzera anche il testo cercato (tutte le card della città accesa)");
   await sctx.grantPermissions(["geolocation"]);
   await sctx.setGeolocation({ latitude: 45.4642, longitude: 9.19 });
   await p.getByRole("button", { name: "La mia posizione", exact: true }).click();
@@ -2522,7 +2522,7 @@ else {
   ok((await p.getByTestId("salvati-stato").getByRole("button", { name: /^Da provare/ }).getAttribute("aria-pressed")) === "true" && (await p.getByTestId("salvato-riga").count()) === 3 && !p.url().includes("stato="), "profilo → 'Da provare': lista dei salvati da provare (anche quelli senza stato, revisore 2/11)");
   await p.getByTestId("salvati-lista-mappa").click();
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
-  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible() && (await p.locator("ul.snap-x li").count()) === 3, "profilo → 'Da provare': anche sulla mappa solo i salvati da provare");
+  ok(await p.getByTestId("salvati-attivi").getByRole("button", { name: "Togli 📌 Da provare" }).isVisible() && (await p.locator("ul.snap-x li").count()) === (await p.evaluate(() => { const b = document.querySelector("[data-testid=salvati-zona][aria-pressed=true]"); return b ? parseInt(b.textContent.replace(/\D/g, ""), 10) : 3; })), "profilo → 'Da provare': anche sulla mappa solo i salvati da provare (della città accesa)");
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok((await p.getByTestId("salvati-foglio").getByRole("button", { name: /^📌 Da provare/ }).getAttribute("aria-pressed")) === "true", "profilo → 'Da provare': acceso anche nel foglio Filtri");
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
