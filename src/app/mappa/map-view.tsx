@@ -2136,10 +2136,13 @@ export default function MapView({
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
   // Revisore 4/11 sera: in ricerca, sul telefono, un segnalino che cade sotto la barra in alto (campo, conteggio,
   // filtri rapidi) non si disegna lì in mezzo ai pulsanti; torna appena la mappa si sposta.
+  // Stesso calcolo dei nomi (dallo stato della vista, non dalla mappa: durante il disegno la mappa può essere indietro).
   const sottoLaBarra = (p: { lat: number; lng: number }, limite = 200) => {
-    if (isDesktop() || typeof window === "undefined") return false;
-    const m = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { y: number } } } | null)?.getMap?.();
-    try { return !!m && m.project([p.lng, p.lat]).y < limite; } catch { return false; }
+    if (isDesktop() || typeof window === "undefined" || !mapBox) return false;
+    const pad = (viewState as { padding?: { top: number; bottom: number } }).padding;
+    const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
+    const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
+    return projectMercator(p.lat, p.lng, viewState.zoom).y - centro.y + cy < limite;
   };
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
@@ -3736,8 +3739,9 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && focusId !== place.id && selected?.id !== place.id && sottoLaBarra(place) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && focusId !== place.id && selected?.id !== place.id && sottoLaBarra(place, 200 - (scostamenti[place.id]?.dy ?? 0)) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
+                data-sotto-barra={aiSearch !== null && sottoLaBarra(place, 200 - (scostamenti[place.id]?.dy ?? 0)) ? "true" : undefined}
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
