@@ -547,7 +547,7 @@ export default function SalvatiLista({
           dell'ultima riga. Sotto la lista resta uno spazio pari al pulsante + 16 px (pt-4), così in fondo l'ultima
           riga sta tutta sopra; a riposo una sfumatura carta dietro il pulsante, niente testo che ci passa sotto. */}
       {/* Con la sola risposta di "Chiedi ai tuoi posti" la lista è vuota: niente mappa vuota (revisore 3/11, quinto). */}
-      {!soloRisposta && (
+      {!rispostaAI && (
       <div className={`pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-4 lg:pb-6 ${mappaNascosta ? "" : "bg-gradient-to-t from-[#f8f6f2] from-55% to-transparent"}`}>
         <button
           type="button"

@@ -487,7 +487,7 @@ export default function VenueSheet({
             )}
             {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
                 dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}
-            {personalTags?.includes("Mi è piaciuto") && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (
+            {personalTags?.includes("Mi è piaciuto") && venue.businessStatus !== "CLOSED_PERMANENTLY" && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (
               <a
                 data-testid="recensione-google"
                 href={`https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`}

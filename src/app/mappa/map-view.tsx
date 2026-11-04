@@ -2089,6 +2089,7 @@ export default function MapView({
     // Revisore 4/11 sera: in ricerca nessun nome sotto la riga dei filtri (in alto) né sotto la pillola
     // "N dei tuoi salvati" (circa 52 px sopra le card); il nome si sposta di lato o si nasconde.
     const vietate: Rect[] = [];
+    if (mappaSalvati && !isDesktop()) vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 128 });
     if (inRicerca && !isDesktop()) {
       vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 196 });
       // La pillola sta subito sotto la parte libera della mappa (stessa misura di fitToPlaces): ~498–542 px su 844.
@@ -2133,6 +2134,13 @@ export default function MapView({
   };
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
+  // Revisore 4/11 sera: in ricerca, sul telefono, un segnalino che cade sotto la barra in alto (campo, conteggio,
+  // filtri rapidi) non si disegna lì in mezzo ai pulsanti; torna appena la mappa si sposta.
+  const sottoLaBarra = (p: { lat: number; lng: number }, limite = 200) => {
+    if (isDesktop() || typeof window === "undefined") return false;
+    const m = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { y: number } } } | null)?.getMap?.();
+    try { return !!m && m.project([p.lng, p.lat]).y < limite; } catch { return false; }
+  };
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
     if (!map || typeof window === "undefined") return;
@@ -2175,7 +2183,8 @@ export default function MapView({
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
     pendingFitRef.current = null;
     // Un risultato lontanissimo dagli altri non allarga la mappa (revisore del 1/11, 05c: a tutta Roma).
-    const inquadrati = salvati ? list : [...puntiDaInquadrare(list), ...sempre];
+    // Revisore 4/11 sera: anche sui salvati "sempre" (la tua posizione) entra nell'inquadratura.
+    const inquadrati = salvati ? [...list, ...sempre] : [...puntiDaInquadrare(list), ...sempre];
     const lngs = inquadrati.map((p) => p.lng);
     const lats = inquadrati.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -3269,7 +3278,7 @@ export default function MapView({
                 {aiSearch !== null
                   ? "Prova con meno requisiti o scrivi un'altra zona (es. “a Trastevere”)."
                   : view === "saved" && savedFiltered
-                    ? "Cambia la ricerca o tocca “Tutti”"
+                    ? "Cambia la ricerca o spegni i filtri accesi"
                     : view === "saved"
                       ? "Salva i posti che scopri, da qualsiasi app: li ritrovi qui quando devi scegliere."
                       : "Sposta la mappa o cambia vista"}
@@ -3727,11 +3736,12 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && place.tags?.includes(OPINION_DISLIKE))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && focusId !== place.id && selected?.id !== place.id && sottoLaBarra(place) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
                 data-testid="pin"
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
+                data-chiuso={mappaSalvati && place.businessStatus === "CLOSED_PERMANENTLY" ? "true" : undefined}
                 data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? (place.tags?.includes(OPINION_DISLIKE) ? "no" : "stato") : "provare") : undefined}
               >
                 {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
@@ -3803,13 +3813,8 @@ export default function MapView({
         {/* "Dai tuoi salvati" (minore del collaudo del 30/10): i salvati scelti per questa ricerca hanno il
             loro segnalino, così si vede dove sono rispetto ai risultati. Segnalibro pieno color brand (il corallo è
             "selezionato"), sotto i risultati; la mappa si allarga per mostrarli (effetto sopra il return). */}
-        {dalSalvatiVisti.filter(({ place: p }) => {
-          // Revisore 4/11 sera: un salvato che cade sotto la barra in alto (campo, conteggio, filtri rapidi)
-          // non si disegna lì in mezzo; resta nella pillola "N dei tuoi salvati" e torna spostando la mappa.
-          if (isDesktop()) return true;
-          const m = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { y: number } } } | null)?.getMap?.();
-          try { return !m || m.project([p.lng, p.lat]).y >= 200; } catch { return true; }
-        }).map(({ place: p }) => (
+        {/* Un salvato sotto la barra in alto resta nella pillola "N dei tuoi salvati" (sottoLaBarra). */}
+        {dalSalvatiVisti.filter(({ place: p }) => !sottoLaBarra(p)).map(({ place: p }) => (
           <Marker
             key={`dai-salvati-${p.id}`}
             longitude={p.lng}
@@ -3923,7 +3928,7 @@ export default function MapView({
               nav={navScheda}
               onNavPrev={() => vaiRisultato(-1)}
               onNavNext={() => vaiRisultato(1)}
-              rankSlot={userId && resolveUuid(selected.id) ? (
+              rankSlot={userId && resolveUuid(selected.id) && selected.businessStatus !== "CLOSED_PERMANENTLY" ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio

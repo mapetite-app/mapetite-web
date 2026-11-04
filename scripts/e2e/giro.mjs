@@ -2545,6 +2545,19 @@ else {
     await pc.getByTestId("scheda-chiuso").waitFor({ timeout: 5000 }).catch(() => {});
     ok((await pc.getByTestId("scheda-chiuso").textContent().catch(() => ""))?.trim() === "Secondo Google ha chiuso", "ha chiuso: la scheda dice 'Secondo Google ha chiuso'");
     ok(await pc.getByTestId("scheda-simili-chiuso").isVisible().catch(() => false), "ha chiuso: nella scheda 'Simili qui vicino'");
+    ok((await pc.getByTestId("recensione-google").count()) === 0, "ha chiuso: nella scheda niente 'lascia due righe su Google'");
+    // Revisore 4/11 sera: anche sulla mappa dei salvati il chiuso si vede (pillola sulla card, segnalino più chiaro).
+    await pc.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+    await pc.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
+    await pc.getByTestId("salvati-lista-mappa").click().catch(() => {});
+    await pc.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).catch(() => {});
+    await pc.waitForTimeout(1500);
+    const pillCarte = await pc.locator("[data-testid=stato-card][data-chiuso=true]").allTextContents();
+    ok(pillCarte.includes("Ha chiuso") && pillCarte.includes("Chiuso per ora"), `ha chiuso: sulla mappa le card dicono 'Ha chiuso' e 'Chiuso per ora' (${JSON.stringify(pillCarte)})`);
+    { const pin = pc.locator("[data-testid=pin][data-chiuso=true]");
+      const cls = (await pin.getAttribute("class").catch(() => "")) ?? "";
+      ok((await pin.count()) === 1 && (cls.includes("opacity-60") || (await pin.getAttribute("data-focused")) === "true"), "ha chiuso: sulla mappa il segnalino del chiuso è più chiaro"); }
+    await pc.screenshot({ path: `${OUT}/11n-mappa-salvati-ha-chiuso.png` });
     await pc.screenshot({ path: `${OUT}/11m-scheda-ha-chiuso.png` });
     await cctx.close(); }
 

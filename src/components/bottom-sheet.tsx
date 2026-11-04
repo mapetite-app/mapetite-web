@@ -933,7 +933,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
-                          <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
+                          (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") ? (
+                          <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">{place.businessStatus === "CLOSED_PERMANENTLY" ? "Ha chiuso" : "Chiuso per ora"}</span>
+                        ) : <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -1050,7 +1052,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
-                          <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
+                          (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") ? (
+                          <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">{place.businessStatus === "CLOSED_PERMANENTLY" ? "Ha chiuso" : "Chiuso per ora"}</span>
+                        ) : <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (

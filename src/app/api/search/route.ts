@@ -309,7 +309,7 @@ export async function POST(request: Request) {
     const visti = risultati;
     after(() => ricordaStato(visti));
     const chiusi = risultati.filter((p) => p.businessStatus === "CLOSED_PERMANENTLY");
-    if (chiusi.length > 0 && chiusi.length < risultati.length) {
+    if (chiusi.length > 0) {
       risultati = risultati.filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY");
       console.log(`[search-chiusi] tolti perché chiusi per sempre secondo Google: ${JSON.stringify(chiusi.map((p) => p.name))}`);
     }
