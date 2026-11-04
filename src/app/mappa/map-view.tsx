@@ -947,6 +947,13 @@ export default function MapView({
   // "I miei salvati" in una riga (Lorenzo 16/10, "il dono della sintesi"): stato, città, raccolte e
   // ordine stanno nel foglio "Filtri"; sullo schermo restano solo la ricerca e i filtri accesi.
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
+  // Il foglio Filtri dei salvati si chiude anche con Esc (terzo revisore 4/11), come le opzioni della ricerca.
+  useEffect(() => {
+    if (!savedSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSavedSheetOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [savedSheetOpen]);
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);

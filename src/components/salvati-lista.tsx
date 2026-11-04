@@ -347,7 +347,7 @@ export default function SalvatiLista({
             ) : (
               <>
                 <h2 className="flex items-center gap-1.5 px-1 font-display text-xs font-semibold uppercase tracking-[0.12em] text-accent">
-                  <Sparkles size={13} aria-hidden /> {raccolta ? `Da ${tagLabel(raccolta)}` : "Tra i tuoi posti"}
+                  <Sparkles size={13} aria-hidden /> {raccolta ? `Dalla raccolta ${tagLabel(raccolta)}` : "Tra i tuoi posti"}
                 </h2>
                 <ul data-testid="chiedi-salvati-scelti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
                   {scelti.map((s, i) => (

@@ -2160,7 +2160,7 @@ else {
         ok(((await vai.textContent().catch(() => "")) ?? "").includes("Chiedi a Romantico"), `chiedi a una raccolta: con 'Romantico' acceso il pulsante dice 'Chiedi a Romantico' (${(await vai.textContent().catch(() => "")) ?? ""})`);
         await vai.click();
         await L.getByTestId("chiedi-salvati-posto").first().waitFor({ timeout: 3000 }).catch(() => {});
-        ok(body?.raccolta === "romantico" && body?.domanda === "dove andiamo sabato sera?" && ((await L.getByTestId("chiedi-salvati").textContent().catch(() => "")) ?? "").includes("Da Romantico"), `chiedi a una raccolta: la domanda va solo alla raccolta e la risposta lo dice (${JSON.stringify(body)})`);
+        ok(body?.raccolta === "romantico" && body?.domanda === "dove andiamo sabato sera?" && ((await L.getByTestId("chiedi-salvati").textContent().catch(() => "")) ?? "").includes("Dalla raccolta Romantico"), `chiedi a una raccolta: la domanda va solo alla raccolta e la risposta lo dice (${JSON.stringify(body)})`);
         await p.unroute("**/api/salvati/chiedi");
         await L.locator("[data-testid=raccolta-cerchio][aria-label^='Romantico']").first().click(); }
       await L.getByLabel("Cerca nei tuoi posti").fill("sushi"); }
@@ -2264,6 +2264,10 @@ else {
   await p.getByTestId("salvati-filtri").waitFor({ timeout: 5000 });
   await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("salvati-foglio").getByRole("button", { name: "📍 Milano · 1" }).isVisible(), "città: chip Milano · 1");
+  // Terzo revisore 4/11: il foglio Filtri si chiude con Esc.
+  await p.keyboard.press("Escape");
+  ok(await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 2000 }).then(() => true, () => false), "salvati: il foglio Filtri si chiude con Esc");
+  await p.getByTestId("salvati-apri-filtri").click(); await p.getByTestId("salvati-foglio").waitFor({ timeout: 3000 });
   await p.getByTestId("salvati-mostra").click(); await p.getByTestId("salvati-foglio").waitFor({ state: "detached", timeout: 3000 });
   // Area 4 (4/11): la zona accesa filtra le card. Si apre su Milano (il primo della lista); con Roma le 2 di Roma.
   const zonaRoma = async () => { const z = p.getByTestId("salvati-zona").filter({ hasText: "Roma" }); if (await z.count()) { await z.click(); await p.waitForTimeout(500); } };
