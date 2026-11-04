@@ -75,6 +75,8 @@ export type Venue = {
   requisiti?: { r: string; prova: string }[] | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
   editorialSummary?: string | null;
+  // Proposta 45: stato da Google ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"), solo se noto.
+  businessStatus?: string | null;
 };
 
 type VenueSheetProps = {
@@ -750,6 +752,11 @@ export default function VenueSheet({
             )}
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {(venue.businessStatus === "CLOSED_PERMANENTLY" || venue.businessStatus === "CLOSED_TEMPORARILY") && (
+            <p data-testid="scheda-chiuso" className="mt-2 inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
+              {venue.businessStatus === "CLOSED_PERMANENTLY" ? "Secondo Google ha chiuso" : "Secondo Google è chiuso per ora"}
+            </p>
+          )}
           {/* UNA riga: "● Aperto ora · 650 m · fino alle 01:00" (orari Google se ci sono, mai inventati). */}
           {(aperto != null || distance || rating != null) && (
             <p data-testid="scheda-fatti" className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] font-sans text-[#4b5058]">

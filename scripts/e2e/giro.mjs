@@ -2519,6 +2519,34 @@ else {
     await pm.screenshot({ path: `${OUT}/11k-mappa-salvati-no.png` });
     await gctx.close(); }
 
+  // Proposta 45 "Ha chiuso?" (4/11): un salvato che Google dà chiuso per sempre va in fondo, con "Ha chiuso",
+  // fuori da "aspettano da mesi"; chiuso per ora ha la sua pillola; la scheda lo dice. Mai tolto.
+  { const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8935, longitude: 12.472 } });
+    await cctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    const pz = (n, name, lat, lng, bs) => ({ id: `00000000-0000-4000-8000-0000000005${n}`, name, category: "restaurant", address: "Via di Prova 1, 00186 Roma RM, Italy", lat, lng, google_place_id: `GC${n}`, rating: 4.4, price_level: 2, business_status: bs });
+    const rowsC = [
+      { created_at: "2026-06-02T10:00:00Z", tags: ["Da provare"], note: null, places: pz("01", "Osteria Chiusa", 41.8936, 12.4721, "CLOSED_PERMANENTLY") },
+      { created_at: "2026-10-20T10:00:00Z", tags: ["Da provare"], note: null, places: pz("02", "Bistrot Lavori", 41.896, 12.475, "CLOSED_TEMPORARILY") },
+      { created_at: "2026-10-31T10:00:00Z", tags: ["Da provare"], note: null, places: pz("03", "Trattoria Aperta", 41.9, 12.48, "OPERATIONAL") },
+    ];
+    await cctx.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rowsC.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rowsC }));
+    const pc = await cctx.newPage();
+    await pc.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+    const Lc = pc.getByTestId("salvati-lista");
+    await Lc.waitFor({ timeout: 8000 }).catch(() => {});
+    await pc.waitForTimeout(1200);
+    const nomiC = await Lc.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents();
+    const pillole = await Lc.getByTestId("salvato-chiuso").allTextContents();
+    ok(nomiC[nomiC.length - 1] === "Osteria Chiusa" && nomiC.length === 3, `ha chiuso: il più vicino ma chiuso per sempre va in fondo, mai tolto (${nomiC.join(", ")})`);
+    ok(JSON.stringify(pillole) === '["Chiuso per ora","Ha chiuso"]', `ha chiuso: pillole 'Chiuso per ora' e 'Ha chiuso', niente sull'aperto (${JSON.stringify(pillole)})`);
+    ok(!(await Lc.getByTestId("salvati-da-mesi").isVisible().catch(() => false)), "ha chiuso: un posto chiuso non conta in 'aspettano da mesi'");
+    await pc.screenshot({ path: `${OUT}/11l-salvati-ha-chiuso.png` });
+    await Lc.getByTestId("salvato-riga").filter({ hasText: "Osteria Chiusa" }).click().catch(() => {});
+    await pc.getByTestId("scheda-chiuso").waitFor({ timeout: 5000 }).catch(() => {});
+    ok((await pc.getByTestId("scheda-chiuso").textContent().catch(() => ""))?.trim() === "Secondo Google ha chiuso", "ha chiuso: la scheda dice 'Secondo Google ha chiuso'");
+    await pc.screenshot({ path: `${OUT}/11m-scheda-ha-chiuso.png` });
+    await cctx.close(); }
+
   // Scorciatoia dell'app: /mappa?vista=salvati apre subito i salvati
   await p.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" });  await p.getByTestId("salvati-lista").waitFor({ timeout: 5000 }).then(() => ok(true, "scorciatoia 'I miei salvati': apre subito i salvati"), () => ok(false, "scorciatoia 'I miei salvati': apre subito i salvati"));
   await p.waitForTimeout(300);

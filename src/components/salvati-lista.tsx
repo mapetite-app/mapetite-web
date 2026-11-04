@@ -210,7 +210,7 @@ export default function SalvatiLista({
   // tornano su con una riga sola; un tocco li mostra da soli. Solo la data di salvataggio, costo zero.
   const [adesso] = useState(() => Date.now());
   const [soloMesi, setSoloMesi] = useState(false);
-  const daMesi = useMemo(() => new Set(all.filter((p) => !p.tags?.includes(DONE) && p.savedAt && adesso - Date.parse(p.savedAt) > 60 * 86_400_000).map((p) => p.id)), [all, adesso]);
+  const daMesi = useMemo(() => new Set(all.filter((p) => !p.tags?.includes(DONE) && p.businessStatus !== "CLOSED_PERMANENTLY" && p.savedAt && adesso - Date.parse(p.savedAt) > 60 * 86_400_000).map((p) => p.id)), [all, adesso]);
   const daQuando = (p: Place) => {
     if (!daMesi.has(p.id) || !p.savedAt) return null;
     const d = new Date(p.savedAt);
@@ -219,16 +219,19 @@ export default function SalvatiLista({
   };
   const shownMesi = useMemo(() => (soloMesi ? shown.filter((p) => daMesi.has(p.id)) : shown), [shown, soloMesi, daMesi]);
   const list = useMemo(() => {
+    // Proposta 45: chi ha chiuso per sempre (secondo Google) va in fondo con qualsiasi ordine. Mai tolto.
+    const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
     // Revisore 3/11 (sesto): anche con "Vicino" i 👎 vanno in fondo (mai primo un posto che non fa per te).
     if (sort === "vicino" && origin) {
       const giu = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 1 : 0);
-      return [...shownMesi].sort((a, b) => giu(a) - giu(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
+      return [...shownMesi].sort((a, b) => chiuso(a) - chiuso(b) || giu(a) - giu(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
     }
     if (sort === "preferiti") {
       const peso = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 3 : p.tags?.includes(OPINION_LIKE) ? 0 : p.tags?.includes(DONE) ? 1 : 2);
-      return [...shownMesi].reverse().sort((a, b) => peso(a) - peso(b));
+      return [...shownMesi].reverse().sort((a, b) => chiuso(a) - chiuso(b) || peso(a) - peso(b));
     }
-    return sort === "recenti" ? [...shownMesi].reverse() : shownMesi;
+    const base = sort === "recenti" ? [...shownMesi].reverse() : [...shownMesi];
+    return base.sort((a, b) => chiuso(a) - chiuso(b));
   }, [shownMesi, origin, sort]);
   const searching = query !== "";
   const domanda = searching && sembraDomanda(query);
@@ -479,6 +482,8 @@ export default function SalvatiLista({
               const done = p.tags?.includes(DONE);
               const daMese = daQuando(p);
               const liked = p.tags?.includes(OPINION_LIKE);
+              const haChiuso = p.businessStatus === "CLOSED_PERMANENTLY";
+              const chiusoPerOra = p.businessStatus === "CLOSED_TEMPORARILY";
               const chip = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
               return (
                 <li key={p.id} className={i > 0 ? `border-t ${LINE}` : ""}>
@@ -488,8 +493,10 @@ export default function SalvatiLista({
                     onClick={() => onOpen(p, list.map((x) => x.id))}
                     className="flex min-h-[84px] w-full items-start gap-3 px-3 py-3 text-left transition-colors active:bg-black/[0.03]"
                   >
-                    <Miniatura place={p} foto={fotoMie[p.id]} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
-                    <span className="min-w-0 flex-1">
+                    <span className={haChiuso ? "opacity-45 grayscale" : undefined}>
+                      <Miniatura place={p} foto={fotoMie[p.id]} size="mt-0.5 h-[60px] w-[60px] text-[28px] rounded-[14px]" />
+                    </span>
+                    <span className={`min-w-0 flex-1 ${haChiuso ? "opacity-70" : ""}`}>
                       {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
                       <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
                       {(meta || dist) && (
@@ -506,6 +513,10 @@ export default function SalvatiLista({
                       {/* Lo stato c'è sempre, e sono solo due (revisore 2/11): senza stato è "Da provare".
                           📌 è l'icona di "Da provare" in tutta l'app; il segnalibro resta per Salva/Salvato. */}
                       <span className="mt-1 flex flex-wrap gap-1.5">
+                          {/* Proposta 45: lo dice Google, non noi; il posto resta finché non lo togli tu. */}
+                          {(haChiuso || chiusoPerOra) && (
+                            <span data-testid="salvato-chiuso" className={`${chip} bg-[#33373d] text-white`}>{haChiuso ? "Ha chiuso" : "Chiuso per ora"}</span>
+                          )}
                           <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
                             {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <span aria-hidden className="text-[10px] leading-none">📌</span>}
                             {done ? "Ci sono stato" : "Da provare"}

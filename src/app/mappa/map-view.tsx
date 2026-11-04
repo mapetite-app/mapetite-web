@@ -565,6 +565,8 @@ export type Place = {
   // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
   // generico ("restaurant"). I salvati non li hanno: la loro emoji resta quella di sempre.
   types?: string[] | null;
+  // Solo nei salvati (proposta 45): stato letto da Google quando il locale è passato da una ricerca o dalla scheda.
+  businessStatus?: string | null;
 };
 
 function SaveButton({
@@ -1532,7 +1534,7 @@ export default function MapView({
       const supabase = await browserClient();
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
+        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level, business_status)")
         .eq("user_id", userId)
         // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
         .order("created_at", { ascending: true });
@@ -1548,12 +1550,12 @@ export default function MapView({
       const fetched = (data ?? [])
         .map((row): Place | null => {
           // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
-          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null }) | null;
+          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null; business_status?: string | null }) | null;
           if (!raw || raw.lat == null || raw.lng == null) return null;
-          const { google_place_id, price_level, ...place } = raw;
+          const { google_place_id, price_level, business_status, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
           // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
-          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, businessStatus: business_status ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
         })
         .filter((p): p is Place => p !== null);
 
@@ -3871,6 +3873,7 @@ export default function MapView({
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,
+                businessStatus: selected.businessStatus ?? null,
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
                   selectedReviews: null, synthesis: null, tags: null, verdict: null,
