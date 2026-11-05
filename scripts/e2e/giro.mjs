@@ -7843,6 +7843,7 @@ else {
   await ip.getByRole("button", { name: "Milano", exact: true }).click();
   await ip.getByRole("button", { name: "Continua" }).click();
   await ip.getByTestId("benvenuto-avanti").click(); // "Cosa ti piace?" (5/11): saltato
+  await ip.getByTestId("tipi-basta").waitFor({ timeout: 8000 }); // il passo può arrivare dopo un attimo (giro del 5/11)
   await ip.getByTestId("tipi-basta").click();
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 8", "primo accesso: 'Basta così' al passo 2 va al passo 3");
   await ip.getByRole("button", { name: "Indietro" }).click();
