@@ -2201,6 +2201,12 @@ export default function MapView({
     const basso = h - 300;
     // 60 di lato (revisore 5/11): a 35 px dal bordo il segnalino restava attaccato e i vicini tagliati.
     if (pt.x > 60 && pt.x < w - 60 && pt.y > alto && pt.y < basso) return;
+    // Dentro lo schermo ma vicino al bordo: si sposta solo di quanto serve, così gli altri segnalini restano in vista.
+    if (pt.x > 0 && pt.x < w && pt.y > alto && pt.y < basso) {
+      const dx = pt.x < 60 ? pt.x - 60 : pt.x - (w - 60);
+      (map as unknown as { panBy: (o: [number, number], a: object) => void }).panBy([Math.round(dx), 0], { duration: 400 });
+      return;
+    }
     map.easeTo({ center: [place.lng, place.lat], offset: [0, Math.round((alto + basso) / 2 - h / 2)], duration: 500 });
   };
 
@@ -2216,7 +2222,7 @@ export default function MapView({
   // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
   // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
   // top 224 (area 4c, 4/11): sotto barra, pillola "N posti" e riga dei filtri rapidi.
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 236, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 236, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false, zoomMax?: number) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
@@ -2239,7 +2245,7 @@ export default function MapView({
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
         // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 48, right: salvati ? 64 : 48 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 48, right: salvati ? 64 : 48 }, maxZoom: zoomMax ?? (inquadrati.length >= 3 ? 16 : 15), duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -3742,18 +3748,17 @@ export default function MapView({
                     (l) => (l.properties as { placeData: Place }).placeData,
                   );
                   if (places.length === 0) return;
-                  // Revisore 5/11: toccare un gruppo avvicina la mappa finché si separa (come Google Maps e
-                  // Places), invece di aprire una lista con la mappa ferma. Solo se i posti sono nello stesso
-                  // punto (non si separano a nessuno zoom) resta la lista.
+                  // Revisore 5/11: toccare un gruppo inquadra tutti i suoi posti in un colpo (come Google Maps e
+                  // Places), sotto le barre, e la card va sul primo di quei posti nell'ordine della lista. Solo se i
+                  // posti sono nello stesso punto (non si separano a nessuno zoom) resta la lista.
                   const limite = mappaSalvati ? SALVATI_GRUPPI_FINO_A : 20;
                   let zoom = limite + 1;
                   try { zoom = clusterIndex.getClusterExpansionZoom(clusterId); } catch { /* lista */ }
-                  const map = (mapRef.current as { getMap?: () => { easeTo: (o: object) => void } } | null)?.getMap?.();
-                  if (map && zoom <= Math.max(limite, 18)) {
-                    const h = typeof window !== "undefined" ? window.innerHeight : 800;
-                    const alto = aiSearch !== null ? 236 : 170;
-                    const basso = h - 300;
-                    map.easeTo({ center: [lng, lat], zoom: Math.max(zoom, viewState.zoom + 1), ...(isDesktop() ? {} : { offset: [0, Math.round((alto + basso) / 2 - h / 2)] }), duration: 600 });
+                  if (zoom <= Math.max(limite, 18)) {
+                    const ids = new Set(places.map((p) => p.id));
+                    const primo = carouselOrder.find((id) => ids.has(id));
+                    if (primo) setFocusedId(primo);
+                    fitToPlaces(places, aiSearch !== null ? 236 : 170, 0, [], true, Math.max(16, Math.min(18, zoom + 0.5)));
                     return;
                   }
                   setClusterPlaces(places);

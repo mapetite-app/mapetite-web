@@ -132,6 +132,9 @@ export function posizionaEtichette(
     if (!it.label) return;
     if (!it.fixed && coperto(i)) return;
     const { x, y } = pts[i];
+    // Revisore 5/11: un segnalino fuori dallo schermo non lascia il suo nome sulla mappa (spostato di lato
+    // sembrava di un altro).
+    if (schermo && !it.fixed && (x < 0 || x > schermo.w || y < 0 || y > schermo.h)) return;
     let best: { side: LabelSide; rect: Rect; n: number } | null = null;
     const opposto: LabelSide | null = it.lato === "destra" ? "sinistra" : it.lato === "sinistra" ? "destra" : it.lato === "sotto" ? "sopra" : it.lato === "sopra" ? "sotto" : null;
     // Revisore 5/11: sui salvati solo 2 nomi su 10 (il nome poteva stare solo a destra). Un nome non fisso

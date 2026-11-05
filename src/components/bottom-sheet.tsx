@@ -1037,7 +1037,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   type="button"
                   onClick={() => onSelect(place)}
                   data-testid="card-risultato"
-                  className="relative flex h-full min-h-[150px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  className={`relative flex h-full min-h-[150px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99] ${place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale opacity-80" : ""}`}
                   style={{ background: coverGradient(place.category, place.name) }}
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
