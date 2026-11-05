@@ -1047,7 +1047,7 @@ await page.unroute("**/api/search");
   if (await c.count()) {
     ok((await page.getByTestId("consiglio-titolo").innerText()) === "Ti porterei da Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Vedi ›/.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);
     const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=consiglio]").getBoundingClientRect(); const card = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: card.top, h: f.height, l: f.left, r: window.innerWidth - f.right }; });
-    ok(g.fb <= g.ct + 1 && g.h >= 44 && g.h <= 64 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
+    ok(g.fb <= g.ct + 1 && g.h >= 60 && g.h <= 74 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
     await c.click();
     await page.waitForTimeout(900);
     const centro = await page.locator("ul.snap-x li[data-id]").evaluateAll((lis) => lis.map((li) => ({ id: li.dataset.id, l: li.getBoundingClientRect().left })).filter((x) => x.l >= 0 && x.l < 60).map((x) => x.id)[0]);
