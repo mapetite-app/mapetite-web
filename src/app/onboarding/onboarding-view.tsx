@@ -7,6 +7,8 @@ import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
+import { amatiValidi, etichetteAmati } from "@/lib/tipi-locale";
+import SelettoreGusti, { contaScelti } from "@/components/selettore-gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
@@ -35,6 +37,7 @@ interface Draft {
   visti: string[];
   scoperta: Scoperta | null;
   diete: string[];
+  amati: string[];
 }
 
 function readDraftRaw(): string | null {
@@ -57,7 +60,7 @@ function clearDraft() {
   } catch { /* niente da fare */ }
 }
 
-const vuota = (d: Draft) => d.step === 0 && !d.city && !d.otherOpen && !d.zone.length && !d.visti.length && !d.occasions.length && !d.priceRange && !d.diete.length;
+const vuota = (d: Draft) => d.step === 0 && !d.city && !d.otherOpen && !d.zone.length && !d.visti.length && !d.occasions.length && !d.priceRange && !d.diete.length && !d.amati.length;
 
 // Solo valori che l'onboarding conosce: il contenuto del telefono si ricontrolla come un input.
 function parseDraft(raw: string | null): Draft | null {
@@ -69,8 +72,10 @@ function parseDraft(raw: string | null): Draft | null {
       Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && allowed.some((a) => a.value === x)) : [];
     const city = CITIES.some((c) => c.value === o.city) ? o.city : null;
     const m = pulisciMappa(o, (z) => ZONE.some((x) => x.nome === z && x.citta === city));
+    // Bozza del primo accesso a 7 passi (prima di "Cosa ti piace?", 5/11): dal secondo passo in poi si sposta di uno.
+    const passo = Number.isInteger(o.step) ? (o.step >= 1 && !Array.isArray(o.amati) ? o.step + 1 : o.step) : 0;
     const d: Draft = {
-      step: Number.isInteger(o.step) ? Math.min(Math.max(o.step, 0), TOTAL - 1) : 0,
+      step: Math.min(Math.max(passo, 0), TOTAL - 1),
       cuisines: pick(o.cuisines, CUISINES),
       occasions: pick(o.occasions, OCCASIONS),
       atmospheres: pick(o.atmospheres, ATMOSPHERES),
@@ -84,6 +89,7 @@ function parseDraft(raw: string | null): Draft | null {
       visti: Array.isArray(o.visti) ? o.visti.filter((x: unknown): x is string => typeof x === "string" && TIPI.some((t) => t.id === x)) : [...m.su, ...m.giu],
       scoperta: m.scoperta,
       diete: dieteValide(o.diete),
+      amati: amatiValidi(o.amati),
     };
     return vuota(d) ? null : d;
   } catch {
@@ -98,6 +104,7 @@ function parseDraft(raw: string | null): Draft | null {
 // Un solo stile in tutti i passi (mockup A): titolo serif, scelta segnata in teal, tasto principale teal.
 const STEPS = [
   { title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
+  { title: "Cosa ti piace?", subtitle: "Tocca tutto quello che ti va." },
   { title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
   { title: "Famosi o chicche?", subtitle: "Scegli quello che ti somiglia di più." },
   { title: "Come mangi?", subtitle: "Diete e cose che eviti: le terrò sempre presenti." },
@@ -106,12 +113,13 @@ const STEPS = [
   { title: "Ecco cosa ho capito di te", subtitle: "" },
 ] as const;
 const TOTAL = STEPS.length;
-const PASSO_TIPI = 1;
-const PASSO_SCOPERTA = 2;
-const PASSO_DIETE = 3;
-const PASSO_OCCASIONI = 4;
-const PASSO_SPESA = 5;
-const PASSO_CAPITO = 6;
+const PASSO_AMATI = 1;
+const PASSO_TIPI = 2;
+const PASSO_SCOPERTA = 3;
+const PASSO_DIETE = 4;
+const PASSO_OCCASIONI = 5;
+const PASSO_SPESA = 6;
+const PASSO_CAPITO = 7;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
@@ -156,7 +164,7 @@ function Chip({
 // con una bozza il modulo riparte da lì, senza effetti che rimettono a posto lo stato.
 const noSubscribe = () => () => {};
 // Risposte già salvate nel profilo (per "Rifalla"): servono da punto di partenza, mai come bozza.
-export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[]; cuisines?: string[]; atmospheres?: string[] };
+export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[]; cuisines?: string[]; atmospheres?: string[]; amati?: string[] };
 
 export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
@@ -176,7 +184,7 @@ export default function OnboardingView({ next = null, dalProfilo = null }: { nex
         occasions: dalProfilo.occasions.filter((o) => OCCASIONS.some((x) => x.value === o)),
         priceRange: PRICE_RANGES.some((x) => x.value === dalProfilo.priceRange) ? dalProfilo.priceRange : null,
         zone: dalProfilo.zone, su: dalProfilo.su, giu: dalProfilo.giu, visti: [...dalProfilo.su, ...dalProfilo.giu],
-        scoperta: dalProfilo.scoperta, diete: dalProfilo.diete,
+        scoperta: dalProfilo.scoperta, diete: dalProfilo.diete, amati: amatiValidi(dalProfilo.amati),
       }
     : null;
   return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} />;
@@ -198,6 +206,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [visti, setVisti] = useState<string[]>(initial?.visti ?? []);
   const [scoperta, setScoperta] = useState<Scoperta | null>(initial?.scoperta ?? null);
   const [diete, setDiete] = useState<string[]>(initial?.diete ?? []);
+  const [amati, setAmati] = useState<string[]>(initial?.amati ?? []);
   // Il passo più avanti visto: le diete si mandano solo se la persona ha visto la loro domanda
   // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
@@ -206,7 +215,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
   // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
-  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete };
+  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete, amati };
   const draftJson = JSON.stringify(draftNow);
   // Le risposte prese dal profilo ("Rifalla") diventano bozza solo quando la persona cambia qualcosa.
   const [partenza] = useState(draftJson);
@@ -267,7 +276,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Prima con `scopertaVista` passava anche una proposta calcolata dopo, da 👍 dati correggendo dalla frase,
   // e la frase diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo 26/10).
   // v: 2: "Famosi o chicche?" qui è una domanda vista; senza risposta il server non deduce niente (B1).
-  const gusto = { v: 2 as const, zone, su, giu, scoperta };
+  const gusto = { v: 2 as const, zone, su, giu, scoperta, amati };
 
   // Arrivati a correggere dalla frase: ogni passo ha "Torna alla frase" (collaudo 23/10: "Continua" portava avanti).
   const [tornaFrase, setTornaFrase] = useState(false);
@@ -335,13 +344,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 e ha lasciato vale come
   // scelta. Una mai mostrata non entra nella sintesi.
   const gustoVisto = gusto;
-  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)) };
+  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: etichetteAmati(amati) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
   // Dietro "Altro" solo ciò che la frase non dice già: quello che è nella frase si cambia toccando la parola.
   const nellaFrase = new Set(frase.flat().map((x) => x.k).filter(Boolean) as string[]);
   const righeAltre = righe.filter((r) => !nellaFrase.has(r.chiave));
-  const PASSO_DI: Record<string, number> = { zone: 0, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_SCOPERTA, occasioni: PASSO_OCCASIONI, spesa: PASSO_SPESA, diete: PASSO_DIETE };
+  const PASSO_DI: Record<string, number> = { zone: 0, amati: PASSO_AMATI, su: PASSO_TIPI, giu: PASSO_TIPI, scoperta: PASSO_SCOPERTA, occasioni: PASSO_OCCASIONI, spesa: PASSO_SPESA, diete: PASSO_DIETE };
   // Scorrimento col dito sulla card (come Beli e Tinder): a destra 👍, a sinistra 👎.
   const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
   // "Altro": le righe del profilo che la frase non dice (chiuse: la frase basta).
@@ -369,7 +378,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // Il tasto in basso dei passi a una domanda: "Torna alla frase" se si correggeva da lì, "Continua" con
   // una risposta, "Salta" senza (prima "Continua" e "Salta" insieme facevano la stessa cosa: collaudo 23/10).
-  const risposto = step === 0 ? !!chosenCity : step === PASSO_SCOPERTA ? !!scopertaOra : step === PASSO_DIETE ? diete.length > 0 : step === PASSO_OCCASIONI ? occasions.length > 0 : step === PASSO_SPESA ? !!priceRange : true;
+  const risposto = step === 0 ? !!chosenCity : step === PASSO_AMATI ? amati.length > 0 : step === PASSO_SCOPERTA ? !!scopertaOra : step === PASSO_DIETE ? diete.length > 0 : step === PASSO_OCCASIONI ? occasions.length > 0 : step === PASSO_SPESA ? !!priceRange : true;
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-clip bg-[#f6f7f7]" data-testid="benvenuto" data-passo={step + 1}>
@@ -492,6 +501,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {step === PASSO_AMATI && (
+          <div data-testid="benvenuto-amati">
+            <SelettoreGusti scelti={amati} onChange={setAmati} />
           </div>
         )}
 
@@ -742,6 +757,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               )}
             </div>
           ) : step < PASSO_CAPITO ? (
+            <>
+            {/* "Cosa ti piace?": quanti ne hai scelti, sempre in vista sopra il tasto. */}
+            {step === PASSO_AMATI && (
+              <p data-testid="gusti-contatore" aria-live="polite" className="mb-2 text-center font-display text-[14px] font-semibold text-brand">{contaScelti(amati.length)}</p>
+            )}
             <button
               type="button"
               data-testid={tornaFrase ? "torna-frase" : "benvenuto-avanti"}
@@ -752,6 +772,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               {/* "Come mangi?" senza scelte è una risposta: "Mangio di tutto", non "Salta". */}
               {tornaFrase ? "Torna alla frase" : risposto || step === 0 ? "Continua" : step === PASSO_DIETE ? "Mangio di tutto" : "Salta"}
             </button>
+            </>
           ) : (
             <>
               <button type="button" data-testid="benvenuto-fine" onClick={() => finish(null)} disabled={!!submitting} className={TASTO_PIENO}>

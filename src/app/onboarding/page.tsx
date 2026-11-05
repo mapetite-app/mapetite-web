@@ -35,7 +35,7 @@ export default async function OnboardingPage({
     if (!error && p) {
       const r = p as { city?: string | null; occasions?: string[] | null; price_range?: string | null; cuisines?: string[] | null; atmospheres?: string[] | null; gusto?: unknown; gusti_ricordati?: unknown };
       const m = pulisciMappa(r.gusto, () => true);
-      dalProfilo = { city: r.city ?? null, occasions: r.occasions ?? [], priceRange: r.price_range ?? null, zone: m.zone, su: m.su, giu: m.giu, scoperta: m.scoperta, diete: dieteValide(r.gusti_ricordati), cuisines: r.cuisines ?? [], atmospheres: r.atmospheres ?? [] };
+      dalProfilo = { city: r.city ?? null, occasions: r.occasions ?? [], priceRange: r.price_range ?? null, zone: m.zone, su: m.su, giu: m.giu, scoperta: m.scoperta, amati: m.amati, diete: dieteValide(r.gusti_ricordati), cuisines: r.cuisines ?? [], atmospheres: r.atmospheres ?? [] };
     }
   }
   // Giro automatico: il profilo già salvato arriva da un cookie (nessun database).
