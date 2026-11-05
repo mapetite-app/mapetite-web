@@ -208,6 +208,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [scoperta, setScoperta] = useState<Scoperta | null>(initial?.scoperta ?? null);
   const [diete, setDiete] = useState<string[]>(initial?.diete ?? []);
   const [amati, setAmati] = useState<string[]>(initial?.amati ?? []);
+  // Il passo dei 10 tipi 👍/👎 si salta solo se i gusti si scelgono adesso (non per quelli già nel profilo).
+  const [amatiToccati, setAmatiToccati] = useState(false);
+  const saltaTipi = amatiToccati && amati.length > 0;
   // Il passo più avanti visto: le diete si mandano solo se la persona ha visto la loro domanda
   // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
@@ -258,7 +261,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   }, []);
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
-  const progress = amati.length > 0 ? ((step > PASSO_TIPI ? step : step + 1) / (TOTAL - 1)) * 100 : ((step + 1) / TOTAL) * 100;
+  const progress = saltaTipi ? ((step > PASSO_TIPI ? step : step + 1) / (TOTAL - 1)) * 100 : ((step + 1) / TOTAL) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -390,7 +393,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_SCOPERTA && amati.length > 0 ? PASSO_AMATI : s - 1)); }}
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_SCOPERTA && saltaTipi ? PASSO_AMATI : s - 1)); }}
             disabled={step === 0}
             aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
             className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
@@ -401,15 +404,15 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
-            aria-valuemax={amati.length > 0 ? TOTAL - 1 : TOTAL}
-            aria-valuenow={amati.length > 0 && step > PASSO_TIPI ? step : step + 1}
+            aria-valuemax={saltaTipi ? TOTAL - 1 : TOTAL}
+            aria-valuenow={saltaTipi && step > PASSO_TIPI ? step : step + 1}
             aria-label="Avanzamento"
           >
             <div className="h-full rounded-pill bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
             {/* Revisore 5/11: saltato il passo dei 10 tipi, il contatore conta solo i passi mostrati (non salta da 2 a 4). */}
-            {amati.length > 0 ? (step > PASSO_TIPI ? step : step + 1) : step + 1} di {amati.length > 0 ? TOTAL - 1 : TOTAL}
+            {saltaTipi ? (step > PASSO_TIPI ? step : step + 1) : step + 1} di {saltaTipi ? TOTAL - 1 : TOTAL}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
@@ -510,7 +513,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_AMATI && (
           <div data-testid="benvenuto-amati">
-            <SelettoreGusti scelti={amati} onChange={setAmati} />
+            <SelettoreGusti scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
           </div>
         )}
 
@@ -773,7 +776,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               onClick={() => {
                 fissaScoperta();
                 // Quarto revisore 5/11: amare i posti vegani non vuol dire essere vegani: la dieta si sceglie solo in "Come mangi?".
-                if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && amati.length > 0 ? PASSO_SCOPERTA : s + 1));
+                if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && saltaTipi ? PASSO_SCOPERTA : s + 1));
               }}
               disabled={step === 0 && !risposto}
               className={risposto || step === 0 || step === PASSO_DIETE || tornaFrase ? TASTO_PIENO : TASTO_VUOTO}
