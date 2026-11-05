@@ -134,7 +134,11 @@ export function posizionaEtichette(
     const { x, y } = pts[i];
     let best: { side: LabelSide; rect: Rect; n: number } | null = null;
     const opposto: LabelSide | null = it.lato === "destra" ? "sinistra" : it.lato === "sinistra" ? "destra" : it.lato === "sotto" ? "sopra" : it.lato === "sopra" ? "sotto" : null;
-    const prova = it.lato ? (fuori(labelRect(it, x, y, it.lato)) && opposto ? [opposto] : [it.lato]) : sides;
+    // Revisore 5/11: sui salvati solo 2 nomi su 10 (il nome poteva stare solo a destra). Un nome non fisso
+    // che a destra tocca qualcosa prova anche a sinistra, sempre in orizzontale come Places.
+    const prova = it.lato
+      ? fuori(labelRect(it, x, y, it.lato)) && opposto ? [opposto] : !it.fixed && opposto ? [it.lato, opposto] : [it.lato]
+      : sides;
     for (const side of prova) {
       const rect = labelRect(it, x, y, side);
       const n = urti(rect, i) + (fuori(rect) ? 10_000 : 0);

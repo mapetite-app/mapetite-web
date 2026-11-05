@@ -917,7 +917,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
                     // insieme), circa 200 px; il contenuto sta in basso, sopra solo la foto (revisore del 1/11,
                     // secondo giro: 260 px con il vuoto in alto e la card dopo appena visibile).
-                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
+                    // Revisore 5/11: un posto chiuso per sempre è spento anche qui, come la sua miniatura nella lista.
+                    className={`relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px] ${place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale opacity-80" : ""}`}
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
                     {i < PHOTO_CARDS && d?.photoRef && (

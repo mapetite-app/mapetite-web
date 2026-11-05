@@ -1336,6 +1336,11 @@ export default function MapView({
     if (z && userPos) fitToPlaces(z.posti.filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 8).concat(z.posti.slice(0, 1)), 170, 0, [userPos], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando "Più vicini" cambia città
   }, [zonaVicinaVista]);
+  // Revisore 5/11: "Più vicini" con un'altra città accesa (sei a Milano, guardi Roma) ordinava per distanza da
+  // Milano (primo il posto più a nord di Roma). Lì si ordina dal centro dei salvati della città accesa.
+  const origineSalvati = zonaAccesa && userPos && zonaAccesa.posti.length > 0 && zonaAccesa.posti.every((p) => distanceMeters(userPos, p) > 50_000)
+    ? (() => { const m = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; }; return { lat: m(zonaAccesa.posti.map((p) => p.lat)), lng: m(zonaAccesa.posti.map((p) => p.lng)) }; })()
+    : userPos;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
     + (aiSearch?.filtri != null ? countActive(filters) : 0);
 
@@ -2170,12 +2175,32 @@ export default function MapView({
       return;
     }
     const { innerWidth: w, innerHeight: h } = window;
+    // Revisore 5/11: con un risultato lontano (prima card a 7 km) l'inquadratura iniziale li tiene tutti e il
+    // quartiere cercato resta una miniatura. Passando a una card del gruppo fitto, la mappa si avvicina al
+    // gruppo; tornando sulla card lontana (fuori schermo) si torna all'inquadratura con tutti.
+    if (aiSearch !== null && clusterPlaces === null) {
+      const tutti = aiSearch.risultati;
+      const fitti = puntiDaInquadrare(tutti);
+      if (fitti.length < tutti.length) {
+        const nelGruppo = fitti.some((p) => p.id === place.id);
+        if (nelGruppo) {
+          const pts = fitti.map((p) => map.project([p.lng, p.lat]));
+          const largo = Math.max(...pts.map((q) => q.x)) - Math.min(...pts.map((q) => q.x));
+          const alto2 = Math.max(...pts.map((q) => q.y)) - Math.min(...pts.map((q) => q.y));
+          if (largo < 170 && alto2 < 150) { fitToPlaces(fitti, 236); return; }
+        } else if (!(pt.x > 30 && pt.x < w - 30 && pt.y > 236 && pt.y < h - 300)) {
+          fitToPlaces(tutti, 236, 0, [place]);
+          return;
+        }
+      }
+    }
     // 224: sotto barra, pillola e riga dei filtri rapidi (revisore 4/11: a 140 un segnalino sotto i filtri contava "in vista").
     // Fascia libera: sotto barra e pillole, sopra le card (~290 px con la barra in basso). Il segnalino va al
     // centro della fascia, non in alto (terzo revisore 4/11: gli altri uscivano dallo schermo).
     const alto = aiSearch !== null ? 236 : 190;
     const basso = h - 300;
-    if (pt.x > 30 && pt.x < w - 30 && pt.y > alto && pt.y < basso) return;
+    // 60 di lato (revisore 5/11): a 35 px dal bordo il segnalino restava attaccato e i vicini tagliati.
+    if (pt.x > 60 && pt.x < w - 60 && pt.y > alto && pt.y < basso) return;
     map.easeTo({ center: [place.lng, place.lat], offset: [0, Math.round((alto + basso) / 2 - h / 2)], duration: 500 });
   };
 
@@ -2248,7 +2273,9 @@ export default function MapView({
         const vicini = order!.map((id) => byId[id]).filter((p): p is Place => !!p)
           // Revisore 3/11 (settimo): i primi 5 vicini nell'ordine della lista (che ha già i 👎 in fondo),
           // così le card in vista sono quelle inquadrate.
-          .filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 5);
+          // Revisore 5/11: all'apertura si vedono tutti i salvati della tua città (come Places con una lista),
+          // non solo i 5 più vicini: con "Roma 12" se ne vedevano 8 e gli altri erano fuori schermo.
+          .filter((p) => distanceMeters(userPos, p) < 50_000);
         // Il primo della lista resta sempre dentro l'inquadratura.
         if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
         // La zona del primo resta accesa (4/11): prima nessuna pillola era accesa e le card erano di tutte le città.
@@ -3706,6 +3733,20 @@ export default function MapView({
                     (l) => (l.properties as { placeData: Place }).placeData,
                   );
                   if (places.length === 0) return;
+                  // Revisore 5/11: toccare un gruppo avvicina la mappa finché si separa (come Google Maps e
+                  // Places), invece di aprire una lista con la mappa ferma. Solo se i posti sono nello stesso
+                  // punto (non si separano a nessuno zoom) resta la lista.
+                  const limite = mappaSalvati ? SALVATI_GRUPPI_FINO_A : 20;
+                  let zoom = limite + 1;
+                  try { zoom = clusterIndex.getClusterExpansionZoom(clusterId); } catch { /* lista */ }
+                  const map = (mapRef.current as { getMap?: () => { easeTo: (o: object) => void } } | null)?.getMap?.();
+                  if (map && zoom <= Math.max(limite, 18)) {
+                    const h = typeof window !== "undefined" ? window.innerHeight : 800;
+                    const alto = aiSearch !== null ? 236 : 170;
+                    const basso = h - 300;
+                    map.easeTo({ center: [lng, lat], zoom: Math.max(zoom, viewState.zoom + 1), ...(isDesktop() ? {} : { offset: [0, Math.round((alto + basso) / 2 - h / 2)] }), duration: 600 });
+                    return;
+                  }
                   setClusterPlaces(places);
                   dispatch({ type: "OPEN_LIST" });
                 }}
@@ -4155,7 +4196,7 @@ export default function MapView({
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
           simileA={aiSearch !== null && view === "all" ? aiSearch.simileA ?? null : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
-          origin={view === "saved" ? userPos : userPos ?? searchOrigin}
+          origin={view === "saved" ? origineSalvati : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
           nearest={view === "saved" && aiSearch === null ? savedNearestOn && !ordineListaOn : undefined}
