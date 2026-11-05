@@ -4,6 +4,15 @@
 // Ogni parola che conta deve ritrovarsi nel locale (nome, tipo, indirizzo, nota, tag); le parole di
 // contorno ("quel", "avevo", "salvato") si ignorano; i tipi di cucina hanno i loro sinonimi.
 
+import { categoryLabel } from "@/lib/category-label";
+import { tagLabel } from "@/lib/tags";
+
+// Tutto quello che si sa di un salvato, in una riga: nome, tipo (etichetta italiana e tipo Google),
+// indirizzo, nota, raccolte. Lo usano la lista e la mappa dei salvati.
+export type Salvato = { name: string; category: string | null; address: string | null; note: string | null; tags: string[] | null };
+export const testoSalvato = (p: Salvato) => [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
+  .filter(Boolean).join(" ");
+
 // Parole di contorno: non dicono niente sul locale.
 const CONTORNO = new Set([
   "quel", "quello", "quella", "quelli", "quelle", "che", "chi", "cui", "dove", "come", "quando",
@@ -92,10 +101,19 @@ export function capisciRicercaSalvati(query: string): FiltroSalvati {
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // Revisione del 17/10: "pub" trovava "Piazza della Repubblica", "bar" trovava "Barberini".
 // I frammenti valgono solo a inizio parola, quelli di 3 lettere o meno solo come parola intera.
+// Le espressioni si costruiscono una volta sola (con 500 salvati, ogni lettera scritta ne provava migliaia).
+const RE = new Map<string, RegExp>();
 function trova(t: string, a: string): boolean {
   if (a === "!") return false;
-  if (a.startsWith("~")) return new RegExp(`(?:^|[^a-z0-9])${esc(a.slice(1))}[a-z]{0,2}(?![a-z0-9])`).test(t);
-  return new RegExp(`(?:^|[^a-z0-9])${esc(a)}${a.length <= 3 ? "(?![a-z0-9])" : ""}`).test(t);
+  let re = RE.get(a);
+  if (!re) {
+    re = a.startsWith("~")
+      ? new RegExp(`(?:^|[^a-z0-9])${esc(a.slice(1))}[a-z]{0,2}(?![a-z0-9])`)
+      : new RegExp(`(?:^|[^a-z0-9])${esc(a)}${a.length <= 3 ? "(?![a-z0-9])" : ""}`);
+    if (RE.size > 2000) RE.clear();
+    RE.set(a, re);
+  }
+  return re.test(t);
 }
 
 // testo = tutto quello che si sa del locale (nome, tipo ed etichetta, indirizzo, nota, tag).
@@ -119,4 +137,16 @@ export function filtraSalvatiNaturale<T>(list: T[], query: string, testoDi: (p: 
   if (utili.length === 0 && f.stato == null) return [];
   const g = { parole: utili, stato: f.stato };
   return list.filter((p, i) => corrispondeSalvato(g, testi[i], tagsDi(p)));
+}
+
+// Ricerca mentre si scrive nei salvati (Lorenzo 5/11: "500 salvati e voglio filtrare quello che mi interessa"):
+// i posti dove il testo compare così com'è (nome, tipo, quartiere, nota, raccolta) più quelli che rispondono
+// alla frase con i sinonimi ("sushi" trova i ristoranti giapponesi, "vino" le enoteche), nell'ordine della lista.
+// Prima valeva il testo esatto da solo: con un "Sushi Bar" salvato, "sushi" nascondeva gli altri giapponesi.
+export function cercaSalvati<T>(list: T[], query: string, testoDi: (p: T) => string, tagsDi: (p: T) => string[] | null): T[] {
+  const q = norm(query.trim());
+  if (!q) return list;
+  const esatti = new Set(list.filter((p) => norm(testoDi(p)).includes(q)));
+  const naturali = new Set(filtraSalvatiNaturale(list, query, testoDi, tagsDi));
+  return list.filter((p) => esatti.has(p) || naturali.has(p));
 }

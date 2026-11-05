@@ -42,7 +42,7 @@ import ClassificaScheda from "@/components/classifica-scheda";
 import CommunityLocale from "@/components/community-locale";
 import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
-import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
+import { cercaSalvati, filtraSalvatiNaturale, testoSalvato } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
 import { zoneDeiSalvati, zonaIniziale, type Zona } from "@/lib/salvati-zone";
@@ -399,8 +399,7 @@ const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag). Il testo si
 // capisce anche come frase (4.5): "quel giapponese che avevo salvato a Milano".
-const savedText = (p: Place) => [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
-  .filter(Boolean).join(" ");
+const savedText = testoSalvato;
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
   const base = list.filter((p) => {
@@ -409,11 +408,8 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
     if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
     return true;
   });
-  if (!q) return base;
-  const plain = base.filter((p) => [p.name, p.category, p.address, p.note, ...(p.tags ?? [])]
-    .some((v) => v != null && v.toLocaleLowerCase("it").includes(q)));
-  if (plain.length > 0) return plain;
-  return filtraSalvatiNaturale(base, q, savedText, (p) => p.tags);
+  // Stessa ricerca della lista (testo esatto più sinonimi, src/lib/cerca-salvati.ts): lista e mappa trovano gli stessi posti.
+  return cercaSalvati(base, q, savedText, (p) => p.tags);
 }
 
 // Salvati che c'entrano con la frase scritta nella barra (voce 11d): basta una parola
@@ -976,6 +972,10 @@ export default function MapView({
   const [ordineLista, setOrdineLista] = useState<string[] | null>(null);
   // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
   const [zonaMappa, setZonaMappa] = useState<string | null>(null);
+  // Città scelta dalla persona (Lorenzo 5/11): una sola scelta per lista e mappa dei salvati. Nella lista filtra le
+  // righe; un tocco su una pillola della mappa (o sulla città nel foglio Filtri) la cambia. null = tutte.
+  // Le zone scelte da sole (zonaMappa all'apertura della mappa) non la toccano.
+  const [zonaScelta, setZonaScelta] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -3252,7 +3252,7 @@ export default function MapView({
                       type="button"
                       data-testid="salvati-zona"
                       aria-pressed={on}
-                      onClick={() => inquadraZona(z)}
+                      onClick={() => { inquadraZona(z); setZonaScelta(z.nome); }}
                       className={`flex min-h-9 shrink-0 items-center gap-1 rounded-pill px-3 text-xs font-display font-semibold shadow-float active:scale-95 ${on ? "bg-brand text-white" : "bg-surface text-brand"}`}
                     >
                       {z.nome} <span className={on ? "text-white/75" : "text-text-muted"}>{z.posti.length}</span>
@@ -3269,7 +3269,7 @@ export default function MapView({
                     </button>
                   )}
                   {activeCity !== null && (
-                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    <button type="button" onClick={() => { setActiveCity(null); setZonaScelta(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
                       📍 {activeCity} <X size={12} aria-hidden />
                     </button>
                   )}
@@ -4180,18 +4180,15 @@ export default function MapView({
         <SalvatiLista
           userId={userId}
           all={savedPlaces}
-          shown={displayedPlaces}
           activeTag={activeTag}
           onTag={pickTag}
-          activeCity={activeCity}
-          onClearCity={() => setActiveCity(null)}
+          zona={zonaScelta}
+          onZona={(z) => { setZonaScelta(z); setActiveCity(null); }}
           query={savedQuery}
           onQuery={setSavedQuery}
           origin={userPos}
           locating={geoState === "loading"}
           onLocate={goToMyPosition}
-          filtersOn={activeCity !== null ? 1 : 0}
-          onFilters={() => setSavedSheetOpen(true)}
           verdicts={venueDetails}
           hideOnDesktop={venueOpen}
           onMap={apriMappaSalvati}
@@ -4343,7 +4340,7 @@ export default function MapView({
                         aria-pressed={activeCity === city}
                         onClick={() => {
                           const next = activeCity === city ? null : city;
-                          setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
+                          setActiveCity(next); setZonaScelta(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
                           fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150, 0, [], true);
                         }}
                         className={sheetChip(activeCity === city)}
@@ -4408,7 +4405,7 @@ export default function MapView({
               <div className="mt-4 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setSavedNearest(false); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
+                  onClick={() => { setActiveTag(null); setActiveCity(null); setZonaScelta(null); setSavedQuery(""); setSavedNearest(false); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                   className="min-h-11 rounded-btn border border-border px-4 text-sm font-display font-semibold text-text"
                 >
                   Azzera filtri
