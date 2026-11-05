@@ -44,7 +44,7 @@ export default function ProfiloAmati({ iniziali }: { iniziali: string[] }) {
     // "Modifica"): una riga "Tipi di locale" con le pillole e "Cambia" accanto.
     <section data-testid="profilo-amati" aria-labelledby="amati-titolo" className="mt-3 border-t border-[#e3e7e7] pt-2">
       <div className="flex items-center gap-1">
-        <h2 id="amati-titolo" className="min-w-0 flex-1 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted"><span className="sr-only">I miei gusti: </span><span aria-hidden>Tipi di locale</span></h2>
+        <h3 id="amati-titolo" className="min-w-0 flex-1 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted"><span className="sr-only">I miei gusti: </span><span aria-hidden>Tipi di locale</span></h3>
         {/* Revisore 5/11: una sola parola "Modifica" nel riquadro (quella del titolo): qui solo la freccia. */}
         <button type="button" data-testid="profilo-amati-modifica" onClick={apri} aria-label={tipi.length ? "Cambia i tipi di locale" : undefined} className="-mr-2 flex min-h-11 min-w-11 items-center justify-center px-2 text-[13px] font-medium text-brand active:opacity-70">
           {tipi.length ? <ChevronRight size={18} aria-hidden /> : "Scegli"}

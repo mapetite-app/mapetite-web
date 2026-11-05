@@ -7880,7 +7880,7 @@ else {
     await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     const sez = gp.getByTestId("profilo-amati");
     const chip = (await sez.getByTestId("profilo-amati-chip").allTextContents()).map((t) => t.trim());
-    ok(await sez.isVisible() && ((await sez.locator("h2").first().textContent()) ?? "").includes("I miei gusti") && (await gp.getByTestId("profilo-gusto").getByTestId("profilo-amati").count()) === 1 && JSON.stringify(chip) === '["🍕Pizzeria","🍣Sushi","🌱Vegano"]', `profilo: 'I miei gusti' mostra i tipi scelti, senza quelli sconosciuti (${JSON.stringify(chip)})`);
+    ok(await sez.isVisible() && ((await sez.locator("h3").first().textContent()) ?? "").includes("I miei gusti") && (await gp.getByTestId("profilo-gusto").getByTestId("profilo-amati").count()) === 1 && JSON.stringify(chip) === '["🍕Pizzeria","🍣Sushi","🌱Vegano"]', `profilo: 'I miei gusti' mostra i tipi scelti, senza quelli sconosciuti (${JSON.stringify(chip)})`);
     ok(!((await gp.getByTestId("profilo-gusto").textContent()) ?? "").includes("Nessuna preferenza"), "profilo: con 'I miei gusti' scelti, 'Il tuo gusto' non dice 'Nessuna preferenza scelta' (si contraddiceva)");
     await sez.scrollIntoViewIfNeeded();
     await gp.screenshot({ path: `${OUT}/profilo-i-miei-gusti.png`, caret: "initial" });
