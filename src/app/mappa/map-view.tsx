@@ -2498,7 +2498,9 @@ export default function MapView({
       setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
       // Il primo risultato (la prima card) resta sempre in vista, anche se è lontano dagli altri (4/11:
       // "Da Cesare al Casaletto" a 2,9 km era la card a fuoco senza segnalino sulla mappa).
-      fitToPlaces(places, 236, 0, places.slice(0, 1));
+      // Lorenzo 5/11 ("prima la posizione dei cerchi, poi da soli li ha rimodificati"): un solo movimento. Lo spazio
+      // della pillola "N dei tuoi salvati" (arriva dopo) si tiene già qui, così non serve una seconda inquadratura.
+      fitToPlaces(places, 236, savedPlaces.length > 0 ? 60 : 0, places.slice(0, 1));
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
@@ -2913,7 +2915,11 @@ export default function MapView({
       // card quando stava in basso: si rifà l'inquadratura con 60 px in più sotto anche in quel caso.
       const primo = risultati[0];
       const primoCoperto = !!primo && (() => { const pt = map.project([primo.lng, primo.lat]); return pt.y > h - Math.min(h * 0.5, 358) - 60 - 34; })();
-      if (fuori || primoCoperto) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
+      // Lorenzo 5/11: niente seconda inquadratura automatica (la mappa tornava indietro e ripartiva). Si
+      // riallarga solo se la prima card finirebbe coperta, cosa che con lo spazio tenuto sopra non succede;
+      // i salvati fuori vista restano nella pillola, che al tocco li mostra.
+      void fuori;
+      if (primoCoperto) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -3787,7 +3793,8 @@ export default function MapView({
               latitude={place.lat}
               anchor="bottom"
               // Scostato di pochi pixel se coprirebbe un segnalino più importante (separaSegnalini).
-              offset={scostamentoDi(place.id)}
+              // Scostamento (separaSegnalini) sul disegno interno con una transizione: prima saltava di colpo
+              // quando arrivavano foto, nomi o pillole (Lorenzo 5/11: "movimento ferraginoso").
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
@@ -3806,6 +3813,7 @@ export default function MapView({
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
                 className={`relative flex cursor-pointer flex-col items-center transition-opacity ${nascostoDallaBarra(place) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""} ${mappaSalvati && place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale" /* revisori 5/11: chiuso per sempre in grigio, diverso da 👎 e da "chiuso per ora" */ : ""}`}
+                style={{ transform: `translate(${scostamentoDi(place.id)[0]}px, ${scostamentoDi(place.id)[1]}px)`, transition: "transform 260ms cubic-bezier(.2,.8,.2,1), opacity 150ms" }}
                 data-testid="pin"
                 data-sotto-barra={nascostoDallaBarra(place) ? "true" : undefined}
                 data-place={place.id}
