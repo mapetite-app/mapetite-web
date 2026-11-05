@@ -405,7 +405,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <div className="h-full rounded-pill bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
-            {step + 1} di {TOTAL}
+            {/* Revisore 5/11: saltato il passo dei 10 tipi, il contatore conta solo i passi mostrati (non salta da 2 a 4). */}
+            {amati.length > 0 ? (step > PASSO_TIPI ? step : step + 1) : step + 1} di {amati.length > 0 ? TOTAL - 1 : TOTAL}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
@@ -766,7 +767,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               type="button"
               data-testid={tornaFrase ? "torna-frase" : "benvenuto-avanti"}
               // Revisore 5/11: chi ha scelto i suoi gusti non rivede la stessa domanda nei 10 tipi 👍/👎 (doppione).
-              onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && amati.length > 0 ? PASSO_SCOPERTA : s + 1)); }}
+              onClick={() => {
+                fissaScoperta();
+                // Revisore 5/11: vegetariano, vegano o senza glutine scelti tra i gusti arrivano già segnati in "Come mangi?".
+                if (step === PASSO_AMATI) { const d = amati.filter((a) => DIETE.some((x) => x.id === a)); if (d.length) setDiete((p) => [...new Set([...p, ...d])]); }
+                if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && amati.length > 0 ? PASSO_SCOPERTA : s + 1));
+              }}
               disabled={step === 0 && !risposto}
               className={risposto || step === 0 || step === PASSO_DIETE || tornaFrase ? TASTO_PIENO : TASTO_VUOTO}
             >

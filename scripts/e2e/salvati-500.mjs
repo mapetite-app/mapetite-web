@@ -155,7 +155,7 @@ const shot = (p, n) => p.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" 
   await L.getByTestId("salvati-comandi").evaluate((el) => el.scrollTo(el.scrollWidth, 0));
   await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Wine bar" }).click();
   const res = (await L.getByTestId("salvati-risultato").textContent()) ?? "";
-  ok(/^\d+ di 100 posti a Milano$/.test(res) && (await righe.allTextContents()).every((t) => t.includes("Wine bar") && t.includes("Milano")), `Milano + Wine bar: '${res}'`);
+  ok(/^\d+ wine bar su 100 a Milano$/.test(res) && (await righe.allTextContents()).every((t) => t.includes("Wine bar") && t.includes("Milano")), `Milano + Wine bar: '${res}'`);
   await shot(p, "06-500-milano-enoteca");
   ok(errors.length === 0, `nessun errore nella pagina (${errors.join(" | ")})`);
   await ctx.close(); }

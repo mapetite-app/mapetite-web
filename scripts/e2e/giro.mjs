@@ -2131,13 +2131,13 @@ else {
     ok((await righe.count()) === 3 && (await L.getByLabel("Cerca nei tuoi posti").inputValue()) === "" && (await L.getByTestId("salvati-risultato").count()) === 0, "salvati lista: 'Azzera' svuota la ricerca e toglie il conteggio");
     // Chip del tipo: un tocco filtra, il conteggio lo dice.
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
-    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 Caffè di 3 posti", "salvati lista: il chip 'Caffè' tiene solo il caffè e il conteggio dice quale filtro è acceso ('1 Caffè di 3 posti')");
+    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 caffè su 3", "salvati lista: il chip 'Caffè' tiene solo il caffè e il conteggio dice quale filtro è acceso ('1 caffè su 3')");
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
     await L.getByLabel("Cerca nei tuoi posti").fill("brunch");
     await p.waitForTimeout(300);
     await L.getByLabel("Cerca nei tuoi posti").fill("sushi");
     await p.waitForTimeout(300);
-    ok(await L.getByTestId("salvati-lista-vuota").isVisible(), "salvati lista: nessun risultato, messaggio e 'Mostra tutti'");
+    ok(await L.getByTestId("salvati-lista-vuota").isVisible(), "salvati lista: nessun risultato, messaggio");
     // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati (risposta simulata).
     { let chiesto = null;
       await p.route("**/api/salvati/chiedi", async (r) => { chiesto = r.request().postDataJSON(); await new Promise((res) => setTimeout(res, 300)); r.fulfill({ json: { scelti: [{ id: "00000000-0000-4000-8000-000000000001", perche: "Hai scritto: tavolo sulla terrazza." }, { id: "estraneo", perche: "Non è tuo" }] } }); });
@@ -2188,8 +2188,10 @@ else {
         await p.unroute("**/api/salvati/chiedi");
         await L.locator("[data-testid=raccolta-cerchio][aria-label^='Romantico']").first().click(); }
       await L.getByLabel("Cerca nei tuoi posti").fill("sushi"); }
-    await L.getByRole("button", { name: "Mostra tutti" }).click();
-    ok((await righe.count()) === 3, "salvati lista: 'Mostra tutti' azzera la ricerca");
+    // Revisore 5/11: senza risultati c'è solo "Azzera" (prima anche "Mostra tutti", stessa azione).
+    ok((await L.getByRole("button", { name: "Mostra tutti" }).count()) === 0, "salvati lista: senza risultati un solo pulsante per azzerare");
+    await L.getByTestId("salvati-azzera").click();
+    ok((await righe.count()) === 3, "salvati lista: 'Azzera' azzera la ricerca");
     // Lorenzo 5/11: scelta una città in alto, la lista è solo di quella (prima restavano anche i posti dell'altra).
     { const citta = L.getByTestId("salvati-citta-pillola");
       await citta.filter({ hasText: "Milano" }).click();

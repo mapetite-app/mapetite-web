@@ -478,7 +478,7 @@ export default function SalvatiLista({
           <div className="flex shrink-0 gap-1.5">
             {/* "Stasera" è uno strumento, non un filtro (revisore 2/11). Revisore 2/11 (quarto giro): forchetta e
                 coltello barrati si leggevano "niente cibo / chiuso": luna corallo e la parola scritta accanto. */}
-            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" title="Stasera dove andiamo?" className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#f3c9bd] bg-white pl-3 pr-3.5 text-[14px] font-medium text-text active:scale-95">
+            <Link href="/stasera" data-testid="lista-stasera" aria-label="Stasera dove andiamo?" title="Stasera dove andiamo?" className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill border border-[#d6dcdc] bg-white pl-3 pr-3.5 text-[14px] font-medium text-text active:scale-95">
               <Moon size={16} strokeWidth={2} aria-hidden className="text-accent" />
               Stasera
             </Link>
@@ -489,7 +489,8 @@ export default function SalvatiLista({
         </header>
 
         {/* Revisore 3/11 (area 3f): la ricerca sempre in vista, come la barra della mappa; si scrive al tocco. */}
-        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-3 flex items-center gap-2 rounded-pill border border-[#d6dcdc] bg-white pl-4 pr-1">
+        {/* Revisore 5/11: con 500 posti la ricerca resta attaccata in alto mentre si scorre (come Places e Mapstr). */}
+        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} data-testid="salvati-cerca-fissa" className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 mt-3 flex items-center gap-2 rounded-pill border border-[#d6dcdc] bg-white pl-4 pr-1 shadow-card">
           <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
           <input
             type="search"
@@ -659,7 +660,7 @@ export default function SalvatiLista({
         {filtrando && !rispostaAI && (
           <div className="mt-1 flex min-h-9 items-center justify-between gap-3 px-1">
             <p data-testid="salvati-risultato" aria-live="polite" className="min-w-0 truncate text-[13px] font-medium text-text-muted">
-              {`${list.length}${tipo ? ` ${tipo}` : ""} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
+              {tipo ? `${list.length} ${tipo.toLowerCase()} su ${base.length}${zonaOn ? ` a ${zonaOn.nome}` : ""}` : `${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
             </p>
             <button type="button" data-testid="salvati-azzera" onClick={azzera} className="-my-1 flex min-h-11 shrink-0 items-center px-1 text-[13px] font-semibold text-brand active:scale-95">
               Azzera
@@ -680,7 +681,7 @@ export default function SalvatiLista({
               >
                 Cerca in tutte le città
               </button>
-            ) : (
+            ) : filtrando ? null /* revisore 5/11: "Azzera" sta già sopra, niente secondo pulsante uguale */ : (
               <button
                 type="button"
                 onClick={azzera}
