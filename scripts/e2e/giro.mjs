@@ -1015,8 +1015,10 @@ await page.unroute("**/api/search");
     ok(cs.vuoleConsiglio("devo festeggiare i 70 anni di mio papà, ama il pesce") && cs.vuoleConsiglio("dove porto mia madre a pranzo?") && cs.vuoleConsiglio("cena con i colleghi a Monti") && !cs.vuoleConsiglio("trattoria a Trastevere") && !cs.vuoleConsiglio("Rooftop romantico per due a Roma") && !cs.vuoleConsiglio("pizza"), "consiglio: solo per frasi da chat (occasione, persona, domanda, 8+ parole), non per 'trattoria a Trastevere'");
     const P = [{ id: "A", name: "Uno" }, { id: "B", name: "Due" }];
     ok(cs.parseConsiglio('{"n":2,"perche":"sala tranquilla e pesce freschissimo, dicono le recensioni"}', P)?.id === "B" && cs.parseConsiglio('{"n":null}', P) === null && cs.parseConsiglio('{"n":7,"perche":"bello e buono davvero"}', P) === null && cs.parseConsiglio('{"n":1,"perche":"ok"}', P) === null && cs.parseConsiglio("non so", P) === null, "consiglio: solo un numero della lista e un perché vero; 'nessuno' resta nessuno");
-    const pr = cs.buildPrompt("compleanno di mio papà", [{ id: "A", name: "Uno", category: "Ristorante", priceLevel: 3, rating: 4.6, editorialSummary: null, reviewTexts: ["Abbiamo festeggiato il compleanno"], verdict: "Pesce fresco", livello: "alto", motivo: "festa in famiglia" }]);
-    ok(/SOLO da verdetto, descrizione o recensioni/.test(pr) && /non nominare prezzo, budget, numero di persone/.test(pr) && /fama NON sono un motivo/.test(pr) && /Adatto alla richiesta: alto — festa in famiglia/.test(pr) && /prezzo €€€/.test(pr), "consiglio: il prompt vieta di inventare, non premia la fama e porta il giudizio della ricerca");
+    const pr = cs.buildPrompt("compleanno di mio papà", [{ id: "A", name: "Uno", category: "Ristorante", priceLevel: 3, rating: 4.6, editorialSummary: null, reviewTexts: ["Abbiamo festeggiato il compleanno"], verdict: "Pesce fresco", livello: "alto" }]);
+    ok(/SOLO da verdetto, descrizione o recensioni/.test(pr) && /non nominare prezzo, budget, numero di persone/.test(pr) && /fama NON sono un motivo/.test(pr) && /Adatto alla richiesta: alto\n/.test(pr) && /non parlare di anniversario/.test(pr) && /prezzo €€€/.test(pr), "consiglio: il prompt vieta di inventare, non premia la fama e porta il giudizio della ricerca (solo alto/medio/basso)");
+    const lungo = "Sala tranquilla e pesce freschissimo, compleanni festeggiati con la torta e la musica, personale attento e cordiale con tutti";
+    ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
   }
   if (bu) {
     ok(bu.prezzoMax("massimo 50 euro a testa") === 3 && bu.prezzoMax("30€ a persona") === 2 && bu.prezzoMax("sotto i 60 euro") === 3 && bu.prezzoMax("cena economica") === 2 && bu.prezzoMax("budget 100 euro") === 4 && bu.prezzoMax("trattoria a Trastevere") === null && bu.prezzoMax("in 10 persone") === null, "budget: la cifra a testa diventa la fascia Google; senza cifra né 'economico' niente");
@@ -1037,13 +1039,14 @@ await page.unroute("**/api/search");
   const c = page.getByTestId("consiglio");
   ok((await c.count()) === 1 && (await page.getByTestId("frase-risultati").count()) === 0 && chiamate === 1, `consiglio: con una frase da chat arriva dopo i verdetti, una chiamata, al posto della frase (${chiamate} chiamate)`);
   if (await c.count()) {
-    ok((await page.getByTestId("consiglio-titolo").innerText()) === "Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Ti porterei qui/i.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);
+    ok((await page.getByTestId("consiglio-titolo").innerText()) === "Ti porterei da Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Vedi ›/.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);
     const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=consiglio]").getBoundingClientRect(); const card = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: card.top, h: f.height, l: f.left, r: window.innerWidth - f.right }; });
-    ok(g.fb <= g.ct + 1 && g.h >= 44 && g.h <= 96 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
+    ok(g.fb <= g.ct + 1 && g.h >= 44 && g.h <= 64 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
     await c.click();
     await page.waitForTimeout(900);
     const centro = await page.locator("ul.snap-x li[data-id]").evaluateAll((lis) => lis.map((li) => ({ id: li.dataset.id, l: li.getBoundingClientRect().left })).filter((x) => x.l >= 0 && x.l < 60).map((x) => x.id)[0]);
     ok(centro === "P3" && /^\d+ di \d+$/.test(await page.getByTestId("posizione-card").innerText()), `consiglio: un tocco porta alla sua card (${centro})`);
+    ok((await page.getByTestId("consiglio-titolo").innerText()) === "Ti porterei qui", "consiglio: con la sua card davanti il nome non si ripete");
     ok((await page.getByTestId("pin-consiglio").count()) === 1 && (await page.locator("[data-testid=pin][data-place=P3] [data-testid=pin-consiglio]").count()) === 1, "consiglio: la ✦ sta sul segnalino del posto scelto, e solo lì");
   }
   await page.unroute("**/api/search/consiglio");

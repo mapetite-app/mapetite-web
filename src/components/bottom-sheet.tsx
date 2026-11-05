@@ -59,7 +59,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[]; budget?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Frase vera da condividere quando il titolo è un'etichetta ("Altri come X"): chi apre il link rifà
@@ -671,7 +671,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           ✨ Per te: {setAside!.per_te!.map((g) => (g === "chicche" ? "preferisci le chicche" : g)).join(" · ")}
         </p>
       )}
-      {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
+      {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0 || (setAside.budget?.length ?? 0) > 0) && (
         <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
           {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
               Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
@@ -680,6 +680,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
             // Fuori dal quartiere chiesto (17/10): in fondo, mai tolti.
             (setAside.fuori_zona?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.fuori_zona!.length === 1 ? "uno fuori zona" : `${setAside.fuori_zona!.length} fuori zona`} (${setAside.fuori_zona!.slice(0, 2).join(", ")}${setAside.fuori_zona!.length > 2 ? "…" : ""})` : null,
+            // Budget scritto nella frase (5/11): in fondo, mai tolti; la fascia è quella di Google.
+            (setAside.budget?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length + (setAside.fuori_zona?.length ?? 0) > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.budget!.length === 1 ? "uno sopra il tuo budget" : `${setAside.budget!.length} sopra il tuo budget`} (${setAside.budget!.slice(0, 2).join(", ")}${setAside.budget!.length > 2 ? "…" : ""})` : null,
           ].filter(Boolean).join(" ")}
         </p>
       )}
@@ -858,14 +860,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             type="button"
             data-testid="consiglio"
             onClick={() => { if (onFocus) onFocus(consiglio.place); }}
-            className="pointer-events-auto mx-4 mb-1.5 flex w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-2 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+            className="pointer-events-auto mx-4 mb-1.5 flex w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
           >
+            {/* Stessa forma della frase che sostituisce (titolo + 2 righe), così non cresce sopra la mappa (revisore 5/11).
+                Con la sua card già davanti il nome non si ripete: basta "Ti porterei qui". */}
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1 text-[11px] font-sans font-semibold uppercase tracking-wide text-accent">
-                <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
-                Ti porterei qui
+              <span data-testid="consiglio-titolo" className="flex items-center gap-1.5 font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                <span className="truncate">{focusedId === consiglio.place.id ? "Ti porterei qui" : `Ti porterei da ${nomeLeggibile(consiglio.place.name)}`}</span>
               </span>
-              <span data-testid="consiglio-titolo" className="mt-0.5 block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(consiglio.place.name)}</span>
               <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
             </span>
             <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>

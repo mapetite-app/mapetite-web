@@ -25,8 +25,7 @@ export type PostoConsiglio = {
   reviewTexts: string[] | null;
   verdict: string | null;
   // Dal secondo tempo della ricerca (stessa frase): quanto è adatto ("alto"/"medio"/"basso") e perché.
-  livello?: string | null;
-  motivo?: string | null;
+  livello?: "alto" | "medio" | "basso" | null;
 };
 
 export type Consiglio = { id: string; perche: string };
@@ -56,7 +55,7 @@ export function buildPrompt(richiesta: string, posti: PostoConsiglio[]): string 
     const righe = [
       `${i + 1}. ${clip(p.name, 60)} — ${clip(p.category, 30) || "locale"}${p.priceLevel ? ` · prezzo ${EURO[p.priceLevel] ?? ""}` : ""}${p.rating ? ` · voto ${p.rating}` : ""}`,
     ];
-    if (p.livello === "alto" || p.livello === "medio" || p.livello === "basso") righe.push(`   Adatto alla richiesta: ${p.livello}${p.motivo ? ` — ${clip(p.motivo, 160)}` : ""}`);
+    if (p.livello) righe.push(`   Adatto alla richiesta: ${p.livello}`);
     if (p.verdict) righe.push(`   Verdetto: ${clip(p.verdict, 220)}`);
     if (p.editorialSummary) righe.push(`   Google: ${clip(p.editorialSummary, 160)}`);
     for (const r of (p.reviewTexts ?? []).slice(0, REVIEWS)) righe.push(`   Recensione: ${clip(r, REVIEW_CHARS)}`);
@@ -73,7 +72,7 @@ export function buildPrompt(richiesta: string, posti: PostoConsiglio[]): string 
     "- Prezzo: € fino a ~15 euro a testa, €€ ~15–35, €€€ ~35–60, €€€€ oltre. Con un budget scritto, non scegliere un posto chiaramente sopra.",
     "- Conta prima l'occasione (con chi si va e perché: festa, coppia, lavoro, famiglia) e l'atmosfera che richiede, poi il cibo. Per una cena di lavoro o una festa scegli un posto curato e adatto a parlare, non il più economico o il più alla buona. Preferisci i posti con \"Adatto alla richiesta: alto\".",
     "- Il numero di recensioni o la fama NON sono un motivo: conta quanto il posto è adatto a questa persona.",
-    "- \"perche\": UNA frase in italiano, massimo 16 parole, che dà del tu e lega il posto alla richiesta con fatti presi SOLO da verdetto, descrizione o recensioni qui sotto (es. \"sala tranquilla e pesce freschissimo, dicono le recensioni\"). Non inventare piatti, sale, orari o servizi che non sono scritti.",
+    "- \"perche\": UNA frase in italiano, massimo 14 parole e 95 caratteri, che dà del tu e dice perché è il più adatto a QUESTA richiesta, con fatti presi SOLO da verdetto, descrizione o recensioni qui sotto (es. \"sala tranquilla e compleanni festeggiati con cura, dicono le recensioni\"). Non riscrivere il verdetto. Non inventare piatti, sale, orari o servizi che non sono scritti. Non attribuire alla persona un'occasione che non ha scritto (se dice \"con la mia fidanzata\", non parlare di anniversario) e non esagerare gli aggettivi delle recensioni.",
     "- Nel \"perche\" non nominare prezzo, budget, numero di persone, età o gruppi, a meno che una recensione o il verdetto ne parlino con quelle parole. Non ripetere il nome del posto.",
     "- Se nessun posto ha nei dati qualcosa che lo lega davvero alla richiesta, rispondi {\"n\":null}. Meglio nessun consiglio che uno sbagliato.",
     "",
@@ -99,10 +98,20 @@ export function parseConsiglio(text: string, posti: PostoConsiglio[]): Consiglio
   const n = Number(o?.n);
   const max = Math.min(posti.length, MAX_POSTI);
   if (o?.n == null || !Number.isInteger(n) || n < 1 || n > max) return null;
-  const perche = clip(typeof o.perche === "string" ? o.perche : "", 180).replace(/^["«]|["»]$/g, "");
+  const perche = accorcia(clip(typeof o.perche === "string" ? o.perche : "", 300).replace(/^["«]|["»]$/g, "").replace(/[.]+$/, ""));
   if (perche.split(/\s+/).length < 3) return null;
   // Il perché non ripete il nome del posto (si legge già nel titolo "Ti porterei da …").
   return { id: posti[n - 1].id, perche: perche.charAt(0).toUpperCase() + perche.slice(1) };
+}
+
+// Il perché sta in 2 righe sotto il titolo (revisore 5/11: la parte che spiegava finiva nei puntini). Oltre
+// MAX_PERCHE caratteri si taglia all'ultima virgola o "e" prima del limite, così resta una frase intera.
+export const MAX_PERCHE = 100;
+export function accorcia(t: string): string {
+  if (t.length <= MAX_PERCHE) return t;
+  const testa = t.slice(0, MAX_PERCHE);
+  const taglio = Math.max(testa.lastIndexOf(", "), testa.lastIndexOf(" e "), testa.lastIndexOf("; "));
+  return taglio >= 40 ? t.slice(0, taglio) : testa.slice(0, testa.lastIndexOf(" ")) + "…";
 }
 
 export function estimateCostUsd(inputTokens: number, outputTokens: number): number {

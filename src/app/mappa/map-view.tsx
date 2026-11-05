@@ -1001,7 +1001,10 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[]; budget?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
+  // Ultima ricerca letta dalle risposte che arrivano dopo (consiglio): aggiornata a ogni cambio.
+  const aiSearchRef = useRef(aiSearch);
+  useEffect(() => { aiSearchRef.current = aiSearch; }, [aiSearch]);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -2655,15 +2658,18 @@ export default function MapView({
       // Frase da chat: l'AI sceglie un posto tra quelli rimasti, coi verdetti appena scritti (in parallelo
       // all'ordine qui sotto; non sposta nessuna card). Se non risponde, resta la frase di sempre.
       if (vuoleConsiglio(searchedQuery) && replies.some((r) => r && Object.keys(r.dettagli ?? {}).length > 0)) {
-        const ids = (pending.places as { id?: unknown }[]).map((p) => p.id).filter((x): x is string => typeof x === "string");
-        const rimasti = ids.every((x) => esclusi.has(x)) ? ids : ids.filter((x) => !esclusi.has(x));
+        // Candidati: i posti rimasti, senza quelli messi in fondo (molto famosi, fuori zona, sopra il budget, gusti).
+        const dp = aiSearchRef.current?.id === id ? aiSearchRef.current.daParte : null;
+        const inFondo = new Set([...(dp?.turistici ?? []), ...(dp?.fuori_zona ?? []), ...(dp?.budget ?? []), ...(dp?.gusti ?? [])]);
+        const tutti = (pending.places as { id?: unknown; name?: unknown }[]).filter((p): p is { id: string; name: string } => typeof p.id === "string" && typeof p.name === "string");
+        const buoni = tutti.filter((p) => !esclusi.has(p.id) && !inFondo.has(p.name)).map((p) => p.id);
+        const rimasti = buoni.length >= 2 ? buoni : tutti.filter((p) => !esclusi.has(p.id)).map((p) => p.id);
         void fetch("/api/search/consiglio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: searchedQuery, places: pending.places, token: pending.token, ids: rimasti,
             livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})),
-            motivi: Object.fromEntries(replies.flatMap((r) => Object.entries(r?.dettagli ?? {}).map(([k, v]) => [k, v.matchReason ?? null]))),
           }),
         }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
           if (searchSeq.current === id && d?.consiglio?.id && d.consiglio.perche) setConsiglio({ ticket: id, ...d.consiglio });
@@ -2692,7 +2698,7 @@ export default function MapView({
           // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni), solo
           // tra le card non ancora viste: "alto" prima, "basso" dopo, a parità resta l'ordine di Google.
           // I locali già messi da parte (molto famosi, fuori tema) restano in fondo: il giudizio non li riporta su.
-          const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? [])]);
+          const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? []), ...(prev.daParte?.budget ?? [])]);
           const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
           const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
             .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
