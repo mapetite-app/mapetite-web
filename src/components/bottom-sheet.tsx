@@ -963,7 +963,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           {d?.openNow === true && (
                             // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
                             // Revisore 5/11 (area 6b): testo con il pallino, non più una pillola bianca che rubava l'occhio al verdetto.
-                            <span data-testid="aperto-card" className="flex shrink-0 items-center gap-1 text-xs font-display font-semibold text-white/90"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#7be0a8]" />Aperto ora</span>
+                            <span data-testid="aperto-card" className="flex shrink-0 items-center gap-1 text-xs font-display font-semibold text-white/90"><span aria-hidden data-testid="aperto-pallino" className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (

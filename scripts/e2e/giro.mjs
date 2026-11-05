@@ -3424,8 +3424,10 @@ if (fakeUser) {
   // Revisore del 2/11 (r5): troppo corallo sulla card. Corallo solo su "Poco conosciuto"; "Come un tuo salvato" in bianco attenuato.
   { const c = await cardSim.getByTestId("simile-a").evaluate((el) => getComputedStyle(el).color);
     ok(/^rgba\(255, 255, 255, 0\.[5-9]|^oklab\(0\.99\d* [-0-9.e]+ [-0-9.e]+ \/ 0\.[5-9]/.test(c), `card: 'Come un tuo salvato' in bianco attenuato, non corallo (${c})`); }
-  { const a = await card.getByTestId("aperto-card").evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, c: getComputedStyle(el).color }));
-    ok(a.bg === "rgb(255, 255, 255)" && a.c === "rgb(26, 60, 64)", `card: 'Aperto ora' bianco e teal, niente verde fuori marchio (${a.bg} / ${a.c})`); }
+  // Revisore 5/11 (area 6b): "Aperto ora" è testo bianco con un pallino bianco, non più una pillola che ruba l'occhio al
+  // verdetto; resta senza verde fuori marchio (revisore del 2/11).
+  { const a = await card.getByTestId("aperto-card").evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, c: getComputedStyle(el).color, dot: getComputedStyle(el.querySelector("[data-testid=aperto-pallino]")).backgroundColor }));
+    ok(a.bg === "rgba(0, 0, 0, 0)" && /^rgba\(255, 255, 255|^oklab\(0\.99|^rgb\(255, 255, 255/.test(a.c) && a.dot === "rgb(255, 255, 255)", `card: 'Aperto ora' testo bianco con pallino bianco, niente verde fuori marchio (${a.bg} / ${a.c} / ${a.dot})`); }
   await q3.screenshot({ path: `${OUT}/r3-risultati.png` });
   // Scheda dal risultato con le foto che non arrivano (429): niente "1 / 2" sopra l'emoji; "‹ 1 di 5 ›" nella barra azioni.
   await card.getByTestId("card-risultato").click();
