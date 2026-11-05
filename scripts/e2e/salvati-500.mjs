@@ -157,6 +157,11 @@ const shot = (p, n) => p.screenshot({ path: `${OUT}/${n}.png`, caret: "initial" 
   const res = (await L.getByTestId("salvati-risultato").textContent()) ?? "";
   ok(/^\d+ wine bar su 100 a Milano$/.test(res) && (await righe.allTextContents()).every((t) => t.includes("Wine bar") && t.includes("Milano")), `Milano + Wine bar: '${res}'`);
   await shot(p, "06-500-milano-enoteca");
+  // Terzo revisore 5/11: scorrendo restano in vista la ricerca e il riassunto dei filtri.
+  await L.evaluate((el) => { el.scrollTop = 900; }); await p.waitForTimeout(300);
+  { const r = await L.getByTestId("salvati-risultato").boundingBox(); const f = await L.getByTestId("salvati-cerca-fissa").boundingBox();
+    ok(!!r && !!f && f.y >= 0 && f.y < 40 && r.y > f.y && r.y < 120, `scorrendo, ricerca e '9 wine bar su 100' restano in alto (${Math.round(f?.y ?? -1)}, ${Math.round(r?.y ?? -1)})`); }
+  await shot(p, "07-500-scorri");
   ok(errors.length === 0, `nessun errore nella pagina (${errors.join(" | ")})`);
   await ctx.close(); }
 

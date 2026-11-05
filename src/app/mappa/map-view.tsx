@@ -2500,7 +2500,9 @@ export default function MapView({
       // "Da Cesare al Casaletto" a 2,9 km era la card a fuoco senza segnalino sulla mappa).
       // Lorenzo 5/11 ("prima la posizione dei cerchi, poi da soli li ha rimodificati"): un solo movimento. Lo spazio
       // della pillola "N dei tuoi salvati" (arriva dopo) si tiene già qui, così non serve una seconda inquadratura.
-      fitToPlaces(places, 236, savedPlaces.length > 0 ? 60 : 0, places.slice(0, 1));
+      // 94 = pillola (60) + nome sotto il segnalino (34): stessa misura del controllo "prima card coperta" più sotto,
+      // che altrimenti scattava quasi sempre e rifaceva l'inquadratura (terzo revisore 5/11).
+      fitToPlaces(places, 236, savedPlaces.length > 0 ? 94 : 0, places.slice(0, 1));
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");

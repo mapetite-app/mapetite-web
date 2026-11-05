@@ -490,23 +490,26 @@ export default function SalvatiLista({
 
         {/* Revisore 3/11 (area 3f): la ricerca sempre in vista, come la barra della mappa; si scrive al tocco. */}
         {/* Revisore 5/11: con 500 posti la ricerca resta attaccata in alto mentre si scorre (come Places e Mapstr). */}
-        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} data-testid="salvati-cerca-fissa" className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 mt-3 flex items-center gap-2 rounded-pill border border-[#d6dcdc] bg-white pl-4 pr-1 shadow-card">
-          <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
-          <input
-            type="search"
-            value={testo}
-            onChange={(e) => scrivi(e.target.value)}
-            enterKeyHint="search"
-            placeholder="Cerca nei tuoi posti o chiedi…"
-            aria-label="Cerca nei tuoi posti"
-            className="min-h-10 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-          />
-          {testo !== "" && (
-            <button type="button" aria-label="Cancella" onClick={() => scrivi("")} className="flex h-10 w-11 items-center justify-center text-text-muted">
-              <X size={16} aria-hidden />
-            </button>
-          )}
-        </form>
+        {/* Terzo revisore 5/11: la barra fissa ha il suo fondo (prima si vedevano pezzi di righe sopra). */}
+        <div data-testid="salvati-barra-fissa" className="sticky top-0 z-20 -mx-4 mt-1 bg-[#f6f7f7] px-4 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} data-testid="salvati-cerca-fissa" className="flex items-center gap-2 rounded-pill border border-[#d6dcdc] bg-white pl-4 pr-1 shadow-card">
+            <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
+            <input
+              type="search"
+              value={testo}
+              onChange={(e) => scrivi(e.target.value)}
+              enterKeyHint="search"
+              placeholder="Cerca nei tuoi posti o chiedi…"
+              aria-label="Cerca nei tuoi posti"
+              className="min-h-10 min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-text-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            />
+            {testo !== "" && (
+              <button type="button" aria-label="Cancella" onClick={() => scrivi("")} className="flex h-10 w-11 items-center justify-center text-text-muted">
+                <X size={16} aria-hidden />
+              </button>
+            )}
+          </form>
+        </div>
 
         {domanda && (
           <section data-testid="chiedi-salvati" aria-live="polite" className="mt-3">
@@ -658,7 +661,9 @@ export default function SalvatiLista({
 
         {/* Quanti ne restano su quanti (della città scelta) e "Azzera", solo con un filtro acceso. */}
         {filtrando && !rispostaAI && (
-          <div className="mt-1 flex min-h-9 items-center justify-between gap-3 px-1">
+          // Terzo revisore 5/11: anche il riassunto dei filtri ("9 wine bar su 100 a Milano · Azzera") resta fisso
+          // sotto la ricerca: scorrendo si capisce sempre che la lista è filtrata.
+          <div data-testid="salvati-risultato-riga" className="sticky top-[calc(max(0.5rem,env(safe-area-inset-top))+3rem)] z-10 -mx-4 mt-1 flex min-h-9 items-center justify-between gap-3 bg-[#f6f7f7] px-5">
             <p data-testid="salvati-risultato" aria-live="polite" className="min-w-0 truncate text-[13px] font-medium text-text-muted">
               {tipo ? `${list.length} ${tipo.toLowerCase()} su ${base.length}${zonaOn ? ` a ${zonaOn.nome}` : ""}` : `${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
             </p>

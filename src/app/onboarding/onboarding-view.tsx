@@ -151,7 +151,8 @@ function Chip({
       type="button"
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
-      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold text-brand transition-colors ${selected ? SCELTA_ON : SCELTA_OFF}`}
+      // Revisore 5/11: stesso aspetto delle chip di "Cosa ti piace?" (teal pieno con la spunta), un passo prima.
+      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
     >
       {item.emoji && <span aria-hidden>{item.emoji}</span>}
       <span>{item.label}</span>
@@ -256,7 +257,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     clearStoredInvite();
   }, []);
 
-  const progress = ((step + 1) / TOTAL) * 100;
+  // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
+  const progress = amati.length > 0 ? ((step > PASSO_TIPI ? step : step + 1) / (TOTAL - 1)) * 100 : ((step + 1) / TOTAL) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -344,7 +346,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // La scelta "chicche/famosi" che la persona ha visto già segnata al passo 3 e ha lasciato vale come
   // scelta. Una mai mostrata non entra nella sintesi.
   const gustoVisto = gusto;
-  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: etichetteAmati(amati) };
+  // Revisore 5/11: una dieta già detta in "Come mangi?" non si ripete tra i gusti ("Ti piacciono vegano… Sei vegano").
+  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: etichetteAmati(amati.filter((a) => !diete.includes(a))) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
   // Dietro "Altro" solo ciò che la frase non dice già: quello che è nella frase si cambia toccando la parola.
