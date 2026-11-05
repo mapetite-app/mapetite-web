@@ -606,22 +606,6 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
-          {/* "Aspettano da mesi" (proposta 40): era una riga sua sotto la fila; Lorenzo 5/11 ("testata più leggera")
-              ora è una pillola della fila, dopo gli stati. Con un altro filtro acceso il conteggio non torna: sparisce. */}
-          {daMesi.size > 0 && (soloMesi || (!searching && (activeTag === null || activeTag === WANT) && tipo === null)) && (
-            <button
-              type="button"
-              data-testid="salvati-da-mesi"
-              aria-pressed={soloMesi}
-              aria-label={`${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
-              onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
-              className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${soloMesi ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
-            >
-              <span aria-hidden className="text-[13px] leading-none">⏳</span>
-              {/* Revisore 5/11: "Da mesi" da solo non diceva cosa; il numero come in "Da provare 8" e "Visti 6". */}
-              Aspettano da mesi {daMesi.size}
-            </button>
-          )}
           {/* Tipi di locale dei tuoi salvati, con emoji e conteggio: "🍣 Giapponese 3". Un tocco filtra, un altro spegne. */}
           {tipiInVista.length > 0 && (
             <div role="group" aria-label="Tipo di locale" data-testid="salvati-tipi" className="flex shrink-0 gap-1.5">
@@ -658,13 +642,30 @@ export default function SalvatiLista({
           </div>
         </div>
 
+        {/* Con un altro filtro acceso (tipo, stato, raccolta, testo) il conteggio dei "da mesi" non torna: la riga sparisce. */}
+        {daMesi.size > 0 && (soloMesi || (!searching && activeTag === null && tipo === null)) && (
+          <button
+            type="button"
+            data-testid="salvati-da-mesi"
+            aria-pressed={soloMesi}
+            onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
+            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#eef1f1] font-medium text-[#33373d]"}`}
+          >
+            <span aria-hidden className="text-[15px] leading-none">⏳</span>
+            <span className="min-w-0 flex-1 truncate">
+              {soloMesi ? "Aspettano da mesi" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
+            </span>
+            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-brand">Vedi</span>}
+          </button>
+        )}
+
         {/* Quanti ne restano su quanti (della città scelta) e "Azzera", solo con un filtro acceso. */}
         {filtrando && !rispostaAI && (
           // Terzo revisore 5/11: anche il riassunto dei filtri ("9 wine bar su 100 a Milano · Azzera") resta fisso
           // sotto la ricerca: scorrendo si capisce sempre che la lista è filtrata.
           <div data-testid="salvati-risultato-riga" className="sticky top-[calc(max(0.5rem,env(safe-area-inset-top))+3rem)] z-10 -mx-4 mt-1 flex min-h-9 items-center justify-between gap-3 bg-[#f6f7f7] px-5">
             <p data-testid="salvati-risultato" aria-live="polite" className="min-w-0 truncate text-[13px] font-medium text-text-muted">
-              {tipo ? `${list.length} ${tipo.toLowerCase()} su ${base.length}${zonaOn ? ` a ${zonaOn.nome}` : ""}` : `${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${soloMesi ? " · da mesi" : ""}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
+              {tipo ? `${list.length} ${tipo.toLowerCase()} su ${base.length}${zonaOn ? ` a ${zonaOn.nome}` : ""}` : `${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
             </p>
             <button type="button" data-testid="salvati-azzera" onClick={azzera} className="-my-1 flex min-h-11 shrink-0 items-center px-1 text-[13px] font-semibold text-brand active:scale-95">
               Azzera
