@@ -373,7 +373,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
-    return [...list].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
+    // I posti chiusi per sempre restano in fondo anche con "Più vicini" (revisore 5/11: "Ha chiuso" era la prima card).
+    const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
+    return [...list].sort((a, b) => chiuso(a) - chiuso(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
   const orderKey = places.map((p) => p.id).join(",");
   useEffect(() => {

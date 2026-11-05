@@ -2254,7 +2254,16 @@ export default function MapView({
   const inquadraZona = (z: Zona<Place>) => {
     setZonaMappa(z.nome);
     const ids = new Set(z.posti.map((p) => p.id));
-    const primo = (ordineLista ?? []).find((id) => ids.has(id)) ?? z.posti[0]?.id;
+    let primo = (ordineLista ?? []).find((id) => ids.has(id)) ?? z.posti[0]?.id;
+    // Revisore 5/11: con "Più vicini" la card a fuoco è la più vicina a te o, se la città è un'altra, al suo centro
+    // (stesso ordine delle card).
+    if (savedNearest && userPos && z.posti.length > 0) {
+      const lontana = z.posti.every((p) => distanceMeters(userPos, p) > 50_000);
+      const m = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
+      const da = lontana ? { lat: m(z.posti.map((p) => p.lat)), lng: m(z.posti.map((p) => p.lng)) } : userPos;
+      const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
+      primo = [...z.posti].sort((a, b) => chiuso(a) - chiuso(b) || distanceMeters(da, a) - distanceMeters(da, b))[0].id;
+    }
     if (primo) setFocusedId(primo);
     fitToPlaces(z.posti, 170, 0, [], true);
   };
@@ -4199,7 +4208,7 @@ export default function MapView({
           origin={view === "saved" ? origineSalvati : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
-          nearest={view === "saved" && aiSearch === null ? savedNearestOn && !ordineListaOn : undefined}
+          nearest={view === "saved" && aiSearch === null ? savedNearestOn && (!ordineListaOn || origineSalvati !== userPos) : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
