@@ -346,7 +346,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </ul>
         ) : (
           // Mappa fatta ma senza scelte leggibili: una frase sola, il gesto è "Modifica" sulla riga del titolo.
-          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">Nessuna preferenza scelta: tocca Modifica per aggiungerle.</p>
+          // Con "I miei gusti" già scelti (riquadro sotto) non si dice "nessuna preferenza": si contraddiceva.
+          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">{amati.length ? "Zone, occasioni e spesa: tocca Modifica per aggiungerle." : "Nessuna preferenza scelta: tocca Modifica per aggiungerle."}</p>
         )}
       </section>
 

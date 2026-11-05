@@ -57,7 +57,7 @@ export default function ProfiloAmati({ iniziali }: { iniziali: string[] }) {
           {tipi.length > VISIBILI && (
             <li>
               <button type="button" onClick={apri} data-testid="profilo-amati-altri" className="inline-flex min-h-9 items-center rounded-pill px-2 text-[14px] font-medium text-brand">
-                e altri {tipi.length - VISIBILI}
+                {tipi.length - VISIBILI === 1 ? "e un altro" : `e altri ${tipi.length - VISIBILI}`}
               </button>
             </li>
           )}
