@@ -11,7 +11,8 @@ import { distanceMeters } from "@/lib/distance";
 import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
-import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
+import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop, massPredicate } from "@/lib/mainstream";
+import { amatiValidi, fraseDiceTipo, suPerGusti } from "@/lib/tipi-locale";
 import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
 import { pulisciMappa, scopertaPer } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
         ({ data, error }) => {
           if (error || !data) return null;
           const m = pulisciMappa((data as { gusto?: unknown }).gusto, () => true);
-          return { chicche: scopertaPer(m) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
+          return { chicche: scopertaPer(m) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati), amati: amatiValidi(m.amati) };
         },
         () => null,
       )
@@ -387,6 +388,18 @@ export async function POST(request: Request) {
           daParte.gusti = r.places.slice(r.places.length - r.spostati).map((p) => p.name);
           perTe.push(...usati.filter((g) => g.inFondo).map((g) => g.label));
           console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${r.spostati} locali ${r.motivo} (profilo)`);
+        }
+      }
+      // "I miei gusti" (5/11): frase generica ("cena stasera", "compleanno di mio papà"), senza un tipo di posto
+      // né di cucina: i locali dei tipi che la persona ama (tipi e nome secondo Google) salgono di qualche posto.
+      // Mai esclusioni; un locale di massa non sale per questo (VISIONE). La frase che dice un tipo vince sempre.
+      const tipoGenerico = !filtri.categoria || /^(?:ristorant[ei]|local[ei]|post[oi]|cena|pranzo)$/i.test(filtri.categoria.trim());
+      if (profilo?.amati.length && tipoGenerico && !fraseDiceTipo(query)) {
+        const r = suPerGusti(risultati, profilo.amati, massPredicate(risultati));
+        if (r.saliti.length > 0) {
+          risultati = r.places;
+          perTe.push(`${r.usati.slice(0, 2).join(" e ")} in cima`);
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} su (tipi amati: ${r.usati.join(", ")}): ${JSON.stringify(r.saliti)}`);
         }
       }
     }

@@ -22,6 +22,8 @@ import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
+import ProfiloAmati from "@/components/profilo-amati";
+import { amatiValidi } from "@/lib/tipi-locale";
 import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES } from "@/lib/preferences";
 import { pulisciMappa, SCOPERTE, tipoDa } from "@/lib/mappa-gusto";
 
@@ -218,6 +220,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     }
   }
   const pillole = pilloleGusto(gustoRow);
+  // "I miei gusti" (5/11): i tipi di locale scelti dal catalogo ampio, dentro profiles.gusto.
+  const amati = amatiValidi(pulisciMappa(gustoRow?.gusto, () => true).amati);
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
@@ -342,9 +346,13 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </ul>
         ) : (
           // Mappa fatta ma senza scelte leggibili: una frase sola, il gesto è "Modifica" sulla riga del titolo.
-          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">Nessuna preferenza scelta: tocca Modifica per aggiungerle.</p>
+          // Con "I miei gusti" già scelti (riquadro sotto) non si dice "nessuna preferenza": si contraddiceva.
+          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">{amati.length ? "Zone, occasioni e spesa: tocca Modifica per aggiungerle." : "Nessuna preferenza scelta: tocca Modifica per aggiungerle."}</p>
         )}
       </section>
+
+      {/* I miei gusti (Lorenzo, 5/11): tutti i tipi di locale che piacciono, con lo stesso selettore del primo accesso. */}
+      <ProfiloAmati iniziali={amati} />
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { gustoPerAI, pulisciMappa } from "@/lib/mappa-gusto";
 import { gustoDa, gustiValidi } from "@/lib/gusti";
+import { amatiValidi, etichetteAmati } from "@/lib/tipi-locale";
 import { hasEnglish } from "@/lib/italian-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnrichmentForPlaces } from "@/lib/enrichment";
@@ -109,7 +110,7 @@ const MATCH_REASON_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano 
 L'utente cerca un locale. Per ogni locale in lista spiega in una frase breve in ITALIANO perché risponde (o non risponde bene) alla sua richiesta specifica.
 
 Ti possono essere forniti i GUSTI dell'utente in due forme:
-- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze; "profilo" con i tipi di posto che gli piacciono e non, e se preferisce posti poco noti o famosi; "dieta" con la dieta che segue (vegetariano, vegano: i posti adatti a quella dieta gli VANNO BENE); "evita" con le cose da evitare (glutine, pesce, carne…).
+- dichiarati: cucine, occasioni, atmosfere e fascia di prezzo che ha scelto nelle preferenze; "profilo" con i tipi di posto che gli piacciono e non, e se preferisce posti poco noti o famosi; "locali_amati" con i tipi di locale e cucina che ha scelto come preferiti (pizzeria, sushi, cocktail bar…); "dieta" con la dieta che segue (vegetariano, vegano: i posti adatti a quella dieta gli VANNO BENE); "evita" con le cose da evitare (glutine, pesce, carne…).
 - storico_stelle_per_tipologia: la media di stelle che l'utente ha dato per tipologia di locale (comportamento reale, più affidabile delle dichiarazioni).
 Quando questi gusti sono presenti, usali per spiegare perché QUESTO locale è adatto (o no) a QUESTA persona, oltre che alla richiesta: per esempio "è il tipo di posto che ami, una trattoria di quartiere" quando la categoria o le recensioni lo mostrano. Non dire che un locale è poco noto, famoso o in una certa zona (non nominare zone o quartieri che non sono scritti nella richiesta): questi dati non li hai. Dai peso allo storico comportamentale quando c'è.
 Se i gusti sono ASSENTI (nessuna preferenza dichiarata e nessuno storico), giudica SOLO su richiesta + dati del locale. Non inventare MAI preferenze non fornite.
@@ -118,7 +119,7 @@ Rispondi SOLO con un array JSON valido, senza backtick, senza markdown.
 Struttura esatta: [{"id":string,"matchReason":string,"per_te":string,"fit":boolean,"fit_reason":string,"match":"alto"|"medio"|"basso"}]
 - id identico a quello ricevuto
 - matchReason: una frase di MASSIMO 22 parole, massima concretezza, riferita alla richiesta dell'utente e, se disponibili, ai suoi gusti. Se il locale non centra bene, dillo. Parla di COME risponde a ciò che la richiesta chiede (tipo di locale, zona, occasione, atmosfera, caratteristiche): non elencare piatti, servizio o qualità generali del locale se la richiesta non li nomina, perché li dice già il verdetto mostrato accanto (niente doppioni). Non ripetere le parole della richiesta come conferma generica ("ideale per una trattoria a Trastevere"): dì il dato concreto delle recensioni che lo conferma. Deve basarsi ESCLUSIVAMENTE su recensioni, descrizione e categorie fornite: non affermare caratteristiche (terrazza, vista, prezzi, musica…) che non vi compaiono; se il dato manca, dillo invece di supporlo.
-- per_te: DEFAULT stringa vuota "". Solo se ti sono forniti i gusti dell'utente E il locale si lega concretamente a uno di essi (categoria, recensioni o descrizione lo mostrano): MASSIMO 6 parole, in seconda persona, che dicono quale gusto soddisfa. Esempi: "il tipo di trattoria che ami", "niente carne, come preferisci", "cucina giapponese, la tua preferita". VIETATO ripetere la richiesta, VIETATO dire poco noto, famoso o zona, VIETATO inventare gusti non forniti. Senza gusti forniti o senza legame concreto: "".
+- per_te: DEFAULT stringa vuota "". Solo se ti sono forniti i gusti dell'utente E il locale si lega concretamente a uno di essi (categoria, recensioni o descrizione lo mostrano): MASSIMO 6 parole, in seconda persona, che dicono quale gusto soddisfa. Un tipo di "locali_amati" si cita SOLO se categoria, nome, descrizione o recensioni mostrano che il locale È proprio quel tipo (una pizzeria per "pizzeria"); mai per somiglianza. Esempi: "il tipo di trattoria che ami", "una pizzeria, come piace a te", "niente carne, come preferisci", "cucina giapponese, la tua preferita". VIETATO ripetere la richiesta, VIETATO dire poco noto, famoso o zona, VIETATO inventare gusti non forniti. Senza gusti forniti o senza legame concreto: "".
 - fit: false SOLO se il locale NON rispetta chiaramente un requisito ESPLICITO della richiesta (tipo di locale, caratteristica fisica come rooftop/terrazza/vista, occasione, atmosfera), e lo puoi dimostrare dalle recensioni, dalla descrizione o dalle categorie fornite. Se mancano dati, se è ambiguo o hai dubbi: true. Non escludere mai per gusti personali o per un requisito non scritto nella richiesta: i GUSTI dell'utente non rendono MAI fit false (un tipo di posto che non ama o un cibo che evita può abbassare match, mai fit).
 - fit_reason: se fit è false, motivo in poche parole basato sui dati forniti; altrimenti stringa vuota.
 - match: quanto il locale è adatto a QUESTA richiesta secondo le recensioni e i dati forniti. "alto" se rispetta tutti i requisiti espliciti e le recensioni lo confermano senza problemi rilevanti per l'occasione; "basso" se le recensioni segnalano problemi seri proprio per questa richiesta (es. servizio pessimo o attese lunghe per un anniversario, vista assente per un rooftop) o se rispetta i requisiti solo in parte; "medio" negli altri casi e nel dubbio. Coerente con matchReason: se scrivi che è "meno adatto" o "un rischio", match è "basso". Non giudicare la fama o il numero di recensioni.
@@ -233,6 +234,8 @@ type UserTaste = {
     profilo?: ReturnType<typeof gustoPerAI>;
     dieta?: string[];
     evita?: string[];
+    // "I miei gusti" (5/11): i tipi di locale scelti dal catalogo ampio, in parole ("pizzeria", "sushi").
+    locali_amati?: string[];
   } | null;
   byCategory: { category: string; avgStars: number; count: number }[];
 };
@@ -266,6 +269,7 @@ async function getUserTaste(userId: string): Promise<UserTaste> {
           // "Vegetariano" è una dieta, non una cosa da evitare: in "evita" l'AI scriveva "non adatto a te" sui posti vegetariani.
           dieta: gustiValidi((profile as { gusti_ricordati?: unknown }).gusti_ricordati).filter((id) => id === "vegetariano" || id === "vegano").map((id) => gustoDa(id)?.label).filter((x): x is string => !!x),
           evita: gustiValidi((profile as { gusti_ricordati?: unknown }).gusti_ricordati).filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => gustoDa(id)?.label).filter((x): x is string => !!x),
+          locali_amati: etichetteAmati(amatiValidi(pulisciMappa((profile as { gusto?: unknown }).gusto, () => true).amati)).slice(0, 25),
         }
       : null;
 
@@ -344,7 +348,8 @@ export async function getSynthesis(
             taste.declared.priceRange != null ||
             taste.declared.profilo != null ||
             (taste.declared.dieta?.length ?? 0) > 0 ||
-            (taste.declared.evita?.length ?? 0) > 0)) ||
+            (taste.declared.evita?.length ?? 0) > 0 ||
+            (taste.declared.locali_amati?.length ?? 0) > 0)) ||
           taste.byCategory.length > 0);
       const tasteBlock = hasTaste
         ? `\n\nGusti dell'utente:\n${JSON.stringify({
