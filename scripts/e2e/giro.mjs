@@ -7862,12 +7862,13 @@ else {
   await ip.getByRole("button", { name: "Continua" }).click();
   for (const id of ["pizzeria", "barbecue", "cocktail"]) await ip.getByTestId("benvenuto-amati").locator(`[data-id="${id}"]`).click();
   await ip.getByTestId("benvenuto-avanti").click();
-  await ip.getByTestId("tipi-basta").click();
+  // Revisore 5/11: chi sceglie i suoi gusti salta i 10 tipi 👍/👎 (doppione) e il contatore conta un passo in meno.
+  ok((await ip.getByTestId("tipi-basta").count()) === 0 && (await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7", `primo accesso: scelti i gusti si salta il passo dei 10 tipi (${await ip.getByTestId("benvenuto-passo").textContent()})`);
   for (let k = 0; k < 4; k++) await ip.getByTestId("benvenuto-avanti").click();
   { const f = ((await ip.getByTestId("capito-frase").textContent()) ?? "").replace(/\s+/g, " ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && f.includes("Ti piacciono pizzeria, barbecue e cocktail bar."), `primo accesso: i gusti scelti nella frase finale (${f.slice(0, 160)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && f.includes("Ti piacciono pizzeria, barbecue e cocktail bar."), `primo accesso: i gusti scelti nella frase finale (${f.slice(0, 160)})`); }
   await ip.getByTestId("capito-parola").filter({ hasText: "barbecue" }).click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && (await ip.getByTestId("benvenuto-amati").locator('[data-id="barbecue"]').getAttribute("aria-pressed")) === "true" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: toccando un gusto nella frase si torna a 'Cosa ti piace?', con le scelte e 'Torna alla frase'");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.getByTestId("benvenuto-amati").locator('[data-id="barbecue"]').getAttribute("aria-pressed")) === "true" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: toccando un gusto nella frase si torna a 'Cosa ti piace?', con le scelte e 'Torna alla frase'");
   await ip.getByTestId("torna-frase").click();
   await ip.getByTestId("benvenuto-fine").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
