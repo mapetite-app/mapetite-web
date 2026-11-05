@@ -2921,7 +2921,9 @@ export default function MapView({
       // riallarga solo se la prima card finirebbe coperta, cosa che con lo spazio tenuto sopra non succede;
       // i salvati fuori vista restano nella pillola, che al tocco li mostra.
       void fuori;
-      if (primoCoperto) fitToPlaces(risultati, 236, 60, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
+      // Quarto revisore 5/11: niente più seconda inquadratura nemmeno qui (restava una piccola mossa dopo la prima);
+      // lo spazio sotto è già tenuto dalla prima inquadratura.
+      void primoCoperto;
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();

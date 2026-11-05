@@ -401,8 +401,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
-            aria-valuemax={TOTAL}
-            aria-valuenow={step + 1}
+            aria-valuemax={amati.length > 0 ? TOTAL - 1 : TOTAL}
+            aria-valuenow={amati.length > 0 && step > PASSO_TIPI ? step : step + 1}
             aria-label="Avanzamento"
           >
             <div className="h-full rounded-pill bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -772,8 +772,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               // Revisore 5/11: chi ha scelto i suoi gusti non rivede la stessa domanda nei 10 tipi 👍/👎 (doppione).
               onClick={() => {
                 fissaScoperta();
-                // Revisore 5/11: vegetariano, vegano o senza glutine scelti tra i gusti arrivano già segnati in "Come mangi?".
-                if (step === PASSO_AMATI) { const d = amati.filter((a) => DIETE.some((x) => x.id === a)); if (d.length) setDiete((p) => [...new Set([...p, ...d])]); }
+                // Quarto revisore 5/11: amare i posti vegani non vuol dire essere vegani: la dieta si sceglie solo in "Come mangi?".
                 if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && amati.length > 0 ? PASSO_SCOPERTA : s + 1));
               }}
               disabled={step === 0 && !risposto}
