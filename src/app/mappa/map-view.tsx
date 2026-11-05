@@ -1093,6 +1093,8 @@ export default function MapView({
   // "Ti porterei da…" (richiesta 5 del 5/11): dopo i verdetti, per una frase da chat, un posto della lista
   // scelto dall'AI con il perché (src/lib/consiglio.ts). `ticket` = numero della ricerca.
   const [consiglio, setConsiglio] = useState<{ ticket: number; id: string; perche: string } | null>(null);
+  // Numero della ricerca per cui il consiglio è in arrivo: la frase sopra le card lo dice e tiene già la sua altezza.
+  const [consiglioAtteso, setConsiglioAtteso] = useState<number | null>(null);
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
   // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
@@ -2610,6 +2612,8 @@ export default function MapView({
   const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
     if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
+    let consiglioPartito = false;
+    if (vuoleConsiglio(searchedQuery)) setConsiglioAtteso(id);
     try {
       type VerdictReply = { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> };
       // A gruppi in parallelo (le prime 2 card arrivano per prime, ~3-4 s): ogni verdetto si mostra
@@ -2658,6 +2662,7 @@ export default function MapView({
       // Frase da chat: l'AI sceglie un posto tra quelli rimasti, coi verdetti appena scritti (in parallelo
       // all'ordine qui sotto; non sposta nessuna card). Se non risponde, resta la frase di sempre.
       if (vuoleConsiglio(searchedQuery) && replies.some((r) => r && Object.keys(r.dettagli ?? {}).length > 0)) {
+        consiglioPartito = true;
         // Candidati: i posti rimasti, senza quelli messi in fondo (molto famosi, fuori zona, sopra il budget, gusti).
         const dp = aiSearchRef.current?.id === id ? aiSearchRef.current.daParte : null;
         const inFondo = new Set([...(dp?.turistici ?? []), ...(dp?.fuori_zona ?? []), ...(dp?.budget ?? []), ...(dp?.gusti ?? [])]);
@@ -2673,7 +2678,7 @@ export default function MapView({
           }),
         }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
           if (searchSeq.current === id && d?.consiglio?.id && d.consiglio.perche) setConsiglio({ ticket: id, ...d.consiglio });
-        }).catch(() => {});
+        }).catch(() => {}).finally(() => setConsiglioAtteso((t) => (t === id ? null : t)));
       }
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
@@ -2711,6 +2716,7 @@ export default function MapView({
       // Degrada: la lista Google resta, senza verdetti.
     } finally {
       if (searchSeq.current === id) setLoadingVerdicts(false);
+      if (!consiglioPartito) setConsiglioAtteso((t) => (t === id ? null : t));
     }
   };
 
@@ -4323,6 +4329,7 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           fromSaved={dalSalvatiVisti}
+          consiglioInArrivo={consiglioAtteso != null && aiSearch?.id === consiglioAtteso && view === "all" && clusterPlaces === null}
           consiglio={(() => {
             if (!consiglio || aiSearch?.id !== consiglio.ticket || view !== "all" || clusterPlaces !== null) return null;
             const place = displayedPlaces.find((p) => p.id === consiglio.id);

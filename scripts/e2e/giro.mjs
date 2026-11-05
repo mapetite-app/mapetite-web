@@ -1018,16 +1018,17 @@ await page.unroute("**/api/search");
     const pr = cs.buildPrompt("compleanno di mio papà", [{ id: "A", name: "Uno", category: "Ristorante", priceLevel: 3, rating: 4.6, editorialSummary: null, reviewTexts: ["Abbiamo festeggiato il compleanno"], verdict: "Pesce fresco", livello: "alto" }]);
     ok(/SOLO da verdetto, descrizione o recensioni/.test(pr) && /non nominare prezzo, budget, numero di persone/.test(pr) && /fama NON sono un motivo/.test(pr) && /Adatto alla richiesta: alto\n/.test(pr) && /non parlare di anniversario/.test(pr) && /prezzo €€€/.test(pr), "consiglio: il prompt vieta di inventare, non premia la fama e porta il giudizio della ricerca (solo alto/medio/basso)");
     const lungo = "Sala tranquilla e pesce freschissimo, compleanni festeggiati con la torta e la musica, personale attento e cordiale con tutti";
+    ok(cs.perchePrestato("Compleanni festeggiati con cura, sala tranquilla dove si parla", "posto tranquillo dove si parla per il compleanno", "Abbiamo festeggiato il mio compleanno, ambiente spazioso e luminoso").join() === "tranquilla,parla" && cs.perchePrestato("Rooftop romantico con vista magica", "ristorante romantico su un rooftop", "Rooftop romantico al tramonto con vista magica").length === 0, "consiglio: una parola presa dalla richiesta che i dati del posto non dicono fa scartare il consiglio");
     ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
   }
   if (bu) {
-    ok(bu.prezzoMax("massimo 50 euro a testa") === 3 && bu.prezzoMax("30€ a persona") === 2 && bu.prezzoMax("sotto i 60 euro") === 3 && bu.prezzoMax("cena economica") === 2 && bu.prezzoMax("budget 100 euro") === 4 && bu.prezzoMax("trattoria a Trastevere") === null && bu.prezzoMax("in 10 persone") === null, "budget: la cifra a testa diventa la fascia Google; senza cifra né 'economico' niente");
+    ok(bu.prezzoMax("massimo 50 euro a testa") === 3 && bu.prezzoMax("30€ a persona") === 2 && bu.prezzoMax("sotto i 60 euro") === 3 && bu.prezzoMax("cena economica") === 2 && bu.prezzoMax("budget 100 euro") === 4 && bu.prezzoMax("trattoria a Trastevere") === null && bu.prezzoMax("in 10 persone") === null && bu.prezzoMax("spendere 50 euro in due") === 2, "budget: la cifra a testa diventa la fascia Google; senza cifra né 'economico' niente");
     const L = [{ name: "Caro", priceLevel: 4 }, { name: "Giusto", priceLevel: 2 }, { name: "Ignoto", priceLevel: null }];
     const r = bu.inFondoPerPrezzo(L, 3);
     ok(r.places.map((x) => x.name).join(",") === "Giusto,Ignoto,Caro" && r.demoted.join() === "Caro" && bu.inFondoPerPrezzo([L[0]], 2).demoted.length === 0, "budget: i posti sopra la fascia in fondo (mai esclusi), quelli senza prezzo restano; se lo sono tutti non si sposta niente");
   }
   let chiamate = 0;
-  await page.route("**/api/search/consiglio", async (r) => { chiamate++; await new Promise((res) => setTimeout(res, 300)); return r.fulfill({ json: { consiglio: { id: "P3", perche: "Cocktail curati e terrazza tranquilla, dicono le recensioni." } } }); });
+  await page.route("**/api/search/consiglio", async (r) => { chiamate++; await new Promise((res) => setTimeout(res, 1500)); return r.fulfill({ json: { consiglio: { id: "P3", perche: "Cocktail curati e terrazza tranquilla sui tetti, dicono le recensioni di chi ci è stato" } } }); });
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await (await esempio(page)).click();
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
@@ -1035,8 +1036,13 @@ await page.unroute("**/api/search");
   ok(chiamate === 0 && (await page.getByTestId("consiglio").count()) === 0 && (await page.getByTestId("frase-risultati").count()) === 1, "consiglio: con una frase breve nessuna chiamata, resta la frase sopra le card");
   await page.getByLabel("Cosa cerchi?").fill("devo festeggiare i 70 anni di mio papà, ama il pesce, saremo in 10");
   await page.keyboard.press("Enter");
+  await page.getByTestId("consiglio-in-arrivo").waitFor({ timeout: 8000 }).catch(() => {});
+  const hPrima = await page.getByTestId("frase-risultati").evaluate((el) => el.getBoundingClientRect().height).catch(() => 0);
+  ok((await page.getByTestId("consiglio-in-arrivo").count()) === 1, "consiglio: mentre arriva, la frase sopra le card dice 'Sto scegliendo il posto per te…'");
   await page.getByTestId("consiglio").waitFor({ timeout: 8000 }).catch(() => {});
   const c = page.getByTestId("consiglio");
+  { const hDopo = await c.evaluate((el) => el.getBoundingClientRect().height).catch(() => 0);
+    ok(hPrima > 0 && Math.abs(hDopo - hPrima) <= 4, `consiglio: quando arriva il riquadro non cresce sopra la mappa (${Math.round(hPrima)} → ${Math.round(hDopo)} px)`); }
   ok((await c.count()) === 1 && (await page.getByTestId("frase-risultati").count()) === 0 && chiamate === 1, `consiglio: con una frase da chat arriva dopo i verdetti, una chiamata, al posto della frase (${chiamate} chiamate)`);
   if (await c.count()) {
     ok((await page.getByTestId("consiglio-titolo").innerText()) === "Ti porterei da Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Vedi ›/.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);

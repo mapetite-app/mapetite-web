@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { categoryLabel } from "@/lib/category-label";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
+import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, perchePrestato, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
 
 // "Ti porterei da…" (richiesta 5 di Lorenzo del 5/11). Terzo tempo della ricerca, dopo i verdetti:
 // riceve gli stessi dati Google firmati del primo tempo (il client non può cambiarli) e l'ordine
@@ -64,10 +64,13 @@ export async function POST(request: Request) {
     livello: livello(livelli[p.id]),
   }));
 
-  // Stessa frase e stessi posti → stesso consiglio (revisore 5/11: in una demo, rifare la ricerca non deve cambiarlo).
-  const chiave = `${query.trim().toLowerCase()}|${posti.map((p) => `${p.id}:${p.livello ?? ""}`).join(",")}`;
+  // Stessa frase → stesso consiglio, se quel posto è ancora in lista (revisori 5/11: in una demo rifare la ricerca
+  // non deve cambiarlo; la lista può avere 11 o 12 posti a seconda dei verdetti, quindi la chiave è solo la frase).
+  const chiave = query.trim().toLowerCase().replace(/\s+/g, " ");
   const giaDato = memoria.get(chiave);
-  if (giaDato && Date.now() - giaDato.at < MEMORIA_MS) return NextResponse.json({ consiglio: giaDato.consiglio });
+  if (giaDato && Date.now() - giaDato.at < MEMORIA_MS && (giaDato.consiglio === null || posti.some((p) => p.id === giaDato.consiglio!.id))) {
+    return NextResponse.json({ consiglio: giaDato.consiglio });
+  }
 
   const t0 = Date.now();
   try {
@@ -79,8 +82,16 @@ export async function POST(request: Request) {
     });
     const { input_tokens, output_tokens } = message.usage;
     const text = message.content.map((c) => (c.type === "text" ? c.text : "")).join("");
-    const consiglio = parseConsiglio(text, posti);
-    const nome = consiglio ? posti.find((p) => p.id === consiglio.id)?.name : null;
+    let consiglio = parseConsiglio(text, posti);
+    const scelto = consiglio ? posti.find((p) => p.id === consiglio!.id) : null;
+    const prestate = consiglio && scelto
+      ? perchePrestato(consiglio.perche, query, [scelto.verdict, scelto.editorialSummary, ...(scelto.reviewTexts ?? [])].filter(Boolean).join(" "))
+      : [];
+    if (prestate.length > 0) {
+      console.log(`[search-consiglio] scartato: parole della richiesta che i dati di ${JSON.stringify(scelto?.name)} non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio?.perche)})`);
+      consiglio = null;
+    }
+    const nome = consiglio ? scelto?.name : null;
     console.log(`[search-consiglio] q=${JSON.stringify(query.trim().slice(0, 80))} posti=${posti.length} scelto=${JSON.stringify(nome ?? null)} perche=${JSON.stringify(consiglio?.perche ?? null)} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
     memoria.set(chiave, { at: Date.now(), consiglio });
     if (memoria.size > 300) memoria.delete(memoria.keys().next().value!);

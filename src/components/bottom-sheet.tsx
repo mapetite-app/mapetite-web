@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { nomeLeggibile } from "@/lib/nome-leggibile";
+import { pinName } from "@/lib/pin-labels";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
@@ -106,6 +107,8 @@ export interface BottomSheetProps {
   // "Ti porterei da…" (richiesta 5 del 5/11): con una frase da chat l'AI sceglie un posto della lista
   // e dice perché, solo dai dati veri (src/lib/consiglio.ts). Prende il posto della frase sopra le card.
   consiglio?: { place: Place; perche: string } | null;
+  // Il consiglio sta arrivando: la frase lo dice su una riga sua (e ha già l'altezza del consiglio).
+  consiglioInArrivo?: boolean;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -344,7 +347,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -860,14 +863,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             type="button"
             data-testid="consiglio"
             onClick={() => { if (onFocus) onFocus(consiglio.place); }}
-            className="pointer-events-auto mx-4 mb-1.5 flex w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+            className="pointer-events-auto mx-4 mb-1.5 flex min-h-[70px] w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
           >
             {/* Stessa forma della frase che sostituisce (titolo + 2 righe), così non cresce sopra la mappa (revisore 5/11).
                 Con la sua card già davanti il nome non si ripete: basta "Ti porterei qui". */}
             <span className="min-w-0 flex-1">
               <span data-testid="consiglio-titolo" className="flex items-center gap-1.5 font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">
                 <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
-                <span className="truncate">{focusedId === consiglio.place.id ? "Ti porterei qui" : `Ti porterei da ${nomeLeggibile(consiglio.place.name)}`}</span>
+                <span className="truncate">{focusedId === consiglio.place.id ? "Ti porterei qui" : `Ti porterei da ${nomeLeggibile(pinName(consiglio.place.name))}`}</span>
               </span>
               <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
             </span>
@@ -876,10 +879,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
-          <div data-testid="frase-risultati" className="pointer-events-none mx-4 mb-1.5 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
+          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo ? "min-h-[70px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
-              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
+              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className={`mt-0.5 ${consiglioInArrivo ? "line-clamp-1" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{fraseOggi.dettaglio}</span>}
+              {consiglioInArrivo && (
+                <span data-testid="consiglio-in-arrivo" className="mt-0.5 flex items-center gap-1.5 text-xs font-sans font-medium leading-4 text-accent">
+                  <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                  Sto scegliendo il posto per te…
+                </span>
+              )}
             </p>
             <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di {places.length}</span>
           </div>

@@ -21,7 +21,10 @@ export function prezzoMax(query: string): number | null {
   const q = query.toLowerCase();
   const m = q.match(MAX_PRIMA) ?? q.match(A_TESTA);
   if (m) {
-    const euro = Number(m[1]);
+    // "50 euro in due" / "per due" / "in coppia": la cifra è per entrambi (secondo revisore del 5/11).
+    const dopo = q.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 14);
+    const inDue = /^\s*(?:in|per)\s+(?:due|2)\b|^\s*in coppia\b/.test(dopo);
+    const euro = Number(m[1]) / (inDue ? 2 : 1);
     if (euro >= 5 && euro <= 500) return livelloDaEuro(euro);
   }
   if (POCO.test(q)) return 2;
