@@ -2580,7 +2580,7 @@ else {
     await Lm.waitFor({ timeout: 8000 }).catch(() => {});
     await pm.waitForTimeout(1200);
     const mesi = Lm.getByTestId("salvati-da-mesi");
-    ok(await mesi.isVisible().catch(() => false) && (await mesi.getAttribute("aria-label")) === "1 posto aspetta da mesi" && /Da mesi\s*1/.test(await mesi.textContent()) && (await mesi.evaluate((el) => !!el.closest("[data-testid=salvati-comandi]"))), `da mesi: pillola '⏳ Da mesi 1' nella fila dei filtri, non una riga sua (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
+    ok(await mesi.isVisible().catch(() => false) && (await mesi.getAttribute("aria-label")) === "1 posto aspetta da mesi" && /Aspettano da mesi\s*1/.test(await mesi.textContent()) && (await mesi.evaluate((el) => !!el.closest("[data-testid=salvati-comandi]"))), `da mesi: pillola '⏳ Da mesi 1' nella fila dei filtri, non una riga sua (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
     const chipMese = Lm.getByTestId("salvato-da-mesi");
     ok((await chipMese.count()) === 1 && (await chipMese.textContent())?.trim() === "da luglio", `da mesi: sulla riga 'Da provare da luglio' (${await chipMese.count()})`);
     const nomi = async () => (await Lm.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents());
@@ -2589,11 +2589,16 @@ else {
     ok(ordine === "vicino" && primi[0] !== "Caffè No" && primi[primi.length - 1] === "Caffè No", `vicino: il 👎 più vicino va in fondo, non primo (${ordine}: ${primi.join(", ")})`);
     await mesi.click().catch(() => {});
     await pm.waitForTimeout(300);
-    ok(JSON.stringify(await nomi()) === '["Osteria Vecchia"]' && (await Lm.getByTestId("salvati-risultato").textContent())?.trim() === "1 di 4 posti" && (await mesi.getAttribute("aria-pressed")) === "true", `da mesi: un tocco mostra solo chi aspetta, '1 di 4 posti' (${(await nomi()).join(", ")})`);
+    ok(JSON.stringify(await nomi()) === '["Osteria Vecchia"]' && (await Lm.getByTestId("salvati-risultato").textContent())?.trim() === "1 di 4 posti · da mesi" && (await mesi.getAttribute("aria-pressed")) === "true", `da mesi: un tocco mostra solo chi aspetta, '1 di 4 posti' (${(await nomi()).join(", ")})`);
     await pm.screenshot({ path: `${OUT}/11j-salvati-da-mesi.png` });
     await mesi.click().catch(() => {});
     await pm.waitForTimeout(300);
     ok((await nomi()).length === 4, "da mesi: un secondo tocco torna a tutti");
+    await Lm.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click().catch(() => {});
+    await pm.waitForTimeout(300);
+    ok(await mesi.isVisible().catch(() => false), "da mesi: la pillola resta con 'Da provare' acceso (sono tutti da provare)");
+    await Lm.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click().catch(() => {});
+    await pm.waitForTimeout(300);
     // Area 4a (4/11): sulla mappa dei salvati il 👎 si distingue dal ✓ (pollice giù, segnalino più chiaro).
     await Lm.getByTestId("salvati-lista-mappa").click().catch(() => {});
     await pm.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).catch(() => {});
