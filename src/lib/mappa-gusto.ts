@@ -62,6 +62,10 @@ export type MappaGusto = {
   su: string[];
   giu: string[];
   scoperta: Scoperta | null;
+  // "I miei gusti" (Lorenzo, 5/11): id del catalogo ampio (tipi-locale.ts). Profili vecchi: campo assente = [].
+  // Qui si controlla solo la forma (questo file non importa niente, lo legge anche il giro da Node): chi salva o
+  // usa la lista la ripassa da amatiValidi() del catalogo.
+  amati: string[];
 };
 
 const soloNoti = (v: unknown, ok: (x: string) => boolean, max: number) =>
@@ -73,7 +77,7 @@ export function pulisciMappa(raw: unknown, zoneNote: (z: string) => boolean): Ma
   const su = soloNoti(o.su, (x) => TIPO.has(x), TIPI.length);
   const giu = soloNoti(o.giu, (x) => TIPO.has(x) && !su.includes(x), TIPI.length);
   const scoperta = SCOPERTE.some((s) => s.value === o.scoperta) ? (o.scoperta as Scoperta) : null;
-  return { v: o.v === 2 ? 2 : 1, zone: soloNoti(o.zone, zoneNote, 4), su, giu, scoperta };
+  return { v: o.v === 2 ? 2 : 1, zone: soloNoti(o.zone, zoneNote, 4), su, giu, scoperta, amati: soloNoti(o.amati, (x) => /^[a-z][a-z-]{1,23}$/.test(x), 80) };
 }
 
 /** Famosi o chicche per ricerca, verdetti e home: la scelta fatta, oppure (solo profili vecchi) quella dedotta dai 👍. */
@@ -142,7 +146,7 @@ const altri = (n: number, shown: number, cosa?: [string, string]) => (n > shown 
 const TIPO_POSTO: [string, string] = ["tipo di posto", "tipi di posto"];
 
 /** "Ecco cosa ho capito di te": righe brevi, solo da quello che la persona ha detto. */
-export function capito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
+export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
   const out: { chiave: string; emoji: string; testo: string }[] = [];
   // Stesse preposizioni della frase ("al Pigneto", "ai Navigli"): collaudo del 23/10.
   const dove = m.zone.length
@@ -216,13 +220,16 @@ function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["u
 // Al massimo `max` frasi (collaudo del 23/10: con i profili ricchi "Correggi" finiva sotto i tasti).
 // Si tengono le più importanti (gusti, dove, diete), nell'ordine di lettura; il resto sta dietro "Correggi".
 // "Famosi o chicche" prima delle zone (collaudo del 26/10, B3: con più zone e una dieta finiva solo dietro "Correggi").
-const PRIORITA: Record<string, number> = { su: 0, stile: 1, diete: 2, dove: 3, giu: 4, occasioni: 5 };
-export function fraseCapito(m: MappaGusto, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }, max = Infinity): PezzoFrase[][] {
+const PRIORITA: Record<string, number> = { su: 0, amati: 0.5, stile: 1, diete: 2, dove: 3, giu: 4, occasioni: 5 };
+export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[]; amati?: string[] }, max = Infinity): PezzoFrase[][] {
   const tutte: { f: PezzoFrase[]; p: string }[] = [];
   const frasi = { push: (f: PezzoFrase[], p = "dove") => tutte.push({ f, p }) };
   const su = m.su.filter((id) => PLURALE[id]);
   // Ogni tipo porta il suo id: toccandolo si riapre proprio quella card.
   if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
+  // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
+  const amati = extra.amati ?? [];
+  if (amati.length) frasi.push([{ t: su.length ? "Ti piacciono anche " : "Ti piacciono " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
