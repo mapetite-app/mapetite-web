@@ -2580,7 +2580,7 @@ else {
     await Lm.waitFor({ timeout: 8000 }).catch(() => {});
     await pm.waitForTimeout(1200);
     const mesi = Lm.getByTestId("salvati-da-mesi");
-    ok(await mesi.isVisible().catch(() => false) && (await mesi.textContent())?.includes("1 posto aspetta da mesi"), `da mesi: una riga '1 posto aspetta da mesi' (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
+    ok(await mesi.isVisible().catch(() => false) && (await mesi.getAttribute("aria-label")) === "1 posto aspetta da mesi" && /Da mesi\s*1/.test(await mesi.textContent()) && (await mesi.evaluate((el) => !!el.closest("[data-testid=salvati-comandi]"))), `da mesi: pillola '⏳ Da mesi 1' nella fila dei filtri, non una riga sua (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
     const chipMese = Lm.getByTestId("salvato-da-mesi");
     ok((await chipMese.count()) === 1 && (await chipMese.textContent())?.trim() === "da luglio", `da mesi: sulla riga 'Da provare da luglio' (${await chipMese.count()})`);
     const nomi = async () => (await Lm.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents());

@@ -606,6 +606,21 @@ export default function SalvatiLista({
               </button>
             ))}
           </div>
+          {/* "Aspettano da mesi" (proposta 40): era una riga sua sotto la fila; Lorenzo 5/11 ("testata più leggera")
+              ora è una pillola della fila, dopo gli stati. Con un altro filtro acceso il conteggio non torna: sparisce. */}
+          {daMesi.size > 0 && (soloMesi || (!searching && activeTag === null && tipo === null)) && (
+            <button
+              type="button"
+              data-testid="salvati-da-mesi"
+              aria-pressed={soloMesi}
+              aria-label={soloMesi ? "Aspettano da mesi, togli il filtro" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
+              onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
+              className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${soloMesi ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
+            >
+              <span aria-hidden className="text-[13px] leading-none">⏳</span>
+              Da mesi <span className={`text-[12px] font-semibold ${soloMesi ? "text-white/75" : "text-text-muted"}`}>{daMesi.size}</span>
+            </button>
+          )}
           {/* Tipi di locale dei tuoi salvati, con emoji e conteggio: "🍣 Giapponese 3". Un tocco filtra, un altro spegne. */}
           {tipiInVista.length > 0 && (
             <div role="group" aria-label="Tipo di locale" data-testid="salvati-tipi" className="flex shrink-0 gap-1.5">
@@ -641,23 +656,6 @@ export default function SalvatiLista({
             </Link>
           </div>
         </div>
-
-        {/* Con un altro filtro acceso (tipo, stato, raccolta, testo) il conteggio dei "da mesi" non torna: la riga sparisce. */}
-        {daMesi.size > 0 && (soloMesi || (!searching && activeTag === null && tipo === null)) && (
-          <button
-            type="button"
-            data-testid="salvati-da-mesi"
-            aria-pressed={soloMesi}
-            onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
-            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#eef1f1] font-medium text-[#33373d]"}`}
-          >
-            <span aria-hidden className="text-[15px] leading-none">⏳</span>
-            <span className="min-w-0 flex-1 truncate">
-              {soloMesi ? "Aspettano da mesi" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
-            </span>
-            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-brand">Vedi</span>}
-          </button>
-        )}
 
         {/* Quanti ne restano su quanti (della città scelta) e "Azzera", solo con un filtro acceso. */}
         {filtrando && !rispostaAI && (
