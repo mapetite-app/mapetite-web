@@ -84,7 +84,7 @@ function Pill({ active, onClick, children, testId }: { active: boolean; onClick:
       onClick={onClick}
       data-testid={testId}
       className={`min-h-12 rounded-pill px-5 text-[15px] font-medium transition-[transform,background-color] duration-150 active:scale-[0.97] ${
-        active ? "bg-brand text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"
+        active ? "bg-brand text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"
       }`}
     >
       {children}
@@ -105,7 +105,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
   const mapHref = spot.lat != null && spot.lng != null ? `/mappa?salvato=${spot.id}` : "/mappa?vista=salvati";
 
   return (
-    <li data-testid="stasera-proposta" data-id={spot.id} className="rounded-card border border-[#e8e2d8] bg-white p-4 text-text shadow-card">
+    <li data-testid="stasera-proposta" data-id={spot.id} className="rounded-card border border-[#e3e7e7] bg-white p-4 text-text shadow-card">
       {/* Semplificare (18/10): nome e foto aprono il posto sulla mappa; sotto resta un solo pulsante, Percorso. */}
       <Link href={mapHref} data-testid="stasera-mappa" aria-label={`Apri ${spot.name} nella mappa`} className="flex items-start gap-3 active:opacity-80">
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-btn bg-accent-light text-3xl leading-none">
@@ -143,7 +143,7 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
       {raccolte.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {raccolte.map((t) => (
-            <span key={t} className="rounded-pill bg-[#f1ece3] px-2.5 py-0.5 font-display text-xs font-medium text-[#33373d]">{tagDisplay(t)}</span>
+            <span key={t} className="rounded-pill bg-[#eef1f1] px-2.5 py-0.5 font-display text-xs font-medium text-[#33373d]">{tagDisplay(t)}</span>
           ))}
         </div>
       )}
@@ -246,7 +246,7 @@ export default function StaseraView({ userId }: { userId: string }) {
   const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato"].join(" · ");
 
   return (
-    <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f8f6f2] pb-[var(--nav-height-mobile)] text-text md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
+    <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f6f7f7] pb-[var(--nav-height-mobile)] text-text md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
       <div className="mx-auto max-w-md px-4 pb-32 pt-6">
         {/* Testata come Salvati (revisore 1/11, terzo giro): freccia, poi sopra-titolo e titolo allineati a sinistra. */}
         <Link href="/profilo" aria-label="Torna al profilo" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-text active:bg-black/5">
@@ -295,7 +295,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} />
               ))}
             </ul>
-            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-[#f8f6f2] from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
+            <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-[#f6f7f7] from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
               <button
                 type="button"
                 onClick={() => setProposals(null)}
@@ -355,7 +355,7 @@ export default function StaseraView({ userId }: { userId: string }) {
             </div>
 
             {matchCount === 0 ? (
-              <div data-testid="stasera-nessuno" className="mt-8 rounded-card border border-[#e8e2d8] bg-white p-4">
+              <div data-testid="stasera-nessuno" className="mt-8 rounded-card border border-[#e3e7e7] bg-white p-4">
                 <p className="font-display font-semibold">Nessun salvato con queste scelte.</p>
                 <p className="mt-0.5 text-sm text-text-muted">Allarga con un tocco:</p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -377,7 +377,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                 </div>
               </div>
             ) : (
-              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-[#f8f6f2] from-70% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-4">
+              <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-4 bg-gradient-to-t from-[#f6f7f7] from-70% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-4">
                 <button
                   type="button"
                   onClick={propose}
@@ -401,9 +401,9 @@ export default function StaseraView({ userId }: { userId: string }) {
                       <Link
                         href={s.lat != null && s.lng != null ? `/mappa?salvato=${s.id}` : "/mappa?vista=salvati"}
                         data-testid="stasera-anteprima-posto"
-                        className="flex h-full flex-col items-center gap-1.5 rounded-card border border-[#e8e2d8] bg-white px-2 pb-2.5 pt-3 text-center active:scale-[0.97]"
+                        className="flex h-full flex-col items-center gap-1.5 rounded-card border border-[#e3e7e7] bg-white px-2 pb-2.5 pt-3 text-center active:scale-[0.97]"
                       >
-                        <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f3efe8] text-[22px] leading-none">{getCategoryEmoji(s.category, s.name)}</span>
+                        <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f0f2f2] text-[22px] leading-none">{getCategoryEmoji(s.category, s.name)}</span>
                         <span className="line-clamp-2 text-[12.5px] font-medium leading-tight text-text">{s.name}</span>
                       </Link>
                     </li>
@@ -414,7 +414,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                         href="/mappa?vista=salvati"
                         data-testid="stasera-anteprima-altri"
                         aria-label={`Altri ${matchCount - ANTEPRIMA_MAX} salvati`}
-                        className="flex h-full min-h-[92px] flex-col items-center justify-center gap-0.5 rounded-card border border-[#e8e2d8] bg-[#f3efe8] px-2 text-center active:scale-[0.97]"
+                        className="flex h-full min-h-[92px] flex-col items-center justify-center gap-0.5 rounded-card border border-[#e3e7e7] bg-[#f0f2f2] px-2 text-center active:scale-[0.97]"
                       >
                         <span className="font-title text-[22px] font-semibold leading-none text-brand">+{matchCount - ANTEPRIMA_MAX}</span>
                         <span className="text-[12px] text-text-muted">altri</span>

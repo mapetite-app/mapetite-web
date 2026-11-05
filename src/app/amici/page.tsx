@@ -22,7 +22,7 @@ export default async function AmiciPage() {
 
   if (!viewer) {
     return (
-      <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-4 bg-[#f8f6f2] px-6 text-center" data-testid="amici-accedi">
+      <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-4 bg-[#f6f7f7] px-6 text-center" data-testid="amici-accedi">
         {/* Revisore 1/11 (terzo giro): icona a tratto teal al posto dell'emoji blu. */}
         <span aria-hidden data-testid="amici-icona" className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-brand"><Users size={30} strokeWidth={1.6} /></span>
         <p className="font-title text-2xl text-text">I posti dei tuoi amici</p>
@@ -47,11 +47,11 @@ export default async function AmiciPage() {
       <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
     </div>
   );
-  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white px-4 text-sm font-sans font-medium text-brand active:scale-95";
+  const chip = "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-[#e1e5e5] bg-white px-4 text-sm font-sans font-medium text-brand active:scale-95";
 
   return (
     // Fondo carta come Salvati (revisore 1/11, terzo giro).
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
       <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
@@ -111,14 +111,14 @@ export default async function AmiciPage() {
           <section className="mt-6" aria-labelledby="attivita-titolo">
             <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
             {feed.seguiti.length === 0 ? (
-              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e8e2d8] bg-white p-5 text-center">
+              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center">
                 <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
                 <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
                   Cerca un amico per nome in alto, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
                 </p>
               </div>
             ) : feed.attivita.length === 0 ? (
-              <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e8e2d8] bg-white p-5 text-center text-sm font-sans text-text-muted">
+              <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center text-sm font-sans text-text-muted">
                 Chi segui non ha ancora salvato posti. Torna più tardi.
               </p>
             ) : (

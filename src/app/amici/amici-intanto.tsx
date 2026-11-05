@@ -30,14 +30,14 @@ export default function AmiciIntanto({ userId, saved }: { userId: string; saved:
         <section aria-labelledby="consigli-titolo" className="-mt-3">
           <h2 id="consigli-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Da consigliare</h2>
           <p className="mt-0.5 text-sm text-text-muted">Posti dove sei stato: mandane uno a chi esce con te.</p>
-          <ul data-testid="amici-consigli" className="mt-2 divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
+          <ul data-testid="amici-consigli" className="mt-2 divide-y divide-[#e3e7e7] overflow-hidden rounded-card border border-[#e3e7e7] bg-white">
             {consigli.map((r) => {
               const meta = [categoryLabel(r.category, r.name), cityFromAddress(r.address)].filter(Boolean).join(" · ");
               const piaciuto = r.tags.includes(OPINION_LIKE);
               return (
                 <li key={r.placeId} data-testid="amici-consiglio" className="flex items-center gap-3 px-3 py-2.5">
                   <Link href={`/locali/${r.placeId}`} className="flex min-w-0 flex-1 items-center gap-3">
-                    <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] text-[22px]">
+                    <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-[#e2e6e6] bg-[linear-gradient(160deg,#f4f6f6,#e5e9e9)] text-[22px]">
                       {getCategoryEmoji(r.category, r.name)}
                     </span>
                     <span className="min-w-0 flex-1">

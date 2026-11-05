@@ -28,8 +28,8 @@ import { fotoUrl } from "@/lib/foto-utenti";
 const [WANT, DONE] = STATE_TAGS;
 type Ordine = "vicino" | "recenti" | "preferiti";
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-const PAPER = "bg-[#f8f6f2]";
-const LINE = "border-[#e8e2d8]";
+const PAPER = "bg-[#f6f7f7]";
+const LINE = "border-[#e3e7e7]";
 
 // Miniatura al posto della foto: emoji del tipo su un fondo carta unico (giro 1/11, D42: niente
 // colori a caso tra un posto e l'altro). Anche le raccolte hanno un fondo solo (revisore 2/11).
@@ -37,7 +37,7 @@ const LINE = "border-[#e8e2d8]";
 function Miniatura({ place, size, foto }: { place: Place; size: string; foto?: string | null }) {
   const [rotta, setRotta] = useState(false);
   return (
-    <span aria-hidden className={`relative flex shrink-0 items-center justify-center overflow-hidden border border-[#e6dfd3] bg-[linear-gradient(160deg,#f6f1e8,#ebe3d6)] ${size}`}>
+    <span aria-hidden className={`relative flex shrink-0 items-center justify-center overflow-hidden border border-[#e2e6e6] bg-[linear-gradient(160deg,#f4f6f6,#e5e9e9)] ${size}`}>
       {getCategoryEmoji(place.category, place.name)}
       {foto && !rotta && (
         // eslint-disable-next-line @next/next/no-img-element -- foto privata servita da /api/foto-utenti (controllo di chi la vede)
@@ -54,7 +54,7 @@ function Copertina({ name, count, icona, on }: { name: string; count: number; ic
   return (
     <span
       data-testid="raccolta-copertina"
-      className={`flex min-h-11 w-full items-center gap-1.5 rounded-pill border px-3 ${on ? "border-brand bg-brand" : "border-[#e3ddd2] bg-white"}`}
+      className={`flex min-h-11 w-full items-center gap-1.5 rounded-pill border px-3 ${on ? "border-brand bg-brand" : "border-[#e1e5e5] bg-white"}`}
     >
       {/* Revisore 3/11 (quinto): emoji in linea, senza cerchio, così a 390 px entrano almeno due raccolte. */}
       <span aria-hidden className="shrink-0 text-[16px] leading-none">{icona}</span>
@@ -377,7 +377,7 @@ export default function SalvatiLista({
         {/* Revisore 2/11: una sola fila, scorrevole: lente, Filtri, stati (senza "Ci sono stato" quando è 0)
             e poi le raccolte con "Nuova" in fondo. Il primo posto parte subito sotto (~160 px). */}
         <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
-          <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white text-[14px] font-medium text-brand active:scale-95 ${filtersOn > 0 ? "px-3.5" : "w-11"}`}>
+          <button type="button" data-testid="salvati-lista-filtri" aria-label={filtersOn > 0 ? `Filtri, ${filtersOn} attivi` : "Filtri"} onClick={onFilters} className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-pill border border-[#e1e5e5] bg-white text-[14px] font-medium text-brand active:scale-95 ${filtersOn > 0 ? "px-3.5" : "w-11"}`}>
             {/* Revisore 3/11 (quarto): senza filtri accesi solo l'icona, così le raccolte entrano nello schermo. */}
             <SlidersHorizontal size={15} aria-hidden />{filtersOn > 0 && " Filtri"}
             {filtersOn > 0 && (
@@ -422,7 +422,7 @@ export default function SalvatiLista({
                 aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
                 title={p.label}
                 onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e3ddd2] bg-white text-[#33373d]"}`}
+                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
               >
                 {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
                 {p.short} {p.n}
@@ -449,7 +449,7 @@ export default function SalvatiLista({
             data-testid="salvati-da-mesi"
             aria-pressed={soloMesi}
             onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
-            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#f1ece3] font-medium text-[#33373d]"}`}
+            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#eef1f1] font-medium text-[#33373d]"}`}
           >
             <span aria-hidden className="text-[15px] leading-none">⏳</span>
             <span className="min-w-0 flex-1 truncate">
@@ -517,20 +517,20 @@ export default function SalvatiLista({
                           {(haChiuso || chiusoPerOra) && (
                             <span data-testid="salvato-chiuso" className={`${chip} bg-[#33373d] text-white`}>{haChiuso ? "Ha chiuso" : "Chiuso per ora"}</span>
                           )}
-                          <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
+                          <span data-testid="stato-lista" className={`${chip} ${done ? "bg-[#e3eded] text-brand" : "bg-[#f0f2f2] font-medium text-[#6b7075]"}`}>
                             {done ? <Check size={12} strokeWidth={3} aria-hidden /> : <span aria-hidden className="text-[10px] leading-none">📌</span>}
                             {done ? "Ci sono stato" : "Da provare"}
                             {daMese && <span data-testid="salvato-da-mesi" className="font-medium">da {daMese}</span>}
                           </span>
                           {liked && (
-                            <span data-testid="salvato-piaciuto" className={`${chip} bg-[#f1ece3] text-[#33373d]`}>{tagLabel(OPINION_LIKE)}</span>
+                            <span data-testid="salvato-piaciuto" className={`${chip} bg-[#eef1f1] text-[#33373d]`}>{tagLabel(OPINION_LIKE)}</span>
                           )}
                           {/* Revisore 3/11: con "Preferiti" il 👎 va in fondo; il chip dice perché. */}
                           {!liked && p.tags?.includes(OPINION_DISLIKE) && (
-                            <span data-testid="salvato-non-piaciuto" className={`${chip} bg-[#f1efeb] text-[#6b7075]`}>{tagLabel(OPINION_DISLIKE)}</span>
+                            <span data-testid="salvato-non-piaciuto" className={`${chip} bg-[#f0f2f2] text-[#6b7075]`}>{tagLabel(OPINION_DISLIKE)}</span>
                           )}
                           {fonte && (
-                            <span data-testid="salvato-provenienza" className={`${chip} bg-[#f1ece3] font-medium text-[#33373d]`}>
+                            <span data-testid="salvato-provenienza" className={`${chip} bg-[#eef1f1] font-medium text-[#33373d]`}>
                               <SquarePlay size={12} aria-hidden className="text-accent" /> {FONTE_LABEL[fonte]}
                             </span>
                           )}
@@ -550,7 +550,7 @@ export default function SalvatiLista({
           riga sta tutta sopra; a riposo una sfumatura carta dietro il pulsante, niente testo che ci passa sotto. */}
       {/* Con la sola risposta di "Chiedi ai tuoi posti" la lista è vuota: niente mappa vuota (revisore 3/11, quinto). */}
       {!rispostaAI && (
-      <div className={`pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-4 lg:pb-6 ${mappaNascosta ? "" : "bg-gradient-to-t from-[#f8f6f2] from-55% to-transparent"}`}>
+      <div className={`pointer-events-none sticky bottom-0 z-10 mt-auto flex shrink-0 justify-center pb-3 pt-4 lg:pb-6 ${mappaNascosta ? "" : "bg-gradient-to-t from-[#f6f7f7] from-55% to-transparent"}`}>
         <button
           type="button"
           data-testid="salvati-lista-mappa"

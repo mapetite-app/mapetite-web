@@ -372,9 +372,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const risposto = step === 0 ? !!chosenCity : step === PASSO_SCOPERTA ? !!scopertaOra : step === PASSO_DIETE ? diete.length > 0 : step === PASSO_OCCASIONI ? occasions.length > 0 : step === PASSO_SPESA ? !!priceRange : true;
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip bg-[#f8f6f2]" data-testid="benvenuto" data-passo={step + 1}>
+    <div className="flex min-h-screen flex-col overflow-x-clip bg-[#f6f7f7]" data-testid="benvenuto" data-passo={step + 1}>
       {/* Barra di avanzamento (mockup A): freccia, barra teal, "2 di 7". */}
-      <div className="sticky top-0 z-10 bg-[#f8f6f2] px-6 pb-2 pt-4">
+      <div className="sticky top-0 z-10 bg-[#f6f7f7] px-6 pb-2 pt-4">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
@@ -720,7 +720,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       </div>
 
       {/* Pulsanti in basso, fissi sul fondo dello schermo (primo accesso a schermo intero, senza la barra dell'app). */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#f8f6f2]/95 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#f6f7f7]/95 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto max-w-lg">
           {step === PASSO_TIPI ? (
             // "Torna al precedente" qui sotto e non sotto i tasti: a 360×740 finiva mezzo coperto (collaudo 23/10).

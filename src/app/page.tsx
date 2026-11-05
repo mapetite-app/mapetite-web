@@ -74,7 +74,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
   const enfasi = parole.pop();
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] px-4 pb-8 md:min-h-[calc(100dvh-3.5rem)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] px-4 pb-8 md:min-h-[calc(100dvh-3.5rem)]">
       {!accountEliminato && <HomeIntro loggedIn={loggedIn} />}
       <div className="mx-auto w-full max-w-md">
         {accountEliminato && (

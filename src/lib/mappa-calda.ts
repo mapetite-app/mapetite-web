@@ -1,4 +1,4 @@
-// Mappa "calda" (piano 1–8/11, area 4e): la base grigia di Mapbox (light-v11) con colori caldi e
+// Mappa "calda" (piano 1–8/11, area 4e; Lorenzo 5/11: niente più crema/beige, "dà un'idea cheap": terra grigio chiaro neutro): la base grigia di Mapbox (light-v11) con colori caldi e
 // tenui, nello stile delle app di riferimento (Places, Mapstr): crema per la terra, verde salvia per
 // i parchi, azzurro polvere per l'acqua. Solo vernice sopra lo stile già scaricato: nessuna
 // richiesta in più, nessun costo. ?mappa=chiara torna alla mappa grigia di prima.
@@ -10,12 +10,12 @@ export type MappaVernice = {
 };
 
 export const MAPPA_CALDA = {
-  terra: "#f6f1e7",
-  edifici: "#ece4d6",
-  parchi: "#e2e9d3",
+  terra: "#f3f4f2",
+  edifici: "#e7e9e6",
+  parchi: "#dde8d9",
   acqua: "#cfe2e4",
   acquaTesto: "#6f9399",
-  stradeBordo: "#e7dfd1",
+  stradeBordo: "#e2e5e2",
   strade: "#ffffff",
 } as const;
 

@@ -1614,7 +1614,7 @@ ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page
 { const g = await page.evaluate(() => { const card = document.querySelector("[data-testid=importa-google]"); const b = document.querySelector("[data-testid=importa-incolla]").getBoundingClientRect(); const f = document.querySelector("[data-testid=importa-incolla-fonti]"); return { bg: getComputedStyle(card).backgroundColor, btn: getComputedStyle(document.querySelector("[data-testid=importa-incolla]")).backgroundColor, sotto: Math.round(f.getBoundingClientRect().top - b.bottom), col: getComputedStyle(f).color }; });
   ok(g.bg === "rgba(0, 0, 0, 0)" && g.btn === "rgb(255, 107, 74)" && g.sotto >= 0 && g.sotto < 16 && g.col !== "rgb(255, 255, 255)" && !g.col.startsWith("rgba(255, 255, 255"), `importa: 'Incolla un link' corallo da solo sul fondo chiaro, sottotitolo grigio subito sotto (${JSON.stringify(g)})`); }
 { const look = await page.evaluate(() => ({ h1: getComputedStyle(document.querySelector("h1")).fontFamily, bg: getComputedStyle(document.querySelector("[data-testid=importa-pagina]")).backgroundColor }));
-  ok(/newsreader/i.test(look.h1) && look.bg === "rgb(248, 246, 242)", `importa: titolo nel serif e fondo beige di home e salvati (giro D7, D52) (${look.h1.slice(0, 30)}, ${look.bg})`); }
+  ok(/newsreader/i.test(look.h1) && look.bg === "rgb(246, 247, 247)", `importa: titolo nel serif e fondo beige di home e salvati (giro D7, D52) (${look.h1.slice(0, 30)}, ${look.bg})`); }
 ok(!(await page.getByText("Scegli uno screenshot").isVisible()) && !(await page.getByTestId("importa-mano").isVisible()) && !(await page.getByTestId("importa-file").isVisible()) && !(await page.getByTestId("importa-maps-guida").isVisible()), "importa: i pannelli restano chiusi finché non si tocca una tessera");
 await page.getByTestId("importa-tessera-shot").click();
 ok(await page.getByText("Scegli uno screenshot").isVisible() && (await page.getByTestId("importa-tessera-shot").getAttribute("aria-expanded")) === "true", "importa: la tessera 'Da screenshot' apre il pannello con il pulsante in italiano");
@@ -2775,7 +2775,7 @@ else {
         const titoli = await cose.getByTestId("tessera-titolo").evaluateAll((els) => els.map((s) => { const c = getComputedStyle(s); return `${/Inter/i.test(c.fontFamily) && !/Poppins/i.test(c.fontFamily.split(",")[0]) ? "Inter" : c.fontFamily.split(",")[0]} ${c.fontWeight}`; }));
         ok(titoli.length === 4 && titoli.every((x) => x === "Inter 500"), `profilo: titoli delle tessere in Inter medio (${[...new Set(titoli)].join(", ")})`); }
       // Stesso fondo carta di Salvati e Importa.
-      ok(await p.locator("body").evaluate((m) => [...m.querySelectorAll("div")].some((d) => getComputedStyle(d).backgroundColor === "rgb(248, 246, 242)" && d.getBoundingClientRect().height > 600)), "profilo: fondo carta come Salvati");
+      ok(await p.locator("body").evaluate((m) => [...m.querySelectorAll("div")].some((d) => getComputedStyle(d).backgroundColor === "rgb(246, 247, 247)" && d.getBoundingClientRect().height > 600)), "profilo: fondo carta come Salvati");
       { const zero = { ...profilo, saved: profilo.saved.map((r) => ({ ...r, tags: (r.tags ?? []).filter((t) => t !== "Già visitato") })) };
         await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(zero)), url: BASE }]);
         await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
@@ -3078,7 +3078,7 @@ else {
     // Revisore 1/11 (terzo giro): fondo carta come Salvati, sopra-titolo e titoletti allineati a sinistra.
     { const bg = await sq.getByTestId("stasera").evaluate((el) => getComputedStyle(el).backgroundColor);
       const xs = await sq.locator("main h2, [data-testid=stasera-sopra], main h1").evaluateAll((els) => els.map((e) => ({ x: Math.round(e.getBoundingClientRect().x), a: getComputedStyle(e).textAlign })));
-      ok(bg === "rgb(248, 246, 242)" && xs.length >= 5 && xs.every((v) => v.x === 16 && v.a !== "center"), `stasera: fondo carta, titoli e titoletti a sinistra come Salvati (${bg}, ${JSON.stringify(xs)})`); }
+      ok(bg === "rgb(246, 247, 247)" && xs.length >= 5 && xs.every((v) => v.x === 16 && v.a !== "center"), `stasera: fondo carta, titoli e titoletti a sinistra come Salvati (${bg}, ${JSON.stringify(xs)})`); }
     await sq.screenshot({ path: `${OUT}/40-stasera-scelte.png`, caret: "initial" });
     // Revisore 2/11 (terzo giro): sotto il pulsante le miniature (emoji e nome) dei salvati che rispettano le scelte,
     // aggiornate a ogni tocco; solo salvati veri. Riempiono il 40% inferiore che prima era vuoto.
@@ -4265,7 +4265,7 @@ else {
       const btnBg = await inv.getByTestId("invita-amico-condividi").evaluate((el) => getComputedStyle(el).backgroundColor);
       ok((await inv.getAttribute("data-vuoto")) === "1" && t.includes("Nessun amico qui, per ora") && !/vedrai|presto/i.test(t) && !!btn && !!card && btn.width >= card.width - 48 && btnBg === "rgb(255, 107, 74)" && (await inv.getByTestId("invita-amico-link").getAttribute("data-path"))?.startsWith("/invito/"), `amici: stato vuoto curato con l'invito a tutta larghezza (${Math.round(btn?.width ?? 0)}/${Math.round(card?.width ?? 0)} px, ${btnBg})`); }
     const bg = await sp.getByTestId("amici").evaluate((el) => getComputedStyle(el.parentElement).backgroundColor);
-    ok(!((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(248, 246, 242)", `amici: niente emoji 👥, fondo carta (${bg})`); }
+    ok(!((await sp.locator("body").innerText()) ?? "").includes("👥") && bg === "rgb(246, 247, 247)", `amici: niente emoji 👥, fondo carta (${bg})`); }
   // Con posti visitati: "Da consigliare", prima quelli che ti sono piaciuti, mai quelli che "non fanno per te";
   // ognuno porta alla pagina pubblica del locale e si manda con un tocco.
   { const sav = (id, name, category, tags, created_at) => ({ created_at, tags, note: null, places: { id: `00000000-0000-4000-8000-0000000007${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } });
@@ -5140,7 +5140,7 @@ else {
   { const h1 = await ap.locator("main h1").evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height > 1).map((e) => ({ t: e.textContent, f: getComputedStyle(e).fontFamily })));
     const mb = await ap.getByRole("link", { name: "Apri la mappa" }).boundingBox();
     const bg = await ap.locator("main").evaluate((el) => getComputedStyle(el).backgroundColor);
-    ok(h1.length === 1 && h1[0].t === "Ciao! Dimmi cosa cerchi." && /newsreader/i.test(h1[0].f) && (await ap.getByText("Assistente Mapetite").count()) === 0 && (await ap.getByText("Trova, filtra, prenota").count()) === 0 && !!mb && mb.x + mb.width > 340 && mb.y < 80 && bg === "rgb(248, 246, 242)", `assistente: un solo titolo serif, mappa in alto a destra, fondo carta (${JSON.stringify(h1)}, ${bg})`); }
+    ok(h1.length === 1 && h1[0].t === "Ciao! Dimmi cosa cerchi." && /newsreader/i.test(h1[0].f) && (await ap.getByText("Assistente Mapetite").count()) === 0 && (await ap.getByText("Trova, filtra, prenota").count()) === 0 && !!mb && mb.x + mb.width > 340 && mb.y < 80 && bg === "rgb(246, 247, 247)", `assistente: un solo titolo serif, mappa in alto a destra, fondo carta (${JSON.stringify(h1)}, ${bg})`); }
   // Revisore 2/11 (quinto giro): domande intere ("Prova a chiedere", come sulla mappa), nessuna promessa di
   // prenotazione (né "Prenota domani", né "Altre idee: prenota", né "ti preparo la prenotazione"); la serata
   // a tappe c'è davvero e resta in vista. Senza salvati il benvenuto sta al centro, senza vuoto enorme sotto.

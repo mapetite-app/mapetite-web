@@ -35,7 +35,7 @@ export const ACTION_TILE =
 // Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
 // fondo carta caldo come la home nuova.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-const PAPER = "bg-[#f8f6f2]";
+const PAPER = "bg-[#f6f7f7]";
 const TILE = `${ACTION_TILE} bg-white/10`;
 
 type SchedaTab = "panoramica" | "recensioni" | "info";
@@ -428,7 +428,7 @@ export default function VenueSheet({
   // "Da provare / Ci sono stato" stanno già nella riga delle azioni (scheda B).
   // senzaFiletto: subito sotto il verdetto, che ha già il suo filetto (collaudo 22/10: doppio filetto nei salvati).
   const personalBlock = (withStatus: boolean, editorial = false, senzaFiletto = false) => (
-    <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e3ddd2] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
+    <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e1e5e5] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
@@ -820,7 +820,7 @@ export default function VenueSheet({
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
               Se manca: "lo sto scrivendo" mentre arriva, altrimenti la frase di Google dichiarata come tale. */}
           {headline != null ? (
-            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p data-testid="verdetto-scheda" className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -828,7 +828,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 text-[20px] italic leading-[1.24] tracking-[-0.005em] text-[#141414] min-[380px]:text-[22px]`}>{headline}</p>
             </section>
           ) : verdettoInArrivo ? (
-            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -836,7 +836,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 animate-pulse text-[20px] italic leading-[1.24] text-text-muted`}>Lo sto scrivendo dalle recensioni…</p>
             </section>
           ) : googleLine ? (
-            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
               {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
                   in corsivo grande si confondeva con il verdetto Mapetite). */}
               <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">{googleLabel}</p>
@@ -868,7 +868,7 @@ export default function VenueSheet({
                     type="button"
                     aria-expanded={provaAperta === r}
                     onClick={() => setProvaAperta((x) => (x === r ? null : r))}
-                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e3ddd2] bg-white text-brand"}`}
+                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e1e5e5] bg-white text-brand"}`}
                   >
                     <span aria-hidden className={provaAperta === r ? "text-white" : "text-success"}>✓</span>
                     {r}
@@ -917,7 +917,7 @@ export default function VenueSheet({
           aria-expanded={detailsOpen}
           aria-controls={`scheda-dettagli-${venue.id}`}
           onClick={openDetails}
-          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e3ddd2]"}`}
+          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e1e5e5]"}`}
         >
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
@@ -956,7 +956,7 @@ export default function VenueSheet({
 
         <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
           {/* Tre sezioni brevi: Info · Recensioni · In breve. */}
-          <div role="tablist" aria-label="Sezioni della scheda" className="mx-[22px] mt-1 flex border-b border-[#e3ddd2]" data-testid="scheda-tabs">
+          <div role="tablist" aria-label="Sezioni della scheda" className="mx-[22px] mt-1 flex border-b border-[#e1e5e5]" data-testid="scheda-tabs">
             {tabs.map(([id, label]) => (
               <button
                 key={id}

@@ -6,6 +6,13 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## RICHIESTE DI LORENZO DEL 5/11 MATTINA (in chat) — PREVALGONO, IN PRODUZIONE STASERA
+1. **Mappa dopo la ricerca a scatti:** i cerchi compaiono in una posizione e poi si spostano da soli senza toccare nulla; il movimento deve essere fluido.
+2. **Grafica:** il color panna/beige delle schede dà un'idea "cheap": rifare i colori di fondo con un aspetto di più valore.
+3. **Salvati:** con una città scelta in alto la lista sotto deve mostrare solo quella città; ricerca e filtri nei salvati immediati, pensati per chi ha 500 salvati.
+4. **I miei gusti (profilo) e primo accesso:** ampliare "tantissimo" i tipi di locale (vegetariano, vegano, pizzeria, barbecue, agriturismo… come i filtri del vecchio MVP, `riferimenti/vecchio-mvp-02-filtri-categorie.png`), da scegliere anche alla registrazione: servono a capire la persona e a filtrare.
+5. **Ricerca che capisce i gusti come una chat:** come Claude ha trovato subito il posto per il compleanno del papà di Lorenzo, ma sulla mappa e con i posti salvabili.
+
 ## PIANO DAL 1/11 ALL'8/11 — PREVALE SU TUTTO IL RESTO (Lorenzo in chat, 1/11 sera)
 Lorenzo, 1/11: "non sto vedendo miglioramenti… da qua a una settimana voglio che fai 4 volte le cose che hai scritto… devi sfruttare tutte e 5 le ore della sessione". Causa del ritardo: dal 27/10 quasi tutto è andato su prenotazioni e pannello ristoratori (invisibili a chi apre l'app) e le sessioni si chiudevano dopo un'ora.
 **Regola delle sessioni (vale da subito):** ogni sessione lavora **fino al limite di utilizzo o fino all'ora della sessione dopo**, voce dopo voce, senza chiudersi dopo la prima. Sotto-agenti in parallelo su voci indipendenti (ognuno con la sua schermata). Merge in produzione ogni ~2 ore se il giro è TUTTO OK. **Stop** fino all'8/11 a prenotazioni, pannello ristoratori, avvisi e proposte nuove: solo ciò che si vede aprendo l'app. Ogni sessione chiude con un messaggio a Lorenzo: le cose che vede diverse, dove toccare, screenshot prima/dopo.

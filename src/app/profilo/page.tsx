@@ -275,7 +275,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
   return (
     // Fondo carta come Salvati e Importa (revisore 1/11, terzo giro): stesso foglio in tutte le schermate.
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
       {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
           Tutto il resto sta in "Impostazioni" in fondo, chiusa. Una sola "Impostazioni" (revisore, 1/11):
@@ -308,7 +308,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
       {/* Il tuo gusto (revisore 2/11, sesto giro): il blocco principale del profilo. Fino a 4 pillole vere dal
           profilo; "Modifica" apre la mappa del gusto, "Condividi" la carta. Niente link doppione sotto. */}
-      <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mb-6 rounded-card border border-[#e8e2d8] bg-white px-4 pb-4 pt-2 shadow-card">
+      <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mb-6 rounded-card border border-[#e3e7e7] bg-white px-4 pb-4 pt-2 shadow-card">
         <div className="flex items-center gap-1">
           <h2 id="gusto-titolo" className="min-w-0 flex-1 font-title text-[22px] leading-tight text-text">Il tuo gusto</h2>
           {!senzaGusto && (
@@ -334,7 +334,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         ) : pillole.length > 0 ? (
           <ul aria-label="I tuoi gusti" className="mt-1 flex flex-wrap gap-2">
             {pillole.map((x) => (
-              <li key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-[#f3efe8] px-3.5 text-[14px] font-medium text-[#33373d]">
+              <li key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-[#f0f2f2] px-3.5 text-[14px] font-medium text-[#33373d]">
                 {x.emoji && <span aria-hidden>{x.emoji}</span>}
                 {x.testo}
               </li>
