@@ -3857,6 +3857,12 @@ export default function MapView({
                 ) : (
                   <span data-testid="pin-stato" aria-label={place.tags?.includes(OPINION_LIKE) ? "Ci sono stato, mi è piaciuto" : "Ci sono stato"} className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
                 ))}
+                {/* "Ti porterei qui" (5/11): la stessa ✦ del consiglio sopra le card, sul segnalino del posto scelto. Assoluta: il segnalino non si sposta. */}
+                {!mappaSalvati && consiglio && aiSearch?.id === consiglio.ticket && consiglio.id === place.id && (
+                  <span data-testid="pin-consiglio" aria-label="Il posto che ti consiglio" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-accent text-white shadow-card">
+                    <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                  </span>
+                )}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"

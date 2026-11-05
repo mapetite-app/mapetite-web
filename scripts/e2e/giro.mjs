@@ -1044,6 +1044,7 @@ await page.unroute("**/api/search");
     await page.waitForTimeout(900);
     const centro = await page.locator("ul.snap-x li[data-id]").evaluateAll((lis) => lis.map((li) => ({ id: li.dataset.id, l: li.getBoundingClientRect().left })).filter((x) => x.l >= 0 && x.l < 60).map((x) => x.id)[0]);
     ok(centro === "P3" && /^\d+ di \d+$/.test(await page.getByTestId("posizione-card").innerText()), `consiglio: un tocco porta alla sua card (${centro})`);
+    ok((await page.getByTestId("pin-consiglio").count()) === 1 && (await page.locator("[data-testid=pin][data-place=P3] [data-testid=pin-consiglio]").count()) === 1, "consiglio: la ✦ sta sul segnalino del posto scelto, e solo lì");
   }
   await page.unroute("**/api/search/consiglio");
 }
