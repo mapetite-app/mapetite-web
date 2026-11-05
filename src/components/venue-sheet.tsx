@@ -35,7 +35,7 @@ export const ACTION_TILE =
 // Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
 // fondo carta caldo come la home nuova.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-const PAPER = "bg-[#f6f7f7]";
+const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
 type SchedaTab = "panoramica" | "recensioni" | "info";
@@ -820,7 +820,7 @@ export default function VenueSheet({
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
               Se manca: "lo sto scrivendo" mentre arriva, altrimenti la frase di Google dichiarata come tale. */}
           {headline != null ? (
-            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
+            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p data-testid="verdetto-scheda" className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -828,7 +828,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 text-[20px] italic leading-[1.24] tracking-[-0.005em] text-[#141414] min-[380px]:text-[22px]`}>{headline}</p>
             </section>
           ) : verdettoInArrivo ? (
-            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
+            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -836,7 +836,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 animate-pulse text-[20px] italic leading-[1.24] text-text-muted`}>Lo sto scrivendo dalle recensioni…</p>
             </section>
           ) : googleLine ? (
-            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
+            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
                   in corsivo grande si confondeva con il verdetto Mapetite). */}
               <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">{googleLabel}</p>
