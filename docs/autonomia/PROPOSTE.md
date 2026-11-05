@@ -16,6 +16,26 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 5/11/2026 (notte, sessione 03:05, CEO che chiude — tema Ricerca). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
+
+### 46. "Perché è qui": una riga che spiega l'ordine dei risultati
+- **Problema:** voti e numero di recensioni sono manipolabili (`PROBLEMI.md`, 20: recensioni false e "review bombing"); chi cerca non sa perché un posto è primo e torna a fidarsi del voto più alto.
+- **Cosa fa:** toccando "8 posti" in cima ai risultati, un foglio dice in 3 righe come sono ordinati: "Prima chi risponde a tutto quello che hai chiesto, poi i più vicini ai tuoi gusti. I posti con molte più recensioni degli altri non salgono per questo (3 messi più in basso)."
+- **Da dove nasce:** Google Maps e TripAdvisor non spiegano l'ordine; Beli mostra un punteggio "quanto ti piacerà" senza dire perché. Noi l'ordine lo abbiamo già (log `[search-mainstream]`, `da_parte`): basta dirlo.
+- **Valore per l'utente:** capisce in 10 secondi che Mapetite non è "il più famoso in cima" (VISIONE).
+- **Valore per il ristoratore:** il piccolo locale vede che non deve comprare recensioni per emergere.
+- **Sforzo:** S. **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 47. "Più tranquillo, più economico": correggi la ricerca con un tocco
+- **Problema:** dopo la prima lista, per cambiare un dettaglio si riscrive tutta la frase (`PROBLEMI.md`, 18: al momento della scelta non si ritrova il posto giusto).
+- **Cosa fa:** sotto la frase dei risultati, 3 chip scelti dall'AI dalla richiesta ("più tranquillo", "spendere meno", "più vicino"): un tocco rifà la ricerca con il vincolo in più, la frase resta leggibile in cima.
+- **Da dove nasce:** "Ask Maps" di Google fa domande di seguito in chat, ma solo in inglese e con ricadute sulla ricerca generica per le domande sfumate ([TechSpot](https://www.techspot.com/news/111670-google-maps-gets-conversational-gemini-powered-ask-maps.html)); noi in italiano, con un tocco, senza chat.
+- **Valore per l'utente:** dalla prima lista al posto giusto in due tocchi.
+- **Valore per il ristoratore:** domanda più precisa ("tranquillo", "economico") nei numeri della zona.
+- **Sforzo:** M. **Costo Google/Haiku:** una Text Search in più per tocco (quota 50/giorno: "spendere meno" e "più vicino" filtrano i risultati già arrivati senza Google, solo "più tranquillo" ne usa una).
+- **Stato proposto:** PRONTA dal 9/11.
+
 ## 4/11/2026 (notte, sessione 22:05 del 3/11, CEO che chiude — tema Mappa)
 
 ### 43. "I miei · Tutti" sulla mappa: i salvati si accendono e si spengono con un tocco
