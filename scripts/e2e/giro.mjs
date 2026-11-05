@@ -1004,6 +1004,50 @@ await page.unroute("**/api/search");
   await page.unroute("**/api/search");
 }
 
+// 5e-ter. "Ti porterei qui" (richiesta 5 di Lorenzo del 5/11, src/lib/consiglio.ts): con una frase da chat, dopo i
+//     verdetti, l'AI sceglie UN posto della lista e dice perché; prende il posto della frase sopra le card, un tocco porta
+//     alla sua card. Con una frase breve niente consiglio (e nessuna chiamata). Budget nella frase → i più cari in fondo.
+{
+  let cs = null, bu = null;
+  try { cs = await import(new URL("../../src/lib/consiglio.ts", import.meta.url).href); } catch (e) { ok(false, `consiglio: modulo importabile (${e.message})`); }
+  try { bu = await import(new URL("../../src/lib/budget.ts", import.meta.url).href); } catch (e) { ok(false, `budget: modulo importabile (${e.message})`); }
+  if (cs) {
+    ok(cs.vuoleConsiglio("devo festeggiare i 70 anni di mio papà, ama il pesce") && cs.vuoleConsiglio("dove porto mia madre a pranzo?") && cs.vuoleConsiglio("cena con i colleghi a Monti") && !cs.vuoleConsiglio("trattoria a Trastevere") && !cs.vuoleConsiglio("Rooftop romantico per due a Roma") && !cs.vuoleConsiglio("pizza"), "consiglio: solo per frasi da chat (occasione, persona, domanda, 8+ parole), non per 'trattoria a Trastevere'");
+    const P = [{ id: "A", name: "Uno" }, { id: "B", name: "Due" }];
+    ok(cs.parseConsiglio('{"n":2,"perche":"sala tranquilla e pesce freschissimo, dicono le recensioni"}', P)?.id === "B" && cs.parseConsiglio('{"n":null}', P) === null && cs.parseConsiglio('{"n":7,"perche":"bello e buono davvero"}', P) === null && cs.parseConsiglio('{"n":1,"perche":"ok"}', P) === null && cs.parseConsiglio("non so", P) === null, "consiglio: solo un numero della lista e un perché vero; 'nessuno' resta nessuno");
+    const pr = cs.buildPrompt("compleanno di mio papà", [{ id: "A", name: "Uno", category: "Ristorante", priceLevel: 3, rating: 4.6, editorialSummary: null, reviewTexts: ["Abbiamo festeggiato il compleanno"], verdict: "Pesce fresco", livello: "alto", motivo: "festa in famiglia" }]);
+    ok(/SOLO da verdetto, descrizione o recensioni/.test(pr) && /non nominare prezzo, budget, numero di persone/.test(pr) && /fama NON sono un motivo/.test(pr) && /Adatto alla richiesta: alto — festa in famiglia/.test(pr) && /prezzo €€€/.test(pr), "consiglio: il prompt vieta di inventare, non premia la fama e porta il giudizio della ricerca");
+  }
+  if (bu) {
+    ok(bu.prezzoMax("massimo 50 euro a testa") === 3 && bu.prezzoMax("30€ a persona") === 2 && bu.prezzoMax("sotto i 60 euro") === 3 && bu.prezzoMax("cena economica") === 2 && bu.prezzoMax("budget 100 euro") === 4 && bu.prezzoMax("trattoria a Trastevere") === null && bu.prezzoMax("in 10 persone") === null, "budget: la cifra a testa diventa la fascia Google; senza cifra né 'economico' niente");
+    const L = [{ name: "Caro", priceLevel: 4 }, { name: "Giusto", priceLevel: 2 }, { name: "Ignoto", priceLevel: null }];
+    const r = bu.inFondoPerPrezzo(L, 3);
+    ok(r.places.map((x) => x.name).join(",") === "Giusto,Ignoto,Caro" && r.demoted.join() === "Caro" && bu.inFondoPerPrezzo([L[0]], 2).demoted.length === 0, "budget: i posti sopra la fascia in fondo (mai esclusi), quelli senza prezzo restano; se lo sono tutti non si sposta niente");
+  }
+  let chiamate = 0;
+  await page.route("**/api/search/consiglio", async (r) => { chiamate++; await new Promise((res) => setTimeout(res, 300)); return r.fulfill({ json: { consiglio: { id: "P3", perche: "Cocktail curati e terrazza tranquilla, dicono le recensioni." } } }); });
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(800);
+  ok(chiamate === 0 && (await page.getByTestId("consiglio").count()) === 0 && (await page.getByTestId("frase-risultati").count()) === 1, "consiglio: con una frase breve nessuna chiamata, resta la frase sopra le card");
+  await page.getByLabel("Cosa cerchi?").fill("devo festeggiare i 70 anni di mio papà, ama il pesce, saremo in 10");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("consiglio").waitFor({ timeout: 8000 }).catch(() => {});
+  const c = page.getByTestId("consiglio");
+  ok((await c.count()) === 1 && (await page.getByTestId("frase-risultati").count()) === 0 && chiamate === 1, `consiglio: con una frase da chat arriva dopo i verdetti, una chiamata, al posto della frase (${chiamate} chiamate)`);
+  if (await c.count()) {
+    ok((await page.getByTestId("consiglio-titolo").innerText()) === "Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Ti porterei qui/i.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);
+    const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=consiglio]").getBoundingClientRect(); const card = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: card.top, h: f.height, l: f.left, r: window.innerWidth - f.right }; });
+    ok(g.fb <= g.ct + 1 && g.h >= 44 && g.h <= 96 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
+    await c.click();
+    await page.waitForTimeout(900);
+    const centro = await page.locator("ul.snap-x li[data-id]").evaluateAll((lis) => lis.map((li) => ({ id: li.dataset.id, l: li.getBoundingClientRect().left })).filter((x) => x.l >= 0 && x.l < 60).map((x) => x.id)[0]);
+    ok(centro === "P3" && /^\d+ di \d+$/.test(await page.getByTestId("posizione-card").innerText()), `consiglio: un tocco porta alla sua card (${centro})`);
+  }
+  await page.unroute("**/api/search/consiglio");
+}
+
 // 5f. Ordine per quanto il locale è adatto (giudizio di Haiku), solo tra le card non ancora viste:
 //     la prima card resta dov'è (correzione 8 del giro del 1/11: l'ordine non salta sotto il dito).
 {

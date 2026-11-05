@@ -103,6 +103,9 @@ export interface BottomSheetProps {
   removed?: readonly string[];
   // Dati veri per la frase sopra le card (src/lib/frase-risultati.ts); null = nessuna frase.
   frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number } | null;
+  // "Ti porterei da…" (richiesta 5 del 5/11): con una frase da chat l'AI sceglie un posto della lista
+  // e dice perché, solo dai dati veri (src/lib/consiglio.ts). Prende il posto della frase sopra le card.
+  consiglio?: { place: Place; perche: string } | null;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -341,7 +344,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -849,7 +852,25 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
-        {fraseOggi && (
+        {nuova && consiglio && places.some((p) => p.id === consiglio.place.id) ? (
+          // Il consiglio sostituisce la frase (una cosa sola sopra le card). Un tocco porta alla sua card.
+          <button
+            type="button"
+            data-testid="consiglio"
+            onClick={() => { if (onFocus) onFocus(consiglio.place); }}
+            className="pointer-events-auto mx-4 mb-1.5 flex w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-2 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1 text-[11px] font-sans font-semibold uppercase tracking-wide text-accent">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                Ti porterei qui
+              </span>
+              <span data-testid="consiglio-titolo" className="mt-0.5 block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(consiglio.place.name)}</span>
+              <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
+            </span>
+            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>
+          </button>
+        ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
           <div data-testid="frase-risultati" className="pointer-events-none mx-4 mb-1.5 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">

@@ -11,6 +11,7 @@ import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { nomeLeggibile } from "@/lib/nome-leggibile";
+import { vuoleConsiglio } from "@/lib/consiglio";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
@@ -1086,6 +1087,9 @@ export default function MapView({
   // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
   const [dalSalvati, setDalSalvati] = useState<{ ticket: number; at: { lat: number; lng: number }; scelti: { id: string; perche: string }[] } | null>(null);
   const salvatiRicercaOn = useBeta("salvati-ricerca");
+  // "Ti porterei da…" (richiesta 5 del 5/11): dopo i verdetti, per una frase da chat, un posto della lista
+  // scelto dall'AI con il perché (src/lib/consiglio.ts). `ticket` = numero della ricerca.
+  const [consiglio, setConsiglio] = useState<{ ticket: number; id: string; perche: string } | null>(null);
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
   // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
@@ -1730,6 +1734,7 @@ export default function MapView({
   const clearAiSearch = () => {
     searchSeq.current++;
     setDalSalvati(null);
+    setConsiglio(null);
     setLoadingVerdicts(false);
     setAiSearching(false);
     setAiSearch(null);
@@ -2647,6 +2652,23 @@ export default function MapView({
       }));
       if (searchSeq.current !== id) return;
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
+      // Frase da chat: l'AI sceglie un posto tra quelli rimasti, coi verdetti appena scritti (in parallelo
+      // all'ordine qui sotto; non sposta nessuna card). Se non risponde, resta la frase di sempre.
+      if (vuoleConsiglio(searchedQuery) && replies.some((r) => r && Object.keys(r.dettagli ?? {}).length > 0)) {
+        const ids = (pending.places as { id?: unknown }[]).map((p) => p.id).filter((x): x is string => typeof x === "string");
+        const rimasti = ids.every((x) => esclusi.has(x)) ? ids : ids.filter((x) => !esclusi.has(x));
+        void fetch("/api/search/consiglio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: searchedQuery, places: pending.places, token: pending.token, ids: rimasti,
+            livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})),
+            motivi: Object.fromEntries(replies.flatMap((r) => Object.entries(r?.dettagli ?? {}).map(([k, v]) => [k, v.matchReason ?? null]))),
+          }),
+        }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
+          if (searchSeq.current === id && d?.consiglio?.id && d.consiglio.perche) setConsiglio({ ticket: id, ...d.consiglio });
+        }).catch(() => {});
+      }
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
         setAiSearch((prev) => {
@@ -4289,6 +4311,11 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           fromSaved={dalSalvatiVisti}
+          consiglio={(() => {
+            if (!consiglio || aiSearch?.id !== consiglio.ticket || view !== "all" || clusterPlaces !== null) return null;
+            const place = displayedPlaces.find((p) => p.id === consiglio.id);
+            return place ? { place, perche: consiglio.perche } : null;
+          })()}
           onOpenSaved={(place) => apriDaiSalvati(place, "riga")}
           onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />
