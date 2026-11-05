@@ -962,7 +962,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
                             // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
-                            <span data-testid="aperto-card" className="shrink-0 rounded-pill bg-white px-2.5 py-0.5 text-xs font-display font-semibold text-brand">Aperto ora</span>
+                            // Revisore 5/11 (area 6b): testo con il pallino, non più una pillola bianca che rubava l'occhio al verdetto.
+                            <span data-testid="aperto-card" className="flex shrink-0 items-center gap-1 text-xs font-display font-semibold text-white/90"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#7be0a8]" />Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
@@ -994,7 +995,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         {d?.verdict ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
-                            <span className="line-clamp-2 text-[13px] font-sans font-medium leading-5 text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
+                            <span className="line-clamp-2 text-[15px] font-sans font-medium leading-[1.35] text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
                           </>
                         ) : loadingVerdicts && details ? (
                           <SkeletonLines dark />

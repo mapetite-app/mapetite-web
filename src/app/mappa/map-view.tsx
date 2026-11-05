@@ -3943,7 +3943,7 @@ export default function MapView({
         )}
         {userPos && (
           // Sulla mappa dei salvati il pallino blu sta sopra i segnalini (revisore del 2/11: il segnalino scelto lo copriva).
-          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 60 : 0 }}>
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 150 : 0 /* sopra anche il segnalino scelto (100): tutta la città in vista, revisore 5/11 */ }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
               <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
               <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
