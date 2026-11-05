@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { ricordaStato } from "@/lib/stato-locale";
 import { compattaOrari } from "@/lib/orari";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +11,8 @@ import { distanceMeters } from "@/lib/distance";
 import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
 import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
-import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop } from "@/lib/mainstream";
+import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop, massPredicate } from "@/lib/mainstream";
+import { amatiValidi, fraseDiceTipo, suPerGusti } from "@/lib/tipi-locale";
 import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
 import { pulisciMappa, scopertaPer } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
@@ -52,6 +54,9 @@ const quotaResponse = () =>
   );
 
 export async function POST(request: Request) {
+  // Tempi per fase (area 5b, 4/11): una riga [search-tempi] nei log di Vercel per ogni ricerca del mondo.
+  const t0 = Date.now();
+  const tempi: Record<string, number> = {};
   const body = await request.json().catch(() => null);
   const query = body?.query;
   const source: "world" | "saved" =
@@ -106,7 +111,7 @@ export async function POST(request: Request) {
         ({ data, error }) => {
           if (error || !data) return null;
           const m = pulisciMappa((data as { gusto?: unknown }).gusto, () => true);
-          return { chicche: scopertaPer(m) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati) };
+          return { chicche: scopertaPer(m) === "chicche", diete: gustiValidi((data as { gusti_ricordati?: unknown }).gusti_ricordati), amati: amatiValidi(m.amati) };
         },
         () => null,
       )
@@ -148,6 +153,8 @@ export async function POST(request: Request) {
     const preIntent = searchIntent === "natural" && body?.intentQuery === query.trim() ? sanitizeIntent(body?.intent) : null;
     if (preIntent) console.log(`[search-intent] già capito mentre si scriveva: "${query.trim().slice(0, 60)}"`);
     const intent = searchIntent === "natural" ? preIntent ?? await extractSearchIntent(query.trim()) : null;
+    tempi.intento = Date.now() - t0;
+    if (preIntent) tempi.intento_gia_capito = 1;
     if (intent) {
       filtri = {
         categoria: intent.tipo,
@@ -243,7 +250,9 @@ export async function POST(request: Request) {
         // (le recensioni contano fino a 150: oltre, i locali turistici non guadagnano posizioni).
         sortMode: searchIntent === "natural" && !area ? "relevance" : "quality",
       };
+      const tG = Date.now();
       risultati = await searchGooglePlaces(queryGoogle, opzioni);
+      tempi.google = Date.now() - tG;
       googleCalls++;
       // Quartiere noto con pochi risultati: Google legge il nome del quartiere come parte dell'insegna
       // ("bar cozy quartiere Moscova Milano" → 4 bar, 3 con "Moscova" nel nome: Lorenzo, 17/10). Allora
@@ -295,6 +304,15 @@ export async function POST(request: Request) {
       console.error("[search/route] Google Places error:", err);
       if (isQuota(err)) return quotaResponse();
       return NextResponse.json({ error: "La ricerca non è disponibile in questo momento: riprova tra poco." }, { status: 503 });
+    }
+    // Proposta 45 (4/11): lo stato letto da Google si ricorda sui locali già in archivio (dopo la risposta),
+    // e un locale chiuso per sempre non si propone: consigliarlo sarebbe un consiglio falso.
+    const visti = risultati;
+    after(() => ricordaStato(visti));
+    const chiusi = risultati.filter((p) => p.businessStatus === "CLOSED_PERMANENTLY");
+    if (chiusi.length > 0) {
+      risultati = risultati.filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY");
+      console.log(`[search-chiusi] tolti perché chiusi per sempre secondo Google: ${JSON.stringify(chiusi.map((p) => p.name))}`);
     }
     // "Colazione", "cocktail bar", "ristorante": i locali di tutt'altro tipo
     // (un pub per la colazione) vanno in fondo, mai esclusi.
@@ -370,6 +388,18 @@ export async function POST(request: Request) {
           daParte.gusti = r.places.slice(r.places.length - r.spostati).map((p) => p.name);
           perTe.push(...usati.filter((g) => g.inFondo).map((g) => g.label));
           console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${r.spostati} locali ${r.motivo} (profilo)`);
+        }
+      }
+      // "I miei gusti" (5/11): frase generica ("cena stasera", "compleanno di mio papà"), senza un tipo di posto
+      // né di cucina: i locali dei tipi che la persona ama (tipi e nome secondo Google) salgono di qualche posto.
+      // Mai esclusioni; un locale di massa non sale per questo (VISIONE). La frase che dice un tipo vince sempre.
+      const tipoGenerico = !filtri.categoria || /^(?:ristorant[ei]|local[ei]|post[oi]|cena|pranzo)$/i.test(filtri.categoria.trim());
+      if (profilo?.amati.length && tipoGenerico && !fraseDiceTipo(query)) {
+        const r = suPerGusti(risultati, profilo.amati, massPredicate(risultati));
+        if (r.saliti.length > 0) {
+          risultati = r.places;
+          perTe.push(`${r.usati.slice(0, 2).join(" e ")} in cima`);
+          console.log(`[search-gusto] q=${JSON.stringify(query.trim().slice(0, 80))} su (tipi amati: ${r.usati.join(", ")}): ${JSON.stringify(r.saliti)}`);
         }
       }
     }
@@ -700,6 +730,9 @@ ESEMPI (input → output atteso):
     });
   }
 
+  if (source === "world") {
+    console.log(`[search-tempi] ${JSON.stringify({ q: query.trim().slice(0, 60), fase: fastPhase ? "fast" : "completa", ...tempi, google_chiamate: googleCalls, totale: Date.now() - t0 })}`);
+  }
   return NextResponse.json({
     risultati: risultatiFinali,
     filtri_usati: filtri,

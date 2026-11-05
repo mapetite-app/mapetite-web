@@ -92,7 +92,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   );
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md bg-[#f8f6f2] pb-8" data-testid="locale-pubblico">
+    <main className="mx-auto min-h-dvh max-w-md bg-[#f6f7f7] pb-8" data-testid="locale-pubblico">
       <div className="relative">
         {photoRef ? (
           <PlacePhoto photoRef={photoRef} alt={place.name} width={800} priority className="h-72 w-full object-cover" fallback={heroFallback} />
@@ -135,7 +135,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
 
       {/* Il verdetto Mapetite in corsivo tra due filetti, come una citazione di rivista (solo se in cache). */}
       {hasVerdict && (
-        <section data-testid="verdetto-pubblico" className="mx-[22px] mt-5 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+        <section data-testid="verdetto-pubblico" className="mx-[22px] mt-5 border-y border-t-[#1c1c1e] border-b-[#e1e5e5] pb-4 pt-3.5">
           {(verdict != null || synthText != null) && (
             <>
               <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">

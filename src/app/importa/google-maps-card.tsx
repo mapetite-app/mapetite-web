@@ -124,7 +124,7 @@ export default function GoogleMapsCard({
     // solo sul fondo carta della pagina, con il sottotitolo sotto.
     <section id="importa-google-card" className="scroll-mt-4 text-text" data-testid="importa-google">
       {!userId ? (
-        <div className="rounded-card border border-[#e8e2d8] bg-white p-5">
+        <div className="rounded-card border border-[#e3e7e7] bg-white p-5">
           <p className="font-display text-lg font-semibold">📋 Incolla un link</p>
           <p className="mt-1 text-sm text-text-muted">
             <Link href="/login?next=%2Fimporta" className="font-semibold text-brand underline">Accedi</Link> per salvare i locali.
@@ -161,7 +161,7 @@ export default function GoogleMapsCard({
                 rows={3}
                 placeholder={"https://maps.app.goo.gl/…\nAnche una chat piena di link"}
                 aria-label="Link da incollare"
-                className="w-full rounded-btn border border-[#ddd5c8] bg-white px-3 py-2 text-base text-text focus:border-brand focus:outline-none"
+                className="w-full rounded-btn border border-[#d6dcdc] bg-white px-3 py-2 text-base text-text focus:border-brand focus:outline-none"
               />
               <button
                 type="button"
@@ -176,7 +176,7 @@ export default function GoogleMapsCard({
 
           {guess && onSearch && (
             // Testo copiato da Google Maps (nome e indirizzo, senza link): un tocco e lo cerco.
-            <div className="mt-3 rounded-card border border-[#e8e2d8] bg-white p-4" data-testid="incolla-testo">
+            <div className="mt-3 rounded-card border border-[#e3e7e7] bg-white p-4" data-testid="incolla-testo">
               <p className="text-sm text-text-muted">Non c’è un link, ma sembra un posto:</p>
               <p className="mt-0.5 truncate font-display text-base font-semibold text-text">{guess.name}</p>
               <button
@@ -189,17 +189,17 @@ export default function GoogleMapsCard({
               </button>
             </div>
           )}
-          {error && <p className="mt-3 rounded-btn border border-[#e8e2d8] bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
+          {error && <p className="mt-3 rounded-btn border border-[#e3e7e7] bg-white px-4 py-3 text-sm text-error" data-testid="incolla-errore">{error}</p>}
           {reel && (
             // Fondo bianco senza margini interni, con il filo come le altre card della pagina.
-            <div className="mt-4 overflow-hidden rounded-card border border-[#e8e2d8] bg-white text-text">
+            <div className="mt-4 overflow-hidden rounded-card border border-[#e3e7e7] bg-white text-text">
               <ReelSave key={reel.n} text={reel.text} userId={userId} />
             </div>
           )}
           {results && (results.every((r) => r.lista)
             // Solo liste di Google Maps: il riquadro della lista da solo, senza una seconda cornice attorno.
             ? <div className="mt-4"><ListaRow count={results.length} /></div>
-            : <div className="mt-4 rounded-card border border-[#e8e2d8] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>)}
+            : <div className="mt-4 rounded-card border border-[#e3e7e7] bg-white p-3 text-text"><LinkResults results={results} userId={userId} /></div>)}
         </>
       )}
     </section>

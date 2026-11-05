@@ -194,6 +194,10 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Mapstr:** un tasto sulla mappa passa da "la mia mappa" alla "mappa dei suggerimenti", senza dire perché un posto è suggerito ([Mapstr](https://mapstr.com/mapstore/fr/article/article_all-in-map_fr_1)); Premium sostituito da "Mapstr CLUB" ([Mapstr](https://mapstr.com/mapstore/en/article/article_mapstr_club)).
 - **Places (Raya):** sottotitolo sull'App Store passato a "Curated Discovery" ([App Store](https://apps.apple.com/us/app/places-curated-discovery/id6446208302)). **Beli, Corner, Albo, BestieBite:** nessuna novità sulla mappa trovata.
 
+### Controllo del 5/11 notte (CEO che chiude, 3 ricerche, tema Ricerca)
+- **Google "Ask Maps":** ricerca a conversazione da marzo 2026, disponibilità che varia per paese e account; una prova trova che sulle domande più sfumate ricade sulla ricerca Google normale ([TechSpot](https://www.techspot.com/news/111670-google-maps-gets-conversational-gemini-powered-ask-maps.html), [Il Fatto Quotidiano](https://www.ilfattoquotidiano.it/2026/02/14/arriva-lintelligenza-artificiale-su-google-maps-lapp-rispondera-a-domande-sui-menu-dei-ristoranti-monumenti-e-non-solo-ecco-come-si-attiva/8285506/)). Noi: la frase intera rispettata in ogni vincolo, verdetto su ogni card, in italiano.
+- **Beli:** nessuna ricerca con l'AI trovata; i consigli restano "quanto ti piacerà" dai propri confronti a coppie, dopo almeno 15 posti in classifica ([Long Beach Post](https://lbpost.com/esd/?p=74448)). Noi consigliamo dal primo accesso (mappa del gusto).
+
 ## In sintesi: dove nessuno arriva
 1. **Ricerca su tutta Google + verdetto onesto per ogni posto**: Places e Corner cercano solo tra i propri posti; Google ordina per fama.
 2. **Dal salvato al tavolo**: nessuno tiene insieme social → salvato → "sei vicino" → prenotazione → "com'è andata".

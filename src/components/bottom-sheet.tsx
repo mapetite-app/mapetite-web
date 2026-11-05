@@ -42,6 +42,8 @@ export interface BottomSheetProps {
   // Filtri rapidi controllati dal genitore (così la mappa nasconde gli stessi pin).
   quick?: ReadonlySet<QuickFilter>;
   onToggleQuick?: (f: QuickFilter) => void;
+  // "Più vicini" acceso o spento (4/11): la mappa si riadatta come con gli altri filtri rapidi.
+  onNearestToggle?: () => void;
   // Titolo editoriale della risposta (la richiesta dell'utente), solo nelle ricerche AI.
   title?: string | null;
   // Variante B: card al centro del carosello ↔ pin evidenziato sulla mappa.
@@ -339,7 +341,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -371,7 +373,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const places = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
-    return [...list].sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b));
+    // I posti chiusi per sempre restano in fondo anche con "Più vicini" (revisore 5/11: "Ha chiuso" era la prima card).
+    const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
+    return [...list].sort((a, b) => chiuso(a) - chiuso(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
   const orderKey = places.map((p) => p.id).join(",");
   useEffect(() => {
@@ -588,12 +592,43 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <button
           type="button"
           aria-pressed={nearestFirst}
-          onClick={() => setNearestFirst((v) => !v)}
+          onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
           className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${nearestFirst ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
         >
           Più vicini
         </button>
       )}
+    </div>
+  );
+
+  // Area 4c del piano (4/11, come i filtri sotto la barra di Google Maps e Places): nella lista nuova i filtri
+  // rapidi stanno in vista, in una riga sotto la pillola "N posti", non più dietro la pillola. Un tocco filtra
+  // card e segnalini insieme; la pillola tiene solo "Ho capito", Affina e Condividi.
+  const filtriInVista = (quickFiltersOn || nearestOn) && (
+    <div data-testid="filtri-mappa" className="pointer-events-auto -ml-3 -mr-[4.25rem] flex basis-[calc(100%+5rem)] gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&>button]:shrink-0 lg:hidden">
+      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={quick.has(k)}
+          onClick={() => toggleQuick(k)}
+          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${quick.has(k) ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          {label}
+        </button>
+      ))}
+      {nearestOn && (
+        <button
+          type="button"
+          aria-pressed={nearestFirst}
+          onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
+          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${nearestFirst ? "bg-brand text-white" : "bg-surface text-text"}`}
+        >
+          Più vicini
+        </button>
+      )}
+      {/* Margine in fondo alla riga: l'ultimo filtro non tocca il bordo dello schermo (revisore 4/11). */}
+      <span aria-hidden className="w-3 shrink-0" />
     </div>
   );
 
@@ -618,7 +653,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     return [...n.values()].map((v): [string, number] => [v.label, v.ids.size]).sort((a, b) => b[1] - a[1]).slice(0, 3);
   })();
   const optionsPanel = title ? (
-    <div data-testid="opzioni-pannello" className="mb-2 mr-3 mt-1 border-t border-border pt-2">
+    <div data-testid="opzioni-pannello" className={`mb-2 mr-3 ${pillSlot && !onOpenArticle ? "" : "mt-1 border-t border-border pt-2"}`}>
       {understood.length > 0 && (
         <p data-testid="ho-capito" className="text-xs font-sans text-accent">Ho capito: {understood.join(" · ")}</p>
       )}
@@ -734,20 +769,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             </span>
           )}
           <span className="sr-only">{loadingVerdicts ? " · preparo i verdetti… · " : " · "}opzioni della ricerca</span>
-          {(quick.size > 0 || nearestFirst) && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
         </button>
         {headerOpen && (
           <div className="absolute left-0 top-full z-20 mt-2 w-[min(calc(100vw-2rem),24rem)] rounded-card bg-surface p-3 pb-1 shadow-float">
-            {(quickFiltersOn || nearestOn || onOpenArticle) && <div className="mb-1">{quickChips}</div>}
+            {onOpenArticle && <div className="mb-1">{quickChips}</div>}
             {optionsPanel}
           </div>
         )}
       </div>,
       pillSlot,
     );
+    const filtriPortale = nuova && pillSlot && filtriInVista ? createPortal(filtriInVista, pillSlot) : null;
     return (
       <>
       {pill}
+      {filtriPortale}
       <div
         data-testid="lista-risultati"
         className="pointer-events-none absolute left-0 right-0 z-10 lg:pointer-events-auto lg:static lg:col-start-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-border lg:pb-5"
@@ -809,7 +845,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           </div>
           {title && headerOpen && optionsPanel}
         </div>}
-        {(nuova ? !headerOpen && (onOpenArticle || ((quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
+        {(nuova ? !headerOpen && (onOpenArticle || (!pillSlot && (quick.size > 0 || nearestFirst) && (quickFiltersOn || nearestOn))) : (onOpenArticle || (chipsVisible && (quickFiltersOn || nearestOn)))) && <div className="pointer-events-auto mx-3 mb-2 lg:mx-5">{quickChips}</div>}
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
@@ -836,6 +872,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Nei salvati lo stato c'è sempre: senza tag di stato è "Da provare" (revisore 2/11, nessun terzo stato).
             // Revisore 3/11 (sesto): prima lo stato (Da provare / Ci sono stato), poi il 👍/👎 accanto, come nella lista.
             const stato = savedMode ? (place.tags ?? []).find((t) => (STATE_TAGS as readonly string[]).includes(t)) ?? ((place.tags ?? []).some(isStateTag) ? STATE_TAGS[1] : STATE_TAGS[0]) : undefined;
+            // Area 4a (4/11): con 👎 la pillola è grigia, non corallo (il corallo chiama "vai qui").
             const parere = savedMode ? (place.tags?.includes("Non fa per me") ? " · 👎" : place.tags?.includes("Mi è piaciuto") ? " · 👍" : "") : "";
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
@@ -882,7 +919,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                     // Altezza: quella della card più piena del carosello (le card della fila si allungano tutte
                     // insieme), circa 200 px; il contenuto sta in basso, sopra solo la foto (revisore del 1/11,
                     // secondo giro: 260 px con il vuoto in alto e la card dopo appena visibile).
-                    className="relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px]"
+                    // Revisore 5/11: un posto chiuso per sempre è spento anche qui, come la sua miniatura nella lista.
+                    className={`relative flex h-full min-h-[176px] w-full flex-col justify-end overflow-hidden rounded-[22px] px-4 pb-3 pt-12 text-left text-white shadow-float active:scale-[0.99] lg:min-h-[236px] ${place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale opacity-80" : ""}`}
                     style={{ background: coverGradient(place.category, place.name) }}
                   >
                     {i < PHOTO_CARDS && d?.photoRef && (
@@ -898,7 +936,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {(stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
+                          (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") ? (
+                          <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">{place.businessStatus === "CLOSED_PERMANENTLY" ? "Ha chiuso" : "Chiuso per ora"}</span>
+                        ) : <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (
@@ -922,7 +962,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         <span className="mt-1.5 flex min-w-0 items-center gap-2">
                           {d?.openNow === true && (
                             // Colori del marchio (revisore del 2/11: il verde era fuori palette): bianco su card scura.
-                            <span data-testid="aperto-card" className="shrink-0 rounded-pill bg-white px-2.5 py-0.5 text-xs font-display font-semibold text-brand">Aperto ora</span>
+                            // Revisore 5/11 (area 6b): testo con il pallino, non più una pillola bianca che rubava l'occhio al verdetto.
+                            <span data-testid="aperto-card" className="flex shrink-0 items-center gap-1 text-xs font-display font-semibold text-white/90"><span aria-hidden data-testid="aperto-pallino" className="h-1.5 w-1.5 rounded-full bg-white" />Aperto ora</span>
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
@@ -954,7 +995,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         {d?.verdict ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
-                            <span className="line-clamp-2 text-[13px] font-sans font-medium leading-5 text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
+                            <span className="line-clamp-2 text-[15px] font-sans font-medium leading-[1.35] text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
                           </>
                         ) : loadingVerdicts && details ? (
                           <SkeletonLines dark />
@@ -997,7 +1038,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                   type="button"
                   onClick={() => onSelect(place)}
                   data-testid="card-risultato"
-                  className="relative flex h-full min-h-[150px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99]"
+                  className={`relative flex h-full min-h-[150px] w-full flex-col overflow-hidden rounded-card p-4 text-left text-white shadow-float active:scale-[0.99] ${place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale opacity-80" : ""}`}
                   style={{ background: coverGradient(place.category, place.name) }}
                 >
                   {/* Copertina: colore della cucina e emoji grande in trasparenza. Resta sotto la foto,
@@ -1015,7 +1056,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span className={`flex ${onSave ? "pr-11" : ""}`}>
                         {/* Salvati (Lorenzo 16/10): card compatte e uguali, lo stato in alto come in Places. */}
                         {stato ? (
-                          <span data-testid="stato-card" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{tagLabel(stato)}{parere}</span>
+                          (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") ? (
+                          <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">{place.businessStatus === "CLOSED_PERMANENTLY" ? "Ha chiuso" : "Chiuso per ora"}</span>
+                        ) : <span data-testid="stato-card" className={`rounded-pill px-2 py-0.5 text-[10px] font-display font-semibold ${parere === " · 👎" ? "bg-stone-500/85" : "bg-accent"}`}>{tagLabel(stato)}{parere}</span>
                         ) : saved ? (
                           <span data-testid="etichetta-salvato" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{saved}</span>
                         ) : poco ? (

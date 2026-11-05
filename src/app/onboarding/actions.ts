@@ -7,6 +7,7 @@ import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES, tasteQuery } from "@/li
 import { DIETE } from "@/lib/mappa-gusto";
 import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
+import { amatiValidi } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
 
 interface OnboardingData {
@@ -41,6 +42,9 @@ export async function completeOnboarding({
   const citta = cleanCity(city);
   // Tutto si rivalida: solo valori che l'app conosce (zone, tipi, cucine, atmosfere, occasioni, spesa, diete).
   const mappa = pulisciMappa(gustoRaw, (z) => ZONE.some((x) => x.nome === z && (!citta || x.citta === citta)));
+  mappa.amati = amatiValidi(mappa.amati);
+  // "Cosa ti piace?" non arriva dal primo accesso vecchio (?primo=vecchio): lì si tengono i gusti già salvati.
+  const amatiArrivati = !!gustoRaw && typeof gustoRaw === "object" && Array.isArray((gustoRaw as { amati?: unknown }).amati);
   // Diete: solo se la persona è passata dalla schermata "Come esci" (altrimenti non arrivano e restano quelle di prima).
   const diete = Array.isArray(dieteRaw) ? dieteValide(dieteRaw) : null;
   const valide = (v: unknown, lista: { value: string }[]) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && lista.some((l) => l.value === x)) : []);
@@ -97,7 +101,11 @@ export async function completeOnboarding({
 
   // Mappa del gusto e diete a parte: senza le colonne (migrazioni 20261021_mappa_gusto e
   // 20261016_gusti_ricordati) i gusti di sempre restano salvati, senza errori per l'utente.
-  if (mappa.zone.length || mappa.su.length || mappa.giu.length || mappa.scoperta) {
+  if (!amatiArrivati) {
+    const { data: prima } = await supabase.from("profiles").select("gusto").eq("id", user.id).maybeSingle();
+    mappa.amati = amatiValidi((prima?.gusto as { amati?: unknown } | null)?.amati);
+  }
+  if (mappa.zone.length || mappa.su.length || mappa.giu.length || mappa.scoperta || mappa.amati.length) {
     const { error: gErr } = await supabase.from("profiles").update({ gusto: mappa }).eq("id", user.id);
     if (gErr) console.error("[onboarding] mappa del gusto:", gErr.message);
   }
@@ -129,6 +137,32 @@ function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, des
   const q = tasteQuery(gusti);
   const full = perTe ?? (q && citta ? `${q} a ${citta}` : q);
   redirect(full ? `/mappa?q=${encodeURIComponent(full)}` : "/mappa");
+}
+
+// "I miei gusti" dal profilo (5/11): solo la lista dei tipi amati dentro profiles.gusto (jsonb), il resto
+// della mappa del gusto resta com'è. Nessuna migrazione: il campo vive nel jsonb che c'è già.
+export async function salvaAmati(raw: unknown): Promise<{ error: string | null; amati: string[] }> {
+  const amati = amatiValidi(raw);
+  // Giro automatico (sviluppo con E2E_FAKE_USER): niente database, si rimanda indietro la lista pulita.
+  if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
+    return { error: null, amati };
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Accesso scaduto: entra di nuovo e riprova.", amati };
+  const { data: p, error: rErr } = await supabase.from("profiles").select("gusto").eq("id", user.id).maybeSingle();
+  if (rErr) {
+    console.error("[gusti] lettura profilo:", rErr.message);
+    return { error: "Non sono riuscito a salvare i tuoi gusti. Controlla la connessione e riprova.", amati };
+  }
+  // Si riscrive il jsonb intero partendo da quello salvato: zone, 👍/👎 e "famosi o chicche" restano.
+  const prima = p?.gusto && typeof p.gusto === "object" ? (p.gusto as Record<string, unknown>) : { v: 2 };
+  const { error } = await supabase.from("profiles").update({ gusto: { ...prima, amati }, updated_at: new Date().toISOString() }).eq("id", user.id);
+  if (error) {
+    console.error("[gusti] salvataggio amati:", error.message);
+    return { error: "Non sono riuscito a salvare i tuoi gusti. Controlla la connessione e riprova.", amati };
+  }
+  return { error: null, amati };
 }
 
 // Città scritta a mano: solo lettere, spazi, apostrofi e trattini, al massimo 40 caratteri.

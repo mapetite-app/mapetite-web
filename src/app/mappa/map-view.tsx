@@ -22,7 +22,7 @@ import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
@@ -42,7 +42,7 @@ import ClassificaScheda from "@/components/classifica-scheda";
 import CommunityLocale from "@/components/community-locale";
 import { votoOf } from "@/lib/diario";
 import { surpriseFromMemory } from "@/lib/sorpresa";
-import { filtraSalvatiNaturale } from "@/lib/cerca-salvati";
+import { cercaSalvati, filtraSalvatiNaturale, testoSalvato } from "@/lib/cerca-salvati";
 import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
 import { zoneDeiSalvati, zonaIniziale, type Zona } from "@/lib/salvati-zone";
@@ -399,8 +399,7 @@ const CHIP_CITY = "min-h-10 rounded-pill border border-border bg-white px-3 py-1
 
 // Salvati filtrati per tag, città e testo (nome, categoria, indirizzo, nota, tag). Il testo si
 // capisce anche come frase (4.5): "quel giapponese che avevo salvato a Milano".
-const savedText = (p: Place) => [p.name, categoryLabel(p.category, p.name), p.category, p.address, p.note, ...(p.tags ?? []).map(tagLabel), ...(p.tags ?? [])]
-  .filter(Boolean).join(" ");
+const savedText = testoSalvato;
 function filterSaved(list: Place[], tag: string | null, city: string | null, query: string): Place[] {
   const q = query.trim().toLocaleLowerCase("it");
   const base = list.filter((p) => {
@@ -409,11 +408,8 @@ function filterSaved(list: Place[], tag: string | null, city: string | null, que
     if (city !== null && (cityFromAddress(p.address) ?? OTHER_CITY) !== city) return false;
     return true;
   });
-  if (!q) return base;
-  const plain = base.filter((p) => [p.name, p.category, p.address, p.note, ...(p.tags ?? [])]
-    .some((v) => v != null && v.toLocaleLowerCase("it").includes(q)));
-  if (plain.length > 0) return plain;
-  return filtraSalvatiNaturale(base, q, savedText, (p) => p.tags);
+  // Stessa ricerca della lista (testo esatto più sinonimi, src/lib/cerca-salvati.ts): lista e mappa trovano gli stessi posti.
+  return cercaSalvati(base, q, savedText, (p) => p.tags);
 }
 
 // Salvati che c'entrano con la frase scritta nella barra (voce 11d): basta una parola
@@ -454,7 +450,19 @@ function nearestWanted(places: Place[], here: { lat: number; lng: number }): { p
     .filter((x) => x.meters <= NEARBY_SAVED_METERS)
     .sort((a, b) => a.meters - b.meters)[0] ?? null;
 }
-function similarSaved(place: Place, saved: Place[]): string | null {
+// Terzo revisore 4/11: con solo tipo e prezzo quasi ogni trattoria "somigliava" a una trattoria salvata e
+// "✨ Come un tuo salvato" stava su tutte le card, cioè non diceva niente. Ora resta solo sui SIMILI_MAX
+// risultati più vicini a un tuo salvato (gli altri card restano senza).
+const SIMILI_MAX = 2;
+function similiInLista(places: Place[], saved: Place[]): globalThis.Map<string, string> {
+  const tutti = places
+    .map((p) => ({ id: p.id, m: similarSavedMatch(p, saved) }))
+    .filter((x): x is { id: string; m: { name: string; d: number } } => x.m != null)
+    .sort((a, b) => a.m.d - b.m.d)
+    .slice(0, SIMILI_MAX);
+  return new globalThis.Map(tutti.map((x) => [x.id, x.m.name]));
+}
+function similarSavedMatch(place: Place, saved: Place[]): { name: string; d: number } | null {
   const kind = categoryLabel(place.category);
   if (!kind) return null;
   let best: { name: string; d: number } | null = null;
@@ -465,7 +473,7 @@ function similarSaved(place: Place, saved: Place[]): string | null {
     if (d > SIMILAR_MAX_METERS) continue;
     if (!best || d < best.d) best = { name: s.name, d };
   }
-  return best?.name ?? null;
+  return best;
 }
 
 // Nome confrontabile ("Da Cesare al Casaletto" = "da cesare al casaletto"), senza accenti e punteggiatura.
@@ -553,6 +561,8 @@ export type Place = {
   // Tutti i tipi Google (solo nei risultati di ricerca): scelgono l'emoji quando il tipo principale è
   // generico ("restaurant"). I salvati non li hanno: la loro emoji resta quella di sempre.
   types?: string[] | null;
+  // Solo nei salvati (proposta 45): stato letto da Google quando il locale è passato da una ricerca o dalla scheda.
+  businessStatus?: string | null;
 };
 
 function SaveButton({
@@ -947,6 +957,13 @@ export default function MapView({
   // "I miei salvati" in una riga (Lorenzo 16/10, "il dono della sintesi"): stato, città, raccolte e
   // ordine stanno nel foglio "Filtri"; sullo schermo restano solo la ricerca e i filtri accesi.
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
+  // Il foglio Filtri dei salvati si chiude anche con Esc (terzo revisore 4/11), come le opzioni della ricerca.
+  useEffect(() => {
+    if (!savedSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSavedSheetOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [savedSheetOpen]);
   const [savedNearest, setSavedNearest] = useState(false);
   // Salvati come lista (mockup C, PR #87; src/components/salvati-lista.tsx); true = la mappa di prima.
   const [salvatiMappa, setSalvatiMappa] = useState(false);
@@ -955,6 +972,10 @@ export default function MapView({
   const [ordineLista, setOrdineLista] = useState<string[] | null>(null);
   // Zona dei salvati inquadrata sulla mappa (revisore 2/11): nome della città, per accendere il suo chip.
   const [zonaMappa, setZonaMappa] = useState<string | null>(null);
+  // Città scelta dalla persona (Lorenzo 5/11): una sola scelta per lista e mappa dei salvati. Nella lista filtra le
+  // righe; un tocco su una pillola della mappa (o sulla città nel foglio Filtri) la cambia. null = tutte.
+  // Le zone scelte da sole (zonaMappa all'apertura della mappa) non la toccano.
+  const [zonaScelta, setZonaScelta] = useState<string | null>(null);
   // Suggerimento "Per te" nella card iniziale, dai gusti indicati nell'onboarding.
   const [tasteSuggestion, setTasteSuggestion] = useState<string | null>(null);
   useEffect(() => {
@@ -1288,11 +1309,38 @@ export default function MapView({
   const ordineListaOn = salvatiMappaOn && clusterPlaces === null && ordineLista != null;
   // I posti non presenti nella lista (es. trovati dopo con la ricerca) vanno in fondo, nel loro ordine.
   const posLista = ordineListaOn && ordineLista ? new globalThis.Map(ordineLista.map((id, i) => [id, i])) : null;
-  const salvatiInOrdine = posLista
+  const salvatiOrdinati = posLista
     ? [...displayedPlaces].sort((a, b) => (posLista.get(a.id) ?? 1e9) - (posLista.get(b.id) ?? 1e9))
     : displayedPlaces;
+  // Area 4 (4/11): la pillola della città accesa ("Roma 12") filtra davvero. Prima spostava solo la mappa e le
+  // card restavano di tutte le città: sembrava un filtro ma non filtrava. Ora card e mappa sono della stessa zona.
+  const zonaAccesa = zoneSalvati.length > 1 && clusterPlaces === null ? zoneSalvati.find((z) => z.nome === zonaMappa) ?? null : null;
+  const salvatiInOrdine = zonaAccesa
+    ? (() => { const ids = new Set(zonaAccesa.posti.map((p) => p.id)); return salvatiOrdinati.filter((p) => ids.has(p.id)); })()
+    : salvatiOrdinati;
   // Filtri accesi nei salvati (il testo cercato si vede già nella casella): il numero sul pulsante.
   const savedNearestOn = savedNearest && userPos != null;
+  // Giro 4/11: con "Più vicini" acceso si accende la città dove sei (a Milano con Roma accesa le card restavano di Roma).
+  const zonaVicina = savedNearestOn && userPos && zoneSalvati.length > 1
+    ? [...zoneSalvati].sort((a, b) => Math.min(...a.posti.map((p) => distanceMeters(userPos, p))) - Math.min(...b.posti.map((p) => distanceMeters(userPos, p))))[0]?.nome ?? null
+    : null;
+  // Aggiornata durante il disegno (schema di React "stato che segue una prop"), non in un effetto.
+  const [zonaVicinaVista, setZonaVicinaVista] = useState<string | null>(null);
+  if (zonaVicina !== zonaVicinaVista) {
+    setZonaVicinaVista(zonaVicina);
+    if (zonaVicina) setZonaMappa(zonaVicina);
+  }
+  // La mappa va sulla città accesa da "Più vicini" (terzo revisore 4/11: cambiavano solo pillola e card).
+  useEffect(() => {
+    const z = zonaVicinaVista ? zoneSalvati.find((x) => x.nome === zonaVicinaVista) : null;
+    if (z && userPos) fitToPlaces(z.posti.filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 8).concat(z.posti.slice(0, 1)), 170, 0, [userPos], true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo quando "Più vicini" cambia città
+  }, [zonaVicinaVista]);
+  // Revisore 5/11: "Più vicini" con un'altra città accesa (sei a Milano, guardi Roma) ordinava per distanza da
+  // Milano (primo il posto più a nord di Roma). Lì si ordina dal centro dei salvati della città accesa.
+  const origineSalvati = zonaAccesa && userPos && zonaAccesa.posti.length > 0 && zonaAccesa.posti.every((p) => distanceMeters(userPos, p) > 50_000)
+    ? (() => { const m = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; }; return { lat: m(zonaAccesa.posti.map((p) => p.lat)), lng: m(zonaAccesa.posti.map((p) => p.lng)) }; })()
+    : userPos;
   const savedActiveCount = (activeTag !== null ? 1 : 0) + (activeCity !== null ? 1 : 0) + (savedNearestOn ? 1 : 0)
     + (aiSearch?.filtri != null ? countActive(filters) : 0);
 
@@ -1491,7 +1539,7 @@ export default function MapView({
       const supabase = await browserClient();
       const { data, error } = await supabase
         .from("saved_places")
-        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level)")
+        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level, business_status)")
         .eq("user_id", userId)
         // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
         .order("created_at", { ascending: true });
@@ -1507,12 +1555,12 @@ export default function MapView({
       const fetched = (data ?? [])
         .map((row): Place | null => {
           // google_place_id serve solo a costruire il ponte id Google -> UUID, poi si scarta.
-          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null }) | null;
+          const raw = row.places as unknown as (Place & { google_place_id?: string | null; price_level?: number | null; business_status?: string | null }) | null;
           if (!raw || raw.lat == null || raw.lng == null) return null;
-          const { google_place_id, price_level, ...place } = raw;
+          const { google_place_id, price_level, business_status, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
           // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
-          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, businessStatus: business_status ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
         })
         .filter((p): p is Place => p !== null);
 
@@ -1854,6 +1902,26 @@ export default function MapView({
   const quickOn = useBeta("filtri-lista");
   const mapPlaces =
     aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
+  // Revisore 4/11: accesi o spenti i filtri rapidi, la mappa si riadatta ai posti rimasti (prima con tre
+  // filtri restava in vista un solo segnalino su 4). Solo al cambio dei filtri, non a ogni disegno.
+  // Secondo revisore 4/11: si inquadra quando il carosello ha già il nuovo ordine (con "Più vicini" la prima card
+  // non è la prima della ricerca), tenendo sempre dentro la prima card.
+  const filtriChiave = [...quickFilters].sort().join(",");
+  const filtriVisti = useRef(filtriChiave);
+  const ordineChiave = carouselOrder.join(",");
+  const daInquadrare = useRef(false);
+  useEffect(() => {
+    if (filtriVisti.current === filtriChiave) return;
+    filtriVisti.current = filtriChiave;
+    daInquadrare.current = true;
+  }, [filtriChiave]);
+  useEffect(() => {
+    if (!daInquadrare.current) return;
+    daInquadrare.current = false;
+    const primo = mapPlaces.find((p) => p.id === carouselOrder[0]) ?? mapPlaces[0];
+    if (aiSearch !== null && primo) fitToPlaces(mapPlaces, 236, 0, [primo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- quando il carosello ha l'ordine nuovo dopo un filtro
+  }, [ordineChiave]);
 
   // Variante pin con foto (?pin=b, stile Places): solo per i locali che hanno già la foto nella
   // card (le prime 6 della lista B), con lo stesso indirizzo immagine → nessuna foto in più da pagare.
@@ -1867,9 +1935,11 @@ export default function MapView({
   // Dopo una ricerca i primi risultati (e il pin della card al centro) non finiscono mai
   // dentro un cerchio "2"/"3": prima i più adatti restavano nascosti mentre quelli spostati
   // in fondo (es. i locali di massa nelle ricerche "non turistiche") avevano il nome in vista.
+  // Mappa dei salvati (4/11): il posto della card a fuoco non finisce mai in un "2" (prima Hey Kids, prima card,
+  // stava dentro un gruppo a zoom di città).
   const topIds = aiSearch !== null && clusterPlaces === null
     ? [...(carouselOrder.length > 0 ? carouselOrder : mapPlaces.map((p) => p.id)).slice(0, TOP_PINS), ...(focusId ? [focusId] : [])]
-    : [];
+    : view === "saved" && clusterPlaces === null && focusId ? [focusId] : [];
   const topKey = topIds.join(",");
   const topPlaces = useMemo(() => {
     const ids = new Set(topKey ? topKey.split(",") : []);
@@ -2021,7 +2091,18 @@ export default function MapView({
     if (tuSeiQui) items.push(tuSeiQui);
     // Niente più tetto di 3 nomi (revisore del 2/11): ogni nome che non tocca altri nomi o segnalini resta,
     // nell'ordine della lista (selezionato, card al centro, poi la prima, la seconda…).
-    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h });
+    // Revisore 4/11 sera: in ricerca nessun nome sotto la riga dei filtri (in alto) né sotto la pillola
+    // "N dei tuoi salvati" (circa 52 px sopra le card); il nome si sposta di lato o si nasconde.
+    const vietate: Rect[] = [];
+    if (mappaSalvati && !isDesktop()) vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 128 });
+    // Testata sopra le card ("I tuoi posti · Roma", "Otto posti a Trastevere"): niente nomi lì sotto (terzo revisore 4/11 sera).
+    if ((mappaSalvati || inRicerca) && !isDesktop()) vietate.push({ x1: 0, y1: mapBox.h - 300, x2: mapBox.w, y2: mapBox.h });
+    if (inRicerca && !isDesktop()) {
+      vietate.push({ x1: 0, y1: 0, x2: mapBox.w, y2: 196 });
+      // La pillola sta subito sotto la parte libera della mappa (stessa misura di fitToPlaces): ~498–542 px su 844.
+      if (dalSalvatiVisti.length > 0) { const giu = mapBox.h - Math.min(Math.round(mapBox.h * 0.5), 358); vietate.push({ x1: 0, y1: giu - 4, x2: mapBox.w, y2: giu + 60 }); }
+    }
+    const lati = posizionaEtichette(items, viewState.zoom, { project: proietta, w: mapBox.w, h: mapBox.h, vietate });
     return { lati, scost };
   })();
 
@@ -2060,9 +2141,31 @@ export default function MapView({
   };
 
   // Porta il pin nella parte di mappa visibile sopra il carosello, solo se è fuori.
+  // Revisore 4/11 sera: in ricerca, sul telefono, un segnalino che cade sotto la barra in alto (campo, conteggio,
+  // filtri rapidi) non si disegna lì in mezzo ai pulsanti; torna appena la mappa si sposta.
+  // Stesso calcolo dei nomi (dallo stato della vista, non dalla mappa: durante il disegno la mappa può essere indietro).
+  const sottoLaBarra = (p: { lat: number; lng: number }, limite = 200) => {
+    if (isDesktop() || typeof window === "undefined" || !mapBox) return false;
+    const pad = (viewState as { padding?: { top: number; bottom: number } }).padding;
+    const centro = projectMercator(viewState.latitude, viewState.longitude, viewState.zoom);
+    const cy = pad ? pad.top + (mapBox.h - pad.top - pad.bottom) / 2 : mapBox.h / 2;
+    return projectMercator(p.lat, p.lng, viewState.zoom).y - centro.y + cy < limite;
+  };
+  // Revisore 4/11 sera (terzo): anche sulla mappa dei salvati (sotto campo e città, ~128 px) e, in entrambe, nella
+  // fascia della testata sopra le card ("I tuoi posti · Roma", "Otto posti a Trastevere") un segnalino non si disegna.
+  const nascostoDallaBarra = (place: Place) => {
+    if (focusId === place.id || selected?.id === place.id || !mapBox) return false;
+    if (aiSearch === null && !mappaSalvati) return false;
+    const dy = scostamenti[place.id]?.dy ?? 0;
+    if (sottoLaBarra(place, (aiSearch !== null ? 200 : 128) - dy)) return true;
+    return !sottoLaBarra(place, mapBox.h - 262 - dy) && !isDesktop();
+  };
   const panIntoView = (place: Place) => {
     const map = (mapRef.current as { getMap?: () => { project: (ll: [number, number]) => { x: number; y: number }; easeTo: (o: object) => void } } | null)?.getMap?.();
     if (!map || typeof window === "undefined") return;
+    // Secondo revisore 4/11: mentre la mappa si sta già inquadrando (filtri, ricerca) non la si sposta di nuovo:
+    // lo spostamento sulla card annullava l'inquadratura e la prima card finiva fuori schermo.
+    if ((map as unknown as { isMoving?: () => boolean }).isMoving?.()) return;
     const pt = map.project([place.lng, place.lat]);
     // Da computer la lista è a fianco, non sopra la mappa: basta che il pin sia nella mappa.
     if (isDesktop()) {
@@ -2072,8 +2175,39 @@ export default function MapView({
       return;
     }
     const { innerWidth: w, innerHeight: h } = window;
-    if (pt.x > 30 && pt.x < w - 30 && pt.y > 140 && pt.y < h * 0.5) return;
-    map.easeTo({ center: [place.lng, place.lat], offset: [0, -Math.round(h * 0.18)], duration: 500 });
+    // Revisore 5/11: con un risultato lontano (prima card a 7 km) l'inquadratura iniziale li tiene tutti e il
+    // quartiere cercato resta una miniatura. Passando a una card del gruppo fitto, la mappa si avvicina al
+    // gruppo; tornando sulla card lontana (fuori schermo) si torna all'inquadratura con tutti.
+    if (aiSearch !== null && clusterPlaces === null) {
+      const tutti = aiSearch.risultati;
+      const fitti = puntiDaInquadrare(tutti);
+      if (fitti.length < tutti.length) {
+        const nelGruppo = fitti.some((p) => p.id === place.id);
+        if (nelGruppo) {
+          const pts = fitti.map((p) => map.project([p.lng, p.lat]));
+          const largo = Math.max(...pts.map((q) => q.x)) - Math.min(...pts.map((q) => q.x));
+          const alto2 = Math.max(...pts.map((q) => q.y)) - Math.min(...pts.map((q) => q.y));
+          if (largo < 170 && alto2 < 150) { fitToPlaces(fitti, 236); return; }
+        } else if (!(pt.x > 30 && pt.x < w - 30 && pt.y > 236 && pt.y < h - 300)) {
+          fitToPlaces(tutti, 236, 0, [place]);
+          return;
+        }
+      }
+    }
+    // 224: sotto barra, pillola e riga dei filtri rapidi (revisore 4/11: a 140 un segnalino sotto i filtri contava "in vista").
+    // Fascia libera: sotto barra e pillole, sopra le card (~290 px con la barra in basso). Il segnalino va al
+    // centro della fascia, non in alto (terzo revisore 4/11: gli altri uscivano dallo schermo).
+    const alto = aiSearch !== null ? 236 : 190;
+    const basso = h - 300;
+    // 60 di lato (revisore 5/11): a 35 px dal bordo il segnalino restava attaccato e i vicini tagliati.
+    if (pt.x > 60 && pt.x < w - 60 && pt.y > alto && pt.y < basso) return;
+    // Dentro lo schermo ma vicino al bordo: si sposta solo di quanto serve, così gli altri segnalini restano in vista.
+    if (pt.x > 0 && pt.x < w && pt.y > alto && pt.y < basso) {
+      const dx = pt.x < 60 ? pt.x - 60 : pt.x - (w - 60);
+      (map as unknown as { panBy: (o: [number, number], a: object) => void }).panBy([Math.round(dx), 0], { duration: 400 });
+      return;
+    }
+    map.easeTo({ center: [place.lng, place.lat], offset: [0, Math.round((alto + basso) / 2 - h / 2)], duration: 500 });
   };
 
   // Sposta la mappa in modo che tutti i risultati siano visibili sopra la lista
@@ -2087,26 +2221,31 @@ export default function MapView({
   // `salvati`: mappa dei salvati (revisore del 2/11: Kiko Sushi Bar, il più a sud, restava fuori). I propri posti
   // si inquadrano tutti, nessuno è "lontanissimo"; margini di lato più larghi, così il nome sotto il segnalino
   // sul bordo resta nello schermo invece di finire sopra il segnalino vicino.
-  const fitToPlaces = (list: { lat: number; lng: number }[], top = 190, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false) => {
+  // top 224 (area 4c, 4/11): sotto barra, pillola "N posti" e riga dei filtri rapidi.
+  const fitToPlaces = (list: { lat: number; lng: number }[], top = 236, extraBottom = 0, sempre: { lat: number; lng: number }[] = [], salvati = false, zoomMax?: number) => {
     if (list.length === 0) return;
     const map = (mapRef.current as { getMap?: () => { fitBounds: (b: [[number, number], [number, number]], o: object) => void } } | null)?.getMap?.();
     if (!map || !mapReadyRef.current) { pendingFitRef.current = { list, top, extraBottom, sempre, salvati }; return; }
     pendingFitRef.current = null;
     // Un risultato lontanissimo dagli altri non allarga la mappa (revisore del 1/11, 05c: a tutta Roma).
-    const inquadrati = salvati ? list : [...puntiDaInquadrare(list), ...sempre];
+    // Revisore 4/11 sera: anche sui salvati "sempre" (la tua posizione) entra nell'inquadratura.
+    const inquadrati = salvati ? [...list, ...sempre] : [...puntiDaInquadrare(list), ...sempre];
     const lngs = inquadrati.map((p) => p.lng);
     const lats = inquadrati.map((p) => p.lat);
     const h = typeof window !== "undefined" ? window.innerHeight : 800;
     // Parte libera sopra le card: barra in basso (64) + margine (12) + card (~200) + frase sopra le card
     // (~52) + spazio per il nome sotto il segnalino (~30). Prima era metà schermo: con le card più basse
     // i segnalini restavano schiacciati in alto.
-    const bottom = Math.min(Math.round(h * 0.5), 358) + extraBottom;
+    // Revisore 4/11 sera: con la pillola "N dei tuoi salvati" sopra le card servono 60 px in più sotto,
+    // a ogni inquadratura (anche dopo un filtro), altrimenti la pillola copriva il nome della prima card.
+    const conPillola = !salvati && aiSearch !== null && dalSalvatiVisti.length > 0;
+    const bottom = Math.min(Math.round(h * 0.5), 358) + (conPillola ? Math.max(extraBottom, 60) : extraBottom);
     try {
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         // Da computer niente carosello né barra sopra la mappa: margini uguali su tutti i lati.
         // Più risultati vicini (pochi isolati): si avvicina di più (fino a 16), così i segnalini si separano.
-        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 40, right: salvati ? 64 : 40 }, maxZoom: inquadrati.length >= 3 ? 16 : 15, duration: 900 },
+        { padding: isDesktop() ? { top: 90, bottom: 60, left: 60, right: 60 } : { top, bottom, left: salvati ? 64 : 48, right: salvati ? 64 : 48 }, maxZoom: zoomMax ?? (inquadrati.length >= 3 ? 16 : 15), duration: 900 },
       );
     } catch {
       // mappa non pronta: si lascia la vista com'è
@@ -2117,7 +2256,23 @@ export default function MapView({
   // un solo gruppo). Si parte dalla zona dove sei (se hai salvati entro 30 km) o da quella con più salvati;
   // margine in alto sotto il campo e le zone.
   // Il carosello va sul primo posto della zona, così card e mappa parlano della stessa città.
-  const inquadraZona = (z: Zona<Place>) => { setZonaMappa(z.nome); if (z.posti[0]) setFocusedId(z.posti[0].id); fitToPlaces(z.posti, 170, 0, [], true); };
+  // La card a fuoco è la prima della zona nell'ordine della lista (le card ora sono solo di quella zona).
+  const inquadraZona = (z: Zona<Place>) => {
+    setZonaMappa(z.nome);
+    const ids = new Set(z.posti.map((p) => p.id));
+    let primo = (ordineLista ?? []).find((id) => ids.has(id)) ?? z.posti[0]?.id;
+    // Revisore 5/11: con "Più vicini" la card a fuoco è la più vicina a te o, se la città è un'altra, al suo centro
+    // (stesso ordine delle card).
+    if (savedNearest && userPos && z.posti.length > 0) {
+      const lontana = z.posti.every((p) => distanceMeters(userPos, p) > 50_000);
+      const m = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
+      const da = lontana ? { lat: m(z.posti.map((p) => p.lat)), lng: m(z.posti.map((p) => p.lng)) } : userPos;
+      const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
+      primo = [...z.posti].sort((a, b) => chiuso(a) - chiuso(b) || distanceMeters(da, a) - distanceMeters(da, b))[0].id;
+    }
+    if (primo) setFocusedId(primo);
+    fitToPlaces(z.posti, 170, 0, [], true);
+  };
   // Revisore 3/11 (quarto): la mappa segue l'ordine della lista (con "Vicino" la prima card è il più vicino)
   // e, con la posizione nota, inquadra i 5 posti più vicini insieme a te invece di tutta la città.
   // Revisore 3/11 (quinto): se il primo della lista è lontano (oltre 50 km, es. ordine "Recenti" con un
@@ -2133,9 +2288,14 @@ export default function MapView({
         const vicini = order!.map((id) => byId[id]).filter((p): p is Place => !!p)
           // Revisore 3/11 (settimo): i primi 5 vicini nell'ordine della lista (che ha già i 👎 in fondo),
           // così le card in vista sono quelle inquadrate.
-          .filter((p) => distanceMeters(userPos, p) < 50_000).slice(0, 5);
+          // Revisore 5/11: all'apertura si vedono tutti i salvati della tua città (come Places con una lista),
+          // non solo i 5 più vicini: con "Roma 12" se ne vedevano 8 e gli altri erano fuori schermo.
+          .filter((p) => distanceMeters(userPos, p) < 50_000);
         // Il primo della lista resta sempre dentro l'inquadratura.
         if (!vicini.some((p) => p.id === primo.id)) vicini.push(primo);
+        // La zona del primo resta accesa (4/11): prima nessuna pillola era accesa e le card erano di tutte le città.
+        const zonaPrimo = zoneDeiSalvati(displayedPlaces).find((z) => z.posti.some((p) => p.id === primo.id));
+        if (zonaPrimo) setZonaMappa(zonaPrimo.nome);
         fitToPlaces(vicini, 170, 0, [userPos], true);
         return;
       }
@@ -2336,7 +2496,13 @@ export default function MapView({
       // e cercando "a Milano" con la mappa su Roma ogni card diceva "479 km".
       const nearAt = places.filter((p) => distanceMeters(at, p) < 20_000).length;
       setSearchOrigin(userPos || nearAt >= places.length / 2 ? at : null);
-      fitToPlaces(places);
+      // Il primo risultato (la prima card) resta sempre in vista, anche se è lontano dagli altri (4/11:
+      // "Da Cesare al Casaletto" a 2,9 km era la card a fuoco senza segnalino sulla mappa).
+      // Lorenzo 5/11 ("prima la posizione dei cerchi, poi da soli li ha rimodificati"): un solo movimento. Lo spazio
+      // della pillola "N dei tuoi salvati" (arriva dopo) si tiene già qui, così non serve una seconda inquadratura.
+      // 94 = pillola (60) + nome sotto il segnalino (34): stessa misura del controllo "prima card coperta" più sotto,
+      // che altrimenti scattava quasi sempre e rifaceva l'inquadratura (terzo revisore 5/11).
+      fitToPlaces(places, 236, savedPlaces.length > 0 ? 94 : 0, places.slice(0, 1));
       void loadVerdicts(id, q, data.sintesi_pendente ?? null);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
@@ -2742,11 +2908,22 @@ export default function MapView({
     // viaggio un salvato sembrava in vista per poi uscire quando la mappa si fermava più vicina.
     const controlla = () => {
       if (searchSeq.current !== ticket) return;
+      // Revisore 4/11 sera: sotto i 236 px (non 190) il segnalino finiva tra i filtri rapidi.
       const fuori = vicini.some(({ place }) => {
         const pt = map.project([place.lng, place.lat]);
-        return pt.x < 30 || pt.x > w - 30 || pt.y < 190 || pt.y > h - Math.min(h * 0.5, 358) - 60;
+        return pt.x < 30 || pt.x > w - 30 || pt.y < 236 || pt.y > h - Math.min(h * 0.5, 358) - 60;
       });
-      if (fuori) fitToPlaces(risultati, 190, 60, vicini.map((d) => d.place));
+      // Revisore 4/11 sera: la pillola "N dei tuoi salvati" (~52 px sopra le card) copriva il nome della prima
+      // card quando stava in basso: si rifà l'inquadratura con 60 px in più sotto anche in quel caso.
+      const primo = risultati[0];
+      const primoCoperto = !!primo && (() => { const pt = map.project([primo.lng, primo.lat]); return pt.y > h - Math.min(h * 0.5, 358) - 60 - 34; })();
+      // Lorenzo 5/11: niente seconda inquadratura automatica (la mappa tornava indietro e ripartiva). Si
+      // riallarga solo se la prima card finirebbe coperta, cosa che con lo spazio tenuto sopra non succede;
+      // i salvati fuori vista restano nella pillola, che al tocco li mostra.
+      // Quarto revisore 5/11: niente seconda inquadratura per il solo spazio della pillola (restava una piccola mossa);
+      // resta solo quando un salvato scelto per questa ricerca è davvero fuori vista (collaudo 31/10), una volta.
+      void primoCoperto;
+      if (fuori) fitToPlaces(risultati, 236, 94, [...risultati.slice(0, 1), ...vicini.map((d) => d.place)]);
     };
     if (map.isMoving()) map.once("moveend", controlla);
     else controlla();
@@ -2961,7 +3138,7 @@ export default function MapView({
         {/* Seconda riga (Lorenzo 16/10: schermo più libero): UN solo accesso
             a tutti i suggerimenti ("Idee"), che si aprono in un pannello ordinato. A destra resta
             libero il posto del pulsante "La mia posizione". */}
-        <div className={`flex items-center gap-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
+        <div className={`flex flex-wrap items-center gap-x-2 gap-y-2 lg:pr-0 ${barOn ? "pr-14" : ""}`}>
           {/* Niente più "Esplora / I miei salvati" (Lorenzo 18/10, chi apre l'app la prima volta): era un
               doppione della barra in basso, dove "Salvati" e "Mappa" fanno la stessa cosa. */}
           {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && (
@@ -3079,7 +3256,7 @@ export default function MapView({
                       type="button"
                       data-testid="salvati-zona"
                       aria-pressed={on}
-                      onClick={() => inquadraZona(z)}
+                      onClick={() => { inquadraZona(z); setZonaScelta(z.nome); }}
                       className={`flex min-h-9 shrink-0 items-center gap-1 rounded-pill px-3 text-xs font-display font-semibold shadow-float active:scale-95 ${on ? "bg-brand text-white" : "bg-surface text-brand"}`}
                     >
                       {z.nome} <span className={on ? "text-white/75" : "text-text-muted"}>{z.posti.length}</span>
@@ -3096,7 +3273,7 @@ export default function MapView({
                     </button>
                   )}
                   {activeCity !== null && (
-                    <button type="button" onClick={() => { setActiveCity(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
+                    <button type="button" onClick={() => { setActiveCity(null); setZonaScelta(null); clearAiSearch(); setClusterPlaces(null); fitToPlaces(filterSaved(savedPlaces, activeTag, null, savedQuery), 150, 0, [], true); }} aria-label={`Togli ${activeCity}`} className={`shrink-0 ${CHIP_ACTIVE}`}>
                       📍 {activeCity} <X size={12} aria-hidden />
                     </button>
                   )}
@@ -3167,7 +3344,7 @@ export default function MapView({
                 {aiSearch !== null
                   ? "Prova con meno requisiti o scrivi un'altra zona (es. “a Trastevere”)."
                   : view === "saved" && savedFiltered
-                    ? "Cambia la ricerca o tocca “Tutti”"
+                    ? "Cambia la ricerca o spegni i filtri accesi"
                     : view === "saved"
                       ? "Salva i posti che scopri, da qualsiasi app: li ritrovi qui quando devi scegliere."
                       : "Sposta la mappa o cambia vista"}
@@ -3581,13 +3758,26 @@ export default function MapView({
                     (l) => (l.properties as { placeData: Place }).placeData,
                   );
                   if (places.length === 0) return;
+                  // Revisore 5/11: toccare un gruppo inquadra tutti i suoi posti in un colpo (come Google Maps e
+                  // Places), sotto le barre, e la card va sul primo di quei posti nell'ordine della lista. Solo se i
+                  // posti sono nello stesso punto (non si separano a nessuno zoom) resta la lista.
+                  const limite = mappaSalvati ? SALVATI_GRUPPI_FINO_A : 20;
+                  let zoom = limite + 1;
+                  try { zoom = clusterIndex.getClusterExpansionZoom(clusterId); } catch { /* lista */ }
+                  if (zoom <= Math.max(limite, 18)) {
+                    const ids = new Set(places.map((p) => p.id));
+                    const primo = carouselOrder.find((id) => ids.has(id));
+                    if (primo) setFocusedId(primo);
+                    fitToPlaces(places, aiSearch !== null ? 236 : 170, 0, [], true, Math.max(16, Math.min(18, zoom + 0.5)));
+                    return;
+                  }
                   setClusterPlaces(places);
                   dispatch({ type: "OPEN_LIST" });
                 }}
               >
                 <div
                   data-testid="pin-gruppo"
-                  className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-accent"
+                  className="flex items-center justify-center rounded-full bg-brand text-white font-display font-semibold cursor-pointer shadow-float border-2 border-white"
                   style={{
                     width: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
                     height: `${30 + (clusterProps.point_count / displayedPlaces.length) * 30}px`,
@@ -3607,7 +3797,8 @@ export default function MapView({
               latitude={place.lat}
               anchor="bottom"
               // Scostato di pochi pixel se coprirebbe un segnalino più importante (separaSegnalini).
-              offset={scostamentoDi(place.id)}
+              // Scostamento (separaSegnalini) sul disegno interno con una transizione: prima saltava di colpo
+              // quando arrivavano foto, nomi o pillole (Lorenzo 5/11: "movimento ferraginoso").
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 // Con il carosello aperto il primo tocco porta la card al centro,
@@ -3625,18 +3816,25 @@ export default function MapView({
             >
               {/* Chiuso ora: pin più chiaro (resta toccabile), come la scritta "Chiuso ora" sulla card. */}
               <div
-                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${aiSearch !== null && venueDetails[place.id]?.openNow === false && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""}`}
+                className={`relative flex cursor-pointer flex-col items-center transition-opacity ${nascostoDallaBarra(place) ? "pointer-events-none !opacity-0" : ""} ${((aiSearch !== null && venueDetails[place.id]?.openNow === false) || (mappaSalvati && (place.tags?.includes(OPINION_DISLIKE) || place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY"))) && focusId !== place.id && selected?.id !== place.id ? "opacity-60" : ""} ${mappaSalvati && place.businessStatus === "CLOSED_PERMANENTLY" ? "grayscale" /* revisori 5/11: chiuso per sempre in grigio, diverso da 👎 e da "chiuso per ora" */ : ""}`}
+                style={{ transform: `translate(${scostamentoDi(place.id)[0]}px, ${scostamentoDi(place.id)[1]}px)`, transition: "transform 260ms cubic-bezier(.2,.8,.2,1), opacity 150ms" }}
                 data-testid="pin"
+                data-sotto-barra={nascostoDallaBarra(place) ? "true" : undefined}
                 data-place={place.id}
                 data-focused={focusId === place.id ? "true" : undefined}
                 data-closed={aiSearch !== null && venueDetails[place.id]?.openNow === false ? "true" : undefined}
-                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? "stato" : "provare") : undefined}
+                data-chiuso={mappaSalvati && place.businessStatus === "CLOSED_PERMANENTLY" ? "true" : undefined}
+                data-stato={mappaSalvati ? (place.tags?.includes(VISIT_DONE) ? (place.tags?.includes(OPINION_DISLIKE) ? "no" : "stato") : "provare") : undefined}
               >
                 {/* Mappa dei salvati (revisore 3/11, area 3e): chi c'è stato ha la spunta teal sul segnalino,
                     "Da provare" resta il segnalino semplice. Si capisce lo stato senza aprire la card. */}
-                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (
-                  <span data-testid="pin-stato" aria-label="Ci sono stato" className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
-                )}
+                {/* Area 4a (4/11): chi c'è stato e non gli è piaciuto ha 👎 su fondo grigio e il segnalino più chiaro,
+                    come i "Chiuso ora" dei risultati: si vede che è lì, ma non chiama l'occhio come i 👍. */}
+                {mappaSalvati && place.tags?.includes(VISIT_DONE) && (place.tags?.includes(OPINION_DISLIKE) ? (
+                  <span data-testid="pin-stato" data-giudizio="no" aria-label="Ci sono stato, non fa per me" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-stone-600 text-white shadow-card"><ThumbsDown size={11} strokeWidth={2.5} aria-hidden /></span>
+                ) : (
+                  <span data-testid="pin-stato" aria-label={place.tags?.includes(OPINION_LIKE) ? "Ci sono stato, mi è piaciuto" : "Ci sono stato"} className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
+                ))}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
@@ -3697,7 +3895,8 @@ export default function MapView({
         {/* "Dai tuoi salvati" (minore del collaudo del 30/10): i salvati scelti per questa ricerca hanno il
             loro segnalino, così si vede dove sono rispetto ai risultati. Segnalibro pieno color brand (il corallo è
             "selezionato"), sotto i risultati; la mappa si allarga per mostrarli (effetto sopra il return). */}
-        {dalSalvatiVisti.map(({ place: p }) => (
+        {/* Un salvato sotto la barra in alto resta nella pillola "N dei tuoi salvati" (sottoLaBarra). */}
+        {dalSalvatiVisti.filter(({ place: p }) => !sottoLaBarra(p)).map(({ place: p }) => (
           <Marker
             key={`dai-salvati-${p.id}`}
             longitude={p.lng}
@@ -3756,7 +3955,7 @@ export default function MapView({
         )}
         {userPos && (
           // Sulla mappa dei salvati il pallino blu sta sopra i segnalini (revisore del 2/11: il segnalino scelto lo copriva).
-          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 120 : 0 }}>
+          <Marker longitude={userPos.lng} latitude={userPos.lat} anchor="center" style={{ zIndex: mappaSalvati ? 150 : 0 /* sopra anche il segnalino scelto (100): tutta la città in vista, revisore 5/11 */ }}>
             <span data-testid="tu-sei-qui" aria-label="Tu sei qui" className="relative flex h-5 w-5 items-center justify-center">
               <span className="absolute inset-0 animate-ping rounded-full bg-sky-500/40" />
               <span className="h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-float" />
@@ -3782,6 +3981,7 @@ export default function MapView({
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,
+                businessStatus: selected.businessStatus ?? null,
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
                   selectedReviews: null, synthesis: null, tags: null, verdict: null,
@@ -3803,13 +4003,14 @@ export default function MapView({
               onBookAlternative={(id, details) => { setPendingBooking({ placeId: id, details }); dispatch({ type: "OPEN_VENUE", placeId: id }); }}
               // Il foglio aperto da "Prenota lì" si apre una volta sola: tornando sul locale non si riapre.
               onBookingClosed={() => setPendingBooking(null)}
-              onAltriCome={piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
+              onSimiliChiuso={selected.businessStatus === "CLOSED_PERMANENTLY" ? () => altriCome(selected) : undefined}
+              onAltriCome={selected.businessStatus !== "CLOSED_PERMANENTLY" && piaciuto(savedPlaces.find((sp) => sp.id === resolveUuid(selected.id))?.tags) ? () => altriCome(selected) : undefined}
               // "‹ 2 di 8 ›": si passa al risultato vicino senza tornare alla lista (stesso ordine del carosello).
               // Sta nella barra azioni della scheda (revisore del 2/11, D28), non più sopra la scheda.
               nav={navScheda}
               onNavPrev={() => vaiRisultato(-1)}
               onNavNext={() => vaiRisultato(1)}
-              rankSlot={userId && resolveUuid(selected.id) ? (
+              rankSlot={userId && resolveUuid(selected.id) && selected.businessStatus !== "CLOSED_PERMANENTLY" ? (
                 <ClassificaScheda userId={userId} place={{ id: resolveUuid(selected.id)!, name: selected.name, category: selected.category, address: selected.address, lat: selected.lat, lng: selected.lng }} />
               ) : null}
               // Id UUID = locale già nel database (es. salvati ancora in caricamento): niente salvataggio
@@ -3983,18 +4184,15 @@ export default function MapView({
         <SalvatiLista
           userId={userId}
           all={savedPlaces}
-          shown={displayedPlaces}
           activeTag={activeTag}
           onTag={pickTag}
-          activeCity={activeCity}
-          onClearCity={() => setActiveCity(null)}
+          zona={zonaScelta}
+          onZona={(z) => { setZonaScelta(z); setActiveCity(null); }}
           query={savedQuery}
           onQuery={setSavedQuery}
           origin={userPos}
           locating={geoState === "loading"}
           onLocate={goToMyPosition}
-          filtersOn={activeCity !== null ? 1 : 0}
-          onFilters={() => setSavedSheetOpen(true)}
           verdicts={venueDetails}
           hideOnDesktop={venueOpen}
           onMap={apriMappaSalvati}
@@ -4015,21 +4213,21 @@ export default function MapView({
           // Nei salvati: il verdetto già in cache (place_synthesis), letto all'avvio senza costi.
           details={aiSearch !== null || view === "saved" ? venueDetails : undefined}
           savedMode={view === "saved" && aiSearch === null}
-          showCity={view === "saved" && aiSearch === null && activeCity === null}
+          showCity={view === "saved" && aiSearch === null && activeCity === null && !zonaAccesa}
           loadingVerdicts={aiSearch !== null && loadingVerdicts}
           variant={listVariant}
           pillSlot={listNew && listVariant === "b" ? pillSlot : null}
           simileA={aiSearch !== null && view === "all" ? aiSearch.simileA ?? null : null}
           // Nei salvati "Più vicini" ha senso solo dalla posizione vera, non dal punto dell'ultima ricerca.
-          origin={view === "saved" ? userPos : userPos ?? searchOrigin}
+          origin={view === "saved" ? origineSalvati : userPos ?? searchOrigin}
           distanceOrigin={userPos}
           // Nei salvati l'ordine si sceglie nel foglio "Filtri" (niente riga di chip in più).
-          nearest={view === "saved" && aiSearch === null ? savedNearestOn && !ordineListaOn : undefined}
+          nearest={view === "saved" && aiSearch === null ? savedNearestOn && (!ordineListaOn || origineSalvati !== userPos) : undefined}
           quick={quickFilters}
           title={aiSearch !== null && view === "all" ? (aiSearch.simileA ? `Altri come ${aiSearch.simileA}` : aiSearch.query ?? null) : null}
           shareQuery={aiSearch?.simileA ? aiSearch.query ?? null : null}
           heading={view === "saved" && aiSearch === null
-            ? `I tuoi posti${activeCity ? ` · ${activeCity}` : ""}`
+            ? `I tuoi posti${activeCity ? ` · ${activeCity}` : zonaAccesa ? ` · ${zonaAccesa.nome}` : ""}`
             : aiSearch !== null && aiSearch.query == null && countActive(filters) > 0 ? `Filtri: ${filtersSummary(filters)}` : null}
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
@@ -4061,11 +4259,10 @@ export default function MapView({
           onOpenArticle={articleOn && aiSearch !== null && view === "all" && clusterPlaces === null ? () => setArticleOpen(true) : undefined}
           isSaved={isPlaceSaved}
           // "Altri come questo": il titolo dice già "come chi"; sulle card restano i ✓ con la prova.
-          similarTo={aiSearch !== null && view === "all" && !aiSearch.simileA && savedPlaces.length > 0 ? (id) => {
-            if (isPlaceSaved(id)) return null;
-            const place = displayedPlaces.find((p) => p.id === id);
-            return place ? similarSaved(place, savedPlaces) : null;
-          } : undefined}
+          similarTo={aiSearch !== null && view === "all" && !aiSearch.simileA && savedPlaces.length > 0 ? (() => {
+            const simili = similiInLista(displayedPlaces.filter((p) => !isPlaceSaved(p.id)), savedPlaces);
+            return (id: string) => simili.get(id) ?? null;
+          })() : undefined}
           savedLabel={(id) => {
             const uuid = resolveUuid(id);
             const tags = uuid ? savedPlaces.find((p) => p.id === uuid)?.tags : null;
@@ -4078,6 +4275,7 @@ export default function MapView({
           // Da computer: il mouse su una card accende il suo pin, senza spostare la mappa.
           onHover={(place) => setFocusedId(place.id)}
           shareAt={searchOrigin ?? { lat: viewState.latitude, lng: viewState.longitude }}
+          onNearestToggle={() => { daInquadrare.current = true; }}
           onToggleQuick={(f) => setQuickFilters((prev) => {
             const next = new Set(prev);
             if (next.has(f)) next.delete(f);
@@ -4146,7 +4344,7 @@ export default function MapView({
                         aria-pressed={activeCity === city}
                         onClick={() => {
                           const next = activeCity === city ? null : city;
-                          setActiveCity(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
+                          setActiveCity(next); setZonaScelta(next); clearAiSearch(); setClusterPlaces(null); setFilterError(null);
                           fitToPlaces(filterSaved(savedPlaces, activeTag, next, savedQuery), 150, 0, [], true);
                         }}
                         className={sheetChip(activeCity === city)}
@@ -4211,7 +4409,7 @@ export default function MapView({
               <div className="mt-4 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { setActiveTag(null); setActiveCity(null); setSavedQuery(""); setSavedNearest(false); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
+                  onClick={() => { setActiveTag(null); setActiveCity(null); setZonaScelta(null); setSavedQuery(""); setSavedNearest(false); clearAiSearch(); setClusterPlaces(null); setFilterError(null); }}
                   className="min-h-11 rounded-btn border border-border px-4 text-sm font-display font-semibold text-text"
                 >
                   Azzera filtri

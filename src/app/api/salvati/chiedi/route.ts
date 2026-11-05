@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const domanda = pulisciDomanda(body?.domanda);
   const daRicerca = body?.da === "ricerca";
+  // Proposta 44 (4/11): "Chiedi a questa raccolta" — solo i salvati con quel tag (mai uno stato).
+  const raccolta = typeof body?.raccolta === "string" && body.raccolta.trim() && body.raccolta.length <= 60 && !isStateTag(body.raccolta.trim()) ? body.raccolta.trim() : null;
   if (!domanda) return NextResponse.json({ error: "Scrivi cosa cerchi." }, { status: 400 });
 
   const supabase = await createClient();
@@ -34,10 +36,12 @@ export async function POST(request: Request) {
   const userId = user?.id ?? devUser;
   if (!userId) return NextResponse.json({ error: "Accedi per chiedere ai tuoi posti." }, { status: 401 });
 
-  const { data, error } = await supabase
+  let lettura = supabase
     .from("saved_places")
     .select("tags, note, places (id, name, category, address, google_place_id)")
-    .eq("user_id", userId)
+    .eq("user_id", userId);
+  if (raccolta) lettura = lettura.contains("tags", [raccolta]);
+  const { data, error } = await lettura
     .order("created_at", { ascending: false })
     .limit(MAX_POSTI);
   if (error) {
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
     const { input_tokens, output_tokens } = message.usage;
     const text = message.content.map((c) => (c.type === "text" ? c.text : "")).join("");
     const scelti = parseScelte(text, posti);
-    console.log(`[chiedi-salvati]${daRicerca ? " da=ricerca" : ""} posti=${posti.length} scelti=${scelti.length} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
+    console.log(`[chiedi-salvati]${daRicerca ? " da=ricerca" : ""}${raccolta ? " raccolta=si" : ""} posti=${posti.length} scelti=${scelti.length} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
     return NextResponse.json({ scelti });
   } catch (err) {
     console.error("[chiedi-salvati] chiamata Haiku fallita:", err);

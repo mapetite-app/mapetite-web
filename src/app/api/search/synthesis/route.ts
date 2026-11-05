@@ -55,7 +55,9 @@ export async function POST(request: Request) {
   let sintesi: Awaited<ReturnType<typeof getSynthesis>> = {};
   try {
     const prove = Object.fromEntries(places.filter((p) => p.prove?.length).map((p) => [p.id, p.prove!]));
+    const tS = Date.now();
     sintesi = await getSynthesis(stubs, query.trim(), user?.id ?? null, { prove });
+    console.log(`[search-tempi] ${JSON.stringify({ q: query.trim().slice(0, 60), fase: "verdetti", locali: stubs.length, ms: Date.now() - tS })}`);
   } catch (err) {
     console.error("[search/synthesis] errore Haiku:", err);
   }

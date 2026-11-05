@@ -213,3 +213,10 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **DAVVERO, in futuro:** stato del locale (aperto, chiuso per sempre, chiuso temporaneamente) sul segnalino e sulla riga, letto da Google solo quando il posto passa già da Google (proposta 45).
 - **Primo passo:** contare quanti salvati hanno già uno stato di chiusura nei dati Google letti finora (team).
 
+## 20. Recensioni false e "review bombing": il voto su Google non è affidabile — 5/11 notte
+- **Chi lo ha:** entrambi. Il cliente sceglie in base a un voto che può essere gonfiato o affossato; il ristoratore subisce ondate di 1 stella, a volte seguite da richieste di denaro per toglierle.
+- **Quanto pesa:** la Legge 34/2026 (in vigore dal 7/4/2026) introduce norme contro le false recensioni nella ristorazione, ma a fine luglio 2026 le linee guida AGCM non erano ancora pubblicate e i casi continuano ([BusinessOnline](https://www.businessonline.it/news/nuova-legge-contro-false-recensioni-esiste-da-aprile-ma-continuano-caso-ristorante-di-asolo-mostra-come-ancora-rovinare-attivit_n86093.html)); in Sardegna recensioni negative false seguite da richieste di pagamento ([Unione Sarda](https://www.unionesarda.it/lunione-in-edicola/false-recensioni-ristorante-ricattato-pe76avsk)); Fipe Sud Sardegna: il 90% dei ristoratori di Cagliari se ne lamenta ([YouTG](https://www.youtg.net/primo-piano/62945-troppe-recensioni-fake-online-una-minaccia-per-il-90-dei-locali-di-cagliari)). Quanto siano diffuse a Roma e Milano: dato non trovato.
+- **OGGI nell'app:** l'ordine non premia chi ha più recensioni (posti di massa più in basso, `mainstream.ts`) e il pavimento qualità è volutamente basso (3,5); il verdetto si basa sul testo delle recensioni, non solo sul voto.
+- **DAVVERO, in futuro:** ordine sempre più basato sui comportamenti di chi usa Mapetite (salvati, "ci sono stato", 👍/👎), che non si comprano; dire all'utente perché un posto è in cima (proposta 46).
+- **Primo passo:** contare nei log `[search-mainstream]` quante ricerche spostano posti di massa, per sapere quanto spesso il voto Google da solo avrebbe deciso (team).
+

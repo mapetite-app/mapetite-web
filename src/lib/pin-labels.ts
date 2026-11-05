@@ -102,13 +102,16 @@ export function labelRect(it: MapItem, x: number, y: number, side: LabelSide): R
 export function posizionaEtichette(
   items: MapItem[],
   zoom: number,
-  schermo?: { project: (lat: number, lng: number) => { x: number; y: number }; w: number; h: number },
+  schermo?: { project: (lat: number, lng: number) => { x: number; y: number }; w: number; h: number; vietate?: Rect[] },
 ): Record<string, LabelSide> {
   const pts = items.map((it) => {
     const q = schermo ? schermo.project(it.lat, it.lng) : project(it.lat, it.lng, zoom);
     return { x: q.x + (it.dx ?? 0), y: q.y + (it.dy ?? 0) };
   });
-  const fuori = (r: Rect) => !!schermo && (r.x1 - SLACK < 0 || r.x2 + SLACK > schermo.w || r.y1 < 0 || r.y2 > schermo.h);
+  // Zone vietate (revisore 4/11 sera): la riga dei filtri in alto e la pillola "dai tuoi salvati" sopra le card.
+  // Un nome lì sotto non si legge e sembra parte dei filtri: conta come fuori dallo schermo.
+  const inVietata = (r: Rect) => !!schermo?.vietate?.some((v) => r.x1 < v.x2 && r.x2 > v.x1 && r.y1 < v.y2 && r.y2 > v.y1);
+  const fuori = (r: Rect) => !!schermo && (r.x1 - SLACK < 0 || r.x2 + SLACK > schermo.w || r.y1 < 0 || r.y2 > schermo.h || inVietata(r));
   const icons = items.map((it, i) => iconRect(it, pts[i].x, pts[i].y));
   const placed: Rect[] = [];
   const out: Record<string, LabelSide> = {};
@@ -129,9 +132,16 @@ export function posizionaEtichette(
     if (!it.label) return;
     if (!it.fixed && coperto(i)) return;
     const { x, y } = pts[i];
+    // Revisore 5/11: un segnalino fuori dallo schermo non lascia il suo nome sulla mappa (spostato di lato
+    // sembrava di un altro).
+    if (schermo && !it.fixed && (x < 0 || x > schermo.w || y < 0 || y > schermo.h)) return;
     let best: { side: LabelSide; rect: Rect; n: number } | null = null;
     const opposto: LabelSide | null = it.lato === "destra" ? "sinistra" : it.lato === "sinistra" ? "destra" : it.lato === "sotto" ? "sopra" : it.lato === "sopra" ? "sotto" : null;
-    const prova = it.lato ? (fuori(labelRect(it, x, y, it.lato)) && opposto ? [opposto] : [it.lato]) : sides;
+    // Revisore 5/11: sui salvati solo 2 nomi su 10 (il nome poteva stare solo a destra). Un nome non fisso
+    // che a destra tocca qualcosa prova anche a sinistra, sempre in orizzontale come Places.
+    const prova = it.lato
+      ? fuori(labelRect(it, x, y, it.lato)) && opposto ? [opposto] : !it.fixed && opposto ? [it.lato, opposto] : [it.lato]
+      : sides;
     for (const side of prova) {
       const rect = labelRect(it, x, y, side);
       const n = urti(rect, i) + (fuori(rect) ? 10_000 : 0);

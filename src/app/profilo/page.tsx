@@ -22,6 +22,8 @@ import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
+import ProfiloAmati from "@/components/profilo-amati";
+import { amatiValidi } from "@/lib/tipi-locale";
 import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES } from "@/lib/preferences";
 import { pulisciMappa, SCOPERTE, tipoDa } from "@/lib/mappa-gusto";
 
@@ -218,6 +220,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     }
   }
   const pillole = pilloleGusto(gustoRow);
+  // "I miei gusti" (5/11): i tipi di locale scelti dal catalogo ampio, dentro profiles.gusto.
+  const amati = amatiValidi(pulisciMappa(gustoRow?.gusto, () => true).amati);
   const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
@@ -275,7 +279,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
   return (
     // Fondo carta come Salvati e Importa (revisore 1/11, terzo giro): stesso foglio in tutte le schermate.
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-8 pt-6">
       {/* Profilo corto (giro 1/11, correzione 10): in vista solo chi sei, i tre numeri e "Le mie cose".
           Tutto il resto sta in "Impostazioni" in fondo, chiusa. Una sola "Impostazioni" (revisore, 1/11):
@@ -299,7 +303,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
               >
                 <span className="font-semibold text-text">{c.value}</span>
                 <span className="lowercase">{c.label}</span>
-                {i < counters.length - 1 && <span aria-hidden className="pl-1 text-[#c9c2b6]">·</span>}
+                {i < counters.length - 1 && <span aria-hidden className="pl-1 text-[#c3cbcb]">·</span>}
               </Link>
             ))}
           </nav>
@@ -308,7 +312,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
       {/* Il tuo gusto (revisore 2/11, sesto giro): il blocco principale del profilo. Fino a 4 pillole vere dal
           profilo; "Modifica" apre la mappa del gusto, "Condividi" la carta. Niente link doppione sotto. */}
-      <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mb-6 rounded-card border border-[#e8e2d8] bg-white px-4 pb-4 pt-2 shadow-card">
+      <section data-testid="profilo-gusto" aria-labelledby="gusto-titolo" className="mb-6 rounded-card border border-[#e3e7e7] bg-white px-4 pb-4 pt-2 shadow-card">
         <div className="flex items-center gap-1">
           <h2 id="gusto-titolo" className="min-w-0 flex-1 font-title text-[22px] leading-tight text-text">Il tuo gusto</h2>
           {!senzaGusto && (
@@ -334,7 +338,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         ) : pillole.length > 0 ? (
           <ul aria-label="I tuoi gusti" className="mt-1 flex flex-wrap gap-2">
             {pillole.map((x) => (
-              <li key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-[#f3efe8] px-3.5 text-[14px] font-medium text-[#33373d]">
+              <li key={x.testo} data-testid="profilo-gusto-pillola" className="inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-[#f0f2f2] px-3.5 text-[14px] font-medium text-[#33373d]">
                 {x.emoji && <span aria-hidden>{x.emoji}</span>}
                 {x.testo}
               </li>
@@ -342,8 +346,12 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           </ul>
         ) : (
           // Mappa fatta ma senza scelte leggibili: una frase sola, il gesto è "Modifica" sulla riga del titolo.
-          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">Nessuna preferenza scelta: tocca Modifica per aggiungerle.</p>
+          // Con "I miei gusti" già scelti (riquadro sotto) non si dice "nessuna preferenza": si contraddiceva.
+          <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">{amati.length ? "Zone, occasioni e spesa: tocca Modifica per aggiungerle." : "Nessuna preferenza scelta: tocca Modifica per aggiungerle."}</p>
         )}
+        {/* I miei gusti (Lorenzo, 5/11): tutti i tipi di locale che piacciono, con lo stesso selettore del primo
+            accesso, dentro lo stesso riquadro (revisore 5/11: due riquadri quasi omonimi confondevano). */}
+        <ProfiloAmati iniziali={amati} />
       </section>
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}

@@ -86,7 +86,7 @@ export default function SalvatiBrevi({
   return (
     <section data-testid={testid} aria-label={titolo} className={className}>
       <p className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{titolo}</p>
-      <ul className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
+      <ul className="mt-2 flex flex-col divide-y divide-[#e3e7e7] overflow-hidden rounded-card border border-[#e3e7e7] bg-white">
         {scelte.map((r) => {
           const tipo = categoryLabel(r.category, r.name);
           const citta = cityFromAddress(r.address);
@@ -100,7 +100,7 @@ export default function SalvatiBrevi({
                 data-testid={`${testid}-riga`}
                 className="flex min-h-14 w-full items-start gap-3 px-4 py-3 text-left active:bg-brand-light"
               >
-                <span aria-hidden className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-lg">
+                <span aria-hidden className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f2] text-lg">
                   {getCategoryEmoji(r.category, r.name)}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -109,7 +109,7 @@ export default function SalvatiBrevi({
                       riga per non allungare il riquadro, che nell'assistente deve stare tutto sopra il campo. */}
                   <span className="mt-0.5 flex min-w-0 items-center gap-2">
                     {meta && <span className="min-w-0 truncate text-[13px] text-text-muted">{meta}</span>}
-                    <span data-testid={`${testid}-stato`} className={`inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold ${r.fatto ? "bg-[#e3eded] text-brand" : "bg-[#f1efeb] font-medium text-[#6b7075]"}`}>
+                    <span data-testid={`${testid}-stato`} className={`inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold ${r.fatto ? "bg-[#e3eded] text-brand" : "bg-[#f0f2f2] font-medium text-[#6b7075]"}`}>
                       {r.fatto ? <Check size={12} strokeWidth={3} aria-hidden /> : <span aria-hidden className="text-[10px] leading-none">📌</span>}
                       {r.fatto ? "Ci sono stato" : "Da provare"}
                     </span>

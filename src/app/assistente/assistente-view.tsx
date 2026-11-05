@@ -669,11 +669,11 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   return (
     // Fondo carta come Salvati (revisore 1/11, terzo giro). Un solo titolo: niente barra "Assistente
     // Mapetite" sopra il benvenuto; in alto a destra restano solo la mappa e, in conversazione, "Nuova".
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-[#f8f6f2] md:min-h-[calc(100dvh-3.5rem)]">
-      <header data-testid="assistente-barra" className={`sticky top-0 z-20 flex items-center justify-end gap-2 px-4 pt-2 md:top-14 ${c.msgs.length > 0 ? "bg-[#f8f6f2]/95 pb-2 backdrop-blur" : ""}`}>
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--nav-height-mobile)-var(--nav-sporgenza))] max-w-lg flex-col bg-[#f6f7f7] md:min-h-[calc(100dvh-3.5rem)]">
+      <header data-testid="assistente-barra" className={`sticky top-0 z-20 flex items-center justify-end gap-2 px-4 pt-2 md:top-14 ${c.msgs.length > 0 ? "bg-[#f6f7f7]/95 pb-2 backdrop-blur" : ""}`}>
         {c.msgs.length > 0 && <h1 className="sr-only">Assistente</h1>}
         <div className="flex items-center gap-1">
-          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-brand"><MapIcon size={18} /></Link>
+          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#d6dcdc] text-brand"><MapIcon size={18} /></Link>
           {c.msgs.length > 0 && (
             <button
               type="button"
@@ -697,7 +697,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               Scrivi o detta come lo diresti a un amico. Trovo i posti giusti per te, non i più famosi.
             </p>
             <p className="mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Prova a chiedere</p>
-            <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e8e2d8] overflow-hidden rounded-card border border-[#e8e2d8] bg-white">
+            <ul data-testid="assistente-esempi" className="mt-2 flex flex-col divide-y divide-[#e3e7e7] overflow-hidden rounded-card border border-[#e3e7e7] bg-white">
               {EXAMPLES.map((e) => (
                 <li key={e.text}>
                   <button
@@ -706,7 +706,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
                     onClick={() => submit(e.text)}
                     className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left text-[15px] font-sans leading-snug text-text active:bg-brand-light"
                   >
-                    <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-lg">{e.emoji}</span>
+                    <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f2] text-lg">{e.emoji}</span>
                     <span className="min-w-0 flex-1">“{e.text}”</span>
                     <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />
                   </button>
@@ -908,10 +908,10 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       {/* Campo in basso, sopra la barra di navigazione: scrivi o detta. */}
       <form
         onSubmit={(e) => { e.preventDefault(); submit(input); }}
-        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-[#e8e2d8] bg-[#f8f6f2]/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
+        className="fixed inset-x-0 bottom-[var(--nav-height-mobile)] z-30 border-t border-[#e3e7e7] bg-[#f6f7f7]/95 px-3 pt-2 pb-[calc(0.5rem+var(--nav-sporgenza))] backdrop-blur"
       >
         {voiceError && <p role="status" className="mx-auto mb-1 max-w-lg px-1 text-xs font-sans text-error">{voiceError}</p>}
-        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-[#e3ddd2] bg-white py-1 pl-4 pr-1 shadow-card">
+        <div className="mx-auto flex max-w-lg items-center gap-1.5 rounded-pill border border-[#e1e5e5] bg-white py-1 pl-4 pr-1 shadow-card">
           <input
             data-testid="assistente-campo"
             value={input}

@@ -35,7 +35,7 @@ export const ACTION_TILE =
 // Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
 // fondo carta caldo come la home nuova.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-const PAPER = "bg-[#f8f6f2]";
+const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
 type SchedaTab = "panoramica" | "recensioni" | "info";
@@ -75,6 +75,8 @@ export type Venue = {
   requisiti?: { r: string; prova: string }[] | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
   editorialSummary?: string | null;
+  // Proposta 45: stato da Google ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"), solo se noto.
+  businessStatus?: string | null;
 };
 
 type VenueSheetProps = {
@@ -106,6 +108,8 @@ type VenueSheetProps = {
   onBookingClosed?: () => void;
   // "Altri come questo" (proposta 27): solo per i salvati con 👍 o "Ci sono stato" (e non 👎).
   onAltriCome?: () => void;
+  // Proposta 45: dalla scheda di un posto che ha chiuso, la stessa ricerca di "Altri come questo".
+  onSimiliChiuso?: () => void;
   // "‹ 2 di 8 ›" tra i risultati (revisore del 2/11, D28: la pillola galleggiava sopra la scheda): sta dentro
   // la barra azioni in basso, la scheda prende tutto lo spazio.
   nav?: { pos: number; total: number } | null;
@@ -156,6 +160,7 @@ export default function VenueSheet({
   autoBook = false,
   onBookingClosed,
   onAltriCome,
+  onSimiliChiuso,
   nav = null,
   onNavPrev,
   onNavNext,
@@ -423,7 +428,7 @@ export default function VenueSheet({
   // "Da provare / Ci sono stato" stanno già nella riga delle azioni (scheda B).
   // senzaFiletto: subito sotto il verdetto, che ha già il suo filetto (collaudo 22/10: doppio filetto nei salvati).
   const personalBlock = (withStatus: boolean, editorial = false, senzaFiletto = false) => (
-    <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e3ddd2] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
+    <div data-testid="tue-note" className={editorial ? `mx-[22px] ${senzaFiletto ? "mt-3.5" : "mt-4 border-t border-[#e1e5e5] pt-3.5"}` : "mx-5 mt-4 rounded-card border-2 border-accent/30 bg-surface p-4"}>
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
@@ -482,7 +487,7 @@ export default function VenueSheet({
             )}
             {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
                 dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}
-            {personalTags?.includes("Mi è piaciuto") && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (
+            {personalTags?.includes("Mi è piaciuto") && venue.businessStatus !== "CLOSED_PERMANENTLY" && googlePlaceId && !/^[0-9a-f-]{36}$/i.test(googlePlaceId) && (userRatingCount == null || userRatingCount < 300) && (
               <a
                 data-testid="recensione-google"
                 href={`https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`}
@@ -750,6 +755,18 @@ export default function VenueSheet({
             )}
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {(venue.businessStatus === "CLOSED_PERMANENTLY" || venue.businessStatus === "CLOSED_TEMPORARILY") && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p data-testid="scheda-chiuso" className="inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
+                {venue.businessStatus === "CLOSED_PERMANENTLY" ? "Secondo Google ha chiuso" : "Secondo Google è chiuso per ora"}
+              </p>
+              {venue.businessStatus === "CLOSED_PERMANENTLY" && onSimiliChiuso && (
+                <button type="button" data-testid="scheda-simili-chiuso" onClick={onSimiliChiuso} className="min-h-[32px] rounded-pill border border-black/10 bg-white px-3 text-[12.5px] font-semibold font-sans text-brand active:bg-black/[0.04]">
+                  Simili qui vicino ›
+                </button>
+              )}
+            </div>
+          )}
           {/* UNA riga: "● Aperto ora · 650 m · fino alle 01:00" (orari Google se ci sono, mai inventati). */}
           {(aperto != null || distance || rating != null) && (
             <p data-testid="scheda-fatti" className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] font-sans text-[#4b5058]">
@@ -803,7 +820,7 @@ export default function VenueSheet({
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
               Se manca: "lo sto scrivendo" mentre arriva, altrimenti la frase di Google dichiarata come tale. */}
           {headline != null ? (
-            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-box" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p data-testid="verdetto-scheda" className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -811,7 +828,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 text-[20px] italic leading-[1.24] tracking-[-0.005em] text-[#141414] min-[380px]:text-[22px]`}>{headline}</p>
             </section>
           ) : verdettoInArrivo ? (
-            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               <p className="flex items-center gap-1.5 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand">
                 <Sparkles size={12} className="shrink-0 text-accent" aria-hidden />
                 Il verdetto Mapetite
@@ -819,7 +836,7 @@ export default function VenueSheet({
               <p className={`${SERIF} mt-2 animate-pulse text-[20px] italic leading-[1.24] text-text-muted`}>Lo sto scrivendo dalle recensioni…</p>
             </section>
           ) : googleLine ? (
-            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#1c1c1e] border-b-[#e3ddd2] pb-4 pt-3.5">
+            <section data-testid="verdetto-google" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">
               {/* Non è il verdetto: testo normale, più piccolo e grigio, dichiarato "Da Google" (collaudo del 22/10:
                   in corsivo grande si confondeva con il verdetto Mapetite). */}
               <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">{googleLabel}</p>
@@ -851,7 +868,7 @@ export default function VenueSheet({
                     type="button"
                     aria-expanded={provaAperta === r}
                     onClick={() => setProvaAperta((x) => (x === r ? null : r))}
-                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e3ddd2] bg-white text-brand"}`}
+                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border px-3.5 text-[13.5px] font-display font-semibold active:scale-95 ${provaAperta === r ? "border-brand bg-brand text-white" : "border-[#e1e5e5] bg-white text-brand"}`}
                   >
                     <span aria-hidden className={provaAperta === r ? "text-white" : "text-success"}>✓</span>
                     {r}
@@ -900,7 +917,7 @@ export default function VenueSheet({
           aria-expanded={detailsOpen}
           aria-controls={`scheda-dettagli-${venue.id}`}
           onClick={openDetails}
-          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e3ddd2]"}`}
+          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e1e5e5]"}`}
         >
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
@@ -939,7 +956,7 @@ export default function VenueSheet({
 
         <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
           {/* Tre sezioni brevi: Info · Recensioni · In breve. */}
-          <div role="tablist" aria-label="Sezioni della scheda" className="mx-[22px] mt-1 flex border-b border-[#e3ddd2]" data-testid="scheda-tabs">
+          <div role="tablist" aria-label="Sezioni della scheda" className="mx-[22px] mt-1 flex border-b border-[#e1e5e5]" data-testid="scheda-tabs">
             {tabs.map(([id, label]) => (
               <button
                 key={id}
@@ -1143,7 +1160,9 @@ export default function VenueSheet({
               target="_blank"
               rel="noopener noreferrer"
               aria-label={walk != null ? `Indicazioni: ${walk} min a piedi` : "Indicazioni"}
-              className={TILE}
+              // Revisore 4/11 sera: niente percorso verso un posto che ha chiuso per sempre.
+              className={`${TILE} ${venue.businessStatus === "CLOSED_PERMANENTLY" ? "hidden" : ""}`}
+              data-testid="scheda-percorso"
             >
               {walk != null ? <Footprints size={17} aria-hidden className="shrink-0" /> : <Navigation size={17} aria-hidden className="shrink-0" />}
               <span className="whitespace-nowrap">{walk != null ? `${walk} min` : "Percorso"}</span>

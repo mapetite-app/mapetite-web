@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 // numero sta accanto al nome ("Raccolte 2", come le pillole dei Salvati), non piccolo in alto a destra.
 export const GRIGLIA_CLASS = "grid grid-cols-2 gap-2 [&>:last-child:nth-child(odd)]:col-span-2";
 export const TILE_CLASS =
-  "flex h-[68px] min-w-0 items-center gap-2.5 overflow-hidden rounded-card border border-[#e8e2d8] bg-white px-3 active:scale-[0.97] transition-transform duration-150";
+  "flex h-[68px] min-w-0 items-center gap-2.5 overflow-hidden rounded-card border border-[#e3e7e7] bg-white px-3 active:scale-[0.97] transition-transform duration-150";
 
 // Revisore 1/11 (terzo giro): una tessera vuota non mostra "0" o "Nessuna" (numeri morti) ma un invito
 // con il gesto da fare ("Segna il primo posto"). `invito` vale solo quando count è 0.
@@ -18,7 +18,7 @@ export function TileBody({ icon, label, sub, count, invito }: { icon: ReactNode;
   const vuota = invito != null && (count ?? 0) === 0;
   return (
     <>
-      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3efe8] text-brand">{icon}</span>
+      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f2] text-brand">{icon}</span>
       <span className="block min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-1.5">
           <span data-testid="tessera-titolo" className="block min-w-0 truncate font-sans text-[14px] font-medium leading-tight text-text">{label}</span>

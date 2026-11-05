@@ -16,6 +16,26 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 5/11/2026 (notte, sessione 03:05, CEO che chiude — tema Ricerca). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
+
+### 46. "Perché è qui": una riga che spiega l'ordine dei risultati
+- **Problema:** voti e numero di recensioni sono manipolabili (`PROBLEMI.md`, 20: recensioni false e "review bombing"); chi cerca non sa perché un posto è primo e torna a fidarsi del voto più alto.
+- **Cosa fa:** toccando "8 posti" in cima ai risultati, un foglio dice in 3 righe come sono ordinati: "Prima chi risponde a tutto quello che hai chiesto, poi i più vicini ai tuoi gusti. I posti con molte più recensioni degli altri non salgono per questo (3 messi più in basso)."
+- **Da dove nasce:** Google Maps e TripAdvisor non spiegano l'ordine; Beli mostra un punteggio "quanto ti piacerà" senza dire perché. Noi l'ordine lo abbiamo già (log `[search-mainstream]`, `da_parte`): basta dirlo.
+- **Valore per l'utente:** capisce in 10 secondi che Mapetite non è "il più famoso in cima" (VISIONE).
+- **Valore per il ristoratore:** il piccolo locale vede che non deve comprare recensioni per emergere.
+- **Sforzo:** S. **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 47. "Più tranquillo, più economico": correggi la ricerca con un tocco
+- **Problema:** dopo la prima lista, per cambiare un dettaglio si riscrive tutta la frase (`PROBLEMI.md`, 18: al momento della scelta non si ritrova il posto giusto).
+- **Cosa fa:** sotto la frase dei risultati, 3 chip scelti dall'AI dalla richiesta ("più tranquillo", "spendere meno", "più vicino"): un tocco rifà la ricerca con il vincolo in più, la frase resta leggibile in cima.
+- **Da dove nasce:** "Ask Maps" di Google fa domande di seguito in chat, ma solo in inglese e con ricadute sulla ricerca generica per le domande sfumate ([TechSpot](https://www.techspot.com/news/111670-google-maps-gets-conversational-gemini-powered-ask-maps.html)); noi in italiano, con un tocco, senza chat.
+- **Valore per l'utente:** dalla prima lista al posto giusto in due tocchi.
+- **Valore per il ristoratore:** domanda più precisa ("tranquillo", "economico") nei numeri della zona.
+- **Sforzo:** M. **Costo Google/Haiku:** una Text Search in più per tocco (quota 50/giorno: "spendere meno" e "più vicino" filtrano i risultati già arrivati senza Google, solo "più tranquillo" ne usa una).
+- **Stato proposto:** PRONTA dal 9/11.
+
 ## 4/11/2026 (notte, sessione 22:05 del 3/11, CEO che chiude — tema Mappa)
 
 ### 43. "I miei · Tutti" sulla mappa: i salvati si accendono e si spengono con un tocco
@@ -24,20 +44,21 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google prova "Nascondi/Mostra sulla mappa" per i salvati ([Android Authority](https://androidauthority.com/google-maps-list-hide-apk-teardown-3697285)); Mapstr passa tra "mia mappa" e "suggerimenti". Noi in una pillola sola.
 - **Valore per l'utente:** in un tocco vede solo i posti scelti da lui. **Per il ristoratore:** separa "visto tra i salvati" da "visto in una ricerca".
 - **Sforzo:** S (prima controllare che `?beta=pin-salvati` non faccia già lo stesso). **Costo:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **4/11: DA RIVEDERE** — i salvati sulla mappa generale li ha scartati Lorenzo il 14/10 (BACKLOG 11c: "solo in I miei salvati, mai sulla mappa generale"); sulla mappa dei risultati ci sono già i segnalini "Dai tuoi salvati" scelti per la ricerca. Non si fa senza un sì di Lorenzo.
 
 ### 44. "Chiedi a questa raccolta", con le risposte come segnalini
 - **Problema:** `PROBLEMI.md` 18: dentro una raccolta non si può chiedere "quale per domenica a pranzo?".
 - **Cosa fa:** con una raccolta accesa, la ricerca dei Salvati diventa "Chiedi a Romantico…": l'AI sceglie solo tra i posti della raccolta, con il perché dalle recensioni già lette.
 - **Da dove nasce:** Google prova "Chiedi" dentro le liste, ma Ask Maps non c'è in Italia e capisce solo l'inglese. Noi riusiamo "Chiedi ai tuoi posti" (33).
 - **Sforzo:** S. **Costo:** zero Google, una chiamata Haiku per domanda (come oggi).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 4/11 notte** (lista dei Salvati: con una raccolta accesa "Chiedi a Romantico"; il server legge solo i salvati con quel tag). Le risposte come segnalini sulla mappa: non ancora.
 
 ### 45. "Ha chiuso?" sui salvati
 - **Problema:** `PROBLEMI.md` 19.
 - **Cosa fa:** quando un salvato passa già da Google (scheda, ricerca, "Altri come questo"), si tiene anche lo stato (aperto, chiuso per sempre, chiuso temporaneamente). Chiuso per sempre: grigio sulla mappa e nella lista, "Ha chiuso · simili qui vicino", in fondo. Mai cancellato da solo.
 - **Sforzo:** S/M (colonna nuova, stile del segnalino). **Costo:** zero chiamate in più (`businessStatus` è un campo base; va verificato che non cambi la fascia di prezzo delle chiamate già fatte).
 - **Stato proposto:** PRONTA, solo nella versione senza chiamate in più.
+- **Stato:** FATTA il 4/11 sera (branch `claude/busy-mendel-wnyqkh`), senza chiamate in più. Manca "simili qui vicino".
 
 ## 3/11/2026 (notte, sessione 03:05, CEO che chiude — solo ciò che si vede aprendo l'app, piano fino all'8/11)
 

@@ -12,6 +12,9 @@ const FIELD_MASK = [
   "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.rating,places.userRatingCount,places.priceLevel",
   "places.currentOpeningHours.openNow,places.currentOpeningHours.periods,places.regularOpeningHours.periods",
   "places.reviews,places.editorialSummary,places.types,places.websiteUri,places.nationalPhoneNumber,places.photos",
+  // Stato del locale (proposta 45, 4/11): campo della fascia Pro, sotto quella già pagata per le recensioni
+  // (Enterprise + Atmosphere): nessun costo in più per chiamata.
+  "places.businessStatus",
   ...GOOGLE_ATTRIBUTES.map((a) => `places.${a}`),
 ].join(",");
 
@@ -19,6 +22,7 @@ type OpeningPeriod = { open?: { day?: number; hour?: number; minute?: number }; 
 
 type GooglePlace = {
   id: string;
+  businessStatus?: string;
   displayName?: { text: string };
   formattedAddress?: string;
   location?: { latitude: number; longitude: number };
@@ -54,6 +58,8 @@ export type PlaceResult = {
   types: string[] | null;
   websiteUri: string | null;
   editorialSummary: string | null;
+  // OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY (o null se Google non lo dice).
+  businessStatus?: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
   // Le stesse recensioni con il voto (per la riga di ripiego della card: mai una stroncatura). Solo server.
   reviewItems?: { text: string; rating: number | null }[] | null;
@@ -298,6 +304,7 @@ function mapGooglePlace(place: GooglePlace): PlaceResult {
     types: place.types ?? null,
     websiteUri: place.websiteUri ?? null,
     editorialSummary: place.editorialSummary?.text ?? null,
+    businessStatus: place.businessStatus ?? null,
     reviewTexts: (() => {
       const texts = (place.reviews ?? [])
         .map((r) => r.text?.text)
