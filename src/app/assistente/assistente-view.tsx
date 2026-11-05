@@ -673,7 +673,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       <header data-testid="assistente-barra" className={`sticky top-0 z-20 flex items-center justify-end gap-2 px-4 pt-2 md:top-14 ${c.msgs.length > 0 ? "bg-[#f6f7f7]/95 pb-2 backdrop-blur" : ""}`}>
         {c.msgs.length > 0 && <h1 className="sr-only">Assistente</h1>}
         <div className="flex items-center gap-1">
-          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5c8] text-brand"><MapIcon size={18} /></Link>
+          <Link href="/mappa" aria-label="Apri la mappa" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#d6dcdc] text-brand"><MapIcon size={18} /></Link>
           {c.msgs.length > 0 && (
             <button
               type="button"

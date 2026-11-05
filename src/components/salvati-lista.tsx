@@ -415,7 +415,7 @@ export default function SalvatiLista({
     ? filtraLista(activeTag === null ? all : all.filter((p) => hasStateOrTag(p.tags, activeTag)), tipo, cercato, testi).length
     : 0;
   const citta = zone.length > 1 ? [{ nome: null as string | null, label: "Tutte", n: all.length }, ...zone.map((z) => ({ nome: z.nome as string | null, label: z.nome, n: z.posti.length }))] : [];
-  const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ddd5c8] text-text active:scale-95";
+  const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6dcdc] text-text active:scale-95";
 
   return (
     <section
@@ -489,7 +489,7 @@ export default function SalvatiLista({
         </header>
 
         {/* Revisore 3/11 (area 3f): la ricerca sempre in vista, come la barra della mappa; si scrive al tocco. */}
-        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-3 flex items-center gap-2 rounded-pill border border-[#ddd5c8] bg-white pl-4 pr-1">
+        <form role="search" onSubmit={(e) => { e.preventDefault(); void chiedi(); }} className="mt-3 flex items-center gap-2 rounded-pill border border-[#d6dcdc] bg-white pl-4 pr-1">
           <Search size={16} className="shrink-0 text-text-muted" aria-hidden />
           <input
             type="search"
@@ -511,7 +511,7 @@ export default function SalvatiLista({
           <section data-testid="chiedi-salvati" aria-live="polite" className="mt-3">
             {!attuale ? (
               // Con risultati per nome (es. "Da Enzo al 29") il pulsante resta secondario: non copre la lista.
-              <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className={`flex min-h-11 w-full items-center gap-2 rounded-pill px-4 text-left text-sm font-display font-semibold active:scale-[0.98] ${list.length === 0 || testo.includes("?") ? "bg-accent text-white" : "border border-[#ddd5c8] bg-white text-accent"}`}>
+              <button type="button" data-testid="chiedi-salvati-vai" onClick={() => void chiedi()} className={`flex min-h-11 w-full items-center gap-2 rounded-pill px-4 text-left text-sm font-display font-semibold active:scale-[0.98] ${list.length === 0 || testo.includes("?") ? "bg-accent text-white" : "border border-[#d6dcdc] bg-white text-accent"}`}>
                 <Sparkles size={16} aria-hidden className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{raccolta ? `Chiedi a ${tagLabel(raccolta)}` : "Chiedi ai tuoi posti"}</span>
               </button>
@@ -630,7 +630,7 @@ export default function SalvatiLista({
               href="/profilo?raccolta=nuova"
               aria-label="Nuova raccolta"
               data-testid={collections.length === 0 ? "raccolte-vuote" : undefined}
-              className="flex min-h-11 items-center gap-1 rounded-pill border-[1.5px] border-dashed border-[#c9c2b6] px-3.5 text-[14px] font-medium text-[#33373d] active:scale-[0.97]"
+              className="flex min-h-11 items-center gap-1 rounded-pill border-[1.5px] border-dashed border-[#c3cbcb] px-3.5 text-[14px] font-medium text-[#33373d] active:scale-[0.97]"
             >
               <Plus size={15} aria-hidden className="text-text-muted" />
               {collections.length === 0 ? "Nuova raccolta" : "Nuova"}
@@ -659,7 +659,7 @@ export default function SalvatiLista({
         {filtrando && !rispostaAI && (
           <div className="mt-1 flex min-h-9 items-center justify-between gap-3 px-1">
             <p data-testid="salvati-risultato" aria-live="polite" className="min-w-0 truncate text-[13px] font-medium text-text-muted">
-              {`${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
+              {`${list.length}${tipo ? ` ${tipo}` : ""} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
             </p>
             <button type="button" data-testid="salvati-azzera" onClick={azzera} className="-my-1 flex min-h-11 shrink-0 items-center px-1 text-[13px] font-semibold text-brand active:scale-95">
               Azzera

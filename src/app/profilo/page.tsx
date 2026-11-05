@@ -303,7 +303,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
               >
                 <span className="font-semibold text-text">{c.value}</span>
                 <span className="lowercase">{c.label}</span>
-                {i < counters.length - 1 && <span aria-hidden className="pl-1 text-[#c9c2b6]">·</span>}
+                {i < counters.length - 1 && <span aria-hidden className="pl-1 text-[#c3cbcb]">·</span>}
               </Link>
             ))}
           </nav>
@@ -349,10 +349,10 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
           // Con "I miei gusti" già scelti (riquadro sotto) non si dice "nessuna preferenza": si contraddiceva.
           <p data-testid="profilo-gusto-vuoto" className="mt-1 text-[14px] text-text-muted">{amati.length ? "Zone, occasioni e spesa: tocca Modifica per aggiungerle." : "Nessuna preferenza scelta: tocca Modifica per aggiungerle."}</p>
         )}
+        {/* I miei gusti (Lorenzo, 5/11): tutti i tipi di locale che piacciono, con lo stesso selettore del primo
+            accesso, dentro lo stesso riquadro (revisore 5/11: due riquadri quasi omonimi confondevano). */}
+        <ProfiloAmati iniziali={amati} />
       </section>
-
-      {/* I miei gusti (Lorenzo, 5/11): tutti i tipi di locale che piacciono, con lo stesso selettore del primo accesso. */}
-      <ProfiloAmati iniziali={amati} />
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">

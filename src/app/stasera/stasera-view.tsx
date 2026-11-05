@@ -278,7 +278,7 @@ export default function StaseraView({ userId }: { userId: string }) {
               <Link href="/mappa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill bg-accent font-display font-semibold text-white">
                 Cerca un locale
               </Link>
-              <Link href="/importa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill border border-[#ddd5c8] bg-white font-display font-semibold text-brand">
+              <Link href="/importa" className="flex min-h-12 w-full max-w-xs items-center justify-center rounded-pill border border-[#d6dcdc] bg-white font-display font-semibold text-brand">
                 Importa i tuoi posti
               </Link>
             </div>
@@ -299,7 +299,7 @@ export default function StaseraView({ userId }: { userId: string }) {
               <button
                 type="button"
                 onClick={() => setProposals(null)}
-                className="min-h-12 flex-1 rounded-pill border border-[#ddd5c8] bg-white font-display font-semibold text-brand active:scale-[0.98]"
+                className="min-h-12 flex-1 rounded-pill border border-[#d6dcdc] bg-white font-display font-semibold text-brand active:scale-[0.98]"
               >
                 Cambia scelte
               </button>

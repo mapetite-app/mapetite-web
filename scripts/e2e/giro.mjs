@@ -2131,7 +2131,7 @@ else {
     ok((await righe.count()) === 3 && (await L.getByLabel("Cerca nei tuoi posti").inputValue()) === "" && (await L.getByTestId("salvati-risultato").count()) === 0, "salvati lista: 'Azzera' svuota la ricerca e toglie il conteggio");
     // Chip del tipo: un tocco filtra, il conteggio lo dice.
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
-    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 di 3 posti", "salvati lista: il chip 'Caffè' tiene solo il caffè, '1 di 3 posti'");
+    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 Caffè di 3 posti", "salvati lista: il chip 'Caffè' tiene solo il caffè e il conteggio dice quale filtro è acceso ('1 Caffè di 3 posti')");
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
     await L.getByLabel("Cerca nei tuoi posti").fill("brunch");
     await p.waitForTimeout(300);
@@ -7878,7 +7878,7 @@ else {
     await gp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
     const sez = gp.getByTestId("profilo-amati");
     const chip = (await sez.getByTestId("profilo-amati-chip").allTextContents()).map((t) => t.trim());
-    ok(await sez.isVisible() && (await sez.locator("h2").first().textContent()) === "I miei gusti" && JSON.stringify(chip) === '["🍕Pizzeria","🍣Sushi","🌱Vegano"]', `profilo: 'I miei gusti' mostra i tipi scelti, senza quelli sconosciuti (${JSON.stringify(chip)})`);
+    ok(await sez.isVisible() && ((await sez.locator("h2").first().textContent()) ?? "").includes("I miei gusti") && (await gp.getByTestId("profilo-gusto").getByTestId("profilo-amati").count()) === 1 && JSON.stringify(chip) === '["🍕Pizzeria","🍣Sushi","🌱Vegano"]', `profilo: 'I miei gusti' mostra i tipi scelti, senza quelli sconosciuti (${JSON.stringify(chip)})`);
     ok(!((await gp.getByTestId("profilo-gusto").textContent()) ?? "").includes("Nessuna preferenza"), "profilo: con 'I miei gusti' scelti, 'Il tuo gusto' non dice 'Nessuna preferenza scelta' (si contraddiceva)");
     await sez.scrollIntoViewIfNeeded();
     await gp.screenshot({ path: `${OUT}/profilo-i-miei-gusti.png`, caret: "initial" });

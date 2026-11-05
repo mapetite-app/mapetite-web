@@ -387,7 +387,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s - 1); }}
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_SCOPERTA && amati.length > 0 ? PASSO_AMATI : s - 1)); }}
             disabled={step === 0}
             aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
             className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
@@ -395,7 +395,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <ArrowLeft size={22} aria-hidden />
           </button>
           <div
-            className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e9e4da]"
+            className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
             aria-valuemax={TOTAL}
@@ -765,7 +765,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             <button
               type="button"
               data-testid={tornaFrase ? "torna-frase" : "benvenuto-avanti"}
-              onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => s + 1); }}
+              // Revisore 5/11: chi ha scelto i suoi gusti non rivede la stessa domanda nei 10 tipi 👍/👎 (doppione).
+              onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_AMATI && amati.length > 0 ? PASSO_SCOPERTA : s + 1)); }}
               disabled={step === 0 && !risposto}
               className={risposto || step === 0 || step === PASSO_DIETE || tornaFrase ? TASTO_PIENO : TASTO_VUOTO}
             >

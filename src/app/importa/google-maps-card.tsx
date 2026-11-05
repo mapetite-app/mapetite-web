@@ -161,7 +161,7 @@ export default function GoogleMapsCard({
                 rows={3}
                 placeholder={"https://maps.app.goo.gl/…\nAnche una chat piena di link"}
                 aria-label="Link da incollare"
-                className="w-full rounded-btn border border-[#ddd5c8] bg-white px-3 py-2 text-base text-text focus:border-brand focus:outline-none"
+                className="w-full rounded-btn border border-[#d6dcdc] bg-white px-3 py-2 text-base text-text focus:border-brand focus:outline-none"
               />
               <button
                 type="button"
