@@ -2579,21 +2579,22 @@ else {
     const Lm = pm.getByTestId("salvati-lista");
     await Lm.waitFor({ timeout: 8000 }).catch(() => {});
     await pm.waitForTimeout(1200);
-    const mesi = Lm.getByTestId("salvati-da-mesi");
-    ok(await mesi.isVisible().catch(() => false) && (await mesi.textContent())?.includes("1 posto aspetta da mesi"), `da mesi: una riga '1 posto aspetta da mesi' (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
+    // Revisore 5/11: niente più riga "Aspettano da mesi" (testata più leggera): l'ordine "Da più tempo" la sostituisce.
+    ok((await Lm.getByTestId("salvati-da-mesi").count()) === 0, "da mesi: nessuna riga in più sopra la lista");
     const chipMese = Lm.getByTestId("salvato-da-mesi");
     ok((await chipMese.count()) === 1 && (await chipMese.textContent())?.trim() === "da luglio", `da mesi: sulla riga 'Da provare da luglio' (${await chipMese.count()})`);
     const nomi = async () => (await Lm.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents());
     const ordine = await Lm.getByTestId("salvati-ordine").inputValue().catch(() => "");
     const primi = await nomi();
     ok(ordine === "vicino" && primi[0] !== "Caffè No" && primi[primi.length - 1] === "Caffè No", `vicino: il 👎 più vicino va in fondo, non primo (${ordine}: ${primi.join(", ")})`);
-    await mesi.click().catch(() => {});
+    await Lm.getByTestId("salvati-ordine").selectOption("attesa").catch(() => {});
     await pm.waitForTimeout(300);
-    ok(JSON.stringify(await nomi()) === '["Osteria Vecchia"]' && (await Lm.getByTestId("salvati-risultato").textContent())?.trim() === "1 di 4 posti" && (await mesi.getAttribute("aria-pressed")) === "true", `da mesi: un tocco mostra solo chi aspetta, '1 di 4 posti' (${(await nomi()).join(", ")})`);
+    const attesa = await nomi();
+    ok(JSON.stringify(attesa) === '["Osteria Vecchia","Pizzeria Nuova","Bar Visto","Caffè No"]', `da più tempo: prima i Da provare dal più vecchio, poi i visitati (${attesa.join(", ")})`);
+    ok((await Lm.getByTestId("salvati-risultato").count()) === 0, "da più tempo: è un ordine, non un filtro (nessun '1 di 4')");
     await pm.screenshot({ path: `${OUT}/11j-salvati-da-mesi.png` });
-    await mesi.click().catch(() => {});
+    await Lm.getByTestId("salvati-ordine").selectOption("vicino").catch(() => {});
     await pm.waitForTimeout(300);
-    ok((await nomi()).length === 4, "da mesi: un secondo tocco torna a tutti");
     // Area 4a (4/11): sulla mappa dei salvati il 👎 si distingue dal ✓ (pollice giù, segnalino più chiaro).
     await Lm.getByTestId("salvati-lista-mappa").click().catch(() => {});
     await pm.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).catch(() => {});
@@ -2626,7 +2627,7 @@ else {
     const pillole = await Lc.getByTestId("salvato-chiuso").allTextContents();
     ok(nomiC[nomiC.length - 1] === "Osteria Chiusa" && nomiC.length === 3, `ha chiuso: il più vicino ma chiuso per sempre va in fondo, mai tolto (${nomiC.join(", ")})`);
     ok(JSON.stringify(pillole) === '["Chiuso per ora","Ha chiuso"]', `ha chiuso: pillole 'Chiuso per ora' e 'Ha chiuso', niente sull'aperto (${JSON.stringify(pillole)})`);
-    ok(!(await Lc.getByTestId("salvati-da-mesi").isVisible().catch(() => false)), "ha chiuso: un posto chiuso non conta in 'aspettano da mesi'");
+    ok((await Lc.getByTestId("salvato-da-mesi").count()) === 0, "ha chiuso: un posto chiuso non dice 'da luglio'");
     await pc.screenshot({ path: `${OUT}/11l-salvati-ha-chiuso.png` });
     await Lc.getByTestId("salvato-riga").filter({ hasText: "Osteria Chiusa" }).click().catch(() => {});
     await pc.getByTestId("scheda-chiuso").waitFor({ timeout: 5000 }).catch(() => {});
