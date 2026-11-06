@@ -3558,11 +3558,14 @@ if (fakeUser) {
     ok(n.fuori && n.testo?.replace(/\s/g, "") === "‹1di5›" && Math.abs(n.centro - 195) <= 2 && n.alto < 80, `scheda: '‹ 1 di 5 ›' in alto al centro, tra Chiudi e Condividi (${n.testo}, centro ${n.centro}, a ${n.alto} px)`);
     ok(n.barra > 0 && n.barra <= 70, `scheda: barra azioni su una riga sola (${n.barra} px)`); }
   { const t0 = await q3.getByTestId("scheda-testata-compatta").evaluate((el) => getComputedStyle(el).opacity);
-    await q3.getByTestId("scheda-trascinabile").evaluate((el) => { el.scrollTop = 400; el.dispatchEvent(new Event("scroll")); });
-    await q3.waitForTimeout(400);
-    const t = await q3.getByTestId("scheda-testata-compatta").evaluate((el) => { const r = el.getBoundingClientRect(); return { o: getComputedStyle(el).opacity, top: Math.round(r.top), x: !!el.querySelector("[aria-label=Chiudi]"), nav: el.querySelector("[data-testid=scheda-nav-compatta]")?.textContent.replace(/\s/g, "") }; });
+    const vp = q3.viewportSize(); await q3.setViewportSize({ width: 390, height: 480 });
+    await q3.getByTestId("scheda-trascinabile").evaluate((el) => { el.scrollTop = el.scrollHeight; el.dispatchEvent(new Event("scroll")); });
+    await q3.waitForTimeout(500);
+    const t = await q3.getByTestId("scheda-testata-compatta").evaluate((el) => { const r = el.getBoundingClientRect(); return { o: getComputedStyle(el).opacity, top: Math.round(r.top), x: !!el.querySelector("[aria-label='Chiudi la scheda']"), nav: el.querySelector("[data-testid=scheda-nav-compatta]")?.textContent.replace(/\s/g, "") }; });
     ok(t0 === "0" && t.o === "1" && t.top <= 1 && t.x && t.nav === "‹1di5›", `scheda: scorrendo compare in alto la testata compatta con Chiudi, nome e '‹ 1 di 5 ›' (prima ${t0}, poi ${t.o}, ${t.nav})`);
-    await q3.getByTestId("scheda-trascinabile").evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event("scroll")); }); }
+    ok((await q3.getByRole("button", { name: "Locale successivo" }).count()) === 1, "scheda: una sola coppia di frecce per volta (foto o testata compatta)");
+    await q3.getByTestId("scheda-trascinabile").evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event("scroll")); });
+    await q3.setViewportSize(vp); await q3.waitForTimeout(300); }
   { const c = await q3.getByTestId("stato-apertura").evaluate((el) => getComputedStyle(el).color);
     ok(c === "rgb(26, 60, 64)", `scheda: 'Aperto ora' in teal del marchio (${c})`); }
   await q3.screenshot({ path: `${OUT}/r3-scheda.png` });

@@ -710,9 +710,9 @@ export default function VenueSheet({
             aria-hidden={!compatta}
             className={`absolute inset-x-0 top-0 flex items-center gap-2 border-b border-border bg-white/95 px-2 pb-1.5 pt-[calc(env(safe-area-inset-top,0px)+0.375rem)] backdrop-blur transition-[opacity,transform] duration-200 ${compatta ? "opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
           >
-            <button type="button" onClick={onClose} aria-label="Chiudi" tabIndex={compatta ? 0 : -1} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text active:scale-95"><X size={20} aria-hidden /></button>
+            <button type="button" onClick={onClose} aria-label="Chiudi la scheda" tabIndex={compatta ? 0 : -1} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text active:scale-95"><X size={20} aria-hidden /></button>
             <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-brand">{nomeBreve}</span>
-            {nav && (
+            {nav && compatta && (
               <span data-testid="scheda-nav-compatta" className="flex shrink-0 items-center text-text">
                 <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
                 <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
@@ -755,7 +755,8 @@ export default function VenueSheet({
                 <X size={19} aria-hidden />
               </button>
               {/* "‹ 1 di 12 ›" in alto al centro sulla foto (designer 6/11): la barra azioni in basso torna su una riga. */}
-              {nav && (
+              {/* Una sola coppia di frecce per volta: quando c'è la testata compatta, quella. */}
+              {nav && !compatta && (
                 <div data-testid="scheda-nav" className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-11 -translate-x-1/2 items-center rounded-full bg-white/90 text-text shadow-card backdrop-blur">
                   <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
                 <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
