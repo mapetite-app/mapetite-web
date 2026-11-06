@@ -72,7 +72,7 @@ export function buildPrompt(richiesta: string, posti: PostoConsiglio[]): string 
     "- Prezzo: € fino a ~15 euro a testa, €€ ~15–35, €€€ ~35–60, €€€€ oltre. Con un budget scritto, non scegliere un posto chiaramente sopra.",
     "- Conta prima l'occasione (con chi si va e perché: festa, coppia, lavoro, famiglia) e l'atmosfera che richiede, poi il cibo. Per una cena di lavoro o una festa scegli un posto curato e adatto a parlare, non il più economico o il più alla buona. Preferisci i posti con \"Adatto alla richiesta: alto\".",
     "- Il numero di recensioni o la fama NON sono un motivo: conta quanto il posto è adatto a questa persona.",
-    "- \"perche\": UNA frase in italiano, massimo 14 parole e 95 caratteri, che dà del tu e dice perché è il più adatto a QUESTA richiesta, con fatti presi SOLO da verdetto, descrizione o recensioni qui sotto (es. \"sala tranquilla e compleanni festeggiati con cura, dicono le recensioni\"). Non riscrivere il verdetto. Non inventare piatti, sale, orari o servizi che non sono scritti. Non attribuire alla persona un'occasione che non ha scritto (se dice \"con la mia fidanzata\", non parlare di anniversario) e non esagerare gli aggettivi delle recensioni.",
+    "- \"perche\": UNA frase in italiano, massimo 13 parole e 85 caratteri, che dà del tu e dice perché è il più adatto a QUESTA richiesta, con fatti presi SOLO da verdetto, descrizione o recensioni qui sotto (es. \"sala tranquilla e compleanni festeggiati con cura, dicono le recensioni\"; scrivi \"dicono le recensioni\" solo se quei fatti sono scritti nelle recensioni, non solo nel verdetto). Non riscrivere il verdetto. Non inventare piatti, sale, orari o servizi che non sono scritti. Non attribuire alla persona un'occasione che non ha scritto (se dice \"con la mia fidanzata\", non parlare di anniversario) e non esagerare gli aggettivi delle recensioni.",
     "- Se le recensioni dello stesso posto si contraddicono su un punto (una dice silenzioso, un'altra rumoroso), quel punto non è un motivo: usane un altro o scegli un altro posto.",
     "- Nel \"perche\" non nominare prezzo, budget, numero di persone, età o gruppi, a meno che una recensione o il verdetto ne parlino con quelle parole. Non ripetere il nome del posto.",
     "- Se nessun posto ha nei dati qualcosa che lo lega davvero alla richiesta, rispondi {\"n\":null}. Meglio nessun consiglio che uno sbagliato.",
@@ -107,7 +107,8 @@ export function parseConsiglio(text: string, posti: PostoConsiglio[]): Consiglio
 
 // Il perché sta in 2 righe sotto il titolo (revisore 5/11: la parte che spiegava finiva nei puntini). Oltre
 // MAX_PERCHE caratteri si taglia all'ultima virgola o "e" prima del limite, così resta una frase intera.
-export const MAX_PERCHE = 105;
+// 6/11 sera (revisore): a 360 px 105 caratteri finivano in "dicono le…": ora 90.
+export const MAX_PERCHE = 90;
 
 // Anti-invenzione (secondo revisore del 5/11: «sala tranquilla dove si parla» era la richiesta rimandata
 // indietro come un fatto). Una parola del perché che viene dalla richiesta deve stare anche nei dati del
@@ -132,9 +133,10 @@ const NEUTRE = radici(
 );
 // Confronto più stretto delle 5 lettere: la parola deve iniziare come una parola dei dati per tutta la sua
 // lunghezza meno 2 lettere (romantico/romantica, festeggiati/festeggiato passano; "tramosto" per tramonto no).
+// Parole di 5–6 lettere: 4 lettere bastano (revisore 6/11 sera: "copre" scartato con "coprire" nella recensione).
 export function percheNonNeiDati(perche: string, datiPosto: string): string[] {
   const parole = [...new Set(norm(datiPosto).match(/[a-z]{4,}/g) ?? [])];
-  const ce = (w: string) => { const testa = w.slice(0, Math.max(5, w.length - 2)); return parole.some((d) => d.startsWith(testa)); };
+  const ce = (w: string) => { const testa = w.slice(0, Math.max(4, w.length - 2)); return parole.some((d) => d.startsWith(testa)); };
   return [...new Set((norm(perche).match(/[a-z]{5,}/g) ?? []))].filter((w) => !NEUTRE.has(w.slice(0, 5)) && !ce(w));
 }
 // Refusi dell'AI ("tramosto" per "tramonto", visto il 6/11): una parola che non c'è nei dati ma dista al
@@ -169,6 +171,10 @@ export function ripeteVerdetto(perche: string, verdetto: string | null | undefin
   const v = radici(verdetto);
   const p = [...radici(perche)].filter((w) => !NEUTRE.has(w));
   const comuni = p.filter((w) => v.has(w)).length;
+  // Revisore 6/11 sera: "Cucina milanese autentica, location elegante" sopra la card "Cucina milanese autentica…":
+  // se le prime 2 parole che contano sono le prime 2 del verdetto, il riquadro si legge come un doppione.
+  const vInizio = [...v].filter((w) => !NEUTRE.has(w)).slice(0, 2);
+  if (vInizio.length === 2 && p.length >= 2 && p[0] === vInizio[0] && p[1] === vInizio[1]) return true;
   return comuni >= 3 ? comuni / p.length > 0.5 : p.length > 0 && comuni === p.length;
 }
 /** Seconda richiesta, una sola volta: stesso posto, perché riscritto senza le parole che i dati non dicono. */
@@ -190,4 +196,16 @@ export function accorcia(t: string): string {
 
 export function estimateCostUsd(inputTokens: number, outputTokens: number): number {
   return (inputTokens * 1.0 + outputTokens * 5.0) / 1_000_000;
+}
+
+// Revisore del 6/11 sera: "vista notturna… staff eccezionalmente premuroso, dicono le recensioni", ma
+// "notturna" e "premuroso" erano solo nel verdetto AI. Se il perché dà la parola alle recensioni, ogni sua
+// parola deve stare nelle recensioni o nella descrizione Google; altrimenti l'attribuzione si toglie (il resto
+// del perché è già controllato sui dati del posto).
+const ATTRIBUZIONE = /\s*(?:[,—–-]\s*)?(?:dicono|raccontano|scrivono) le recensioni\.?|^\s*(?:secondo le recensioni|le recensioni dicono(?: che)?)[,:]?\s*/gi;
+export function senzaAttribuzioneFalsa(perche: string, recensioniEDescrizione: string): string {
+  if (!new RegExp(ATTRIBUZIONE.source, "i").test(perche)) return perche;
+  const nudo = perche.replace(ATTRIBUZIONE, "").trim().replace(/[,;:]$/, "");
+  if (percheNonNeiDati(nudo, recensioniEDescrizione).length === 0) return perche;
+  return nudo.charAt(0).toUpperCase() + nudo.slice(1);
 }

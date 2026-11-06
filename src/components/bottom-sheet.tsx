@@ -353,6 +353,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
+  // "Ti porterei da <nome>" al primo arrivo anche se la sua card è già davanti (revisore 6/11 sera: con il
+  // consiglio sulla prima card il nome non si vedeva mai e la scelta dell'AI passava inosservata). "Ti porterei
+  // qui" solo dopo che la persona ha toccato il riquadro o scorso le card. Stato aggiornato durante il render.
+  const consiglioId = consiglio?.place.id ?? null;
+  const [arrivo, setArrivo] = useState<{ id: string | null; focus: string | null; mosso: boolean }>({ id: consiglioId, focus: focusedId, mosso: false });
+  if (arrivo.id !== consiglioId) setArrivo({ id: consiglioId, focus: focusedId, mosso: false });
+  else if (!arrivo.mosso && focusedId !== arrivo.focus) setArrivo({ ...arrivo, mosso: true });
+  const consiglioQui = consiglio != null && focusedId === consiglio.place.id && arrivo.id === consiglioId && arrivo.mosso;
   // Lista nuova: le opzioni aperte dalla pillola si chiudono toccando fuori o con Esc.
   const pillRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -864,8 +872,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           <button
             type="button"
             data-testid="consiglio"
-            onClick={() => { if (onFocus) onFocus(consiglio.place); }}
-            className="pointer-events-auto mx-4 mb-1.5 flex h-[82px] w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+            onClick={() => { setArrivo((a) => ({ ...a, mosso: true })); if (onFocus) onFocus(consiglio.place); }}
+            className={`pointer-events-auto mx-4 mb-1.5 flex h-[82px] w-[calc(100%-2rem)] ${consiglioQui ? "items-center" : "items-end"} gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]`}
           >
             {/* Terzo revisore 6/11: "Ti porterei da Osteria dell'Acqu…" tagliava il nome, la cosa più importante.
                 Ora "Ti porterei da" è piccolo sopra e il nome ha la riga sua; stessa altezza dell'attesa (82 px).
@@ -873,14 +881,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             <span className="min-w-0 flex-1">
               <span data-testid="consiglio-sopra" className="flex items-center gap-1 text-[11px] font-sans font-semibold uppercase leading-[14px] tracking-[0.08em] text-accent">
                 <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
-                {focusedId === consiglio.place.id ? "Ti porterei qui" : "Ti porterei da"}
+                {consiglioQui ? "Ti porterei qui" : "Ti porterei da"}
               </span>
-              {focusedId !== consiglio.place.id && (
+              {!consiglioQui && (
                 <span data-testid="consiglio-titolo" className="block truncate font-title text-[17px] font-semibold leading-[21px] text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(pinName(consiglio.place.name))}</span>
               )}
-              <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
+              {consiglio.perche && <span data-testid="consiglio-perche" className={`mt-0.5 ${consiglioQui ? "line-clamp-3" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{consiglio.perche}</span>}
             </span>
-            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>
+            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{consiglioQui ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : focusedId === consiglio.place.id ? "Qui sotto" : "Vedi ›"}</span>
           </button>
         ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
@@ -1021,9 +1029,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           )}
                           {/* Punti forti nella stessa riga (card più bassa): solo se non ci sono già i ✓ o "Come…". */}
                           {!similar && req.length === 0 && chips.length > 0 && !d?.perTe && (
-                            <span data-testid="punti-forti" className="flex min-w-0 gap-1.5">
+                            // 6/11 sera (area 6b): niente pillole tagliate ("Pesce fres…"): quelle che non stanno intere vanno a
+                            // capo su una seconda riga nascosta. Si vedono solo pillole intere.
+                            <span data-testid="punti-forti" className="flex h-[22px] min-w-0 flex-1 flex-wrap gap-1.5 overflow-hidden">
                               {chips.map((c) => (
-                                <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
+                                <span key={c} className="shrink-0 whitespace-nowrap rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
                               ))}
                             </span>
                           )}

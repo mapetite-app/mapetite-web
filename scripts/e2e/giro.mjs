@@ -355,6 +355,8 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) === 0, "card: il perché non è sulla card (sta nella scheda)");
 // Card più bassa (revisore del 1/11, secondo giro): i punti forti stanno nella riga di "Aperto ora", solo dove non ci sono già i ✓.
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").count()) === 0 && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale (dove non ci sono già i ✓ delle recensioni)");
+{ const t = await page.locator("[data-testid=punti-forti]").evaluateAll((els) => els.flatMap((el) => { const r = el.getBoundingClientRect(); return [...el.children].filter((c) => c.getBoundingClientRect().top < r.bottom - 1).map((c) => c.scrollWidth <= c.clientWidth + 1 && c.getBoundingClientRect().right <= r.right + 1); }));
+  ok(t.length > 0 && t.every(Boolean), `card: punti forti solo come pillole intere, mai tagliate (${t.length} in vista)`); }
 ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' sopra le card, accanto alla frase (la card resta bassa)");
 { const m = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((lis) => lis.map((li) => {
     const card = li.querySelector("[data-testid=card-risultato]");
@@ -1030,6 +1032,7 @@ await page.unroute("**/api/search");
       && /ripete il verdetto/.test(cs.promptRiscrivi("P", "{}", [cs.RIPETE]))
       && /Queste parole non sono scritte nei dati di quel posto: professionale/.test(cs.promptRiscrivi("P", '{"n":1}', ["professionale"])),
       "consiglio: una parola del perché assente dai dati del posto si riscrive una volta (le parole neutre come 'recensioni dicono' passano)");
+    ok(cs.senzaAttribuzioneFalsa("Vista notturna e staff premuroso, dicono le recensioni", "Roma ai tuoi piedi, personale attento") === "Vista notturna e staff premuroso" && cs.senzaAttribuzioneFalsa("Sala tranquilla e pesce fresco, dicono le recensioni", "una sala tranquilla, pesce fresco ogni giorno") === "Sala tranquilla e pesce fresco, dicono le recensioni" && cs.senzaAttribuzioneFalsa("Secondo le recensioni, vista notturna", "vista sul mare") === "Vista notturna", "consiglio: 'dicono le recensioni' solo se quelle parole sono nelle recensioni, altrimenti l'attribuzione si toglie");
     ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
   }
   if (bu) {
@@ -2266,6 +2269,7 @@ else {
     // Revisore 5/11: senza risultati c'è solo "Azzera" (prima anche "Mostra tutti", stessa azione).
     ok((await L.getByRole("button", { name: "Mostra tutti" }).count()) === 0, "salvati lista: senza risultati un solo pulsante per azzerare");
     await L.getByTestId("salvati-azzera").click();
+    for (let i = 0; i < 30 && (await righe.count()) !== 3; i++) await p.waitForTimeout(100);
     ok((await righe.count()) === 3, "salvati lista: 'Azzera' azzera la ricerca");
     // Lorenzo 5/11: scelta una città in alto, la lista è solo di quella (prima restavano anche i posti dell'altra).
     { const citta = L.getByTestId("salvati-citta-pillola");

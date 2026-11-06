@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { categoryLabel } from "@/lib/category-label";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, RIPETE, ripeteVerdetto, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
+import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, senzaAttribuzioneFalsa, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, RIPETE, ripeteVerdetto, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
 
 // "Ti porterei da…" (richiesta 5 di Lorenzo del 5/11). Terzo tempo della ricerca, dopo i verdetti:
 // riceve gli stessi dati Google firmati del primo tempo (il client non può cambiarli) e l'ordine
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     const fuori = (c: ReturnType<typeof parseConsiglio>) => {
       const p = c ? posti.find((x) => x.id === c.id) : null;
       if (!c || !p) return [];
-      c.perche = correggiRefusi(c.perche, datiDi(p));
+      c.perche = senzaAttribuzioneFalsa(correggiRefusi(c.perche, datiDi(p)), [p.editorialSummary, ...(p.reviewTexts ?? [])].filter(Boolean).join(" "));
       return [...new Set([...perchePrestato(c.perche, query, datiDi(p)), ...percheNonNeiDati(c.perche, datiDi(p)), ...numeriNonNeiDati(c.perche, datiDi(p)), ...(ripeteVerdetto(c.perche, p.verdict) ? [RIPETE] : [])])];
     };
     const message = await chiedi(prompt);
@@ -95,21 +95,38 @@ export async function POST(request: Request) {
       // Una sola seconda richiesta (~0,45 centesimi), solo quando il perché ha parole non sostenute dai dati.
       console.log(`[search-consiglio] riscrivo: parole che i dati non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio.perche)})`);
       const primo = consiglio.id;
+      // Revisore 6/11 sera: se l'unico difetto era ripetere il verdetto e la riscrittura fallisce, resta la prima scelta senza perché.
+      const soloRipete = prestate.length === 1 && prestate[0] === RIPETE ? { ...consiglio, perche: "" } : null;
       const m2 = await chiedi(promptRiscrivi(prompt, text, prestate));
       input_tokens += m2.usage.input_tokens;
       output_tokens += m2.usage.output_tokens;
       const c2 = parseConsiglio(testo(m2), posti);
       consiglio = c2 && c2.id === primo ? c2 : null;
       prestate = fuori(consiglio);
+      if (soloRipete && (!consiglio || (prestate.length > 0 && !(prestate.length === 1 && prestate[0] === RIPETE)))) {
+        console.log(`[search-consiglio] riscrittura non valida (${JSON.stringify(prestate)}): resta la prima scelta senza perché`);
+        consiglio = soloRipete;
+        prestate = [];
+      }
     }
     const scelto = consiglio ? posti.find((p) => p.id === consiglio!.id) : null;
+    // 6/11 sera: se dopo la riscrittura l'unico difetto è ripetere il verdetto (ogni parola sta nei dati), il
+    // consiglio resta: la scelta del posto vale da sola, e un riquadro che compare una volta sì e una no non si
+    // capisce (VISIONE). Le parole inventate scartano sempre.
+    // Revisore 6/11 sera: il perché ripetuto si leggeva due volte (riquadro e card): resta solo la scelta, senza perché.
+    if (prestate.length === 1 && prestate[0] === RIPETE && consiglio) {
+      console.log(`[search-consiglio] tenuto senza perché (ripeteva il verdetto): ${JSON.stringify(consiglio.perche)}`);
+      consiglio = { ...consiglio, perche: "" };
+      prestate = [];
+    }
     if (prestate.length > 0) {
       console.log(`[search-consiglio] scartato: parole che i dati di ${JSON.stringify(scelto?.name)} non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio?.perche)})`);
       consiglio = null;
     }
     const nome = consiglio ? scelto?.name : null;
     console.log(`[search-consiglio] q=${JSON.stringify(query.trim().slice(0, 80))} posti=${posti.length} scelto=${JSON.stringify(nome ?? null)} perche=${JSON.stringify(consiglio?.perche ?? null)} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
-    memoria.set(chiave, { at: Date.now(), consiglio });
+    // Solo i consigli dati: un "nessuno" non resta in memoria, la stessa frase rifatta ci riprova (revisore 6/11 sera).
+    if (consiglio) memoria.set(chiave, { at: Date.now(), consiglio });
     if (memoria.size > 300) memoria.delete(memoria.keys().next().value!);
     return NextResponse.json({ consiglio });
   } catch (err) {
