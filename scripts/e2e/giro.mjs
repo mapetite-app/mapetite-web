@@ -355,6 +355,8 @@ await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout:
 ok((await page.locator("ul.snap-x").getByText("Ha una vera terrazza.").count()) === 0, "card: il perché non è sulla card (sta nella scheda)");
 // Card più bassa (revisore del 1/11, secondo giro): i punti forti stanno nella riga di "Aperto ora", solo dove non ci sono già i ✓.
 ok((await page.locator("ul.snap-x li[data-id=P1]").getByTestId("punti-forti").count()) === 0 && (await page.locator("ul.snap-x li[data-id=P3]").getByTestId("punti-forti").textContent()) === "cocktail", "card nuova: punti forti presi dai goFor veri del locale (dove non ci sono già i ✓ delle recensioni)");
+{ const t = await page.locator("[data-testid=punti-forti]").evaluateAll((els) => els.flatMap((el) => { const r = el.getBoundingClientRect(); return [...el.children].filter((c) => c.getBoundingClientRect().top < r.bottom - 1).map((c) => c.scrollWidth <= c.clientWidth + 1 && c.getBoundingClientRect().right <= r.right + 1); }));
+  ok(t.length > 0 && t.every(Boolean), `card: punti forti solo come pillole intere, mai tagliate (${t.length} in vista)`); }
 ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()}`, "card nuova: '1 di N' sopra le card, accanto alla frase (la card resta bassa)");
 { const m = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((lis) => lis.map((li) => {
     const card = li.querySelector("[data-testid=card-risultato]");
@@ -3548,15 +3550,11 @@ if (fakeUser) {
   // Revisore del 2/11 (r4): senza foto un riquadro grigio di 220 px con l'emoji piccola; la scheda lasciava 110 px di mappa sopra.
   { const s = await q3.evaluate(() => { const c = document.querySelector("[data-testid=scheda-carosello]"); const t = document.querySelector("[data-testid=scheda-trascinabile]").getBoundingClientRect(); const e = document.querySelector("[data-testid=scheda-intestazione-emoji]");
       return { senza: c?.dataset.senzaFoto === "true", h: Math.round(c?.getBoundingClientRect().height ?? -1), fondo: e ? getComputedStyle(e).backgroundColor : "", nome: Math.round(document.querySelector("[data-testid=scheda-trascinabile] h2").getBoundingClientRect().top), top: Math.round(t.top), alta: Math.round(t.height) }; });
-    ok(s.senza && s.h <= 160 && s.fondo === "rgb(26, 60, 64)" && s.nome < 235, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
-    { const e = await q3.evaluate(() => { const em = document.querySelector("[data-testid=scheda-intestazione-emoji] span")?.getBoundingClientRect(); const nv = document.querySelector("[data-testid=scheda-nav]")?.getBoundingClientRect(); return { lato: Math.round(em?.width ?? 0), sotto: em && nv ? Math.round(em.top - nv.bottom) : -99 }; });
-      ok(e.lato >= 70 && e.sotto >= 0, `scheda senza foto: emoji grande (${e.lato} px) sotto '‹ 1 di 5 ›', non dietro (${e.sotto} px)`); }
+    ok(s.senza && s.h <= 130 && s.fondo === "rgb(26, 60, 64)" && s.nome < 200, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
     ok(s.top <= 0 && s.alta >= 843, `scheda: a tutto schermo come Places, in alto solo la zona sicura (da ${s.top} px, alta ${s.alta})`); }
   { const n = await q3.evaluate(() => { const nav = document.querySelector("[data-testid=scheda-nav]"); const sheet = document.querySelector("[data-testid=scheda-trascinabile]")?.getBoundingClientRect();
-      const bar = document.querySelector("[data-testid=barra-azioni]")?.firstElementChild?.getBoundingClientRect(); const r = nav?.getBoundingClientRect();
-      return { fuori: !nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1), centro: r ? Math.round(r.left + r.width / 2) : -1, alto: r ? Math.round(r.top) : -1, barra: Math.round(bar?.height ?? 0) }; });
-    ok(n.fuori && n.testo?.replace(/\s/g, "") === "‹1di5›" && Math.abs(n.centro - 195) <= 2 && n.alto < 80, `scheda: '‹ 1 di 5 ›' in alto al centro, tra Chiudi e Condividi (${n.testo}, centro ${n.centro}, a ${n.alto} px)`);
-    ok(n.barra > 0 && n.barra <= 70, `scheda: barra azioni su una riga sola (${n.barra} px)`); }
+      return { dentro: !!nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1) }; });
+    ok(n.dentro && n.testo?.replace(/\s/g, "") === "‹1di5›", `scheda: '‹ 1 di 5 ›' dentro la barra azioni in basso, non sopra la scheda (${n.testo})`); }
   { const c = await q3.getByTestId("stato-apertura").evaluate((el) => getComputedStyle(el).color);
     ok(c === "rgb(26, 60, 64)", `scheda: 'Aperto ora' in teal del marchio (${c})`); }
   await q3.screenshot({ path: `${OUT}/r3-scheda.png` });

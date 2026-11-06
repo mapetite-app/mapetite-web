@@ -1029,9 +1029,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           )}
                           {/* Punti forti nella stessa riga (card più bassa): solo se non ci sono già i ✓ o "Come…". */}
                           {!similar && req.length === 0 && chips.length > 0 && !d?.perTe && (
-                            <span data-testid="punti-forti" className="flex min-w-0 gap-1.5">
+                            // 6/11 sera (area 6b): niente pillole tagliate ("Pesce fres…"): quelle che non stanno intere vanno a
+                            // capo su una seconda riga nascosta. Si vedono solo pillole intere.
+                            <span data-testid="punti-forti" className="flex h-[22px] min-w-0 flex-1 flex-wrap gap-1.5 overflow-hidden">
                               {chips.map((c) => (
-                                <span key={c} className="min-w-0 truncate rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
+                                <span key={c} className="shrink-0 whitespace-nowrap rounded-pill border border-white/70 px-2.5 py-0.5 text-xs font-sans font-medium text-white first-letter:uppercase">{c}</span>
                               ))}
                             </span>
                           )}
