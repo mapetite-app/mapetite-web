@@ -1014,7 +1014,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                           )}
                           {/* Chiuso: lo si dice, senza nasconderlo (può servire per un'altra sera). */}
                           {d?.openNow === false && (
-                            <span data-testid="chiuso-ora" className="shrink-0 rounded-pill bg-white/20 px-2.5 py-0.5 text-xs font-display font-semibold text-white/90">Chiuso ora</span>
+                            // Revisore 6/11 sera: stesso stile di "Aperto ora" (testo con pallino), non una pillola piena.
+                            <span data-testid="chiuso-ora" className="flex shrink-0 items-center gap-1 text-xs font-display font-semibold text-white/60"><span aria-hidden className="h-1.5 w-1.5 rounded-full border border-white/60" />Chiuso ora</span>
                           )}
                           {similar && (
                             // Corta, così non si taglia ("✨ Come Hostaria Del …", revisore del 2/11): il nome del salvato
