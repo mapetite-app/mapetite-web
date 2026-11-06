@@ -2267,6 +2267,7 @@ else {
     // Revisore 5/11: senza risultati c'è solo "Azzera" (prima anche "Mostra tutti", stessa azione).
     ok((await L.getByRole("button", { name: "Mostra tutti" }).count()) === 0, "salvati lista: senza risultati un solo pulsante per azzerare");
     await L.getByTestId("salvati-azzera").click();
+    for (let i = 0; i < 30 && (await righe.count()) !== 3; i++) await p.waitForTimeout(100);
     ok((await righe.count()) === 3, "salvati lista: 'Azzera' azzera la ricerca");
     // Lorenzo 5/11: scelta una città in alto, la lista è solo di quella (prima restavano anche i posti dell'altra).
     { const citta = L.getByTestId("salvati-citta-pillola");

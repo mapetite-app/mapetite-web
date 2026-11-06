@@ -238,7 +238,9 @@ export default function VenueSheet({
   const [fotoBassa, setFotoBassa] = useState<{ id: string; livello: number }>({ id: venue.id, livello: 0 });
   const livelloFoto = fotoBassa.id === venue.id ? fotoBassa.livello : 0;
   useEffect(() => {
-    if (livelloFoto >= 2 || detailsOpen) return;
+    // Con "‹ 1 di 12 ›" in alto la foto non scende sotto 96 px (revisore 6/11 sera: a 64 px la pillola copriva
+    // l'autore della foto, che Google chiede di mostrare).
+    if (livelloFoto >= (nav ? 1 : 2) || detailsOpen) return;
     const raf = requestAnimationFrame(() => {
       const riga = document.querySelector("[data-testid=scheda-altro-info]")?.getBoundingClientRect();
       const barra = document.querySelector("[data-testid=barra-azioni]")?.getBoundingClientRect();
@@ -686,6 +688,17 @@ export default function VenueSheet({
     return (
       // min-h-full: a tutto schermo la barra azioni resta in fondo anche quando la scheda è corta.
       <div className={`relative flex min-h-full flex-col rounded-card ${PAPER} shadow-float`}>
+        {/* "‹ 1 di 12 ›" in alto al centro, tra Chiudi e Condividi (designer 6/11: la barra in basso torna su una riga
+            sola). Fissa mentre si scorre (revisore 6/11 sera: prima, scendendo, spariva; in basso era sempre in vista). */}
+        {nav && (
+          <div className="sticky top-0 z-20 h-0">
+            <div data-testid="scheda-nav" className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-11 -translate-x-1/2 items-center rounded-full bg-white/90 text-text shadow-card backdrop-blur">
+              <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
+              <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
+              <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
+            </div>
+          </div>
+        )}
         <SchedaCarosello
           photoRefs={venue.photoRef ? [venue.photoRef] : []}
           name={name}
@@ -709,7 +722,8 @@ export default function VenueSheet({
               </div>
             ) : (
               <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-center justify-center bg-brand pt-[env(safe-area-inset-top,0px)]">
-                <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none">{emoji}</span>
+                {/* Intestazione bassa: con "‹ 1 di 12 ›" al centro l'emoji finirebbe dietro la pillola. */}
+                <span aria-hidden className={`${nav ? "hidden" : "flex"} h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none`}>{emoji}</span>
               </div>
             )
           }
@@ -724,15 +738,6 @@ export default function VenueSheet({
               >
                 <X size={19} aria-hidden />
               </button>
-              {/* "‹ 1 di 12 ›" in alto al centro, tra Chiudi e Condividi (designer 6/11: la barra in basso torna su
-                  una riga sola, come in Places e Google Maps dove si scorre tra i risultati dall'alto). */}
-              {nav && (
-                <div data-testid="scheda-nav" className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-11 -translate-x-1/2 items-center rounded-full bg-white/90 text-text shadow-card backdrop-blur">
-                  <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
-                  <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
-                  <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
-                </div>
-              )}
               {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}
               <div className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex gap-2" data-testid="azioni-scheda">
                 {shareOn && (

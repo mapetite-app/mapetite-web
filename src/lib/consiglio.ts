@@ -133,9 +133,10 @@ const NEUTRE = radici(
 );
 // Confronto più stretto delle 5 lettere: la parola deve iniziare come una parola dei dati per tutta la sua
 // lunghezza meno 2 lettere (romantico/romantica, festeggiati/festeggiato passano; "tramosto" per tramonto no).
+// Parole di 5–6 lettere: 4 lettere bastano (revisore 6/11 sera: "copre" scartato con "coprire" nella recensione).
 export function percheNonNeiDati(perche: string, datiPosto: string): string[] {
   const parole = [...new Set(norm(datiPosto).match(/[a-z]{4,}/g) ?? [])];
-  const ce = (w: string) => { const testa = w.slice(0, Math.max(5, w.length - 2)); return parole.some((d) => d.startsWith(testa)); };
+  const ce = (w: string) => { const testa = w.slice(0, Math.max(4, w.length - 2)); return parole.some((d) => d.startsWith(testa)); };
   return [...new Set((norm(perche).match(/[a-z]{5,}/g) ?? []))].filter((w) => !NEUTRE.has(w.slice(0, 5)) && !ce(w));
 }
 // Refusi dell'AI ("tramosto" per "tramonto", visto il 6/11): una parola che non c'è nei dati ma dista al
@@ -170,6 +171,10 @@ export function ripeteVerdetto(perche: string, verdetto: string | null | undefin
   const v = radici(verdetto);
   const p = [...radici(perche)].filter((w) => !NEUTRE.has(w));
   const comuni = p.filter((w) => v.has(w)).length;
+  // Revisore 6/11 sera: "Cucina milanese autentica, location elegante" sopra la card "Cucina milanese autentica…":
+  // se le prime 2 parole che contano sono le prime 2 del verdetto, il riquadro si legge come un doppione.
+  const vInizio = [...v].filter((w) => !NEUTRE.has(w)).slice(0, 2);
+  if (vInizio.length === 2 && p.length >= 2 && p[0] === vInizio[0] && p[1] === vInizio[1]) return true;
   return comuni >= 3 ? comuni / p.length > 0.5 : p.length > 0 && comuni === p.length;
 }
 /** Seconda richiesta, una sola volta: stesso posto, perché riscritto senza le parole che i dati non dicono. */

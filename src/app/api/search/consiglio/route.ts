@@ -95,12 +95,19 @@ export async function POST(request: Request) {
       // Una sola seconda richiesta (~0,45 centesimi), solo quando il perché ha parole non sostenute dai dati.
       console.log(`[search-consiglio] riscrivo: parole che i dati non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio.perche)})`);
       const primo = consiglio.id;
+      // Revisore 6/11 sera: se l'unico difetto era ripetere il verdetto e la riscrittura fallisce, resta la prima scelta senza perché.
+      const soloRipete = prestate.length === 1 && prestate[0] === RIPETE ? { ...consiglio, perche: "" } : null;
       const m2 = await chiedi(promptRiscrivi(prompt, text, prestate));
       input_tokens += m2.usage.input_tokens;
       output_tokens += m2.usage.output_tokens;
       const c2 = parseConsiglio(testo(m2), posti);
       consiglio = c2 && c2.id === primo ? c2 : null;
       prestate = fuori(consiglio);
+      if (soloRipete && (!consiglio || (prestate.length > 0 && !(prestate.length === 1 && prestate[0] === RIPETE)))) {
+        console.log(`[search-consiglio] riscrittura non valida (${JSON.stringify(prestate)}): resta la prima scelta senza perché`);
+        consiglio = soloRipete;
+        prestate = [];
+      }
     }
     const scelto = consiglio ? posti.find((p) => p.id === consiglio!.id) : null;
     // 6/11 sera: se dopo la riscrittura l'unico difetto è ripetere il verdetto (ogni parola sta nei dati), il
@@ -118,7 +125,8 @@ export async function POST(request: Request) {
     }
     const nome = consiglio ? scelto?.name : null;
     console.log(`[search-consiglio] q=${JSON.stringify(query.trim().slice(0, 80))} posti=${posti.length} scelto=${JSON.stringify(nome ?? null)} perche=${JSON.stringify(consiglio?.perche ?? null)} ms=${Date.now() - t0} in=${input_tokens} out=${output_tokens} cost=$${estimateCostUsd(input_tokens, output_tokens).toFixed(6)}`);
-    memoria.set(chiave, { at: Date.now(), consiglio });
+    // Solo i consigli dati: un "nessuno" non resta in memoria, la stessa frase rifatta ci riprova (revisore 6/11 sera).
+    if (consiglio) memoria.set(chiave, { at: Date.now(), consiglio });
     if (memoria.size > 300) memoria.delete(memoria.keys().next().value!);
     return NextResponse.json({ consiglio });
   } catch (err) {
