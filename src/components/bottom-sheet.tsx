@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import { createPortal } from "react-dom";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { nomeLeggibile } from "@/lib/nome-leggibile";
+import { pinName } from "@/lib/pin-labels";
 import type { Place } from "@/app/mappa/map-view";
 import { useBeta, useOptIn } from "@/lib/beta";
 import { isGem } from "@/lib/gem";
@@ -59,7 +60,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[]; budget?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Frase vera da condividere quando il titolo è un'etichetta ("Altri come X"): chi apre il link rifà
@@ -103,6 +104,13 @@ export interface BottomSheetProps {
   removed?: readonly string[];
   // Dati veri per la frase sopra le card (src/lib/frase-risultati.ts); null = nessuna frase.
   frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number } | null;
+  // "Ti porterei da…" (richiesta 5 del 5/11): con una frase da chat l'AI sceglie un posto della lista
+  // e dice perché, solo dai dati veri (src/lib/consiglio.ts). Prende il posto della frase sopra le card.
+  consiglio?: { place: Place; perche: string } | null;
+  // Il consiglio sta arrivando: la frase lo dice su una riga sua (e ha già l'altezza del consiglio).
+  consiglioInArrivo?: boolean;
+  // Un consiglio è stato chiesto per questa ricerca: anche se non arriva, la frase resta alta come il consiglio.
+  consiglioChiesto?: boolean;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -341,7 +349,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -668,7 +676,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           ✨ Per te: {setAside!.per_te!.map((g) => (g === "chicche" ? "preferisci le chicche" : g)).join(" · ")}
         </p>
       )}
-      {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0) && (
+      {setAside && (setAside.turistici.length > 0 || setAside.fuori_tema.length > 0 || (setAside.fuori_zona?.length ?? 0) > 0 || (setAside.budget?.length ?? 0) > 0) && (
         <p data-testid="messi-da-parte" className="mt-1 text-xs font-sans text-text-muted">
           {/* "Molto famosi", non "turistici": la regola guarda solo il numero di recensioni (src/lib/mainstream.ts).
               Il 14/10 dal vivo Bar Basso a Milano risultava "turistico": un'affermazione che non sappiamo (VISIONE: mai inventare). */}
@@ -677,6 +685,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             setAside.fuori_tema.length > 0 ? `${setAside.turistici.length > 0 ? "e" : "Ho messo da parte"} ${setAside.fuori_tema.length === 1 ? "uno fuori tema" : `${setAside.fuori_tema.length} fuori tema`} (${setAside.fuori_tema.slice(0, 2).join(", ")}${setAside.fuori_tema.length > 2 ? "…" : ""})` : null,
             // Fuori dal quartiere chiesto (17/10): in fondo, mai tolti.
             (setAside.fuori_zona?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.fuori_zona!.length === 1 ? "uno fuori zona" : `${setAside.fuori_zona!.length} fuori zona`} (${setAside.fuori_zona!.slice(0, 2).join(", ")}${setAside.fuori_zona!.length > 2 ? "…" : ""})` : null,
+            // Budget scritto nella frase (5/11): in fondo, mai tolti; la fascia è quella di Google.
+            (setAside.budget?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length + (setAside.fuori_zona?.length ?? 0) > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.budget!.length === 1 ? "uno sopra il tuo budget" : `${setAside.budget!.length} sopra il tuo budget`} (${setAside.budget!.slice(0, 2).join(", ")}${setAside.budget!.length > 2 ? "…" : ""})` : null,
           ].filter(Boolean).join(" ")}
         </p>
       )}
@@ -849,13 +859,42 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
-        {fraseOggi && (
+        {nuova && consiglio && places.some((p) => p.id === consiglio.place.id) ? (
+          // Il consiglio sostituisce la frase (una cosa sola sopra le card). Un tocco porta alla sua card.
+          <button
+            type="button"
+            data-testid="consiglio"
+            onClick={() => { if (onFocus) onFocus(consiglio.place); }}
+            className="pointer-events-auto mx-4 mb-1.5 flex h-[82px] w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+          >
+            {/* Terzo revisore 6/11: "Ti porterei da Osteria dell'Acqu…" tagliava il nome, la cosa più importante.
+                Ora "Ti porterei da" è piccolo sopra e il nome ha la riga sua; stessa altezza dell'attesa (82 px).
+                Con la sua card già davanti il nome non si ripete: "Ti porterei qui" e il perché. */}
+            <span className="min-w-0 flex-1">
+              <span data-testid="consiglio-sopra" className="flex items-center gap-1 text-[11px] font-sans font-semibold uppercase leading-[14px] tracking-[0.08em] text-accent">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                {focusedId === consiglio.place.id ? "Ti porterei qui" : "Ti porterei da"}
+              </span>
+              {focusedId !== consiglio.place.id && (
+                <span data-testid="consiglio-titolo" className="block truncate font-title text-[17px] font-semibold leading-[21px] text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(pinName(consiglio.place.name))}</span>
+              )}
+              <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
+            </span>
+            <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>
+          </button>
+        ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
-          <div data-testid="frase-risultati" className="pointer-events-none mx-4 mb-1.5 flex items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5">
+          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo || consiglioChiesto ? "h-[82px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
-              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{fraseOggi.dettaglio}</span>}
+              {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className={`mt-0.5 ${consiglioInArrivo ? "line-clamp-1" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{fraseOggi.dettaglio}</span>}
+              {consiglioInArrivo && (
+                <span data-testid="consiglio-in-arrivo" className="mt-0.5 flex items-center gap-1.5 text-xs font-sans font-medium leading-4 text-accent">
+                  <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                  Sto scegliendo il posto per te…
+                </span>
+              )}
             </p>
             <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di {places.length}</span>
           </div>

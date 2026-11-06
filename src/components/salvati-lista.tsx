@@ -35,7 +35,7 @@ const [WANT, DONE] = STATE_TAGS;
 const PASSO = 60;
 // Tipi di locale nella fila dei filtri rapidi: i più frequenti, non tutti (con 500 salvati sarebbero decine).
 const MAX_TIPI = 12;
-type Ordine = "vicino" | "recenti" | "preferiti";
+type Ordine = "vicino" | "recenti" | "preferiti" | "attesa";
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
 const LINE = "border-[#e3e7e7]";
@@ -337,10 +337,9 @@ export default function SalvatiLista({
   // "Preferiti" (revisore 3/11, area 3d): prima i 👍, poi gli altri "Ci sono stato", poi i da provare
   // dal più recente; i 👎 in fondo. Solo segnali dati dalla persona, nessuna fama.
   const sort = ordine ?? (origin ? "vicino" : "recenti");
-  // "Aspettano da mesi" (PROPOSTE.md 40, PROBLEMI.md 18): i "Da provare" salvati da oltre 60 giorni
-  // tornano su con una riga sola; un tocco li mostra da soli. Solo la data di salvataggio, costo zero.
+  // "Da mesi" (PROPOSTE.md 40, PROBLEMI.md 18): i "Da provare" salvati da oltre 60 giorni dicono "da luglio"
+  // sulla riga; l'ordine "Da più tempo" li porta in cima. Solo la data di salvataggio, costo zero.
   const [adesso] = useState(() => Date.now());
-  const [soloMesi, setSoloMesi] = useState(false);
   const daMesi = useMemo(() => new Set(base.filter((p) => !p.tags?.includes(DONE) && p.businessStatus !== "CLOSED_PERMANENTLY" && p.savedAt && adesso - Date.parse(p.savedAt) > 60 * 86_400_000).map((p) => p.id)), [base, adesso]);
   const daQuando = (p: Place) => {
     if (!daMesi.has(p.id) || !p.savedAt) return null;
@@ -348,29 +347,34 @@ export default function SalvatiLista({
     const mese = d.toLocaleDateString("it-IT", { month: "long" });
     return new Date(adesso).getFullYear() === d.getFullYear() ? mese : `${mese} ${d.getFullYear()}`;
   };
-  const shownMesi = useMemo(() => (soloMesi ? shown.filter((p) => daMesi.has(p.id)) : shown), [shown, soloMesi, daMesi]);
   const list = useMemo(() => {
     // Proposta 45: chi ha chiuso per sempre (secondo Google) va in fondo con qualsiasi ordine. Mai tolto.
     const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
     // Revisore 3/11 (sesto): anche con "Vicino" i 👎 vanno in fondo (mai primo un posto che non fa per te).
     if (sort === "vicino" && origin) {
       const giu = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 1 : 0);
-      return [...shownMesi].sort((a, b) => chiuso(a) - chiuso(b) || giu(a) - giu(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
+      return [...shown].sort((a, b) => chiuso(a) - chiuso(b) || giu(a) - giu(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
+    }
+    // "Da più tempo" (revisore 5/11, al posto della riga "Aspettano da mesi"): prima i Da provare dal più
+    // vecchio, poi i già visitati; come gli ordinamenti di Places, Mapstr e Google Maps. Solo la data di salvataggio.
+    if (sort === "attesa") {
+      const fatto = (p: Place) => (p.tags?.includes(DONE) ? 1 : 0);
+      return [...shown].sort((a, b) => chiuso(a) - chiuso(b) || fatto(a) - fatto(b));
     }
     if (sort === "preferiti") {
       const peso = (p: Place) => (p.tags?.includes(OPINION_DISLIKE) ? 3 : p.tags?.includes(OPINION_LIKE) ? 0 : p.tags?.includes(DONE) ? 1 : 2);
-      return [...shownMesi].reverse().sort((a, b) => chiuso(a) - chiuso(b) || peso(a) - peso(b));
+      return [...shown].reverse().sort((a, b) => chiuso(a) - chiuso(b) || peso(a) - peso(b));
     }
-    const ordinati = sort === "recenti" ? [...shownMesi].reverse() : [...shownMesi];
+    const ordinati = sort === "recenti" ? [...shown].reverse() : [...shown];
     return ordinati.sort((a, b) => chiuso(a) - chiuso(b));
-  }, [shownMesi, origin, sort]);
+  }, [shown, origin, sort]);
   // Un tocco su una riga apre la scheda con l'ordine della lista. Funzione stabile (le righe sono memo).
   const apri = useRef({ onOpen, ids: [] as string[] });
   useEffect(() => { apri.current = { onOpen, ids: list.map((x) => x.id) }; });
   const apriRiga = useCallback((p: Place) => apri.current.onOpen(p, apri.current.ids), []);
   // Righe disegnate: le prime PASSO, poi altre scorrendo (onScroll). Si riparte da capo a ogni filtro nuovo.
   const [quanti, setQuanti] = useState(PASSO);
-  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${tipo ?? ""}|${cercato}|${soloMesi}|${sort}`;
+  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${tipo ?? ""}|${cercato}|${sort}`;
   const [chiaveVista, setChiaveVista] = useState(chiaveFiltri);
   if (chiaveFiltri !== chiaveVista) { setChiaveVista(chiaveFiltri); setQuanti(PASSO); }
   const onScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -408,8 +412,8 @@ export default function SalvatiLista({
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
   ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
   // Filtri accesi oltre alla città: sotto la fila compaiono "23 di 500" e "Azzera".
-  const filtrando = searching || soloMesi || activeTag !== null || tipo !== null;
-  const azzera = () => { onTag(null); scrivi(""); setTipo(null); setSoloMesi(false); };
+  const filtrando = searching || activeTag !== null || tipo !== null;
+  const azzera = () => { onTag(null); scrivi(""); setTipo(null); };
   // Nessun posto in questa città ma qualcuno nelle altre: si propone di cercare dappertutto.
   const altrove = list.length === 0 && zonaOn && filtrando
     ? filtraLista(activeTag === null ? all : all.filter((p) => hasStateOrTag(p.tags, activeTag)), tipo, cercato, testi).length
@@ -469,6 +473,7 @@ export default function SalvatiLista({
               <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
               <option value="recenti">Recenti</option>
               <option value="preferiti">Preferiti</option>
+              <option value="attesa">Da più tempo</option>
             </select>
             <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-1 text-text-muted" />
           </label>
@@ -641,23 +646,6 @@ export default function SalvatiLista({
             </Link>
           </div>
         </div>
-
-        {/* Con un altro filtro acceso (tipo, stato, raccolta, testo) il conteggio dei "da mesi" non torna: la riga sparisce. */}
-        {daMesi.size > 0 && (soloMesi || (!searching && activeTag === null && tipo === null)) && (
-          <button
-            type="button"
-            data-testid="salvati-da-mesi"
-            aria-pressed={soloMesi}
-            onClick={() => { setSoloMesi((v) => !v); if (!soloMesi) trackFeature("salvati_da_mesi", { n: daMesi.size }); }}
-            className={`mt-2.5 flex min-h-11 w-full items-center gap-2 rounded-card px-3.5 text-left text-[14px] active:scale-[0.99] ${soloMesi ? "bg-brand font-semibold text-white" : "bg-[#eef1f1] font-medium text-[#33373d]"}`}
-          >
-            <span aria-hidden className="text-[15px] leading-none">⏳</span>
-            <span className="min-w-0 flex-1 truncate">
-              {soloMesi ? "Aspettano da mesi" : `${daMesi.size} ${daMesi.size === 1 ? "posto aspetta" : "posti aspettano"} da mesi`}
-            </span>
-            {soloMesi ? <X size={14} aria-hidden className="shrink-0" /> : <span className="shrink-0 text-[13px] font-semibold text-brand">Vedi</span>}
-          </button>
-        )}
 
         {/* Quanti ne restano su quanti (della città scelta) e "Azzera", solo con un filtro acceso. */}
         {filtrando && !rispostaAI && (

@@ -848,10 +848,9 @@ export default function VenueSheet({
               gusti; il perché della ricerca si chiama "Perché qui" (non parla della persona). Subito sotto il verdetto,
               prima dei ✓: è la ragione per cui Mapetite è diversa e deve stare nella prima schermata (collaudo 23/10). */}
           {perTeLine && (
-            <p data-testid="per-te-scheda" className="mt-3.5 flex items-center gap-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-              <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
-                <Sparkles size={15} />
-              </span>
+            // Designer 6/11: senza il cerchio con la scintilla (sembrava un pulsante, terza ✦ dello schermo): una riga
+            // che continua il verdetto, come la descrizione sotto il nome in Places.
+            <p data-testid="per-te-scheda" className="mt-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
               <span className="min-w-0">
                 <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
               </span>
@@ -909,31 +908,16 @@ export default function VenueSheet({
           </div>
         )}
 
-        {/* "Orari, contatti, recensioni ›": tutto il resto, un tocco più in là. Subito sotto il verdetto
-            il filetto c'è già (quello sotto il verdetto): niente secondo filetto con il vuoto in mezzo (collaudo 22/10). */}
-        <button
-          type="button"
-          data-testid="scheda-altro-info"
-          aria-expanded={detailsOpen}
-          aria-controls={`scheda-dettagli-${venue.id}`}
-          onClick={openDetails}
-          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto ? "" : "mt-4 border-t border-[#e1e5e5]"}`}
-        >
-          Orari, contatti, recensioni
-          <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
-        </button>
-
         {/* Sopra la barra, a scheda chiusa: i punti forti e due frasi delle recensioni Google già caricate
             (revisore del 2/11, r5: senza foto restava un terzo di schermo vuoto). Solo dati già presenti nella
             scheda, nessuna chiamata in più; senza dati il blocco non c'è. Corto: al massimo 2 righe di pillole. */}
-        {!detailsOpen && (puntiForti.length > 0 || frasiRecensioni.length > 0) && (
+        {(puntiForti.length > 0 || frasiRecensioni.length > 0) && (
           <section data-testid="scheda-in-vista" className="mx-[22px] mt-1 pb-2">
             {puntiForti.length > 0 && (
               <div data-testid="scheda-punti-forti">
-                <p className="font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Per cosa andarci</p>
-                <div className="mt-2 flex max-h-[3.75rem] flex-wrap gap-1.5 overflow-hidden">
+                <div className="mt-1 flex max-h-[4.25rem] flex-wrap gap-1.5 overflow-hidden">
                   {puntiForti.map((chip) => (
-                    <span key={chip} className="inline-flex max-w-full items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-medium text-brand">
+                    <span key={chip} className="inline-flex max-w-full items-center gap-1 rounded-pill border border-[#d9dede] bg-white px-3 py-1.5 text-[13px] font-sans font-medium text-text">
                       <Check size={12} className="shrink-0" aria-hidden />
                       <span className="truncate">{chip}</span>
                     </span>
@@ -945,7 +929,7 @@ export default function VenueSheet({
               <div data-testid="scheda-frasi-recensioni" className={puntiForti.length > 0 ? "mt-4" : ""}>
                 <ul className="flex flex-col gap-2">
                   {frasiRecensioni.map((f) => (
-                    <li key={f} className={`${SERIF} text-[15.5px] italic leading-snug text-[#3d4248]`}>«{f}»</li>
+                    <li key={f} className="font-sans text-[14px] leading-[1.45] text-[#4b5058]">«{f}»</li>
                   ))}
                 </ul>
                 <p className="mt-1.5 text-[11.5px] font-sans text-text-muted">dalle recensioni Google</p>
@@ -953,6 +937,20 @@ export default function VenueSheet({
             )}
           </section>
         )}
+
+        {/* "Orari, contatti, recensioni ›": tutto il resto, un tocco più in là. Designer 6/11: chiude il racconto
+            (verdetto → perché → per cosa andarci → frasi → altro) invece di interromperlo, come la riga › di Albo. */}
+        <button
+          type="button"
+          data-testid="scheda-altro-info"
+          aria-expanded={detailsOpen}
+          aria-controls={`scheda-dettagli-${venue.id}`}
+          onClick={openDetails}
+          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto && !(puntiForti.length > 0 || frasiRecensioni.length > 0) ? "" : "mt-2 border-t border-[#e1e5e5]"}`}
+        >
+          Orari, contatti, recensioni
+          <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
+        </button>
 
         <div id={`scheda-dettagli-${venue.id}`} data-testid="scheda-dettagli" hidden={!detailsOpen} className="scroll-mt-4">
           {/* Tre sezioni brevi: Info · Recensioni · In breve. */}

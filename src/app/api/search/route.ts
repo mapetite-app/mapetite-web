@@ -7,6 +7,7 @@ import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
 import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
+import { inFondoPerPrezzo, prezzoMax } from "@/lib/budget";
 import { distanceMeters } from "@/lib/distance";
 import { isAutomated, recordEvent, ANON_COOKIE, SESSION_COOKIE } from "@/lib/events";
 import { cookies } from "next/headers";
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
   // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
   // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
-  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -418,6 +419,20 @@ export async function POST(request: Request) {
         risultati = places;
         daParte.fuori_tema = [...daParte.fuori_tema, ...demoted].slice(0, 10);
         console.log(`[search-zona] q=${JSON.stringify(query.trim().slice(0, 80))} citta=${city} in fondo (fuori città): ${JSON.stringify(demoted)}`);
+      }
+    }
+
+    // Budget scritto nella frase ("massimo 50 euro a testa", 5/11): i posti con fascia Google sopra vanno
+    // in fondo, mai esclusi (src/lib/budget.ts). Prima del taglio a 12, così non occupano i posti con il verdetto.
+    if (searchIntent === "natural") {
+      const max = prezzoMax(query);
+      if (max != null) {
+        const { places, demoted } = inFondoPerPrezzo(risultati, max);
+        if (demoted.length > 0) {
+          risultati = places;
+          daParte.budget = demoted.slice(0, 10);
+          console.log(`[search-budget] q=${JSON.stringify(query.trim().slice(0, 80))} fascia max=${max} in fondo (sopra il budget): ${JSON.stringify(demoted)}`);
+        }
       }
     }
 
@@ -737,7 +752,7 @@ ESEMPI (input → output atteso):
     risultati: risultatiFinali,
     filtri_usati: filtri,
     // "Per te": quali gusti del profilo hanno cambiato l'ordine (il telefono lo dice accanto a "messi da parte").
-    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || perTe.length > 0
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || (daParte.budget?.length ?? 0) > 0 || perTe.length > 0
       ? { da_parte: { ...daParte, ...(perTe.length > 0 ? { per_te: [...new Set(perTe)] } : {}) } }
       : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.

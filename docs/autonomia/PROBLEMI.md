@@ -220,3 +220,10 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **DAVVERO, in futuro:** ordine sempre più basato sui comportamenti di chi usa Mapetite (salvati, "ci sono stato", 👍/👎), che non si comprano; dire all'utente perché un posto è in cima (proposta 46).
 - **Primo passo:** contare nei log `[search-mainstream]` quante ricerche spostano posti di massa, per sapere quanto spesso il voto Google da solo avrebbe deciso (team).
 
+## 21. Il posto salvato è pieno proprio la sera in cui decido — 6/11 notte
+- **Chi lo ha:** il cliente (salva un posto, lo sceglie il sabato e non c'è posto, quindi ripiega sul solito) e il ristoratore (tavoli liberati da una disdetta che nessuno riprende).
+- **Quanto pesa:** il no-show riguarda il 12,8% delle uscite a cena su 212 mila prenotazioni in 300 locali italiani (Osservatorio Incremento-Ristorazione 2025, riportato da [Libero](https://www.liberoquotidiano.it/news/italia/44528856/ristoranti-rovinati-clienti-prenotano-non-vanno-idea-caparra/)): sono tavoli che si liberano all'ultimo. Corner avvisa già quando si libera un tavolo in un posto salvato ([Business Insider via Dnyuz](https://dnyuz.com/2026/07/21/a-startup-building-a-map-to-help-you-make-plans-with-friends-has-doubled-its-funding/)). Quante serate saltano per "era pieno" a Roma e Milano: dato non trovato.
+- **OGGI nell'app:** "Stasera" propone i salvati aperti; "Tavoli da Mapetite" per i locali che aderiscono; nessun avviso di tavolo libero.
+- **DAVVERO, in futuro:** il ristoratore segna un tavolo liberato e Mapetite avvisa solo chi ha quel posto tra i "Da provare" ed è vicino (proposta 6 del 18/10, "Avvisami se si libera"): domanda qualificata, il lato B2B di VISIONE.
+- **Primo passo:** dopo l'8/11, contare nei log quante volte "Stasera" non trova posti salvati aperti (team).
+

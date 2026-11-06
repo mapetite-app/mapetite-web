@@ -1004,6 +1004,81 @@ await page.unroute("**/api/search");
   await page.unroute("**/api/search");
 }
 
+// 5e-ter. "Ti porterei qui" (richiesta 5 di Lorenzo del 5/11, src/lib/consiglio.ts): con una frase da chat, dopo i
+//     verdetti, l'AI sceglie UN posto della lista e dice perché; prende il posto della frase sopra le card, un tocco porta
+//     alla sua card. Con una frase breve niente consiglio (e nessuna chiamata). Budget nella frase → i più cari in fondo.
+{
+  let cs = null, bu = null;
+  try { cs = await import(new URL("../../src/lib/consiglio.ts", import.meta.url).href); } catch (e) { ok(false, `consiglio: modulo importabile (${e.message})`); }
+  try { bu = await import(new URL("../../src/lib/budget.ts", import.meta.url).href); } catch (e) { ok(false, `budget: modulo importabile (${e.message})`); }
+  if (cs) {
+    ok(cs.vuoleConsiglio("devo festeggiare i 70 anni di mio papà, ama il pesce") && cs.vuoleConsiglio("dove porto mia madre a pranzo?") && cs.vuoleConsiglio("cena con i colleghi a Monti") && !cs.vuoleConsiglio("trattoria a Trastevere") && !cs.vuoleConsiglio("Rooftop romantico per due a Roma") && !cs.vuoleConsiglio("pizza"), "consiglio: solo per frasi da chat (occasione, persona, domanda, 8+ parole), non per 'trattoria a Trastevere'");
+    const P = [{ id: "A", name: "Uno" }, { id: "B", name: "Due" }];
+    ok(cs.parseConsiglio('{"n":2,"perche":"sala tranquilla e pesce freschissimo, dicono le recensioni"}', P)?.id === "B" && cs.parseConsiglio('{"n":null}', P) === null && cs.parseConsiglio('{"n":7,"perche":"bello e buono davvero"}', P) === null && cs.parseConsiglio('{"n":1,"perche":"ok"}', P) === null && cs.parseConsiglio("non so", P) === null, "consiglio: solo un numero della lista e un perché vero; 'nessuno' resta nessuno");
+    const pr = cs.buildPrompt("compleanno di mio papà", [{ id: "A", name: "Uno", category: "Ristorante", priceLevel: 3, rating: 4.6, editorialSummary: null, reviewTexts: ["Abbiamo festeggiato il compleanno"], verdict: "Pesce fresco", livello: "alto" }]);
+    ok(/SOLO da verdetto, descrizione o recensioni/.test(pr) && /non nominare prezzo, budget, numero di persone/.test(pr) && /fama NON sono un motivo/.test(pr) && /Adatto alla richiesta: alto\n/.test(pr) && /non parlare di anniversario/.test(pr) && /prezzo €€€/.test(pr), "consiglio: il prompt vieta di inventare, non premia la fama e porta il giudizio della ricerca (solo alto/medio/basso)");
+    const lungo = "Sala tranquilla e pesce freschissimo, compleanni festeggiati con la torta e la musica, personale attento e cordiale con tutti";
+    ok(cs.perchePrestato("Compleanni festeggiati con cura, sala tranquilla dove si parla", "posto tranquillo dove si parla per il compleanno", "Abbiamo festeggiato il mio compleanno, ambiente spazioso e luminoso").join() === "tranquilla,parla" && cs.perchePrestato("Rooftop romantico con vista magica", "ristorante romantico su un rooftop", "Rooftop romantico al tramonto con vista magica").length === 0, "consiglio: una parola presa dalla richiesta che i dati del posto non dicono fa scartare il consiglio");
+    // Terzo revisore 6/11: "professionale" non era nei dati. Ogni parola del perché deve stare nei dati del posto.
+    ok(JSON.stringify(cs.percheNonNeiDati("Autentica cucina milanese, ambiente caloroso ma professionale", "Cucina milanese autentica, ambiente caloroso e familiare")) === '["professionale"]'
+      && cs.percheNonNeiDati("Pesce eccezionale, le recensioni dicono che i compleanni sono festeggiati con cura", "pesce eccezionale; abbiamo festeggiato i compleanni, curato tutto").length === 0
+      && JSON.stringify(cs.percheNonNeiDati("Rooftop romantico al tramosto", "Rooftop romantica al tramonto")) === '["tramosto"]'
+      && cs.correggiRefusi("Rooftop romantico al tramosto", "Rooftop romantica al tramonto") === "Rooftop romantico al tramonto"
+      && cs.correggiRefusi("Personale garbato", "personale gentile") === "Personale garbato"
+      && JSON.stringify(cs.numeriNonNeiDati("Perfetto per i 70 anni di tuo papà", "pesce fresco, 2 sale")) === '["70"]'
+      && cs.ripeteVerdetto("Pesce eccezionale", "Pesce eccezionale e trattato con passione") && !cs.ripeteVerdetto("Compleanni festeggiati con attenzione, dicono le recensioni", "Pesce eccezionale e trattato con passione")
+      && /ripete il verdetto/.test(cs.promptRiscrivi("P", "{}", [cs.RIPETE]))
+      && /Queste parole non sono scritte nei dati di quel posto: professionale/.test(cs.promptRiscrivi("P", '{"n":1}', ["professionale"])),
+      "consiglio: una parola del perché assente dai dati del posto si riscrive una volta (le parole neutre come 'recensioni dicono' passano)");
+    ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
+  }
+  if (bu) {
+    ok(bu.prezzoMax("massimo 50 euro a testa") === 3 && bu.prezzoMax("30€ a persona") === 2 && bu.prezzoMax("sotto i 60 euro") === 3 && bu.prezzoMax("cena economica") === 2 && bu.prezzoMax("budget 100 euro") === 4 && bu.prezzoMax("trattoria a Trastevere") === null && bu.prezzoMax("in 10 persone") === null && bu.prezzoMax("spendere 50 euro in due") === 2, "budget: la cifra a testa diventa la fascia Google; senza cifra né 'economico' niente");
+    const L = [{ name: "Caro", priceLevel: 4 }, { name: "Giusto", priceLevel: 2 }, { name: "Ignoto", priceLevel: null }];
+    const r = bu.inFondoPerPrezzo(L, 3);
+    ok(r.places.map((x) => x.name).join(",") === "Giusto,Ignoto,Caro" && r.demoted.join() === "Caro" && bu.inFondoPerPrezzo([L[0]], 2).demoted.length === 0, "budget: i posti sopra la fascia in fondo (mai esclusi), quelli senza prezzo restano; se lo sono tutti non si sposta niente");
+  }
+  let chiamate = 0;
+  await page.route("**/api/search/consiglio", async (r) => { chiamate++; await new Promise((res) => setTimeout(res, 1500)); return r.fulfill({ json: { consiglio: { id: "P3", perche: "Cocktail curati e terrazza tranquilla sui tetti, dicono le recensioni di chi ci è stato" } } }); });
+  // Spento per tutti dal 6/11 (due bocciature): senza ?beta=consiglio nessuna chiamata anche con una frase da chat.
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await page.getByLabel("Cosa cerchi?").fill("devo festeggiare i 70 anni di mio papà, ama il pesce, saremo in 10");
+  await page.keyboard.press("Enter");
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  ok(chiamate === 0 && (await page.getByTestId("consiglio").count()) === 0 && (await page.getByTestId("consiglio-in-arrivo").count()) === 0, "consiglio spento di default: nessuna chiamata, nessun 'Sto scegliendo'");
+  await page.goto(`${BASE}/mappa?beta=consiglio`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
+  await page.waitForTimeout(800);
+  ok(chiamate === 0 && (await page.getByTestId("consiglio").count()) === 0 && (await page.getByTestId("frase-risultati").count()) === 1, "consiglio: con una frase breve nessuna chiamata, resta la frase sopra le card");
+  await page.getByLabel("Cosa cerchi?").fill("devo festeggiare i 70 anni di mio papà, ama il pesce, saremo in 10");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("consiglio-in-arrivo").waitFor({ timeout: 8000 }).catch(() => {});
+  const hPrima = await page.getByTestId("frase-risultati").evaluate((el) => el.getBoundingClientRect().height).catch(() => 0);
+  ok((await page.getByTestId("consiglio-in-arrivo").count()) === 1, "consiglio: mentre arriva, la frase sopra le card dice 'Sto scegliendo il posto per te…'");
+  await page.getByTestId("consiglio").waitFor({ timeout: 8000 }).catch(() => {});
+  const c = page.getByTestId("consiglio");
+  { const hDopo = await c.evaluate((el) => el.getBoundingClientRect().height).catch(() => 0);
+    ok(hPrima > 0 && Math.abs(hDopo - hPrima) <= 4, `consiglio: quando arriva il riquadro non cresce sopra la mappa (${Math.round(hPrima)} → ${Math.round(hDopo)} px)`); }
+  ok((await c.count()) === 1 && (await page.getByTestId("frase-risultati").count()) === 0 && chiamate === 1, `consiglio: con una frase da chat arriva dopo i verdetti, una chiamata, al posto della frase (${chiamate} chiamate)`);
+  if (await c.count()) {
+    ok((await page.getByTestId("consiglio-sopra").innerText()).toLowerCase().includes("ti porterei da") && (await page.getByTestId("consiglio-titolo").innerText()) === "Rooftop Tre" && /^Cocktail curati/.test(await page.getByTestId("consiglio-perche").innerText()) && /Vedi ›/.test(await c.innerText()), `consiglio: "Ti porterei qui", il nome e il perché ('${(await c.innerText()).replace(/\n/g, " / ")}')`);
+    const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=consiglio]").getBoundingClientRect(); const card = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: card.top, h: f.height, l: f.left, r: window.innerWidth - f.right }; });
+    ok(g.fb <= g.ct + 1 && g.h >= 78 && g.h <= 86 && g.l >= 12 && g.r >= 12, `consiglio: subito sopra le card, alto ${Math.round(g.h)} px, margini ${Math.round(g.l)}/${Math.round(g.r)} px`);
+    await c.click();
+    await page.waitForTimeout(900);
+    const centro = await page.locator("ul.snap-x li[data-id]").evaluateAll((lis) => lis.map((li) => ({ id: li.dataset.id, l: li.getBoundingClientRect().left })).filter((x) => x.l >= 0 && x.l < 60).map((x) => x.id)[0]);
+    ok(centro === "P3" && /^\d+ di \d+$/.test(await page.getByTestId("posizione-card").innerText()), `consiglio: un tocco porta alla sua card (${centro})`);
+    ok((await page.getByTestId("consiglio-sopra").innerText()).toLowerCase().includes("ti porterei qui") && (await page.getByTestId("consiglio-titolo").count()) === 0, "consiglio: con la sua card davanti il nome non si ripete");
+    { const hTap = await c.evaluate((el) => el.getBoundingClientRect().height).catch(() => 0);
+      ok(Math.abs(hTap - g.h) <= 1, `consiglio: al tocco il riquadro non cambia altezza (${Math.round(g.h)} → ${Math.round(hTap)} px)`); }
+    ok((await page.getByTestId("pin-consiglio").count()) === 1 && (await page.locator("[data-testid=pin][data-place=P3] [data-testid=pin-consiglio]").count()) === 1, "consiglio: la ✦ sta sul segnalino del posto scelto, e solo lì");
+  }
+  await page.unroute("**/api/search/consiglio");
+  await page.goto(`${BASE}/mappa?beta=-consiglio`, { waitUntil: "networkidle" });
+}
+
 // 5f. Ordine per quanto il locale è adatto (giudizio di Haiku), solo tra le card non ancora viste:
 //     la prima card resta dov'è (correzione 8 del giro del 1/11: l'ordine non salta sotto il dito).
 {
@@ -2078,7 +2153,7 @@ else {
     // Ordine visibile: senza posizione "Recenti" (dall'ultimo salvato: Caffè Milano è l'ultimo della risposta).
     { const ord = L.getByTestId("salvati-ordine");
       // Terzo giro: l'ordine è una pillola sola "Recenti ▾" (menu Vicino / Recenti) nella riga dei comandi.
-      ok((await ord.locator("option").allTextContents()).join("|") === "Vicino|Recenti|Preferiti" && (await ord.inputValue()) === "recenti" && (await ord.getAttribute("aria-label")) === "Ordina" && (await righe.first().textContent()).includes("Caffè Milano"), "salvati lista: ordine 'Recenti ▾' (scelta Vicino / Recenti) in vista, senza posizione 'Recenti' con l'ultimo salvato in cima");
+      ok((await ord.locator("option").allTextContents()).join("|") === "Vicino|Recenti|Preferiti|Da più tempo" && (await ord.inputValue()) === "recenti" && (await ord.getAttribute("aria-label")) === "Ordina" && (await righe.first().textContent()).includes("Caffè Milano"), "salvati lista: ordine 'Recenti ▾' (scelta Vicino / Recenti) in vista, senza posizione 'Recenti' con l'ultimo salvato in cima");
       ok((await righe.filter({ hasText: "Caffè Milano" }).getByTestId("salvato-nota").textContent()).includes("Brunch domenica") && (await L.getByTestId("salvato-distanza").count()) === 0, "salvati lista: senza verdetto la riga mostra la nota; senza posizione nessuna distanza inventata");
       // Terzo giro: la nota ha lo stesso stile del verdetto (serif corsivo), tra virgolette perché sono parole tue.
       const [sn, sv] = await Promise.all([righe.filter({ hasText: "Caffè Milano" }).getByTestId("salvato-nota"), righe.filter({ hasText: "Terrazza Uno" }).getByTestId("salvato-verdetto")].map((l) => l.evaluate((el) => { const c = getComputedStyle(el); return `${c.fontFamily}|${c.fontStyle}|${c.fontSize}`; })));
@@ -2525,21 +2600,22 @@ else {
     const Lm = pm.getByTestId("salvati-lista");
     await Lm.waitFor({ timeout: 8000 }).catch(() => {});
     await pm.waitForTimeout(1200);
-    const mesi = Lm.getByTestId("salvati-da-mesi");
-    ok(await mesi.isVisible().catch(() => false) && (await mesi.textContent())?.includes("1 posto aspetta da mesi"), `da mesi: una riga '1 posto aspetta da mesi' (solo il Da provare di luglio, non il visitato) (${(await mesi.textContent().catch(() => ""))?.trim()})`);
+    // Revisore 5/11: niente più riga "Aspettano da mesi" (testata più leggera): l'ordine "Da più tempo" la sostituisce.
+    ok((await Lm.getByTestId("salvati-da-mesi").count()) === 0, "da mesi: nessuna riga in più sopra la lista");
     const chipMese = Lm.getByTestId("salvato-da-mesi");
     ok((await chipMese.count()) === 1 && (await chipMese.textContent())?.trim() === "da luglio", `da mesi: sulla riga 'Da provare da luglio' (${await chipMese.count()})`);
     const nomi = async () => (await Lm.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents());
     const ordine = await Lm.getByTestId("salvati-ordine").inputValue().catch(() => "");
     const primi = await nomi();
     ok(ordine === "vicino" && primi[0] !== "Caffè No" && primi[primi.length - 1] === "Caffè No", `vicino: il 👎 più vicino va in fondo, non primo (${ordine}: ${primi.join(", ")})`);
-    await mesi.click().catch(() => {});
+    await Lm.getByTestId("salvati-ordine").selectOption("attesa").catch(() => {});
     await pm.waitForTimeout(300);
-    ok(JSON.stringify(await nomi()) === '["Osteria Vecchia"]' && (await Lm.getByTestId("salvati-risultato").textContent())?.trim() === "1 di 4 posti" && (await mesi.getAttribute("aria-pressed")) === "true", `da mesi: un tocco mostra solo chi aspetta, '1 di 4 posti' (${(await nomi()).join(", ")})`);
+    const attesa = await nomi();
+    ok(JSON.stringify(attesa) === '["Osteria Vecchia","Pizzeria Nuova","Bar Visto","Caffè No"]', `da più tempo: prima i Da provare dal più vecchio, poi i visitati (${attesa.join(", ")})`);
+    ok((await Lm.getByTestId("salvati-risultato").count()) === 0, "da più tempo: è un ordine, non un filtro (nessun '1 di 4')");
     await pm.screenshot({ path: `${OUT}/11j-salvati-da-mesi.png` });
-    await mesi.click().catch(() => {});
+    await Lm.getByTestId("salvati-ordine").selectOption("vicino").catch(() => {});
     await pm.waitForTimeout(300);
-    ok((await nomi()).length === 4, "da mesi: un secondo tocco torna a tutti");
     // Area 4a (4/11): sulla mappa dei salvati il 👎 si distingue dal ✓ (pollice giù, segnalino più chiaro).
     await Lm.getByTestId("salvati-lista-mappa").click().catch(() => {});
     await pm.getByTestId("salvati-filtri").waitFor({ timeout: 5000 }).catch(() => {});
@@ -2572,7 +2648,7 @@ else {
     const pillole = await Lc.getByTestId("salvato-chiuso").allTextContents();
     ok(nomiC[nomiC.length - 1] === "Osteria Chiusa" && nomiC.length === 3, `ha chiuso: il più vicino ma chiuso per sempre va in fondo, mai tolto (${nomiC.join(", ")})`);
     ok(JSON.stringify(pillole) === '["Chiuso per ora","Ha chiuso"]', `ha chiuso: pillole 'Chiuso per ora' e 'Ha chiuso', niente sull'aperto (${JSON.stringify(pillole)})`);
-    ok(!(await Lc.getByTestId("salvati-da-mesi").isVisible().catch(() => false)), "ha chiuso: un posto chiuso non conta in 'aspettano da mesi'");
+    ok((await Lc.getByTestId("salvato-da-mesi").count()) === 0, "ha chiuso: un posto chiuso non dice 'da luglio'");
     await pc.screenshot({ path: `${OUT}/11l-salvati-ha-chiuso.png` });
     await Lc.getByTestId("salvato-riga").filter({ hasText: "Osteria Chiusa" }).click().catch(() => {});
     await pc.getByTestId("scheda-chiuso").waitFor({ timeout: 5000 }).catch(() => {});

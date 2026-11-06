@@ -11,6 +11,7 @@ import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { nomeLeggibile } from "@/lib/nome-leggibile";
+import { vuoleConsiglio } from "@/lib/consiglio";
 import FiltersSheet, { type Filters, EMPTY_FILTERS, CATEGORIES, countActive, withDefaults } from "@/components/filters-sheet";
 import { CUISINES, OCCASIONS, FEATURES, OPEN_AT, filterQueryWords, openAtSlot } from "@/lib/filter-options";
 import VenueSheet, { ACTION_TILE } from "@/components/venue-sheet";
@@ -1000,7 +1001,10 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[]; budget?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
+  // Ultima ricerca letta dalle risposte che arrivano dopo (consiglio): aggiornata a ogni cambio.
+  const aiSearchRef = useRef(aiSearch);
+  useEffect(() => { aiSearchRef.current = aiSearch; }, [aiSearch]);
   // true mentre arriva il secondo tempo della ricerca (verdetti, esclusioni).
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const searchSeq = useRef(0);
@@ -1086,6 +1090,13 @@ export default function MapView({
   // salvati per la stessa frase, in parallelo alla ricerca. `ticket` = numero della ricerca.
   const [dalSalvati, setDalSalvati] = useState<{ ticket: number; at: { lat: number; lng: number }; scelti: { id: string; perche: string }[] } | null>(null);
   const salvatiRicercaOn = useBeta("salvati-ricerca");
+  // "Ti porterei da…" (richiesta 5 del 5/11): dopo i verdetti, per una frase da chat, un posto della lista
+  // scelto dall'AI con il perché (src/lib/consiglio.ts). `ticket` = numero della ricerca.
+  const [consiglio, setConsiglio] = useState<{ ticket: number; id: string; perche: string } | null>(null);
+  // Numero della ricerca per cui il consiglio è in arrivo: la frase sopra le card lo dice e tiene già la sua altezza.
+  const [consiglioAtteso, setConsiglioAtteso] = useState<number | null>(null);
+  // Ricerca per cui un consiglio è stato chiesto: se poi non arriva, la frase tiene la stessa altezza (revisore 6/11: salto di 28 px).
+  const [consiglioChiesto, setConsiglioChiesto] = useState<number | null>(null);
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
   // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
@@ -1100,6 +1111,9 @@ export default function MapView({
   const savedPinsOn = useOptIn("pin-salvati");
   // Risposta "come un articolo" (?beta=articolo, spenta di default).
   const articleOn = useOptIn("articolo");
+  // "Ti porterei qui" (?beta=consiglio, spento di default): bocciato due volte dai revisori il 6/11 (8,0 e 8,0),
+  // per regola non va a tutti finché un revisore nuovo non lo porta ad almeno 8,5.
+  const consiglioOn = useOptIn("consiglio");
   // Campo "Chiedi all'AI" + pulsante "Filtri" sempre visibili in cima alla mappa (scelta di Lorenzo 11/10).
   // ?beta=-barra riporta l'icona ✨ di prima.
   const barOn = useBeta("barra");
@@ -1730,6 +1744,7 @@ export default function MapView({
   const clearAiSearch = () => {
     searchSeq.current++;
     setDalSalvati(null);
+    setConsiglio(null);
     setLoadingVerdicts(false);
     setAiSearching(false);
     setAiSearch(null);
@@ -2602,6 +2617,8 @@ export default function MapView({
   const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
     if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
+    let consiglioPartito = false;
+    if (consiglioOn && vuoleConsiglio(searchedQuery)) { setConsiglioAtteso(id); setConsiglioChiesto(id); }
     try {
       type VerdictReply = { dettagli?: Record<string, Partial<VenueDetails>>; esclusi?: string[]; livelli?: Record<string, string> };
       // A gruppi in parallelo (le prime 2 card arrivano per prime, ~3-4 s): ogni verdetto si mostra
@@ -2647,6 +2664,27 @@ export default function MapView({
       }));
       if (searchSeq.current !== id) return;
       const esclusi = new Set(replies.flatMap((r) => r?.esclusi ?? []));
+      // Frase da chat: l'AI sceglie un posto tra quelli rimasti, coi verdetti appena scritti (in parallelo
+      // all'ordine qui sotto; non sposta nessuna card). Se non risponde, resta la frase di sempre.
+      if (consiglioOn && vuoleConsiglio(searchedQuery) && replies.some((r) => r && Object.keys(r.dettagli ?? {}).length > 0)) {
+        consiglioPartito = true;
+        // Candidati: i posti rimasti, senza quelli messi in fondo (molto famosi, fuori zona, sopra il budget, gusti).
+        const dp = aiSearchRef.current?.id === id ? aiSearchRef.current.daParte : null;
+        const inFondo = new Set([...(dp?.turistici ?? []), ...(dp?.fuori_zona ?? []), ...(dp?.budget ?? []), ...(dp?.gusti ?? [])]);
+        const tutti = (pending.places as { id?: unknown; name?: unknown }[]).filter((p): p is { id: string; name: string } => typeof p.id === "string" && typeof p.name === "string");
+        const buoni = tutti.filter((p) => !esclusi.has(p.id) && !inFondo.has(p.name)).map((p) => p.id);
+        const rimasti = buoni.length >= 2 ? buoni : tutti.filter((p) => !esclusi.has(p.id)).map((p) => p.id);
+        void fetch("/api/search/consiglio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: searchedQuery, places: pending.places, token: pending.token, ids: rimasti,
+            livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})),
+          }),
+        }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
+          if (searchSeq.current === id && d?.consiglio?.id && d.consiglio.perche) setConsiglio({ ticket: id, ...d.consiglio });
+        }).catch(() => {}).finally(() => setConsiglioAtteso((t) => (t === id ? null : t)));
+      }
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
       if (esclusi.size > 0 || Object.keys(livelli).length > 0) {
         setAiSearch((prev) => {
@@ -2670,7 +2708,7 @@ export default function MapView({
           // Ordine per quanto il locale è adatto alla richiesta (giudizio di Haiku sulle recensioni), solo
           // tra le card non ancora viste: "alto" prima, "basso" dopo, a parità resta l'ordine di Google.
           // I locali già messi da parte (molto famosi, fuori tema) restano in fondo: il giudizio non li riporta su.
-          const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? [])]);
+          const aside = new Set([...(prev.daParte?.turistici ?? []), ...(prev.daParte?.fuori_tema ?? []), ...(prev.daParte?.fuori_zona ?? []), ...(prev.daParte?.gusti ?? []), ...(prev.daParte?.budget ?? [])]);
           const rank = (p: Place) => aside.has(p.name) ? 3 : livelli[p.id] === "alto" ? 0 : livelli[p.id] === "basso" ? 2 : 1;
           const dopo = prev.risultati.slice(fermi).filter((p) => !fuori.has(p.id))
             .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
@@ -2683,6 +2721,7 @@ export default function MapView({
       // Degrada: la lista Google resta, senza verdetti.
     } finally {
       if (searchSeq.current === id) setLoadingVerdicts(false);
+      if (!consiglioPartito) setConsiglioAtteso((t) => (t === id ? null : t));
     }
   };
 
@@ -3835,6 +3874,12 @@ export default function MapView({
                 ) : (
                   <span data-testid="pin-stato" aria-label={place.tags?.includes(OPINION_LIKE) ? "Ci sono stato, mi è piaciuto" : "Ci sono stato"} className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border-[1.5px] border-white bg-brand text-[9px] font-bold leading-none text-white shadow-card">✓</span>
                 ))}
+                {/* "Ti porterei qui" (5/11): la stessa ✦ del consiglio sopra le card, sul segnalino del posto scelto. Assoluta: il segnalino non si sposta. */}
+                {!mappaSalvati && consiglio && aiSearch?.id === consiglio.ticket && consiglio.id === place.id && (
+                  <span data-testid="pin-consiglio" aria-label="Il posto che ti consiglio" className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-white bg-accent text-white shadow-card">
+                    <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                  </span>
+                )}
                 {pinPhotoIds.has(place.id) && venueDetails[place.id]?.photoRef ? (
                   <span
                     data-testid="pin-foto"
@@ -4289,6 +4334,13 @@ export default function MapView({
             if (map) map.flyTo({ center: [place.lng, place.lat], zoom: Math.max(viewState.zoom, 17) });
           }}
           fromSaved={dalSalvatiVisti}
+          consiglioInArrivo={consiglioAtteso != null && aiSearch?.id === consiglioAtteso && view === "all" && clusterPlaces === null}
+          consiglioChiesto={consiglioChiesto != null && aiSearch?.id === consiglioChiesto && view === "all" && clusterPlaces === null}
+          consiglio={(() => {
+            if (!consiglio || aiSearch?.id !== consiglio.ticket || view !== "all" || clusterPlaces !== null) return null;
+            const place = displayedPlaces.find((p) => p.id === consiglio.id);
+            return place ? { place, perche: consiglio.perche } : null;
+          })()}
           onOpenSaved={(place) => apriDaiSalvati(place, "riga")}
           onClose={() => { setClusterPlaces(null); setFilterError(null); clearAiSearch(); setAiQuery(""); dispatch({ type: "RESET" }); }}
         />

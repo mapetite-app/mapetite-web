@@ -23,7 +23,7 @@ export type BetaFlag = "filtri-lista" | "condividi" | "recenti" | "barra" | "sug
 //   home-salvati  in home, per chi ha salvati: "N posti da provare" con "Stasera dove andiamo?" e "I miei N"
 //   prenota-account  in "Le mie prenotazioni": "Tienile sul tuo account" (Cliente di parola, passo 2; accesa
 //                 per tutti dal 31/10 sera dopo il collaudo approvato, si spegne con ?beta=-prenota-account)
-export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati" | "prenota-account";
+export type OptInFlag = "gemme" | "articolo" | "salva" | "sorprendimi" | "voce" | "pin-salvati" | "ci-sei-stato" | "copertine" | "home-salvati" | "prenota-account" | "consiglio";
 const OPTIN_KEY = "mapetite.beta";
 
 // Accese per tutti dal 14/10 (Lorenzo: carta bianca, "accendi quello che hai verificato").

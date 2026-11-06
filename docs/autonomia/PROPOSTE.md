@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 6/11/2026 (notte, sessione 03:05, CEO che chiude — tema Grafica e Salvati). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
+
+### 48. "Perché ti piacerà": il motivo personale scritto, non un punteggio
+- **Problema:** Beli dà un numero "quanto ti piacerà" che gli utenti trovano poco preciso ([Stanford Daily](https://stanforddaily.com/2026/01/20/from-one-beli-to-another-bringing-the-social-aspect-back-to-eating-out/)); un numero senza motivo non si verifica (`PROBLEMI.md`, 10).
+- **Cosa fa:** nella scheda, sotto il verdetto, una riga sola quando c'è un legame vero con i tuoi segnali: "Come Roscioli e Armando, che ti sono piaciuti: trattoria romana, €€". Solo tipo, fascia di prezzo e zona dei tuoi 👍, mai inventato; senza legame la riga non c'è.
+- **Da dove nasce:** Beli (punteggio), Mapstr Plus ("AI sui tuoi gusti", a pagamento). Noi: il motivo in parole, gratis, dal primo 👍.
+- **Valore per l'utente:** capisce perché quel posto è per lui. **Per il ristoratore:** clienti già affini al suo locale.
+- **Sforzo:** S. **Costo Google/Haiku:** zero (dati già salvati).
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 49. "Il tuo anno a tavola": la mappa di dove sei stato
+- **Problema:** i "Ci sono stato" restano una lista; manca il motivo per tornare nell'app a fine anno (`PROBLEMI.md`, 9).
+- **Cosa fa:** a dicembre, dal profilo, una pagina da condividere: la mappa dei posti visitati nel 2026, i 3 preferiti (👍), il quartiere più girato, il tipo di locale più scelto. Solo dati dell'utente.
+- **Da dove nasce:** Beli mostra la mappa di dove hai mangiato nel tempo; Spotify Wrapped ha reso il riepilogo un rito. Nessuna app di posti lo fa in italiano e con i "da provare" del 2027 accanto.
+- **Valore per l'utente:** un ricordo da condividere che porta amici nell'app. **Per il ristoratore:** compare nelle storie dei clienti.
+- **Sforzo:** M. **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA dal 9/11 (da fare entro metà dicembre).
+
 ## 5/11/2026 (notte, sessione 03:05, CEO che chiude — tema Ricerca). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 
 ### 46. "Perché è qui": una riga che spiega l'ordine dei risultati
