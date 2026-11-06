@@ -161,9 +161,25 @@ export function numeriNonNeiDati(perche: string, datiPosto: string): string[] {
   const neiDati = new Set(datiPosto.match(/\d+/g) ?? []);
   return (perche.match(/\d+/g) ?? []).filter((n) => !neiDati.has(n));
 }
+// Revisore 6/11: "…pesce eccezionale" sopra una card che dice "Pesce eccezionale e trattato con passione".
+// Se 3+ parole e oltre metà del perché vengono dal verdetto del posto, il riquadro non aggiunge niente.
+export const RIPETE = "(ripete il verdetto)";
+export function ripeteVerdetto(perche: string, verdetto: string | null | undefined): boolean {
+  if (!verdetto) return false;
+  const v = radici(verdetto);
+  const p = [...radici(perche)].filter((w) => !NEUTRE.has(w));
+  const comuni = p.filter((w) => v.has(w)).length;
+  return comuni >= 3 ? comuni / p.length > 0.5 : p.length > 0 && comuni === p.length;
+}
 /** Seconda richiesta, una sola volta: stesso posto, perché riscritto senza le parole che i dati non dicono. */
 export function promptRiscrivi(prompt: string, risposta: string, parole: string[]): string {
-  return `${prompt}\n\nHai risposto: ${risposta.trim()}\nQueste parole non sono scritte nei dati di quel posto: ${parole.join(", ")}. Riscrivi il "perche" per lo stesso posto usando solo fatti e parole presi dal suo verdetto, dalla descrizione o dalle recensioni. Se non ci riesci, rispondi {"n":null}. Rispondi SOLO con JSON.`;
+  const ripete = parole.includes(RIPETE);
+  const fuori = parole.filter((w) => w !== RIPETE);
+  const motivo = [
+    fuori.length > 0 ? `Queste parole non sono scritte nei dati di quel posto: ${fuori.join(", ")}.` : "",
+    ripete ? "Il perché ripete il verdetto, che la persona legge già sulla card: usa un altro fatto delle recensioni, legato alla sua richiesta." : "",
+  ].filter(Boolean).join(" ");
+  return `${prompt}\n\nHai risposto: ${risposta.trim()}\n${motivo} Riscrivi il "perche" per lo stesso posto usando solo fatti e parole presi dal suo verdetto, dalla descrizione o dalle recensioni. Se non ci riesci, rispondi {"n":null}. Rispondi SOLO con JSON.`;
 }
 export function accorcia(t: string): string {
   if (t.length <= MAX_PERCHE) return t;

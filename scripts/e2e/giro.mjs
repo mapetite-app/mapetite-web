@@ -1026,6 +1026,8 @@ await page.unroute("**/api/search");
       && cs.correggiRefusi("Rooftop romantico al tramosto", "Rooftop romantica al tramonto") === "Rooftop romantico al tramonto"
       && cs.correggiRefusi("Personale garbato", "personale gentile") === "Personale garbato"
       && JSON.stringify(cs.numeriNonNeiDati("Perfetto per i 70 anni di tuo papà", "pesce fresco, 2 sale")) === '["70"]'
+      && cs.ripeteVerdetto("Pesce eccezionale", "Pesce eccezionale e trattato con passione") && !cs.ripeteVerdetto("Compleanni festeggiati con attenzione, dicono le recensioni", "Pesce eccezionale e trattato con passione")
+      && /ripete il verdetto/.test(cs.promptRiscrivi("P", "{}", [cs.RIPETE]))
       && /Queste parole non sono scritte nei dati di quel posto: professionale/.test(cs.promptRiscrivi("P", '{"n":1}', ["professionale"])),
       "consiglio: una parola del perché assente dai dati del posto si riscrive una volta (le parole neutre come 'recensioni dicono' passano)");
     ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
@@ -1038,7 +1040,14 @@ await page.unroute("**/api/search");
   }
   let chiamate = 0;
   await page.route("**/api/search/consiglio", async (r) => { chiamate++; await new Promise((res) => setTimeout(res, 1500)); return r.fulfill({ json: { consiglio: { id: "P3", perche: "Cocktail curati e terrazza tranquilla sui tetti, dicono le recensioni di chi ci è stato" } } }); });
+  // Spento per tutti dal 6/11 (due bocciature): senza ?beta=consiglio nessuna chiamata anche con una frase da chat.
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await page.getByLabel("Cosa cerchi?").fill("devo festeggiare i 70 anni di mio papà, ama il pesce, saremo in 10");
+  await page.keyboard.press("Enter");
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  ok(chiamate === 0 && (await page.getByTestId("consiglio").count()) === 0 && (await page.getByTestId("consiglio-in-arrivo").count()) === 0, "consiglio spento di default: nessuna chiamata, nessun 'Sto scegliendo'");
+  await page.goto(`${BASE}/mappa?beta=consiglio`, { waitUntil: "networkidle" });
   await (await esempio(page)).click();
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 6000 });
   await page.waitForTimeout(800);
@@ -1067,6 +1076,7 @@ await page.unroute("**/api/search");
     ok((await page.getByTestId("pin-consiglio").count()) === 1 && (await page.locator("[data-testid=pin][data-place=P3] [data-testid=pin-consiglio]").count()) === 1, "consiglio: la ✦ sta sul segnalino del posto scelto, e solo lì");
   }
   await page.unroute("**/api/search/consiglio");
+  await page.goto(`${BASE}/mappa?beta=-consiglio`, { waitUntil: "networkidle" });
 }
 
 // 5f. Ordine per quanto il locale è adatto (giudizio di Haiku), solo tra le card non ancora viste:

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { categoryLabel } from "@/lib/category-label";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
+import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, RIPETE, ripeteVerdetto, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
 
 // "Ti porterei da…" (richiesta 5 di Lorenzo del 5/11). Terzo tempo della ricerca, dopo i verdetti:
 // riceve gli stessi dati Google firmati del primo tempo (il client non può cambiarli) e l'ordine
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       const p = c ? posti.find((x) => x.id === c.id) : null;
       if (!c || !p) return [];
       c.perche = correggiRefusi(c.perche, datiDi(p));
-      return [...new Set([...perchePrestato(c.perche, query, datiDi(p)), ...percheNonNeiDati(c.perche, datiDi(p)), ...numeriNonNeiDati(c.perche, datiDi(p))])];
+      return [...new Set([...perchePrestato(c.perche, query, datiDi(p)), ...percheNonNeiDati(c.perche, datiDi(p)), ...numeriNonNeiDati(c.perche, datiDi(p)), ...(ripeteVerdetto(c.perche, p.verdict) ? [RIPETE] : [])])];
     };
     const message = await chiedi(prompt);
     let { input_tokens, output_tokens } = message.usage;

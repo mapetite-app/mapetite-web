@@ -109,6 +109,8 @@ export interface BottomSheetProps {
   consiglio?: { place: Place; perche: string } | null;
   // Il consiglio sta arrivando: la frase lo dice su una riga sua (e ha già l'altezza del consiglio).
   consiglioInArrivo?: boolean;
+  // Un consiglio è stato chiesto per questa ricerca: anche se non arriva, la frase resta alta come il consiglio.
+  consiglioChiesto?: boolean;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -347,7 +349,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -883,7 +885,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
-          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo ? "h-[82px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
+          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo || consiglioChiesto ? "h-[82px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
               {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className={`mt-0.5 ${consiglioInArrivo ? "line-clamp-1" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{fraseOggi.dettaglio}</span>}
