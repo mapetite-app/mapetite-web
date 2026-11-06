@@ -911,7 +911,7 @@ export default function VenueSheet({
         {/* Sopra la barra, a scheda chiusa: i punti forti e due frasi delle recensioni Google già caricate
             (revisore del 2/11, r5: senza foto restava un terzo di schermo vuoto). Solo dati già presenti nella
             scheda, nessuna chiamata in più; senza dati il blocco non c'è. Corto: al massimo 2 righe di pillole. */}
-        {!detailsOpen && (puntiForti.length > 0 || frasiRecensioni.length > 0) && (
+        {(puntiForti.length > 0 || frasiRecensioni.length > 0) && (
           <section data-testid="scheda-in-vista" className="mx-[22px] mt-1 pb-2">
             {puntiForti.length > 0 && (
               <div data-testid="scheda-punti-forti">
@@ -946,7 +946,7 @@ export default function VenueSheet({
           aria-expanded={detailsOpen}
           aria-controls={`scheda-dettagli-${venue.id}`}
           onClick={openDetails}
-          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto && !(!detailsOpen && (puntiForti.length > 0 || frasiRecensioni.length > 0)) ? "" : "mt-2 border-t border-[#e1e5e5]"}`}
+          className={`mx-[22px] flex min-h-12 items-center justify-between pt-0.5 text-left text-[13.5px] font-sans text-[#4b5058] ${subitoDopoVerdetto && !(puntiForti.length > 0 || frasiRecensioni.length > 0) ? "" : "mt-2 border-t border-[#e1e5e5]"}`}
         >
           Orari, contatti, recensioni
           <ChevronRight size={18} aria-hidden className={`shrink-0 transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
