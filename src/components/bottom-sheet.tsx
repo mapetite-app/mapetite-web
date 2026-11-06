@@ -878,7 +878,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               {focusedId !== consiglio.place.id && (
                 <span data-testid="consiglio-titolo" className="block truncate font-title text-[17px] font-semibold leading-[21px] text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(pinName(consiglio.place.name))}</span>
               )}
-              <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
+              <span data-testid="consiglio-perche" className={`mt-0.5 ${focusedId === consiglio.place.id ? "line-clamp-3" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{consiglio.perche}</span>
             </span>
             <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>
           </button>

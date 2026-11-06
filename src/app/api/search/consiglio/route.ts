@@ -103,6 +103,13 @@ export async function POST(request: Request) {
       prestate = fuori(consiglio);
     }
     const scelto = consiglio ? posti.find((p) => p.id === consiglio!.id) : null;
+    // 6/11 sera: se dopo la riscrittura l'unico difetto è ripetere il verdetto (ogni parola sta nei dati), il
+    // consiglio resta: la scelta del posto vale da sola, e un riquadro che compare una volta sì e una no non si
+    // capisce (VISIONE). Le parole inventate scartano sempre.
+    if (prestate.length === 1 && prestate[0] === RIPETE) {
+      console.log(`[search-consiglio] tenuto anche se ripete il verdetto: ${JSON.stringify(consiglio?.perche)}`);
+      prestate = [];
+    }
     if (prestate.length > 0) {
       console.log(`[search-consiglio] scartato: parole che i dati di ${JSON.stringify(scelto?.name)} non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio?.perche)})`);
       consiglio = null;
