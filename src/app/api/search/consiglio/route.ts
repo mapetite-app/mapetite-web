@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { categoryLabel } from "@/lib/category-label";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, RIPETE, ripeteVerdetto, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
+import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, senzaAttribuzioneFalsa, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, RIPETE, ripeteVerdetto, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
 
 // "Ti porterei da…" (richiesta 5 di Lorenzo del 5/11). Terzo tempo della ricerca, dopo i verdetti:
 // riceve gli stessi dati Google firmati del primo tempo (il client non può cambiarli) e l'ordine
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     const fuori = (c: ReturnType<typeof parseConsiglio>) => {
       const p = c ? posti.find((x) => x.id === c.id) : null;
       if (!c || !p) return [];
-      c.perche = correggiRefusi(c.perche, datiDi(p));
+      c.perche = senzaAttribuzioneFalsa(correggiRefusi(c.perche, datiDi(p)), [p.editorialSummary, ...(p.reviewTexts ?? [])].filter(Boolean).join(" "));
       return [...new Set([...perchePrestato(c.perche, query, datiDi(p)), ...percheNonNeiDati(c.perche, datiDi(p)), ...numeriNonNeiDati(c.perche, datiDi(p)), ...(ripeteVerdetto(c.perche, p.verdict) ? [RIPETE] : [])])];
     };
     const message = await chiedi(prompt);
@@ -106,8 +106,10 @@ export async function POST(request: Request) {
     // 6/11 sera: se dopo la riscrittura l'unico difetto è ripetere il verdetto (ogni parola sta nei dati), il
     // consiglio resta: la scelta del posto vale da sola, e un riquadro che compare una volta sì e una no non si
     // capisce (VISIONE). Le parole inventate scartano sempre.
-    if (prestate.length === 1 && prestate[0] === RIPETE) {
-      console.log(`[search-consiglio] tenuto anche se ripete il verdetto: ${JSON.stringify(consiglio?.perche)}`);
+    // Revisore 6/11 sera: il perché ripetuto si leggeva due volte (riquadro e card): resta solo la scelta, senza perché.
+    if (prestate.length === 1 && prestate[0] === RIPETE && consiglio) {
+      console.log(`[search-consiglio] tenuto senza perché (ripeteva il verdetto): ${JSON.stringify(consiglio.perche)}`);
+      consiglio = { ...consiglio, perche: "" };
       prestate = [];
     }
     if (prestate.length > 0) {

@@ -1030,6 +1030,7 @@ await page.unroute("**/api/search");
       && /ripete il verdetto/.test(cs.promptRiscrivi("P", "{}", [cs.RIPETE]))
       && /Queste parole non sono scritte nei dati di quel posto: professionale/.test(cs.promptRiscrivi("P", '{"n":1}', ["professionale"])),
       "consiglio: una parola del perché assente dai dati del posto si riscrive una volta (le parole neutre come 'recensioni dicono' passano)");
+    ok(cs.senzaAttribuzioneFalsa("Vista notturna e staff premuroso, dicono le recensioni", "Roma ai tuoi piedi, personale attento") === "Vista notturna e staff premuroso" && cs.senzaAttribuzioneFalsa("Sala tranquilla e pesce fresco, dicono le recensioni", "una sala tranquilla, pesce fresco ogni giorno") === "Sala tranquilla e pesce fresco, dicono le recensioni" && cs.senzaAttribuzioneFalsa("Secondo le recensioni, vista notturna", "vista sul mare") === "Vista notturna", "consiglio: 'dicono le recensioni' solo se quelle parole sono nelle recensioni, altrimenti l'attribuzione si toglie");
     ok(cs.accorcia("Breve e vero") === "Breve e vero" && cs.accorcia(lungo).length <= cs.MAX_PERCHE && !cs.accorcia(lungo).endsWith(",") && lungo.startsWith(cs.accorcia(lungo)), `consiglio: il perché sta in 2 righe e resta una frase intera ('${cs.accorcia(lungo)}')`);
   }
   if (bu) {
@@ -3546,11 +3547,15 @@ if (fakeUser) {
   // Revisore del 2/11 (r4): senza foto un riquadro grigio di 220 px con l'emoji piccola; la scheda lasciava 110 px di mappa sopra.
   { const s = await q3.evaluate(() => { const c = document.querySelector("[data-testid=scheda-carosello]"); const t = document.querySelector("[data-testid=scheda-trascinabile]").getBoundingClientRect(); const e = document.querySelector("[data-testid=scheda-intestazione-emoji]");
       return { senza: c?.dataset.senzaFoto === "true", h: Math.round(c?.getBoundingClientRect().height ?? -1), fondo: e ? getComputedStyle(e).backgroundColor : "", nome: Math.round(document.querySelector("[data-testid=scheda-trascinabile] h2").getBoundingClientRect().top), top: Math.round(t.top), alta: Math.round(t.height) }; });
-    ok(s.senza && s.h <= 130 && s.fondo === "rgb(26, 60, 64)" && s.nome < 200, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
+    ok(s.senza && s.h <= 160 && s.fondo === "rgb(26, 60, 64)" && s.nome < 235, `scheda senza foto: intestazione bassa con l'emoji su fondo del marchio, il nome sale (${s.h} px, nome a ${s.nome} px)`);
+    { const e = await q3.evaluate(() => { const em = document.querySelector("[data-testid=scheda-intestazione-emoji] span")?.getBoundingClientRect(); const nv = document.querySelector("[data-testid=scheda-nav]")?.getBoundingClientRect(); return { lato: Math.round(em?.width ?? 0), sotto: em && nv ? Math.round(em.top - nv.bottom) : -99 }; });
+      ok(e.lato >= 70 && e.sotto >= 0, `scheda senza foto: emoji grande (${e.lato} px) sotto '‹ 1 di 5 ›', non dietro (${e.sotto} px)`); }
     ok(s.top <= 0 && s.alta >= 843, `scheda: a tutto schermo come Places, in alto solo la zona sicura (da ${s.top} px, alta ${s.alta})`); }
   { const n = await q3.evaluate(() => { const nav = document.querySelector("[data-testid=scheda-nav]"); const sheet = document.querySelector("[data-testid=scheda-trascinabile]")?.getBoundingClientRect();
-      return { dentro: !!nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1) }; });
-    ok(n.dentro && n.testo?.replace(/\s/g, "") === "‹1di5›", `scheda: '‹ 1 di 5 ›' dentro la barra azioni in basso, non sopra la scheda (${n.testo})`); }
+      const bar = document.querySelector("[data-testid=barra-azioni]")?.firstElementChild?.getBoundingClientRect(); const r = nav?.getBoundingClientRect();
+      return { fuori: !nav?.closest("[data-testid=barra-azioni]"), testo: nav?.textContent.replace(/\s+/g, " ").trim(), cima: Math.round(sheet?.top ?? -1), centro: r ? Math.round(r.left + r.width / 2) : -1, alto: r ? Math.round(r.top) : -1, barra: Math.round(bar?.height ?? 0) }; });
+    ok(n.fuori && n.testo?.replace(/\s/g, "") === "‹1di5›" && Math.abs(n.centro - 195) <= 2 && n.alto < 80, `scheda: '‹ 1 di 5 ›' in alto al centro, tra Chiudi e Condividi (${n.testo}, centro ${n.centro}, a ${n.alto} px)`);
+    ok(n.barra > 0 && n.barra <= 70, `scheda: barra azioni su una riga sola (${n.barra} px)`); }
   { const c = await q3.getByTestId("stato-apertura").evaluate((el) => getComputedStyle(el).color);
     ok(c === "rgb(26, 60, 64)", `scheda: 'Aperto ora' in teal del marchio (${c})`); }
   await q3.screenshot({ path: `${OUT}/r3-scheda.png` });

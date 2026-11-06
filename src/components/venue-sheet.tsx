@@ -699,11 +699,19 @@ export default function VenueSheet({
           heightClass={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-48 min-[380px]:h-56 [@media(min-height:701px)_and_(max-height:760px)]:h-40 [@media(max-height:700px)]:h-28"}
           // Senza foto niente riquadro grigio da 220px con l'emoji piccola (revisore del 2/11, r4): intestazione bassa
           // (120px più la zona sicura) con l'emoji su fondo del marchio, e il nome sale.
-          heightSenzaFoto={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-[calc(env(safe-area-inset-top,0px)+7.5rem)]"}
+          // 6/11 sera (designer, quinto punto): "‹ 1 di 12 ›" sta in alto al centro, quindi senza foto l'intestazione
+          // cresce di 32 px e l'emoji, più grande (72 px), scende sotto i tasti invece di finirci dietro.
+          heightSenzaFoto={livelloFoto === 2 ? "h-16" : livelloFoto === 1 ? "h-24" : "h-[calc(env(safe-area-inset-top,0px)+9.5rem)]"}
           fallback={
-            <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-center justify-center bg-brand pt-[env(safe-area-inset-top,0px)]">
-              <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none">{emoji}</span>
-            </div>
+            livelloFoto === 0 ? (
+              <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-end justify-center bg-brand pb-3 pt-[env(safe-area-inset-top,0px)]">
+                <span aria-hidden className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-white/10 text-[42px] leading-none">{emoji}</span>
+              </div>
+            ) : (
+              <div data-testid="scheda-intestazione-emoji" className="flex h-full w-full items-center justify-center bg-brand pt-[env(safe-area-inset-top,0px)]">
+                <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-[34px] leading-none">{emoji}</span>
+              </div>
+            )
           }
           overlay={
             <>
@@ -716,6 +724,15 @@ export default function VenueSheet({
               >
                 <X size={19} aria-hidden />
               </button>
+              {/* "‹ 1 di 12 ›" in alto al centro, tra Chiudi e Condividi (designer 6/11: la barra in basso torna su
+                  una riga sola, come in Places e Google Maps dove si scorre tra i risultati dall'alto). */}
+              {nav && (
+                <div data-testid="scheda-nav" className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-11 -translate-x-1/2 items-center rounded-full bg-white/90 text-text shadow-card backdrop-blur">
+                  <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
+                  <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
+                  <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
+                </div>
+              )}
               {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}
               <div className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex gap-2" data-testid="azioni-scheda">
                 {shareOn && (
@@ -1127,13 +1144,6 @@ export default function VenueSheet({
           className="sticky bottom-[calc(max(var(--nav-height-mobile),env(safe-area-inset-bottom,0px))+var(--nav-sporgenza)+0.5rem)] z-10 mt-6 flex justify-center px-4"
         >
           <div className="w-full rounded-[22px] bg-brand p-2 shadow-[0_14px_30px_rgba(26,60,64,0.35)]">
-          {nav && (
-            <div data-testid="scheda-nav" className="-mt-1 mb-1 flex items-center justify-between text-white">
-              <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">‹</button>
-              <span className="text-[13px] font-display font-semibold text-white/85">{nav.pos} di {nav.total}</span>
-              <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-9 w-12 items-center justify-center rounded-full text-xl leading-none text-white/90 active:scale-95">›</button>
-            </div>
-          )}
           <div className="flex w-full items-center gap-2">
             {lead === "prenota" && (
               <button type="button" data-testid="prenota-scheda" onClick={() => openBooking("barra")} aria-label={`Prenota da ${name}`} className={`${ACTION_TILE} bg-accent`} style={{ flexGrow: 1.4 }}>

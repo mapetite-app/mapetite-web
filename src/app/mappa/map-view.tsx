@@ -2682,7 +2682,7 @@ export default function MapView({
             livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})),
           }),
         }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
-          if (searchSeq.current === id && d?.consiglio?.id && d.consiglio.perche) setConsiglio({ ticket: id, ...d.consiglio });
+          if (searchSeq.current === id && d?.consiglio?.id) setConsiglio({ ticket: id, ...d.consiglio });
         }).catch(() => {}).finally(() => setConsiglioAtteso((t) => (t === id ? null : t)));
       }
       const livelli: Record<string, string> = Object.assign({}, ...replies.map((r) => r?.livelli ?? {}));
