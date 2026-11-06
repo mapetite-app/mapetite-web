@@ -242,18 +242,16 @@ export default function VenueSheet({
   const radiceRef = useRef<HTMLDivElement>(null);
   const [compatta, setCompatta] = useState(false);
   useEffect(() => {
-    const radice = radiceRef.current;
-    let el: HTMLElement | null = radice?.parentElement ?? null;
-    while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
-    if (!radice || !el) return;
-    const scroller = el;
+    // In ascolto su tutta la pagina (fase di cattura): la scheda scorre dentro contenitori diversi a seconda di dove si apre.
     const onScroll = () => {
+      const radice = radiceRef.current;
+      if (!radice) return;
       const foto = radice.querySelector("[data-testid=scheda-carosello], [data-testid=scheda-intestazione-emoji]")?.getBoundingClientRect();
-      const cima = scroller.getBoundingClientRect().top;
-      setCompatta(foto ? foto.bottom - cima < 72 : scroller.scrollTop > 120);
+      const cima = Math.max(0, radice.parentElement?.getBoundingClientRect().top ?? 0);
+      setCompatta(foto != null && foto.height > 0 && foto.bottom - cima < 72);
     };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
   }, [venue.id]);
   useEffect(() => {
     if (livelloFoto >= 1 || detailsOpen) return;
