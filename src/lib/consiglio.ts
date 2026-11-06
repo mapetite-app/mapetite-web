@@ -120,6 +120,51 @@ export function perchePrestato(perche: string, richiesta: string, datiPosto: str
   const neiDati = radici(datiPosto);
   return [...new Set((norm(perche).match(/[a-z]{5,}/g) ?? []))].filter((w) => dallaRichiesta.has(w.slice(0, 5)) && !neiDati.has(w.slice(0, 5)));
 }
+// Terzo revisore del 6/11: «ambiente caloroso ma professionale» per una cena di lavoro, e "professionale" non
+// era scritto da nessuna parte. Ora OGNI parola di 5+ lettere del perché deve stare nei dati del posto
+// (stesse 5 lettere iniziali), tranne le parole che non dicono niente del posto ("le recensioni dicono…").
+const NEUTRE = radici(
+  "recensioni recensione dicono raccontano scrivono parlano secondo clienti tutti molto sempre anche ancora " +
+  "perfetto perfetta ideale adatto adatta posto locale quando dove perche questo questa quello quella proprio " +
+  "davvero spesso persone ospiti chiunque serata insieme " +
+  // Nomi generici di un locale: da soli non affermano niente (lo affermano gli aggettivi, che restano controllati).
+  "staff personale servizio camerieri piatti piatto cucina ambiente atmosfera ristorante menu porzioni prezzi"
+);
+// Confronto più stretto delle 5 lettere: la parola deve iniziare come una parola dei dati per tutta la sua
+// lunghezza meno 2 lettere (romantico/romantica, festeggiati/festeggiato passano; "tramosto" per tramonto no).
+export function percheNonNeiDati(perche: string, datiPosto: string): string[] {
+  const parole = [...new Set(norm(datiPosto).match(/[a-z]{4,}/g) ?? [])];
+  const ce = (w: string) => { const testa = w.slice(0, Math.max(5, w.length - 2)); return parole.some((d) => d.startsWith(testa)); };
+  return [...new Set((norm(perche).match(/[a-z]{5,}/g) ?? []))].filter((w) => !NEUTRE.has(w.slice(0, 5)) && !ce(w));
+}
+// Refusi dell'AI ("tramosto" per "tramonto", visto il 6/11): una parola che non c'è nei dati ma dista al
+// massimo 2 lettere da una parola dei dati con le stesse 4 iniziali diventa quella parola. Mai parole nuove.
+function distanza(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+export function correggiRefusi(perche: string, datiPosto: string): string {
+  const parole = [...new Set(datiPosto.toLowerCase().match(/[\p{L}]{5,}/gu) ?? [])];
+  return perche.replace(/[\p{L}]{5,}/gu, (w) => {
+    const l = w.toLowerCase();
+    if (parole.includes(l)) return w;
+    const vicina = parole.find((d) => d.slice(0, 4) === l.slice(0, 4) && Math.abs(d.length - l.length) <= 1 && distanza(d, l) <= 2 && distanza(d, l) < l.length / 3);
+    return vicina && percheNonNeiDati(w, datiPosto).length > 0 ? (w[0] === w[0].toUpperCase() ? vicina[0].toUpperCase() + vicina.slice(1) : vicina) : w;
+  });
+}
+/** Numeri del perché ("70 anni", "10 persone") che i dati del posto non contengono: vengono dalla richiesta. */
+export function numeriNonNeiDati(perche: string, datiPosto: string): string[] {
+  const neiDati = new Set(datiPosto.match(/\d+/g) ?? []);
+  return (perche.match(/\d+/g) ?? []).filter((n) => !neiDati.has(n));
+}
+/** Seconda richiesta, una sola volta: stesso posto, perché riscritto senza le parole che i dati non dicono. */
+export function promptRiscrivi(prompt: string, risposta: string, parole: string[]): string {
+  return `${prompt}\n\nHai risposto: ${risposta.trim()}\nQueste parole non sono scritte nei dati di quel posto: ${parole.join(", ")}. Riscrivi il "perche" per lo stesso posto usando solo fatti e parole presi dal suo verdetto, dalla descrizione o dalle recensioni. Se non ci riesci, rispondi {"n":null}. Rispondi SOLO con JSON.`;
+}
 export function accorcia(t: string): string {
   if (t.length <= MAX_PERCHE) return t;
   const testa = t.slice(0, MAX_PERCHE);

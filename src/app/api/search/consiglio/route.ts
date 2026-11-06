@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { verifySynthesisInput, type SynthesisInput } from "@/lib/synthesis-token";
 import { categoryLabel } from "@/lib/category-label";
-import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, perchePrestato, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
+import { MAX_POSTI, MAX_TOKENS, buildPrompt, estimateCostUsd, parseConsiglio, correggiRefusi, numeriNonNeiDati, perchePrestato, percheNonNeiDati, promptRiscrivi, vuoleConsiglio, type PostoConsiglio } from "@/lib/consiglio";
 
 // "Ti porterei da…" (richiesta 5 di Lorenzo del 5/11). Terzo tempo della ricerca, dopo i verdetti:
 // riceve gli stessi dati Google firmati del primo tempo (il client non può cambiarli) e l'ordine
@@ -74,21 +74,37 @@ export async function POST(request: Request) {
 
   const t0 = Date.now();
   try {
-    const message = await anthropic.messages.create({
-      model: HAIKU_MODEL,
-      max_tokens: MAX_TOKENS,
-      temperature: 0,
-      messages: [{ role: "user", content: buildPrompt(query.trim(), posti) }],
-    });
-    const { input_tokens, output_tokens } = message.usage;
-    const text = message.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+    const prompt = buildPrompt(query.trim(), posti);
+    const chiedi = (content: string) =>
+      anthropic.messages.create({ model: HAIKU_MODEL, max_tokens: MAX_TOKENS, temperature: 0, messages: [{ role: "user", content }] });
+    const testo = (m: Awaited<ReturnType<typeof chiedi>>) => m.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+    const datiDi = (p: PostoConsiglio) => [p.verdict, p.editorialSummary, ...(p.reviewTexts ?? [])].filter(Boolean).join(" ");
+    // Parole del perché che i dati del posto non dicono: quelle prese dalla richiesta (5/11) e ogni altra (6/11).
+    const fuori = (c: ReturnType<typeof parseConsiglio>) => {
+      const p = c ? posti.find((x) => x.id === c.id) : null;
+      if (!c || !p) return [];
+      c.perche = correggiRefusi(c.perche, datiDi(p));
+      return [...new Set([...perchePrestato(c.perche, query, datiDi(p)), ...percheNonNeiDati(c.perche, datiDi(p)), ...numeriNonNeiDati(c.perche, datiDi(p))])];
+    };
+    const message = await chiedi(prompt);
+    let { input_tokens, output_tokens } = message.usage;
+    const text = testo(message);
     let consiglio = parseConsiglio(text, posti);
+    let prestate = fuori(consiglio);
+    if (consiglio && prestate.length > 0) {
+      // Una sola seconda richiesta (~0,45 centesimi), solo quando il perché ha parole non sostenute dai dati.
+      console.log(`[search-consiglio] riscrivo: parole che i dati non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio.perche)})`);
+      const primo = consiglio.id;
+      const m2 = await chiedi(promptRiscrivi(prompt, text, prestate));
+      input_tokens += m2.usage.input_tokens;
+      output_tokens += m2.usage.output_tokens;
+      const c2 = parseConsiglio(testo(m2), posti);
+      consiglio = c2 && c2.id === primo ? c2 : null;
+      prestate = fuori(consiglio);
+    }
     const scelto = consiglio ? posti.find((p) => p.id === consiglio!.id) : null;
-    const prestate = consiglio && scelto
-      ? perchePrestato(consiglio.perche, query, [scelto.verdict, scelto.editorialSummary, ...(scelto.reviewTexts ?? [])].filter(Boolean).join(" "))
-      : [];
     if (prestate.length > 0) {
-      console.log(`[search-consiglio] scartato: parole della richiesta che i dati di ${JSON.stringify(scelto?.name)} non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio?.perche)})`);
+      console.log(`[search-consiglio] scartato: parole che i dati di ${JSON.stringify(scelto?.name)} non dicono: ${JSON.stringify(prestate)} (perche=${JSON.stringify(consiglio?.perche)})`);
       consiglio = null;
     }
     const nome = consiglio ? scelto?.name : null;

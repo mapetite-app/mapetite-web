@@ -863,15 +863,19 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             type="button"
             data-testid="consiglio"
             onClick={() => { if (onFocus) onFocus(consiglio.place); }}
-            className="pointer-events-auto mx-4 mb-1.5 flex min-h-[70px] w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
+            className="pointer-events-auto mx-4 mb-1.5 flex h-[82px] w-[calc(100%-2rem)] items-end gap-3 rounded-2xl bg-surface/95 px-3 py-1.5 text-left shadow-card backdrop-blur-sm active:scale-[0.99] lg:mx-5 lg:w-[calc(100%-2.5rem)]"
           >
-            {/* Stessa forma della frase che sostituisce (titolo + 2 righe), così non cresce sopra la mappa (revisore 5/11).
-                Con la sua card già davanti il nome non si ripete: basta "Ti porterei qui". */}
+            {/* Terzo revisore 6/11: "Ti porterei da Osteria dell'Acqu…" tagliava il nome, la cosa più importante.
+                Ora "Ti porterei da" è piccolo sopra e il nome ha la riga sua; stessa altezza dell'attesa (82 px).
+                Con la sua card già davanti il nome non si ripete: "Ti porterei qui" e il perché. */}
             <span className="min-w-0 flex-1">
-              <span data-testid="consiglio-titolo" className="flex items-center gap-1.5 font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">
-                <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
-                <span className="truncate">{focusedId === consiglio.place.id ? "Ti porterei qui" : `Ti porterei da ${nomeLeggibile(pinName(consiglio.place.name))}`}</span>
+              <span data-testid="consiglio-sopra" className="flex items-center gap-1 text-[11px] font-sans font-semibold uppercase leading-[14px] tracking-[0.08em] text-accent">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+                {focusedId === consiglio.place.id ? "Ti porterei qui" : "Ti porterei da"}
               </span>
+              {focusedId !== consiglio.place.id && (
+                <span data-testid="consiglio-titolo" className="block truncate font-title text-[17px] font-semibold leading-[21px] text-brand in-data-[titoli=serif]:text-[19px]">{nomeLeggibile(pinName(consiglio.place.name))}</span>
+              )}
               <span data-testid="consiglio-perche" className="mt-0.5 line-clamp-2 text-xs font-sans font-medium leading-4 text-text">{consiglio.perche}</span>
             </span>
             <span data-testid="posizione-card" className="shrink-0 pb-px text-xs font-sans font-medium text-text-muted">{focusedId === consiglio.place.id ? `${Math.max(0, places.findIndex((p) => p.id === focusedId)) + 1} di ${places.length}` : "Vedi ›"}</span>
@@ -879,7 +883,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         ) : fraseOggi && (
           // Su un fondo chiaro (revisore del 2/11: scritta direttamente sulla mappa, si leggeva attraverso i
           // nomi delle strade). Il bordo sinistro della pillola è allineato a quello della card.
-          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo ? "min-h-[70px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
+          <div data-testid="frase-risultati" className={`pointer-events-none mx-4 mb-1.5 flex items-end gap-3 ${consiglioInArrivo ? "h-[82px]" : ""} rounded-2xl bg-surface/95 px-3 py-1.5 shadow-card backdrop-blur-sm lg:mx-5`}>
             <p className="min-w-0 flex-1">
               <span data-testid="frase-titolo" className="block truncate font-title text-[17px] font-semibold leading-tight text-brand in-data-[titoli=serif]:text-[19px]">{fraseOggi.titolo}</span>
               {fraseOggi.dettaglio && <span data-testid="frase-dettaglio" className={`mt-0.5 ${consiglioInArrivo ? "line-clamp-1" : "line-clamp-2"} text-xs font-sans font-medium leading-4 text-text`}>{fraseOggi.dettaglio}</span>}
