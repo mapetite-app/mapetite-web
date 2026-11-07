@@ -129,6 +129,7 @@ const CITIES = [
 // Scelta segnata: lo stesso aspetto per card, pillole e prezzi (collaudo 23/10: erano due stili diversi).
 // Revisore 7/11: le card erano ancora chiare con il bollino e le pillole teal piene. Ora tutto teal pieno,
 // testo bianco e spunta, come le chip di "Cosa ti piace?".
+// Revisore 7/11: sulle card niente transizione di colore (il testo diventava bianco prima dello sfondo: lampo bianco su bianco).
 const SCELTA_ON = "border-brand bg-brand text-white";
 const SCELTA_OFF = "border-border bg-white";
 // Dentro una card scelta: testo bianco, riga sotto bianca attenuata, cerchio dell'emoji velato, bollino bianco.
@@ -490,7 +491,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     setCity(on ? null : c.value);
                     setZone([]);
                   }}
-                  className={`flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
+                  className={`flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
                   <span aria-hidden className={cerchioCard(on)}>{c.emoji}</span>
                   <span className={`flex-1 ${titoloCard(on)}`}>{c.value}</span>
@@ -498,7 +499,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 </button>
               );
             })}
-            <div className={`rounded-card border-2 px-4 py-2.5 transition-colors ${otherOpen ? SCELTA_ON : SCELTA_OFF}`}>
+            <div className={`rounded-card border-2 px-4 py-2.5 ${otherOpen ? SCELTA_ON : SCELTA_OFF}`}>
               <button
                 type="button"
                 aria-pressed={otherOpen}
@@ -663,7 +664,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   role="radio"
                   aria-checked={on}
                   onClick={() => setScoperta(sc.value)}
-                  className={`flex min-h-[4.5rem] w-full items-center gap-4 rounded-card border-2 px-4 py-3 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
+                  className={`flex min-h-[4.5rem] w-full items-center gap-4 rounded-card border-2 px-4 py-3 text-left ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
                   <span aria-hidden className={cerchioCard(on)}>{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍽️"}</span>
                   <span className="min-w-0 flex-1">
@@ -703,7 +704,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   type="button"
                   aria-pressed={on}
                   onClick={() => setPriceRange(on ? null : item.value)}
-                  className={`relative flex min-h-20 flex-col items-center justify-center rounded-card border-2 px-2 py-2 transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
+                  className={`relative flex min-h-20 flex-col items-center justify-center rounded-card border-2 px-2 py-2 ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
                   <span className={`font-display text-xl font-bold ${on ? "text-white" : "text-brand"}`}>{item.value}</span>
                   <span className={rigaCard(on)}>{item.description}</span>

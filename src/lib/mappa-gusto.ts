@@ -161,9 +161,10 @@ export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | nu
   // Revisore 7/11: "Meno: …", "Esci per: …" erano etichette secche accanto alla frase da amico. Stesso tono e
   // stesse parole della frase ("Ami le trattorie di quartiere"), sempre in seconda persona, senza allungare.
   const su = m.su.filter((id) => PLURALE[id]);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ami ${elenco([...su.slice(0, 3).map((id) => PLURALE[id]), ...(su.length > 3 ? [altri(su.length, 3, TIPO_POSTO).slice(3)] : [])])}` });
+  // Revisore 7/11: "e un altro tipo di posto" era vago; se ne resta uno solo si scrive il nome, come nella frase.
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ami ${elenco(su.length === 4 ? su.map((id) => PLURALE[id]) : [...su.slice(0, 3).map((id) => PLURALE[id]), ...(su.length > 3 ? [altri(su.length, 3, TIPO_POSTO).slice(3)] : [])])}` });
   const giu = m.giu.filter((id) => PLURALE[id]);
-  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Ti convincono meno ${elenco([...giu.slice(0, 2).map((id) => PLURALE[id]), ...(giu.length > 2 ? [altri(giu.length, 2, TIPO_POSTO).slice(3)] : [])])}` });
+  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Ti convincono meno ${elenco(giu.length === 3 ? giu.map((id) => PLURALE[id]) : [...giu.slice(0, 2).map((id) => PLURALE[id]), ...(giu.length > 2 ? [altri(giu.length, 2, TIPO_POSTO).slice(3)] : [])])}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
