@@ -9614,7 +9614,9 @@ else {
     await m.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await m.waitForTimeout(1000);
     await idee(m);
-    ok(await m.getByRole("button", { name: "Rooftop romantico per due a Milano", exact: true }).isVisible() && (await m.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 0, "mappa su Milano: 'Prova a chiedere' con gli esempi di Milano");
+    // Gli esempi con la città dipendono dall'ora (revisore 7/11): nessuno deve parlare di Roma.
+    { const es = await m.getByTestId("idee-fila").getByTestId("idee-esempio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+      ok(es.length >= 2 && !es.some((t) => /a Roma$|Trastevere/.test(t)), `mappa su Milano: 'Prova a chiedere' senza esempi di Roma (${es.join(" | ")})`); }
     await c.close(); }
   // Assistente con la quota Google finita: il messaggio porta ai propri salvati.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
