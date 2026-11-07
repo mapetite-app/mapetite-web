@@ -231,7 +231,8 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
   const amati = extra.amati ?? [];
   // Revisore 7/11: "Ti piacciono trattoria, ristorante…" era sgrammaticato (etichette al singolare).
-  if (amati.length) frasi.push([{ t: su.length ? "Ti piace anche: " : "Ti piace: " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
+  if (amati.length) // Revisore 7/11: "Ami le trattorie…" e poi "Ti piace: pizzeria" erano due registri. Stesso verbo per tutte e due.
+  if (amati.length) frasi.push([{ t: su.length ? "Ami anche: " : "Ami: " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];

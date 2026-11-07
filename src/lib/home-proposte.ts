@@ -1,4 +1,5 @@
 import { scopertaPer, tipoDa, type MappaGusto, type TipoPosto } from "@/lib/mappa-gusto";
+import { ZONE } from "@/lib/gusti";
 
 // Home (Lorenzo 21/10: "più fica e utile, con classifiche o proposte in base alle ricerche precedenti").
 // Tutto qui sono RICERCHE pronte, non locali: un tocco apre /mappa?q=… e i posti veri arrivano da Google
@@ -157,7 +158,10 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const scelti = [...amati].sort((a, b) => rank(ordine, a.id) - rank(ordine, b.id)).slice(0, 2);
     scelti.forEach((tipo, i) => {
       usati.add(tipo.id);
-      const zona = gusto.zone[i] ?? gusto.zone[0];
+      // Revisore 7/11: con la città Milano non si propone "al Pigneto". Solo le zone della città scelta
+      // (quelle che non conosciamo restano: non sappiamo di che città sono).
+      const zoneQui = gusto.zone.filter((z) => { const c = ZONE.find((x) => x.nome === z)?.citta; return !c || c.toLowerCase() === citta.toLowerCase(); });
+      const zona = zoneQui[i] ?? zoneQui[0];
       const dove = zona ?? citta;
       const chicche = scoperta === "chicche" ? " fuori dai giri turistici" : "";
       add({ emoji: tipo.emoji, titolo: `${TITOLO_HOME[tipo.id] ?? tipo.titolo} ${aZona(dove)}`, perche: zona ? `Ami questi posti · esci ${aZona(zona)}` : "Ami questi posti", q: `${tipo.query}${chicche} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id });

@@ -20,11 +20,12 @@ export type TipoLocale = {
   parole?: RegExp;
 };
 
+// Revisore 7/11: l'emoji del gruppo non è mai quella di una sua voce (🍸 Bere accanto a 🍸 Cocktail bar).
 export type GruppoLocale = { id: string; titolo: string; emoji: string; tipi: TipoLocale[] };
 
 export const GRUPPI_LOCALE: GruppoLocale[] = [
   {
-    id: "italiana", titolo: "Cucina italiana", emoji: "🍝",
+    id: "italiana", titolo: "Cucina italiana", emoji: "🍅",
     tipi: [
       { id: "trattoria", emoji: "🍝", label: "Trattoria", query: "trattoria", google: [], nome: /\btrattori/i, parole: /\btrattori/i },
       { id: "osteria", emoji: "🍷", label: "Osteria", query: "osteria", google: [], nome: /\bosteri/i, parole: /\bosteri/i },
@@ -43,7 +44,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "mondo", titolo: "Dal mondo", emoji: "🌍",
+    id: "mondo", titolo: "Dal mondo", emoji: "🗺️",
     tipi: [
       { id: "sushi", emoji: "🍣", label: "Sushi", query: "sushi", google: ["sushi_restaurant", "japanese_restaurant"], parole: /sushi|giappones|japanese|izakaya/i },
       { id: "ramen", emoji: "🍜", label: "Ramen", query: "ramen", google: ["ramen_restaurant"], nome: /ramen/i, parole: /ramen/i },
@@ -63,7 +64,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "diete", titolo: "Diete", emoji: "🥗",
+    id: "diete", titolo: "Diete", emoji: "🌿",
     tipi: [
       { id: "vegetariano", emoji: "🥗", label: "Vegetariano", query: "ristorante vegetariano", google: ["vegetarian_restaurant"], parole: /vegetar/i },
       { id: "vegano", emoji: "🌱", label: "Vegano", query: "ristorante vegano", google: ["vegan_restaurant"], parole: /vegan/i },
@@ -72,7 +73,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "veloce", titolo: "Veloce", emoji: "🥪",
+    id: "veloce", titolo: "Veloce", emoji: "⚡",
     tipi: [
       { id: "street-food", emoji: "🌯", label: "Street food", query: "street food", google: ["food_court"], parole: /street\s*food|cibo\s+di\s+strada/i },
       { id: "paninoteca", emoji: "🥪", label: "Paninoteca", query: "paninoteca", google: ["sandwich_shop", "deli"], nome: /panin|sandwich/i, parole: /panin|sandwich|tramezzin/i },
@@ -83,7 +84,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "dolci", titolo: "Dolci & caffè", emoji: "🍰",
+    id: "dolci", titolo: "Dolci & caffè", emoji: "🧁",
     tipi: [
       { id: "colazione", emoji: "☕", label: "Colazione al bar", query: "colazione bar", google: ["breakfast_restaurant", "cafe"], parole: /colazion|cornett|cappuccin/i },
       { id: "specialty", emoji: "🫘", label: "Caffè specialty", query: "caffè di specialità", google: ["coffee_shop"], parole: /specialty|specialit[aà]|caff[eè]\s+filtr|espresso\s+bar/i },
@@ -95,7 +96,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "bere", titolo: "Bere", emoji: "🍸",
+    id: "bere", titolo: "Bere", emoji: "🥂",
     tipi: [
       { id: "cocktail", emoji: "🍸", label: "Cocktail bar", query: "cocktail bar", google: ["cocktail_bar"], parole: /cocktail|mixolog/i },
       { id: "speakeasy", emoji: "🗝️", label: "Speakeasy", query: "speakeasy", google: [], nome: /speakeasy/i, parole: /speakeasy|nascost|segret/i },

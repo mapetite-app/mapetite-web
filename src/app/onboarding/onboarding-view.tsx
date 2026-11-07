@@ -105,7 +105,7 @@ function parseDraft(raw: string | null): Draft | null {
 const STEPS = [
   { title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
   { title: "Cosa ti piace?", subtitle: "Tocca tutto quello che ti va." },
-  { title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
+  { title: "Ci andresti?", subtitle: "Dieci tipi di posto: 👍 o 👎, d'istinto." },
   { title: "Famosi o chicche?", subtitle: "Scegli quello che ti somiglia di più." },
   { title: "Come mangi?", subtitle: "Diete e cose che eviti: le terrò sempre presenti." },
   { title: "Per cosa esci di solito?", subtitle: "Anche più di una risposta." },
@@ -269,7 +269,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
-  // spariva). "Cosa ti piace?" e "Ti piace o no?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
+  // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
   const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
   const progress = (passoMostrato / (TOTAL - 1)) * 100;
