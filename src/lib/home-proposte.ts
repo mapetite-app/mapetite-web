@@ -139,7 +139,8 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
       if (usati.has(chiave)) continue;
       usati.add(chiave);
       const tipo = tipoDa(id.tipo)!;
-      add({ emoji: id.emoji ?? tipo.emoji, titolo: `${id.titolo} a ${citta}`, perche: id.perche, q: `${id.q} a ${citta}`, sfondo: tipo.sfondo, chiave });
+      add({ emoji: id.emoji ?? tipo.emoji, titolo: id.titolo, // revisore 7/11: "Roma" andava a capo da sola; la città sta già nel titolo delle classifiche
+      perche: id.perche, q: `${id.q} a ${citta}`, sfondo: tipo.sfondo, chiave });
     }
   }
   return out.slice(0, 3);
@@ -154,6 +155,8 @@ const IDEE: Record<Momento, Idea[]> = {
   colazione: [
     { tipo: "brunch", chiave: "pasticceria", titolo: "Colazione fatta bene", perche: "Cornetti veri, caffè di specialità", q: "colazione con cornetti artigianali e caffè di specialità" },
     { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pane, focacce e lievitati fatti lì", q: "forno artigianale di quartiere" },
+    { tipo: "brunch", chiave: "salata", emoji: "🍳", titolo: "Colazione salata", perche: "Uova, pane buono, niente fretta", q: "colazione salata con uova e pane artigianale" },
+    { tipo: "brunch", chiave: "specialty", emoji: "🫘", titolo: "Caffè d'autore", perche: "Torrefazione piccola, caffè filtro", q: "caffè di specialità con torrefazione propria" },
   ],
   pranzo: [
     { tipo: "mondo", chiave: "veloce", titolo: "Pranzo veloce e buono", perche: "Pochi minuti, niente catene", q: "pranzo veloce buono non catena" },
@@ -201,13 +204,22 @@ const CLASSIFICHE: Record<string, Classifica[]> = {
     { id: "vini", emoji: "🍷", titolo: "Enoteche di vini naturali", sotto: "Dove l'oste ti consiglia davvero", q: "enoteca vini naturali a Roma", momenti: ["aperitivo", "dopocena", "pomeriggio"], chiave: "enoteca" },
     { id: "cocktail", emoji: "🍸", titolo: "Cocktail bar nascosti", sotto: "Porte senza insegna, drink d'autore", q: "cocktail bar nascosto d'autore a Roma", momenti: ["dopocena", "aperitivo"], chiave: "speakeasy" },
     { id: "gelato", emoji: "🍨", titolo: "Gelato artigianale", sotto: "Colori naturali, niente montagne", q: "gelateria artigianale migliore a Roma", momenti: ["pomeriggio", "dopocena"], chiave: "gelato" },
-    { id: "suppli", emoji: "🍙", titolo: "Supplì e fritti", sotto: "Il cibo di strada romano", q: "migliori supplì di Roma", momenti: ["pranzo", "aperitivo"] },
+    { id: "suppli", emoji: "🍙", titolo: "Supplì e fritti", sotto: "Il cibo di strada romano", q: "migliori supplì di Roma", momenti: ["pranzo", "aperitivo"], chiave: "fritti" },
+    { id: "bancone", emoji: "☕", titolo: "Caffè al bancone", sotto: "Bar di quartiere, cornetto caldo", q: "bar storico di quartiere per colazione a Roma", momenti: ["colazione"], chiave: "bar" },
+    // Revisore 7/11: all'aperitivo e dopo cena vino, cocktail e vista stanno già nelle idee sotto il campo.
+    { id: "vermouth", emoji: "🥃", titolo: "Vermouth e bitter", sotto: "L'aperitivo all'italiana, al bancone", q: "bar per aperitivo con vermouth e bitter a Roma", momenti: ["aperitivo"], chiave: "vermouth" },
+    { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Roma", momenti: ["dopocena"], chiave: "musica" },
+    { id: "tardi", emoji: "🌙", titolo: "Fame a tarda notte", sotto: "Cucine aperte dopo mezzanotte", q: "cucina aperta fino a tardi la notte a Roma", momenti: ["dopocena"], chiave: "tardi" },
   ],
   Milano: [
     { id: "risotto", emoji: "🍚", titolo: "Risotto alla milanese", sotto: "I migliori secondo le recensioni, fuori dai giri turistici", q: "migliore risotto alla milanese non turistico a Milano", momenti: ["pranzo", "cena", "pomeriggio"] },
     { id: "cotoletta", emoji: "🍖", titolo: "Cotoletta, la classifica", sotto: "Orecchia d'elefante o alta con l'osso", q: "migliore cotoletta alla milanese a Milano", momenti: ["pranzo", "cena"] },
     { id: "pizza", emoji: "🍕", titolo: "Pizza napoletana a Milano", sotto: "Cornicione alto, impasto leggero", q: "migliore pizza napoletana a Milano", momenti: ["cena", "pranzo"], chiave: "pizza" },
     { id: "brunch", emoji: "🥐", titolo: "Brunch e caffè di specialità", sotto: "Luce, pancake, caffè filtro", q: "brunch e caffè di specialità a Milano", momenti: ["colazione", "pranzo"], chiave: "brunch" },
+    { id: "brioche", emoji: "🥐", titolo: "Brioche e cappuccino", sotto: "Pasticcerie storiche, non catene", q: "pasticceria storica per colazione a Milano", momenti: ["colazione"], chiave: "pasticceria-storica" },
+    { id: "vermouth", emoji: "🥃", titolo: "Bitter e vermouth", sotto: "L'aperitivo milanese, quello vero", q: "bar storico per aperitivo con bitter e vermouth a Milano", momenti: ["aperitivo"], chiave: "vermouth" },
+    { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Milano", momenti: ["dopocena"], chiave: "musica" },
+    { id: "tardi", emoji: "🌙", titolo: "Fame a tarda notte", sotto: "Cucine aperte dopo mezzanotte", q: "cucina aperta fino a tardi la notte a Milano", momenti: ["dopocena"], chiave: "tardi" },
     { id: "aperitivo", emoji: "🍹", titolo: "Aperitivi veri", sotto: "Lontano dai Navigli turistici", q: "aperitivo non turistico a Milano", momenti: ["aperitivo", "pomeriggio"] },
     { id: "vini", emoji: "🍷", titolo: "Enoteche di vini naturali", sotto: "Dove l'oste ti consiglia davvero", q: "enoteca vini naturali a Milano", momenti: ["aperitivo", "dopocena", "pomeriggio"], chiave: "enoteca" },
     { id: "cocktail", emoji: "🍸", titolo: "Cocktail bar nascosti", sotto: "Porte senza insegna, drink d'autore", q: "cocktail bar nascosto d'autore a Milano", momenti: ["dopocena", "aperitivo"], chiave: "speakeasy" },
@@ -226,7 +238,9 @@ export function classifiche(citta: string, momento: Momento, now: Date, n = 4, e
   // Un tipo di posto già mostrato più in alto (idee, "Per te") o in una classifica prima non si ripete.
   const visti = new Set(escludi);
   const doppione = (c: Classifica) => { if (!c.chiave) return false; if (visti.has(c.chiave)) return true; visti.add(c.chiave); return false; };
-  return ruotate.filter((x) => !stona(x.c) && !doppione(x.c)).slice(0, n).map((x) => x.c);
+  // Revisore 7/11 (home 7,5): togliendo i doppioni restavano le classifiche fuori orario (supplì alle 8, risotto a
+  // mezzanotte). Solo quelle giuste per l'ora, anche se sono poche: meglio due righe vere che quattro fuori posto.
+  return ruotate.filter((x) => x.c.momenti.includes(momento) && !stona(x.c) && !doppione(x.c)).slice(0, n).map((x) => x.c);
 }
 
 const FUORI_ORA: Record<Momento, Momento[]> = {

@@ -82,6 +82,7 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto }: { mome
   const sopra = chiaviPillole(momento);
   for (const p of proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) })) sopra.add(p.chiave);
   const top = classifiche(dove, momento, now, 4, sopra);
+  if (!top.length) return null; // nessuna classifica adatta all'ora: meglio niente che una fuori posto
   return (
     <section data-testid="home-classifiche" className="mt-8">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Le classifiche di {dove}</h2>
@@ -142,9 +143,9 @@ export default function HomePerTe({
             <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
             <span className="min-w-0 flex-1">
               <span className={`${SERIF} line-clamp-2 block text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
-              <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-accent">
+              <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden>✦</span>
-                <span className="line-clamp-1">{p.perche}</span>
+                <span className="line-clamp-2">{p.perche}</span>
               </span>
             </span>
           </Link>
@@ -154,7 +155,7 @@ export default function HomePerTe({
           <span aria-hidden className={`${TONDO} bg-brand`}>🎲</span>
           <span className="min-w-0 flex-1">
             <span className={`${SERIF} block text-[18px] font-medium leading-[1.15] text-text`}>Sorprendimi</span>
-            <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-accent">
+            <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
               <span aria-hidden>✦</span>
               <span className="line-clamp-1">Un posto mai provato</span>
             </span>

@@ -889,7 +889,7 @@ ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder")) === "Cosa
 ok(/^(Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato|Domenica) /i.test((await page.getByTestId("home-momento").textContent()) ?? "") && /^Dove /.test((await page.getByRole("heading", { level: 1 }).textContent()) ?? ""), `home: giorno e momento sopra la domanda (${await page.getByTestId("home-momento").textContent()})`);
 { const prop = page.getByTestId("home-proposta"); const n = await prop.count();
   ok(n >= 1 && n <= 3 && (await prop.first().getAttribute("href"))?.startsWith("/mappa?q=") && /✦/.test(await prop.first().innerText()), `home: 'Per te' con 1-3 proposte che aprono una ricerca e dicono perché (${n})`); }
-ok((await page.getByTestId("home-classifica").count()) >= 3 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: 3-4 classifiche della città, numerate, mai fuori orario");
+ok((await page.getByTestId("home-classifica").count()) >= 1 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: classifiche della città (1-4, solo quelle giuste per l'ora)");
 ok((await page.getByTestId("home-invito-gusto").getAttribute("href"))?.includes("onboarding"), "home: invito alla mappa del gusto per chi non l'ha fatta");
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
 ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");
@@ -900,8 +900,6 @@ ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count(
   ok(doppi.length === 0, `home: ogni tipo di posto una volta sola tra idee, Per te e classifiche (${tipi.join(",")}${doppi.length ? ` · doppi: ${doppi.join(",")}` : ""})`); }
 // Audit design 7/11: card "Per te" basse, non più un riquadro alto con la sola emoji.
 { const h = await page.getByTestId("home-proposta").first().boundingBox(); ok(!!h && h.height <= 110, `home: card 'Per te' compatte (${Math.round(h?.height ?? 0)} px)`); }
-// Audit design 7/11: sulla home la barra in basso ha una voce accesa ("Mappa").
-ok((await page.getByTestId("barra").locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",") === "Mappa", "barra in basso: sulla home è accesa 'Mappa'");
 // Audit design 7/11: il testo del campo non si taglia neanche a 360 px.
 { await page.setViewportSize({ width: 360, height: 780 });
   const fit = await page.getByLabel("Cosa cerchi?").evaluate((el) => { const cs = getComputedStyle(el); const c = document.createElement("canvas").getContext("2d"); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; return { testo: c.measureText(el.placeholder).width, spazio: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; });
@@ -6903,10 +6901,10 @@ else {
       const acc = bp.getByTestId("profilo-account");
       ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
-      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Mappa"]]) {
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
-        // Home (audit design 7/11): accesa "Mappa", l'inizio dell'esplorazione (prima, D5 del 1/11: nessuna).
+        // Home (giro 1/11, D5): nessuna voce accesa. Revisore 7/11: accendere "Mappa" sulla home diceva "sei qui" su una pagina che non è la mappa.
         ok(voce === null ? accese.length === 0 : accese.length === 1 && accese[0] === voce, `barra: su ${path} ${voce ? `è accesa '${voce}'` : "nessuna voce accesa"} (${accese.join(",")})`);
       }
     }
