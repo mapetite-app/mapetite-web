@@ -107,7 +107,7 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto, weekend 
               <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-2xl">{c.emoji}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-display font-semibold leading-tight text-text">{c.titolo}</span>
-                <span className="mt-0.5 line-clamp-2 block text-xs font-sans leading-snug text-text-muted">{c.sotto}</span>
+                <span className="mt-0.5 line-clamp-2 text-xs font-sans leading-snug text-text-muted">{c.sotto}</span>
               </span>
               <span aria-hidden className="text-lg text-text-muted">›</span>
             </Link>
@@ -156,7 +156,7 @@ export default function HomePerTe({
           >
             <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
             <span className="min-w-0 flex-1">
-              <span className={`${SERIF} line-clamp-2 block text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
+              <span className={`${SERIF} line-clamp-2 text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
               <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden>✦</span>
                 <span className="line-clamp-2 [text-wrap:pretty]">{p.perche}</span>
