@@ -5097,6 +5097,10 @@ else {
 
 // 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
 //     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
+// Idee (designer e revisore 7/11): di notte stesso giorno e stessa soglia della home (ora di Roma, "notte" dalle 23:30).
+{ const id = await import(new URL("../../src/lib/idee.ts", import.meta.url).href);
+  const a = id.contestoIdee(new Date("2026-11-07T00:10:00Z"), null), b = id.contestoIdee(new Date("2026-11-06T22:40:00Z"), null), c = id.contestoIdee(new Date("2026-11-06T22:20:00Z"), null);
+  ok(a === "Venerdì notte" && b === "Venerdì notte" && c === "Venerdì sera", `idee: all'1:10 di sabato "Venerdì notte", alle 23:40 "notte", alle 23:20 "sera" (${a} / ${b} / ${c})`); }
 {
   let bk = null;
   try { bk = await import(new URL("../../src/lib/booking.ts", import.meta.url).href); } catch (e) { ok(false, `prenota: modulo src/lib/booking.ts importabile (${e.message})`); }
