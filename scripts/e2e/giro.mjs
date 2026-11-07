@@ -5114,7 +5114,11 @@ else {
 // 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
 //     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
 // Idee (designer e revisore 7/11): di notte stesso giorno e stessa soglia della home (ora di Roma, "notte" dalle 23:30).
-{ const id = await import(new URL("../../src/lib/idee.ts", import.meta.url).href);
+// idee.ts importa "@/lib/moment", che Node non risolve: se ne importa una copia con il percorso vero.
+{ const { writeFileSync, mkdtempSync } = await import("fs"); const { tmpdir } = await import("os");
+  const src = readFileSync(new URL("../../src/lib/idee.ts", import.meta.url), "utf8").replace(/from "@\/lib\/([\w-]+)"/g, (_, m) => `from "${new URL(`../../src/lib/${m}.ts`, import.meta.url).href}"`);
+  const tmp = `${mkdtempSync(`${tmpdir()}/giro-idee-`)}/idee.ts`; writeFileSync(tmp, src);
+  const id = await import(`file://${tmp}`);
   const a = id.contestoIdee(new Date("2026-11-07T00:10:00Z"), null), b = id.contestoIdee(new Date("2026-11-06T22:40:00Z"), null), c = id.contestoIdee(new Date("2026-11-06T22:20:00Z"), null);
   ok(a === "Venerdì notte" && b === "Venerdì notte" && c === "Venerdì sera", `idee: all'1:10 di sabato "Venerdì notte", alle 23:40 "notte", alle 23:20 "sera" (${a} / ${b} / ${c})`); }
 {

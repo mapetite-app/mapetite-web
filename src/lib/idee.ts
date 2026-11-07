@@ -3,7 +3,7 @@
 // l'idea del momento (cosa), "Vicino a me, aperto adesso" (dove, subito), una tua idea o Sorprendimi.
 // Revisore del 2/11 (r4): con 4 righe il pannello copriva metà schermo; il resto sta nella fila di suggerimenti.
 // Nessun costo Google: sono frasi, la ricerca parte solo al tocco.
-import { oraRoma, type Weather } from "./moment";
+import { oraRoma, type Weather } from "@/lib/moment";
 
 const GIORNI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 
