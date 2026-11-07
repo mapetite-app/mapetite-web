@@ -15,6 +15,14 @@ const SERIF = "font-[family-name:var(--font-newsreader)]";
 const CARD = "flex min-h-[5.5rem] w-[72vw] max-w-[17.5rem] shrink-0 snap-start items-center gap-3 rounded-card border border-border bg-white p-3 shadow-sm active:scale-[0.99]";
 const TONDO = "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-sm";
 
+// Revisore 7/11 (sera): il server disegna pillole e "Per te" senza le ricerche recenti (stanno sul telefono) e il
+// telefono le cambia subito dopo: si vedeva il cambio. Finché il telefono non ha letto le ricerche, invisibili.
+const noop = () => () => {};
+function usePronto(): string {
+  const pronto = useSyncExternalStore(noop, () => true, () => false);
+  return `transition-opacity duration-150 ${pronto ? "opacity-100" : "opacity-0"}`;
+}
+
 function useRecenti(): string[] {
   const on = useBeta("recenti");
   const raw = useSyncExternalStore(subscribeRecent, () => JSON.stringify(loadRecentSearches()), () => "[]");
@@ -47,10 +55,11 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
   // Revisore 7/11: la ricerca da cui nasce una card "Per te" ("Hai cercato «…»") non torna anche come pillola ↻.
   const inCard = new Set(proposte({ gusto, recenti: tutte, citta, momento, weekend, escludi: chiaviPillole(momento, gusto, tutte, weekend) }).map((p) => p.da).filter(Boolean));
   const recenti = tutte.filter((q) => !inCard.has(q)).slice(0, 3);
+  const fade = usePronto();
   const pill = "flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95";
   return (
     // Prima le ultime ricerche fatte su questo telefono (↻), poi tre idee giuste per l'ora nella tua città.
-    <div data-testid="home-suggerimenti" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+    <div data-testid="home-suggerimenti" className={`${fade} -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
       {recenti.length > 0 && (
         <span data-testid="home-recenti" className="contents">
           {recenti.map((q) => (
@@ -61,7 +70,7 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
           ))}
         </span>
       )}
-      {pillole(momento, gusto, tutte, weekend).map(({ label }) => {
+      {pillole(momento, gusto, tutte, weekend, citta).map(({ label }) => {
         const q = `${label} a ${citta}`;
         return (
           <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
@@ -87,6 +96,7 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto, weekend 
   // Né il tipo di una ricerca recente già in vista come pillola ↻ (revisore 7/11: ↻ cocktail e "Cocktail bar nascosti").
   for (const q of recenti.slice(0, 3)) { const t = tipoRicerca(q); if (t) sopra.add(t); }
   const top = classifiche(dove, momento, now, 4, sopra);
+  const fade = usePronto();
   // Meno di 2 classifiche adatte all'ora: la sezione con una riga sola sembrava vuota (revisore 7/11).
   // Revisore 7/11 (home 8,0): senza classifiche la home restava mezza vuota; con una sola la sezione regge.
   if (top.length < 1) return null;
@@ -94,7 +104,7 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto, weekend 
     <section data-testid="home-classifiche" className="mt-8">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Le classifiche di {dove}</h2>
       <p className="mt-1.5 text-xs font-sans text-text-muted">Ordinate dalle recensioni e dal verdetto Mapetite, non dalla fama.</p>
-      <ol className="mt-3 divide-y divide-border overflow-hidden rounded-card border border-border bg-white">
+      <ol className={`${fade} mt-3 divide-y divide-border overflow-hidden rounded-card border border-border bg-white`}>
         {top.map((c, i) => (
           <li key={c.id}>
             <Link
@@ -140,12 +150,13 @@ export default function HomePerTe({
   const prima = lista[0]?.q;
   useEffect(() => { scorri.current?.scrollTo({ left: 0 }); }, [prima]);
   const senzaGusto = !gusto || gusto.su.length === 0;
+  const fade = usePronto();
   return (
     <section data-testid="home-per-te" className="mt-7">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Per te</h2>
       {/* Card basse (audit design 7/11: il grande riquadro con la sola emoji sembrava un segnaposto).
           Emoji in un piccolo tondo colorato, titolo e perché accanto: tutta la card si legge. */}
-      <div ref={scorri} className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+      <div ref={scorri} className={`${fade} -mx-4 mt-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]`}>
         {lista.map((p, i) => (
           <Link
             key={p.q}

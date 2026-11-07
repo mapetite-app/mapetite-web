@@ -170,7 +170,7 @@ export function suPerGusti<T extends { name: string; category?: string | null; t
 // Revisore 7/11 (primo accesso 8,3): "Ami: trattoria, pizzeria e cucina romana" suonava come un elenco. Nella
 // frase da amico ogni tipo con l'articolo, come i 10 tipi del primo accesso ("Ami le trattorie di quartiere").
 const IN_FRASE: Record<string, string> = {
-  trattoria: "le trattorie", osteria: "le osterie", ristorante: "i ristoranti", pizzeria: "le pizzerie", "pizza-taglio": "la pizza al taglio",
+  trattoria: "le trattorie", osteria: "le osterie", ristorante: "i ristoranti italiani", pizzeria: "le pizzerie", "pizza-taglio": "la pizza al taglio",
   romana: "la cucina romana", milanese: "la cucina milanese", regionale: "la cucina regionale", agriturismo: "gli agriturismi",
   pesce: "il pesce", griglieria: "la carne alla griglia", steakhouse: "le steakhouse", gourmet: "i ristoranti gourmet", bistrot: "i bistrot",
   sushi: "il sushi", ramen: "il ramen", cinese: "la cucina cinese", thai: "la cucina thai", vietnamita: "la cucina vietnamita",
@@ -183,5 +183,9 @@ const IN_FRASE: Record<string, string> = {
   speakeasy: "gli speakeasy", "vini-naturali": "le enoteche", pub: "i pub", "birra-artigianale": "la birra artigianale", rooftop: "i rooftop",
   aperitivo: "l'aperitivo", lounge: "la musica dal vivo",
 };
+// Revisore 7/11: "Ami la cucina milanese e i ristoranti" era piatta. "Ristorante" sta in "Cucina italiana" (per Google
+// italian_restaurant): si dice "i ristoranti italiani", e dopo i gusti più precisi, che aprono la frase.
+const GENERICI = new Set(["ristorante"]);
 /** I tipi amati come si dicono in una frase ("le pizzerie", "il sushi"); senza voce, l'etichetta. */
-export const amatiInFrase = (ids: string[]): string[] => ids.map((id) => IN_FRASE[id] ?? PER_ID.get(id)?.label.toLowerCase()).filter((x): x is string => !!x);
+export const amatiInFrase = (ids: string[]): string[] =>
+  [...ids.filter((id) => !GENERICI.has(id)), ...ids.filter((id) => GENERICI.has(id))].map((id) => IN_FRASE[id] ?? PER_ID.get(id)?.label.toLowerCase()).filter((x): x is string => !!x);
