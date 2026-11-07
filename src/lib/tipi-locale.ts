@@ -76,9 +76,9 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     tipi: [
       { id: "street-food", emoji: "🌯", label: "Street food", query: "street food", google: ["food_court"], parole: /street\s*food|cibo\s+di\s+strada/i },
       { id: "paninoteca", emoji: "🥪", label: "Paninoteca", query: "paninoteca", google: ["sandwich_shop", "deli"], nome: /panin|sandwich/i, parole: /panin|sandwich|tramezzin/i },
-      { id: "piadineria", emoji: "🫓", label: "Piadineria", query: "piadineria", google: [], nome: /piadin/i, parole: /piadin/i },
+      { id: "piadineria", emoji: "🥙", label: "Piadineria", query: "piadineria", google: [], nome: /piadin/i, parole: /piadin/i },
       { id: "friggitoria", emoji: "🍤", label: "Fritti", query: "friggitoria", google: [], nome: /friggitori|suppl|arancin|fritt/i, parole: /friggitori|fritt|suppl|arancin/i },
-      { id: "kebab", emoji: "🥙", label: "Kebab", query: "kebab", google: [], nome: /kebab|kebap|d[oö]ner/i, parole: /kebab|kebap|d[oö]ner/i },
+      { id: "kebab", emoji: "🍢", label: "Kebab", query: "kebab", google: [], nome: /kebab|kebap|d[oö]ner/i, parole: /kebab|kebap|d[oö]ner/i },
       { id: "fast-food", emoji: "🍟", label: "Fast food", query: "fast food", google: ["fast_food_restaurant"], parole: /fast\s*food/i },
     ],
   },
@@ -99,7 +99,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     tipi: [
       { id: "cocktail", emoji: "🍸", label: "Cocktail bar", query: "cocktail bar", google: ["cocktail_bar"], parole: /cocktail|mixolog/i },
       { id: "speakeasy", emoji: "🗝️", label: "Speakeasy", query: "speakeasy", google: [], nome: /speakeasy/i, parole: /speakeasy|nascost|segret/i },
-      { id: "vini-naturali", emoji: "🍷", label: "Enoteca e vini", query: "enoteca vini naturali", google: ["wine_bar"], nome: /enotec|vineri|wine/i, parole: /enotec|vin[oi]\b|wine|calice|vineri/i },
+      { id: "vini-naturali", emoji: "🍇", label: "Enoteca e vini", query: "enoteca vini naturali", google: ["wine_bar"], nome: /enotec|vineri|wine/i, parole: /enotec|vin[oi]\b|wine|calice|vineri/i },
       { id: "pub", emoji: "🍺", label: "Pub", query: "pub", google: ["pub", "irish_pub", "gastropub", "sports_bar"], nome: /\bpub\b/i, parole: /\bpub\b/i },
       { id: "birra-artigianale", emoji: "🍻", label: "Birra artigianale", query: "birra artigianale", google: ["brewery", "brewpub", "beer_garden"], nome: /birr|brew|beer/i, parole: /birr|beer|brew/i },
       { id: "rooftop", emoji: "🌇", label: "Rooftop", query: "rooftop", google: [], nome: /rooftop|terrazz/i, parole: /rooftop|terrazz|tetti|panoramic/i },

@@ -74,7 +74,14 @@ async function esempio(pg) {
   const idea = pg.getByTestId("apri-idee");
   for (let i = 0; i < 50; i++) {
     if (await b.isVisible().catch(() => false)) return b;
-    if (await idea.isVisible().catch(() => false)) { await idee(pg); return b; }
+    if (await idea.isVisible().catch(() => false)) {
+      await idee(pg);
+      if (await b.count() > 0) return b;
+      // Di mattina (5–11) il rooftop non è tra gli esempi (solo quelli della fascia oraria, revisore 7/11):
+      // stessa ricerca scritta nella barra, come farebbe una persona.
+      const scrivi = { click: async () => { await pg.getByLabel("Cosa cerchi?").fill("Rooftop romantico per due a Roma"); await pg.keyboard.press("Enter"); }, first: () => scrivi, count: async () => 1, isVisible: async () => true };
+      return scrivi;
+    }
     await pg.waitForTimeout(200);
   }
   return b;
@@ -225,7 +232,7 @@ await idee(page);
     ok(!/\d{1,2}:\d{2}/.test(sub) && !/^Per le /.test(sub) && sub.length > 0, `Idee: sotto l'idea del momento una frase umana, senza orario ('${sub}')`); }
   ok((await pan.getByTestId("idee-stasera").count()) === 0 && (await pan.getByTestId("suggerimento-momento-2").count()) === 0, "Idee: niente 'Stasera dove andiamo?' (sta nei Salvati) né una seconda idea dello stesso momento");
   ok((await page.getByTestId("apri-idee").getAttribute("aria-expanded")) === "true", "Idee: il pulsante dice che il pannello è aperto"); }
-ok((await page.getByRole("button", { name: "Rooftop romantico per due a Roma", exact: true }).count()) === 1, "primo accesso: esempi cliccabili presenti");
+ok((await page.getByTestId("idee-fila").getByTestId("idee-esempio").count()) >= 2, "primo accesso: esempi cliccabili presenti (almeno 2, quelli dell'ora)");
 ok(await page.getByTestId("suggerimento-momento").isVisible(), "primo accesso: suggerimento legato all'ora del giorno");
 await shot("01b-idee");
 await page.getByTestId("idee-fuori").click({ position: { x: 385, y: 400 } });

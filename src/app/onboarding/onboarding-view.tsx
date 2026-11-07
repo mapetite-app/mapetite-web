@@ -277,7 +277,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
   // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
-  const dedotta = scopertaDedotta(su, [...su, ...giu]);
+  // Revisore 7/11: da un solo 👍 "Le chicche" era già scelto e finiva nella frase. Si propone da 3 voti in su.
+  const dedotta = su.length + giu.length >= 3 ? scopertaDedotta(su, [...su, ...giu]) : null;
   const scopertaOra = scoperta ?? dedotta;
   // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
   // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).

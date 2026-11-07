@@ -838,20 +838,32 @@ type ViewMode = "all" | "saved";
 
 // Ricerche di esempio del primo accesso (titolo + seconda riga per le schede della variante B).
 type Esempio = { query: string; title: string; sub: string; momenti: Momento[] };
+// Uguali nelle due città: colazione, pranzo veloce, cocktail e vino.
+const ESEMPI_COMUNI: Esempio[] = [
+  { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino", momenti: ["colazione"] },
+  { query: "Caffè di specialità qui vicino", title: "Caffè di specialità", sub: "qui vicino", momenti: ["colazione"] },
+  { query: "Brunch con calma nel weekend", title: "Brunch con calma", sub: "nel weekend", momenti: ["colazione"] },
+  { query: "Pranzo veloce e buono, non catena", title: "Pranzo veloce", sub: "buono, non catena", momenti: ["pranzo"] },
+  { query: "Cucina dal mondo autentica in un posto piccolo", title: "Cucina dal mondo", sub: "autentica, posto piccolo", momenti: ["pranzo", "cena"] },
+  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Vino naturale e taglieri", title: "Vino naturale", sub: "e taglieri", momenti: ["aperitivo", "dopocena"] },
+];
 // Revisore 7/11: "Colazione buona" a pranzo e cocktail alle 8 stonavano: ogni esempio ha le sue ore.
 const WELCOME_EXAMPLES: Esempio[] = [
-  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["pomeriggio", "aperitivo", "cena"] },
-  { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere", momenti: ["colazione", "pranzo", "pomeriggio", "aperitivo", "cena"] },
-  { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino", momenti: ["dopocena", "colazione"] },
-  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["pranzo", "pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere", momenti: ["pranzo", "pomeriggio", "cena"] },
+  ...ESEMPI_COMUNI,
 ];
 // Con la mappa su Milano (VISIONE: si parte da Roma e Milano) gli esempi parlano di Milano.
 const WELCOME_EXAMPLES_MILANO: Esempio[] = [
-  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["pomeriggio", "aperitivo", "cena"] },
-  { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana", momenti: ["colazione", "pranzo", "pomeriggio", "aperitivo", "cena"] },
-  { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino", momenti: ["dopocena", "colazione"] },
-  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["pranzo", "pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana", momenti: ["pranzo", "pomeriggio", "cena"] },
+  ...ESEMPI_COMUNI,
 ];
+
+// Parole che non bastano a dire che due idee sono la stessa ("qui vicino", "buono", "per stasera").
+const PAROLE_VUOTE = new Set(["qui", "vicino", "buono", "buona", "buoni", "stasera", "stamattina", "serata", "bene", "fatto", "fatta", "posto", "locale", "iniziare"]);
+const paroleChiave = (t: string) => t.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 4 && !PAROLE_VUOTE.has(w)).map((w) => (w === "wine" ? "vino" : w.slice(0, 6)));
 
 // Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
 // hideTitle (revisore 1/11: tre intestazioni per sei righe): il gruppo resta per i lettori di schermo, l'elenco è unico.
@@ -1464,15 +1476,11 @@ export default function MapView({
   // vicino a un posto che volevi provare, la mappa te lo dice da sola. Una volta per apertura,
   // solo sulla mappa libera (non sopra una ricerca o una scheda).
   const tuttiEsempi = cityNear(viewState.latitude, viewState.longitude) === "Milano" ? WELCOME_EXAMPLES_MILANO : WELCOME_EXAMPLES;
-  // Revisore 7/11: prima gli esempi giusti per l'ora di Roma (niente "Colazione buona" in testa a pranzo), gli altri
-  // in fondo alla fila; mai quello che ripete l'idea del momento già in cima al pannello ("Colazione…" due volte).
+  // Revisore 7/11 (due giri): solo gli esempi della fascia oraria di Roma (niente "Colazione buona" a mezzanotte)
+  // e mai uno che ripete l'idea del momento in cima al pannello ("Pranzo in trattoria" e "Trattoria autentica").
   const momentoOra = momentHour == null ? null : momentoDi(new Date()).momento;
-  const primaParola = (t: string) => t.toLowerCase().split(" ")[0];
-  const doppione = momentExample ? primaParola(titoloMomento(momentExample)) : null;
-  const welcomeExamples = momentoOra == null ? tuttiEsempi : [
-    ...tuttiEsempi.filter((ex) => ex.momenti.includes(momentoOra)),
-    ...tuttiEsempi.filter((ex) => !ex.momenti.includes(momentoOra)),
-  ].filter((ex) => primaParola(ex.title) !== doppione);
+  const giaInCima = new Set(momentExample ? paroleChiave(titoloMomento(momentExample)) : []);
+  const welcomeExamples = momentoOra == null ? tuttiEsempi : tuttiEsempi.filter((ex) => ex.momenti.includes(momentoOra) && !paroleChiave(ex.query).some((w) => giaInCima.has(w)));
   // Pannello Idee (revisore del 2/11, r4): 3 righe al massimo; Sorprendimi va nella fila quando la riga è di un'idea tua.
   const recentiIdee = recentOn ? (JSON.parse(recentSearches) as string[]).slice(0, 3) : [];
   const sorprendimiInFila = !!(tasteSuggestion || savedSuggestion);
