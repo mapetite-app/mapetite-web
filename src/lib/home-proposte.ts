@@ -45,17 +45,24 @@ const TITOLO_HOME: Record<string, string> = { pizza: "Pizza napoletana vera", st
 export const PILLOLE: Record<Momento, { label: string; chiave: string }[]> = {
   colazione: [{ label: "Colazione con cornetti veri", chiave: "pasticceria" }, { label: "Caffè di specialità", chiave: "caffe" }, { label: "Brunch con calma", chiave: "brunch" }, { label: "Forno di quartiere", chiave: "forno" }],
   pranzo: [{ label: "Pranzo veloce e buono", chiave: "veloce" }, { label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Pranzo tranquillo, senza fretta", chiave: "lavoro" }, { label: "Cucina dal mondo", chiave: "mondo" }],
-  pomeriggio: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }],
+  // Revisore 7/11 (sera): alle 16 Idee proponeva merenda e gelato, la home solo la sera. Ora una cosa per adesso e due per stasera.
+  pomeriggio: [{ label: "Merenda buona", chiave: "merenda" }, { label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Cena romantica", chiave: "romantica" }, { label: "Gelato artigianale", chiave: "gelato" }, { label: "Vino naturale", chiave: "enoteca" }],
   aperitivo: [{ label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Birra artigianale", chiave: "birra" }, { label: "Vermouth al bancone", chiave: "vermouth" }],
   cena: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Trattoria non turistica", chiave: "trattoria" }, { label: "Pizza napoletana", chiave: "pizza" }, { label: "Cucina dal mondo", chiave: "mondo" }, { label: "Bistrot creativo", chiave: "bistrot" }],
-  dopocena: [{ label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Wine bar fino a tardi", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }, { label: "Fame a tarda notte", chiave: "tardi" }],
+  // Revisore 7/11: con cocktail e vino tra i gusti, sotto "Dove andiamo a bere?" restavano gelato e fame: la birra fa da riserva.
+  dopocena: [{ label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Wine bar fino a tardi", chiave: "enoteca" }, { label: "Birra artigianale", chiave: "birra" }, { label: "Gelato artigianale", chiave: "gelato" }, { label: "Fame a tarda notte", chiave: "tardi" }],
 };
 
 // Revisore 7/11 (terzo, home 7,8): sabato e domenica la home era uguale al martedì ("Pranzo veloce" di sabato,
 // mentre il pannello Idee diceva "Pranzo del sabato in trattoria"). Nel weekend niente pranzo veloce o di lavoro;
 // a colazione il brunch viene prima, a pranzo c'è il brunch e il pranzo fuori porta.
 const VIA_WEEKEND = new Set(["veloce", "lavoro"]);
-function pilloleDelGiorno(momento: Momento, weekend: boolean): { label: string; chiave: string }[] {
+// Revisore 7/11: a Milano si dice brioche, non cornetto.
+const milanese = (citta: string | undefined, l: string) => (citta?.toLowerCase() === "milano" ? l.replace(/([Cc])ornetti veri/g, "$1ornetti vere").replace(/([Cc])ornett[io]/g, (_, c: string) => (c === "C" ? "Brioche" : "brioche")) : l);
+function pilloleDelGiorno(momento: Momento, weekend: boolean, citta?: string): { label: string; chiave: string }[] {
+  return pilloleBase(momento, weekend).map((p) => ({ ...p, label: milanese(citta, p.label) }));
+}
+function pilloleBase(momento: Momento, weekend: boolean): { label: string; chiave: string }[] {
   if (!weekend) return PILLOLE[momento];
   if (momento === "colazione") return [{ label: "Brunch con calma", chiave: "brunch" }, ...PILLOLE.colazione.filter((p) => p.chiave !== "brunch")];
   if (momento === "pranzo") return [{ label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Brunch del weekend", chiave: "brunch" }, { label: "Pranzo fuori porta", chiave: "fuoriporta" }, { label: "Cucina dal mondo", chiave: "mondo" }];
@@ -79,9 +86,9 @@ function tipiDalGusto(gusto: MappaGusto | null | undefined, momento: Momento): s
  * recente (↻ "trattoria a Monti" accanto a "Trattoria per pranzo") né di un tipo che ami: quello va in "Per te"
  * con il tuo perché, che vale più dell'idea generica.
  */
-export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = [], weekend = false): { label: string; chiave: string }[] {
+export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = [], weekend = false, citta?: string): { label: string; chiave: string }[] {
   const via = new Set<string>([...tipiDalGusto(gusto, momento), ...recenti.slice(0, 3).map(tipoRicerca).filter((t): t is string => !!t)]);
-  return pilloleDelGiorno(momento, weekend).filter((p) => !via.has(p.chiave)).slice(0, 3);
+  return pilloleDelGiorno(momento, weekend, citta).filter((p) => !via.has(p.chiave)).slice(0, 3);
 }
 
 /** Tipi di posto già occupati dalle idee sotto il campo: "Per te" e le classifiche non li ripetono. */
@@ -125,6 +132,22 @@ const DA_RICERCA: { re: RegExp; tipo: string; nome: string }[] = [
   { re: /bistrot|creativ|gourmet|degustazion/i, tipo: "bistrot", nome: "bistrot" },
 ];
 
+// Revisore 7/11: da "cocktail bar con terrazza" la card perdeva la terrazza. Le richieste fisiche e d'occasione
+// della ricerca restano nella proposta (solo quelle scritte, niente di aggiunto).
+const EXTRA: { re: RegExp; testo: string }[] = [
+  { re: /terrazz/i, testo: "con terrazza" },
+  { re: /\bvista\b/i, testo: "con vista" },
+  { re: /giardin|all'aperto|dehors|tavoli fuori/i, testo: "con tavoli all'aperto" },
+  { re: /romantic|a due|per due|appuntament/i, testo: "per una serata a due" },
+  { re: /vegan/i, testo: "con piatti vegani" },
+  { re: /vegetarian/i, testo: "con piatti vegetariani" },
+  { re: /senza glutine|celiac/i, testo: "con piatti senza glutine" },
+  { re: /cane|cani|dog/i, testo: "dove si entra con il cane" },
+];
+function extraDi(q: string, tipo: string): string[] {
+  return EXTRA.filter((e) => e.re.test(q) && !(tipo === "rooftop" && /vista|terrazza/.test(e.testo))).map((e) => e.testo).slice(0, 2);
+}
+
 // Zona scritta nella ricerca ("… a Monti", "… in Brera"): parola con la maiuscola dopo "a"/"in"/"al".
 function zonaDi(q: string): string | null {
   const m = q.match(/\b(?:a|in|al|ai|zona)\s+([A-ZÀ-Ý][\p{L}']+(?:\s+[A-ZÀ-Ý][\p{L}']+)?)\s*$/u) ?? q.match(/\b(?:a|in|al|ai|zona)\s+([A-ZÀ-Ý][\p{L}']+)/u);
@@ -143,6 +166,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
   // Un tipo di posto una volta sola: "trattorie a Monti" dalla ricerca non torna uguale dal gusto.
   // Parte dai tipi già mostrati più in alto (le idee sotto il campo).
   const usati = new Set<string>(input.escludi ?? []);
+  let zonaRicerca: string | null = null;
 
   // 1. Dall'ultima ricerca: lo stesso genere, ma le chicche (il differenziatore: non i più famosi).
   for (const r of recenti.slice(0, 3)) {
@@ -155,7 +179,11 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const parola = hit.nome || (r.match(hit.re)?.[0] ?? "").toLowerCase();
     const cosa = hit.nome ? tipo.query : parola;
     usati.add(tipo.id);
-    add({ emoji: tipo.emoji, titolo: `${cap(parola)} che pochi conoscono ${aZona(dove)}`, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} poco conosciuto fuori dai giri turistici ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
+    const extra = extraDi(r, hit.tipo);
+    zonaRicerca = dove;
+    // "che pochi conoscono" vale per maschile e femminile ("trattoria … poco conosciuto" no, revisore 7/11).
+    const titolo = `${cap(parola)}${extra[0] && extra[0].length <= 14 ? ` ${extra[0]}` : ""} che pochi conoscono ${aZona(dove)}`;
+    add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa}${extra.map((e) => ` ${e}`).join("")} che pochi conoscono, fuori dai giri turistici, ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }
 
@@ -173,7 +201,9 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
       usati.add(tipo.id);
       // Revisore 7/11: con la città Milano non si propone "al Pigneto". Solo le zone della città scelta
       // (quelle che non conosciamo restano: non sappiamo di che città sono).
-      const zoneQui = gusto.zone.filter((z) => { const c = ZONE.find((x) => x.nome === z)?.citta; return !c || c.toLowerCase() === citta.toLowerCase(); });
+      const zoneCitta = gusto.zone.filter((z) => { const c = ZONE.find((x) => x.nome === z)?.citta; return !c || c.toLowerCase() === citta.toLowerCase(); });
+      // Revisore 7/11: due card "Per te" nella stessa zona quando la prima nasce da una ricerca: l'altra zona prima.
+      const zoneQui = zonaRicerca && zoneCitta.some((z) => z !== zonaRicerca) ? zoneCitta.filter((z) => z !== zonaRicerca) : zoneCitta;
       const zona = zoneQui[i] ?? zoneQui[0];
       const dove = zona ?? citta;
       const chicche = scoperta === "chicche" ? " fuori dai giri turistici" : "";
@@ -190,7 +220,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
       usati.add(chiave);
       const tipo = tipoDa(id.tipo)!;
       add({ emoji: id.emoji ?? tipo.emoji, titolo: id.titolo, // revisore 7/11: "Roma" andava a capo da sola; la città sta già nel titolo delle classifiche
-      perche: id.perche, q: `${id.q} a ${citta}`, sfondo: tipo.sfondo, chiave });
+      perche: milanese(citta, id.perche), q: `${milanese(citta, id.q)} a ${citta}`, sfondo: tipo.sfondo, chiave });
     }
   }
   return out.slice(0, 3);

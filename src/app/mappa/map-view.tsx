@@ -851,15 +851,16 @@ const ESEMPI_COMUNI: Esempio[] = [
   { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["aperitivo", "cena", "dopocena"] },
   { query: "Vino naturale e taglieri", title: "Vino naturale", sub: "e taglieri", momenti: ["aperitivo", "dopocena"] },
 ];
+// Revisore 7/11 (sera): niente "Rooftop romantico" a mezzanotte.
 // Revisore 7/11: "Colazione buona" a pranzo e cocktail alle 8 stonavano: ogni esempio ha le sue ore.
 const WELCOME_EXAMPLES: Esempio[] = [
-  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["aperitivo", "cena", "dopocena"] },
+  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["aperitivo", "cena"] },
   { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere", momenti: ["pranzo", "cena"] },
   ...ESEMPI_COMUNI,
 ];
 // Con la mappa su Milano (VISIONE: si parte da Roma e Milano) gli esempi parlano di Milano.
 const WELCOME_EXAMPLES_MILANO: Esempio[] = [
-  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["aperitivo", "cena", "dopocena"] },
+  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["aperitivo", "cena"] },
   { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana", momenti: ["pranzo", "cena"] },
   ...ESEMPI_COMUNI,
 ];
