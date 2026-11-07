@@ -3186,7 +3186,7 @@ export default function MapView({
               data-testid="apri-idee"
               aria-expanded={ideasShown}
               onClick={() => setIdeasOpen((o) => !o)}
-              className={`pointer-events-auto flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${ideasShown ? "bg-brand text-white" : "bg-surface text-brand"}`}
+              className={`pointer-events-auto flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${ideasShown ? "bg-brand text-white" : "bg-surface text-brand"}`}
             >
               {ideasShown ? <X size={16} aria-hidden /> : <Lightbulb size={16} className="text-accent" aria-hidden />}
               Idee

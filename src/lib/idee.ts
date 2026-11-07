@@ -20,7 +20,11 @@ function parteDelGiorno(h: number): string {
 
 // Riga sotto il titolo: "Domenica sera · 12°" (il meteo solo se c'è).
 export function contestoIdee(now: Date, weather: Weather | null): string {
-  const base = `${GIORNI[now.getDay()]} ${parteDelGiorno(now.getHours())}`;
+  // Designer 7/11: all'una di sabato la home diceva "Venerdì notte" e il pannello "Sabato notte". Stessa regola
+  // della home (`momentoDi`): prima delle 5, per chi esce, è ancora la notte del giorno prima.
+  const h = now.getHours();
+  const giorno = GIORNI[(now.getDay() + (h < 5 ? 6 : 0)) % 7];
+  const base = `${giorno} ${parteDelGiorno(h)}`;
   if (!weather) return base;
   return `${base} · ${Math.round(weather.tempC)}°${weather.rain ? ", piove" : ""}`;
 }

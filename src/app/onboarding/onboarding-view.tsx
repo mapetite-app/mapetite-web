@@ -152,11 +152,11 @@ function Chip({
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
       // Revisore 5/11: stesso aspetto delle chip di "Cosa ti piace?" (teal pieno con la spunta), un passo prima.
-      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
     >
-      {item.emoji && <span aria-hidden>{item.emoji}</span>}
+      {/* Designer 7/11: la spunta prende il posto dell'emoji, così la chip non si allarga e la riga non si riordina. */}
+      {(item.emoji || selected) && <span aria-hidden className="flex w-5 justify-center">{selected ? <Check size={16} strokeWidth={3} /> : item.emoji}</span>}
       <span>{item.label}</span>
-      {selected && <Check size={16} strokeWidth={3} aria-hidden />}
     </button>
   );
 }
@@ -582,14 +582,14 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 whitespace-nowrap rounded-pill border border-border bg-white px-4 text-center text-[14px] font-display font-semibold text-text-muted active:scale-95">
                     Non lo conosco
                   </button>
                   <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted [@media(max-height:760px)]:hidden">← trascina la card, oppure tocca →</p>
+                {/* Designer 7/11: tolta la riga "← trascina la card, oppure tocca →" (testo in più: i tasti si spiegano da soli). */}
                 <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}: {corrente.titolo}.</p>
               </>
             ) : (

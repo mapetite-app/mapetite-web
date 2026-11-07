@@ -201,7 +201,8 @@ const maiuscola = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Elenco evidenziato "A, B e altri 2": nessuna scelta sparisce senza dirlo (collaudo del 23/10).
 function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["un altro", "altri"]): PezzoFrase[] {
-  const vis = xs.slice(0, max);
+  // Designer 7/11: "e un altro gusto" era vago. Se ne resta uno solo, si scrive quello (costa una parola sola).
+  const vis = xs.slice(0, xs.length === max + 1 ? max + 1 : max);
   const resto = xs.length - vis.length;
   const out: PezzoFrase[] = [];
   vis.forEach((x, i) => {
