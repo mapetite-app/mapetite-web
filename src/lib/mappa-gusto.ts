@@ -154,7 +154,7 @@ export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | nu
     : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ti piace: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2, TIPO_POSTO)}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
@@ -230,7 +230,8 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
   // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
   const amati = extra.amati ?? [];
-  if (amati.length) frasi.push([{ t: su.length ? "Ti piacciono anche " : "Ti piacciono " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
+  // Revisore 7/11: "Ti piacciono trattoria, ristorante…" era sgrammaticato (etichette al singolare).
+  if (amati.length) frasi.push([{ t: su.length ? "Ti piace anche: " : "Ti piace: " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];

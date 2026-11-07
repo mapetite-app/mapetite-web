@@ -3,16 +3,17 @@
 // l'idea del momento (cosa), "Vicino a me, aperto adesso" (dove, subito), una tua idea o Sorprendimi.
 // Revisore del 2/11 (r4): con 4 righe il pannello copriva metà schermo; il resto sta nella fila di suggerimenti.
 // Nessun costo Google: sono frasi, la ricerca parte solo al tocco.
-import type { Weather } from "@/lib/moment";
+import { oraRoma, type Weather } from "@/lib/moment";
 
 const GIORNI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 
 // Righe del pannello: oltre si torna all'elenco lungo che Lorenzo ha bocciato.
 export const IDEE_MAX = 3;
 
+// Stesse fasce della home (`momentoDi`, revisore 7/11): "mattina" fino alle 11, poi "a pranzo".
 function parteDelGiorno(h: number): string {
-  if (h >= 5 && h < 12) return "mattina";
-  if (h >= 12 && h < 15) return "pranzo";
+  if (h >= 5 && h < 11) return "mattina";
+  if (h >= 11 && h < 15) return "a pranzo";
   if (h >= 15 && h < 18) return "pomeriggio";
   if (h >= 18 && h < 23.5) return "sera"; // dalle 23:30 "notte", come la home (`momentoDi`)
   return "notte";
@@ -23,10 +24,8 @@ export function contestoIdee(now: Date, weather: Weather | null): string {
   // Designer 7/11: all'una di sabato la home diceva "Venerdì notte" e il pannello "Sabato notte". Stessa regola
   // della home (`momentoDi`): prima delle 5, per chi esce, è ancora la notte del giorno prima.
   // Ora di Roma e "notte" dalle 23:30, come la home (revisore 7/11: tra le 23:30 e mezzanotte la home diceva "notte", il pannello "sera").
-  const parti = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
-  const h = Number(parti.find((p) => p.type === "hour")?.value ?? now.getHours()) + Number(parti.find((p) => p.type === "minute")?.value ?? 0) / 60;
-  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parti.find((p) => p.type === "weekday")?.value ?? "");
-  const giorno = GIORNI[((wd < 0 ? now.getDay() : wd) + (h < 5 ? 6 : 0)) % 7];
+  const { h, day } = oraRoma(now);
+  const giorno = GIORNI[(day + (h < 5 ? 6 : 0)) % 7];
   const base = `${giorno} ${parteDelGiorno(h)}`;
   if (!weather) return base;
   return `${base} · ${Math.round(weather.tempC)}°${weather.rain ? ", piove" : ""}`;
@@ -37,7 +36,7 @@ export function contestoIdee(now: Date, weather: Weather | null): string {
 // fascia, senza orario (le fasce sono quelle di momentSuggestion). I gradi stanno già nel titolo quando servono.
 export function percheMomento(now: Date, weather: Weather | null): string {
   if (weather?.rain) return "Oggi piove";
-  const h = now.getHours();
+  const { h } = oraRoma(now); // ora di Roma, come momentSuggestion e la home (revisore 7/11)
   // Stesse eccezioni di momentSuggestion: col freddo di sera la trattoria calda, col caldo l'aperitivo fino alle 22.
   if (weather && Math.round(weather.tempC) <= 10 && h >= 18) return "Per scaldarsi";
   if (weather && Math.round(weather.tempC) >= 20 && h >= 18 && h < 22) return "Per l'aperitivo";

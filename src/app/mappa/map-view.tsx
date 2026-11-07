@@ -908,7 +908,7 @@ function IdeaChips({ title, action, children }: { title: string; action?: React.
   );
 }
 
-const CHIP = "flex min-h-10 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
+const CHIP = "flex min-h-11 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
 
 function IdeaChip({ text, label, onClick, testId }: { text: string; label?: string; onClick: () => void; testId?: string }) {
   return (
