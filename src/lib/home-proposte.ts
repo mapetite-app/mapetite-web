@@ -88,6 +88,8 @@ function tipiDalGusto(gusto: MappaGusto | null | undefined, momento: Momento): s
  */
 export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = [], weekend = false, citta?: string): { label: string; chiave: string }[] {
   const via = new Set<string>([...tipiDalGusto(gusto, momento), ...recenti.slice(0, 3).map(tipoRicerca).filter((t): t is string => !!t)]);
+  // Revisore 7/11: ↻ «trattoria romantica a Monti» accanto a "Cena romantica" era quasi un doppione.
+  if (recenti.slice(0, 3).some((r) => /romantic/i.test(r))) via.add("romantica");
   return pilloleDelGiorno(momento, weekend, citta).filter((p) => !via.has(p.chiave)).slice(0, 3);
 }
 
@@ -136,13 +138,13 @@ const DA_RICERCA: { re: RegExp; tipo: string; nome: string }[] = [
 // della ricerca restano nella proposta (solo quelle scritte, niente di aggiunto).
 const EXTRA: { re: RegExp; testo: string }[] = [
   { re: /terrazz/i, testo: "con terrazza" },
-  { re: /\bvista\b/i, testo: "con vista" },
+  { re: /\bcon (la )?vista\b|panoramic/i, testo: "con vista" },
   { re: /giardin|all'aperto|dehors|tavoli fuori/i, testo: "con tavoli all'aperto" },
-  { re: /romantic|a due|per due|appuntament/i, testo: "per una serata a due" },
+  { re: /romantic|\bper due\b|appuntament/i, testo: "per una serata a due" }, // non "a due passi da…" (revisore 7/11)
   { re: /vegan/i, testo: "con piatti vegani" },
   { re: /vegetarian/i, testo: "con piatti vegetariani" },
   { re: /senza glutine|celiac/i, testo: "con piatti senza glutine" },
-  { re: /cane|cani|dog/i, testo: "dove si entra con il cane" },
+  { re: /\bcon (il )?can[ei]\b|dog[- ]?friendly|\bpet[- ]?friendly/i, testo: "dove si entra con il cane" }, // non "messicani", "toscani", "hot dog" (revisore 7/11)
 ];
 function extraDi(q: string, tipo: string): string[] {
   return EXTRA.filter((e) => e.re.test(q) && !(tipo === "rooftop" && /vista|terrazza/.test(e.testo))).map((e) => e.testo).slice(0, 2);
@@ -166,7 +168,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
   // Un tipo di posto una volta sola: "trattorie a Monti" dalla ricerca non torna uguale dal gusto.
   // Parte dai tipi già mostrati più in alto (le idee sotto il campo).
   const usati = new Set<string>(input.escludi ?? []);
-  let zonaRicerca: string | null = null;
+  const zoneUsate = new Set<string>();
 
   // 1. Dall'ultima ricerca: lo stesso genere, ma le chicche (il differenziatore: non i più famosi).
   for (const r of recenti.slice(0, 3)) {
@@ -180,10 +182,10 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const cosa = hit.nome ? tipo.query : parola;
     usati.add(tipo.id);
     const extra = extraDi(r, hit.tipo);
-    zonaRicerca = dove;
+    zoneUsate.add(dove);
     // "che pochi conoscono" vale per maschile e femminile ("trattoria … poco conosciuto" no, revisore 7/11).
     const titolo = `${cap(parola)}${extra[0] && extra[0].length <= 14 ? ` ${extra[0]}` : ""} che pochi conoscono ${aZona(dove)}`;
-    add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa}${extra.map((e) => ` ${e}`).join("")} che pochi conoscono, fuori dai giri turistici, ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
+    add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} che pochi conoscono, fuori dai giri turistici,${extra.map((e) => ` ${e},`).join("")} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }
 
@@ -203,8 +205,9 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
       // (quelle che non conosciamo restano: non sappiamo di che città sono).
       const zoneCitta = gusto.zone.filter((z) => { const c = ZONE.find((x) => x.nome === z)?.citta; return !c || c.toLowerCase() === citta.toLowerCase(); });
       // Revisore 7/11: due card "Per te" nella stessa zona quando la prima nasce da una ricerca: l'altra zona prima.
-      const zoneQui = zonaRicerca && zoneCitta.some((z) => z !== zonaRicerca) ? zoneCitta.filter((z) => z !== zonaRicerca) : zoneCitta;
-      const zona = zoneQui[i] ?? zoneQui[0];
+      // Ogni card la sua zona; finite le zone, la città (revisore 7/11: Monti, poi Pigneto e ancora Pigneto).
+      const zona = zoneCitta.find((z) => !zoneUsate.has(z)) ?? (i === 0 && out.length === 0 ? zoneCitta[0] : undefined);
+      if (zona) zoneUsate.add(zona);
       const dove = zona ?? citta;
       const chicche = scoperta === "chicche" ? " fuori dai giri turistici" : "";
       add({ emoji: tipo.emoji, titolo: `${TITOLO_HOME[tipo.id] ?? tipo.titolo} ${aZona(dove)}`, perche: zona ? `Dai tuoi gusti · esci ${aZona(zona)}` : "Dai tuoi gusti", q: `${tipo.query}${chicche} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id });

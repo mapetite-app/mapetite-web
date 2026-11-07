@@ -5,7 +5,7 @@ export type Weather = { tempC: number; rain: boolean };
 import { oraRoma } from "@/lib/idee";
 
 
-export function momentSuggestion(now: Date, weather: Weather | null = null): string {
+export function momentSuggestion(now: Date, weather: Weather | null = null, citta: string | null = null): string {
   const { h, day } = oraRoma(now);
   const weekend = day === 0 || day === 6;
   const t = weather ? Math.round(weather.tempC) : null;
@@ -22,7 +22,7 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
   }
   if (t != null && t <= 10 && h >= 18) return "🍲 Trattoria calda e accogliente per stasera";
   // Dalle 5, come "mattina" nel pannello Idee (revisore 7/11).
-  if (h >= 5 && h < 11) return weekend ? "☕ Brunch buono per stamattina" : "☕ Colazione con cornetti buoni qui vicino";
+  if (h >= 5 && h < 11) return weekend ? "☕ Brunch buono per stamattina" : (citta === "Milano" ? "☕ Colazione con brioche buone qui vicino" : "☕ Colazione con cornetti buoni qui vicino"); // a Milano si dice brioche (revisore 7/11)
   if (h >= 11 && h < 15) // Revisore 7/11: di sabato il pannello diceva "Sabato a pranzo" e sotto "Pranzo della domenica".
     return day === 0 ? "🍝 Pranzo della domenica in trattoria" : day === 6 ? "🍝 Pranzo del sabato in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";

@@ -1101,7 +1101,7 @@ export default function MapView({
     void fetchWeather(at.lat, at.lng).then((w) => { if (alive) setWeather(w); });
     return () => { alive = false; };
   }, []);
-  const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather);
+  const momentExample = momentHour == null ? null : momentSuggestion(new Date(), weather, cityNear(viewState.latitude, viewState.longitude));
   // Testo della ricerca AI: vive qui perché il pannello si smonta alla chiusura.
   const [aiQuery, setAiQuery] = useState("");
   // Barra in uso (cursore dentro): la frase si scrive nel campo; fuori, con i risultati, si legge intera su 2 righe.
