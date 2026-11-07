@@ -161,7 +161,7 @@ export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | nu
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
-  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}${extra.occasions.length === 4 ? " e un'altra occasione" : extra.occasions.length > 4 ? ` e altre ${extra.occasions.length - 3} occasioni` : ""}` });
+  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, extra.occasions.length === 4 ? 4 : 3).map((o) => o.label.toLowerCase()).join(", ")}${extra.occasions.length > 4 ? ` e altre ${extra.occasions.length - 3} occasioni` : ""}` }); // una sola in più: si scrive quella
   if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
   // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
   // Vegano e vegetariano insieme: basta "vegano" (come nella frase).
@@ -267,6 +267,18 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" }); // revisore 7/11: "Sei vegetariano" dava per scontato il maschile
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }], "diete");
+  // Revisore 7/11: con il tetto di frasi le zone staccate (priorità bassa) sparivano dietro "Il resto del
+  // profilo", pur essendo la prima risposta data. Se non c'è posto per due frasi, zone e stile tornano una frase sola.
+  if (staccaZone && tutte.length > max) {
+    const i = tutte.findIndex((x) => x.p === "dove");
+    const j = tutte.findIndex((x, k) => k > i && x.p === "stile");
+    if (i >= 0 && j > i) {
+      const unita: PezzoFrase[] = parti.flatMap((x, k) => [...(k === 0 ? [] : [{ t: k === parti.length - 1 ? " e " : ", " }]), ...x]);
+      unita[0] = { ...unita[0], t: maiuscola(unita[0].t) };
+      tutte.splice(j, 1);
+      tutte[i] = { f: [...unita, { t: "." }], p: "stile" };
+    }
+  }
   const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));
   const out = tutte.filter((_, i) => scelte.has(i)).map((x) => x.f);
   // Profilo corto: una mezza frase vera invece di una pagina vuota.

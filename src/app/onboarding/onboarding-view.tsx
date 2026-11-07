@@ -308,7 +308,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
     const dopo = visti.includes(id) ? visti : [...visti, id];
     setVisti(dopo);
-    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
+    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Mai provato"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
     // Card riaperta dalla frase: rivotata, si torna sempre alla frase (prima solo se si erano votate tutte e dieci).
     // Riaperta dall'elenco "Fatto: …" del passo stesso: si torna all'elenco.
     if (riaperta === id) { if (tornaFrase) setTimeout(tornaAllaFrase, 250); else setRiaperta(null); return; }

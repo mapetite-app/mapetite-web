@@ -841,29 +841,34 @@ type Esempio = { query: string; title: string; sub: string; momenti: Momento[] }
 // Uguali nelle due città: colazione, pranzo veloce, cocktail e vino.
 const ESEMPI_COMUNI: Esempio[] = [
   { query: "Colazione buona qui vicino", title: "Colazione buona", sub: "qui vicino", momenti: ["colazione"] },
-  { query: "Caffè di specialità qui vicino", title: "Caffè di specialità", sub: "qui vicino", momenti: ["colazione"] },
-  { query: "Brunch con calma nel weekend", title: "Brunch con calma", sub: "nel weekend", momenti: ["colazione"] },
+  { query: "Caffè di specialità qui vicino", title: "Caffè di specialità", sub: "qui vicino", momenti: ["colazione", "pomeriggio"] },
+  { query: "Brunch con calma qui vicino", title: "Brunch con calma", sub: "qui vicino", momenti: ["colazione"] },
+  { query: "Merenda con torte fatte in casa", title: "Merenda buona", sub: "torte fatte in casa", momenti: ["pomeriggio"] },
+  { query: "Gelato artigianale qui vicino", title: "Gelato artigianale", sub: "qui vicino", momenti: ["pomeriggio", "dopocena"] },
   { query: "Pranzo veloce e buono, non catena", title: "Pranzo veloce", sub: "buono, non catena", momenti: ["pranzo"] },
+  { query: "Pizza al taglio croccante qui vicino", title: "Pizza al taglio", sub: "croccante, qui vicino", momenti: ["pranzo"] },
   { query: "Cucina dal mondo autentica in un posto piccolo", title: "Cucina dal mondo", sub: "autentica, posto piccolo", momenti: ["pranzo", "cena"] },
-  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["pomeriggio", "aperitivo", "cena", "dopocena"] },
+  { query: "Cocktail bar elegante per un appuntamento", title: "Cocktail bar elegante", sub: "per un appuntamento", momenti: ["aperitivo", "cena", "dopocena"] },
   { query: "Vino naturale e taglieri", title: "Vino naturale", sub: "e taglieri", momenti: ["aperitivo", "dopocena"] },
 ];
 // Revisore 7/11: "Colazione buona" a pranzo e cocktail alle 8 stonavano: ogni esempio ha le sue ore.
 const WELCOME_EXAMPLES: Esempio[] = [
-  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["pranzo", "pomeriggio", "aperitivo", "cena", "dopocena"] },
-  { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere", momenti: ["pranzo", "pomeriggio", "cena"] },
+  { query: "Rooftop romantico per due a Roma", title: "Rooftop romantico", sub: "per due a Roma", momenti: ["aperitivo", "cena", "dopocena"] },
+  { query: "Trattoria autentica non turistica a Trastevere", title: "Trattoria autentica", sub: "non turistica a Trastevere", momenti: ["pranzo", "cena"] },
   ...ESEMPI_COMUNI,
 ];
 // Con la mappa su Milano (VISIONE: si parte da Roma e Milano) gli esempi parlano di Milano.
 const WELCOME_EXAMPLES_MILANO: Esempio[] = [
-  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["pranzo", "pomeriggio", "aperitivo", "cena", "dopocena"] },
-  { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana", momenti: ["pranzo", "pomeriggio", "cena"] },
+  { query: "Rooftop romantico per due a Milano", title: "Rooftop romantico", sub: "per due a Milano", momenti: ["aperitivo", "cena", "dopocena"] },
+  { query: "Trattoria milanese autentica non turistica a Porta Romana", title: "Trattoria milanese", sub: "vera, a Porta Romana", momenti: ["pranzo", "cena"] },
   ...ESEMPI_COMUNI,
 ];
 
 // Parole che non bastano a dire che due idee sono la stessa ("qui vicino", "buono", "per stasera").
 const PAROLE_VUOTE = new Set(["qui", "vicino", "buono", "buona", "buoni", "stasera", "stamattina", "serata", "bene", "fatto", "fatta", "posto", "locale", "iniziare"]);
-const paroleChiave = (t: string) => t.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 4 && !PAROLE_VUOTE.has(w)).map((w) => (w === "wine" ? "vino" : w.slice(0, 6)));
+const paroleChiave = (t: string) => t.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 4 && !PAROLE_VUOTE.has(w)).map((w) => SINONIMI[w] ?? w.slice(0, 6));
+// Stessa idea con parole diverse (secondo revisore 7/11: "Aperitivo con vista" in cima e "Rooftop romantico" nella fila).
+const SINONIMI: Record<string, string> = { wine: "vino", rooftop: "vista", terrazza: "vista", aperto: "vista", "all'aperto": "vista", panoramica: "vista", panorama: "vista" };
 
 // Pannello "Ti suggeriamo": gruppi brevi (Adesso · Per te · Recenti · Prova a chiedere), una riga per idea.
 // hideTitle (revisore 1/11: tre intestazioni per sei righe): il gruppo resta per i lettori di schermo, l'elenco è unico.
