@@ -40,7 +40,7 @@ const TITOLO_HOME: Record<string, string> = { pizza: "Pizza napoletana vera", st
 // Idee sotto il campo per l'ora (quando non c'è ancora nessuna ricerca recente stanno da sole). Le prime tre
 // che restano: dopo le prime tre ci sono le riserve, per quando un tipo passa a "Per te" o a una ricerca recente.
 export const PILLOLE: Record<Momento, { label: string; chiave: string }[]> = {
-  colazione: [{ label: "Colazione con cornetti veri", chiave: "pasticceria" }, { label: "Caffè di specialità", chiave: "caffe" }, { label: "Brunch nel weekend", chiave: "brunch" }, { label: "Forno di quartiere", chiave: "forno" }],
+  colazione: [{ label: "Colazione con cornetti veri", chiave: "pasticceria" }, { label: "Caffè di specialità", chiave: "caffe" }, { label: "Brunch con calma", chiave: "brunch" }, { label: "Forno di quartiere", chiave: "forno" }],
   pranzo: [{ label: "Pranzo veloce e buono", chiave: "veloce" }, { label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Pranzo di lavoro tranquillo", chiave: "lavoro" }, { label: "Cucina dal mondo", chiave: "mondo" }],
   pomeriggio: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }],
   aperitivo: [{ label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Birra artigianale", chiave: "birra" }, { label: "Vermouth al bancone", chiave: "vermouth" }],
@@ -145,6 +145,10 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     break;
   }
 
+  // Revisore 7/11 (secondo giro): il tipo di una ricerca recente in vista come pillola ↻ non torna in "Per te"
+  // (↻ "cocktail bar nascosto a Pigneto" accanto alla card "Cocktail bar nascosto").
+  for (const r of recenti.slice(0, 3)) { const t = tipoRicerca(r); if (t) usati.add(t); }
+
   // 2. Dalla mappa del gusto: i tipi che ami, quelli giusti per quest'ora prima.
   if (gusto && gusto.su.length > 0) {
     const ordine = PER_MOMENTO[momento];
@@ -197,18 +201,21 @@ const IDEE: Record<Momento, Idea[]> = {
     { tipo: "enoteca", titolo: "Un calice stasera", perche: "Vini naturali, piatti da condividere", q: "enoteca vini naturali" },
     { tipo: "trattoria", titolo: "Cena di quartiere", perche: "Dove mangiano quelli del posto", q: "trattoria di quartiere non turistica" },
     { tipo: "speakeasy", titolo: "Cocktail bar nascosto", perche: "Drink d'autore, luci basse", q: "cocktail bar d'autore nascosto" },
+    { tipo: "brunch", chiave: "merenda", emoji: "🍰", titolo: "Merenda buona", perche: "Torte fatte in casa, tè o caffè", q: "bakery o pasticceria per merenda con torte fatte in casa" },
   ],
   aperitivo: [
     { tipo: "rooftop", titolo: "Aperitivo con vista", perche: "Il tramonto sopra i tetti", q: "aperitivo con vista" },
     { tipo: "enoteca", titolo: "Vino e taglieri", perche: "Bancone piccolo, l'oste consiglia", q: "enoteca vini naturali con taglieri" },
     { tipo: "trattoria", chiave: "fritti", emoji: "🧆", titolo: "Fritti e taglieri", perche: "Aperitivo di quartiere, prezzi onesti", q: "aperitivo con fritti e taglieri di quartiere non turistico" },
     { tipo: "mondo", chiave: "birra", emoji: "🍺", titolo: "Birra artigianale", perche: "Spine che cambiano spesso", q: "birreria artigianale con birre alla spina" },
+    { tipo: "enoteca", chiave: "bollicine", emoji: "🥂", titolo: "Bollicine e crudi", perche: "Un calice e qualcosa di fresco", q: "aperitivo con bollicine e crudi" },
   ],
   cena: [
     { tipo: "trattoria", titolo: "Trattoria vera", perche: "Dove mangiano quelli del posto", q: "trattoria autentica non turistica" },
     { tipo: "bistrot", chiave: "romantica", titolo: "Cena a due", perche: "Tavoli lontani, luci basse", q: "ristorante romantico per due tranquillo" },
     { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cuochi di quei paesi", q: "cucina etnica autentica" },
     { tipo: "bistrot", titolo: "Bistrot creativo", perche: "Menù corto, chef giovane", q: "bistrot cucina creativa" },
+    { tipo: "bistrot", chiave: "degustazione", emoji: "✨", titolo: "Degustazione piccola", perche: "Chef giovane, prezzo onesto", q: "menù degustazione in un ristorante piccolo a prezzo onesto" },
   ],
   dopocena: [
     { tipo: "speakeasy", titolo: "Cocktail bar nascosto", perche: "Drink d'autore, luci basse", q: "cocktail bar d'autore nascosto" },
