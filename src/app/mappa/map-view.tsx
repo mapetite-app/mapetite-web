@@ -3485,7 +3485,7 @@ export default function MapView({
                   Cancella
                 </button>
               )}
-              {welcomeExamples.map((ex) => (
+              {tuttiEsempi.map((ex) => (
                 <button
                   key={ex.query}
                   type="button"
@@ -3659,7 +3659,7 @@ export default function MapView({
                   {momentExample}
                 </button>
               )}
-              {welcomeExamples.map(({ query: example }) => (
+              {tuttiEsempi.map(({ query: example }) => (
                 <button
                   key={example}
                   type="button"
