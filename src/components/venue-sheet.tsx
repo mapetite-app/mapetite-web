@@ -248,7 +248,9 @@ export default function VenueSheet({
       if (!radice) return;
       const foto = radice.querySelector("[data-testid=scheda-carosello], [data-testid=scheda-intestazione-emoji]")?.getBoundingClientRect();
       const cima = Math.max(0, radice.parentElement?.getBoundingClientRect().top ?? 0);
-      setCompatta(foto != null && foto.height > 0 && foto.bottom - cima < 72);
+      // Revisore 7/11: con "foto.bottom < 72" a 375×667 c'era una zona (60–88 px di scorrimento) senza X né frecce:
+      // i tasti sulla foto erano già usciti e la testata non era ancora comparsa. Ora compare appena i tasti escono.
+      setCompatta(foto != null && foto.height > 0 && foto.top - cima <= -48);
     };
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
@@ -712,9 +714,9 @@ export default function VenueSheet({
             <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-brand">{nomeBreve}</span>
             {nav && compatta && (
               <span data-testid="scheda-nav-compatta" className="flex shrink-0 items-center text-text">
-                <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
+                <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
                 <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
-                <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
+                <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
               </span>
             )}
           </div>
@@ -756,9 +758,9 @@ export default function VenueSheet({
               {/* Una sola coppia di frecce per volta: quando c'è la testata compatta, quella. */}
               {nav && !compatta && (
                 <div data-testid="scheda-nav" className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-11 -translate-x-1/2 items-center rounded-full bg-white/90 text-text shadow-card backdrop-blur">
-                  <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
+                  <button type="button" onClick={onNavPrev} aria-label="Locale precedente" className="flex h-11 w-11 items-center justify-center rounded-full text-xl leading-none active:scale-95">‹</button>
                 <span className="whitespace-nowrap text-[13px] font-display font-semibold tabular-nums">{nav.pos} di {nav.total}</span>
-                <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-10 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
+                <button type="button" onClick={onNavNext} aria-label="Locale successivo" className="flex h-11 w-11 items-center justify-center rounded-full text-xl leading-none active:scale-95">›</button>
                 </div>
               )}
               {/* Condividi e Altro: tondi sulla foto, a destra (mockup A). Una sola volta ciascuno. */}

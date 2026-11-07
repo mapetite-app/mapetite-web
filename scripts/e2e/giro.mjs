@@ -4624,7 +4624,7 @@ else {
   if (fakeUser) ok((await s.getByTestId("amici-qui").textContent())?.includes("1 amico ci è stato") && (await s.getByTestId("amici-qui").getByRole("link", { name: "Giulia" }).getAttribute("href")) === "/u/giulia.rm", "scheda della mappa: '1 amico ci è stato' con il link al profilo");
   // Carosello: la foto è quella della card (nessuna richiesta foto nuova); la mappa "dove si trova" solo se ci si arriva.
   ok([...sPhotos].every((u) => photosBefore.has(u) || u.includes("S1")) && new Set(sPhotos.filter((u) => u.includes("S1"))).size <= 1, `scheda: nessuna foto Google in più oltre a quella della card (${new Set(sPhotos).size} indirizzi foto)`);
-  ok(staticMaps === 0 && ((await s.getByTestId("carosello-contatore").textContent()) ?? "").replace(/\s+/g, " ").trim() === "1 / 2", `carosello: "1 / 2" (foto + 'dove si trova'), la mappa non si scarica finché non serve (${staticMaps})`);
+  ok(staticMaps === 0 && (await s.getByTestId("carosello-contatore").getAttribute("data-pos")) === "1/2", `carosello: "1 / 2" (foto + 'dove si trova'), la mappa non si scarica finché non serve (${staticMaps})`);
   await s.screenshot({ path: `${OUT}/60-scheda-places-ristorante.png`, caret: "initial" });
   // Scheda pulita (Lorenzo 16/10): verdetto e azioni in vista senza scorrere, il resto in schede e nel menu "Altro".
   { const r = await s.evaluate(() => {
