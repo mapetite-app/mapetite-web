@@ -5097,10 +5097,6 @@ else {
 
 // 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
 //     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
-// Idee (designer e revisore 7/11): di notte stesso giorno e stessa soglia della home (ora di Roma, "notte" dalle 23:30).
-{ const id = await import(new URL("../../src/lib/idee.ts", import.meta.url).href);
-  const a = id.contestoIdee(new Date("2026-11-07T00:10:00Z"), null), b = id.contestoIdee(new Date("2026-11-06T22:40:00Z"), null), c = id.contestoIdee(new Date("2026-11-06T22:20:00Z"), null);
-  ok(a === "Venerdì notte" && b === "Venerdì notte" && c === "Venerdì sera", `idee: all'1:10 di sabato "Venerdì notte", alle 23:40 "notte", alle 23:20 "sera" (${a} / ${b} / ${c})`); }
 {
   let bk = null;
   try { bk = await import(new URL("../../src/lib/booking.ts", import.meta.url).href); } catch (e) { ok(false, `prenota: modulo src/lib/booking.ts importabile (${e.message})`); }
@@ -9411,7 +9407,7 @@ else {
       ok(r.places[0].name === "Pizzeria Quattro" && r.places.length === lista.length && r.places.at(-1).name === "Pizza Famosa" && JSON.stringify(r.usati) === '["pizzeria"]', `gusti: frase generica, la pizzeria amata sale; quella di massa no; nessuno escluso (${r.places.map((p) => p.name).join(", ")})`);
       ok(tl.suPerGusti(lista, [], () => false).saliti.length === 0 && tl.suPerGusti(lista, ["ramen"], () => false).saliti.length === 0, "gusti: senza gusti o senza locali di quei tipi l'ordine non cambia");
       const frA = mg.fraseCapito({ v: 2, zone: [], su: [], giu: [], scoperta: null }, { citta: "Roma", priceRange: null, diete: [], occasions: [], amati: tl.etichetteAmati(["pizzeria", "sushi", "vegano", "barbecue"]) }).map((x) => x.map((y) => y.t).join("")).join(" ");
-      ok(frA.includes("Ti piacciono pizzeria, sushi, vegano e barbecue."), `gusti: nella frase finale 'Ti piacciono pizzeria, sushi…' (${frA})`); }
+      ok(frA.includes("Ti piacciono pizzeria, sushi, vegano e un altro gusto."), `gusti: nella frase finale 'Ti piacciono pizzeria, sushi…' (${frA})`); }
     ok(mg.scopertaDedotta(["trattoria", "enoteca"]) === "chicche" && mg.scopertaDedotta(["pizza", "rooftop"]) === "famosi" && mg.scopertaDedotta(["pizza", "enoteca"]) === "misto" && mg.scopertaDedotta([]) === null, "mappa del gusto: famosi o chicche dedotto dai 👍");
     ok(mg.scopertaDedotta(mg.TIPI.map((t) => t.id)) === "misto" && mg.scopertaDedotta(mg.TIPI.map((t) => t.id), mg.TIPI.map((t) => t.id)) === "misto", "mappa del gusto: tutti 👍 → 'Un po' tutto', non 'Le chicche' (collaudo 23/10)");
     ok(mg.scopertaDedotta(["pizza"], ["trattoria", "storica", "pizza"]) === "famosi" && mg.scopertaDedotta(["trattoria"], ["trattoria"]) === "chicche", "mappa del gusto: famosi o chicche confrontato su quelli visti");

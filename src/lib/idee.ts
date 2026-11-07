@@ -14,20 +14,13 @@ function parteDelGiorno(h: number): string {
   if (h >= 5 && h < 12) return "mattina";
   if (h >= 12 && h < 15) return "pranzo";
   if (h >= 15 && h < 18) return "pomeriggio";
-  if (h >= 18 && h < 23.5) return "sera"; // dalle 23:30 "notte", come la home (`momentoDi`)
+  if (h >= 18 && h < 24) return "sera";
   return "notte";
 }
 
 // Riga sotto il titolo: "Domenica sera · 12°" (il meteo solo se c'è).
 export function contestoIdee(now: Date, weather: Weather | null): string {
-  // Designer 7/11: all'una di sabato la home diceva "Venerdì notte" e il pannello "Sabato notte". Stessa regola
-  // della home (`momentoDi`): prima delle 5, per chi esce, è ancora la notte del giorno prima.
-  // Ora di Roma e "notte" dalle 23:30, come la home (revisore 7/11: tra le 23:30 e mezzanotte la home diceva "notte", il pannello "sera").
-  const parti = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
-  const h = Number(parti.find((p) => p.type === "hour")?.value ?? now.getHours()) + Number(parti.find((p) => p.type === "minute")?.value ?? 0) / 60;
-  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parti.find((p) => p.type === "weekday")?.value ?? "");
-  const giorno = GIORNI[((wd < 0 ? now.getDay() : wd) + (h < 5 ? 6 : 0)) % 7];
-  const base = `${giorno} ${parteDelGiorno(h)}`;
+  const base = `${GIORNI[now.getDay()]} ${parteDelGiorno(now.getHours())}`;
   if (!weather) return base;
   return `${base} · ${Math.round(weather.tempC)}°${weather.rain ? ", piove" : ""}`;
 }

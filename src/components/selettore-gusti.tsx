@@ -33,9 +33,9 @@ export default function SelettoreGusti({ scelti, onChange }: { scelti: string[];
                     onClick={() => tocca(t.id)}
                     className={`inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 px-3.5 font-display text-[15px] font-semibold transition-colors active:scale-[0.97] ${sel ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
                   >
-                    {/* Designer 7/11: la spunta al posto dell'emoji, la chip non cambia larghezza. */}
-                    <span aria-hidden className="flex w-5 justify-center">{sel ? <Check size={15} strokeWidth={3} /> : t.emoji}</span>
+                    <span aria-hidden>{t.emoji}</span>
                     <span>{t.label}</span>
+                    {sel && <Check size={15} strokeWidth={3} aria-hidden />}
                   </button>
                 );
               })}
