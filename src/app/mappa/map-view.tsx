@@ -3047,7 +3047,7 @@ export default function MapView({
                   onChange={(e) => setAiQuery(e.target.value)}
                   onFocus={() => { setIdeasOpen(true); setBarFocus(true); }}
                   onBlur={() => setBarFocus(false)}
-                  placeholder="Chiedi all'AI…"
+                  placeholder="Cosa cerchi?"
                   aria-label="Chiedi all'AI: cosa cerchi?"
                   // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
                   // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
