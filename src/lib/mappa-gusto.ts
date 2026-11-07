@@ -151,29 +151,33 @@ const altri = (n: number, shown: number, cosa?: [string, string]) => (n > shown 
 const TIPO_POSTO: [string, string] = ["tipo di posto", "tipi di posto"];
 
 /** "Ecco cosa ho capito di te": righe brevi, solo da quello che la persona ha detto. */
-export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
+export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | null; priceRange: string | null; diete: string[]; occasions: { value?: string; label: string }[] }): { chiave: string; emoji: string; testo: string }[] {
   const out: { chiave: string; emoji: string; testo: string }[] = [];
   // Stesse preposizioni della frase ("al Pigneto", "ai Navigli"): collaudo del 23/10.
   const dove = m.zone.length
     ? elenco(m.zone.map((z) => { const [prep, t] = PREP[z] ?? ["a "]; return `${prep}${t ?? z}`; }))
     : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
-  const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ti piace: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
-  const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2, TIPO_POSTO)}` });
+  // Revisore 7/11: "Meno: …", "Esci per: …" erano etichette secche accanto alla frase da amico. Stesso tono e
+  // stesse parole della frase ("Ami le trattorie di quartiere"), sempre in seconda persona, senza allungare.
+  const su = m.su.filter((id) => PLURALE[id]);
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ami ${elenco([...su.slice(0, 3).map((id) => PLURALE[id]), ...(su.length > 3 ? [altri(su.length, 3, TIPO_POSTO).slice(3)] : [])])}` });
+  const giu = m.giu.filter((id) => PLURALE[id]);
+  if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Ti convincono meno ${elenco([...giu.slice(0, 2).map((id) => PLURALE[id]), ...(giu.length > 2 ? [altri(giu.length, 2, TIPO_POSTO).slice(3)] : [])])}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
-  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, extra.occasions.length === 4 ? 4 : 3).map((o) => o.label.toLowerCase()).join(", ")}${extra.occasions.length > 4 ? ` e altre ${extra.occasions.length - 3} occasioni` : ""}` }); // una sola in più: si scrive quella
-  if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
-  // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
-  // Vegano e vegetariano insieme: basta "vegano" (come nella frase).
-  const mangi = extra.diete.includes("vegano") ? ["vegano"] : extra.diete.includes("vegetariano") ? ["vegetariano"] : [];
-  const eviti = extra.diete.filter((id) => id !== "vegetariano" && id !== "vegano").map((id) => DIETE.find((d) => d.id === id)?.label.toLowerCase().replace(/^(niente|senza) /, "")).filter(Boolean);
-  const frasi = [mangi.length ? `sei ${mangi.join(" e ")}` : null, eviti.length ? `eviti ${eviti.join(", ")}` : null].filter(Boolean).join("; ");
-  if (frasi) out.push({ chiave: "diete", emoji: "🍽️", testo: frasi.charAt(0).toUpperCase() + frasi.slice(1) });
+  // Una sola in più: si scrive quella; da due in più "e altre N occasioni".
+  const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase());
+  const occVis = occ.slice(0, occ.length === 4 ? 4 : 3);
+  if (occ.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci spesso per ${elenco([...occVis, ...(occ.length > occVis.length ? [`altre ${occ.length - occVis.length} occasioni`] : [])])}` });
+  if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: SPESA[extra.priceRange] ? `${maiuscola(SPESA[extra.priceRange])} (${extra.priceRange})` : `Spesa tipica ${extra.priceRange}` });
+  // Come nella frase: "Mangi vegetariano ed eviti il glutine" (vegano e vegetariano insieme: basta "vegano").
+  const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
+  const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
+  const frasi = [mangi ? `mangi ${mangi}` : null, eviti.length ? `${mangi ? "ed " : ""}eviti ${elenco(eviti)}` : null].filter(Boolean).join(" ");
+  if (frasi) out.push({ chiave: "diete", emoji: "🍽️", testo: maiuscola(frasi) });
   return out;
 }
 

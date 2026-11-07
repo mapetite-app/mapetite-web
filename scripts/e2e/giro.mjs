@@ -7807,6 +7807,15 @@ else {
   await ip.getByRole("button", { name: "Roma", exact: true }).click();
   await ip.getByRole("button", { name: "Monti", exact: true }).click();
   ok(await ip.getByTestId("benvenuto-zone").isVisible() && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true" && (await ip.getByRole("button", { name: "Isola", exact: true }).count()) === 0, "primo accesso: scelta Roma, le zone di Roma (non quelle di Milano)");
+  // Revisore 7/11: la quarta zona non faceva niente in silenzio; ora la riga sopra dice "Massimo 3 zone".
+  for (const z of ["Trastevere", "Testaccio", "Pigneto"]) await ip.getByRole("button", { name: z, exact: true }).click();
+  ok(((await ip.getByTestId("zone-limite").textContent()) ?? "").includes("Massimo 3 zone") && (await ip.getByRole("button", { name: "Pigneto", exact: true }).getAttribute("aria-pressed")) === "false", `primo accesso: toccando una quarta zona si legge 'Massimo 3 zone' e la zona non entra (${await ip.getByTestId("zone-limite").textContent()})`);
+  for (const z of ["Trastevere", "Testaccio"]) await ip.getByRole("button", { name: z, exact: true }).click();
+  ok(!((await ip.getByTestId("zone-limite").textContent()) ?? "").includes("Massimo"), "primo accesso: tolta una zona l'avviso 'Massimo 3 zone' sparisce");
+  // Un solo stile di "scelto": card della città e chip delle zone teal piene (revisore 7/11: prima card chiare e pillole piene).
+  { const bg = async (name) => ip.getByRole("button", { name, exact: true }).evaluate((e) => getComputedStyle(e).backgroundColor);
+    const [citta, zona] = [await bg("Roma"), await bg("Monti")];
+    ok(citta === zona && citta !== "rgb(255, 255, 255)", `primo accesso: città scelta e zona scelta con lo stesso colore pieno (${citta} / ${zona})`); }
   await ip.screenshot({ path: `${OUT}/benvenuto-1-citta-zone.png`, caret: "initial" });
   // Chi entra la prima volta non vede mai "Ho ritrovato le risposte" (la bozza salvata mentre risponde non conta: collaudo 23/10).
   await ip.waitForTimeout(300);
@@ -7905,7 +7914,7 @@ else {
     const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
   else { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piace: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ami le trattorie di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti il pesce") && righe.includes("l'aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
   ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
   await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
@@ -9445,7 +9454,13 @@ else {
       ok(r.places[0].name === "Pizzeria Quattro" && r.places.length === lista.length && r.places.at(-1).name === "Pizza Famosa" && JSON.stringify(r.usati) === '["pizzeria"]', `gusti: frase generica, la pizzeria amata sale; quella di massa no; nessuno escluso (${r.places.map((p) => p.name).join(", ")})`);
       ok(tl.suPerGusti(lista, [], () => false).saliti.length === 0 && tl.suPerGusti(lista, ["ramen"], () => false).saliti.length === 0, "gusti: senza gusti o senza locali di quei tipi l'ordine non cambia");
       const frA = mg.fraseCapito({ v: 2, zone: [], su: [], giu: [], scoperta: null }, { citta: "Roma", priceRange: null, diete: [], occasions: [], amati: tl.amatiInFrase(["pizzeria", "sushi", "vegano", "barbecue"]) }).map((x) => x.map((y) => y.t).join("")).join(" ");
-      ok(frA.includes("Ami le pizzerie, il sushi, la cucina vegana e il barbecue."), `gusti: nella frase finale 'Ami le pizzerie, il sushi…' (${frA})`); }
+      ok(frA.includes("Ami le pizzerie, il sushi, la cucina vegana e il barbecue."), `gusti: nella frase finale 'Ami le pizzerie, il sushi…' (${frA})`);
+      // Revisore 7/11: "Ami la cucina milanese e i ristoranti" era piatta: "ristorante" si dice "i ristoranti italiani", dopo i gusti precisi.
+      const frR = mg.fraseCapito({ v: 2, zone: [], su: [], giu: [], scoperta: null }, { citta: "Milano", priceRange: null, diete: [], occasions: [], amati: tl.amatiInFrase(["ristorante", "milanese"]) }).map((x) => x.map((y) => y.t).join("")).join(" ");
+      ok(frR.includes("Ami la cucina milanese e i ristoranti italiani."), `gusti: niente 'i ristoranti' generico nella frase, i gusti precisi prima (${frR})`);
+      // Le righe di "Il resto del profilo" con lo stesso tono della frase (revisore 7/11: "Meno: …", "Esci per: …").
+      const rr = mg.capito({ v: 2, zone: [], su: [], giu: ["storica", "rooftop", "gourmet"], scoperta: null }, { citta: null, priceRange: "€€", diete: ["vegetariano", "celiaco"], occasions: [{ value: "aperitivo", label: "Aperitivo" }, { value: "cena_amici", label: "Cena con amici" }] }).map((r) => r.testo);
+      ok(JSON.stringify(rr) === JSON.stringify(["Ti convincono meno le osterie storiche, i rooftop con vista e un altro tipo di posto", "Esci spesso per l'aperitivo e le cene con gli amici", "Spendi il giusto (€€)", "Mangi vegetariano ed eviti il glutine"]), `mappa del gusto: righe del profilo in frasi brevi, seconda persona (${JSON.stringify(rr)})`); }
     ok(mg.scopertaDedotta(["trattoria", "enoteca"]) === "chicche" && mg.scopertaDedotta(["pizza", "rooftop"]) === "famosi" && mg.scopertaDedotta(["pizza", "enoteca"]) === "misto" && mg.scopertaDedotta([]) === null, "mappa del gusto: famosi o chicche dedotto dai 👍");
     ok(mg.scopertaDedotta(mg.TIPI.map((t) => t.id)) === "misto" && mg.scopertaDedotta(mg.TIPI.map((t) => t.id), mg.TIPI.map((t) => t.id)) === "misto", "mappa del gusto: tutti 👍 → 'Un po' tutto', non 'Le chicche' (collaudo 23/10)");
     ok(mg.scopertaDedotta(["pizza"], ["trattoria", "storica", "pizza"]) === "famosi" && mg.scopertaDedotta(["trattoria"], ["trattoria"]) === "chicche", "mappa del gusto: famosi o chicche confrontato su quelli visti");

@@ -101,7 +101,7 @@ function parseDraft(raw: string | null): Draft | null {
 // Una domanda per schermata, come Albo (collaudo 23/10: il vecchio passo 3 ne aveva quattro insieme):
 // città e zone, dieci tipi di posto 👍/👎, famosi o chicche, cosa eviti a tavola, occasioni, spesa,
 // poi "Ecco cosa ho capito di te" e subito i posti per te. Tutto saltabile.
-// Un solo stile in tutti i passi (mockup A): titolo serif, scelta segnata in teal, tasto principale teal.
+// Un solo stile in tutti i passi (mockup A): titolo serif, scelta segnata in teal pieno, tasto principale teal.
 const STEPS = [
   { title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
   { title: "Cosa ti piace?", subtitle: "Tocca tutto quello che ti va." },
@@ -127,8 +127,16 @@ const CITIES = [
 ];
 
 // Scelta segnata: lo stesso aspetto per card, pillole e prezzi (collaudo 23/10: erano due stili diversi).
-const SCELTA_ON = "border-brand bg-[#e8efee]";
+// Revisore 7/11: le card erano ancora chiare con il bollino e le pillole teal piene. Ora tutto teal pieno,
+// testo bianco e spunta, come le chip di "Cosa ti piace?".
+const SCELTA_ON = "border-brand bg-brand text-white";
 const SCELTA_OFF = "border-border bg-white";
+// Dentro una card scelta: testo bianco, riga sotto bianca attenuata, cerchio dell'emoji velato, bollino bianco.
+const titoloCard = (on: boolean) => `font-display text-lg font-semibold ${on ? "text-white" : "text-brand"}`;
+const rigaCard = (on: boolean) => `text-sm font-sans ${on ? "text-white/80" : "text-text-muted"}`;
+const cerchioCard = (on: boolean) => `flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl ${on ? "bg-white/15" : "bg-surface"}`;
+const BOLLINO = "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-brand";
+const MAX_ZONE = 3;
 const TASTO = "flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-6 font-display text-[17px] font-semibold transition-opacity active:scale-[0.98] disabled:opacity-40";
 const TASTO_PIENO = `${TASTO} bg-brand text-white shadow-float hover:opacity-90`;
 const TASTO_VUOTO = `${TASTO} border-2 border-brand bg-transparent text-brand`;
@@ -152,7 +160,7 @@ function Chip({
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
       // Revisore 5/11: stesso aspetto delle chip di "Cosa ti piace?" (teal pieno con la spunta), un passo prima.
-      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? SCELTA_ON : `${SCELTA_OFF} text-brand`}`}
     >
       {/* Designer 7/11: la spunta prende il posto dell'emoji, così la chip non si allarga e la riga non si riordina. */}
       {/* Revisore 7/11: senza emoji (le zone) niente spunta: bastano il pieno teal e il testo bianco. */}
@@ -203,6 +211,13 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [otherCity, setOtherCity] = useState(initial?.otherCity ?? "");
   const [otherOpen, setOtherOpen] = useState(initial?.otherOpen ?? false);
   const [zone, setZone] = useState<string[]>(initial?.zone ?? []);
+  // Quarta zona toccata: la riga sopra le zone lo dice per qualche secondo.
+  const [troppeZone, setTroppeZone] = useState(false);
+  useEffect(() => {
+    if (!troppeZone) return;
+    const t = setTimeout(() => setTroppeZone(false), 3000);
+    return () => clearTimeout(t);
+  }, [troppeZone]);
   const [su, setSu] = useState<string[]>(initial?.su ?? []);
   const [giu, setGiu] = useState<string[]>(initial?.giu ?? []);
   const [visti, setVisti] = useState<string[]>(initial?.visti ?? []);
@@ -477,9 +492,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   }}
                   className={`flex min-h-16 w-full items-center gap-4 rounded-card border-2 px-4 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
-                  <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-2xl">{c.emoji}</span>
-                  <span className="flex-1 font-display text-lg font-semibold text-brand">{c.value}</span>
-                  {on && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
+                  <span aria-hidden className={cerchioCard(on)}>{c.emoji}</span>
+                  <span className={`flex-1 ${titoloCard(on)}`}>{c.value}</span>
+                  {on && <span aria-hidden className={BOLLINO}><Check size={14} strokeWidth={3} /></span>}
                 </button>
               );
             })}
@@ -490,9 +505,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 onClick={() => { setOtherOpen((o) => !o); setZone([]); }}
                 className="flex min-h-11 w-full items-center gap-4 text-left"
               >
-                <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-2xl">📍</span>
-                <span className="flex-1 font-display text-lg font-semibold text-brand">Un&apos;altra città</span>
-                {otherOpen && <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
+                <span aria-hidden className={cerchioCard(otherOpen)}>📍</span>
+                <span className={`flex-1 ${titoloCard(otherOpen)}`}>Un&apos;altra città</span>
+                {otherOpen && <span aria-hidden className={BOLLINO}><Check size={14} strokeWidth={3} /></span>}
               </button>
               {otherOpen && (
                 <input
@@ -503,20 +518,27 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   placeholder="es. Torino"
                   aria-label="La tua città"
                   data-testid="benvenuto-altra-citta"
-                  className="mt-3 w-full rounded-btn border border-border bg-white px-3 py-2.5 text-base focus:border-brand focus:outline-none"
+                  className="mt-3 w-full rounded-btn border border-border bg-white px-3 py-2.5 text-base text-text focus:border-brand focus:outline-none"
                 />
               )}
             </div>
             {zoneCitta.length > 0 && (
               <div data-testid="benvenuto-zone" className="mt-2">
-                <p className="mb-2.5 text-[15px] font-sans text-text-muted">Le tue zone, fino a 3 <span className="text-text-muted/80">(facoltativo)</span></p>
+                {/* Revisore 7/11: la quarta zona toccata non faceva niente, senza dire perché. Ora la riga lo dice in corallo. */}
+                <p data-testid="zone-limite" role="status" className={`mb-2.5 text-[15px] font-sans transition-colors ${troppeZone ? "font-semibold text-accent" : "text-text-muted"}`}>
+                  {troppeZone ? `Massimo ${MAX_ZONE} zone: togline una per cambiare` : <>Le tue zone, fino a {MAX_ZONE} <span className="text-text-muted/80">(facoltativo)</span></>}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {zoneCitta.map((z) => (
                     <Chip
                       key={z.nome}
                       item={{ value: z.nome, label: z.nome, emoji: "" }}
                       selected={zone.includes(z.nome)}
-                      onToggle={(v) => setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : p.length >= 3 ? p : [...p, v]))}
+                      onToggle={(v) => {
+                        if (!zone.includes(v) && zone.length >= MAX_ZONE) { setTroppeZone(true); return; }
+                        setTroppeZone(false);
+                        setZone((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
+                      }}
                     />
                   ))}
                 </div>
@@ -643,12 +665,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   onClick={() => setScoperta(sc.value)}
                   className={`flex min-h-[4.5rem] w-full items-center gap-4 rounded-card border-2 px-4 py-3 text-left transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
-                  <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-2xl">{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍽️"}</span>
+                  <span aria-hidden className={cerchioCard(on)}>{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍽️"}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-display text-lg font-semibold text-brand">{sc.label}</span>
-                    <span className="block text-sm font-sans text-text-muted">{sc.riga}</span>
+                    <span className={`block ${titoloCard(on)}`}>{sc.label}</span>
+                    <span className={`block ${rigaCard(on)}`}>{sc.riga}</span>
                   </span>
-                  {on && <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-white"><Check size={14} strokeWidth={3} /></span>}
+                  {on && <span aria-hidden className={BOLLINO}><Check size={14} strokeWidth={3} /></span>}
                 </button>
               );
             })}
@@ -683,9 +705,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   onClick={() => setPriceRange(on ? null : item.value)}
                   className={`relative flex min-h-20 flex-col items-center justify-center rounded-card border-2 px-2 py-2 transition-colors ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
-                  <span className="font-display text-xl font-bold text-brand">{item.value}</span>
-                  <span className="text-sm font-sans text-text-muted">{item.description}</span>
-                  {on && <span aria-hidden className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white"><Check size={12} strokeWidth={3} /></span>}
+                  <span className={`font-display text-xl font-bold ${on ? "text-white" : "text-brand"}`}>{item.value}</span>
+                  <span className={rigaCard(on)}>{item.description}</span>
+                  {on && <span aria-hidden className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-brand"><Check size={12} strokeWidth={3} /></span>}
                 </button>
               );
             })}
