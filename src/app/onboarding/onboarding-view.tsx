@@ -7,7 +7,7 @@ import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
-import { amatiValidi, etichetteAmati } from "@/lib/tipi-locale";
+import { amatiInFrase, amatiValidi } from "@/lib/tipi-locale";
 import SelettoreGusti, { contaScelti } from "@/components/selettore-gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
@@ -105,7 +105,7 @@ function parseDraft(raw: string | null): Draft | null {
 const STEPS = [
   { title: "Dove esci di solito?", subtitle: "Città e zone: i consigli partono da lì." },
   { title: "Cosa ti piace?", subtitle: "Tocca tutto quello che ti va." },
-  { title: "Ti piace o no?", subtitle: "Dieci tipi di posto. Rispondi d'istinto." },
+  { title: "Ci andresti?", subtitle: "Dieci tipi di posto: 👍 o 👎, d'istinto." },
   { title: "Famosi o chicche?", subtitle: "Scegli quello che ti somiglia di più." },
   { title: "Come mangi?", subtitle: "Diete e cose che eviti: le terrò sempre presenti." },
   { title: "Per cosa esci di solito?", subtitle: "Anche più di una risposta." },
@@ -152,11 +152,12 @@ function Chip({
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
       // Revisore 5/11: stesso aspetto delle chip di "Cosa ti piace?" (teal pieno con la spunta), un passo prima.
-      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
     >
-      {item.emoji && <span aria-hidden>{item.emoji}</span>}
+      {/* Designer 7/11: la spunta prende il posto dell'emoji, così la chip non si allarga e la riga non si riordina. */}
+      {/* Revisore 7/11: senza emoji (le zone) niente spunta: bastano il pieno teal e il testo bianco. */}
+      {item.emoji && <span aria-hidden className="flex w-5 justify-center">{selected ? <Check size={16} strokeWidth={3} /> : item.emoji}</span>}
       <span>{item.label}</span>
-      {selected && <Check size={16} strokeWidth={3} aria-hidden />}
     </button>
   );
 }
@@ -235,6 +236,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     bozzaScritta.current = true;
   }, [draftJson, partenza]);
 
+  // Revisore 7/11: senza la barra dell'app niente spazio riservato in fondo (ogni passo scorreva di 64 px a vuoto).
+  useEffect(() => {
+    document.documentElement.setAttribute("data-primo-accesso", "");
+    return () => document.documentElement.removeAttribute("data-primo-accesso");
+  }, []);
+
   // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -262,15 +269,18 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
-  // spariva). "Cosa ti piace?" e "Ti piace o no?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
+  // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
   const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
-  const progress = (passoMostrato / (TOTAL - 1)) * 100;
+  // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
+  // la barra avanza di mezzo passo, così il tocco si vede.
+  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / (TOTAL - 1)) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
   // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
-  const dedotta = scopertaDedotta(su, [...su, ...giu]);
+  // Revisore 7/11: da un solo 👍 "Le chicche" era già scelto e finiva nella frase. Si propone da 3 voti in su.
+  const dedotta = su.length + giu.length >= 3 ? scopertaDedotta(su, [...su, ...giu]) : null;
   const scopertaOra = scoperta ?? dedotta;
   // Lasciando il passo 3 la proposta dei 👍 diventa la scelta: prima si ricalcolava a ogni voto e la frase
   // diceva "giri alla larga dai posti turistici" senza che la persona l'avesse mai vista (collaudo del 24/10).
@@ -300,7 +310,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     setGiu((p) => (voto === "giu" ? (p.includes(id) ? p : cambiata ? [id, ...p] : [...p, id]) : p.filter((x) => x !== id)));
     const dopo = visti.includes(id) ? visti : [...visti, id];
     setVisti(dopo);
-    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Non lo conosci"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
+    setEsito(`${voto === "su" ? "Sì" : voto === "giu" ? "No" : "Mai provato"}: ${TIPI.find((t) => t.id === id)?.titolo ?? ""}.`);
     // Card riaperta dalla frase: rivotata, si torna sempre alla frase (prima solo se si erano votate tutte e dieci).
     // Riaperta dall'elenco "Fatto: …" del passo stesso: si torna all'elenco.
     if (riaperta === id) { if (tornaFrase) setTimeout(tornaAllaFrase, 250); else setRiaperta(null); return; }
@@ -354,7 +364,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // scelta. Una mai mostrata non entra nella sintesi.
   const gustoVisto = gusto;
   // Revisore 5/11: una dieta già detta in "Come mangi?" non si ripete tra i gusti ("Ti piacciono vegano… Sei vegano").
-  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: etichetteAmati(amati.filter((a) => !diete.includes(a))) };
+  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: amatiInFrase(amati.filter((a) => !diete.includes(a))) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
   // Dietro "Altro" solo ciò che la frase non dice già: quello che è nella frase si cambia toccando la parola.
@@ -433,7 +443,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       </div>
 
       {/* Contenuto */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-48 pt-3">
+      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-32 pt-3">
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
@@ -517,7 +527,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_AMATI && (
           <div data-testid="benvenuto-amati">
-            <SelettoreGusti scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
+            <SelettoreGusti compatto citta={chosenCity} scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
           </div>
         )}
 
@@ -577,19 +587,20 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <p className="relative mt-1.5 text-sm font-sans text-white/90">{corrente.riga}</p>
                 </div>
                 </div>
-                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
-                <div className="mt-8 flex items-center justify-between px-3 [@media(max-height:760px)]:mt-6">
-                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
+                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Mai provato" in mezzo. */}
+                {/* Revisore 7/11: a 360 px "Non lo conosco" toccava i tasti tondi: spazio fisso e tasti da 64 px sotto 380 px. */}
+                <div className="mt-8 flex items-center justify-between gap-3 px-3 max-[380px]:px-1 [@media(max-height:760px)]:mt-6">
+                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
-                    Non lo conosco
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 whitespace-nowrap rounded-pill border border-border bg-white px-4 text-center text-[14px] font-display font-semibold text-text-muted active:scale-95">
+                    Mai provato
                   </button>
-                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
+                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted [@media(max-height:760px)]:hidden">← trascina la card, oppure tocca →</p>
+                {/* Designer 7/11: tolta la riga "← trascina la card, oppure tocca →" (testo in più: i tasti si spiegano da soli). */}
                 <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}: {corrente.titolo}.</p>
               </>
             ) : (

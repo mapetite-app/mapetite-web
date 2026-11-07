@@ -20,11 +20,12 @@ export type TipoLocale = {
   parole?: RegExp;
 };
 
+// Revisore 7/11: l'emoji del gruppo non è mai quella di una sua voce (🍸 Bere accanto a 🍸 Cocktail bar).
 export type GruppoLocale = { id: string; titolo: string; emoji: string; tipi: TipoLocale[] };
 
 export const GRUPPI_LOCALE: GruppoLocale[] = [
   {
-    id: "italiana", titolo: "Cucina italiana", emoji: "🍝",
+    id: "italiana", titolo: "Cucina italiana", emoji: "🍅",
     tipi: [
       { id: "trattoria", emoji: "🍝", label: "Trattoria", query: "trattoria", google: [], nome: /\btrattori/i, parole: /\btrattori/i },
       { id: "osteria", emoji: "🍷", label: "Osteria", query: "osteria", google: [], nome: /\bosteri/i, parole: /\bosteri/i },
@@ -32,7 +33,7 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
       { id: "pizzeria", emoji: "🍕", label: "Pizzeria", query: "pizzeria", google: ["pizza_restaurant"], nome: /\bpizz/i, parole: /\bpizz/i },
       { id: "pizza-taglio", emoji: "🫓", label: "Pizza al taglio", query: "pizza al taglio", google: [], nome: /al\s+taglio|pinsa|trapizz/i, parole: /al\s+taglio|pinsa|trapizz/i },
       { id: "romana", emoji: "🏛️", label: "Cucina romana", query: "cucina romana", google: [], parole: /\bromanesc|cucina\s+romana|carbonara|amatriciana|cacio\s+e\s+pepe/i },
-      { id: "milanese", emoji: "🥘", label: "Cucina milanese", query: "cucina milanese", google: [], parole: /milanes|risotto|cotoletta|ossobuco/i },
+      { id: "milanese", emoji: "🍚", label: "Cucina milanese", query: "cucina milanese", google: [], parole: /milanes|risotto|cotoletta|ossobuco/i },
       { id: "regionale", emoji: "🧀", label: "Regionale", query: "cucina regionale", google: [], parole: /regional|pugliese|siciliana|sarda|toscana|napoletana|emilian/i },
       { id: "agriturismo", emoji: "🚜", label: "Agriturismo", query: "agriturismo", google: ["farm"], nome: /agriturism/i, parole: /agriturism/i },
       { id: "pesce", emoji: "🐟", label: "Pesce", query: "ristorante di pesce", google: ["seafood_restaurant"], parole: /\bpesce|crudi|frutti\s+di\s+mare|sushi/i },
@@ -43,12 +44,12 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "mondo", titolo: "Dal mondo", emoji: "🌍",
+    id: "mondo", titolo: "Dal mondo", emoji: "🗺️",
     tipi: [
       { id: "sushi", emoji: "🍣", label: "Sushi", query: "sushi", google: ["sushi_restaurant", "japanese_restaurant"], parole: /sushi|giappones|japanese|izakaya/i },
       { id: "ramen", emoji: "🍜", label: "Ramen", query: "ramen", google: ["ramen_restaurant"], nome: /ramen/i, parole: /ramen/i },
       { id: "cinese", emoji: "🥟", label: "Cinese", query: "ristorante cinese", google: ["chinese_restaurant"], parole: /cines|ravioli\s+cinesi|dim\s*sum/i },
-      { id: "thai", emoji: "🥢", label: "Thai", query: "ristorante thai", google: ["thai_restaurant"], parole: /\bthai|thailandes/i },
+      { id: "thai", emoji: "🌶️", label: "Thai", query: "ristorante thai", google: ["thai_restaurant"], parole: /\bthai|thailandes/i },
       { id: "vietnamita", emoji: "🍲", label: "Vietnamita", query: "ristorante vietnamita", google: ["vietnamese_restaurant"], parole: /vietnam|\bpho\b/i },
       { id: "coreano", emoji: "🥢", label: "Coreano", query: "ristorante coreano", google: ["korean_restaurant"], parole: /corean|korean/i },
       { id: "indiano", emoji: "🍛", label: "Indiano", query: "ristorante indiano", google: ["indian_restaurant"], parole: /indian|curry/i },
@@ -63,27 +64,27 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "diete", titolo: "Diete", emoji: "🥗",
+    id: "diete", titolo: "Diete", emoji: "🌿",
     tipi: [
       { id: "vegetariano", emoji: "🥗", label: "Vegetariano", query: "ristorante vegetariano", google: ["vegetarian_restaurant"], parole: /vegetar/i },
       { id: "vegano", emoji: "🌱", label: "Vegano", query: "ristorante vegano", google: ["vegan_restaurant"], parole: /vegan/i },
       { id: "celiaco", emoji: "🌾", label: "Senza glutine", query: "senza glutine", google: [], nome: /gluten\s*free|senza\s+glutine/i, parole: /glutine|celiac|gluten/i },
-      { id: "healthy", emoji: "🥙", label: "Healthy e poke", query: "poke healthy", google: ["juice_shop", "acai_shop"], nome: /pok[eé]|healthy|salad/i, parole: /pok[eé]|healthy|insalat|salad|bowl/i },
+      { id: "healthy", emoji: "🥑", label: "Healthy e poke", query: "poke healthy", google: ["juice_shop", "acai_shop"], nome: /pok[eé]|healthy|salad/i, parole: /pok[eé]|healthy|insalat|salad|bowl/i },
     ],
   },
   {
-    id: "veloce", titolo: "Veloce", emoji: "🥪",
+    id: "veloce", titolo: "Veloce", emoji: "⚡",
     tipi: [
       { id: "street-food", emoji: "🌯", label: "Street food", query: "street food", google: ["food_court"], parole: /street\s*food|cibo\s+di\s+strada/i },
       { id: "paninoteca", emoji: "🥪", label: "Paninoteca", query: "paninoteca", google: ["sandwich_shop", "deli"], nome: /panin|sandwich/i, parole: /panin|sandwich|tramezzin/i },
-      { id: "piadineria", emoji: "🫓", label: "Piadineria", query: "piadineria", google: [], nome: /piadin/i, parole: /piadin/i },
+      { id: "piadineria", emoji: "🥙", label: "Piadineria", query: "piadineria", google: [], nome: /piadin/i, parole: /piadin/i },
       { id: "friggitoria", emoji: "🍤", label: "Fritti", query: "friggitoria", google: [], nome: /friggitori|suppl|arancin|fritt/i, parole: /friggitori|fritt|suppl|arancin/i },
-      { id: "kebab", emoji: "🥙", label: "Kebab", query: "kebab", google: [], nome: /kebab|kebap|d[oö]ner/i, parole: /kebab|kebap|d[oö]ner/i },
+      { id: "kebab", emoji: "🍢", label: "Kebab", query: "kebab", google: [], nome: /kebab|kebap|d[oö]ner/i, parole: /kebab|kebap|d[oö]ner/i },
       { id: "fast-food", emoji: "🍟", label: "Fast food", query: "fast food", google: ["fast_food_restaurant"], parole: /fast\s*food/i },
     ],
   },
   {
-    id: "dolci", titolo: "Dolci & caffè", emoji: "🍰",
+    id: "dolci", titolo: "Dolci & caffè", emoji: "🧁",
     tipi: [
       { id: "colazione", emoji: "☕", label: "Colazione al bar", query: "colazione bar", google: ["breakfast_restaurant", "cafe"], parole: /colazion|cornett|cappuccin/i },
       { id: "specialty", emoji: "🫘", label: "Caffè specialty", query: "caffè di specialità", google: ["coffee_shop"], parole: /specialty|specialit[aà]|caff[eè]\s+filtr|espresso\s+bar/i },
@@ -95,11 +96,11 @@ export const GRUPPI_LOCALE: GruppoLocale[] = [
     ],
   },
   {
-    id: "bere", titolo: "Bere", emoji: "🍸",
+    id: "bere", titolo: "Bere", emoji: "🥂",
     tipi: [
       { id: "cocktail", emoji: "🍸", label: "Cocktail bar", query: "cocktail bar", google: ["cocktail_bar"], parole: /cocktail|mixolog/i },
       { id: "speakeasy", emoji: "🗝️", label: "Speakeasy", query: "speakeasy", google: [], nome: /speakeasy/i, parole: /speakeasy|nascost|segret/i },
-      { id: "vini-naturali", emoji: "🍷", label: "Enoteca e vini", query: "enoteca vini naturali", google: ["wine_bar"], nome: /enotec|vineri|wine/i, parole: /enotec|vin[oi]\b|wine|calice|vineri/i },
+      { id: "vini-naturali", emoji: "🍇", label: "Enoteca e vini", query: "enoteca vini naturali", google: ["wine_bar"], nome: /enotec|vineri|wine/i, parole: /enotec|vin[oi]\b|wine|calice|vineri/i },
       { id: "pub", emoji: "🍺", label: "Pub", query: "pub", google: ["pub", "irish_pub", "gastropub", "sports_bar"], nome: /\bpub\b/i, parole: /\bpub\b/i },
       { id: "birra-artigianale", emoji: "🍻", label: "Birra artigianale", query: "birra artigianale", google: ["brewery", "brewpub", "beer_garden"], nome: /birr|brew|beer/i, parole: /birr|beer|brew/i },
       { id: "rooftop", emoji: "🌇", label: "Rooftop", query: "rooftop", google: [], nome: /rooftop|terrazz/i, parole: /rooftop|terrazz|tetti|panoramic/i },
@@ -165,3 +166,22 @@ export function suPerGusti<T extends { name: string; category?: string | null; t
   const usati = [...new Set(ordine.filter((x, k) => hit[x.i] && k < x.i).map((x) => hit[x.i]!.label.toLowerCase()))];
   return { places: ordine.map((x) => x.p), saliti, usati };
 }
+
+// Revisore 7/11 (primo accesso 8,3): "Ami: trattoria, pizzeria e cucina romana" suonava come un elenco. Nella
+// frase da amico ogni tipo con l'articolo, come i 10 tipi del primo accesso ("Ami le trattorie di quartiere").
+const IN_FRASE: Record<string, string> = {
+  trattoria: "le trattorie", osteria: "le osterie", ristorante: "i ristoranti", pizzeria: "le pizzerie", "pizza-taglio": "la pizza al taglio",
+  romana: "la cucina romana", milanese: "la cucina milanese", regionale: "la cucina regionale", agriturismo: "gli agriturismi",
+  pesce: "il pesce", griglieria: "la carne alla griglia", steakhouse: "le steakhouse", gourmet: "i ristoranti gourmet", bistrot: "i bistrot",
+  sushi: "il sushi", ramen: "il ramen", cinese: "la cucina cinese", thai: "la cucina thai", vietnamita: "la cucina vietnamita",
+  coreano: "la cucina coreana", indiano: "la cucina indiana", mediorientale: "la cucina mediorientale", greco: "la cucina greca",
+  spagnolo: "le tapas", messicano: "la cucina messicana", peruviano: "la cucina peruviana", burger: "i burger", barbecue: "il barbecue",
+  africano: "la cucina africana", vegetariano: "la cucina vegetariana", vegano: "la cucina vegana", celiaco: "i posti senza glutine",
+  healthy: "le poke e i posti healthy", "street-food": "lo street food", paninoteca: "i panini", piadineria: "le piadine", friggitoria: "i fritti",
+  kebab: "il kebab", "fast-food": "i fast food", colazione: "la colazione al bar", specialty: "il caffè specialty", brunch: "il brunch",
+  pasticceria: "le pasticcerie", gelateria: "il gelato", forno: "i forni", cioccolateria: "il cioccolato", cocktail: "i cocktail bar",
+  speakeasy: "gli speakeasy", "vini-naturali": "le enoteche", pub: "i pub", "birra-artigianale": "la birra artigianale", rooftop: "i rooftop",
+  aperitivo: "l'aperitivo", lounge: "la musica dal vivo",
+};
+/** I tipi amati come si dicono in una frase ("le pizzerie", "il sushi"); senza voce, l'etichetta. */
+export const amatiInFrase = (ids: string[]): string[] => ids.map((id) => IN_FRASE[id] ?? PER_ID.get(id)?.label.toLowerCase()).filter((x): x is string => !!x);

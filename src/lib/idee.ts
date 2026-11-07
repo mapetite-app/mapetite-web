@@ -5,22 +5,39 @@
 // Nessun costo Google: sono frasi, la ricerca parte solo al tocco.
 import type { Weather } from "@/lib/moment";
 
+// Niente import di valori qui: il giro automatico importa questo file direttamente con Node.
+/** Ora di Roma (con i minuti: 23,5 = 23:30) e giorno della settimana (0 = domenica). Home, Idee e frase del
+ *  momento usano la stessa ora, anche se il telefono è su un altro fuso (revisore 7/11). */
+export function oraRoma(now: Date): { h: number; day: number } {
+  const parti = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const ore = Number(parti.find((p) => p.type === "hour")?.value);
+  const min = Number(parti.find((p) => p.type === "minute")?.value);
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parti.find((p) => p.type === "weekday")?.value ?? "");
+  return { h: Number.isFinite(ore) ? ore + (Number.isFinite(min) ? min / 60 : 0) : now.getHours(), day: wd < 0 ? now.getDay() : wd };
+}
+
 const GIORNI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 
 // Righe del pannello: oltre si torna all'elenco lungo che Lorenzo ha bocciato.
 export const IDEE_MAX = 3;
 
+// Stesse fasce della home (`momentoDi`, revisore 7/11): "mattina" fino alle 11, poi "a pranzo".
 function parteDelGiorno(h: number): string {
-  if (h >= 5 && h < 12) return "mattina";
-  if (h >= 12 && h < 15) return "pranzo";
+  if (h >= 5 && h < 11) return "mattina";
+  if (h >= 11 && h < 15) return "a pranzo";
   if (h >= 15 && h < 18) return "pomeriggio";
-  if (h >= 18 && h < 24) return "sera";
+  if (h >= 18 && h < 23.5) return "sera"; // dalle 23:30 "notte", come la home (`momentoDi`)
   return "notte";
 }
 
 // Riga sotto il titolo: "Domenica sera · 12°" (il meteo solo se c'è).
 export function contestoIdee(now: Date, weather: Weather | null): string {
-  const base = `${GIORNI[now.getDay()]} ${parteDelGiorno(now.getHours())}`;
+  // Designer 7/11: all'una di sabato la home diceva "Venerdì notte" e il pannello "Sabato notte". Stessa regola
+  // della home (`momentoDi`): prima delle 5, per chi esce, è ancora la notte del giorno prima.
+  // Ora di Roma e "notte" dalle 23:30, come la home (revisore 7/11: tra le 23:30 e mezzanotte la home diceva "notte", il pannello "sera").
+  const { h, day } = oraRoma(now);
+  const giorno = GIORNI[(day + (h < 5 ? 6 : 0)) % 7];
+  const base = `${giorno} ${parteDelGiorno(h)}`;
   if (!weather) return base;
   return `${base} · ${Math.round(weather.tempC)}°${weather.rain ? ", piove" : ""}`;
 }
@@ -30,15 +47,16 @@ export function contestoIdee(now: Date, weather: Weather | null): string {
 // fascia, senza orario (le fasce sono quelle di momentSuggestion). I gradi stanno già nel titolo quando servono.
 export function percheMomento(now: Date, weather: Weather | null): string {
   if (weather?.rain) return "Oggi piove";
-  const h = now.getHours();
+  const { h, day } = oraRoma(now); // ora di Roma, come momentSuggestion e la home (revisore 7/11)
   // Stesse eccezioni di momentSuggestion: col freddo di sera la trattoria calda, col caldo l'aperitivo fino alle 22.
   if (weather && Math.round(weather.tempC) <= 10 && h >= 18) return "Per scaldarsi";
   if (weather && Math.round(weather.tempC) >= 20 && h >= 18 && h < 22) return "Per l'aperitivo";
-  if (h >= 6 && h < 11) return "Per iniziare la giornata";
-  if (h >= 11 && h < 15) return "Per la pausa pranzo";
+  if (h >= 5 && h < 11) return "Per iniziare la giornata"; // dalle 5, come "mattina" nel titolo
+  if (h >= 11 && h < 15) return day === 0 || day === 6 ? "Per un pranzo con calma" : "Per la pausa pranzo"; // nel weekend niente "pausa"
   if (h >= 15 && h < 18) return "Per una pausa golosa";
-  if (h >= 18 && h < 21) return "Per l'aperitivo";
-  if (h >= 21) return "Per il dopocena";
+  if (h >= 18 && h < 21) return "Prima di cena"; // revisore 7/11: "Aperitivo con vista · Per l'aperitivo" ripeteva il titolo
+  if (h >= 21 && h < 23) return "Per stasera"; // come la home, cena fino alle 23 (revisore 7/11)
+  if (h >= 21) return "Fino a tardi"; // "Wine bar per il dopocena · Per il dopocena" ripeteva il titolo
   return "Aperti fino a tardi";
 }
 

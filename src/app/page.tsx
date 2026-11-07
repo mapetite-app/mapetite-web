@@ -118,7 +118,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
             →
           </button>
         </Form>
-        <HomePillole momento={ora.momento} cittaProfilo={cittaProfilo} />
+        <HomePillole momento={ora.momento} weekend={ora.weekend} cittaProfilo={cittaProfilo} gusto={prof.gusto} />
 
         {/* Prenotazioni richieste dall'assistente: promemoria oggi, "Com'è andata?" dopo. */}
         <div className="mt-4 empty:hidden">
@@ -127,7 +127,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
           <DomandaSettimanale />
         </div>
 
-        <HomePerTe gusto={prof.gusto} cittaProfilo={cittaProfilo} momento={ora.momento} loggedIn={loggedIn} />
+        <HomePerTe gusto={prof.gusto} cittaProfilo={cittaProfilo} momento={ora.momento} weekend={ora.weekend} loggedIn={loggedIn} />
 
         {saved.total > 0 && (
           <section data-testid="home-salvati" className="mt-6 flex items-center gap-3 rounded-card border border-border bg-white p-3 shadow-sm">
@@ -152,7 +152,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
           </section>
         )}
 
-        <HomeClassifiche momento={ora.momento} cittaProfilo={cittaProfilo} adesso={now.getTime()} />
+        <HomeClassifiche momento={ora.momento} weekend={ora.weekend} cittaProfilo={cittaProfilo} adesso={now.getTime()} gusto={prof.gusto} />
 
         <p className="mt-6 flex justify-center text-xs font-sans text-text-muted">
           <IntroAgain />

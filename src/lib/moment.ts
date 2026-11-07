@@ -1,15 +1,17 @@
 // Suggerimento di ricerca adatto al momento: ora e giorno del telefono e, se c'è, il meteo.
 // Nessun costo Google: è solo una frase in più tra gli esempi.
 export type Weather = { tempC: number; rain: boolean };
+// oraRoma sta in idee.ts: il giro automatico importa idee.ts con Node, che non risolve "@/lib".
+import { oraRoma } from "@/lib/idee";
+
 
 export function momentSuggestion(now: Date, weather: Weather | null = null): string {
-  const h = now.getHours();
-  const day = now.getDay();
+  const { h, day } = oraRoma(now);
   const weekend = day === 0 || day === 6;
   const t = weather ? Math.round(weather.tempC) : null;
   // Meteo prima di tutto: con la pioggia nessuno vuole l'aperto, con il caldo sì.
   if (weather?.rain) {
-    if (h >= 6 && h < 11) return "🌧️ Colazione al calduccio qui vicino";
+    if (h >= 5 && h < 11) return "🌧️ Colazione al calduccio qui vicino";
     if (h >= 11 && h < 15) return "🌧️ Pranzo al coperto, accogliente, qui vicino";
     if (h >= 18) return "🌧️ Locale accogliente al coperto per stasera";
   }
@@ -19,10 +21,14 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
     if (h >= 18 && h < 22) return `🍹 Aperitivo all'aperto, stasera ${t}°`;
   }
   if (t != null && t <= 10 && h >= 18) return "🍲 Trattoria calda e accogliente per stasera";
-  if (h >= 6 && h < 11) return weekend ? "☕ Brunch buono per stamattina" : "☕ Colazione con cornetti buoni qui vicino";
-  if (h >= 11 && h < 15) return weekend ? "🍝 Pranzo della domenica in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
+  // Dalle 5, come "mattina" nel pannello Idee (revisore 7/11).
+  if (h >= 5 && h < 11) return weekend ? "☕ Brunch buono per stamattina" : "☕ Colazione con cornetti buoni qui vicino";
+  if (h >= 11 && h < 15) // Revisore 7/11: di sabato il pannello diceva "Sabato a pranzo" e sotto "Pranzo della domenica".
+    return day === 0 ? "🍝 Pranzo della domenica in trattoria" : day === 6 ? "🍝 Pranzo del sabato in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";
   if (h >= 18 && h < 21) return day === 5 || day === 6 ? "🍸 Cocktail bar per iniziare la serata" : "🍹 Aperitivo con vista stasera";
+  // Revisore 7/11: fino alle 23 la home dice "Dove andiamo stasera?" con idee da cena; il pannello Idee uguale.
+  if (h >= 21 && h < 23) return "🍽️ Cena buona e non turistica qui vicino";
   if (h >= 21) return "🍷 Wine bar per il dopocena qui vicino";
   // Di notte "aperto adesso" lo dice già la riga "Vicino a me, aperto adesso" (revisore del 2/11): qui da mangiare.
   return "🍕 Da mangiare a tarda notte qui vicino";

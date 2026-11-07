@@ -127,17 +127,22 @@ export function gustiDaTipi(su: string[], scelti: { occasions: string[]; priceRa
 }
 
 /** La prima ricerca "5 posti per te": il tipo piaciuto più adatto, la zona, e "fuori dai giri turistici" per chi ama le chicche. */
-export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
+export function queryPerTe(m: MappaGusto, citta: string | null, queryAmato: string | null = null): string | null {
   const scoperta = scopertaPer(m);
   const tipi = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
   // Per chi ama le chicche si parte da un tipo "chicca"; per chi ama i famosi da uno famoso.
   const primo = (scoperta === "chicche" ? tipi.find((t) => !t.famoso) : scoperta === "famosi" ? tipi.find((t) => t.famoso) : null) ?? tipi[0];
-  if (!primo) return null;
-  const base = primo.query.charAt(0).toUpperCase() + primo.query.slice(1);
+  // Revisore 7/11 (primo accesso, G1): chi sceglie i gusti in "Cosa ti piace?" salta i 10 tipi, quindi niente 👍:
+  // la prima ricerca parte dal primo gusto scelto (la parola chiave del catalogo, `queryAmato`), non dalla ricerca generica.
+  const query = primo?.query ?? queryAmato;
+  if (!query) return null;
+  const base = query.charAt(0).toUpperCase() + query.slice(1);
   // "fuori dai giri turistici" (non "non turistico": vale per trattoria e per cocktail bar) attiva
   // la stessa regola di chi lo scrive (mainstream.ts).
   const nonTuristico = scoperta === "chicche" ? " fuori dai giri turistici" : "";
-  const dove = m.zone[0] ? ` a ${m.zone[0]}` : citta ? ` a ${citta}` : "";
+  // "al Pigneto", "ai Navigli" come nella frase finale (revisore 7/11).
+  const z = m.zone[0] ? PREP[m.zone[0]] ?? ["a "] : null;
+  const dove = m.zone[0] ? ` ${z![0]}${z![1] ?? m.zone[0]}` : citta ? ` a ${citta}` : "";
   return `${base}${nonTuristico}${dove}`;
 }
 
@@ -154,14 +159,14 @@ export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | nu
     : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ti piace: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2, TIPO_POSTO)}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
   const scoperta = m.scoperta;
   if (scoperta === "chicche") out.push({ chiave: "scoperta", emoji: "💎", testo: "Preferisci le chicche: i posti di massa li metto in fondo" });
   else if (scoperta === "famosi") out.push({ chiave: "scoperta", emoji: "⭐", testo: "Ti piacciono anche i posti famosi" });
-  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, 3).map((o) => o.label.toLowerCase()).join(", ")}${extra.occasions.length === 4 ? " e un'altra occasione" : extra.occasions.length > 4 ? ` e altre ${extra.occasions.length - 3} occasioni` : ""}` });
+  if (extra.occasions.length) out.push({ chiave: "occasioni", emoji: "🗓️", testo: `Esci per: ${extra.occasions.slice(0, extra.occasions.length === 4 ? 4 : 3).map((o) => o.label.toLowerCase()).join(", ")}${extra.occasions.length > 4 ? ` e altre ${extra.occasions.length - 3} occasioni` : ""}` }); // una sola in più: si scrive quella
   if (extra.priceRange) out.push({ chiave: "spesa", emoji: "💶", testo: `Spesa tipica ${extra.priceRange}` });
   // "Vegetariano" non è una cosa che si evita: si dice a parte da glutine, pesce, carne…
   // Vegano e vegetariano insieme: basta "vegano" (come nella frase).
@@ -201,7 +206,8 @@ const maiuscola = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Elenco evidenziato "A, B e altri 2": nessuna scelta sparisce senza dirlo (collaudo del 23/10).
 function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["un altro", "altri"]): PezzoFrase[] {
-  const vis = xs.slice(0, max);
+  // Designer 7/11: "e un altro gusto" era vago. Se ne resta uno solo, si scrive quello (costa una parola sola).
+  const vis = xs.slice(0, xs.length === max + 1 ? max + 1 : max);
   const resto = xs.length - vis.length;
   const out: PezzoFrase[] = [];
   vis.forEach((x, i) => {
@@ -229,7 +235,9 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
   // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
   const amati = extra.amati ?? [];
-  if (amati.length) frasi.push([{ t: su.length ? "Ti piacciono anche " : "Ti piacciono " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
+  // Revisori 7/11: "Ti piacciono trattoria…" era sgrammaticato, "Ami: pizzeria" un elenco. Arrivano con l'articolo
+  // ("le pizzerie, il sushi", amatiInFrase) e con lo stesso verbo dei 10 tipi.
+  if (amati.length) frasi.push([{ t: su.length ? "Ami anche " : "Ami " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
@@ -262,9 +270,21 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
-  if (mangi) d.push({ t: "Sei " }, { t: mangi, k: "diete" });
+  if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" }); // revisore 7/11: "Sei vegetariano" dava per scontato il maschile
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }], "diete");
+  // Revisore 7/11: con il tetto di frasi le zone staccate (priorità bassa) sparivano dietro "Il resto del
+  // profilo", pur essendo la prima risposta data. Se non c'è posto per due frasi, zone e stile tornano una frase sola.
+  if (staccaZone && tutte.length > max) {
+    const i = tutte.findIndex((x) => x.p === "dove");
+    const j = tutte.findIndex((x, k) => k > i && x.p === "stile");
+    if (i >= 0 && j > i) {
+      const unita: PezzoFrase[] = parti.flatMap((x, k) => [...(k === 0 ? [] : [{ t: k === parti.length - 1 ? " e " : ", " }]), ...x]);
+      unita[0] = { ...unita[0], t: maiuscola(unita[0].t) };
+      tutte.splice(j, 1);
+      tutte[i] = { f: [...unita, { t: "." }], p: "stile" };
+    }
+  }
   const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));
   const out = tutte.filter((_, i) => scelte.has(i)).map((x) => x.f);
   // Profilo corto: una mezza frase vera invece di una pagina vuota.
