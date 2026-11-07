@@ -37,19 +37,42 @@ export type Proposta = { emoji: string; titolo: string; perche: string; q: strin
 // suonerebbe come un invito al posto più popolare (revisore 7/11, VISIONE.md).
 const TITOLO_HOME: Record<string, string> = { pizza: "Pizza napoletana vera", storica: "Osteria di tradizione" };
 
-// Idee sotto il campo per l'ora (quando non c'è ancora nessuna ricerca recente stanno da sole).
+// Idee sotto il campo per l'ora (quando non c'è ancora nessuna ricerca recente stanno da sole). Le prime tre
+// che restano: dopo le prime tre ci sono le riserve, per quando un tipo passa a "Per te" o a una ricerca recente.
 export const PILLOLE: Record<Momento, { label: string; chiave: string }[]> = {
-  colazione: [{ label: "Colazione con cornetti veri", chiave: "pasticceria" }, { label: "Caffè di specialità", chiave: "caffe" }, { label: "Brunch nel weekend", chiave: "brunch" }],
-  pranzo: [{ label: "Pranzo veloce e buono", chiave: "veloce" }, { label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Pranzo di lavoro tranquillo", chiave: "lavoro" }],
-  pomeriggio: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }],
-  aperitivo: [{ label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Cocktail d'autore", chiave: "speakeasy" }],
-  cena: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Trattoria non turistica", chiave: "trattoria" }, { label: "Pizza napoletana", chiave: "pizza" }],
-  dopocena: [{ label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Wine bar fino a tardi", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }],
+  colazione: [{ label: "Colazione con cornetti veri", chiave: "pasticceria" }, { label: "Caffè di specialità", chiave: "caffe" }, { label: "Brunch nel weekend", chiave: "brunch" }, { label: "Forno di quartiere", chiave: "forno" }],
+  pranzo: [{ label: "Pranzo veloce e buono", chiave: "veloce" }, { label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Pranzo di lavoro tranquillo", chiave: "lavoro" }, { label: "Cucina dal mondo", chiave: "mondo" }],
+  pomeriggio: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }],
+  aperitivo: [{ label: "Aperitivo con vista", chiave: "rooftop" }, { label: "Vino naturale", chiave: "enoteca" }, { label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Birra artigianale", chiave: "birra" }, { label: "Vermouth al bancone", chiave: "vermouth" }],
+  cena: [{ label: "Cena romantica", chiave: "romantica" }, { label: "Trattoria non turistica", chiave: "trattoria" }, { label: "Pizza napoletana", chiave: "pizza" }, { label: "Cucina dal mondo", chiave: "mondo" }, { label: "Bistrot creativo", chiave: "bistrot" }],
+  dopocena: [{ label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Wine bar fino a tardi", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }, { label: "Fame a tarda notte", chiave: "tardi" }],
 };
 
+/** Tipo di posto di una ricerca scritta ("trattoria a Monti" → "trattoria"), o null. */
+export function tipoRicerca(q: string): string | null {
+  return DA_RICERCA.find((d) => d.re.test(q))?.tipo ?? null;
+}
+
+/** I tipi che "Per te" prende dalla mappa del gusto a quest'ora (gli stessi calcoli di proposte()). */
+function tipiDalGusto(gusto: MappaGusto | null | undefined, momento: Momento): string[] {
+  if (!gusto || gusto.su.length === 0) return [];
+  const ordine = PER_MOMENTO[momento];
+  return gusto.su.filter((id) => ordine.includes(id)).sort((a, b) => rank(ordine, a) - rank(ordine, b)).slice(0, 2);
+}
+
+/**
+ * Idee sotto il campo, al massimo tre. Revisore 7/11: niente idea generica dello stesso tipo di una ricerca
+ * recente (↻ "trattoria a Monti" accanto a "Trattoria per pranzo") né di un tipo che ami: quello va in "Per te"
+ * con il tuo perché, che vale più dell'idea generica.
+ */
+export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = []): { label: string; chiave: string }[] {
+  const via = new Set<string>([...tipiDalGusto(gusto, momento), ...recenti.slice(0, 3).map(tipoRicerca).filter((t): t is string => !!t)]);
+  return PILLOLE[momento].filter((p) => !via.has(p.chiave)).slice(0, 3);
+}
+
 /** Tipi di posto già occupati dalle idee sotto il campo: "Per te" e le classifiche non li ripetono. */
-export function chiaviPillole(momento: Momento): Set<string> {
-  return new Set(PILLOLE[momento].map((p) => p.chiave));
+export function chiaviPillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = []): Set<string> {
+  return new Set(pillole(momento, gusto, recenti).map((p) => p.chiave));
 }
 
 // Tipi adatti a ogni momento (in ordine): il pomeriggio si pensa già alla sera.
@@ -167,7 +190,7 @@ const IDEE: Record<Momento, Idea[]> = {
   pranzo: [
     { tipo: "mondo", chiave: "veloce", titolo: "Pranzo veloce e buono", perche: "Pochi minuti, niente catene", q: "pranzo veloce buono non catena" },
     { tipo: "trattoria", titolo: "Trattoria per pranzo", perche: "Piatto del giorno, prezzi onesti", q: "trattoria di quartiere per pranzo" },
-    { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cucina chi viene da lì", q: "cucina etnica autentica per pranzo" },
+    { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cuochi di quei paesi", q: "cucina etnica autentica per pranzo" },
     { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pane, focacce e lievitati fatti lì", q: "forno artigianale di quartiere" },
   ],
   pomeriggio: [
@@ -184,7 +207,7 @@ const IDEE: Record<Momento, Idea[]> = {
   cena: [
     { tipo: "trattoria", titolo: "Trattoria vera", perche: "Dove mangiano quelli del posto", q: "trattoria autentica non turistica" },
     { tipo: "bistrot", chiave: "romantica", titolo: "Cena a due", perche: "Tavoli lontani, luci basse", q: "ristorante romantico per due tranquillo" },
-    { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cucina chi viene da lì", q: "cucina etnica autentica" },
+    { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cuochi di quei paesi", q: "cucina etnica autentica" },
     { tipo: "bistrot", titolo: "Bistrot creativo", perche: "Menù corto, chef giovane", q: "bistrot cucina creativa" },
   ],
   dopocena: [
@@ -211,11 +234,17 @@ const CLASSIFICHE: Record<string, Classifica[]> = {
     { id: "cocktail", emoji: "🍸", titolo: "Cocktail bar nascosti", sotto: "Porte senza insegna, drink d'autore", q: "cocktail bar nascosto d'autore a Roma", momenti: ["dopocena", "aperitivo"], chiave: "speakeasy" },
     { id: "gelato", emoji: "🍨", titolo: "Gelato artigianale", sotto: "Colori naturali, niente montagne", q: "gelateria artigianale migliore a Roma", momenti: ["pomeriggio", "dopocena"], chiave: "gelato" },
     { id: "suppli", emoji: "🍙", titolo: "Supplì e fritti", sotto: "Il cibo di strada romano", q: "migliori supplì di Roma", momenti: ["pranzo", "aperitivo"], chiave: "fritti" },
+    { id: "forno", emoji: "🥖", titolo: "Forni di quartiere", sotto: "Pizza bianca calda e lievitati fatti lì", q: "forno artigianale con pizza bianca a Roma", momenti: ["colazione"], chiave: "forno" },
+    { id: "ciambelle", emoji: "🍩", titolo: "Ciambelle e bombe", sotto: "Fritte la mattina, zucchero sopra", q: "ciambelle fritte e bombe per colazione a Roma", momenti: ["colazione"], chiave: "fritte-dolci" },
+    { id: "salata", emoji: "🍳", titolo: "Colazione salata", sotto: "Uova, pane buono, niente fretta", q: "colazione salata con uova a Roma", momenti: ["colazione"], chiave: "salata" },
+    { id: "birra", emoji: "🍺", titolo: "Birre artigianali", sotto: "Spine che cambiano, pub piccoli", q: "birreria artigianale con birre alla spina a Roma", momenti: ["aperitivo", "dopocena"], chiave: "birra" },
+    { id: "taglieri", emoji: "🧀", titolo: "Taglieri e norcinerie", sotto: "Salumi, formaggi e un calice", q: "norcineria o salumeria con taglieri per aperitivo a Roma", momenti: ["aperitivo"], chiave: "taglieri" },
     { id: "bancone", emoji: "☕", titolo: "Caffè al bancone", sotto: "Bar di quartiere, cornetto caldo", q: "bar storico di quartiere per colazione a Roma", momenti: ["colazione"], chiave: "bar" },
     // Revisore 7/11: all'aperitivo e dopo cena vino, cocktail e vista stanno già nelle idee sotto il campo.
     { id: "vermouth", emoji: "🥃", titolo: "Vermouth e bitter", sotto: "L'aperitivo all'italiana, al bancone", q: "bar per aperitivo con vermouth e bitter a Roma", momenti: ["aperitivo"], chiave: "vermouth" },
     { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Roma", momenti: ["dopocena"], chiave: "musica" },
     { id: "tardi", emoji: "🌙", titolo: "Fame a tarda notte", sotto: "Cucine aperte dopo mezzanotte", q: "cucina aperta fino a tardi la notte a Roma", momenti: ["dopocena"], chiave: "tardi" },
+    { id: "amari", emoji: "🥃", titolo: "Amari e distillati", sotto: "Bar piccoli per l'ultimo bicchiere", q: "bar con amari e distillati per il dopocena a Roma", momenti: ["dopocena"], chiave: "amari" },
   ],
   Milano: [
     { id: "risotto", emoji: "🍚", titolo: "Risotto alla milanese", sotto: "I migliori secondo le recensioni, fuori dai giri turistici", q: "migliore risotto alla milanese non turistico a Milano", momenti: ["pranzo", "cena", "pomeriggio"] },
@@ -223,9 +252,16 @@ const CLASSIFICHE: Record<string, Classifica[]> = {
     { id: "pizza", emoji: "🍕", titolo: "Pizza napoletana a Milano", sotto: "Cornicione alto, impasto leggero", q: "migliore pizza napoletana a Milano", momenti: ["cena", "pranzo"], chiave: "pizza" },
     { id: "brunch", emoji: "🥐", titolo: "Brunch e caffè di specialità", sotto: "Luce, pancake, caffè filtro", q: "brunch e caffè di specialità a Milano", momenti: ["colazione", "pranzo"], chiave: "brunch" },
     { id: "brioche", emoji: "🥐", titolo: "Brioche e cappuccino", sotto: "Pasticcerie storiche, non catene", q: "pasticceria storica per colazione a Milano", momenti: ["colazione"], chiave: "pasticceria" }, // come l'idea dei cornetti: a Milano brioche e cornetto sono la stessa cosa
+    { id: "banco", emoji: "☕", titolo: "Caffè al banco", sotto: "Bar di quartiere, brioche calda", q: "bar di quartiere per colazione a Milano", momenti: ["colazione"], chiave: "bar" },
+    { id: "forno", emoji: "🥖", titolo: "Focaccia e lievitati", sotto: "Forni artigianali, appena sfornato", q: "forno artigianale con focaccia a Milano", momenti: ["colazione"], chiave: "forno" },
+    { id: "torte", emoji: "🍰", titolo: "Torte e caffè", sotto: "Bakery di quartiere, dolci fatti lì", q: "bakery di quartiere con torte fatte in casa per colazione a Milano", momenti: ["colazione"], chiave: "bakery" },
+    { id: "salata", emoji: "🍳", titolo: "Colazione salata", sotto: "Uova, pane buono, niente fretta", q: "colazione salata con uova a Milano", momenti: ["colazione"], chiave: "salata" },
+    { id: "mondeghili", emoji: "🧆", titolo: "Mondeghili e piattini", sotto: "Le polpette milanesi con il bicchiere", q: "aperitivo con mondeghili e piattini a Milano", momenti: ["aperitivo"], chiave: "fritti" },
+    { id: "birra", emoji: "🍺", titolo: "Birre artigianali", sotto: "Spine che cambiano, pub piccoli", q: "birreria artigianale con birre alla spina a Milano", momenti: ["aperitivo", "dopocena"], chiave: "birra" },
     { id: "vermouth", emoji: "🥃", titolo: "Bitter e vermouth", sotto: "L'aperitivo milanese, quello vero", q: "bar storico per aperitivo con bitter e vermouth a Milano", momenti: ["aperitivo"], chiave: "vermouth" },
     { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Milano", momenti: ["dopocena"], chiave: "musica" },
     { id: "tardi", emoji: "🌙", titolo: "Fame a tarda notte", sotto: "Cucine aperte dopo mezzanotte", q: "cucina aperta fino a tardi la notte a Milano", momenti: ["dopocena"], chiave: "tardi" },
+    { id: "amari", emoji: "🥃", titolo: "Amari e distillati", sotto: "Bar piccoli per l'ultimo bicchiere", q: "bar con amari e distillati per il dopocena a Milano", momenti: ["dopocena"], chiave: "amari" },
     { id: "aperitivo", emoji: "🍹", titolo: "Aperitivi veri", sotto: "Lontano dai Navigli turistici", q: "aperitivo non turistico a Milano", momenti: ["aperitivo", "pomeriggio"] },
     { id: "vini", emoji: "🍷", titolo: "Enoteche di vini naturali", sotto: "Dove l'oste ti consiglia davvero", q: "enoteca vini naturali a Milano", momenti: ["aperitivo", "dopocena", "pomeriggio"], chiave: "enoteca" },
     { id: "cocktail", emoji: "🍸", titolo: "Cocktail bar nascosti", sotto: "Porte senza insegna, drink d'autore", q: "cocktail bar nascosto d'autore a Milano", momenti: ["dopocena", "aperitivo"], chiave: "speakeasy" },

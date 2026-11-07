@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { loadRecentSearches, subscribeRecent, useBeta } from "@/lib/beta";
-import { CITTA_CLASSIFICHE, PILLOLE, chiaviPillole, classifiche, proposte, type Momento } from "@/lib/home-proposte";
+import { CITTA_CLASSIFICHE, chiaviPillole, pillole, tipoRicerca, classifiche, proposte, type Momento } from "@/lib/home-proposte";
 import { grantedPosition, readLastView } from "@/lib/last-view";
 import { cityNear } from "@/lib/named-city";
 import type { MappaGusto } from "@/lib/mappa-gusto";
@@ -45,7 +45,7 @@ export function HomePillole({ momento, cittaProfilo, gusto }: { momento: Momento
   const citta = useCitta(cittaProfilo);
   const tutte = useRecenti();
   // Revisore 7/11: la ricerca da cui nasce una card "Per te" ("Hai cercato «…»") non torna anche come pillola ↻.
-  const inCard = new Set(proposte({ gusto, recenti: tutte, citta, momento, escludi: chiaviPillole(momento) }).map((p) => p.da).filter(Boolean));
+  const inCard = new Set(proposte({ gusto, recenti: tutte, citta, momento, escludi: chiaviPillole(momento, gusto, tutte) }).map((p) => p.da).filter(Boolean));
   const recenti = tutte.filter((q) => !inCard.has(q)).slice(0, 3);
   const pill = "flex min-h-11 max-w-64 shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95";
   return (
@@ -61,7 +61,7 @@ export function HomePillole({ momento, cittaProfilo, gusto }: { momento: Momento
           ))}
         </span>
       )}
-      {PILLOLE[momento].map(({ label }) => {
+      {pillole(momento, gusto, tutte).map(({ label }) => {
         const q = `${label} a ${citta}`;
         return (
           <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
@@ -82,8 +82,10 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto }: { mome
   const dove = CITTA_CLASSIFICHE.includes(citta) ? citta : "Roma";
   const [now] = useState(() => new Date(adesso));
   // Niente tipi già mostrati più in alto: le idee sotto il campo e le proposte "Per te" (stessi calcoli).
-  const sopra = chiaviPillole(momento);
-  for (const p of proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) })) sopra.add(p.chiave);
+  const sopra = chiaviPillole(momento, gusto, recenti);
+  for (const p of proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento, gusto, recenti) })) sopra.add(p.chiave);
+  // Né il tipo di una ricerca recente già in vista come pillola ↻ (revisore 7/11: ↻ cocktail e "Cocktail bar nascosti").
+  for (const q of recenti.slice(0, 3)) { const t = tipoRicerca(q); if (t) sopra.add(t); }
   const top = classifiche(dove, momento, now, 4, sopra);
   // Meno di 2 classifiche adatte all'ora: la sezione con una riga sola sembrava vuota (revisore 7/11).
   if (top.length < 2) return null;
@@ -128,7 +130,7 @@ export default function HomePerTe({
 }) {
   const citta = useCitta(cittaProfilo);
   const recenti = useRecenti();
-  const lista = proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) });
+  const lista = proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento, gusto, recenti) });
   const senzaGusto = !gusto || gusto.su.length === 0;
   return (
     <section data-testid="home-per-te" className="mt-7">
@@ -149,7 +151,7 @@ export default function HomePerTe({
               <span className={`${SERIF} line-clamp-2 block text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
               <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden>✦</span>
-                <span className="line-clamp-2">{p.perche}</span>
+                <span className="line-clamp-2 [text-wrap:pretty]">{p.perche}</span>
               </span>
             </span>
           </Link>
