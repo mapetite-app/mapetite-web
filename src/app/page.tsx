@@ -118,7 +118,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
             →
           </button>
         </Form>
-        <HomePillole momento={ora.momento} cittaProfilo={cittaProfilo} />
+        <HomePillole momento={ora.momento} cittaProfilo={cittaProfilo} gusto={prof.gusto} />
 
         {/* Prenotazioni richieste dall'assistente: promemoria oggi, "Com'è andata?" dopo. */}
         <div className="mt-4 empty:hidden">

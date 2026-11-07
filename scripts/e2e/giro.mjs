@@ -1175,7 +1175,8 @@ await page.unroute("**/api/search");
 searchMode = "error";
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await idee(page);
-await page.getByRole("button", { name: "Colazione buona qui vicino", exact: true }).click();
+// Gli esempi cambiano ordine con l'ora (revisore 7/11): il primo della fila, qualunque sia.
+await page.getByTestId("idee-fila").getByTestId("idee-esempio").first().click();
 await page.getByText(/Qualcosa è andato storto/).first().waitFor({ timeout: 4000 });
 ok(true, "errore API: messaggio umano mostrato nella card");
 await shot("06-errore");

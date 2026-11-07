@@ -31,7 +31,11 @@ export function momentoDi(now: Date): { momento: Momento; etichetta: string; dom
 // "chiave" = il tipo di posto (trattoria, cocktail bar…): sulla home ogni tipo compare una volta sola tra
 // idee sotto il campo, "Per te" e classifiche (audit design 7/11: il cocktail usciva tre volte). Vince la
 // sezione più in alto: prima le idee, poi "Per te", poi le classifiche.
-export type Proposta = { emoji: string; titolo: string; perche: string; q: string; sfondo: string; chiave: string };
+export type Proposta = { emoji: string; titolo: string; perche: string; q: string; sfondo: string; chiave: string; da?: string };
+
+// Titoli della home per i tipi "famosi" del primo accesso: lì "con la fila" serve a riconoscerli, qui
+// suonerebbe come un invito al posto più popolare (revisore 7/11, VISIONE.md).
+const TITOLO_HOME: Record<string, string> = { pizza: "Pizza napoletana vera", storica: "Osteria di tradizione" };
 
 // Idee sotto il campo per l'ora (quando non c'è ancora nessuna ricerca recente stanno da sole).
 export const PILLOLE: Record<Momento, { label: string; chiave: string }[]> = {
@@ -114,7 +118,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const parola = hit.nome || (r.match(hit.re)?.[0] ?? "").toLowerCase();
     const cosa = hit.nome ? tipo.query : parola;
     usati.add(tipo.id);
-    add({ emoji: tipo.emoji, titolo: `${cap(parola)} che pochi conoscono ${aZona(dove)}`, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} poco conosciuto fuori dai giri turistici ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id });
+    add({ emoji: tipo.emoji, titolo: `${cap(parola)} che pochi conoscono ${aZona(dove)}`, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} poco conosciuto fuori dai giri turistici ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }
 
@@ -129,7 +133,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
       const zona = gusto.zone[i] ?? gusto.zone[0];
       const dove = zona ?? citta;
       const chicche = scoperta === "chicche" ? " fuori dai giri turistici" : "";
-      add({ emoji: tipo.emoji, titolo: `${tipo.titolo} ${aZona(dove)}`, perche: zona ? `Ami questi posti · esci ${aZona(zona)}` : "Ami questi posti", q: `${tipo.query}${chicche} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id });
+      add({ emoji: tipo.emoji, titolo: `${TITOLO_HOME[tipo.id] ?? tipo.titolo} ${aZona(dove)}`, perche: zona ? `Ami questi posti · esci ${aZona(zona)}` : "Ami questi posti", q: `${tipo.query}${chicche} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id });
     });
   }
 

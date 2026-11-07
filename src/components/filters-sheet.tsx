@@ -219,7 +219,7 @@ export default function FiltersSheet({
             // Audit design 7/11: corallo su grigio (e spento al 40%) quasi non si leggeva. Ora pillola bianca,
             // teal da acceso (contrasto oltre 10:1), grigio da spento (4,8:1), alta 44 px come un tocco comodo.
             data-testid="filtri-azzera"
-            className="flex min-h-11 shrink-0 items-center rounded-pill border border-brand bg-white px-4 font-display text-sm font-semibold text-brand active:scale-95 disabled:border-border disabled:text-text-muted"
+            className="flex min-h-11 shrink-0 items-center rounded-pill border border-brand bg-white px-4 font-display text-sm font-semibold text-brand active:scale-95 disabled:border-text-muted/50 disabled:text-text-muted"
             disabled={active === 0}
           >
             Azzera

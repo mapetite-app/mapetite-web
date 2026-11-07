@@ -584,14 +584,14 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <p className="relative mt-1.5 text-sm font-sans text-white/90">{corrente.riga}</p>
                 </div>
                 </div>
-                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
+                {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Mai provato" in mezzo. */}
                 {/* Revisore 7/11: a 360 px "Non lo conosco" toccava i tasti tondi: spazio fisso e tasti da 64 px sotto 380 px. */}
                 <div className="mt-8 flex items-center justify-between gap-3 px-3 max-[380px]:px-1 [@media(max-height:760px)]:mt-6">
                   <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
                   <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 whitespace-nowrap rounded-pill border border-border bg-white px-4 text-center text-[14px] font-display font-semibold text-text-muted active:scale-95">
-                    Non lo conosco
+                    Mai provato
                   </button>
                   <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
                     <span aria-hidden>👍</span>
