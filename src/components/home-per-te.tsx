@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { loadRecentSearches, subscribeRecent, useBeta } from "@/lib/beta";
-import { CITTA_CLASSIFICHE, classifiche, proposte, type Momento } from "@/lib/home-proposte";
+import { CITTA_CLASSIFICHE, PILLOLE, chiaviPillole, classifiche, proposte, type Momento } from "@/lib/home-proposte";
 import { grantedPosition, readLastView } from "@/lib/last-view";
 import { cityNear } from "@/lib/named-city";
 import type { MappaGusto } from "@/lib/mappa-gusto";
@@ -12,6 +12,8 @@ import { trackFeature } from "@/lib/track";
 // Pillole sotto il campo e rotaia "Per te" della home (mockup A del 21/10, scelto da Lorenzo).
 // Le ricerche recenti stanno solo su questo telefono: le legge il browser, il server passa gusto e ora.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
+const CARD = "flex min-h-[5.5rem] w-[72vw] max-w-[17.5rem] shrink-0 snap-start items-center gap-3 rounded-card border border-border bg-white p-3 shadow-sm active:scale-[0.99]";
+const TONDO = "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-sm";
 
 function useRecenti(): string[] {
   const on = useBeta("recenti");
@@ -38,15 +40,6 @@ export function useCitta(dalProfilo: string | null): string {
   return dalProfilo ?? vicina ?? "Roma";
 }
 
-// Esempi per l'ora quando non c'è ancora nessuna ricerca recente.
-const PILLOLE: Record<Momento, string[]> = {
-  colazione: ["Colazione con cornetti veri", "Caffè di specialità", "Brunch nel weekend"],
-  pranzo: ["Pranzo veloce e buono", "Trattoria per pranzo", "Pranzo di lavoro tranquillo"],
-  pomeriggio: ["Cena romantica", "Aperitivo con vista", "Vino naturale"],
-  aperitivo: ["Aperitivo con vista", "Vino naturale", "Cocktail d'autore"],
-  cena: ["Cena romantica", "Trattoria non turistica", "Pizza napoletana"],
-  dopocena: ["Cocktail d'autore", "Wine bar fino a tardi", "Gelato artigianale"],
-};
 
 export function HomePillole({ momento, cittaProfilo }: { momento: Momento; cittaProfilo: string | null }) {
   const citta = useCitta(cittaProfilo);
@@ -65,7 +58,7 @@ export function HomePillole({ momento, cittaProfilo }: { momento: Momento; citta
           ))}
         </span>
       )}
-      {PILLOLE[momento].map((label) => {
+      {PILLOLE[momento].map(({ label }) => {
         const q = `${label} a ${citta}`;
         return (
           <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
@@ -80,11 +73,15 @@ export function HomePillole({ momento, cittaProfilo }: { momento: Momento; citta
 // Classifiche della città (lato telefono: la città può venire dalla posizione). Ogni riga è una ricerca.
 // L'ora arriva dal server, come il momento: con l'orologio del telefono, a cavallo del cambio di
 // settimana la rotazione cambiava tra server e telefono (errore di idratazione visto il 23/10).
-export function HomeClassifiche({ momento, cittaProfilo, adesso }: { momento: Momento; cittaProfilo: string | null; adesso: number }) {
+export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto }: { momento: Momento; cittaProfilo: string | null; adesso: number; gusto: MappaGusto | null }) {
   const citta = useCitta(cittaProfilo);
+  const recenti = useRecenti();
   const dove = CITTA_CLASSIFICHE.includes(citta) ? citta : "Roma";
   const [now] = useState(() => new Date(adesso));
-  const top = classifiche(dove, momento, now);
+  // Niente tipi già mostrati più in alto: le idee sotto il campo e le proposte "Per te" (stessi calcoli).
+  const sopra = chiaviPillole(momento);
+  for (const p of proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) })) sopra.add(p.chiave);
+  const top = classifiche(dove, momento, now, 4, sopra);
   return (
     <section data-testid="home-classifiche" className="mt-8">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Le classifiche di {dove}</h2>
@@ -126,11 +123,13 @@ export default function HomePerTe({
 }) {
   const citta = useCitta(cittaProfilo);
   const recenti = useRecenti();
-  const lista = proposte({ gusto, recenti, citta, momento });
+  const lista = proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) });
   const senzaGusto = !gusto || gusto.su.length === 0;
   return (
     <section data-testid="home-per-te" className="mt-7">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Per te</h2>
+      {/* Card basse (audit design 7/11: il grande riquadro con la sola emoji sembrava un segnaposto).
+          Emoji in un piccolo tondo colorato, titolo e perché accanto: tutta la card si legge. */}
       <div className="-mx-4 mt-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
         {lista.map((p, i) => (
           <Link
@@ -138,30 +137,27 @@ export default function HomePerTe({
             href={`/mappa?q=${encodeURIComponent(p.q)}`}
             onClick={() => trackFeature("home_proposta", { stato: String(i + 1) })}
             data-testid="home-proposta"
-            className="block w-[68vw] max-w-[17rem] shrink-0 snap-start active:scale-[0.99]"
+            className={CARD}
           >
-            <span
-              aria-hidden
-              className="relative flex h-40 items-center justify-center overflow-hidden rounded-[20px] text-6xl shadow-card"
-              style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}
-            >
-              <span className="absolute -left-6 -top-6 h-24 w-24 rounded-full bg-white/15 blur-xl" />
-              <span className="drop-shadow-md">{p.emoji}</span>
-            </span>
-            <span className={`${SERIF} mt-2.5 line-clamp-2 block text-[21px] font-medium leading-tight text-text`}>{p.titolo}</span>
-            <span className="mt-1 flex items-start gap-1 text-[13px] font-sans font-medium leading-snug text-accent">
-              <span aria-hidden>✦</span>
-              <span className="line-clamp-2">{p.perche}</span>
+            <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
+            <span className="min-w-0 flex-1">
+              <span className={`${SERIF} line-clamp-2 block text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
+              <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-accent">
+                <span aria-hidden>✦</span>
+                <span className="line-clamp-1">{p.perche}</span>
+              </span>
             </span>
           </Link>
         ))}
         {/* Sorprendimi (piano 2.5): un posto mai provato che probabilmente ti piace, con il perché. */}
-        <Link href="/sorprendimi?da=home" data-testid="home-sorprendimi" className="block w-[68vw] max-w-[17rem] shrink-0 snap-start active:scale-[0.99]">
-          <span aria-hidden className="flex h-40 items-center justify-center rounded-[20px] bg-brand text-6xl shadow-card">🎲</span>
-          <span className={`${SERIF} mt-2.5 block text-[21px] font-medium leading-tight text-text`}>Sorprendimi</span>
-          <span className="mt-1 flex items-start gap-1 text-[13px] font-sans font-medium leading-snug text-accent">
-            <span aria-hidden>✦</span>
-            <span>Un posto mai provato, scelto per te</span>
+        <Link href="/sorprendimi?da=home" data-testid="home-sorprendimi" className={CARD}>
+          <span aria-hidden className={`${TONDO} bg-brand`}>🎲</span>
+          <span className="min-w-0 flex-1">
+            <span className={`${SERIF} block text-[18px] font-medium leading-[1.15] text-text`}>Sorprendimi</span>
+            <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-accent">
+              <span aria-hidden>✦</span>
+              <span className="line-clamp-1">Un posto mai provato</span>
+            </span>
           </span>
         </Link>
       </div>
