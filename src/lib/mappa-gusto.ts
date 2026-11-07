@@ -264,7 +264,7 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
-  if (mangi) d.push({ t: "Sei " }, { t: mangi, k: "diete" });
+  if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" }); // revisore 7/11: "Sei vegetariano" dava per scontato il maschile
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }], "diete");
   const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));

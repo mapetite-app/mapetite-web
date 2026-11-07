@@ -7790,25 +7790,25 @@ else {
     const gruppi = (await am.getByTestId("gusti-gruppo").locator("h2").allTextContents()).map((t) => t.trim());
     const chips0 = await am.getByTestId("gusto-chip").count();
     const chiusi = await am.getByTestId("gusti-gruppo-apri").count();
-    ok(chips0 <= 16 && chiusi === 5 && (await am.locator('[data-id="milanese"]').count()) === 0 && (await am.locator('[data-id="romana"]').count()) === 1, `primo accesso: 'Cosa ti piace?' apre solo il primo gruppo (${chips0} chip, ${chiusi} gruppi chiusi) e a chi esce a Roma non propone la cucina milanese`);
+    ok(chips0 <= 16 && chiusi === 4 && (await am.locator('[data-id="vegano"]').count()) === 0 && (await am.locator('[data-id="milanese"]').count()) === 0 && (await am.locator('[data-id="romana"]').count()) === 1, `primo accesso: 'Cosa ti piace?' apre solo il primo gruppo (${chips0} chip, ${chiusi} gruppi chiusi) ; a chi esce a Roma niente cucina milanese; le diete solo in 'Come mangi?'`);
     await am.getByTestId("gusti-gruppo-apri").first().click();
-    ok((await am.getByTestId("gusti-gruppo-apri").count()) === 4, "primo accesso: un gruppo chiuso si apre al tocco");
+    ok((await am.getByTestId("gusti-gruppo-apri").count()) === 3, "primo accesso: un gruppo chiuso si apre al tocco");
     while (await am.getByTestId("gusti-gruppo-apri").count()) await am.getByTestId("gusti-gruppo-apri").first().click();
     const chips = await am.getByTestId("gusto-chip").count();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Diete", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 6 gruppi (${gruppi.join(" | ")})`);
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 5 gruppi (le diete stanno in 'Come mangi?') (${gruppi.join(" | ")})`);
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: 'Cosa ti piace?' senza scelte dice 'Nessuno scelto' e il tasto 'Salta'");
     const altezze = await am.getByTestId("gusto-chip").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     ok(Math.min(...altezze) >= 44, `primo accesso: chip dei gusti alte almeno 44 px (${Math.min(...altezze)})`);
-    for (const id of ["pizzeria", "sushi", "vegano", "barbecue", "agriturismo"]) await am.locator(`[data-id="${id}"]`).click();
+    for (const id of ["pizzeria", "sushi", "ramen", "barbecue", "agriturismo"]) await am.locator(`[data-id="${id}"]`).click();
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "5 scelti" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Continua" && (await am.locator('[data-id="barbecue"]').getAttribute("aria-pressed")) === "true", `primo accesso: 5 gusti scelti, contatore '5 scelti' e 'Continua' (${await ip.getByTestId("gusti-contatore").textContent()})`);
     // Il tasto resta in vista anche scorrendo in fondo all'elenco.
     await am.locator('[data-id="lounge"]').scrollIntoViewIfNeeded();
     { const b = await ip.getByTestId("benvenuto-avanti").boundingBox(); ok(!!b && b.y + b.height <= 844 && b.y > 600, `primo accesso: 'Continua' sempre visibile in basso (${Math.round(b?.y ?? -1)})`); }
     await ip.evaluate(() => window.scrollTo(0, 0));
     await ip.screenshot({ path: `${OUT}/benvenuto-2-cosa-ti-piace.png`, caret: "initial" });
-    { const b = JSON.parse(await ip.evaluate(() => localStorage.getItem("mapetite.benvenuto") ?? "{}")); ok(JSON.stringify(b.amati) === '["pizzeria","sushi","vegano","barbecue","agriturismo"]', `primo accesso: i gusti scelti restano nella bozza del telefono (${JSON.stringify(b.amati)})`); }
+    { const b = JSON.parse(await ip.evaluate(() => localStorage.getItem("mapetite.benvenuto") ?? "{}")); ok(JSON.stringify(b.amati) === '["pizzeria","sushi","ramen","barbecue","agriturismo"]', `primo accesso: i gusti scelti restano nella bozza del telefono (${JSON.stringify(b.amati)})`); }
     // Tolti di nuovo (qui il giro prova la frase con zone, chicche e diete): un secondo tocco toglie la scelta.
-    for (const id of ["pizzeria", "sushi", "vegano", "barbecue", "agriturismo"]) await am.locator(`[data-id="${id}"]`).click();
+    for (const id of ["pizzeria", "sushi", "ramen", "barbecue", "agriturismo"]) await am.locator(`[data-id="${id}"]`).click();
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto", "primo accesso: un secondo tocco toglie il gusto");
     await ip.getByTestId("benvenuto-avanti").click(); }
   // 3) dieci tipi di posto 👍/👎

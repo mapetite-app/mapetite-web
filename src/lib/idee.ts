@@ -47,12 +47,12 @@ export function contestoIdee(now: Date, weather: Weather | null): string {
 // fascia, senza orario (le fasce sono quelle di momentSuggestion). I gradi stanno già nel titolo quando servono.
 export function percheMomento(now: Date, weather: Weather | null): string {
   if (weather?.rain) return "Oggi piove";
-  const { h } = oraRoma(now); // ora di Roma, come momentSuggestion e la home (revisore 7/11)
+  const { h, day } = oraRoma(now); // ora di Roma, come momentSuggestion e la home (revisore 7/11)
   // Stesse eccezioni di momentSuggestion: col freddo di sera la trattoria calda, col caldo l'aperitivo fino alle 22.
   if (weather && Math.round(weather.tempC) <= 10 && h >= 18) return "Per scaldarsi";
   if (weather && Math.round(weather.tempC) >= 20 && h >= 18 && h < 22) return "Per l'aperitivo";
   if (h >= 5 && h < 11) return "Per iniziare la giornata"; // dalle 5, come "mattina" nel titolo
-  if (h >= 11 && h < 15) return "Per la pausa pranzo";
+  if (h >= 11 && h < 15) return day === 0 || day === 6 ? "Per un pranzo con calma" : "Per la pausa pranzo"; // nel weekend niente "pausa"
   if (h >= 15 && h < 18) return "Per una pausa golosa";
   if (h >= 18 && h < 21) return "Per l'aperitivo";
   if (h >= 21) return "Per il dopocena";

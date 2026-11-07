@@ -15,17 +15,24 @@ import { GRUPPI_LOCALE } from "@/lib/tipi-locale";
 const SOLO_CITTA: Record<string, string> = { romana: "Roma", milanese: "Milano" };
 // Revisore 7/11 (8,4): con 2 gruppi aperti le righe chiuse finivano sotto la piega; con 1 si vedono subito.
 const APERTI = 1;
+// Revisore 7/11: nel primo accesso le diete si chiedevano due volte (qui e in "Come mangi?"). Nel primo accesso
+// restano solo in "Come mangi?"; "Healthy e poke" passa in "Veloce".
+const DIETE_ID = new Set(["vegetariano", "vegano", "celiaco"]);
+const GRUPPI_PRIMO_ACCESSO = GRUPPI_LOCALE.filter((g) => g.id !== "diete").map((g) =>
+  g.id === "veloce" ? { ...g, tipi: [...g.tipi, ...(GRUPPI_LOCALE.find((x) => x.id === "diete")?.tipi ?? []).filter((t) => !DIETE_ID.has(t.id))] } : g,
+);
 
 export default function SelettoreGusti({ scelti, onChange, citta = null, compatto = false }: { scelti: string[]; onChange: (ids: string[]) => void; citta?: string | null; compatto?: boolean }) {
   const on = new Set(scelti);
   const tocca = (id: string) => onChange(on.has(id) ? scelti.filter((x) => x !== id) : [...scelti, id]);
+  const gruppi = compatto ? GRUPPI_PRIMO_ACCESSO : GRUPPI_LOCALE;
   const [aperti, setAperti] = useState<Set<string>>(
-    () => new Set(GRUPPI_LOCALE.filter((g, i) => !compatto || i < APERTI || g.tipi.some((t) => scelti.includes(t.id))).map((g) => g.id)),
+    () => new Set(gruppi.filter((g, i) => !compatto || i < APERTI || g.tipi.some((t) => scelti.includes(t.id))).map((g) => g.id)),
   );
   const visibile = (id: string) => on.has(id) || !citta || !SOLO_CITTA[id] || SOLO_CITTA[id] === citta;
   return (
     <div data-testid="selettore-gusti" className="flex flex-col gap-5">
-      {GRUPPI_LOCALE.map((g) => {
+      {gruppi.map((g) => {
         const tipi = g.tipi.filter((t) => visibile(t.id));
         const n = tipi.filter((t) => on.has(t.id)).length;
         const aperto = aperti.has(g.id);
