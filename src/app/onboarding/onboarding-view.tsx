@@ -7,7 +7,7 @@ import { completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
-import { amatiValidi, etichetteAmati } from "@/lib/tipi-locale";
+import { amatiInFrase, amatiValidi } from "@/lib/tipi-locale";
 import SelettoreGusti, { contaScelti } from "@/components/selettore-gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
@@ -272,7 +272,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
   const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
-  const progress = (passoMostrato / (TOTAL - 1)) * 100;
+  // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
+  // la barra avanza di mezzo passo, così il tocco si vede.
+  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / (TOTAL - 1)) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -362,7 +364,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // scelta. Una mai mostrata non entra nella sintesi.
   const gustoVisto = gusto;
   // Revisore 5/11: una dieta già detta in "Come mangi?" non si ripete tra i gusti ("Ti piacciono vegano… Sei vegano").
-  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: etichetteAmati(amati.filter((a) => !diete.includes(a))) };
+  const extra = { citta: chosenCity, priceRange, diete, occasions: OCCASIONS.filter((o) => occasions.includes(o.value)), amati: amatiInFrase(amati.filter((a) => !diete.includes(a))) };
   const righe = capito(gustoVisto, extra);
   const frase = fraseCapito(gustoVisto, extra, 3);
   // Dietro "Altro" solo ciò che la frase non dice già: quello che è nella frase si cambia toccando la parola.

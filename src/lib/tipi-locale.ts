@@ -166,3 +166,22 @@ export function suPerGusti<T extends { name: string; category?: string | null; t
   const usati = [...new Set(ordine.filter((x, k) => hit[x.i] && k < x.i).map((x) => hit[x.i]!.label.toLowerCase()))];
   return { places: ordine.map((x) => x.p), saliti, usati };
 }
+
+// Revisore 7/11 (primo accesso 8,3): "Ami: trattoria, pizzeria e cucina romana" suonava come un elenco. Nella
+// frase da amico ogni tipo con l'articolo, come i 10 tipi del primo accesso ("Ami le trattorie di quartiere").
+const IN_FRASE: Record<string, string> = {
+  trattoria: "le trattorie", osteria: "le osterie", ristorante: "i ristoranti", pizzeria: "le pizzerie", "pizza-taglio": "la pizza al taglio",
+  romana: "la cucina romana", milanese: "la cucina milanese", regionale: "la cucina regionale", agriturismo: "gli agriturismi",
+  pesce: "il pesce", griglieria: "la carne alla griglia", steakhouse: "le steakhouse", gourmet: "i ristoranti gourmet", bistrot: "i bistrot",
+  sushi: "il sushi", ramen: "il ramen", cinese: "la cucina cinese", thai: "la cucina thai", vietnamita: "la cucina vietnamita",
+  coreano: "la cucina coreana", indiano: "la cucina indiana", mediorientale: "la cucina mediorientale", greco: "la cucina greca",
+  spagnolo: "le tapas", messicano: "la cucina messicana", peruviano: "la cucina peruviana", burger: "i burger", barbecue: "il barbecue",
+  africano: "la cucina africana", vegetariano: "la cucina vegetariana", vegano: "la cucina vegana", celiaco: "i posti senza glutine",
+  healthy: "le poke e i posti healthy", "street-food": "lo street food", paninoteca: "i panini", piadineria: "le piadine", friggitoria: "i fritti",
+  kebab: "il kebab", "fast-food": "i fast food", colazione: "la colazione al bar", specialty: "il caffè specialty", brunch: "il brunch",
+  pasticceria: "le pasticcerie", gelateria: "il gelato", forno: "i forni", cioccolateria: "il cioccolato", cocktail: "i cocktail bar",
+  speakeasy: "gli speakeasy", "vini-naturali": "le enoteche", pub: "i pub", "birra-artigianale": "la birra artigianale", rooftop: "i rooftop",
+  aperitivo: "l'aperitivo", lounge: "la musica dal vivo",
+};
+/** I tipi amati come si dicono in una frase ("le pizzerie", "il sushi"); senza voce, l'etichetta. */
+export const amatiInFrase = (ids: string[]): string[] => ids.map((id) => IN_FRASE[id] ?? PER_ID.get(id)?.label.toLowerCase()).filter((x): x is string => !!x);

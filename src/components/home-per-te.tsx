@@ -88,7 +88,8 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto }: { mome
   for (const q of recenti.slice(0, 3)) { const t = tipoRicerca(q); if (t) sopra.add(t); }
   const top = classifiche(dove, momento, now, 4, sopra);
   // Meno di 2 classifiche adatte all'ora: la sezione con una riga sola sembrava vuota (revisore 7/11).
-  if (top.length < 2) return null;
+  // Revisore 7/11 (home 8,0): senza classifiche la home restava mezza vuota; con una sola la sezione regge.
+  if (top.length < 1) return null;
   return (
     <section data-testid="home-classifiche" className="mt-8">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Le classifiche di {dove}</h2>

@@ -127,17 +127,22 @@ export function gustiDaTipi(su: string[], scelti: { occasions: string[]; priceRa
 }
 
 /** La prima ricerca "5 posti per te": il tipo piaciuto più adatto, la zona, e "fuori dai giri turistici" per chi ama le chicche. */
-export function queryPerTe(m: MappaGusto, citta: string | null): string | null {
+export function queryPerTe(m: MappaGusto, citta: string | null, queryAmato: string | null = null): string | null {
   const scoperta = scopertaPer(m);
   const tipi = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
   // Per chi ama le chicche si parte da un tipo "chicca"; per chi ama i famosi da uno famoso.
   const primo = (scoperta === "chicche" ? tipi.find((t) => !t.famoso) : scoperta === "famosi" ? tipi.find((t) => t.famoso) : null) ?? tipi[0];
-  if (!primo) return null;
-  const base = primo.query.charAt(0).toUpperCase() + primo.query.slice(1);
+  // Revisore 7/11 (primo accesso, G1): chi sceglie i gusti in "Cosa ti piace?" salta i 10 tipi, quindi niente 👍:
+  // la prima ricerca parte dal primo gusto scelto (la parola chiave del catalogo, `queryAmato`), non dalla ricerca generica.
+  const query = primo?.query ?? queryAmato;
+  if (!query) return null;
+  const base = query.charAt(0).toUpperCase() + query.slice(1);
   // "fuori dai giri turistici" (non "non turistico": vale per trattoria e per cocktail bar) attiva
   // la stessa regola di chi lo scrive (mainstream.ts).
   const nonTuristico = scoperta === "chicche" ? " fuori dai giri turistici" : "";
-  const dove = m.zone[0] ? ` a ${m.zone[0]}` : citta ? ` a ${citta}` : "";
+  // "al Pigneto", "ai Navigli" come nella frase finale (revisore 7/11).
+  const z = m.zone[0] ? PREP[m.zone[0]] ?? ["a "] : null;
+  const dove = m.zone[0] ? ` ${z![0]}${z![1] ?? m.zone[0]}` : citta ? ` a ${citta}` : "";
   return `${base}${nonTuristico}${dove}`;
 }
 
@@ -230,9 +235,9 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
   // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
   const amati = extra.amati ?? [];
-  // Revisore 7/11: "Ti piacciono trattoria, ristorante…" era sgrammaticato (etichette al singolare).
-  if (amati.length) // Revisore 7/11: "Ami le trattorie…" e poi "Ti piace: pizzeria" erano due registri. Stesso verbo per tutte e due.
-  if (amati.length) frasi.push([{ t: su.length ? "Ami anche: " : "Ami: " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
+  // Revisori 7/11: "Ti piacciono trattoria…" era sgrammaticato, "Ami: pizzeria" un elenco. Arrivano con l'articolo
+  // ("le pizzerie, il sushi", amatiInFrase) e con lo stesso verbo dei 10 tipi.
+  if (amati.length) frasi.push([{ t: su.length ? "Ami anche " : "Ami " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];

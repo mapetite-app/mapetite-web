@@ -55,6 +55,7 @@ export function percheMomento(now: Date, weather: Weather | null): string {
   if (h >= 11 && h < 15) return day === 0 || day === 6 ? "Per un pranzo con calma" : "Per la pausa pranzo"; // nel weekend niente "pausa"
   if (h >= 15 && h < 18) return "Per una pausa golosa";
   if (h >= 18 && h < 21) return "Per l'aperitivo";
+  if (h >= 21 && h < 23) return "Per stasera"; // come la home, cena fino alle 23 (revisore 7/11)
   if (h >= 21) return "Per il dopocena";
   return "Aperti fino a tardi";
 }

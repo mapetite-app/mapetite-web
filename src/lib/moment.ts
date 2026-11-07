@@ -27,6 +27,8 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
     return day === 0 ? "🍝 Pranzo della domenica in trattoria" : day === 6 ? "🍝 Pranzo del sabato in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";
   if (h >= 18 && h < 21) return day === 5 || day === 6 ? "🍸 Cocktail bar per iniziare la serata" : "🍹 Aperitivo con vista stasera";
+  // Revisore 7/11: fino alle 23 la home dice "Dove andiamo stasera?" con idee da cena; il pannello Idee uguale.
+  if (h >= 21 && h < 23) return "🍽️ Cena buona e non turistica qui vicino";
   if (h >= 21) return "🍷 Wine bar per il dopocena qui vicino";
   // Di notte "aperto adesso" lo dice già la riga "Vicino a me, aperto adesso" (revisore del 2/11): qui da mangiare.
   return "🍕 Da mangiare a tarda notte qui vicino";

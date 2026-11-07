@@ -26,9 +26,13 @@ export default function SelettoreGusti({ scelti, onChange, citta = null, compatt
   const on = new Set(scelti);
   const tocca = (id: string) => onChange(on.has(id) ? scelti.filter((x) => x !== id) : [...scelti, id]);
   const gruppi = compatto ? GRUPPI_PRIMO_ACCESSO : GRUPPI_LOCALE;
-  const [aperti, setAperti] = useState<Set<string>>(
-    () => new Set(gruppi.filter((g, i) => !compatto || i < APERTI || g.tipi.some((t) => scelti.includes(t.id))).map((g) => g.id)),
-  );
+  const [aperti, setAperti] = useState<Set<string>>(() => {
+    const basso = compatto && typeof window !== "undefined" && window.innerHeight < 760;
+    return new Set(gruppi.filter((g, i) => !compatto || (i < APERTI && !basso) || g.tipi.some((t) => scelti.includes(t.id))).map((g) => g.id));
+  });
+  // Revisore 7/11 (primo accesso 8,3): sotto i 760 px di altezza il gruppo aperto copriva tutti gli altri (a 375×667
+  // sembrava un elenco di sola cucina italiana). Lì si parte con tutti i gruppi chiusi: cinque righe, un tocco per aprirne una.
+  // Il passo si apre solo nel telefono (mai disegnato dal server), quindi l'altezza si legge già alla prima resa.
   const visibile = (id: string) => on.has(id) || !citta || !SOLO_CITTA[id] || SOLO_CITTA[id] === citta;
   return (
     <div data-testid="selettore-gusti" className="flex flex-col gap-5">
