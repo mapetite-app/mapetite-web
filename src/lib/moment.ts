@@ -1,16 +1,9 @@
 // Suggerimento di ricerca adatto al momento: ora e giorno del telefono e, se c'è, il meteo.
 // Nessun costo Google: è solo una frase in più tra gli esempi.
 export type Weather = { tempC: number; rain: boolean };
+// oraRoma sta in idee.ts: il giro automatico importa idee.ts con Node, che non risolve "@/lib".
+import { oraRoma } from "@/lib/idee";
 
-/** Ora di Roma (con i minuti: 23,5 = 23:30) e giorno della settimana (0 = domenica). Home, Idee e frase del
- *  momento usano la stessa ora, anche se il telefono è su un altro fuso (revisore 7/11). */
-export function oraRoma(now: Date): { h: number; day: number } {
-  const parti = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
-  const ore = Number(parti.find((p) => p.type === "hour")?.value);
-  const min = Number(parti.find((p) => p.type === "minute")?.value);
-  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parti.find((p) => p.type === "weekday")?.value ?? "");
-  return { h: Number.isFinite(ore) ? ore + (Number.isFinite(min) ? min / 60 : 0) : now.getHours(), day: wd < 0 ? now.getDay() : wd };
-}
 
 export function momentSuggestion(now: Date, weather: Weather | null = null): string {
   const { h, day } = oraRoma(now);

@@ -236,6 +236,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     bozzaScritta.current = true;
   }, [draftJson, partenza]);
 
+  // Revisore 7/11: senza la barra dell'app niente spazio riservato in fondo (ogni passo scorreva di 64 px a vuoto).
+  useEffect(() => {
+    document.documentElement.setAttribute("data-primo-accesso", "");
+    return () => document.documentElement.removeAttribute("data-primo-accesso");
+  }, []);
+
   // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -518,7 +524,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_AMATI && (
           <div data-testid="benvenuto-amati">
-            <SelettoreGusti scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
+            <SelettoreGusti compatto citta={chosenCity} scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
           </div>
         )}
 

@@ -3,7 +3,18 @@
 // l'idea del momento (cosa), "Vicino a me, aperto adesso" (dove, subito), una tua idea o Sorprendimi.
 // Revisore del 2/11 (r4): con 4 righe il pannello copriva metà schermo; il resto sta nella fila di suggerimenti.
 // Nessun costo Google: sono frasi, la ricerca parte solo al tocco.
-import { oraRoma, type Weather } from "@/lib/moment";
+import type { Weather } from "@/lib/moment";
+
+// Niente import di valori qui: il giro automatico importa questo file direttamente con Node.
+/** Ora di Roma (con i minuti: 23,5 = 23:30) e giorno della settimana (0 = domenica). Home, Idee e frase del
+ *  momento usano la stessa ora, anche se il telefono è su un altro fuso (revisore 7/11). */
+export function oraRoma(now: Date): { h: number; day: number } {
+  const parti = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const ore = Number(parti.find((p) => p.type === "hour")?.value);
+  const min = Number(parti.find((p) => p.type === "minute")?.value);
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parti.find((p) => p.type === "weekday")?.value ?? "");
+  return { h: Number.isFinite(ore) ? ore + (Number.isFinite(min) ? min / 60 : 0) : now.getHours(), day: wd < 0 ? now.getDay() : wd };
+}
 
 const GIORNI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 

@@ -68,6 +68,12 @@ html[data-scheda-aperta] [data-app-nav] {
   display: none;
 }
 
+/* Primo accesso: la barra dell'app non c'è, quindi niente spazio riservato in fondo (revisore 7/11: ogni passo
+   scorreva di 64 px a vuoto). La barra Continua del primo accesso tiene conto da sola della zona sicura. */
+html[data-primo-accesso] {
+  --nav-height-mobile: 0px;
+}
+
 /* Su desktop la nav è in alto: nessun ingombro dal fondo, offset azzerato. */
 @media (min-width: 768px) {
   :root {
