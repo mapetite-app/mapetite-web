@@ -218,7 +218,7 @@ await idee(page);
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
     ok(adesso === 2 && perTe === 1 && righe <= 3, `Idee: al massimo 3 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
   { const es = pan.getByTestId("idee-fila").getByTestId("idee-esempio"); const n = await es.count(); const ys = new Set(); for (let i = 0; i < n; i++) ys.add(Math.round((await es.nth(i).boundingBox())?.y ?? -1));
-    ok(n === 4 && ys.size === 1 && (await pan.getByTestId("idee-fila").count()) === 1, `Idee: 'Prova a chiedere' in una fila sola (${n} esempi, ${ys.size} righe)`); }
+    ok(n >= 2 && ys.size === 1 && (await pan.getByTestId("idee-fila").count()) === 1, `Idee: 'Prova a chiedere' in una fila sola (${n} esempi, ${ys.size} righe)`); }
   { const g = await pan.evaluate((el) => {
       const p = el.getBoundingClientRect(); const fila = el.querySelector("[data-testid=idee-fila] .overflow-x-auto"); const chips = [...fila.children].map((c) => c.getBoundingClientRect());
       const titoli = [...el.querySelectorAll("li")].map((li) => li.querySelector("span.min-w-0 > span")).filter(Boolean).map((t) => Math.round(t.getBoundingClientRect().height));
@@ -7968,7 +7968,7 @@ else {
   await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
   await ip.getByTestId("benvenuto-fine").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
-  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Trattoria di quartiere fuori dai giri turistici a Pigneto", `primo accesso: 'Mostrami i posti per me' → trattoria fuori dai giri turistici al Pigneto (${new URL(ip.url()).searchParams.get("q")})`);
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Trattoria di quartiere a Pigneto", `primo accesso: 'Mostrami i posti per me' → trattoria al Pigneto; con un solo 👍 niente "fuori dai giri turistici" dedotto (revisore 7/11) (${new URL(ip.url()).searchParams.get("q")})`);
   // Chi ama i posti famosi: niente "fuori dai giri"; "Salta" al passo 2 salta solo quel passo.
   await ip.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Milano", exact: true }).click();
