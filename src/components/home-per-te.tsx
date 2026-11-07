@@ -82,7 +82,8 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto }: { mome
   const sopra = chiaviPillole(momento);
   for (const p of proposte({ gusto, recenti, citta, momento, escludi: chiaviPillole(momento) })) sopra.add(p.chiave);
   const top = classifiche(dove, momento, now, 4, sopra);
-  if (!top.length) return null; // nessuna classifica adatta all'ora: meglio niente che una fuori posto
+  // Meno di 2 classifiche adatte all'ora: la sezione con una riga sola sembrava vuota (revisore 7/11).
+  if (top.length < 2) return null;
   return (
     <section data-testid="home-classifiche" className="mt-8">
       <h2 className={`${SERIF} text-[28px] font-medium leading-none text-text`}>Le classifiche di {dove}</h2>

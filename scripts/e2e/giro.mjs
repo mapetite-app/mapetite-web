@@ -889,7 +889,8 @@ ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder")) === "Cosa
 ok(/^(Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato|Domenica) /i.test((await page.getByTestId("home-momento").textContent()) ?? "") && /^Dove /.test((await page.getByRole("heading", { level: 1 }).textContent()) ?? ""), `home: giorno e momento sopra la domanda (${await page.getByTestId("home-momento").textContent()})`);
 { const prop = page.getByTestId("home-proposta"); const n = await prop.count();
   ok(n >= 1 && n <= 3 && (await prop.first().getAttribute("href"))?.startsWith("/mappa?q=") && /✦/.test(await prop.first().innerText()), `home: 'Per te' con 1-3 proposte che aprono una ricerca e dicono perché (${n})`); }
-ok((await page.getByTestId("home-classifica").count()) >= 1 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), "home: classifiche della città (1-4, solo quelle giuste per l'ora)");
+{ const sez = await page.getByTestId("home-classifiche").count(); const righe = await page.getByTestId("home-classifica").count();
+  ok(sez === 0 ? righe === 0 : righe >= 2 && /Le classifiche di (Roma|Milano)/.test(await page.getByTestId("home-classifiche").innerText()), `home: classifiche della città solo se almeno 2 sono giuste per l'ora (${righe})`); }
 ok((await page.getByTestId("home-invito-gusto").getAttribute("href"))?.includes("onboarding"), "home: invito alla mappa del gusto per chi non l'ha fatta");
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
 ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");

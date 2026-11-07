@@ -106,7 +106,8 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
   // 1. Dall'ultima ricerca: lo stesso genere, ma le chicche (il differenziatore: non i più famosi).
   for (const r of recenti.slice(0, 3)) {
     const hit = DA_RICERCA.find((d) => d.re.test(r));
-    if (!hit || /turistic|nascost|poco conosciut|chicc/i.test(r) || usati.has(hit.tipo)) continue;
+    // Revisore 7/11: niente cocktail bar alle 8 perché l'hai cercato ieri sera. La ricerca resta tra le pillole ↻.
+    if (!hit || /turistic|nascost|poco conosciut|chicc/i.test(r) || usati.has(hit.tipo) || !PER_MOMENTO[momento].includes(hit.tipo)) continue;
     const tipo = tipoDa(hit.tipo)!;
     const dove = zonaDi(r) ?? citta;
     // Cucine dal mondo: si tiene la parola cercata ("sushi", "ramen"), non "cucina etnica".
@@ -119,8 +120,9 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
 
   // 2. Dalla mappa del gusto: i tipi che ami, quelli giusti per quest'ora prima.
   if (gusto && gusto.su.length > 0) {
-    const amati = gusto.su.map(tipoDa).filter((t): t is TipoPosto => t != null && !usati.has(t.id));
     const ordine = PER_MOMENTO[momento];
+    // Revisore 7/11: solo i tipi giusti per l'ora (prima finivano in fondo all'ordine ma passavano: rooftop all'una).
+    const amati = gusto.su.map(tipoDa).filter((t): t is TipoPosto => t != null && !usati.has(t.id) && ordine.includes(t.id));
     const scelti = [...amati].sort((a, b) => rank(ordine, a.id) - rank(ordine, b.id)).slice(0, 2);
     scelti.forEach((tipo, i) => {
       usati.add(tipo.id);
@@ -216,7 +218,7 @@ const CLASSIFICHE: Record<string, Classifica[]> = {
     { id: "cotoletta", emoji: "🍖", titolo: "Cotoletta, la classifica", sotto: "Orecchia d'elefante o alta con l'osso", q: "migliore cotoletta alla milanese a Milano", momenti: ["pranzo", "cena"] },
     { id: "pizza", emoji: "🍕", titolo: "Pizza napoletana a Milano", sotto: "Cornicione alto, impasto leggero", q: "migliore pizza napoletana a Milano", momenti: ["cena", "pranzo"], chiave: "pizza" },
     { id: "brunch", emoji: "🥐", titolo: "Brunch e caffè di specialità", sotto: "Luce, pancake, caffè filtro", q: "brunch e caffè di specialità a Milano", momenti: ["colazione", "pranzo"], chiave: "brunch" },
-    { id: "brioche", emoji: "🥐", titolo: "Brioche e cappuccino", sotto: "Pasticcerie storiche, non catene", q: "pasticceria storica per colazione a Milano", momenti: ["colazione"], chiave: "pasticceria-storica" },
+    { id: "brioche", emoji: "🥐", titolo: "Brioche e cappuccino", sotto: "Pasticcerie storiche, non catene", q: "pasticceria storica per colazione a Milano", momenti: ["colazione"], chiave: "pasticceria" }, // come l'idea dei cornetti: a Milano brioche e cornetto sono la stessa cosa
     { id: "vermouth", emoji: "🥃", titolo: "Bitter e vermouth", sotto: "L'aperitivo milanese, quello vero", q: "bar storico per aperitivo con bitter e vermouth a Milano", momenti: ["aperitivo"], chiave: "vermouth" },
     { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Milano", momenti: ["dopocena"], chiave: "musica" },
     { id: "tardi", emoji: "🌙", titolo: "Fame a tarda notte", sotto: "Cucine aperte dopo mezzanotte", q: "cucina aperta fino a tardi la notte a Milano", momenti: ["dopocena"], chiave: "tardi" },
