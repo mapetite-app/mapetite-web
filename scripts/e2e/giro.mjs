@@ -194,7 +194,9 @@ ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "
 await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
 ok((await page.getByTestId("benvenuto").count()) === 0 && await page.getByTestId("apri-idee").isVisible() && !(await page.getByTestId("idee-pannello").isVisible()), "mappa libera: niente card in basso né righe di suggerimenti, un solo pulsante 'Idee' (Lorenzo 16/10)");
 ok(await page.getByRole("button", { name: "Filtri", exact: true }).getByText("Filtri").isVisible(), "barra in alto: pulsante 'Filtri' con la scritta");
-ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder"))?.includes("Chiedi all'AI"), "barra in alto: si capisce che è la ricerca con l'AI");
+// Audit design 7/11: stesso testo breve della home ("Cosa cerchi?", non più "Chiedi all'AI…" tagliato); l'AI resta
+// nell'etichetta letta dallo screen reader e nell'icona ✨.
+ok((await page.getByLabel("Cosa cerchi?").getAttribute("placeholder")) === "Cosa cerchi?" && (await page.getByLabel("Cosa cerchi?").getAttribute("aria-label"))?.includes("Chiedi all'AI"), "barra in alto: 'Cosa cerchi?' come in home, l'AI detta allo screen reader");
 { const pr = await page.getByTestId("pannello-ricerca").boundingBox(); ok(!!pr && pr.y + pr.height < 130, `mappa libera: sopra la mappa solo barra + una riga (fino a ${Math.round((pr?.y ?? 0) + (pr?.height ?? 0))} px)`); }
 { const ib = await page.getByTestId("apri-idee").boundingBox(); ok(!!ib && ib.y < 160 && ib.x + ib.width <= 390, `'Idee' nella riga di 'Esplora / I miei salvati' (y ${Math.round(ib?.y ?? 0)})`); }
 ok((await page.getByRole("button", { name: "I miei salvati" }).count()) === 0 && (await page.getByRole("button", { name: "Esplora", exact: true }).count()) === 0, "mappa: niente 'Esplora / I miei salvati' (stanno già nella barra in basso)");
@@ -891,6 +893,20 @@ ok((await page.getByTestId("home-classifica").count()) >= 3 && /Le classifiche d
 ok((await page.getByTestId("home-invito-gusto").getAttribute("href"))?.includes("onboarding"), "home: invito alla mappa del gusto per chi non l'ha fatta");
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
 ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");
+// Audit design 7/11: lo stesso tipo di posto non torna tra idee, "Per te" e classifiche (il cocktail usciva 3 volte).
+{ const tipoDi = (t) => /cocktail|speakeasy|drink/i.test(t) ? "cocktail" : /vin[oi]|enotec|wine/i.test(t) ? "vino" : /vista|rooftop|terrazz/i.test(t) ? "vista" : /gelat/i.test(t) ? "gelato" : /brunch/i.test(t) ? "brunch" : /pizz/i.test(t) ? "pizza" : /trattori|osteri/i.test(t) ? "trattoria" : /cornett|maritozz/i.test(t) ? "cornetti" : null;
+  const testi = [...await page.getByTestId("home-suggerimenti").locator("[data-esempio]").allInnerTexts(), ...await page.getByTestId("home-proposta").allInnerTexts(), ...await page.getByTestId("home-classifica").allInnerTexts()];
+  const tipi = testi.map(tipoDi).filter(Boolean); const doppi = tipi.filter((t, i) => tipi.indexOf(t) !== i);
+  ok(doppi.length === 0, `home: ogni tipo di posto una volta sola tra idee, Per te e classifiche (${tipi.join(",")}${doppi.length ? ` · doppi: ${doppi.join(",")}` : ""})`); }
+// Audit design 7/11: card "Per te" basse, non più un riquadro alto con la sola emoji.
+{ const h = await page.getByTestId("home-proposta").first().boundingBox(); ok(!!h && h.height <= 110, `home: card 'Per te' compatte (${Math.round(h?.height ?? 0)} px)`); }
+// Audit design 7/11: sulla home la barra in basso ha una voce accesa ("Mappa").
+ok((await page.getByTestId("barra").locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",") === "Mappa", "barra in basso: sulla home è accesa 'Mappa'");
+// Audit design 7/11: il testo del campo non si taglia neanche a 360 px.
+{ await page.setViewportSize({ width: 360, height: 780 });
+  const fit = await page.getByLabel("Cosa cerchi?").evaluate((el) => { const cs = getComputedStyle(el); const c = document.createElement("canvas").getContext("2d"); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; return { testo: c.measureText(el.placeholder).width, spazio: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; });
+  await page.setViewportSize({ width: 390, height: 844 });
+  ok(fit.testo <= fit.spazio, `home 360 px: 'Cosa cerchi?' sta intero nel campo (${Math.round(fit.testo)} su ${Math.round(fit.spazio)} px)`); }
 // 17/10: marchio vero (SVG) al posto dell'emoji e schermata d'avvio per l'iPhone.
 ok(await page.getByRole("img", { name: "Mapetite" }).first().isVisible(), "home: il marchio Mapetite (non più l'emoji)");
 {
@@ -5098,7 +5114,11 @@ else {
 // 14. Assistente (/assistente, piano 1.1) e prenotazione assistita (1.3). Ricerca e verdetti simulati:
 //     nessuna chiamata Google/Haiku. I seguiti "più economici", "per 4"… non devono rifare la ricerca.
 // Idee (designer e revisore 7/11): di notte stesso giorno e stessa soglia della home (ora di Roma, "notte" dalle 23:30).
-{ const id = await import(new URL("../../src/lib/idee.ts", import.meta.url).href);
+// idee.ts importa "@/lib/moment", che Node non risolve: se ne importa una copia con il percorso vero.
+{ const { writeFileSync, mkdtempSync } = await import("fs"); const { tmpdir } = await import("os");
+  const src = readFileSync(new URL("../../src/lib/idee.ts", import.meta.url), "utf8").replace(/from "@\/lib\/([\w-]+)"/g, (_, m) => `from "${new URL(`../../src/lib/${m}.ts`, import.meta.url).href}"`);
+  const tmp = `${mkdtempSync(`${tmpdir()}/giro-idee-`)}/idee.ts`; writeFileSync(tmp, src);
+  const id = await import(`file://${tmp}`);
   const a = id.contestoIdee(new Date("2026-11-07T00:10:00Z"), null), b = id.contestoIdee(new Date("2026-11-06T22:40:00Z"), null), c = id.contestoIdee(new Date("2026-11-06T22:20:00Z"), null);
   ok(a === "Venerdì notte" && b === "Venerdì notte" && c === "Venerdì sera", `idee: all'1:10 di sabato "Venerdì notte", alle 23:40 "notte", alle 23:20 "sera" (${a} / ${b} / ${c})`); }
 {
@@ -6883,10 +6903,10 @@ else {
       const acc = bp.getByTestId("profilo-account");
       ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
-      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
+      for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", "Mappa"]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const accese = (await nav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim());
-        // Home (giro 1/11, D5): nessuna voce accesa, "Mappa" solo sulla mappa.
+        // Home (audit design 7/11): accesa "Mappa", l'inizio dell'esplorazione (prima, D5 del 1/11: nessuna).
         ok(voce === null ? accese.length === 0 : accese.length === 1 && accese[0] === voce, `barra: su ${path} ${voce ? `è accesa '${voce}'` : "nessuna voce accesa"} (${accese.join(",")})`);
       }
     }
