@@ -440,7 +440,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       </div>
 
       {/* Contenuto */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-48 pt-3">
+      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-32 pt-3">
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}

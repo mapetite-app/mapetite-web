@@ -7,13 +7,14 @@ import { GRUPPI_LOCALE } from "@/lib/tipi-locale";
 // "Cosa ti piace?" (Lorenzo, 5/11): tutti i tipi di locale a gruppi, chip a scelta multipla come i filtri del
 // vecchio MVP, con la grafica di adesso. Lo stesso componente nel primo accesso e in "I miei gusti" del profilo.
 // Il contatore e il tasto per andare avanti li mette chi lo usa (barra fissa in basso).
-// Revisore 7/11: 54 chip in una pagina lunga erano troppe. Aperti solo i primi due gruppi; gli altri sono una
+// Revisore 7/11: 54 chip in una pagina lunga erano troppe. Aperto solo il primo gruppo; gli altri sono una
 // riga che si apre al tocco (aperti da subito se hanno già una scelta). Solo nel primo accesso (`compatto`):
 // in "I miei gusti" del profilo si vede tutto. La cucina dell'altra città non si mostra.
 
 // Cucine legate a una città: a chi esce a Roma non si propone "Cucina milanese" (e viceversa).
 const SOLO_CITTA: Record<string, string> = { romana: "Roma", milanese: "Milano" };
-const APERTI = 2;
+// Revisore 7/11 (8,4): con 2 gruppi aperti le righe chiuse finivano sotto la piega; con 1 si vedono subito.
+const APERTI = 1;
 
 export default function SelettoreGusti({ scelti, onChange, citta = null, compatto = false }: { scelti: string[]; onChange: (ids: string[]) => void; citta?: string | null; compatto?: boolean }) {
   const on = new Set(scelti);

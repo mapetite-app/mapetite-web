@@ -22,7 +22,8 @@ export function momentSuggestion(now: Date, weather: Weather | null = null): str
   }
   if (t != null && t <= 10 && h >= 18) return "🍲 Trattoria calda e accogliente per stasera";
   if (h >= 6 && h < 11) return weekend ? "☕ Brunch buono per stamattina" : "☕ Colazione con cornetti buoni qui vicino";
-  if (h >= 11 && h < 15) return weekend ? "🍝 Pranzo della domenica in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
+  if (h >= 11 && h < 15) // Revisore 7/11: di sabato il pannello diceva "Sabato a pranzo" e sotto "Pranzo della domenica".
+    return day === 0 ? "🍝 Pranzo della domenica in trattoria" : day === 6 ? "🍝 Pranzo del sabato in trattoria" : "🍝 Pranzo buono e non turistico qui vicino";
   if (h >= 15 && h < 18) return "🍦 Gelato artigianale qui vicino";
   if (h >= 18 && h < 21) return day === 5 || day === 6 ? "🍸 Cocktail bar per iniziare la serata" : "🍹 Aperitivo con vista stasera";
   if (h >= 21) return "🍷 Wine bar per il dopocena qui vicino";

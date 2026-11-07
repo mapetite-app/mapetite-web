@@ -7790,9 +7790,9 @@ else {
     const gruppi = (await am.getByTestId("gusti-gruppo").locator("h2").allTextContents()).map((t) => t.trim());
     const chips0 = await am.getByTestId("gusto-chip").count();
     const chiusi = await am.getByTestId("gusti-gruppo-apri").count();
-    ok(chips0 <= 30 && chiusi === 4 && (await am.locator('[data-id="milanese"]').count()) === 0 && (await am.locator('[data-id="romana"]').count()) === 1, `primo accesso: 'Cosa ti piace?' apre solo 2 gruppi (${chips0} chip, ${chiusi} gruppi chiusi) e a chi esce a Roma non propone la cucina milanese`);
+    ok(chips0 <= 16 && chiusi === 5 && (await am.locator('[data-id="milanese"]').count()) === 0 && (await am.locator('[data-id="romana"]').count()) === 1, `primo accesso: 'Cosa ti piace?' apre solo il primo gruppo (${chips0} chip, ${chiusi} gruppi chiusi) e a chi esce a Roma non propone la cucina milanese`);
     await am.getByTestId("gusti-gruppo-apri").first().click();
-    ok((await am.getByTestId("gusti-gruppo-apri").count()) === 3, "primo accesso: un gruppo chiuso si apre al tocco");
+    ok((await am.getByTestId("gusti-gruppo-apri").count()) === 4, "primo accesso: un gruppo chiuso si apre al tocco");
     while (await am.getByTestId("gusti-gruppo-apri").count()) await am.getByTestId("gusti-gruppo-apri").first().click();
     const chips = await am.getByTestId("gusto-chip").count();
     ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Diete", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 6 gruppi (${gruppi.join(" | ")})`);

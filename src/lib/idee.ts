@@ -51,7 +51,7 @@ export function percheMomento(now: Date, weather: Weather | null): string {
   // Stesse eccezioni di momentSuggestion: col freddo di sera la trattoria calda, col caldo l'aperitivo fino alle 22.
   if (weather && Math.round(weather.tempC) <= 10 && h >= 18) return "Per scaldarsi";
   if (weather && Math.round(weather.tempC) >= 20 && h >= 18 && h < 22) return "Per l'aperitivo";
-  if (h >= 6 && h < 11) return "Per iniziare la giornata";
+  if (h >= 5 && h < 11) return "Per iniziare la giornata"; // dalle 5, come "mattina" nel titolo
   if (h >= 11 && h < 15) return "Per la pausa pranzo";
   if (h >= 15 && h < 18) return "Per una pausa golosa";
   if (h >= 18 && h < 21) return "Per l'aperitivo";
