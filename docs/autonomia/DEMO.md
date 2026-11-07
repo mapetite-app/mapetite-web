@@ -1,6 +1,19 @@
 # Demo di Mapetite in 5 minuti (telefono in mano, per investitori)
 
-## Copione di 3 minuti (sprint, 26/10) — quello da usare dal vivo
+## Copione di 3 minuti (7/11) — quello da usare dal vivo
+Aggiornato con le funzioni dal 1/11 al 7/11. I testi tra virgolette sono quelli dei tasti, controllati nel codice il 7/11. **Da provare dal vivo domenica 8/11** (voce 7b): finché non c'è scritto "provato", vale come bozza.
+**Prima (2 minuti):** in `/admin/numeri` "AI: ok" e "Google oggi" sotto 40; posizione già permessa; negli appunti il link di un TikTok di un ristorante; account nuovo per il primo accesso, account demo (Sofia) per Salvati.
+
+1. **0:00 — Primo accesso (40 s).** Account nuovo: "Roma" → "Continua" → "Cosa ti piace?": tocca Trattoria, Pizzeria, Cocktail bar → "Continua" → "Le chicche" → salta diete e occasioni → spesa "€€" → **"Ecco cosa ho capito di te"**. Tocca una parola sottolineata per far vedere che si corregge. Dì: "Sette domande, trenta secondi. Nessun questionario." Tocca **"Apri la mia mappa"**.
+2. **0:40 — I posti per te (30 s).** La mappa si apre già con una ricerca sui tuoi gusti. Card con **"Il verdetto Mapetite"** e il perché per te. Dì: "Non i più famosi: quelli giusti per te. E il verdetto non lo inventa: viene dalle recensioni vere."
+3. **1:10 — Ricerca che rispetta i vincoli (40 s).** Barra in alto: "trattoria autentica non turistica a Trastevere". Mostra la riga **"Ho messo da parte N locali molto famosi"**: "Google qui metterebbe primi i posti con diecimila recensioni. Noi li mettiamo da parte, e lo diciamo." Se c'è tempo: "cena romantica massimo 50 euro a testa" → i posti sopra budget vanno in fondo, con la nota.
+4. **1:50 — La scheda (25 s).** Tocca una card: foto, verdetto in alto. Scorri: in alto resta la testata con il nome e **"‹ 1 di N ›"**, si passa al posto dopo senza tornare alla lista. Tocca **"Salva"**.
+5. **2:15 — Raccogli in un gesto (25 s).** Salvati → **+** (in alto) → incolla il link del TikTok: il locale compare con la foto, "✓ Salvato". Dì: "Il reel non si perde più. E le liste di Google Maps entrano tutte insieme con 'Porta le tue liste'."
+6. **2:40 — Ritrova (20 s).** Account Sofia, **Salvati**: città in alto, cerca "romantico", ordine **"Da più tempo"** ("i posti che aspettano da mesi"), poi **"Chiedi ai tuoi posti"**. Chiudi: "Raccogli, ritrova, scegli. Tutto in un'app."
+
+**Se qualcosa va storto:** quota Google finita → cerca tra i salvati; AI ferma → i risultati Google restano, i posti già visti hanno il verdetto. Mai indirizzi con `?beta=` ("Ti porterei qui" è ancora in prova).
+
+## Copione di 3 minuti (sprint, 26/10) — superato dal 7/11, tenuto come storia
 Le 4 chiavi di volta in fila: primo accesso, salva dal reel, ricerca con l'AI, scheda. Il copione lungo (5 minuti, 18/10) resta sotto per le domande.
 **Prima (2 minuti):** credito Anthropic attivo (in `/admin/numeri` deve esserci "AI: ok"; senza, la ricerca funziona ma i verdetti dei posti nuovi non arrivano); link di un TikTok di un ristorante negli appunti; posizione già permessa.
 
