@@ -155,7 +155,8 @@ function Chip({
       className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
     >
       {/* Designer 7/11: la spunta prende il posto dell'emoji, così la chip non si allarga e la riga non si riordina. */}
-      {(item.emoji || selected) && <span aria-hidden className="flex w-5 justify-center">{selected ? <Check size={16} strokeWidth={3} /> : item.emoji}</span>}
+      {/* Revisore 7/11: senza emoji (le zone) niente spunta: bastano il pieno teal e il testo bianco. */}
+      {item.emoji && <span aria-hidden className="flex w-5 justify-center">{selected ? <Check size={16} strokeWidth={3} /> : item.emoji}</span>}
       <span>{item.label}</span>
     </button>
   );
