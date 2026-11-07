@@ -3261,7 +3261,7 @@ export default function MapView({
             <IdeaChips
               title="Prova a chiedere"
               action={recentiIdee.length > 0 ? (
-                <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-8 px-2 text-xs font-sans text-text-muted active:scale-95">
+                <button type="button" data-testid="cancella-recenti" onClick={clearRecentSearches} aria-label="Cancella le ricerche recenti" className="min-h-11 px-2 text-xs font-sans text-text-muted active:scale-95">
                   Cancella recenti
                 </button>
               ) : undefined}

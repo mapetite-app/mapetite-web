@@ -23,7 +23,7 @@ export function momentoDi(now: Date): { momento: Momento; etichetta: string; dom
   const weekend = giorno === "Sabato" || giorno === "Domenica";
   if (t >= 5 && t < 11) return { momento: "colazione", etichetta: `${giorno} mattina`, domanda: "Dove facciamo colazione", weekend };
   if (t >= 11 && t < 15) return { momento: "pranzo", etichetta: `${giorno} a pranzo`, domanda: "Dove mangiamo oggi", weekend };
-  if (t >= 15 && t < 18) return { momento: "pomeriggio", etichetta: `${giorno} pomeriggio`, domanda: "Dove andiamo stasera", weekend };
+  if (t >= 15 && t < 18) return { momento: "pomeriggio", etichetta: `${giorno} pomeriggio`, domanda: "Dove andiamo oggi", weekend }; // revisore 7/11: alle 16 merenda e stasera insieme
   if (t >= 18 && t < 20.5) return { momento: "aperitivo", etichetta: `${giorno} sera`, domanda: "Dove facciamo l'aperitivo", weekend };
   if (t >= 20.5 && t < 23.5) return { momento: "cena", etichetta: `${giorno} sera`, domanda: "Dove andiamo stasera", weekend };
   return { momento: "dopocena", etichetta: `${giorno} notte`, domanda: "Dove andiamo a bere", weekend };
@@ -51,6 +51,17 @@ export const PILLOLE: Record<Momento, { label: string; chiave: string }[]> = {
   dopocena: [{ label: "Cocktail d'autore", chiave: "speakeasy" }, { label: "Wine bar fino a tardi", chiave: "enoteca" }, { label: "Gelato artigianale", chiave: "gelato" }, { label: "Fame a tarda notte", chiave: "tardi" }],
 };
 
+// Revisore 7/11 (terzo, home 7,8): sabato e domenica la home era uguale al martedì ("Pranzo veloce" di sabato,
+// mentre il pannello Idee diceva "Pranzo del sabato in trattoria"). Nel weekend niente pranzo veloce o di lavoro;
+// a colazione il brunch viene prima, a pranzo c'è il brunch e il pranzo fuori porta.
+const VIA_WEEKEND = new Set(["veloce", "lavoro"]);
+function pilloleDelGiorno(momento: Momento, weekend: boolean): { label: string; chiave: string }[] {
+  if (!weekend) return PILLOLE[momento];
+  if (momento === "colazione") return [{ label: "Brunch con calma", chiave: "brunch" }, ...PILLOLE.colazione.filter((p) => p.chiave !== "brunch")];
+  if (momento === "pranzo") return [{ label: "Trattoria per pranzo", chiave: "trattoria" }, { label: "Brunch del weekend", chiave: "brunch" }, { label: "Pranzo fuori porta", chiave: "fuoriporta" }, { label: "Cucina dal mondo", chiave: "mondo" }];
+  return PILLOLE[momento];
+}
+
 /** Tipo di posto di una ricerca scritta ("trattoria a Monti" → "trattoria"), o null. */
 export function tipoRicerca(q: string): string | null {
   return DA_RICERCA.find((d) => d.re.test(q))?.tipo ?? null;
@@ -68,14 +79,14 @@ function tipiDalGusto(gusto: MappaGusto | null | undefined, momento: Momento): s
  * recente (↻ "trattoria a Monti" accanto a "Trattoria per pranzo") né di un tipo che ami: quello va in "Per te"
  * con il tuo perché, che vale più dell'idea generica.
  */
-export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = []): { label: string; chiave: string }[] {
+export function pillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = [], weekend = false): { label: string; chiave: string }[] {
   const via = new Set<string>([...tipiDalGusto(gusto, momento), ...recenti.slice(0, 3).map(tipoRicerca).filter((t): t is string => !!t)]);
-  return PILLOLE[momento].filter((p) => !via.has(p.chiave)).slice(0, 3);
+  return pilloleDelGiorno(momento, weekend).filter((p) => !via.has(p.chiave)).slice(0, 3);
 }
 
 /** Tipi di posto già occupati dalle idee sotto il campo: "Per te" e le classifiche non li ripetono. */
-export function chiaviPillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = []): Set<string> {
-  return new Set(pillole(momento, gusto, recenti).map((p) => p.chiave));
+export function chiaviPillole(momento: Momento, gusto?: MappaGusto | null, recenti: string[] = [], weekend = false): Set<string> {
+  return new Set(pillole(momento, gusto, recenti, weekend).map((p) => p.chiave));
 }
 
 // Tipi adatti a ogni momento (in ordine): il pomeriggio si pensa già alla sera.
@@ -124,7 +135,7 @@ function zonaDi(q: string): string | null {
  * Proposte "Per te": dalle ricerche fatte su questo telefono e dalla mappa del gusto, adatte all'ora.
  * Mai più di 3; ogni proposta dice perché è lì (la ricerca o il gusto da cui nasce).
  */
-export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; citta: string; momento: Momento; escludi?: Set<string> }): Proposta[] {
+export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; citta: string; momento: Momento; escludi?: Set<string>; weekend?: boolean }): Proposta[] {
   const { gusto, recenti, citta, momento } = input;
   const out: Proposta[] = [];
   const add = (p: Proposta) => { if (!out.some((x) => x.q.toLowerCase() === p.q.toLowerCase())) out.push(p); };
@@ -175,7 +186,7 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     for (const id of IDEE[momento]) {
       if (out.length >= 2) break;
       const chiave = id.chiave ?? id.tipo;
-      if (usati.has(chiave)) continue;
+      if (usati.has(chiave) || (input.weekend && VIA_WEEKEND.has(chiave))) continue;
       usati.add(chiave);
       const tipo = tipoDa(id.tipo)!;
       add({ emoji: id.emoji ?? tipo.emoji, titolo: id.titolo, // revisore 7/11: "Roma" andava a capo da sola; la città sta già nel titolo delle classifiche
@@ -212,7 +223,7 @@ const IDEE: Record<Momento, Idea[]> = {
   aperitivo: [
     { tipo: "rooftop", titolo: "Aperitivo con vista", perche: "Il tramonto sopra i tetti", q: "aperitivo con vista" },
     { tipo: "enoteca", titolo: "Vino e taglieri", perche: "Bancone piccolo, l'oste consiglia", q: "enoteca vini naturali con taglieri" },
-    { tipo: "trattoria", chiave: "fritti", emoji: "🧆", titolo: "Fritti e taglieri", perche: "Supplì, olive ascolane, un calice", q: "aperitivo con fritti e taglieri di quartiere non turistico" },
+    { tipo: "trattoria", chiave: "fritti", emoji: "🧆", titolo: "Fritti e taglieri", perche: "Fritti, salumi e un calice", q: "aperitivo con fritti e taglieri di quartiere non turistico" },
     { tipo: "mondo", chiave: "birra", emoji: "🍺", titolo: "Birra artigianale", perche: "Spine che cambiano spesso", q: "birreria artigianale con birre alla spina" },
     { tipo: "enoteca", chiave: "bollicine", emoji: "🥂", titolo: "Bollicine e crudi", perche: "Un calice e qualcosa di fresco", q: "aperitivo con bollicine e crudi" },
   ],
