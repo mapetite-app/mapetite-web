@@ -7968,7 +7968,7 @@ else {
   await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
   await ip.getByTestId("benvenuto-fine").click();
   await ip.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
-  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Trattoria di quartiere a Pigneto", `primo accesso: 'Mostrami i posti per me' → trattoria al Pigneto; con un solo 👍 niente "fuori dai giri turistici" dedotto (revisore 7/11) (${new URL(ip.url()).searchParams.get("q")})`);
+  ok(new URL(ip.url()).pathname === "/mappa" && new URL(ip.url()).searchParams.get("q") === "Trattoria di quartiere al Pigneto", `primo accesso: 'Mostrami i posti per me' → trattoria al Pigneto; con un solo 👍 niente "fuori dai giri turistici" dedotto (revisore 7/11) (${new URL(ip.url()).searchParams.get("q")})`);
   // Chi ama i posti famosi: niente "fuori dai giri"; "Salta" al passo 2 salta solo quel passo.
   await ip.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await ip.getByRole("button", { name: "Milano", exact: true }).click();

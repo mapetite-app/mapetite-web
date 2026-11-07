@@ -212,7 +212,7 @@ const IDEE: Record<Momento, Idea[]> = {
   aperitivo: [
     { tipo: "rooftop", titolo: "Aperitivo con vista", perche: "Il tramonto sopra i tetti", q: "aperitivo con vista" },
     { tipo: "enoteca", titolo: "Vino e taglieri", perche: "Bancone piccolo, l'oste consiglia", q: "enoteca vini naturali con taglieri" },
-    { tipo: "trattoria", chiave: "fritti", emoji: "🧆", titolo: "Fritti e taglieri", perche: "Aperitivo di quartiere, prezzi onesti", q: "aperitivo con fritti e taglieri di quartiere non turistico" },
+    { tipo: "trattoria", chiave: "fritti", emoji: "🧆", titolo: "Fritti e taglieri", perche: "Supplì, olive ascolane, un calice", q: "aperitivo con fritti e taglieri di quartiere non turistico" },
     { tipo: "mondo", chiave: "birra", emoji: "🍺", titolo: "Birra artigianale", perche: "Spine che cambiano spesso", q: "birreria artigianale con birre alla spina" },
     { tipo: "enoteca", chiave: "bollicine", emoji: "🥂", titolo: "Bollicine e crudi", perche: "Un calice e qualcosa di fresco", q: "aperitivo con bollicine e crudi" },
   ],

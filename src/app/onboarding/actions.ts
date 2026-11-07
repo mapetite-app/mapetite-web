@@ -122,6 +122,9 @@ export async function completeOnboarding({
 }
 
 // Dopo l'ultima schermata.
+// Revisore 7/11: chi tocca prima "Ristorante" non deve partire da "Ristorante a Roma" se ha scelto anche le pizzerie.
+const GENERICI = new Set(["ristorante", "fast-food"]);
+
 function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, dest: OnboardingData["dest"], back: string | null, mappa: MappaGusto): never {
   // "Importa i tuoi salvati da Google Maps": /importa si apre con "Incolla più link" in cima.
   if (dest === "importa") redirect("/importa?da=benvenuto");
@@ -133,7 +136,7 @@ function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, des
   // (1 ricerca Google, una volta per utente, come se la scrivesse lui), nella sua città.
   // Con la mappa del gusto: "5 posti per te" sul tipo di posto piaciuto, nella zona, "non turistico"
   // per chi ama le chicche. Senza: la ricerca sui gusti di sempre.
-  const perTe = queryPerTe(mappa, citta, mappa.amati.map((id) => tipoLocale(id)?.query).find((x): x is string => !!x) ?? null);
+  const perTe = queryPerTe(mappa, citta, [...mappa.amati].sort((a, b) => Number(GENERICI.has(a)) - Number(GENERICI.has(b))).map((id) => tipoLocale(id)?.query).find((x): x is string => !!x) ?? null);
   const q = tasteQuery(gusti);
   const full = perTe ?? (q && citta ? `${q} a ${citta}` : q);
   redirect(full ? `/mappa?q=${encodeURIComponent(full)}` : "/mappa");
