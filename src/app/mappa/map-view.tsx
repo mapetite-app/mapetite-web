@@ -908,7 +908,7 @@ function IdeaChips({ title, action, children }: { title: string; action?: React.
   );
 }
 
-const CHIP = "flex min-h-10 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
+const CHIP = "flex min-h-11 max-w-[13rem] shrink-0 items-center rounded-pill border border-border bg-white px-3 text-[13.5px] font-sans text-text active:scale-95";
 
 function IdeaChip({ text, label, onClick, testId }: { text: string; label?: string; onClick: () => void; testId?: string }) {
   return (
@@ -3047,7 +3047,7 @@ export default function MapView({
                   onChange={(e) => setAiQuery(e.target.value)}
                   onFocus={() => { setIdeasOpen(true); setBarFocus(true); }}
                   onBlur={() => setBarFocus(false)}
-                  placeholder="Chiedi all'AI…"
+                  placeholder="Cosa cerchi?"
                   aria-label="Chiedi all'AI: cosa cerchi?"
                   // Frase più lunga del campo: "cena romantica a Trastevere" finiva in "a Traste" senza segno
                   // (giro del 1/11, D19). Ora i puntini dicono che continua; toccando il campo si legge tutta.
@@ -3186,7 +3186,7 @@ export default function MapView({
               data-testid="apri-idee"
               aria-expanded={ideasShown}
               onClick={() => setIdeasOpen((o) => !o)}
-              className={`pointer-events-auto flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${ideasShown ? "bg-brand text-white" : "bg-surface text-brand"}`}
+              className={`pointer-events-auto flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill px-3.5 text-sm font-display font-semibold shadow-float active:scale-95 ${ideasShown ? "bg-brand text-white" : "bg-surface text-brand"}`}
             >
               {ideasShown ? <X size={16} aria-hidden /> : <Lightbulb size={16} className="text-accent" aria-hidden />}
               Idee

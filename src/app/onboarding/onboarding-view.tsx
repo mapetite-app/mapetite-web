@@ -152,11 +152,12 @@ function Chip({
       aria-pressed={selected}
       onClick={() => onToggle(item.value)}
       // Revisore 5/11: stesso aspetto delle chip di "Cosa ti piace?" (teal pieno con la spunta), un passo prima.
-      className={`inline-flex min-h-12 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border-2 px-4 py-1.5 font-display text-[15px] font-semibold transition-colors ${selected ? "border-brand bg-brand text-white" : `${SCELTA_OFF} text-brand`}`}
     >
-      {item.emoji && <span aria-hidden>{item.emoji}</span>}
+      {/* Designer 7/11: la spunta prende il posto dell'emoji, così la chip non si allarga e la riga non si riordina. */}
+      {/* Revisore 7/11: senza emoji (le zone) niente spunta: bastano il pieno teal e il testo bianco. */}
+      {item.emoji && <span aria-hidden className="flex w-5 justify-center">{selected ? <Check size={16} strokeWidth={3} /> : item.emoji}</span>}
       <span>{item.label}</span>
-      {selected && <Check size={16} strokeWidth={3} aria-hidden />}
     </button>
   );
 }
@@ -234,6 +235,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     saveDraft(d);
     bozzaScritta.current = true;
   }, [draftJson, partenza]);
+
+  // Revisore 7/11: senza la barra dell'app niente spazio riservato in fondo (ogni passo scorreva di 64 px a vuoto).
+  useEffect(() => {
+    document.documentElement.setAttribute("data-primo-accesso", "");
+    return () => document.documentElement.removeAttribute("data-primo-accesso");
+  }, []);
 
   // Ogni schermata parte dall'alto (prima restava lo scorrimento della precedente: titolo tagliato).
   useEffect(() => {
@@ -433,7 +440,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       </div>
 
       {/* Contenuto */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-48 pt-3">
+      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-32 pt-3">
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
@@ -517,7 +524,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_AMATI && (
           <div data-testid="benvenuto-amati">
-            <SelettoreGusti scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
+            <SelettoreGusti compatto citta={chosenCity} scelti={amati} onChange={(v) => { setAmati(v); setAmatiToccati(true); }} />
           </div>
         )}
 
@@ -578,18 +585,19 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 </div>
                 </div>
                 {/* Tasti tondi grandi (mockup A): 👎 bianco, 👍 corallo, "Non lo conosco" in mezzo. */}
-                <div className="mt-8 flex items-center justify-between px-3 [@media(max-height:760px)]:mt-6">
-                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
+                {/* Revisore 7/11: a 360 px "Non lo conosco" toccava i tasti tondi: spazio fisso e tasti da 64 px sotto 380 px. */}
+                <div className="mt-8 flex items-center justify-between gap-3 px-3 max-[380px]:px-1 [@media(max-height:760px)]:mt-6">
+                  <button type="button" data-testid="tipo-giu" aria-label={`No, ${corrente.titolo}`} onClick={() => vota(corrente.id, "giu")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full border border-border bg-white text-[2rem] shadow-card active:scale-95">
                     <span aria-hidden>👎</span>
                   </button>
-                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 max-w-[7rem] px-2 text-center text-[15px] font-sans leading-snug text-text-muted">
+                  <button type="button" data-testid="tipo-boh" onClick={() => vota(corrente.id, "boh")} className="min-h-11 whitespace-nowrap rounded-pill border border-border bg-white px-4 text-center text-[14px] font-display font-semibold text-text-muted active:scale-95">
                     Non lo conosco
                   </button>
-                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
+                  <button type="button" data-testid="tipo-su" aria-label={`Sì, ${corrente.titolo}`} onClick={() => vota(corrente.id, "su")} className="flex h-[4.5rem] w-[4.5rem] shrink-0 max-[380px]:h-16 max-[380px]:w-16 items-center justify-center rounded-full bg-accent text-[2rem] shadow-[0_10px_28px_rgba(255,107,74,0.45)] active:scale-95">
                     <span aria-hidden>👍</span>
                   </button>
                 </div>
-                <p aria-hidden className="mt-2 text-center text-xs font-sans text-text-muted [@media(max-height:760px)]:hidden">← trascina la card, oppure tocca →</p>
+                {/* Designer 7/11: tolta la riga "← trascina la card, oppure tocca →" (testo in più: i tasti si spiegano da soli). */}
                 <p className="sr-only" aria-live="polite" data-testid="tipi-esito">{esito} {riaperta ? "Cambia la risposta" : `${visti.length + 1} di ${TIPI.length}`}: {corrente.titolo}.</p>
               </>
             ) : (

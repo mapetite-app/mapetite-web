@@ -154,7 +154,7 @@ export function capito(m: Omit<MappaGusto, "amati">, extra: { citta: string | nu
     : extra.citta ? `a ${extra.citta.trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}` : null;
   if (dove) out.push({ chiave: "zone", emoji: "📍", testo: `Esci soprattutto ${dove}` });
   const su = m.su.map(tipoDa).filter((t): t is TipoPosto => t != null);
-  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `${su.length === 1 ? "Ti piace" : "Ti piacciono"}: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
+  if (su.length) out.push({ chiave: "su", emoji: "❤️", testo: `Ti piace: ${su.slice(0, 3).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(su.length, 3, TIPO_POSTO)}` });
   const giu = m.giu.map(tipoDa).filter((t): t is TipoPosto => t != null);
   if (giu.length) out.push({ chiave: "giu", emoji: "🙅", testo: `Meno: ${giu.slice(0, 2).map((t) => t.titolo.toLowerCase()).join(" · ")}${altri(giu.length, 2, TIPO_POSTO)}` });
   // Solo la scelta fatta davvero (niente dedotto dai 👍).
@@ -201,7 +201,8 @@ const maiuscola = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Elenco evidenziato "A, B e altri 2": nessuna scelta sparisce senza dirlo (collaudo del 23/10).
 function evidenziati(xs: PezzoFrase[], max: number, cosa: [string, string] = ["un altro", "altri"]): PezzoFrase[] {
-  const vis = xs.slice(0, max);
+  // Designer 7/11: "e un altro gusto" era vago. Se ne resta uno solo, si scrive quello (costa una parola sola).
+  const vis = xs.slice(0, xs.length === max + 1 ? max + 1 : max);
   const resto = xs.length - vis.length;
   const out: PezzoFrase[] = [];
   vis.forEach((x, i) => {
@@ -229,7 +230,8 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (su.length) frasi.push([{ t: "Ami " }, ...evidenziati(su.map((id) => ({ t: PLURALE[id], k: "su", id })), 3, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "su");
   // "Cosa ti piace?" (catalogo ampio, 5/11): le etichette arrivano già leggibili ("pizzeria", "sushi").
   const amati = extra.amati ?? [];
-  if (amati.length) frasi.push([{ t: su.length ? "Ti piacciono anche " : "Ti piacciono " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
+  // Revisore 7/11: "Ti piacciono trattoria, ristorante…" era sgrammaticato (etichette al singolare).
+  if (amati.length) frasi.push([{ t: su.length ? "Ti piace anche: " : "Ti piace: " }, ...evidenziati(amati.map((t) => ({ t, k: "amati" })), 3, ["un altro gusto", "altri N gusti"]), { t: "." }], "amati");
   // Dove, quanto spendi, chicche o famosi: una frase sola, come nel mockup ("Esci a Monti e al Pigneto, spendi il giusto e…").
   // Solo la scelta fatta davvero: niente "chicche" dedotte dai 👍 (collaudo del 23/10).
   const parti: PezzoFrase[][] = [];
@@ -262,7 +264,7 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
   const eviti = extra.diete.map((id) => EVITA[id]).filter(Boolean);
   const d: PezzoFrase[] = [];
-  if (mangi) d.push({ t: "Sei " }, { t: mangi, k: "diete" });
+  if (mangi) d.push({ t: "Mangi " }, { t: mangi, k: "diete" }); // revisore 7/11: "Sei vegetariano" dava per scontato il maschile
   if (eviti.length) d.push({ t: mangi ? " ed eviti " : "Eviti " }, { t: elenco(eviti), k: "diete" });
   if (d.length) frasi.push([...d, { t: "." }], "diete");
   const scelte = new Set([...tutte.keys()].sort((x, y) => PRIORITA[tutte[x].p] - PRIORITA[tutte[y].p] || x - y).slice(0, max));

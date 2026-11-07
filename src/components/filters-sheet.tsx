@@ -208,7 +208,7 @@ export default function FiltersSheet({
         </div>
 
         {/* Header */}
-        <div className="flex items-start justify-between px-5 pb-3 pt-1">
+        <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-1">
           <div>
             <span className="font-display text-lg font-semibold text-text">Filtri</span>
             <p className="text-xs font-sans text-text-muted">Tipo, cucina, occasione, zona e orario: senza scrivere niente.</p>
@@ -216,7 +216,10 @@ export default function FiltersSheet({
           <button
             type="button"
             onClick={() => setLocal(EMPTY_FILTERS)}
-            className="min-h-10 font-display text-sm font-semibold text-accent disabled:opacity-40"
+            // Audit design 7/11: corallo su grigio (e spento al 40%) quasi non si leggeva. Ora pillola bianca,
+            // teal da acceso (contrasto oltre 10:1), grigio da spento (4,8:1), alta 44 px come un tocco comodo.
+            data-testid="filtri-azzera"
+            className="flex min-h-11 shrink-0 items-center rounded-pill border border-brand bg-white px-4 font-display text-sm font-semibold text-brand active:scale-95 disabled:border-border disabled:text-text-muted"
             disabled={active === 0}
           >
             Azzera
