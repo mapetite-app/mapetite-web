@@ -153,13 +153,13 @@ type Idea = { tipo: string; chiave?: string; emoji?: string; titolo: string; per
 const IDEE: Record<Momento, Idea[]> = {
   colazione: [
     { tipo: "brunch", chiave: "pasticceria", titolo: "Colazione fatta bene", perche: "Cornetti veri, caffè di specialità", q: "colazione con cornetti artigianali e caffè di specialità" },
-    { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pizza bianca e lievitati fatti lì", q: "forno artigianale di quartiere" },
+    { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pane, focacce e lievitati fatti lì", q: "forno artigianale di quartiere" },
   ],
   pranzo: [
     { tipo: "mondo", chiave: "veloce", titolo: "Pranzo veloce e buono", perche: "Pochi minuti, niente catene", q: "pranzo veloce buono non catena" },
     { tipo: "trattoria", titolo: "Trattoria per pranzo", perche: "Piatto del giorno, prezzi onesti", q: "trattoria di quartiere per pranzo" },
     { tipo: "mondo", titolo: "Cucina dal mondo", perche: "Posti piccoli, cucina chi viene da lì", q: "cucina etnica autentica per pranzo" },
-    { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pizza bianca e lievitati fatti lì", q: "forno artigianale di quartiere" },
+    { tipo: "brunch", chiave: "forno", emoji: "🥖", titolo: "Forno di quartiere", perche: "Pane, focacce e lievitati fatti lì", q: "forno artigianale di quartiere" },
   ],
   pomeriggio: [
     { tipo: "enoteca", titolo: "Un calice stasera", perche: "Vini naturali, piatti da condividere", q: "enoteca vini naturali" },
