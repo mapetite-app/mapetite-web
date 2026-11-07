@@ -139,8 +139,11 @@ export default function SchedaCarosello({
             }}
             className="flex min-h-11 min-w-11 items-center justify-center px-1"
           >
-            <span data-testid="carosello-contatore" className="rounded-pill bg-black/45 px-2.5 py-1 font-display text-[11.5px] font-medium text-white backdrop-blur">
-              {index + 1} / {slides}
+            {/* Puntini, non "1 / 2" (revisore 7/11): in alto c'è già "‹ 1 di 12 ›", due numeri quasi uguali sembravano un doppione. */}
+            <span data-testid="carosello-contatore" data-pos={`${index + 1}/${slides}`} className="flex items-center gap-1.5 rounded-pill bg-black/40 px-2 py-1.5 backdrop-blur">
+              {Array.from({ length: slides }, (_, i) => (
+                <span key={i} aria-hidden className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-white" : "bg-white/50"}`} />
+              ))}
             </span>
           </button>
         </div>

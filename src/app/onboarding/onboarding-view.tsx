@@ -261,7 +261,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   }, []);
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
-  const progress = saltaTipi ? ((step > PASSO_TIPI ? step : step + 1) / (TOTAL - 1)) * 100 : ((step + 1) / TOTAL) * 100;
+  // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
+  // spariva). "Cosa ti piace?" e "Ti piace o no?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
+  // così il totale resta sempre 7 e il numero non salta mai.
+  const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
+  const progress = (passoMostrato / (TOTAL - 1)) * 100;
   const config = STEPS[step];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -404,15 +408,15 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
-            aria-valuemax={saltaTipi ? TOTAL - 1 : TOTAL}
-            aria-valuenow={saltaTipi && step > PASSO_TIPI ? step : step + 1}
+            aria-valuemax={TOTAL - 1}
+            aria-valuenow={passoMostrato}
             aria-label="Avanzamento"
           >
             <div className="h-full rounded-pill bg-brand transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
-            {/* Revisore 5/11: saltato il passo dei 10 tipi, il contatore conta solo i passi mostrati (non salta da 2 a 4). */}
-            {saltaTipi ? (step > PASSO_TIPI ? step : step + 1) : step + 1} di {saltaTipi ? TOTAL - 1 : TOTAL}
+            {/* Revisore 5/11: non salta da 2 a 4; collaudo 7/11: nemmeno da "di 8" a "di 7". */}
+            {passoMostrato} di {TOTAL - 1}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte

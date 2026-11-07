@@ -227,3 +227,10 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **DAVVERO, in futuro:** il ristoratore segna un tavolo liberato e Mapetite avvisa solo chi ha quel posto tra i "Da provare" ed è vicino (proposta 6 del 18/10, "Avvisami se si libera"): domanda qualificata, il lato B2B di VISIONE.
 - **Primo passo:** dopo l'8/11, contare nei log quante volte "Stasera" non trova posti salvati aperti (team).
 
+
+## 22. In centro non distingui la trattoria vera dalla trappola per turisti — 7/11
+- **Chi lo ha:** il cliente che mangia in centro (romano a spasso, chi viene da fuori, il turista italiano) e il ristoratore onesto di una zona turistica, che sulle mappe si confonde con i locali "acchiappaturisti".
+- **Quanto pesa:** il Gambero Rosso a gennaio 2026 descrive il Tridente di Roma (via del Corso, via del Babuino, via di Ripetta) come una delle zone "più insidiose per chi ama mangiare e bere bene" e propone 15 indirizzi per evitare le trappole ([Gambero Rosso](https://www.gamberorosso.it/notizie/rubriche/miniguide/dove-mangiare-centro-roma/)). Sluurpy nota prezzi più alti nei ristoranti del centro turistico ([Sluurpy](https://www.sluurpy.it/roma/ristoranti/quartiere/centro-storico)). È lo stesso caso della VISIONE (primo un posto con 4.396 recensioni in inglese). Quante persone ci cascano, a Roma o a Milano: dato non trovato.
+- **OGGI nell'app:** i posti con molte più recensioni degli altri scendono (`mainstream.ts`), "💎 Poco conosciuto" sulle card, verdetto dal testo delle recensioni e non dal voto.
+- **DAVVERO, in futuro:** dire in chiaro chi scrive le recensioni ("Qui scrivono soprattutto romani", proposta 50) e "Da ordinare" con la prova (proposta 51): la trappola si riconosce in un colpo d'occhio. Poi i comportamenti di chi usa Mapetite (chi ci torna) come segnale più forte.
+- **Primo passo:** controllare se le recensioni che Google ci manda già dicono la lingua originale (campo `originalText.languageCode`), senza chiamate in più (team).

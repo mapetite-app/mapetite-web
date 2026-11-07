@@ -2,6 +2,32 @@
 
 Bilancio della settimana, scritto dalla prima sessione del sabato (regola del team gstack). Fonti: `git log` di `main`, PR, `BACKLOG.md`, database di produzione.
 
+## Settimana 1–6/11 (scritta sabato 7/11)
+
+### Cosa è stato fatto
+- **In produzione (6 PR unite: #121, #123, #125, #128, #130, #131):** Idee rifatte (massimo 6, per momento); Importa da Google con le liste che diventano raccolte; Salvati con ricerca sempre in vista, città, "Preferiti", "Da più tempo", "Ha chiuso"; mappa senza scatti e colori freddi al posto del beige; gusti con 54 tipi di locale; "Chiedi a Romantico"; budget nella frase di ricerca; scheda più pulita; card dei risultati senza pillole tagliate.
+- **Fermo:** "Ti porterei qui" (spento, `?beta=consiglio`), "‹ 1 di 12 ›" sulla scheda (tolto dal merge).
+
+### Cosa è andato
+- **Il piano di Lorenzo del 1/11 ha funzionato:** solo cose visibili, una area per notte, sessioni piene con sviluppatori in parallelo. Sei PR in sei giorni, tutte su schermate che si vedono aprendo l'app.
+- **Unire la parte che passa** (regola del 24/10): la scheda bocciata è uscita dal merge e il resto è andato in produzione lo stesso.
+
+### Cosa non è andato
+1. **Troppe bocciature sulle stesse voci:** mappa bocciata 3 volte, "Ti porterei qui" 4 volte (voti tra 6,5 e 8,0), scheda 2 volte. Ogni revisore nuovo trova difetti diversi: si corregge e si riparte da capo.
+2. **"Ti porterei qui" è una voce AI che deve essere perfetta** (mai inventare): ogni giro ha trovato un caso nuovo in cui il perché era falso o tagliato. Costruita senza un elenco di casi di prova fissato prima.
+3. **Le risposte Google salvate spariscono** ancora a ogni container nuovo: 3–6 ricerche vere al giorno solo per ricrearle.
+
+### 3 cambi per la settimana dopo
+- **Casi di prova scritti prima del codice** per le voci AI: 10 frasi con la risposta giusta attesa; il revisore le prova tutte e vota solo dopo.
+- **Alla seconda bocciatura si taglia la voce**, non si rifà tutta: si unisce la parte sopra 8,5 e il resto diventa una voce nuova più piccola. Alla terza la voce si ferma e si scrive a Lorenzo.
+- **Un mockup prima del codice per le schermate grandi** (scheda, primo accesso): il designer vota il mockup contro Places, poi si costruisce.
+
+### Revisione dei documenti del team
+- **`PROPOSTE.md`:** fatte nella settimana: 36, 39, 40, 44, 45; ferma senza un sì di Lorenzo: 43; nuove: 46–52 (tutte dal 9/11).
+- **`COMPETITOR.md`:** controlli ogni notte; novità: BestieBite punta agli USA (round di giugno), Albo insegna il "Condividi" nel primo accesso, Corner fermo alla versione del 26/9.
+- **`PROBLEMI.md`:** 22 problemi; aggiunto il 22 (trappole per turisti in centro).
+- **`PARTNER.md`:** nessun contatto partito, giusto così; nessun partner nuovo emerso.
+
 ## Settimana 24–30/10 (scritta sabato 31/10 alle 03:30)
 
 ### Cosa è stato fatto
