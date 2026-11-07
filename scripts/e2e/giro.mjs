@@ -7766,7 +7766,7 @@ else {
   ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
   ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
   // Mappa del gusto (sprint 25/10): 4 passi a schermo intero. 1) città e zone.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 8" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 8 con barra di avanzamento (una domanda per schermata, come Albo)");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 7 con barra di avanzamento (una domanda per schermata, come Albo)");
   ok(await ip.getByTestId("benvenuto-avanti").isDisabled(), "primo accesso: senza città 'Continua' non va avanti (per saltare tutto c'è 'Salta' in alto, niente doppioni)");
   ok((await ip.getByTestId("barra").count()) === 0, "primo accesso: a schermo intero, senza la barra in basso");
   ok(await ip.getByTestId("benvenuto-citta").isVisible() && (await ip.getByTestId("benvenuto-zone").count()) === 0, "primo accesso: si parte dalla città, le zone compaiono dopo");
@@ -7782,7 +7782,7 @@ else {
   { const am = ip.getByTestId("benvenuto-amati");
     const gruppi = (await am.getByTestId("gusti-gruppo").locator("h2").allTextContents()).map((t) => t.trim());
     const chips = await am.getByTestId("gusto-chip").count();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Diete", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 6 gruppi (${gruppi.join(" | ")})`);
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Diete", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 6 gruppi (${gruppi.join(" | ")})`);
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: 'Cosa ti piace?' senza scelte dice 'Nessuno scelto' e il tasto 'Salta'");
     const altezze = await am.getByTestId("gusto-chip").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     ok(Math.min(...altezze) >= 44, `primo accesso: chip dei gusti alte almeno 44 px (${Math.min(...altezze)})`);
@@ -7799,7 +7799,7 @@ else {
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto", "primo accesso: un secondo tocco toglie il gusto");
     await ip.getByTestId("benvenuto-avanti").click(); }
   // 3) dieci tipi di posto 👍/👎
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
   await ip.screenshot({ path: `${OUT}/benvenuto-2-tipi.png`, caret: "initial" });
   await ip.getByTestId("tipo-su").click();
   ok((await ip.getByTestId("tipi-contatore").textContent()) === "2 di 10", "primo accesso: dopo il 👍 il tipo successivo");
@@ -7823,7 +7823,7 @@ else {
   for (const v of ["su", "giu", "giu", "su", "su", "su", "giu", "giu", "su", "boh"]) await ip.getByTestId(`tipo-${v}`).click();
   await ip.getByTestId("benvenuto-scoperta").waitFor({ timeout: 3000 }).catch(() => {});
   // 3) famosi o chicche, già proposto dai 👍 (5 chicche su 6, nessun famoso): una domanda sola per schermata.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 8" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
   ok((await ip.locator("h1").count()) === 1 && (await ip.getByText("Famosi o chicche?").count()) === 1 && (await ip.getByRole("button", { name: "Niente pesce", exact: true }).count()) === 0 && (await ip.getByRole("button", { name: "Aperitivo", exact: true }).count()) === 0, "primo accesso: al passo 3 una domanda sola, il titolo non si ripete (collaudo 23/10: erano quattro)");
   // Un solo stile in tutti i passi: titolo serif, scelta segnata teal, tasto principale teal (collaudo 23/10).
   const stile = async () => ip.evaluate(() => {
@@ -7834,18 +7834,18 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-3-scoperta.png`, caret: "initial" });
   await ip.getByTestId("benvenuto-avanti").click();
   // 4) come mangi: senza scelte il tasto dice "Mangio di tutto" (una risposta, non "Salta").
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "5 di 8" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Mangio di tutto", `primo accesso: passo 4, senza diete 'Mangio di tutto' (${await ip.getByTestId("benvenuto-avanti").textContent()})`);
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 7" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Mangio di tutto", `primo accesso: passo 4, senza diete 'Mangio di tutto' (${await ip.getByTestId("benvenuto-avanti").textContent()})`);
   await ip.getByRole("button", { name: "Niente pesce", exact: true }).click();
   ok((await ip.getByTestId("benvenuto-avanti").textContent()) === "Continua" && (await ip.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: con una scelta 'Continua', e nessun 'Salta' insieme (doppione, collaudo 23/10)");
   stili.push(await stile());
   await ip.getByTestId("benvenuto-avanti").click();
   // 5) occasioni: senza scelte "Salta", con una scelta "Continua".
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "6 di 8" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: passo 5, occasioni; senza scelte il tasto dice 'Salta'");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "5 di 7" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: passo 5, occasioni; senza scelte il tasto dice 'Salta'");
   await ip.getByRole("button", { name: "Aperitivo", exact: true }).click();
   stili.push(await stile());
   await ip.getByTestId("benvenuto-avanti").click();
   // 6) spesa: saltata.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 8", "primo accesso: passo 6, la spesa");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "6 di 7", "primo accesso: passo 6, la spesa");
   await ip.getByTestId("benvenuto-avanti").click();
   // 7) "Ecco cosa ho capito", con i posti per te o prima l'import
   // Mockup A (23/10): una frase da amico con le parole chiave evidenziate; le righe dietro "Correggi".
@@ -7863,9 +7863,9 @@ else {
   if (capitoA) { await ip.getByTestId("capito-correggi").click();
     // Dietro "Il resto" solo ciò che la frase non dice (prima ripeteva zone, gusti e diete con altre parole: collaudo 23/10).
     const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
   else { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ti piacciono: trattoria di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti pesce") && righe.includes("aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
   ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
   await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
@@ -7875,27 +7875,27 @@ else {
     ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`); }
   await ip.setViewportSize({ width: 390, height: 844 });
   if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
     // Card riaperta: niente "10 di 10" né "↶ Precedente" (annullava un'altra card), ma "Torna alla frase" (collaudo 23/10).
     ok(/^Cambia la risposta · prima (👍|👎)$/.test((await ip.getByTestId("tipi-contatore").textContent()) ?? "") && (await ip.getByTestId("tipo-indietro").count()) === 0 && await ip.getByTestId("torna-frase").isVisible(), `primo accesso: card riaperta dalla frase con 'Torna alla frase', senza contatore né 'Precedente' (${await ip.getByTestId("tipi-contatore").textContent()})`);
     await ip.getByTestId("tipo-su").click();
     await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
     await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 8" && ((await ip.getByTestId("torna-frase").textContent()) ?? "").includes("Torna alla frase"), "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia, con 'Torna alla frase'");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7" && ((await ip.getByTestId("torna-frase").textContent()) ?? "").includes("Torna alla frase"), "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia, con 'Torna alla frase'");
     await ip.getByTestId("torna-frase").click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, si torna alla frase (non al passo dopo)");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, si torna alla frase (non al passo dopo)");
     // "e altri N tipi di posto" si tocca come le altre parole (collaudo 24/10): porta all'elenco dei tipi.
     { const altri = ip.getByTestId("capito-parola").filter({ hasText: /^altr[oi] / });
       if (await altri.count()) { await altri.first().click();
-        ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: 'e altri N tipi di posto' si tocca e porta ai tipi, con 'Torna alla frase'");
+        ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: 'e altri N tipi di posto' si tocca e porta ai tipi, con 'Torna alla frase'");
         if (await ip.getByTestId("tipi-rifai").count()) { await ip.getByTestId("tipi-rifai").click();
           ok((await ip.getByTestId("tipi-rifai").textContent())?.includes("Sicuro?") && await ip.getByTestId("tipi-finiti").isVisible(), "primo accesso: 'Rifai tutti e dieci' chiede conferma prima di cancellare (collaudo 24/10)"); }
         await ip.getByTestId("torna-frase").click(); } }
     // Un tipo toccato nella frase quando non si sono votate tutte le card: c'è sempre l'uscita (collaudo 23/10).
     await ip.getByTestId("capito-parola").filter({ hasText: "Monti" }).click(); }
   else await ip.getByTestId("capito-riga").first().click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 8" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando la zona si torna a cambiarla, con le scelte conservate");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando la zona si torna a cambiarla, con le scelte conservate");
   ok((await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: tornando al passo 1 dalla frase non c'è 'Salta' (cancellava tutte le risposte, collaudo 24/10)");
   await ip.getByTestId("torna-frase").click();
   await ip.getByTestId("benvenuto-importa-si").click();
@@ -7922,7 +7922,7 @@ else {
   await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click();
   await ip.getByTestId("tipo-giu").click();
   await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8", "primo accesso: tipo toccato nella frase con 9 card non votate, rivotato si torna alla frase");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7", "primo accesso: tipo toccato nella frase con 9 card non votate, rivotato si torna alla frase");
   await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click(); // ora tra quelle che convincono meno
   await ip.getByTestId("tipo-su").click();
   await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
@@ -7936,7 +7936,7 @@ else {
   await ip.getByTestId("benvenuto-avanti").click(); // "Cosa ti piace?" (5/11): saltato
   await ip.getByTestId("tipi-basta").waitFor({ timeout: 8000 }); // il passo può arrivare dopo un attimo (giro del 5/11)
   await ip.getByTestId("tipi-basta").click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 8", "primo accesso: 'Basta così' al passo 2 va al passo 3");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7", "primo accesso: 'Basta così' al passo 2 va al passo 3");
   await ip.getByRole("button", { name: "Indietro" }).click();
   await ip.getByTestId("tipo-giu").click();
   await ip.getByTestId("tipo-giu").click();
@@ -9327,7 +9327,7 @@ else {
   await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now(), step: 6, su: [], giu: [], visti: [], zone: [], city: null, occasions: [], diete: [] })));
   await vp.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await vp.getByTestId("benvenuto-capito").waitFor({ timeout: 5000 }).catch(() => {});
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: all'ultimo passo niente 'Salta'");
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && (await vp.getByTestId("onboarding-salta").count()) === 0 && (await vp.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: all'ultimo passo niente 'Salta'");
   ok(await vp.getByTestId("capito-vuoto").isVisible() && (await vp.locator("h1").textContent()) === "Partiamo da zero", `primo accesso: senza risposte titolo 'Partiamo da zero' e niente di inventato (collaudo 23/10: 'Ecco cosa ho capito' sopra 'Non mi hai detto niente') (${await vp.locator("h1").textContent()})`);
   ok((await vp.getByText("tengono conto di questo").count()) === 0, "primo accesso: senza risposte niente 'Da ora ricerca… tengono conto di questo' (si contraddiceva)");
 
@@ -9353,7 +9353,7 @@ else {
   await vp.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await vp.getByTestId("benvenuto-capito").waitFor({ timeout: 5000 }).catch(() => {});
   // All'ultimo passo niente avviso "Ho ritrovato le risposte": lo spazio è della frase (collaudo 23/10).
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && (await vp.getByTestId("benvenuto-ripreso").count()) === 0 && await vp.getByTestId("benvenuto-capito").isVisible(), "risposte conservate: dopo l'accesso si riparte dall'ultimo passo");
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && (await vp.getByTestId("benvenuto-ripreso").count()) === 0 && await vp.getByTestId("benvenuto-capito").isVisible(), "risposte conservate: dopo l'accesso si riparte dall'ultimo passo");
   await vp.screenshot({ path: `${OUT}/zz-benvenuto-ripreso.png`, caret: "initial" });
   ok(((await vp.getByTestId("benvenuto-capito").textContent()) ?? "").toLowerCase().includes("pizzeri"), "risposte conservate: i tipi votati ci sono ancora");
   await vp.getByTestId("benvenuto-fine").click();
@@ -9361,14 +9361,14 @@ else {
   ok(new URL(vp.url()).searchParams.get("q") === "Pizzeria napoletana a Milano", `risposte conservate: applicate dopo l'accesso, mappa sui gusti nella città (${new URL(vp.url()).searchParams.get("q")})`);
   ok((await vp.evaluate(() => localStorage.getItem("mapetite.benvenuto"))) === null, "risposte conservate: salvate le risposte, la bozza sparisce");
   await vp.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 8", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 7", "risposte conservate: riaperto dopo, l'onboarding riparte da capo");
   // Una bozza scaduta (più di 2 giorni) o con valori sconosciuti non si riprende.
   await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now() - 3 * 864e5, step: 2, su: ["pizza"], city: "Roma" })));
   await vp.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 8", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
+  ok((await vp.getByTestId("benvenuto-ripreso").count()) === 0 && (await vp.getByTestId("benvenuto-passo").textContent()) === "1 di 7", "risposte conservate: una bozza vecchia di 3 giorni non si riprende");
   await vp.evaluate(() => localStorage.setItem("mapetite.benvenuto", JSON.stringify({ ts: Date.now(), step: 1, su: ["inventato"], zone: ["Atlantide"], city: "Roma" })));
   await vp.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
-  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && (await vp.getByTestId("tipi-contatore").textContent()) === "1 di 10", "risposte conservate: tipi e zone sconosciuti nella bozza si ignorano");
+  ok((await vp.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await vp.getByTestId("tipi-contatore").textContent()) === "1 di 10", "risposte conservate: tipi e zone sconosciuti nella bozza si ignorano");
   await vp.evaluate(() => localStorage.removeItem("mapetite.benvenuto"));
 
   // "Rifalla" (da I tuoi gusti): si riparte da quello che il profilo ha già, diete comprese (non si perdono).
