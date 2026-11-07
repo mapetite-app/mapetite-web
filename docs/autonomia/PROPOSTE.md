@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 7/11/2026 (sabato, CEO che chiude — tema scheda, primo accesso e demo). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
+
+### 50. "Qui scrivono soprattutto romani": chi ha scritto le recensioni, detto in chiaro
+- **Problema:** `PROBLEMI.md` 22: in centro la trattoria vera e la trappola per turisti si somigliano sulla mappa.
+- **Cosa fa:** nella scheda, una riga sola sotto il verdetto quando il segnale è netto: "Recensioni lette: 4 su 5 in italiano" oppure "Recensioni lette: quasi tutte in inglese". Conta solo le recensioni che Google ci manda già (al massimo 5), dice sempre quante sono, e senza un segnale netto la riga non c'è.
+- **Da dove nasce:** Gambero Rosso fa una guida a mano per evitare le trappole del Tridente ([Gambero Rosso](https://www.gamberorosso.it/notizie/rubriche/miniguide/dove-mangiare-centro-roma/)); nelle app viste nessuno lo dice. È il caso della VISIONE (4.396 recensioni in inglese messo primo).
+- **Valore per l'utente:** capisce in un secondo se è un posto di quartiere. **Per il ristoratore:** il locale onesto in zona turistica smette di confondersi con gli altri.
+- **Sforzo:** S (prima verificare che `originalText.languageCode` arrivi già con il FIELD_MASK attuale). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 51. "Da ordinare": il piatto che le recensioni nominano di più, con la prova
+- **Problema:** `PROBLEMI.md` 22 e 10: la scheda dice com'è il posto, non cosa prendere; chi arriva da un reel spesso ricorda solo il piatto.
+- **Cosa fa:** nella scheda, una riga "Da ordinare: cacio e pepe · 3 recensioni su 5", solo se almeno 2 recensioni lette nominano lo stesso piatto; un tocco mostra la frase della recensione (come i ✓). Senza prova la riga non c'è, mai inventata.
+- **Da dove nasce:** BestieBite fa vedere il piatto nei video, ma bisogna guardarli ([App Store](https://apps.apple.com/app/id6444921443)); nelle app viste nessuno lo scrive in una riga con la prova.
+- **Valore per l'utente:** sa cosa prendere prima di sedersi. **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
+- **Sforzo:** S/M (un campo in più nella sintesi già fatta, con la regola anti-invenzione). **Costo Google/Haiku:** zero chiamate in più; poche decine di token in uscita nella chiamata Haiku che c'è già.
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 52. "Prova il gesto": il primo salvataggio insegnato nel primo accesso
+- **Problema:** chi installa l'app non sa che si salva dal "Condividi" di Instagram o Maps; in una demo va spiegato a voce (VISIONE: niente che funzioni solo se sai dove cliccare).
+- **Cosa fa:** dopo "Ecco cosa ho capito di te", una schermata facoltativa con un'animazione di 3 passi ("Nel reel tocca Condividi → Mapetite", su iPhone "Copia link → incolla qui") e un campo per incollare subito un link vero; "Salta" sempre in vista. Non allunga il percorso di chi ha fretta.
+- **Da dove nasce:** Albo ha una schermata che insegna a salvare dal "Condividi" dentro il primo accesso, ma il suo primo accesso è lungo e finisce con la prova a pagamento ([ScreensDesign](https://screensdesign.com/showcase/albo-save-organise)). Noi: una schermata sola, gratis, con il salvataggio vero.
+- **Valore per l'utente:** il primo posto salvato nel primo minuto. **Per il ristoratore:** nessuno diretto.
+- **Sforzo:** S (riusa `reel-save.tsx` e la pagina Importa). **Costo Google/Haiku:** zero, salvo la ricerca del link incollato (come oggi).
+- **Stato proposto:** PRONTA dal 9/11 (con un revisore di design: deve stare in una schermata a 390×844).
+
 ## 6/11/2026 (notte, sessione 03:05, CEO che chiude — tema Grafica e Salvati). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 
 ### 48. "Perché ti piacerà": il motivo personale scritto, non un punteggio
@@ -88,7 +114,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** domanda dormiente che si riaccende (misurabile nel pannello).
 - **Sforzo:** S (data di salvataggio già presente, `created_at`).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 3/11 sera** ("⏳ N posti aspettano da mesi", PR #125); il 6/11 la riga è diventata l'ordine "Da più tempo" (PR #130).
 
 ### 41. "Aperto ora" sui salvati
 - **Problema:** il revisore del 3/11 non ha trovato "Aperto ora" nei Salvati: i salvati non hanno gli orari.
@@ -125,7 +151,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** nessuno diretto.
 - **Sforzo:** S (riusa le copertine dei Salvati).
 - **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 2/11 notte** (copertine "Apri la raccolta" dopo il file di Google), in produzione con la PR #123.
 
 ## 1/11/2026 (notte, sessione 03:06, CEO che chiude)
 
