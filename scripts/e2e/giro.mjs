@@ -206,7 +206,7 @@ await idee(page);
   ok(await pan.getByText("Idee", { exact: true }).isVisible() && (await pan.getByText("Ti suggeriamo").count()) === 0 && (await pan.getByText("Adesso", { exact: true }).count()) === 0 && await pan.getByText("Prova a chiedere").isVisible(), "Idee: un solo nome (pulsante e titolo 'Idee'), elenco unico senza intestazioni, esempi in una riga");
   ok(await pan.getByTestId("mappa-sorprendimi").isVisible() && (await pan.getByTestId("mappa-assistente").count()) === 0, "Idee: Sorprendimi c'è, 'Parla con l'assistente' no (è già nella barra in basso)");
   // Ordinato (Lorenzo, 1/11: "troppe e randomiche"): contesto del momento, 3 idee in "Adesso", al massimo 3 in "Per te", esempi in una riga.
-  ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
+  ok(/^(Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato) (mattina|a pranzo|pomeriggio|sera|notte)/.test((await pan.getByTestId("idee-contesto").textContent()) ?? ""), `Idee: sotto il titolo il momento ('${await pan.getByTestId("idee-contesto").textContent()}')`);
   // Revisore del 2/11 (r4): il pannello copriva metà schermo. Al massimo 3 righe (titoli su una riga) più UNA fila.
   { const righe = await pan.locator("li").count(); const adesso = await pan.locator('section[aria-label="Adesso"]').locator("li").count(); const perTe = await pan.locator('section[aria-label="Per te"]').locator("li").count();
     ok(adesso === 2 && perTe === 1 && righe <= 3, `Idee: al massimo 3 righe (Adesso ${adesso}, Per te ${perTe}, totale ${righe})`); }
