@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { bookingReminders, cancelMessage, chiConferma, daConfermare, dateKey, doubleBookings, loadBookings, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
 
@@ -49,6 +49,11 @@ export function AzioniTavolo({ b, fonte, chiaro = false }: { b: BookingRequest; 
       )}
     </div>
   );
+}
+
+// Il canale in parole: "Richiesta su WhatsApp", "Richiesta per telefono"…
+function viaDi(b: BookingRequest): string {
+  return VIA[b.via].charAt(0).toUpperCase() + VIA[b.via].slice(1);
 }
 
 // "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
@@ -203,19 +208,25 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
-  const { today, tomorrow, howWasIt, risposta } = bookingReminders(list);
+  const rem = bookingReminders(list);
+  const { howWasIt, risposta } = rem;
+  // Promemoria e doppioni solo per i tavoli con il sì della persona (revisore 8/11): un tocco su
+  // "Prenota su TheFork" o su WhatsApp non è ancora una prenotazione.
+  const today = rem.today.filter((b) => b.confirmed);
+  const tomorrow = rem.tomorrow.filter((b) => b.confirmed);
   // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
   const now = new Date();
   const todayKey = dateKey(now);
   const tomorrowD = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowKey = dateKey(tomorrowD);
-  const doppi = doubleBookings(list, now)
+  const doppi = doubleBookings(list.filter((b) => b.confirmed), now)
     .filter((g) => g[0].date === todayKey || (g[0].date === tomorrowKey && g.some((b) => !b.dismissedEve)))
     .map((g) => ({ group: g, domani: g[0].date === tomorrowKey }));
   const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
-  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0) return null;
   // La richiesta in attesa di risposta ha già la sua scheda ("Hanno riaperto"): niente doppione.
   const inRisposta = new Set(risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => b.id));
+  const chiedi = daConfermare(list, now).filter((b) => !inRisposta.has(b.id)).slice(0, 2);
+  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0 && chiedi.length === 0) return null;
   const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
@@ -231,6 +242,34 @@ export default function BookingReminder() {
             </button>
             <button type="button" data-testid="risposta-non-ancora" onClick={() => { updateBooking(b.id, { dismissedRisposta: true }); trackFeature("prenotazione_risposta", { stato: "non_ancora" }); }} className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95">
               Non ancora
+            </button>
+          </div>
+        </section>
+      ))}
+      {/* Richiesta partita, senza risposta della persona: "Hai prenotato da …?" al posto del promemoria. */}
+      {chiedi.map((b) => (
+        <section key={`c-${b.id}`} data-testid="promemoria-hai-prenotato" className="rounded-card border border-border bg-surface p-4 shadow-card">
+          <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            <CalendarCheck size={14} /> {quandoTavolo(b, now)}{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
+          </p>
+          <p data-testid="hai-prenotato-titolo" className="mt-1 font-title text-lg font-semibold leading-tight text-text">Hai prenotato da {b.placeName}?</p>
+          <p data-testid="hai-prenotato-canale" className="mt-0.5 text-sm font-sans text-text-muted">{b.piattaforma ? `Se hai confermato su ${b.piattaforma}, segnalo qui.` : `${viaDi(b)}: ${chiConferma(b)}.`}</p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              data-testid="hai-prenotato-si"
+              onClick={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }}
+              className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
+            >
+              Sì, {quandoTavolo(b, now).toLowerCase()}
+            </button>
+            <button
+              type="button"
+              data-testid="hai-prenotato-no"
+              onClick={() => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); }}
+              className="min-h-11 rounded-pill border border-border bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95"
+            >
+              No
             </button>
           </div>
         </section>
@@ -252,7 +291,7 @@ export default function BookingReminder() {
                 {quandoTavolo(b, now)} da <span className="break-words">{b.placeName}</span>
               </p>
               <p className="mt-0.5 text-sm font-sans text-white/80">
-                {b.confirmed ? "Prenotato" : `${VIA[b.via]}: la conferma arriva dal locale`}
+                Prenotato{b.piattaforma ? ` su ${b.piattaforma}` : ""}
               </p>
             </div>
             <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">

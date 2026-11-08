@@ -196,7 +196,8 @@ export function bookingMessage(b: BookingDetails, name: string | null, now: Date
   if (contatto?.telefono?.trim()) parts.push(` Il mio cellulare è ${contatto.telefono.trim()}.`);
   if (volta && volta >= 2) parts.push(` Sarà la mia ${volta}ª volta da voi.`);
   if (parola && parola >= PAROLA_MIN) parts.push(` Con Mapetite ho già prenotato ${parola} tavoli, anche altrove: sempre presente o disdetto in tempo.`);
-  const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
+  // Il nome una volta sola (revisore 8/11): con "a nome …" la firma è solo "Grazie".
+  const sign = name?.trim() && !contatto?.nome.trim() ? `Grazie, ${name.trim()}` : "Grazie";
   return `${parts.join("")} ${sign}`;
 }
 
@@ -585,9 +586,25 @@ export function quandoTavolo(b: Pick<BookingRequest, "date" | "time">, now: Date
   return `${giorno}${b.time ? ` alle ${b.time}` : ""}`;
 }
 
-// Ancora da fare: né disdetta, né nascosta, né conclusa.
+// Un tavolo vero e ancora da fare: la persona ha detto "Sì, l'ho prenotato" (revisore 8/11: un tocco su
+// "Prenota su TheFork" non è una prenotazione), e non è né disdetto, né nascosto, né concluso.
 function viva(b: BookingRequest): boolean {
-  return !b.dismissed && !b.outcome && b.disdetta == null;
+  return b.confirmed === true && !b.dismissed && !b.outcome && b.disdetta == null;
+}
+
+// Chi conferma, a seconda del canale: su TheFork la conferma la dà TheFork, altrimenti il locale.
+export function chiConferma(b: Pick<BookingRequest, "piattaforma">): string {
+  return b.piattaforma ? `la conferma la dà ${b.piattaforma}` : "la conferma arriva dal locale";
+}
+
+// Richieste partite ma senza risposta della persona, oggi o domani: "Hai prenotato da …?" (Sì / No)
+// al posto del promemoria. Solo quelle senza un altro promemoria in corso ("ti hanno risposto?").
+export function daConfermare(list: BookingRequest[], now: Date = new Date()): BookingRequest[] {
+  const oggi = dateKey(now);
+  const domani = dateKey(addDays(now, 1));
+  return list
+    .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani))
+    .sort((a, c) => `${a.date} ${a.time ?? ""}`.localeCompare(`${c.date} ${c.time ?? ""}`));
 }
 
 // Il banner della mappa: la prossima prenotazione di oggi (fino a un'ora dopo l'ora del tavolo),

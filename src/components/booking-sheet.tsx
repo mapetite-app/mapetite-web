@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle, CalendarPlus } from "lucide-react";
 import {
+  accountPrenotazioni,
   addBooking,
   bookingMessage,
   clienteDiParola,
@@ -320,16 +321,16 @@ export default function BookingSheet({
             <div className="rounded-card bg-brand p-5 text-white">
               <p className="flex items-center gap-2 font-display text-lg font-semibold"><Check size={20} className="text-accent" /> Prenotazione richiesta</p>
               <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                Hai scritto a {place.name} {viaLabel}
+                {done.piattaforma ? `Hai aperto ${done.piattaforma} per ${place.name}` : `Hai scritto a ${place.name} ${viaLabel}`}
                 {done.people ? ` per ${done.people} ${done.people === 1 ? "persona" : "persone"}` : ""}
                 {done.date ? `, ${dayLabel(done.date)}` : ""}
                 {done.time ? ` alle ${done.time}` : ""}.
               </p>
               <p className="mt-2 text-sm font-sans font-semibold leading-relaxed text-white">
-                La conferma arriva dal locale: Mapetite non vede i tavoli liberi.
+                {done.piattaforma ? `La conferma la dà ${done.piattaforma}, non Mapetite.` : "La conferma arriva dal locale: Mapetite non vede i tavoli liberi."}
               </p>
               <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                La trovi in &ldquo;Le mie prenotazioni&rdquo;: quando ti confermano, segnala lì. Te la ricordo comunque il giorno stesso.
+                La trovi in &ldquo;Le mie prenotazioni&rdquo;: quando ti confermano, segnalo lì o dal promemoria in home.
               </p>
             </div>
             <button type="button" onClick={onClose} className={`${btn} mt-4 bg-accent text-white`}>Fatto</button>
@@ -508,7 +509,7 @@ export default function BookingSheet({
                 ))}
                 <label className="mt-3 flex items-start gap-3 text-sm font-sans text-text">
                   <input type="checkbox" data-testid="prenota-dati-consenso" checked={modulo2.consenso} onChange={(e) => setModulo2({ ...modulo2, consenso: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0 accent-brand" />
-                  Usali per scrivere ai locali: restano su questo telefono.
+                  {accountPrenotazioni() ? "Usali per scrivere ai locali: restano su questo telefono e, con le prenotazioni, sul tuo account." : "Usali per scrivere ai locali: restano su questo telefono."}
                 </label>
                 {modulo2.telefono.trim() !== "" && !telefonoValido(modulo2.telefono) && (
                   <p className="mt-1 text-xs font-sans text-error">Controlla il numero.</p>
@@ -597,17 +598,37 @@ export default function BookingSheet({
             />
 
             {/* Onestà sulla disponibilità: solo i dati Google, mai tavoli o orari inventati. */}
-            <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
-              {/* Con il modulo della piattaforma la frase sui tavoli liberi sta già sotto i pulsanti (minore del 30/10). */}
-              {modulo ? `La prenotazione la confermi tu, su ${modulo.nome} o con il locale.` : "Mapetite non vede i tavoli liberi: la conferma arriva dal locale."}
-              {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
-              {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
-            </p>
+            {/* Con il modulo della piattaforma la frase su chi conferma sta solo sotto il suo pulsante (revisore 8/11). */}
+            {(!modulo || (isToday && place.openNow != null) || riapre) && (
+              <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
+                {modulo ? "" : "Mapetite non vede i tavoli liberi: la conferma arriva dal locale."}
+                {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
+                {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
+              </p>
+            )}
             {chiusoScelto && (
               <p data-testid="prenota-chiuso-2" className="mt-1 text-xs font-sans font-semibold text-error">A quell&apos;ora risulta chiuso (orari Google): controlla l&apos;orario prima di inviare.</p>
             )}
 
             <div className={`mt-3 flex flex-col gap-2 ${disabled ? "pointer-events-none opacity-40" : ""}`} aria-disabled={disabled}>
+              {/* Con il modulo della piattaforma (l'unica via che vede i tavoli liberi) è lui il pulsante
+                  principale, con la sua nota subito sotto; WhatsApp e Chiama restano come alternative (revisore 8/11). */}
+              {modulo && (
+                <>
+                  <a
+                    data-testid="prenota-piattaforma"
+                    href={modulo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => { if (dati) void navigator.clipboard?.writeText(datiDaIncollare(dati)).catch(() => {}); record("sito", modulo.nome); }}
+                    className={`${btn} bg-accent text-white`}
+                  >
+                    <Globe size={18} /> Prenota su {modulo.nome}
+                  </a>
+                  <p data-testid="prenota-piattaforma-nota" className="text-center text-xs font-sans leading-relaxed text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì{dati ? ": i tuoi dati sono già copiati" : ""}.</p>
+                  {(wa || place.phone) && <p className="mt-1 text-xs font-display font-semibold text-text-muted">Oppure scrivi al locale</p>}
+                </>
+              )}
               {wa && (
                 <a
                   data-testid="prenota-whatsapp"
@@ -615,7 +636,7 @@ export default function BookingSheet({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => record("whatsapp")}
-                  className={`${btn} bg-[#1f8f4e] text-white`}
+                  className={`${btn} ${modulo ? "border border-border bg-white text-[#1f8f4e]" : "bg-[#1f8f4e] text-white"}`}
                 >
                   <MessageCircle size={18} /> Invia su WhatsApp
                 </a>
@@ -625,23 +646,9 @@ export default function BookingSheet({
                   data-testid="prenota-chiama"
                   href={telHref(place.phone)}
                   onClick={() => record("telefono")}
-                  className={`${btn} ${wa ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
+                  className={`${btn} ${wa || modulo ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
                 >
                   <Phone size={18} /> Chiama {place.phone}
-                </a>
-              )}
-              {/* Il modulo vero della piattaforma (tavoli liberi) prende il posto di "dal sito", nello stesso
-                  punto: arrivando dopo non sposta i pulsanti sopra (collaudo del 30/10). */}
-              {modulo && (
-                <a
-                  data-testid="prenota-piattaforma"
-                  href={modulo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => { if (dati) void navigator.clipboard?.writeText(datiDaIncollare(dati)).catch(() => {}); record("sito", modulo.nome); }}
-                  className={`${btn} ${wa || place.phone ? "border border-brand bg-white text-brand" : "bg-brand text-white"}`}
-                >
-                  <Globe size={18} /> Prenota su {modulo.nome}
                 </a>
               )}
               {place.websiteUri && !modulo && (
@@ -664,9 +671,7 @@ export default function BookingSheet({
               >
                 <Copy size={16} /> {copied ? "Messaggio copiato" : "Copia il messaggio"}
               </button>
-              {modulo ? (
-                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì (giorno e ora li scegli di nuovo){dati ? "; i tuoi dati sono già copiati, da incollare" : ""}.</p>
-              ) : place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
+              {!modulo && place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
               {!place.phone && !place.websiteUri && (
                 <p className="text-center text-xs font-sans text-text-muted">Google non ha telefono né sito di questo locale: copia il messaggio e mandalo come preferisci.</p>
               )}
