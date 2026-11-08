@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import Link from "next/link";
 import { CalendarPlus, Check, MessageCircle, Navigation, Phone, Globe, Copy, Trash2 } from "lucide-react";
 import {
-  bookingIcs,
   bookingStatus,
   dayLabel,
   fromKey,
   loadBookings,
   removeBooking,
+  scaricaIcs,
   splitBookings,
   subscribeBookings,
   updateBooking,
@@ -63,18 +63,7 @@ function capitalize(s: string): string {
 }
 
 function downloadIcs(b: BookingRequest) {
-  const ics = bookingIcs(b);
-  if (!ics) return;
-  const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  const slug = b.placeName.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "locale";
-  a.download = `prenotazione-${slug}.ics`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  signal("prenotazione_calendario", b);
+  if (scaricaIcs(b)) signal("prenotazione_calendario", b);
 }
 
 function DateTile({ date, muted }: { date: string | null; muted?: boolean }) {

@@ -198,7 +198,7 @@ await ctx.route("**/api/search/synthesis", async (route) => {
 });
 const page = await ctx.newPage();
 // L'intro del primo accesso sulla home ha i suoi controlli (5h0, contesto pulito): qui risulta già vista.
-await page.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+await page.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message + (process.env.E2E_DEBUG ? " STACK " + (e.stack ?? "").slice(0, 600) + " @ " + page.url() : "")));
 page.on("console", async (m) => { if (process.env.E2E_DEBUG && m.type() === "error") console.log("CONSOLE-ERR", m.text().slice(0, 200), JSON.stringify(m.location()), await Promise.all(m.args().map((a) => a.evaluate((v) => (v && v.stack) ? String(v.stack).slice(0, 400) : String(v)).catch(() => "?")))); if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
@@ -903,7 +903,7 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
   // Nessun lampo: prima che React parta (script dell'app bloccati) decide il CSS, guidato dallo script del layout.
   for (const seen of [false, true]) {
     const nctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-    if (seen) await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    if (seen) await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await nctx.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => route.abort()); // il CSS resta
     const np = await nctx.newPage();
     await np.goto(`${BASE}/`, { waitUntil: "load" });
@@ -1854,7 +1854,7 @@ ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams
 // Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.
 for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_code: 61 }, "al coperto"], [{ temperature_2m: 24, precipitation: 0, weather_code: 1 }, "all'aperto, stasera 24°"]]) {
   const wctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await wctx.route("**/api.open-meteo.com/**", (r) => r.fulfill({ json: { current: meteo } }));
   const wp = await wctx.newPage();
   await wp.clock.setFixedTime(new Date("2026-10-15T19:30:00"));
@@ -1871,7 +1871,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
   const casi = [["03:00", null], ["05:30", null], ["08:00", null], ["13:00", null], ["16:30", null], ["19:30", null], ["22:00", null], ["23:30", null],
     ["08:00", { temperature_2m: 9, precipitation: 3, weather_code: 63 }], ["13:00", { temperature_2m: 26, precipitation: 0, weather_code: 1 }], ["19:30", { temperature_2m: 6, precipitation: 0, weather_code: 2 }], ["21:30", { temperature_2m: 12, precipitation: 2, weather_code: 61 }]];
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await ictx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   for (const [ora, meteo] of casi) {
     await ictx.unroute("**/api.open-meteo.com/**").catch(() => {});
@@ -3644,7 +3644,7 @@ if (fakeUser) {
     mk("E5", "Trattoria Da Teo", 41.8875, 12.4755, { category: "restaurant", types: ["restaurant"], openNow: false }),
   ].map((r) => ({ ...r, priceLevel: 2 }));
   const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, geolocation: { latitude: 41.889, longitude: 12.47 }, permissions: ["geolocation"], locale: "it-IT" });
-  await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* */ } });
+  await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* */ } });
   await c3.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   await c3.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await c3.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3 }));
@@ -4811,7 +4811,7 @@ else {
   await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: sSynth }));
   const s = await sctx.newPage();
   s.on("pageerror", (e) => errors.push(e.message));
-  await s.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await s.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   // I link esterni (Google Maps, tel:) non si aprono davvero: conta solo il segnale registrato.
   await s.addInitScript(() => document.addEventListener("click", (e) => { const a = e.target instanceof Element ? e.target.closest("a[target=_blank], a[href^='tel:']") : null; if (a) e.preventDefault(); }, true));
   await s.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
@@ -4969,7 +4969,7 @@ else {
 // QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
 {
   const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const qRows = [
     { tags: ["Romantico", "Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000301", name: "Terrazza Uno", category: "bar", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.915, lng: 12.497, google_place_id: "GQ1", rating: 4.6, price_level: 2 } },
     { tags: ["Economico"], note: null, places: { id: "00000000-0000-4000-8000-000000000302", name: "Forno Due", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.87, lng: 12.48, google_place_id: "GQ2", rating: 4.5, price_level: 1 } },
@@ -5206,7 +5206,7 @@ else {
   await tctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await tctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const tp = await tctx.newPage();
-  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const tErrors = [];
   tp.on("pageerror", (e) => tErrors.push(e.message));
   await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -5409,6 +5409,21 @@ else {
     const rem = bk.bookingReminders(list, now);
     ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso; dopo 'Sì, ci vado' non torna)");
     ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
+    // Promemoria che si vedono (8/11): banner, foglio "Tra 2 ore", Portami lì, dati per prenotare.
+    { const g = (h, m) => new Date(2026, 9, 15, h, m); // giovedì 15/10
+      const L = [
+        { id: "p1", placeId: "ChIJabcdefghijklmnop", placeName: "Da Enzo", lat: 41.88, lng: 12.47, date: "2026-10-15", time: "21:00", people: 2, via: "whatsapp" },
+        { id: "p2", placeId: "P2", placeName: "Disdetto", lat: 41.9, lng: 12.5, date: "2026-10-15", time: "20:00", people: 2, via: "telefono", outcome: "non-andato", dismissed: true, disdetta: 1 },
+        { id: "p3", placeId: "P3", placeName: "Domani", lat: 41.9, lng: 12.5, date: "2026-10-16", time: "13:00", people: 4, via: "sito" },
+      ];
+      ok(bk.quandoTavolo(L[0], g(10, 0)) === "Stasera alle 21:00" && bk.quandoTavolo({ date: "2026-10-15", time: "13:00" }, g(10, 0)) === "Oggi alle 13:00" && bk.quandoTavolo(L[2], g(10, 0)) === "Domani alle 13:00", "promemoria: 'Stasera alle 21:00', 'Oggi alle 13:00', 'Domani alle 13:00'");
+      ok(bk.portamiLiUrl(L[0]) === "https://www.google.com/maps/dir/?api=1&destination=41.88%2C12.47&destination_place_id=ChIJabcdefghijklmnop" && bk.portamiLiUrl({ ...L[0], placeId: "6f1e2d3c-aaaa-bbbb-cccc-123456789abc" }) === "https://www.google.com/maps/dir/?api=1&destination=41.88%2C12.47" && bk.portamiLiUrl({ ...L[0], lat: null, lng: null, placeId: "x" }) === null, "promemoria: 'Portami lì' con destinazione e Place ID Google (mai l'UUID dei salvati)");
+      ok(bk.prenotazioneDaRicordare(L, g(10, 0))?.b.id === "p1" && bk.prenotazioneDaRicordare(L, g(22, 30))?.b.id === "p3" && bk.prenotazioneDaRicordare(L, g(22, 30))?.domani === true, "promemoria: banner della mappa sul tavolo di oggi, poi (passata l'ora) su quello di domani; i disdetti mai");
+      ok(bk.prenotazioneTraPoco(L, g(18, 45))?.b.id === "p1" && bk.prenotazioneTraPoco(L, g(18, 0)) === null && bk.prenotazioneTraPoco(L, g(21, 5)) === null && bk.prenotazioneTraPoco(L, g(19, 0), ["p1"]) === null, "promemoria: foglio 'Tra 2 ore' solo nelle 2 ore e mezza prima, una volta per prenotazione, mai per i disdetti");
+      ok(bk.traQuanto(120) === "Tra 2 ore" && bk.traQuanto(95) === "Tra un'ora e mezza" && bk.traQuanto(62) === "Tra un'ora" && bk.traQuanto(38) === "Tra 40 minuti", "promemoria: 'Tra 2 ore', 'Tra un'ora e mezza', 'Tra 40 minuti'");
+      const m = bk.bookingMessage({ date: "2026-10-17", time: "21:00", people: 2, special: null }, "Lorenzo Rossi", g(18, 0), null, null, { nome: "Lorenzo Rossi", telefono: "333 123 4567" });
+      ok(/vorrei prenotare un tavolo per 2 persone sabato 17\/10 alle 21:00 a nome Lorenzo Rossi\. È disponibile\? Il mio cellulare è 333 123 4567\. Grazie, Lorenzo Rossi$/.test(m), `dati per prenotare: 'a nome …' e cellulare nel messaggio (${m})`);
+      ok(bk.telefonoValido("+39 333 123 4567") && !bk.telefonoValido("ciao") && bk.datiDaIncollare({ nome: "Lorenzo Rossi", telefono: "333", email: "", consenso: true }) === "Lorenzo Rossi\n333", "dati per prenotare: numero controllato, dati da incollare nel modulo"); }
     // Due tavoli per lo stesso pasto (proposta CEO 19/10).
     const dop = [
       { id: "s1", placeId: "A", date: "2026-10-17", time: "20:30", placeName: "Uno", via: "whatsapp" },
@@ -5441,7 +5456,7 @@ else {
   }
 
   const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
-  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const aEvents = [];
   const searches = [];
   await actx.route("**/api/events", (route) => { aEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
@@ -5613,6 +5628,12 @@ else {
   const [popup] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-whatsapp").click()]);
   ok(decodeURIComponent(popup.url()).includes("per 3 persone"), "prenota: WhatsApp si apre con il messaggio");
   await popup.close();
+  // Tornati da WhatsApp (8/11): "L'hai prenotato?" con giorno, ora e persone; "Non ancora" = richiesta inviata.
+  await ap.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 });
+  { const si = (await ap.getByTestId("prenota-si").textContent()) ?? "";
+    ok(/^Sì, domani \d\d\/\d\d alle 21:00 per 3$/.test(si.trim()) && await ap.getByTestId("prenota-non-ancora").isVisible() && await ap.getByTestId("prenota-si-altro").isVisible() && (await ap.getByTestId("prenota-segnata").count()) === 0, `prenota: tornati da WhatsApp 'L'hai prenotato?' con 'Sì, il giorno alle ora per N', niente 'prenotato' finché non lo dice la persona (${si.trim()})`); }
+  await ashot("52b-prenota-hai-prenotato");
+  await ap.getByTestId("prenota-non-ancora").click();
   await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-fatto").textContent()).includes("La conferma arriva dal locale"), "prenota: 'Prenotazione richiesta' con la conferma che arriva dal locale");
   const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
@@ -5625,7 +5646,7 @@ else {
   // "Prenota su TheFork" (Lorenzo, 30/10): il sito del locale usa il modulo di TheFork → un tocco e ci sei.
   await actx.route("**/api/prenota/canale**", (r) => r.fulfill({ json: { canale: { piattaforma: "thefork", nome: "TheFork", url: "https://www.thefork.it/ristorante/terrazza-uno-r123" } } }));
   await actx.route("https://www.thefork.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<title>TheFork</title>" }));
-  await ap.evaluate(() => localStorage.setItem("mapetite.beta.prenota", "1")); // spento per tutti: si prova con ?beta=prenota
+  // Acceso per tutti dall'8/11 (niente più ?beta=prenota).
   await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
@@ -5635,15 +5656,27 @@ else {
   { const [pop] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-piattaforma").click()]);
     ok(pop.url().startsWith("https://www.thefork.it/ristorante/terrazza-uno-r123"), `prenota su piattaforma: apre il modulo di TheFork (${pop.url()})`);
     await pop.close(); }
-  await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 }).catch(() => {});
+  await ap.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 }).catch(() => {});
   { const sv = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
     const ultima = sv[sv.length - 1];
-    ok(ultima?.via === "sito" && ultima.piattaforma === "TheFork" && (await ap.getByTestId("prenota-fatto").textContent()).includes("su TheFork"), `prenota su piattaforma: richiesta salvata 'su TheFork' (${JSON.stringify(ultima)})`);
+    ok(ultima?.via === "sito" && ultima.piattaforma === "TheFork" && !ultima.confirmed && (await ap.getByTestId("prenota-hai-prenotato").textContent()).includes("Se hai confermato su TheFork"), `prenota su piattaforma: richiesta salvata 'su TheFork', non ancora prenotata (${JSON.stringify(ultima)})`);
     ok(aEvents.some((e) => e.type === "sito" && e.props?.fonte === "prenota" && e.props?.contesto === "TheFork"), "prenota su piattaforma: segnale 'sito' da prenota con la piattaforma"); }
+  // "Sì, ma un altro giorno o ora": su TheFork ha scelto le 21:30, si corregge e si segna prenotato.
+  await ap.getByTestId("prenota-si-altro").click();
+  await ap.getByRole("button", { name: "21:30" }).click();
+  await ap.getByTestId("prenota-avanti").click();
+  await ap.getByTestId("prenota-segnata").waitFor({ timeout: 3000 });
+  { const sv = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+    const ultima = sv[sv.length - 1];
+    ok(ultima?.confirmed === true && ultima.time === "21:30" && sv.filter((x) => x.piattaforma === "TheFork").length === 1 && (await ap.getByTestId("prenota-segnata-quando").textContent()).includes("alle 21:30"), `prenota: 'Sì, ma un altro giorno o ora' corregge la stessa prenotazione e la segna prenotata (${ultima?.time})`); }
+  await ashot("53c-prenota-segnata");
+  { const [dl] = await Promise.all([ap.waitForEvent("download", { timeout: 5000 }), ap.getByTestId("prenota-calendario").click()]);
+    const { readFileSync } = await import("fs");
+    const f = readFileSync(await dl.path(), "utf8").replace(/\r\n /g, "");
+    ok(f.includes("BEGIN:VALARM") && f.includes("TRIGGER:-PT2H") && f.includes("T213000") && f.includes("Prenotato (l'hai segnato tu)"), "prenota: subito dopo 'Sì', 'Aggiungi al calendario' scarica il .ics con l'avviso 2 ore prima"); }
   await ap.getByRole("button", { name: "Fatto" }).click();
   await actx.unroute("**/api/prenota/canale**");
   await actx.unroute("https://www.thefork.it/**");
-  await ap.evaluate(() => localStorage.removeItem("mapetite.beta.prenota"));
   // Funzioni pure: riconosce i moduli veri, non le pagine generiche; risolve i link relativi.
   { const cp = await import(new URL("../../src/lib/canale-prenotazione.ts", import.meta.url).href);
     ok(cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345")?.nome === "TheFork" && cp.canaleDaUrl("https://www.thefork.it/")?.nome === undefined && cp.canaleDaUrl("https://bookings.zenchef.com/results?rid=123")?.nome === "Zenchef" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234")?.nome === "Quandoo" && cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345?cc=18980")?.nome === "TheFork" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234?aid=7")?.nome === "Quandoo" && cp.canaleDaUrl("https://evilthefork.it/ristorante/x-r1") === null && cp.canaleDaUrl("javascript:alert(1)") === null && ["https://www.thefork.it/blog/restaurant-week", "https://www.thefork.it/thefork-awards/ristorante-dell-anno", "https://www.thefork.com/restaurants", "https://www.opentable.it/restaurants/rome", "https://www.quandoo.it/places-in-rome"].every((u) => cp.canaleDaUrl(u) === null), "prenota su piattaforma: riconosce i moduli di TheFork, Zenchef, Quandoo e non le home o i domini finti");
@@ -5719,7 +5752,8 @@ else {
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 });
-  ok((await ap.getByTestId("promemoria-oggi").textContent()).includes("Oggi alle 21:00") && (await ap.getByTestId("promemoria-oggi").textContent()).includes("Terrazza Uno"), "home: promemoria della prenotazione di oggi");
+  ok((await ap.getByTestId("promemoria-oggi-titolo").textContent()) === "Stasera alle 21:00 da Terrazza Uno", `home: promemoria 'Stasera alle 21:00 da Terrazza Uno' (${await ap.getByTestId("promemoria-oggi-titolo").textContent()})`);
+  ok((await ap.getByTestId("promemoria-oggi").getByTestId("portami-li").getAttribute("href")) === "https://www.google.com/maps/dir/?api=1&destination=41.9%2C12.49", "home: 'Portami lì' apre le indicazioni con la destinazione già messa");
   ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
   await ashot("56-home-promemoria");
   await ap.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
@@ -5853,7 +5887,7 @@ else {
 
   // 360 px: si legge, niente scorrimento orizzontale
   const nctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await nctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
   await nctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
   await nctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -5909,7 +5943,7 @@ else {
 
     const U = "00000000-0000-0000-0000-000000000001";
     const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const gEvents = [], gSearches = [], gSynth = [], gIntents = [], gPatches = [];
     await gctx.route("**/api/events", (route) => { gEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
     await gctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -6020,7 +6054,7 @@ else {
 
     // 360 px e senza accesso: i gusti restano nel telefono.
     const g3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await g3.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
     const g3Patches = [], g3Searches = [];
     await g3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
@@ -6072,7 +6106,7 @@ else {
     }
 
     const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const sEvents = [], sSearches = [], sIntents = [], sAdds = [];
     await sctx.route("**/api/events", (route) => { sEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
     await sctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -6162,7 +6196,7 @@ else {
 
     // 360 px: si legge, niente scorrimento orizzontale.
     const s3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await s3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
     await s3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
     await s3.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -6184,7 +6218,7 @@ else {
   // Server simulato: Google 300 ms; l'AI che capisce la frase 1200 ms, sul server se la ricerca
   // arriva senza intento, oppure in anticipo mentre si scrive (/api/search/intent).
   const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await pctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
   await pctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
   await pctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -6850,7 +6884,7 @@ else {
   }
 
   const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, acceptDownloads: true });
-  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const pEvents = [];
   await pctx.route("**/api/events", (route) => { pEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
   await pctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -6911,7 +6945,7 @@ else {
   const [dl] = await Promise.all([pp.waitForEvent("download", { timeout: 5000 }), u1.getByTestId("prenotazione-calendario").click()]);
   const { readFileSync } = await import("fs");
   const icsFile = readFileSync(await dl.path(), "utf8").replace(/\r\n /g, "");
-  ok(dl.suggestedFilename() === "prenotazione-terrazza-uno.ics" && icsFile.includes("BEGIN:VEVENT") && icsFile.includes("SUMMARY:Tavolo da Terrazza Uno") && icsFile.includes("T210000") && icsFile.includes("Confermata dal locale"), `prenotazioni: 'Calendario' scarica il file .ics (${dl.suggestedFilename()})`);
+  ok(dl.suggestedFilename() === "prenotazione-terrazza-uno.ics" && icsFile.includes("BEGIN:VEVENT") && icsFile.includes("SUMMARY:Tavolo da Terrazza Uno") && icsFile.includes("T210000") && icsFile.includes("Prenotato (l'hai segnato tu)") && icsFile.includes("TRIGGER:-PT2H") && icsFile.includes("URL:https://www.google.com/maps/dir/?api=1&destination="), `prenotazioni: 'Calendario' scarica il file .ics con avviso 2 ore prima e indicazioni (${dl.suggestedFilename()})`);
   ok(pEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_calendario"), "prenotazioni: calendario registrato");
 
   // Com'è andata?
@@ -7027,6 +7061,48 @@ else {
   await pctx.close();
 }
 
+// 14-ter. Promemoria che si vedono (Lorenzo, 8/11): foglio "Tra 2 ore", banner sulla mappa, dati per prenotare.
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  await vctx.addInitScript(() => {
+    try {
+      localStorage.setItem("mapetite.intro", "visto");
+      if (!localStorage.getItem("mapetite.prenotazioni")) localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+        { id: "v1", placeId: "ChIJabcdefghijklmnop", placeName: "Trattoria Vera", lat: 41.889, lng: 12.469, date: "2026-11-08", time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 06 1234567", confirmed: true, createdAt: 1_790_000_000_000 },
+      ]));
+    } catch { /* ignorato */ }
+  });
+  const vp = await vctx.newPage();
+  await vp.clock.setFixedTime(new Date("2026-11-08T19:00:00"));
+  await vp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await vp.getByTestId("popup-prenotazione").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(((await vp.getByTestId("popup-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Tra 2 ore da Trattoria Vera", "promemoria: 2 ore prima, aprendo l'app, foglio 'Tra 2 ore da Trattoria Vera'");
+  ok((await vp.getByTestId("popup-portami-li").getAttribute("href").catch(() => "")) === "https://www.google.com/maps/dir/?api=1&destination=41.889%2C12.469&destination_place_id=ChIJabcdefghijklmnop" && await vp.getByTestId("popup-ho-disdetto").isVisible().catch(() => false), "promemoria: nel foglio 'Portami lì' (destinazione e locale già messi) e 'Ho disdetto'");
+  await vp.screenshot({ path: `${OUT}/56b-popup-tra-2-ore.png` });
+  await vp.getByTestId("popup-prenotazione").getByRole("button", { name: "Chiudi" }).click().catch(() => {});
+  ok((await vp.getByTestId("promemoria-oggi-titolo").textContent().catch(() => "")) === "Stasera alle 21:00 da Trattoria Vera" && (await vp.getByTestId("promemoria-oggi").getByTestId("promemoria-chiama").getAttribute("href").catch(() => "")) === "tel:+39061234567", "home: banner 'Stasera alle 21:00 da…' con Portami lì e Chiama");
+  await vp.reload({ waitUntil: "networkidle" });
+  await vp.waitForTimeout(600);
+  ok((await vp.getByTestId("popup-prenotazione").count()) === 0, "promemoria: il foglio 'Tra 2 ore' non torna ricaricando (una volta per prenotazione)");
+  await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await vp.getByTestId("mappa-prenotazione").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(((await vp.getByTestId("mappa-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Stasera alle 21:00 da Trattoria Vera" && await vp.getByTestId("mappa-prenotazione").getByTestId("portami-li").isVisible().catch(() => false), "mappa: banner 'Stasera alle 21:00 da…' con Portami lì");
+  { const w = await vp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `mappa: banner della prenotazione senza scorrimento orizzontale (${w}px)`); }
+  await vp.screenshot({ path: `${OUT}/56c-mappa-prenotazione.png` });
+  await vp.getByTestId("mappa-prenotazione").getByRole("button", { name: "Nascondi il promemoria" }).click().catch(() => {});
+  await vp.reload({ waitUntil: "networkidle" });
+  await vp.waitForTimeout(800);
+  ok((await vp.getByTestId("mappa-prenotazione").count()) === 0, "mappa: banner nascosto con la X resta nascosto");
+  // "Ho disdetto" dal foglio: la prenotazione è chiusa, nessun promemoria.
+  await vp.evaluate(() => { localStorage.removeItem("mapetite.prenota.popup"); });
+  await vp.clock.setFixedTime(new Date("2026-11-08T20:00:00"));
+  await vp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await vp.getByTestId("popup-ho-disdetto").click({ timeout: 6000 }).catch(() => {});
+  { const v = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]")[0]);
+    ok(v?.outcome === "non-andato" && typeof v?.disdetta === "number" && (await vp.getByTestId("promemoria-oggi").count()) === 0, "promemoria: 'Ho disdetto' chiude la prenotazione e il promemoria sparisce"); }
+  await vctx.close();
+}
+
 // 15. Barra in basso ridisegnata (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
 //     Da non collegati l'ultima voce è "Entra". Il cookie "e2e_collegato" (solo sviluppo) dà la barra da collegato.
 {
@@ -7041,7 +7117,7 @@ else {
     await bctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: profiloFinto, url: BASE }]);
     const bp = await bctx.newPage();
     bp.on("pageerror", (e) => errors.push(e.message));
-    await bp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+    await bp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
     await bp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
     const nav = bp.getByTestId("barra");
     const nomi = (await nav.getByRole("link").allTextContents()).map((t) => t.trim());
@@ -7181,7 +7257,7 @@ else {
   await gctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   const gp = await gctx.newPage();
   gp.on("pageerror", (e) => errors.push(e.message));
-  await gp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  await gp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
   await gp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   const gnav = gp.getByTestId("barra");
   const accesa = async () => (await gnav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",");
@@ -7263,7 +7339,7 @@ else {
     await setProfilo(dctx, profilo);
     const d = await dctx.newPage();
     d.on("pageerror", (e) => errors.push(e.message));
-    await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+    await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
 
     // Ingresso dal profilo
     // I posti fissi sono una riga dentro Impostazioni: #posti-fissi apre Impostazioni e la riga (ProfiloSezione).
@@ -7494,7 +7570,7 @@ else {
   await dctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const dp = await dctx.newPage();
   dp.on("pageerror", (e) => errors.push(e.message));
-  await dp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await dp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const scrollX = () => dp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   await dp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   const mappa = await dp.locator(".mapboxgl-map").boundingBox();
@@ -7564,7 +7640,7 @@ else {
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await mctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   const mp = await mctx.newPage();
-  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await mp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   const pos = await mp.getByTestId("pannello-ricerca").evaluate((el) => getComputedStyle(el).position);
   const mm = await mp.locator(".mapboxgl-map").boundingBox();
@@ -7618,7 +7694,7 @@ else {
   sp.on("pageerror", (e) => errors.push(e.message));
   // Ore 20:30: momento "cena" (la sorpresa dipende dall'ora: il controllo deve valere a qualsiasi ora del giro).
   await sp.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
-  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
 
   // Ingressi: home e mappa.
   await sp.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -8304,7 +8380,7 @@ if (!fakeUser) console.log("SKIP  ti è stato utile: dev server senza E2E_FAKE_U
 else {
   const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>';
   const uctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const uEv = [];
   await uctx.route("**/api/events", (r) => { uEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await uctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: SVG }));
@@ -8356,6 +8432,7 @@ else {
   await up.getByLabel("Il tuo nome").fill("Giulia");
   const [wa] = await Promise.all([up.waitForEvent("popup"), up.getByTestId("prenota-whatsapp").click()]);
   await wa.close();
+  await up.getByTestId("prenota-non-ancora").click({ timeout: 3000 });
   await up.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
   const fu = up.getByTestId("foglio-prenota").getByTestId("utile");
   ok(await fu.isVisible() && await fu.getAttribute("data-contesto") === "prenota", "utile: dopo l'invio della prenotazione, 'Ti è stato utile?' nel foglio");
@@ -8422,7 +8499,7 @@ else {
   const wEv = [];
   await wctx.route("**/api/events", (r) => { wEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await wctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
-  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const wp = await wctx.newPage();
   wp.on("pageerror", (e) => errors.push(e.message));
   wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
@@ -8928,7 +9005,7 @@ else {
   await vctx.route("**/api/search", (r) => { vBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
   await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const vp = await vctx.newPage();
-  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   vp.on("pageerror", (e) => errors.push(e.message));
   await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await idee(vp);
@@ -9226,7 +9303,7 @@ else {
   await qctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   await qctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await qctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
-  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const qProfilo = { email: "qa@example.com", saved: [{ created_at: "2026-10-10", tags: ["Da provare", "Romantico"], note: null, places: { id: "00000000-0000-4000-8000-0000000009a1", name: "Trattoria QA", category: "restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }], reviews: [] };
   if (fakeUser) await qctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(qProfilo)), url: BASE }]);
   const qp = await qctx.newPage();
@@ -9411,7 +9488,7 @@ else {
   };
   const fp = await fctx.newPage();
   fp.on("pageerror", (e) => errors.push(e.message));
-  await fp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  await fp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
   // Foto "scattata" col telefono: 4000×3000, generata nel browser (sfumature e dettagli, pesante).
   await fp.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
   const bigPhoto = Buffer.from(await fp.evaluate(async () => {
@@ -9831,7 +9908,7 @@ else {
   ok(vicino(a8, 45.464, 9.19), `Sorprendimi senza permesso ma con la mappa lasciata a Milano (o Milano scelta al primo accesso): cerca a Milano (${JSON.stringify(a8)})`);
   // Mappa su Milano: "Prova a chiedere" con gli esempi di Milano.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: MILANO });
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const m = await c.newPage();
     m.on("pageerror", (e) => errors.push(e.message));
     await m.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -9860,7 +9937,7 @@ else {
   // Salvati senza account (18/10): cosa sono in una frase e "Crea la tua mappa", niente lucchetto.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const a = await c.newPage();
     a.on("pageerror", (e) => errors.push(e.message));
     await a.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -9872,7 +9949,7 @@ else {
   // Home: idee e classifiche della città dove sei (Milano), senza permesso quelle di Roma.
   for (const [permesso, atteso] of [[true, "Milano"], [false, "Roma"]]) {
     const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const h = await c.newPage();
     h.on("pageerror", (e) => errors.push(e.message));
     await h.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -9885,7 +9962,7 @@ else {
 
 // "Quando ci vai?" (proposta 17): il salvato segnato per oggi va primo in "Stasera dove andiamo?".
 { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
   const row = (i, name, tags, piano) => ({ tags, note: null, piano_al: piano, places: { id: `00000000-0000-0000-0000-00000000090${i}`, name, category: "ristorante", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, google_place_id: `GS${i}` } });
   const rows = [row(1, "Osteria Uno", ["Da provare"], null), row(2, "Trattoria Due", ["Da provare"], null), row(3, "Pizzeria Tre", ["Da provare"], null), row(4, "Bistrot Quattro", [], oggi), row(5, "Enoteca Cinque", ["Da provare"], "2020-01-04")];
@@ -9925,7 +10002,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["trattoria"], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: [], token: "x" } } }));
     await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
     const p = await c.newPage();
-    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     // Senza "at": con un link condiviso la posizione non si legge (src/app/mappa/map-view.tsx), qui serve quella già permessa.
     await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}`, { waitUntil: "networkidle" });
     await p.getByText("I romani ci tornano per la gricia.").first().waitFor({ timeout: 8000 });

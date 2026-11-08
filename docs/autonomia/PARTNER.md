@@ -41,6 +41,27 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Grazie,
   > Roberto, Mapetite
 
+## Bozze per Lorenzo: "l'assistente che prenota per te" (8/11) — DA DECIDERE LORENZO
+**Nessun contatto è stato fatto. Non inviare senza decisione di Lorenzo.** Richiesta del founder dell'8/11: un assistente che prenota al posto della persona e propone alternative se non c'è posto. Senza accordi non si automatizzano i siti delle piattaforme (termini d'uso, niente scraping): servono le loro API per partner. Nell'app oggi: "Prenota su TheFork/Quandoo" apre il modulo del locale con i dati della persona già copiati, poi "L'hai prenotato?" salva la prenotazione. Link con giorno/ora/persone già impostati: formato dei parametri non verificato (siti non raggiungibili dalla sessione), quindi oggi link semplice.
+**Domanda per Lorenzo:** "Mandiamo (tu o Roberto) queste due richieste, prima Quandoo e poi TheFork?"
+
+- **Bozza a Quandoo (programma partner / affiliate API):**
+  > Oggetto: Mapetite × Quandoo: prenotazioni da clienti che hanno già scelto, Roma e Milano
+  >
+  > Buongiorno, sono Lorenzo, founder di Mapetite: app italiana dove le persone salvano i locali visti sui social e li ritrovano quando devono scegliere, concentrata su Roma e Milano.
+  > Vorremmo diventare vostro partner di distribuzione: leggere le disponibilità in tempo reale dei ristoranti Quandoo e, con il consenso esplicito dell'utente, inviare la prenotazione a suo nome (nome, cellulare, persone, orario), proponendo un altro locale Quandoo se non c'è posto.
+  > Offriamo domanda qualificata: persone che hanno già salvato quel locale e sono al momento della scelta, con dati anonimi su cosa cercano per zona. Siamo aperti a discutere una commissione per prenotazione onorata.
+  > Avete un programma partner o un'API affiliate? Bastano 20 minuti per mostrarvi l'app dal telefono.
+  > Grazie, Lorenzo, Mapetite
+
+- **Bozza a TheFork (programma affiliati / partner):**
+  > Oggetto: Mapetite: utenti già decisi, pronti a prenotare sui ristoranti TheFork
+  >
+  > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti a Roma e Milano: i nostri utenti arrivano alla prenotazione avendo già scelto il locale.
+  > Vorremmo capire se esiste un programma affiliati o un'API partner per mostrare le disponibilità in tempo reale dei vostri ristoranti e prenotare per conto dell'utente, con il suo consenso esplicito, anche proponendo un'alternativa TheFork quando il locale è pieno.
+  > In cambio portiamo domanda qualificata nelle due città dove siamo concentrati; siamo disponibili a parlare di una commissione per prenotazione.
+  > A chi possiamo rivolgerci? Grazie, Lorenzo, Mapetite
+
 ## Zenchef + CoverManager
 - **Chi è:** gruppo europeo di gestionali per prenotazioni, proprietà del fondo PSG Equity; fusione del luglio 2025.
 - **Quanti locali:** oltre 36.000 ristoranti in più di 20 paesi ([Maddyness](https://www.maddyness.com/2025/07/15/foodtech-zenchef-fusionne-avec-son-rival-espagnol-covermanager/)). In Italia: dato non trovato.

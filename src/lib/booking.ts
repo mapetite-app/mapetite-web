@@ -183,18 +183,51 @@ export function missingDetails(b: BookingDetails): ("persone" | "giorno" | "ora"
 
 // Il messaggio per il locale: cortese, breve, modificabile. Solo dati scelti dall'utente.
 // volta: "Sarà la mia 3ª volta da voi" (PROPOSTE.md 11), solo se l'utente lo accende nel foglio Prenota.
-export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date(), volta: number | null = null, parola: number | null = null): string {
+// contatto: "I tuoi dati per prenotare" (8/11), solo con il consenso della persona: "a nome …" e il cellulare.
+export function bookingMessage(b: BookingDetails, name: string | null, now: Date = new Date(), volta: number | null = null, parola: number | null = null, contatto: { nome: string; telefono: string | null } | null = null): string {
   const greeting = now.getHours() < 13 ? "Buongiorno" : "Buonasera";
   const parts = [`${greeting}, vorrei prenotare un tavolo`];
   if (b.people) parts.push(` per ${b.people} ${b.people === 1 ? "persona" : "persone"}`);
   if (b.date) parts.push(` ${dayLabel(b.date, now)}`);
   if (b.time) parts.push(` alle ${b.time}`);
+  if (contatto?.nome.trim()) parts.push(` a nome ${contatto.nome.trim()}`);
   if (b.special) parts.push(`, ${b.special} se possibile`);
   parts.push(". È disponibile?");
+  if (contatto?.telefono?.trim()) parts.push(` Il mio cellulare è ${contatto.telefono.trim()}.`);
   if (volta && volta >= 2) parts.push(` Sarà la mia ${volta}ª volta da voi.`);
   if (parola && parola >= PAROLA_MIN) parts.push(` Con Mapetite ho già prenotato ${parola} tavoli, anche altrove: sempre presente o disdetto in tempo.`);
   const sign = name?.trim() ? `Grazie, ${name.trim()}` : "Grazie";
   return `${parts.join("")} ${sign}`;
+}
+
+// "I tuoi dati per prenotare" (8/11): nome e cognome, cellulare, email facoltativa, chiesti una volta
+// nel foglio Prenota e usati solo con il consenso esplicito. Restano sul telefono; sull'account va solo
+// nome e cellulare della singola prenotazione, e solo se la persona ha già acceso "Tienile sul tuo account".
+export type DatiPrenotazione = { nome: string; telefono: string; email: string; consenso: boolean };
+export const DATI_KEY = "mapetite.dati-prenotazione";
+export function leggiDatiPrenotazione(): DatiPrenotazione | null {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(DATI_KEY) ?? "null");
+    if (!v || typeof v !== "object" || v.consenso !== true) return null;
+    return { nome: String(v.nome ?? "").slice(0, 60), telefono: String(v.telefono ?? "").slice(0, 30), email: String(v.email ?? "").slice(0, 120), consenso: true };
+  } catch {
+    return null;
+  }
+}
+export function salvaDatiPrenotazione(d: DatiPrenotazione | null) {
+  try {
+    if (!d || !d.consenso) window.localStorage.removeItem(DATI_KEY);
+    else window.localStorage.setItem(DATI_KEY, JSON.stringify({ nome: d.nome.trim().slice(0, 60), telefono: d.telefono.trim().slice(0, 30), email: d.email.trim().slice(0, 120), consenso: true }));
+  } catch { /* storage non disponibile */ }
+}
+// Cellulare plausibile (italiano o internazionale): niente lettere, 8–15 cifre.
+export function telefonoValido(t: string): boolean {
+  const c = t.replace(/[\s.()-]/g, "");
+  return /^\+?\d{8,15}$/.test(c);
+}
+// Per i moduli dei siti (TheFork, sito del locale): i dati in righe da incollare.
+export function datiDaIncollare(d: DatiPrenotazione): string {
+  return [d.nome.trim(), d.telefono.trim(), d.email.trim()].filter(Boolean).join("\n");
 }
 
 // Disdetta (contro i tavoli prenotati e vuoti: 12,8% in media, docs/autonomia/POSIZIONAMENTO.md):
@@ -245,6 +278,8 @@ export type BookingRequest = BookingDetails & {
   piattaforma?: string | null; // "Prenota su TheFork" (via "sito"): il nome della piattaforma (dal 30/10)
   ciVado?: number | null;  // "Ci vai domani? Sì" (ms, proposta 36): il promemoria del giorno prima non torna (dal 1/11)
   modificataAt?: number;   // ultima modifica fatta sul telefono (ms): tra due telefoni vince la più recente (dal 31/10)
+  aNome?: string | null;   // "a nome …" (I tuoi dati per prenotare, con consenso; dall'8/11)
+  telCliente?: string | null; // cellulare della persona dato al locale (con consenso; dall'8/11)
 };
 
 const KEY = "mapetite.prenotazioni";
@@ -487,15 +522,109 @@ export function bookingIcs(b: BookingRequest, now: Date = new Date()): string | 
   const details = [
     b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null,
     b.special ? `Richiesta: ${b.special}` : null,
-    b.confirmed ? "Confermata dal locale." : "Richiesta inviata: la conferma arriva dal locale.",
+    b.confirmed ? "Prenotato (l'hai segnato tu)." : "Richiesta inviata: la conferma arriva dal locale.",
   ].filter(Boolean).join("\n");
   const title = icsText(`Tavolo da ${b.placeName}`);
-  lines.push(`SUMMARY:${title}`, `DESCRIPTION:${icsText(details)}`);
-  if (b.lat != null && b.lng != null) {
-    lines.push(`GEO:${b.lat};${b.lng}`, `URL:https://www.google.com/maps/dir/?api=1&destination=${b.lat}%2C${b.lng}`);
-  }
+  lines.push(`SUMMARY:${title}`, `DESCRIPTION:${icsText(details)}`, `LOCATION:${icsText(b.placeName)}`);
+  if (b.lat != null && b.lng != null) lines.push(`GEO:${b.lat};${b.lng}`);
+  // Il link apre le indicazioni con la destinazione già messa (Lorenzo, 8/11: "portami lì").
+  const dir = portamiLiUrl(b);
+  if (dir) lines.push(`URL:${dir}`);
   lines.push("BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", `DESCRIPTION:${title}`, "END:VALARM", "END:VEVENT", "END:VCALENDAR");
   // Righe lunghe piegate (RFC 5545: massimo 75 byte; 60 caratteri lasciano margine agli accenti).
   const fold = (l: string) => (l.length <= 60 ? l : (l.match(/[\s\S]{1,60}/gu) ?? [l]).join("\r\n "));
   return lines.map(fold).join("\r\n") + "\r\n";
+}
+
+// Scarica il file .ics (nel browser): lo usano "Le mie prenotazioni" e il foglio Prenota dopo "Sì, l'ho prenotato".
+export function scaricaIcs(b: BookingRequest): boolean {
+  const ics = bookingIcs(b);
+  if (!ics) return false;
+  try {
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    const slug = b.placeName.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "locale";
+    a.download = `prenotazione-${slug}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Promemoria che si vedono (Lorenzo, 8/11): banner in home e sulla mappa, foglio 2 ore prima ──
+
+// "Portami lì": indicazioni di Google Maps con la destinazione già messa. Il Place ID (solo se è di
+// Google, non l'UUID dei salvati) fa aprire proprio il locale e non un punto qualsiasi.
+export function portamiLiUrl(b: Pick<BookingRequest, "lat" | "lng" | "placeId" | "placeName">): string | null {
+  const pid = b.placeId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.placeId) && /^[A-Za-z0-9_-]{16,}$/.test(b.placeId) ? b.placeId : null;
+  if (b.lat != null && b.lng != null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${b.lat}%2C${b.lng}${pid ? `&destination_place_id=${encodeURIComponent(pid)}` : ""}`;
+  }
+  if (pid) return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.placeName)}&destination_place_id=${encodeURIComponent(pid)}`;
+  return null;
+}
+
+// Ora del tavolo nell'ora del telefono (come l'ha scelta la persona).
+export function inizioLocale(b: Pick<BookingRequest, "date" | "time">): Date | null {
+  if (!b.date || !b.time || !/^\d{1,2}:\d{2}$/.test(b.time)) return null;
+  const d = fromKey(b.date);
+  const [h, m] = b.time.split(":").map(Number);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+// "Stasera alle 21:00", "Oggi alle 13:00", "Domani alle 21:00".
+export function quandoTavolo(b: Pick<BookingRequest, "date" | "time">, now: Date = new Date()): string {
+  const sera = b.time ? Number(b.time.slice(0, 2)) >= 18 : false;
+  const giorno = b.date === dateKey(addDays(now, 1)) ? "Domani" : b.date === dateKey(now) ? (sera ? "Stasera" : "Oggi") : b.date ? dayLabel(b.date, now) : "";
+  return `${giorno}${b.time ? ` alle ${b.time}` : ""}`;
+}
+
+// Ancora da fare: né disdetta, né nascosta, né conclusa.
+function viva(b: BookingRequest): boolean {
+  return !b.dismissed && !b.outcome && b.disdetta == null;
+}
+
+// Il banner della mappa: la prossima prenotazione di oggi (fino a un'ora dopo l'ora del tavolo),
+// altrimenti quella di domani. Una sola, la più vicina.
+export function prenotazioneDaRicordare(list: BookingRequest[], now: Date = new Date()): { b: BookingRequest; domani: boolean } | null {
+  const oggi = dateKey(now);
+  const domani = dateKey(addDays(now, 1));
+  const ordina = (a: BookingRequest, c: BookingRequest) => (a.time ?? "").localeCompare(c.time ?? "");
+  const nonPassata = (b: BookingRequest) => { const t = inizioLocale(b); return !t || t.getTime() > now.getTime() - 3_600_000; };
+  const diOggi = list.filter((b) => viva(b) && b.date === oggi && nonPassata(b)).sort(ordina)[0];
+  if (diOggi) return { b: diOggi, domani: false };
+  const diDomani = list.filter((b) => viva(b) && b.date === domani && !b.dismissedEve).sort(ordina)[0];
+  return diDomani ? { b: diDomani, domani: true } : null;
+}
+
+// Il foglio "Tra 2 ore da…": da 2 ore e mezza prima fino all'ora del tavolo, una volta per prenotazione.
+export const POPUP_FINESTRA_MS = 150 * 60_000;
+export function prenotazioneTraPoco(list: BookingRequest[], now: Date = new Date(), giaMostrate: string[] = []): { b: BookingRequest; minuti: number } | null {
+  if (giaMostrate.includes("*")) return null; // spento su questo telefono (lo usa il giro automatico)
+  let best: { b: BookingRequest; minuti: number } | null = null;
+  for (const b of list) {
+    if (!viva(b) || giaMostrate.includes(b.id)) continue;
+    const t = inizioLocale(b);
+    if (!t) continue;
+    const diff = t.getTime() - now.getTime();
+    if (diff <= 0 || diff > POPUP_FINESTRA_MS) continue;
+    const minuti = Math.round(diff / 60_000);
+    if (!best || minuti < best.minuti) best = { b, minuti };
+  }
+  return best;
+}
+
+// "Tra 2 ore", "Tra un'ora e mezza", "Tra 40 minuti" (a mezz'ore e a 5 minuti: niente falsa precisione).
+export function traQuanto(minuti: number): string {
+  if (minuti < 55) return `Tra ${Math.max(5, Math.round(minuti / 5) * 5)} minuti`;
+  const mezz = Math.round(minuti / 30) / 2;
+  const ore = Math.floor(mezz);
+  if (mezz === ore) return ore === 1 ? "Tra un'ora" : `Tra ${ore} ore`;
+  return ore === 1 ? "Tra un'ora e mezza" : `Tra ${ore} ore e mezza`;
 }
