@@ -23,8 +23,8 @@ function usePronto(): string {
   // Revisore 8/11: invisibili lasciavano un buco di 120 px sul 4G lento. Ora si vedono le card (contorni e colori)
   // e il testo arriva quando il telefono ha letto le ricerche.
   // Secondo revisore 8/11: i righi di testo diventano barre grigie (segnaposto come Places), non riquadri vuoti.
-  // Terzo revisore 8/11: barre sottili arrotondate ad altezza fissa (12 px, 60% della riga) e ✦ tolto senza lasciare spazio (revisore 8/11 pomeriggio), come i segnaposto di Places.
-  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! attesa [&_.stella]:hidden [&_.num]:text-border!";
+  // Terzo revisore 8/11: barre sottili arrotondate ad altezza fissa (12 px, 60% della riga) e ✦ trasparente ma col suo spazio (secondo revisore 8/11 pomeriggio: tolta, il perché andava su una riga e la card cresceva di 16 px), come i segnaposto di Places.
+  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! attesa [&_.stella]:invisible [&_.num]:text-border!";
 }
 
 function useRecenti(): string[] {
