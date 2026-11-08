@@ -20,7 +20,9 @@ const TONDO = "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl t
 const noop = () => () => {};
 function usePronto(): string {
   const pronto = useSyncExternalStore(noop, () => true, () => false);
-  return `transition-opacity duration-150 ${pronto ? "opacity-100" : "opacity-0"}`;
+  // Revisore 8/11: invisibili lasciavano un buco di 120 px sul 4G lento. Ora si vedono le card (contorni e colori)
+  // e il testo arriva quando il telefono ha letto le ricerche.
+  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent!";
 }
 
 function useRecenti(): string[] {
