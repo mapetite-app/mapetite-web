@@ -1139,6 +1139,8 @@ export default function MapView({
   const [consiglioChiesto, setConsiglioChiesto] = useState<number | null>(null);
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
+  // Ricerca riaperta dalla memoria del telefono (ricarica, Indietro): anche "Dai tuoi salvati" torna da lì (revisore 8/11).
+  const daMemoriaPer = useRef<number | null>(null);
   // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
   const ricercaMondo = useRef<number | null>(null);
   // Schermata di benvenuto: sparisce alla prima interazione.
@@ -2424,7 +2426,7 @@ export default function MapView({
   // Nessuna chiamata Google; ogni errore (429, 503, rete) lascia solo i risultati, senza messaggi.
   const chiediSalvati = async (q: string, ticket: number, at: { lat: number; lng: number }, daMemoria = false) => {
     // Revisori 8/11: riaprendo la ricerca dalla memoria (ricarica, Indietro) niente seconda chiamata all'AI.
-    const memoKey = chiaveRicerca("/api/salvati/chiedi", { u: userId, q: q.trim(), n: savedPlaces.length });
+    const memoKey = chiaveRicerca("/api/salvati/chiedi", { u: userId, q: q.trim() });
     const memo = daMemoria ? ricordata<{ scelti?: unknown }>(memoKey) : null;
     if (memo) {
       if (searchSeq.current === ticket && Array.isArray(memo.scelti)) setDalSalvati({ ticket, at, scelti: memo.scelti });
@@ -2463,7 +2465,7 @@ export default function MapView({
     if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
     if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
     chiestoPer.current = aiSearchId;
-    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
+    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude }, daMemoriaPer.current === aiSearchId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
   }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
@@ -2489,6 +2491,7 @@ export default function MapView({
     ricercaMondo.current = mondo && !opts.simile ? ticket : null;
     // L'avviso "A 250 m c'è…" non torna a coprire la mappa quando si chiude la ricerca.
     setNearbySaved(null);
+    daMemoriaPer.current = opts.daMemoria ? ticket : null;
     if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at, opts.daMemoria === true); }
     setLoadingVerdicts(false);
     setAiSearching(true);

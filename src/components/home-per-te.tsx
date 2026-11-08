@@ -23,8 +23,8 @@ function usePronto(): string {
   // Revisore 8/11: invisibili lasciavano un buco di 120 px sul 4G lento. Ora si vedono le card (contorni e colori)
   // e il testo arriva quando il telefono ha letto le ricerche.
   // Secondo revisore 8/11: i righi di testo diventano barre grigie (segnaposto come Places), non riquadri vuoti.
-  // Terzo revisore 8/11: barre sottili ad altezza fissa (12 px, 60% della riga) e ✦ nascosto, come i segnaposto di Places.
-  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! [&_.testo]:bg-[linear-gradient(var(--color-border),var(--color-border))] [&_.testo]:bg-[length:60%_0.75rem] [&_.testo]:bg-[position:0_50%] [&_.testo]:bg-no-repeat [&_.stella]:invisible [&_.num]:text-border!";
+  // Terzo revisore 8/11: barre sottili arrotondate ad altezza fissa (12 px, 60% della riga) e ✦ tolto senza lasciare spazio (revisore 8/11 pomeriggio), come i segnaposto di Places.
+  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! attesa [&_.stella]:hidden [&_.num]:text-border!";
 }
 
 function useRecenti(): string[] {
@@ -176,7 +176,7 @@ export default function HomePerTe({
             <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
             <span className="min-w-0 flex-1">
               {/* Due righe sempre riservate: il titolo che arriva dal telefono non allunga la card (terzo revisore 8/11, 16 px di salto). */}
-              <span className={`testo ${SERIF} line-clamp-2 min-h-[2.3em] text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
+              <span className={`testo2 ${SERIF} line-clamp-2 min-h-[2.3em] text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
               <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden className="stella">✦</span>
                 <span className="testo line-clamp-2 [text-wrap:pretty]">{p.perche}</span>

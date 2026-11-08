@@ -147,3 +147,13 @@ a,
     transition: transform 80ms ease-out;
   }
 }
+
+/* Home "Per te" prima che il telefono legga le ricerche: barre grigie arrotondate ad altezza fissa al posto del testo
+   (segnaposto come Places; revisori 8/11). Il testo resta trasparente sotto, così l'altezza non cambia. */
+.attesa .testo {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='12' preserveAspectRatio='none'%3E%3Crect width='200' height='12' rx='6' fill='%23e3e7e7'/%3E%3C/svg%3E") 0 50% / 60% 0.75rem no-repeat;
+}
+/* Titolo su due righe: due barre, come due righe di testo. */
+.attesa .testo2 {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='12' preserveAspectRatio='none'%3E%3Crect width='200' height='12' rx='6' fill='%23e3e7e7'/%3E%3C/svg%3E") 0 0.2em / 85% 0.75rem no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='12' preserveAspectRatio='none'%3E%3Crect width='200' height='12' rx='6' fill='%23e3e7e7'/%3E%3C/svg%3E") 0 1.35em / 55% 0.75rem no-repeat;
+}
