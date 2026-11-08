@@ -34,6 +34,8 @@ Collaudatore separato, domenica 8/11 tra le 03:00 e le 03:30 (ora di Roma), prod
 6. **Ricerca persa ricaricando `/mappa`** (D25 del 1/11, ancora aperto): ogni ricarica costa una ricerca Google.
 7. Minori: banner "📲 Aggiungi Mapetite alla Home" sopra le card di caricamento; dopo il primo accesso la home mostra anche l'intro "Non perdere più i posti"; l'account di prova con 5 salvati finisce di nuovo su `/onboarding` dopo l'accesso (D2); la barra in basso compare su `/login` (D1).
 
+**Sistemati l'8/11 mattina (PR della sessione 10:05):** 3 in parte (la prima ricerca parte dal tipo scelto adatto all'ora: di sera il cocktail bar, se scelto); 4 ("Messi da parte Nannarella e altri N molto famosi" ora sta in vista sopra le card, senza toccare la pillola: il passo 3 del copione non richiede più il tocco); 5 ("Salva" della scheda in un tocco, avviso "📌 Salvato · Aggiungi nota"); 7 in parte (l'invito "Aggiungi alla Home" non copre più le card in arrivo; `/raccolte` porta ai Salvati).
+
 ## Copione di 3 minuti (sprint, 26/10) — superato dal 7/11, tenuto come storia
 Le 4 chiavi di volta in fila: primo accesso, salva dal reel, ricerca con l'AI, scheda. Il copione lungo (5 minuti, 18/10) resta sotto per le domande.
 **Prima (2 minuti):** credito Anthropic attivo (in `/admin/numeri` deve esserci "AI: ok"; senza, la ricerca funziona ma i verdetti dei posti nuovi non arrivano); link di un TikTok di un ristorante negli appunti; posizione già permessa.
