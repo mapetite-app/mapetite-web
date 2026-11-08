@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft } from "lucide-react";
 
 // Primo accesso (stile Albo): tre schermate, un'idea per schermata, poi la home con la ricerca.
@@ -13,8 +13,10 @@ export const INTRO_KEY = "mapetite.intro";
 const EVENT = "mapetite-intro";
 let forced = false;
 
-function read(): "si" | "no" {
-  if (forced || document.documentElement.dataset.intro === "nuovo") return "si";
+function read(): "forzata" | "si" | "no" {
+  // "Come funziona" o ?intro=1 (prove): si mostra anche a chi usa già l'app.
+  if (forced || new URLSearchParams(window.location.search).get("intro") === "1") return "forzata";
+  if (document.documentElement.dataset.intro === "nuovo") return "si";
   try {
     return window.localStorage.getItem(INTRO_KEY) ? "no" : "si";
   } catch {
@@ -163,11 +165,16 @@ const SCREENS = [
   },
 ];
 
-export default function HomeIntro({ loggedIn }: { loggedIn: boolean }) {
+// giaDentro: account che usa già l'app (salvati o primo accesso fatto, D3 della prova dell'8/11). L'intro
+// non si mostra (nemmeno prima di React) e il telefono se la segna come vista; "Come funziona" la riapre.
+export default function HomeIntro({ loggedIn, giaDentro = false }: { loggedIn: boolean; giaDentro?: boolean }) {
   const state = useSyncExternalStore(subscribe, read, () => "ssr" as const);
   const [step, setStep] = useState(0);
   const touchX = useRef<number | null>(null);
-  if (state === "no") return null;
+  useEffect(() => {
+    if (giaDentro && read() !== "forzata") markSeen();
+  }, [giaDentro]);
+  if (state === "no" || (giaDentro && state !== "forzata")) return null;
 
   const last = step === SCREENS.length - 1;
   const close = () => {

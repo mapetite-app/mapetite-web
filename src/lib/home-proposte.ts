@@ -298,7 +298,7 @@ const CLASSIFICHE: Record<string, Classifica[]> = {
     { id: "taglieri", emoji: "🧀", titolo: "Taglieri e norcinerie", sotto: "Salumi, formaggi e un calice", q: "norcineria o salumeria con taglieri per aperitivo a Roma", momenti: ["aperitivo"], chiave: "fritti" }, // "Fritti e taglieri" nelle idee è lo stesso aperitivo (revisore 7/11)
     { id: "quartiere", emoji: "🫒", titolo: "Aperitivi di quartiere", sotto: "Dove va chi abita lì, prezzi onesti", q: "aperitivo di quartiere non turistico a Roma", momenti: ["aperitivo"] },
     { id: "crudi", emoji: "🦪", titolo: "Crudi e bollicine", sotto: "Banconi piccoli, pesce del giorno", q: "aperitivo con crudi di pesce e bollicine a Roma", momenti: ["aperitivo"], chiave: "bollicine" },
-    { id: "bancone", emoji: "☕", titolo: "Caffè al bancone", sotto: "Bar di quartiere, cornetto caldo", q: "bar storico di quartiere per colazione a Roma", momenti: ["colazione"], chiave: "bar" },
+    { id: "bancone", emoji: "☕", titolo: "Caffè al bancone", sotto: "Bar di quartiere, colazione al banco", q: "bar storico di quartiere per colazione a Roma", momenti: ["colazione"], chiave: "bar" },
     // Revisore 7/11: all'aperitivo e dopo cena vino, cocktail e vista stanno già nelle idee sotto il campo.
     { id: "vermouth", emoji: "🥃", titolo: "Vermouth e bitter", sotto: "L'aperitivo all'italiana, al bancone", q: "bar per aperitivo con vermouth e bitter a Roma", momenti: ["aperitivo"], chiave: "vermouth" },
     { id: "jazz", emoji: "🎷", titolo: "Musica dal vivo", sotto: "Jazz e concerti piccoli, un drink in mano", q: "locale con musica jazz dal vivo a Roma", momenti: ["dopocena"], chiave: "musica" },

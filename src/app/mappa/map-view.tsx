@@ -49,6 +49,7 @@ import { circlePolygon, nearNowQuery, radiusLabel } from "@/lib/vicino";
 import { grantedPosition, readLastView, saveLastView } from "@/lib/last-view";
 import { zoneDeiSalvati, zonaIniziale, type Zona } from "@/lib/salvati-zone";
 import { firmaPer, rememberFirme } from "@/lib/catalog-firme";
+import { aperturaRipetuta, arrotonda, chiaveRicerca, ricorda, ricordata } from "@/lib/ricerca-memoria";
 
 // Versione da computer (piano 6.5): da 1024px la mappa sta a sinistra e ricerca, lista e scheda
 // in un pannello a destra (stesso breakpoint `lg:` delle classi). Sul telefono non cambia nulla.
@@ -63,6 +64,24 @@ const LATO_ETICHETTA: Record<LabelSide, string> = {
   sinistra: "right-full top-1/2 mr-[3px] -translate-y-1/2",
   sopra: "bottom-full left-1/2 mb-0.5 -translate-x-1/2",
 };
+
+// D25: la ricerca nell'indirizzo (/mappa?q=…&at=lat,lng), senza nuova voce nella cronologia; null la toglie.
+function scriviRicercaInIndirizzo(q: string | null, at?: { lat: number; lng: number }) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  if (q) {
+    params.set("q", q.trim().slice(0, 200));
+    if (at) params.set("at", `${arrotonda(at.lat)},${arrotonda(at.lng)}`);
+  } else {
+    if (!params.has("q") && !params.has("at")) return;
+    params.delete("q");
+    params.delete("at");
+  }
+  const rest = params.toString();
+  // Stato null: così Next (che copia da sé il suo stato) aggiorna anche il proprio indirizzo; passando
+  // window.history.state (che ha __NA) Next non se ne accorgeva e poi riscriveva /mappa senza ?q=.
+  window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+}
 
 // Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
@@ -2418,6 +2437,16 @@ export default function MapView({
     }
   };
 
+  // D25: quando la ricerca nell'indirizzo non è più quella a schermo (✕, filtri, Sorprendimi, un'altra
+  // ricerca), ?q= si toglie, così ricaricare non riapre una ricerca chiusa.
+  const ricercaInIndirizzo = useRef<number | null>(null);
+  const aiSearchIdUrl = aiSearch?.id ?? null;
+  useEffect(() => {
+    if (ricercaInIndirizzo.current == null || aiSearchIdUrl === ricercaInIndirizzo.current) return;
+    ricercaInIndirizzo.current = null;
+    scriviRicercaInIndirizzo(null);
+  }, [aiSearchIdUrl]);
+
   // Dalla home (/mappa?q=…) la ricerca parte prima che i salvati siano letti: si chiede appena arrivano.
   const aiSearchId = aiSearch?.id ?? null;
   const aiSearchQuery = aiSearch?.query ?? null;
@@ -2431,7 +2460,7 @@ export default function MapView({
 
   // opts.mondo: ricerca nel mondo anche se si parte dai salvati (la vista passa a "all" nello stesso
   // tocco, ma qui `view` è ancora quella di prima). opts.simile: "Altri come questo" (proposta 27).
-  const runAISearch = async (qScritta: string, center?: { lat: number; lng: number }, optsDati: { mondo?: boolean; simile?: { nome: string; escludi: string[] } } = {}) => {
+  const runAISearch = async (qScritta: string, center?: { lat: number; lng: number }, optsDati: { mondo?: boolean; simile?: { nome: string; escludi: string[] }; daMemoria?: boolean } = {}) => {
     // "Altri come Nome" nella barra (minore del collaudo del 31/10): reinviata così com'è, è ancora
     // la ricerca dei simili, con la sua frase vera e il posto di partenza escluso.
     const s = simileRef.current;
@@ -2456,29 +2485,43 @@ export default function MapView({
     setAiSearching(true);
       setAiError(null);
       try {
-        // Frase già capita mentre si scriveva: la ricerca non riaspetta l'AI (~1-2 s in meno).
-        const intent = mondo ? await intentFor(q) : null;
-        if (searchSeq.current !== ticket) return;
-        const res = await fetch("/api/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: q,
-            source: mondo ? "world" : "saved",
-            searchIntent: "natural",
-            phase: "fast",
-            ...(intent && { intent, intentQuery: q.trim() }),
-            lat: at.lat,
-            lng: at.lng,
-          }),
-        });
-        const data = await res.json();
-        rememberFirme(data?.risultati);
-        if (searchSeq.current !== ticket) return;
-        if (!res.ok) {
-          setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
-          return;
+        // D25 (prova dell'8/11): la stessa ricerca, nello stesso punto, negli ultimi minuti è già nel
+        // telefono (ricarica, Indietro): si riusa senza chiamare Google né l'AI.
+        const memoKey = mondo ? chiaveRicerca("/api/search", { u: userId, q: q.trim(), lat: arrotonda(at.lat), lng: arrotonda(at.lng) }) : null;
+        // Stessa forma libera della risposta di /api/search (res.json()).
+        // Solo riaprendo la pagina (opts.daMemoria): una ricerca rifatta a mano chiede sempre risposte fresche.
+        let data: Awaited<ReturnType<Response["json"]>> = memoKey && opts.daMemoria ? ricordata(memoKey) : null;
+        if (data) {
+          rememberFirme(data?.risultati);
+        } else {
+          // Frase già capita mentre si scriveva: la ricerca non riaspetta l'AI (~1-2 s in meno).
+          const intent = mondo ? await intentFor(q) : null;
+          if (searchSeq.current !== ticket) return;
+          const res = await fetch("/api/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: q,
+              source: mondo ? "world" : "saved",
+              searchIntent: "natural",
+              phase: "fast",
+              ...(intent && { intent, intentQuery: q.trim() }),
+              lat: at.lat,
+              lng: at.lng,
+            }),
+          });
+          data = await res.json();
+          rememberFirme(data?.risultati);
+          if (searchSeq.current !== ticket) return;
+          if (!res.ok) {
+            setAiError(data.error ?? "Qualcosa è andato storto. Riprova.");
+            return;
+          }
+          if (memoKey) ricorda(memoKey, data);
         }
+        if (searchSeq.current !== ticket) return;
+        // La ricerca resta nell'indirizzo (/mappa?q=…&at=…): ricaricare o tornare indietro la ritrova.
+        if (mondo && !opts.simile) { scriviRicercaInIndirizzo(q, at); ricercaInIndirizzo.current = ticket; }
         type RawPlace = {
           id: string; name: string; category: string | null; lat: number | null; lng: number | null;
           rating: number | null; priceLevel: number | null; address: string | null;
@@ -2544,7 +2587,7 @@ export default function MapView({
       // 94 = pillola (60) + nome sotto il segnalino (34): stessa misura del controllo "prima card coperta" più sotto,
       // che altrimenti scattava quasi sempre e rifaceva l'inquadratura (terzo revisore 5/11).
       fitToPlaces(places, 236, savedPlaces.length > 0 ? 94 : 0, places.slice(0, 1));
-      void loadVerdicts(id, q, data.sintesi_pendente ?? null);
+      void loadVerdicts(id, q, data.sintesi_pendente ?? null, opts.daMemoria === true);
       } catch {
         setAiError("Errore di rete. Controlla la connessione e riprova.");
       } finally {
@@ -2640,7 +2683,7 @@ export default function MapView({
 
   // Secondo tempo della ricerca AI: verdetti e motivi arrivano dopo la lista.
   // Se nel frattempo l'utente ha cambiato o azzerato la ricerca (id diverso) si scarta.
-  const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null) => {
+  const loadVerdicts = async (id: number, searchedQuery: string, pending: PendingSynthesis | null, daMemoria = false) => {
     if (!pending) { if (searchSeq.current === id) setLoadingVerdicts(false); return; }
     setLoadingVerdicts(true);
     let consiglioPartito = false;
@@ -2653,6 +2696,10 @@ export default function MapView({
       // Un gruppo perso (errore del server, rete, AI che non risponde) si richiede UNA volta: il 19/10 dal
       // vivo un 502 lasciava una trattoria di Trastevere senza verdetto (VISIONE: il verdetto c'è SEMPRE).
       const fetchGroup = async (g: { places: unknown[]; token: string }): Promise<VerdictReply | null> => {
+        // Verdetti già scritti per questa ricerca (ricarica, Indietro: D25): niente seconda chiamata all'AI.
+        const memoKey = chiaveRicerca("/api/search/synthesis", { u: userId, q: searchedQuery, token: g.token });
+        const memo = daMemoria ? ricordata<VerdictReply>(memoKey) : null;
+        if (memo) return memo;
         for (let attempt = 0; attempt < 2; attempt++) {
           if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
           if (searchSeq.current !== id) return null;
@@ -2665,7 +2712,8 @@ export default function MapView({
             if (res.status >= 400 && res.status < 500) return null; // richiesta rifiutata: riprovare non serve
             if (!res.ok) continue;
             const part: VerdictReply = await res.json();
-            if (Object.keys(part.dettagli ?? {}).length > 0 || attempt === 1) return part;
+            if (Object.keys(part.dettagli ?? {}).length > 0) { ricorda(memoKey, part); return part; }
+            if (attempt === 1) return part;
           } catch {
             // rete: si riprova una volta
           }
@@ -2829,7 +2877,7 @@ export default function MapView({
   }, []);
 
   // Link a una ricerca (/mappa?q=…&at=lat,lng): la rifà una volta all'apertura, nello stesso punto.
-  // Costa quanto una ricerca scritta a mano. Poi toglie q dall'indirizzo, così ricaricare non la ripete.
+  // Costa quanto una ricerca scritta a mano. Ricaricando la si ritrova dalla memoria del telefono (D25).
   const sharedSearchDone = useRef(false);
   // La mappa è stata spostata con il dito: la posizione arrivata dopo non la sposta più.
   const touchedMap = useRef(false);
@@ -2936,10 +2984,18 @@ export default function MapView({
       Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
       ? { lat, lng }
       : undefined;
+    const ripetuta = aperturaRipetuta(window.location.href); // prima di togliere q e at dall'indirizzo
     params.delete("q");
     params.delete("at");
     const rest = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+    // D25: ricarica o Indietro. Se la ricerca è ancora nel telefono si riapre com'era (runAISearch la
+    // ritrova senza Google); se è scaduta non si rifà da sola: la frase resta nel campo, un tocco la rilancia.
+    const inMemoria = center != null && ricordata(chiaveRicerca("/api/search", { u: userId, q, lat: arrotonda(center.lat), lng: arrotonda(center.lng) })) != null;
+    if (!inMemoria && ripetuta) {
+      setTimeout(() => { setWelcomeDismissed(true); setAiQuery(q); }, 0);
+      return;
+    }
     // Fuori dal ciclo dell'effetto: gli aggiornamenti di stato partono dopo il primo disegno.
     // Senza "at" la ricerca parte da dove sei (permesso già dato) o dall'ultima vista.
     void (center ? Promise.resolve(null) : here).then((pos) => {
@@ -2947,7 +3003,7 @@ export default function MapView({
       if (start) setViewState((v) => ({ ...v, latitude: start.lat, longitude: start.lng, zoom: center || startHere(pos) ? 13 : v.zoom }));
       setWelcomeDismissed(true);
       setAiQuery(q);
-      void runAISearch(q, start);
+      void runAISearch(q, start, { daMemoria: inMemoria });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al primo caricamento
   }, []);
