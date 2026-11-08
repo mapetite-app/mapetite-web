@@ -13,14 +13,19 @@ import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/h
 // Privacy (8/11): accendere "pubblico" apre prima un foglio che dice cosa vedranno gli altri e cosa
 // mai (consenso informato); spegnerlo salva subito, in un tocco (revoca immediata).
 // Cosa vedono gli altri: deve restare uguale a quello che escono dalle viste pubbliche
-// (profili_pubblici, salvati_pubblici, classifica_pubblica, recensioni/foto/contenuti_pubblici).
+// (profili_pubblici, salvati_pubblici, classifica_pubblica, recensioni/foto/contenuti_pubblici) e
+// con la sezione "Profilo pubblico e amici" di /privacy (stesse voci, stesso ordine).
 const VISIBILE = [
-  "Nome, @nome, città e bio",
-  "I posti provati e da provare, con le raccolte",
+  "Nome, @nome, città, bio, quanti segui e ti seguono",
+  "Posti provati e da provare, raccolte e tipi che salvi di più",
   "Quelli che ti sono piaciuti e la tua classifica",
   "Recensioni, foto e video che pubblichi, con il tuo nome",
+  "Chi ha l'accesso: i posti che avete in comune",
+  "Chi ti segue: cosa salvi e quando, e dove sei stato",
 ];
-const MAI = ["note", "“Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "date delle visite"];
+// Finché la migrazione 20261108_non_fa_per_me_privati non è applicata il posto resta tra i provati.
+const NON_FA_PER_ME_NOTA = "Un posto segnato “Non fa per me” può comparire tra i provati, senza il giudizio.";
+const MAI = ["note", "il giudizio “Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "data del diario"];
 export type MySocialInitial = {
   handle: string | null;
   display_name: string | null;
@@ -203,7 +208,7 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
               <Lock size={14} aria-hidden className="mt-0.5 shrink-0 text-brand" />
               <span><span className="font-semibold">Mai:</span> {MAI.join(", ")}.</span>
             </p>
-            <p className="mt-2 text-xs text-text-muted">Puoi tornare privato quando vuoi, con un tocco: vale subito.</p>
+            <p data-testid="conferma-nota" className="mt-2 text-xs text-text-muted">{NON_FA_PER_ME_NOTA} Puoi tornare privato quando vuoi, con un tocco: vale subito.</p>
             <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"
