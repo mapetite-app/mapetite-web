@@ -987,10 +987,13 @@ ok(page.url().includes("/mappa") && (await page.getByTestId("titolo-risposta").t
   await page.evaluate(() => sessionStorage.removeItem("mapetite.ricerche"));
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(800);
-  ok(chiamate === 0 && (await page.getByLabel("Scrivi cosa cerchi").inputValue().catch(() => "")).includes("pizza napoletana"), `D25: memoria scaduta, ricaricando niente ricerca da sola; la frase resta da rilanciare (${chiamate})`);
-  await page.getByLabel("Scrivi cosa cerchi").press("Enter");
+  ok(chiamate === 0 && (await page.getByLabel("Chiedi all'AI: cosa cerchi?").inputValue().catch(() => "")).includes("pizza napoletana"), `D25: memoria scaduta, ricaricando niente ricerca da sola; la frase resta da rilanciare (${chiamate})`);
+  await page.getByLabel("Chiedi all'AI: cosa cerchi?").press("Enter");
   await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
   ok(chiamate === 1, `D25: rilanciata a mano, la ricerca chiama Google (${chiamate})`);
+  // Verdetti arrivati prima di togliere i contatori (una richiesta in viaggio verrebbe gestita due volte).
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1200);
   await page.unroute("**/api/search");
   await page.unroute("**/api/search/synthesis");
 }
@@ -1308,6 +1311,8 @@ ok(!!shared && /\/mappa\?q=Rooftop/.test(shared.url) && /&at=-?\d+\.\d+,-?\d+\.\
 if (shared) {
   let body = null;
   await page.route("**/api/search", async (route) => { body = route.request().postDataJSON(); return route.fulfill({ json: SEARCH_FAST }); });
+  // Il link lo apre un altro telefono: niente ricerca già in memoria (D25).
+  await page.evaluate(() => sessionStorage.removeItem("mapetite.ricerche"));
   await page.goto(shared.url, { waitUntil: "networkidle" });
   await page.getByTestId("titolo-risposta").waitFor({ timeout: 6000 });
   ok(/Rooftop romantico/i.test(await page.getByTestId("titolo-risposta").innerText()), "link ricerca: apre la stessa ricerca con il titolo");
