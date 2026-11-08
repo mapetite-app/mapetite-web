@@ -35,5 +35,12 @@ const PLURALI: Record<string, string> = {
   Hamburgeria: "Hamburgerie", Pasticceria: "Pasticcerie", Gelateria: "Gelaterie", Caffetteria: "Caffetterie",
   Cioccolateria: "Cioccolaterie", Birreria: "Birrerie", Birrificio: "Birrifici", Cantina: "Cantine", Enoteca: "Enoteche",
   Forno: "Forni", Gastronomia: "Gastronomie", Discoteca: "Discoteche", Steakhouse: "Steakhouse",
+  // Revisore 8/11: plurali coerenti anche per le cucine ("Giapponesi" accanto a "Pizzerie", non "Giapponese").
+  Giapponese: "Giapponesi", Cinese: "Cinesi", Indiano: "Indiani", Thailandese: "Thailandesi", Messicano: "Messicani",
+  Greco: "Greci", Spagnolo: "Spagnoli", Francese: "Francesi", Americano: "Americani", Mediorientale: "Mediorientali",
+  Vegano: "Vegani", Vegetariano: "Vegetariani", Coreano: "Coreani", Vietnamita: "Vietnamiti", Turco: "Turchi",
+  Libanese: "Libanesi", Brasiliano: "Brasiliani", Peruviano: "Peruviani", Africano: "Africani", Asiatico: "Asiatici",
+  "Tavola calda": "Tavole calde", "Sala da tè": "Sale da tè", Negozio: "Negozi", Alimentari: "Alimentari",
 };
+// Invariati al plurale e quindi già coerenti: Bar, Caffè, Cocktail bar, Wine bar, Pub, Sushi, Ramen, Bistrot, Brunch.
 export const tipoPlurale = (label: string) => PLURALI[label] ?? label;
