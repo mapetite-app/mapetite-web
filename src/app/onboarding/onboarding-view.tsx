@@ -459,7 +459,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       </div>
 
       {/* Contenuto */}
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 pb-32 pt-3">
+      {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
+      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step === PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
@@ -666,7 +667,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   onClick={() => setScoperta(sc.value)}
                   className={`flex min-h-[4.5rem] w-full items-center gap-4 rounded-card border-2 px-4 py-3 text-left ${on ? SCELTA_ON : SCELTA_OFF}`}
                 >
-                  <span aria-hidden className={cerchioCard(on)}>{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍽️"}</span>
+                  <span aria-hidden className={cerchioCard(on)}>{sc.value === "chicche" ? "💎" : sc.value === "famosi" ? "⭐" : "🍱"}</span>
                   <span className="min-w-0 flex-1">
                     <span className={`block ${titoloCard(on)}`}>{sc.label}</span>
                     <span className={`block ${rigaCard(on)}`}>{sc.riga}</span>

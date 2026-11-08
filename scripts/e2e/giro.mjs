@@ -902,7 +902,7 @@ ok((await page.getByTestId("home-invito-gusto").getAttribute("href"))?.includes(
 ok((await page.getByTestId("home-assistente").count()) === 0 && (await page.getByText("Apri la mappa").count()) === 0 && (await page.getByTestId("home-sorprendimi").count()) === 1, "home semplice: niente doppioni della barra in basso (Assistente, Apri la mappa); Sorprendimi nel carosello");
 ok((await page.getByTestId("home-suggerimenti").locator("[data-esempio]").count()) === 3 && (await page.getByLabel("Cosa cerchi?").count()) === 1, "home: una sola barra, con tre idee per l'ora sotto");
 // Audit design 7/11: lo stesso tipo di posto non torna tra idee, "Per te" e classifiche (il cocktail usciva 3 volte).
-{ const tipoDi = (t) => /cocktail|speakeasy|drink/i.test(t) ? "cocktail" : /vin[oi]|enotec|wine/i.test(t) ? "vino" : /vista|rooftop|terrazz/i.test(t) ? "vista" : /gelat/i.test(t) ? "gelato" : /brunch/i.test(t) ? "brunch" : /pizz/i.test(t) ? "pizza" : /trattori|osteri/i.test(t) ? "trattoria" : /cornett|maritozz/i.test(t) ? "cornetti" : null;
+{ const tipoDi = (t) => /cocktail|speakeasy|drink d'autore/i.test(t) ? "cocktail" : /vin[oi]|enotec|wine/i.test(t) ? "vino" : /vista|rooftop|terrazz/i.test(t) ? "vista" : /gelat/i.test(t) ? "gelato" : /brunch/i.test(t) ? "brunch" : /pizz/i.test(t) ? "pizza" : /trattori|osteri/i.test(t) ? "trattoria" : /cornett|maritozz/i.test(t) ? "cornetti" : null;
   const testi = [...await page.getByTestId("home-suggerimenti").locator("[data-esempio]").allInnerTexts(), ...await page.getByTestId("home-proposta").allInnerTexts(), ...await page.getByTestId("home-classifica").allInnerTexts()];
   const tipi = testi.map(tipoDi).filter(Boolean); const doppi = tipi.filter((t, i) => tipi.indexOf(t) !== i);
   ok(doppi.length === 0, `home: ogni tipo di posto una volta sola tra idee, Per te e classifiche (${tipi.join(",")}${doppi.length ? ` · doppi: ${doppi.join(",")}` : ""})`); }
@@ -9466,6 +9466,19 @@ else {
     ok(mg.scopertaDedotta(["pizza"], ["trattoria", "storica", "pizza"]) === "famosi" && mg.scopertaDedotta(["trattoria"], ["trattoria"]) === "chicche", "mappa del gusto: famosi o chicche confrontato su quelli visti");
     { const fr = mg.fraseCapito({ v: 1, zone: ["Monti", "Pigneto"], su: [], giu: [], scoperta: "chicche" }, { citta: "Roma", priceRange: "€€", diete: [], occasions: [] }).map((x) => x.map((y) => y.t).join("")).join(" ");
       ok(!fr.includes(";") && fr.includes("Esci a Monti e al Pigneto.") && fr.includes("Spendi il giusto e giri alla larga dai posti turistici."), `mappa del gusto: più zone in una frase a sé, senza punto e virgola (${fr})`); }
+    // Revisori 7/11 (notte): con poche frasi le zone tornano nella frase dello stile, senza la doppia "e";
+    // le occasioni in una frase vera, senza i due punti.
+    { const fr = mg.fraseCapito({ v: 2, zone: ["Monti", "Pigneto"], su: ["trattoria"], giu: [], scoperta: null }, { citta: "Roma", priceRange: "€€€€", diete: ["vegano"], occasions: [{ value: "aperitivo", label: "Aperitivo" }] }, 3).map((x) => x.map((y) => y.t).join("")).join(" ");
+      ok(fr.includes("Esci a Monti e al Pigneto, ti concedi l'alta cucina.") && !/Pigneto e ti/.test(fr), `mappa del gusto: zone e spesa unite senza doppia 'e' (${fr})`); }
+    { const fr = mg.fraseCapito({ v: 2, zone: [], su: [], giu: [], scoperta: null }, { citta: "Roma", priceRange: null, diete: [], occasions: [{ value: "aperitivo", label: "Aperitivo" }] }).map((x) => x.map((y) => y.t).join("")).join(" ");
+      ok(fr.includes("Cerchi posti per l'aperitivo.") && !fr.includes(":"), `mappa del gusto: occasioni senza i due punti (${fr})`); }
+    { const { writeFileSync, mkdtempSync } = await import("fs"); const { tmpdir } = await import("os");
+      // home-proposte.ts importa "@/lib/…", che Node non risolve: copia con i percorsi veri (come per idee.ts).
+      const src = readFileSync(new URL("../../src/lib/home-proposte.ts", import.meta.url), "utf8").replace(/from "@\/lib\/([\w-]+)"/g, (_, m) => `from "${new URL(`../../src/lib/${m}.ts`, import.meta.url).href}"`);
+      const tmp = `${mkdtempSync(`${tmpdir()}/giro-hp-`)}/home-proposte.ts`; writeFileSync(tmp, src);
+      const hp = await import(`file://${tmp}`);
+      const p = hp.proposte({ gusto: null, recenti: ["trattoria romantica a Trastevere"], citta: "Roma", momento: "cena" });
+      ok(/^Trattori\w+ per due che pochi conoscono a Trastevere$/.test(p[0]?.titolo ?? ""), `home: il titolo della card da ricerca tiene 'romantica' in breve (${p[0]?.titolo})`); }
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");

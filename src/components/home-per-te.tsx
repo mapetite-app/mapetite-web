@@ -55,11 +55,13 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
   // Revisore 7/11: la ricerca da cui nasce una card "Per te" ("Hai cercato «…»") non torna anche come pillola ↻.
   const inCard = new Set(proposte({ gusto, recenti: tutte, citta, momento, weekend, escludi: chiaviPillole(momento, gusto, tutte, weekend) }).map((p) => p.da).filter(Boolean));
   const recenti = tutte.filter((q) => !inCard.has(q)).slice(0, 3);
-  const fade = usePronto();
-  const pill = "flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95";
+  // Revisore 7/11 (notte): sul 4G lento la riga restava vuota 1–2 s. Prima che il telefono legga le ricerche
+  // si vedono i contorni delle pillole (segnaposto), poi il testo: niente buco e niente cambio sotto gli occhi.
+  const pronto = useSyncExternalStore(noop, () => true, () => false);
+  const pill = `${pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent!"} flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95`;
   return (
     // Prima le ultime ricerche fatte su questo telefono (↻), poi tre idee giuste per l'ora nella tua città.
-    <div data-testid="home-suggerimenti" className={`${fade} -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
+    <div data-testid="home-suggerimenti" data-pronto={pronto ? "1" : "0"} className={`-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
       {recenti.length > 0 && (
         <span data-testid="home-recenti" className="contents">
           {recenti.map((q) => (

@@ -146,6 +146,8 @@ const EXTRA: { re: RegExp; testo: string }[] = [
   { re: /senza glutine|celiac/i, testo: "con piatti senza glutine" },
   { re: /\bcon (il )?can[ei]\b|dog[- ]?friendly|\bpet[- ]?friendly/i, testo: "dove si entra con il cane" }, // non "messicani", "toscani", "hot dog" (revisore 7/11)
 ];
+// Forma corta per il titolo della card, valida per maschile e femminile ("trattoria per due", "ristorante per due").
+const BREVE: Record<string, string> = { "per una serata a due": "per due", "con tavoli all'aperto": "all'aperto" };
 function extraDi(q: string, tipo: string): string[] {
   return EXTRA.filter((e) => e.re.test(q) && !(tipo === "rooftop" && /vista|terrazza/.test(e.testo))).map((e) => e.testo).slice(0, 2);
 }
@@ -184,7 +186,9 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const extra = extraDi(r, hit.tipo);
     zoneUsate.add(dove);
     // "che pochi conoscono" vale per maschile e femminile ("trattoria … poco conosciuto" no, revisore 7/11).
-    const titolo = `${cap(parola)}${extra[0] && extra[0].length <= 14 ? ` ${extra[0]}` : ""} che pochi conoscono ${aZona(dove)}`;
+    // Revisore 7/11 (notte): "per una serata a due" è troppo lungo per il titolo e "romantica" spariva. Forma corta.
+    const breve = extra[0] ? (BREVE[extra[0]] ?? extra[0]) : "";
+    const titolo = `${cap(parola)}${breve && breve.length <= 14 ? ` ${breve}` : ""} che pochi conoscono ${aZona(dove)}`;
     add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} che pochi conoscono, fuori dai giri turistici,${extra.map((e) => ` ${e},`).join("")} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }
