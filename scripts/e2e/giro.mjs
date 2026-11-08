@@ -2772,7 +2772,11 @@ else {
       { const tabs = await S.getByTestId("scaffali-scheda").allTextContents();
         const nz = await nomi("scaffale-zone");
         const vis = await ps.evaluate(() => { const b = document.querySelector("[data-testid=salvati-lista-mappa]").getBoundingClientRect().top; return [...document.querySelectorAll("[data-testid=salvato-riga]")].filter((r) => { const x = r.getBoundingClientRect(); return x.top >= 0 && x.bottom <= b; }).length; });
-        ok(tabs.join("|") === "Zone|Tipi|Raccolte" && nz.includes("Trastevere") && !nz.includes("Vicino a te") && (await conti("scaffale-zone")).every((n) => n >= 2) && vis >= 2, `scaffali ${width}px: schede ${tabs.join("/")}, zone (${nz.slice(0, 4).join(", ")}…) da 2 posti in su, senza 'Vicino a te' con l'ordine già Vicino; ${vis} posti interi in vista sopra 'Sulla mappa'`);
+        ok(tabs.join("|") === "Zone|Tipi|Raccolte" && nz.includes("Trastevere") && !nz.includes("Vicino a te") && (await conti("scaffale-zone")).every((n) => n >= 2) && vis >= 3, `scaffali ${width}px: schede ${tabs.join("/")}, zone (${nz.slice(0, 4).join(", ")}…) da 2 posti in su, senza 'Vicino a te' con l'ordine già Vicino; ${vis} posti interi in vista sopra 'Sulla mappa'`);
+        // Revisore 8/11: le città in alto stanno intere (o, se non entrano, la fila sfuma al bordo e scorre).
+        const cit = await ps.evaluate(() => { const g = document.querySelector("[data-testid=salvati-citta]"); const gr = g.getBoundingClientRect(); return { scorre: g.dataset.scorre === "true", tagliate: [...g.querySelectorAll("[data-testid=salvati-citta-pillola] > span")].filter((e) => { const r = e.getBoundingClientRect(); return r.right > gr.right + 0.5 || r.left < gr.left - 0.5; }).length }; });
+        ok(cit.scorre || cit.tagliate === 0, `scaffali ${width}px: città in alto intere, niente pillole tagliate (${JSON.stringify(cit)})`);
+        ok((await S.getByTestId("salvati-stato-pillola").allTextContents()).every((t) => !/ 0$/.test(t.trim())), "scaffali: nessuna pillola di stato a 0");
         await scheda("Tipi");
         const nt = await nomi("scaffale-tipi");
         ok(nt.includes("Pizzerie") && nt.includes("Trattorie") && nt.includes("Gelaterie") && (await S.getByTestId("scaffale-zone").count()) === 0, `scaffali ${width}px: scheda Tipi al plurale (${nt.join(", ")})`);
@@ -2793,6 +2797,26 @@ else {
       ok((await ris()) === `${nPD} di 120 posti` && await S.getByRole("button", { name: "Togli Pizzerie" }).isVisible(), `scaffali ${width}px: tolta solo Trastevere restano Pizzerie e Da provare (${await ris()})`);
       await S.getByTestId("salvati-azzera").click();
       ok((await S.getByTestId("salvati-risultato").count()) === 0 && await S.getByTestId("scaffali").isVisible() && (await S.getByTestId("salvato-riga").count()) === 60, `scaffali ${width}px: 'Azzera' riporta scaffali e lista (60 righe disegnate)`);
+      // In qualunque ordine (revisore 8/11): tipo, poi zona, poi raccolta, poi stato; la scheda Raccolte resta con zona e
+      // tipo accesi e conta solo i posti rimasti.
+      await scheda("Tipi");
+      await S.getByTestId("scaffale-tipi").getByRole("button", { name: /^Pizzerie,/ }).click();
+      await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Trastevere,/ }).click();
+      const pt = (m) => m.tipo === "pizza_restaurant" && m.zona === "Trastevere";
+      const tabsPT = await S.getByTestId("scaffali-scheda").allTextContents();
+      await scheda("Raccolte");
+      const nPTA = conta((m) => pt(m) && m.tags.includes("Con amici"));
+      const copA = await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).getAttribute("aria-label");
+      ok(tabsPT.includes("Raccolte") && copA === `Con amici, ${nPTA} ${nPTA === 1 ? "posto" : "posti"}`, `scaffali ${width}px: con Pizzerie e Trastevere resta la scheda Raccolte, con i numeri dei posti rimasti (${copA})`);
+      await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).click();
+      ok((await ris()) === `${nPTA} di 120 posti`, `scaffali ${width}px: Pizzerie · Trastevere · Con amici (${await ris()}, attesi ${nPTA})`);
+      await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click();
+      const nPTAD = conta((m) => pt(m) && m.tags.includes("Con amici") && !visto(m));
+      const chipsT = await S.getByTestId("salvati-filtro-acceso").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+      ok((await ris()) === `${nPTAD} di 120 posti` && (await S.getByTestId("salvato-riga").count()) === nPTAD && chipsT.length === 3, `scaffali ${width}px: tutti e quattro insieme (${chipsT.join(", ")} + Da provare → ${await ris()}, attesi ${nPTAD})`);
+      await sborda("quattro filtri");
+      await ps.screenshot({ path: `${OUT}/11o-salvati-quattro-filtri-${width}.png` });
+      await S.getByTestId("salvati-azzera").click();
       // Raccolta + stato (revisore 8/11): "Con amici" poi "Da provare" = l'intersezione; la raccolta resta accesa.
       await scheda("Raccolte");
       await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).click();
