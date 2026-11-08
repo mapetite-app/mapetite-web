@@ -6,6 +6,7 @@ import { Lock, Globe } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/handle";
+import { NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 // Impostazioni del profilo pubblico (piano 5.1) dentro /profilo: nome pubblico (handle), nome,
 // città, una riga su di sé e l'interruttore "Profilo pubblico" (spento di default).
@@ -15,18 +16,6 @@ import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/h
 // Cosa vedono gli altri: deve restare uguale a quello che escono dalle viste pubbliche
 // (profili_pubblici, salvati_pubblici, classifica_pubblica, recensioni/foto/contenuti_pubblici) e
 // con la sezione "Profilo pubblico e amici" di /privacy (stesse voci, stesso ordine).
-const VISIBILE = [
-  "Nome, @nome, città, bio, quanti segui e ti seguono",
-  "Posti provati e da provare, raccolte e tipi che salvi di più",
-  "Quelli che ti sono piaciuti e la tua classifica",
-  "Recensioni, foto e video che pubblichi, con il tuo nome",
-  "Chi ha l'accesso: i posti che avete in comune",
-  "Chi ti segue: cosa salvi e quando, e dove sei stato",
-];
-// Finché la migrazione 20261108_non_fa_per_me_privati non è applicata il posto resta tra i provati.
-// Migrazione 20261108_non_fa_per_me_privati applicata l'8/11: i posti "Non fa per me" non si vedono più agli altri.
-const NON_FA_PER_ME_NOTA = "I posti segnati “Non fa per me” restano solo tuoi.";
-const MAI = ["note", "il giudizio “Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "data del diario"];
 export type MySocialInitial = {
   handle: string | null;
   display_name: string | null;
@@ -199,17 +188,17 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
           >
             <span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
             <h3 id="conferma-pubblico-titolo" className="font-title text-lg font-semibold text-brand">Rendere pubblico il profilo?</h3>
-            <p className="mt-1 text-sm text-text">Chi ha il link o ti cerca su Mapetite vedrà:</p>
+            <p className="mt-1 text-sm text-text">{PUBBLICO_CHI}:</p>
             <ul data-testid="conferma-visibile" className="mt-2 space-y-1.5 rounded-card border border-border bg-surface px-4 py-3 text-sm text-text">
-              {VISIBILE.map((c) => (
+              {PUBBLICO_VEDONO.map((c) => (
                 <li key={c} className="flex gap-2"><Globe size={14} aria-hidden className="mt-0.5 shrink-0 text-accent" />{c}</li>
               ))}
             </ul>
             <p data-testid="conferma-mai" className="mt-3 flex gap-2 text-sm text-text">
               <Lock size={14} aria-hidden className="mt-0.5 shrink-0 text-brand" />
-              <span><span className="font-semibold">Mai:</span> {MAI.join(", ")}.</span>
+              <span><span className="font-semibold">Mai:</span> {PUBBLICO_MAI.join(", ")}.</span>
             </p>
-            <p data-testid="conferma-nota" className="mt-2 text-xs text-text-muted">{NON_FA_PER_ME_NOTA} Puoi tornare privato quando vuoi, con un tocco: vale subito.</p>
+            <p data-testid="conferma-nota" className="mt-2 text-xs text-text-muted">{NON_FA_PER_ME_NOTA} {PUBBLICO_REVOCA}</p>
             <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"

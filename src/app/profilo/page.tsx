@@ -29,6 +29,7 @@ import { pulisciMappa, SCOPERTE, tipoDa } from "@/lib/mappa-gusto";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { topTypes } from "@/lib/social-view";
+import { tipoPlurale } from "@/lib/scaffali-salvati";
 import { profilePath } from "@/lib/handle";
 
 type SavedPlaceRow = {
@@ -239,9 +240,10 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const wantCount = saved.filter((r) => isWanted(r.tags)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
   const counters = [
-    { label: "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
+    // Lessico (revisore 8/11): "Provati" per i numeri e i titoli, "Ci sono stato" solo per l'azione sulla scheda.
+    { label: saved.length === 1 ? "Salvato" : "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
     { label: "Da provare", value: wantCount, href: savedHref({ stato: "voglio" }), id: "voglio" },
-    { label: "Ci sono stato", value: doneCount, href: savedHref({ stato: "fatto" }), id: "fatto" },
+    { label: doneCount === 1 ? "Provato" : "Provati", value: doneCount, href: savedHref({ stato: "fatto" }), id: "fatto" },
   ];
 
   // Raccolte = i tag dell'utente (esclusi i due di stato): le gestisce il componente client.
@@ -279,12 +281,13 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
 
   // "Come ti vedono" (8/11): gli stessi numeri che legge chi apre /u/<nome> (provati, città, tipo che salvi di più).
   const citta = new Set(saved.flatMap((r) => (r.places && r.tags?.includes(STATE_DONE) ? [cityFromAddress(r.places.address)] : [])).filter(Boolean)).size;
-  const tipoTop = topTypes(saved.flatMap((r) => (r.places ? [{ category: r.places.category }] : [])), (c) => categoryLabel(c), 1)[0]?.tipo ?? null;
+  const tipoTop = topTypes(saved.flatMap((r) => (r.places ? [{ category: r.places.category }] : [])), (c) => categoryLabel(c), 1, 1)[0]?.tipo ?? null;
   const pubblico = !("stato" in social) && social.is_public && social.handle ? social.handle : null;
   const vedonoNumeri = [
-    { id: "provati", value: String(doneCount), label: doneCount === 1 ? "provato" : "provati" },
-    { id: "citta", value: String(citta), label: "città" },
-    ...(tipoTop ? [{ id: "tipo", value: tipoTop, label: "il tuo tipo" }] : []),
+    // Stesse parole dei numeri del profilo pubblico ("Provati"); il tipo al plurale come negli scaffali dei Salvati.
+    { id: "provati", value: String(doneCount), label: doneCount === 1 ? "Provato" : "Provati" },
+    { id: "citta", value: String(citta), label: "Città" },
+    ...(tipoTop ? [{ id: "tipo", value: tipoPlurale(tipoTop), label: "Salvi di più" }] : []),
   ];
 
   const REVIEWS_PREVIEW = 2;

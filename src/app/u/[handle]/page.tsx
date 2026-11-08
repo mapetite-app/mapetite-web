@@ -184,7 +184,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           recent={recent.map(posto)}
           want={want.map(posto)}
           tipi={tipi}
-          mine={[...mine]}
+          mine={places.flatMap((p) => (mine.has(p.place_id) ? [p.place_id] : []))} // solo quelli in comune: gli altri salvati di chi guarda non lasciano il server
           verdetti={verdetti}
           posizioni={posizioni}
         />
