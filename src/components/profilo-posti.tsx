@@ -20,7 +20,8 @@ export type PostoPersona = {
   category: string | null;
   address: string | null;
   tags: string[] | null;
-  created_at: string;
+  // Nessuna data: il giorno in cui un posto è stato salvato come "provato" dice quando ci è stato.
+  // L'ordine ("Di recente") lo decide il server.
 };
 
 const ANTEPRIMA = 5; // righe per sezione prima di "Mostra tutti"
@@ -47,6 +48,7 @@ export default function ProfiloPosti({
   tipi,
   mine: mineInit,
   verdetti,
+  posizioni = {},
 }: {
   isMe: boolean;
   viewer: string | null;
@@ -57,6 +59,7 @@ export default function ProfiloPosti({
   tipi: { tipo: string; count: number }[];
   mine: string[];
   verdetti: Record<string, string>;
+  posizioni?: Record<string, number>; // place_id → posizione nella sua classifica di quella città (1, 2, 3)
 }) {
   const [mine, setMine] = useState(() => new Set(mineInit));
   const [stato, setStato] = useState<Record<string, SalvaStato>>({});
@@ -83,14 +86,14 @@ export default function ProfiloPosti({
   };
 
   // Funzioni che restituiscono JSX (non componenti annidati: lo stato resta tra un render e l'altro).
-  function salvaBtn(p: PostoPersona, scuro = false) {
+  function salvaBtn(p: PostoPersona) {
     if (!canSave) return null;
     const mio = mine.has(p.place_id);
     const st = stato[p.place_id];
     const base = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full active:scale-95 transition-transform duration-150";
     if (mio) {
       return (
-        <span data-testid="salvato-anche-tu" role="img" aria-label="È già tra i tuoi salvati" className={`${base} ${scuro ? "bg-white/15 text-white" : "bg-accent-light text-accent"}`}>
+        <span data-testid="salvato-anche-tu" role="img" aria-label="È già tra i tuoi salvati" className={`${base} bg-accent-light text-accent`}>
           <BookmarkCheck size={18} strokeWidth={2} aria-hidden />
         </span>
       );
@@ -102,7 +105,7 @@ export default function ProfiloPosti({
         aria-label={st === "errore" ? `Non salvato: riprova a salvare ${p.name}` : `Salva ${p.name} anche tu`}
         disabled={st === "salvo"}
         onClick={() => void salva(p.place_id)}
-        className={`${base} ${scuro ? "bg-white text-brand" : "border border-border bg-white text-brand"} ${st === "errore" ? "ring-2 ring-error" : ""} disabled:opacity-60`}
+        className={`${base} border border-border bg-white text-brand ${st === "errore" ? "ring-2 ring-error" : ""} disabled:opacity-60`}
       >
         <BookmarkPlus size={18} strokeWidth={2} aria-hidden />
       </button>
@@ -183,30 +186,35 @@ export default function ProfiloPosti({
           {liked.length > 0 && (
             <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
               <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "Ti è piaciuto" : "Gli è piaciuto"}</Titolo></div>
-              <ul className="flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-                {liked.map((p, i) => {
-                  const kind = categoryLabel(p.category);
-                  const city = cityFromAddress(p.address);
+              {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
+              <ul className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+                {liked.map((p) => {
+                  const meta = [categoryLabel(p.category), cityFromAddress(p.address)].filter(Boolean).join(" · ");
                   const verdict = verdetti[p.place_id];
+                  // Numero solo se viene dalla sua classifica (posizione nella città di quel posto).
+                  const pos = posizioni[p.place_id];
                   return (
-                    <li key={p.place_id} className="relative w-[70%] max-w-[260px] shrink-0 snap-start">
+                    <li key={p.place_id} className="relative flex w-[76%] max-w-[280px] shrink-0 snap-start">
                       <Link
                         href={`/locali/${p.place_id}`}
                         data-testid="piaciuto-card"
-                        className="relative flex min-h-40 flex-col justify-between overflow-hidden rounded-card bg-brand p-4 pr-14 text-white shadow-card active:scale-[0.99] transition-transform duration-150"
+                        className="flex w-full flex-col gap-2 rounded-card border border-border bg-white p-3 shadow-card active:scale-[0.99] transition-transform duration-150"
                       >
-                        <span aria-hidden className="pointer-events-none absolute -right-3 -bottom-4 text-[80px] leading-none opacity-25">{getCategoryEmoji(p.category, p.name)}</span>
-                        <span className="relative min-w-0">
-                          <span className="line-clamp-2 font-title text-lg font-semibold leading-tight">{p.name}</span>
-                          {kind && <span className="mt-1 block truncate text-[11px] font-display font-semibold uppercase tracking-wider text-white/70">{kind}</span>}
-                          {verdict && <span className="mt-1.5 line-clamp-2 text-[13px] font-sans leading-snug text-white/90">{verdict}</span>}
+                        <span className="flex items-start gap-3 pr-11">
+                          <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">{getCategoryEmoji(p.category, p.name)}</span>
+                          <span className="min-w-0">
+                            <span className="line-clamp-2 font-display text-[15px] font-semibold leading-snug text-text">{p.name}</span>
+                            {meta && <span className="mt-0.5 block truncate text-xs font-sans text-text-muted">{meta}</span>}
+                          </span>
                         </span>
-                        <span className="relative flex items-center gap-2 text-xs font-sans text-white/80">
-                          <span className="rounded-pill bg-accent px-2 py-0.5 text-[11px] font-display font-semibold text-white">{i < 3 ? `👍 N.${i + 1}` : "👍"}</span>
-                          {city && <span className="truncate">{city}</span>}
+                        {verdict && <span data-testid="piaciuto-verdetto" className="line-clamp-2 text-[13px] font-sans leading-snug text-text">{verdict}</span>}
+                        <span className="mt-auto">
+                          <span data-testid="piaciuto-badge" className="inline-flex rounded-pill bg-accent-light px-2 py-0.5 text-[11px] font-display font-semibold text-accent">
+                            {pos ? `👍 N.${pos} in classifica` : "👍"}
+                          </span>
                         </span>
                       </Link>
-                      <span className="absolute right-2 top-2">{salvaBtn(p, true)}</span>
+                      <span className="absolute right-2 top-2">{salvaBtn(p)}</span>
                     </li>
                   );
                 })}

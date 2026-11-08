@@ -99,14 +99,18 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
     viewer && !isMe ? myPlaceIds(viewer) : Promise.resolve(new Set<string>()),
   ]);
   const scopritore = scopritori?.find((s) => s.id === profile.id && s.gemme > 0) ?? null;
-  const tops = ranks
-    ? topByCity(recent.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 3).flatMap(([, list]) => list.map((p) => p.place_id))
+  // Posizione in classifica PER CITTÀ (1, 2, 3): il numero sulla card c'è solo se viene da qui.
+  const perCitta = ranks
+    ? topByCity(recent.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 3)
     : [];
-  const liked = likedPlaces(places, tops);
+  const posizioni: Record<string, number> = Object.fromEntries(perCitta.flatMap(([, list]) => list.map((p, i) => [p.place_id, i + 1] as const)));
+  const liked = likedPlaces(places, perCitta.flatMap(([, list]) => list.map((p) => p.place_id)));
   const tipi = topTypes(places, (c) => categoryLabel(c));
   // Verdetto Mapetite sulle righe (come le card degli amici): chi apre il link capisce perché andarci.
   const verdetti = await loadVerdetti([...liked, ...recent, ...want].map((p) => p.place_id));
-  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: p.tags, created_at: p.created_at });
+  // Al telefono solo questi campi: niente date (il giorno in cui un posto è segnato "provato" dice quando
+  // la persona ci è stata), niente id o nome di chi l'ha salvato. L'ordine resta quello deciso qui.
+  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: p.tags });
   const stats = [
     { label: "Provati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },
@@ -182,6 +186,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           tipi={tipi}
           mine={[...mine]}
           verdetti={verdetti}
+          posizioni={posizioni}
         />
       )}
 

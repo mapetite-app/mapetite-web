@@ -4656,6 +4656,9 @@ else {
     const ordine = await sp.locator("[data-testid=profilo-posti] h2").allTextContents();
     ok(ordine.join("|") === "Gli è piaciuto|Di recente|I suoi tipi|In comune · 2|Da provare", `profilo di un altro: sezioni nell'ordine giusto (${ordine.join(" | ")})`);
     ok((await sp.getByTestId("piaciuto-card").count()) === 1 && (await sp.getByTestId("piaciuto-card").getAttribute("href")) === `/locali/${many[4].place_id}`, "profilo di un altro: 'Gli è piaciuto' con il posto segnato 👍");
+    // Revisore 8/11: nessun numero di classifica inventato (solo 👍 senza classifica); prima card a 16 px dal bordo.
+    { const badge = (await sp.getByTestId("piaciuto-badge").textContent())?.trim(); const x = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.x ?? -1;
+      ok(badge === "👍" && Math.round(x) === 16, `profilo di un altro: 👍 senza numero se non c'è classifica, card a 16 px (${badge}, x=${Math.round(x)})`); }
     { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Caffè8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
     ok((await sp.getByTestId("in-comune-posto").count()) === 2 && (await sp.getByTestId("salvato-anche-tu").count()) >= 1, "profilo di un altro: 'In comune' e i posti già tuoi segnati");
     ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 5 && (await sp.getByTestId("mostra-tutti-recenti").textContent()) === "Mostra tutti (10)", "profilo di un altro: 5 posti e 'Mostra tutti (10)', nessun limite fisso");
@@ -4672,7 +4675,7 @@ else {
     ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 8, "profilo di un altro: un tocco su un tipo mostra solo quei posti");
     await sp.screenshot({ path: `${OUT}/60c-profilo-altro-filtro.png`, caret: "initial" });
     const html = await sp.content();
-    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\""), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', data della visita)");
+    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\"") && !html.includes("2026-10-") && !html.includes("created_at"), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', data della visita)");
     await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
     await setSocial(soctx, social);
     await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
@@ -4732,7 +4735,7 @@ else {
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   { const f = sp.getByTestId("conferma-pubblico");
     const vis = await f.getByTestId("conferma-visibile").innerText(); const mai = await f.getByTestId("conferma-mai").innerText();
-    ok(await f.isVisible() && vis.includes("città e bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
+    ok(await f.isVisible() && vis.includes("bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && vis.includes("in comune") && vis.includes("Chi ti segue") && (await f.getByTestId("conferma-nota").innerText()).includes("può comparire tra i provati") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
     profPatch = null;
     await f.getByTestId("conferma-pubblico-no").click();
     ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura"); }
@@ -6550,7 +6553,7 @@ else {
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
     const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
-    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-piaciuti").textContent()).includes("N.1"), "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine");
+    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("piaciuto-badge").allTextContents()).join("|") === "👍 N.1 in classifica|👍 N.2 in classifica|👍 N.3 in classifica", "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine");
     await g.getByTestId("profilo-piaciuti").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
@@ -6560,6 +6563,12 @@ else {
     await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica-non-trovata").isVisible(), "raccolta condivisa: nome inesistente → 'non disponibile'");
+    // Revisore 8/11: con due città ognuna ha il suo N.1 (la posizione è per città, non nella fila delle card).
+    { const mil = { ...sv("44444444-0000-4000-8000-0000000007b5", "Osteria Cinque", "restaurant", ["Già visitato"], 45.46, 9.19, 2), address: "Via Torino 3, 20123 Milano MI, Italy" };
+      await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, salvati: [...socialG.salvati, mil] })), url: BASE }]);
+      await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+      const b = (await g.getByTestId("piaciuto-badge").allTextContents()).join("|");
+      ok(b === "👍 N.1 in classifica|👍 N.2 in classifica|👍 N.3 in classifica|👍 N.1 in classifica" && (await g.getByTestId("piaciuto-card").last().textContent()).includes("Milano"), `profilo pubblico: con due città il N.1 di Milano resta N.1 (${b})`); }
     await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica (e senza 👍) 'Gli è piaciuto' non compare");
