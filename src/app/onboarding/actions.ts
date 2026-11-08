@@ -7,7 +7,7 @@ import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES, tasteQuery } from "@/li
 import { DIETE } from "@/lib/mappa-gusto";
 import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
-import { amatiValidi, tipoLocale } from "@/lib/tipi-locale";
+import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
 
 interface OnboardingData {
@@ -136,7 +136,8 @@ function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, des
   // (1 ricerca Google, una volta per utente, come se la scrivesse lui), nella sua città.
   // Con la mappa del gusto: "5 posti per te" sul tipo di posto piaciuto, nella zona, "non turistico"
   // per chi ama le chicche. Senza: la ricerca sui gusti di sempre.
-  const perTe = queryPerTe(mappa, citta, [...mappa.amati].sort((a, b) => Number(GENERICI.has(a)) - Number(GENERICI.has(b))).map((id) => tipoLocale(id)?.query).find((x): x is string => !!x) ?? null);
+  // Prova dal vivo 8/11: il tipo adatto all'ora (di sera un cocktail bar, se piace), poi i generici in fondo.
+  const perTe = queryPerTe(mappa, citta, ordinePerOra([...mappa.amati].sort((a, b) => Number(GENERICI.has(a)) - Number(GENERICI.has(b))), oraDiRoma()).map((id) => tipoLocale(id)?.query).find((x): x is string => !!x) ?? null);
   const q = tasteQuery(gusti);
   const full = perTe ?? (q && citta ? `${q} a ${citta}` : q);
   redirect(full ? `/mappa?q=${encodeURIComponent(full)}` : "/mappa");
