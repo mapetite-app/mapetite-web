@@ -269,7 +269,7 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
   if (staccaZone) { unisci([parti[0]], "dove"); unisci(parti.slice(1), "stile"); }
   else if (parti.length) unisci(parti, m.scoperta ? "stile" : "dove");
   const occ = extra.occasions.map((o) => (o.value && OCCASIONE[o.value]) || o.label.toLowerCase()).map((t) => ({ t, k: "occasioni" }));
-  if (occ.length) frasi.push([{ t: "Le tue uscite: " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }], "occasioni");
+  if (occ.length) frasi.push([{ t: "Cerchi posti per " }, ...evidenziati(occ, 3, ["un'altra occasione", "altre N occasioni"]), { t: "." }], "occasioni");
   const giu = m.giu.filter((id) => PLURALE[id]);
   if (giu.length) frasi.push([{ t: "Ti convincono meno " }, ...evidenziati(giu.map((id) => ({ t: PLURALE[id], k: "giu", id })), 2, ["un altro tipo di posto", "altri N tipi di posto"]), { t: "." }], "giu");
   const mangi = extra.diete.includes("vegano") ? "vegano" : extra.diete.includes("vegetariano") ? "vegetariano" : null;
@@ -284,7 +284,8 @@ export function fraseCapito(m: Omit<MappaGusto, "amati">, extra: { citta: string
     const i = tutte.findIndex((x) => x.p === "dove");
     const j = tutte.findIndex((x, k) => k > i && x.p === "stile");
     if (i >= 0 && j > i) {
-      const unita: PezzoFrase[] = parti.flatMap((x, k) => [...(k === 0 ? [] : [{ t: k === parti.length - 1 ? " e " : ", " }]), ...x]);
+      // Dopo le zone (che hanno già la loro "e") sempre la virgola: niente "a Monti e al Pigneto e ti concedi…".
+      const unita: PezzoFrase[] = parti.flatMap((x, k) => [...(k === 0 ? [] : [{ t: k > 1 && k === parti.length - 1 ? " e " : ", " }]), ...x]);
       unita[0] = { ...unita[0], t: maiuscola(unita[0].t) };
       tutte.splice(j, 1);
       tutte[i] = { f: [...unita, { t: "." }], p: "stile" };

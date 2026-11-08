@@ -50,6 +50,10 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 8. **Accendere gli avvisi push (proposta 6) — APERTA dal 29/10 notte, 1 minuto.** Il codice è in produzione ma resta nascosto finché su Vercel non ci sono 4 variabili nuove (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`). Non cambiano nessuna chiave esistente e non costano niente. Basta che tu risponda in chat **"aggiungi tu le chiavi degli avvisi"**: la sessione dopo le genera e le mette su Vercel con il token, senza scriverle da nessuna parte. Passi a mano in `ISTRUZIONI-LORENZO.md`, punto "Avvisi push".
    - Come si verifica: dopo "Quando ci vai? → Stasera" compare "🔔 Avvisami quel giorno"; nel profilo c'è l'interruttore "Avvisi".
 
+9. **Prima della demo: account Sofia e foto — APERTA dall'8/11, 3 minuti.**
+   - L'account demo Sofia non c'è in produzione (prova dal vivo dell'8/11): dal computer `DEMO_PASSWORD='la-tua-password' node scripts/demo/crea-account-demo.mjs`. La password la scegli tu: per questo non la crea il team.
+   - Le foto: alle 3 di notte dell'8/11 Google rispondeva "quota finita" su metà delle foto (la quota foto è a 100 al giorno, il tuo tetto è 200). Se vuoi le foto sicure in demo, alzala a 200 su console.cloud.google.com → Places API (New) → Quote. Decidi tu: il team non tocca le quote.
+
 ## Fatte
 
 - **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.
