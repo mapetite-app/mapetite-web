@@ -2052,7 +2052,7 @@ else {
   const p = await sctx.newPage();
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-  ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding, e si cerca solo quello che c'è scritto (Lorenzo 8/11)");
   // Revisore del 2/11: il titolo della terza idea non stava in una riga a 390 px. Ora 1-3 parole, intero.
   { const t = await p.getByTestId("suggerimento-per-te").locator("span.truncate").first().evaluate((el) => ({ t: el.textContent, intero: el.scrollWidth <= el.clientWidth }));
     ok(t.t === "Cena romantica" && t.intero, `Idee: titolo breve della tua idea, intero in una riga ('${t.t}')`); }

@@ -6,6 +6,15 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## RICHIESTE DI LORENZO DELL'8/11 (in chat, domenica 11:20) — PREVALGONO SU TUTTO, DA ORA E NEI PROSSIMI GIORNI
+"Prendo l'app: perché la dovrei usare?" Obiettivo: darla a persone vere e dire "usatela". Serve un ciclo completo **cerca → scopri → guarda → salva → ritrova → prenota → ci vai**, con benefici che si vedono.
+1. **Ricerche e Idee che fanno quello che dici:** toccando "Cena romantica" si cercava "cena romantica, cucina romana, atmosfera intima" (gusti aggiunti in silenzio). Si cerca solo quello che c'è scritto; i gusti cambiano l'ordine, non la frase. Controllare tutte le idee e i suggerimenti allo stesso modo.
+2. **Salvati che si ritrovano (il problema dei 500 cuoricini di Google Maps):** organizzazione più facile da vedere: per città e zona, per tipo, per stato (da provare / ci sono stato), ricerca immediata, raccolte come copertine. Con 500 salvati il posto giusto in 2 secondi.
+3. **Profilo e social:** il proprio profilo più ricco, e il profilo di un amico (es. Roberto): dove è stato, cosa gli piace, i suoi preferiti, i tipi che cerca di più. Sempre nel rispetto della privacy: verificare la conformità (GDPR) e aggiungere avvisi/consensi dove servono.
+4. **Prenotare dall'app:** da TheFork, dal sito del locale o in qualunque modo possibile; poi promemoria (banner e pop-up il giorno prima e il giorno stesso), indicazioni già pronte per arrivarci. Integrazione ufficiale TheFork = partner → bozza per Lorenzo (mai contattare); intanto tutto ciò che si può fare senza accordi.
+5. **Grafica:** benefici visibili nell'uso, non solo ritocchi.
+6. **Dopo:** importazione da Google con le liste condivise (Lorenzo: "in Turchia mi condivisero una playlist di posti, cliccavo e comparivano tutti").
+
 ## RICHIESTE DI LORENZO DEL 5/11 MATTINA (in chat) — PREVALGONO, IN PRODUZIONE STASERA
 1. **Mappa dopo la ricerca a scatti:** i cerchi compaiono in una posizione e poi si spostano da soli senza toccare nulla; il movimento deve essere fluido.
 2. **Grafica:** il color panna/beige delle schede dà un'idea "cheap": rifare i colori di fondo con un aspetto di più valore.

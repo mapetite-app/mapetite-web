@@ -3321,7 +3321,9 @@ export default function MapView({
             <IdeaGroup title="Per te" hideTitle>
               {(() => { const mie = [
                 tasteSuggestion ? (
-                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={titoloBreve(tasteSuggestion)} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+                  // Lorenzo 8/11: "ti ho chiesto solo cena romantica, non cena romantica osteria romana". Si cerca quello che
+                  // c'è scritto; i gusti del profilo cambiano già l'ordine dei risultati, non la frase.
+                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${titoloBreve(tasteSuggestion)}`} emoji="✨" title={titoloBreve(tasteSuggestion)} sub="Dai tuoi gusti" onClick={() => { const q = titoloBreve(tasteSuggestion); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
                 ) : null,
                 savedSuggestion ? (
                   <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={titoloBreve(savedSuggestion.label)} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />
