@@ -9,6 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { matchesQuery } from "@/lib/social-view";
+import { tipoPlurale } from "@/lib/scaffali-salvati";
 
 // I posti di una persona sul suo profilo pubblico (8/11), in quest'ordine: "Gli è piaciuto",
 // "Di recente", "I suoi tipi", "In comune", "Da provare". Solo dati della vista salvati_pubblici
@@ -173,7 +174,7 @@ export default function ProfiloPosti({
               </button>
             }
           >
-            {tipo ?? "Risultati"} · {filtrati.length}
+            {tipo ? tipoPlurale(tipo) : "Risultati"} · {filtrati.length}
           </Titolo>
           {filtrati.length === 0 ? (
             <p className="rounded-card border border-border bg-surface p-4 text-center text-sm font-sans text-text-muted">Nessun posto così.</p>
@@ -241,7 +242,7 @@ export default function ProfiloPosti({
                     onClick={() => setTipo(t.tipo)}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-white px-3.5 text-[14px] font-sans font-medium text-text shadow-card active:scale-95"
                   >
-                    {t.tipo}
+                    {tipoPlurale(t.tipo)}
                     <span className="font-display font-semibold text-accent">{t.count}</span>
                   </button>
                 ))}

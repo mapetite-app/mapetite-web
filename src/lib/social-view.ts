@@ -89,14 +89,14 @@ export function recentVisited<T extends { tags: string[] | null; created_at: str
 }
 
 /** I tipi di locale che salva di più (etichetta già tradotta), con quanti posti; solo da 2 in su. */
-export function topTypes<T extends { category: string | null }>(rows: T[], label: (c: string | null) => string | null, max = 4): { tipo: string; count: number }[] {
+export function topTypes<T extends { category: string | null }>(rows: T[], label: (c: string | null) => string | null, max = 4, min = 2): { tipo: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
     const t = label(r.category);
     if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .filter(([, n]) => n >= 2)
+    .filter(([, n]) => n >= min)
     .map(([tipo, count]) => ({ tipo, count }))
     .sort((a, b) => b.count - a.count || a.tipo.localeCompare(b.tipo, "it"))
     .slice(0, max);

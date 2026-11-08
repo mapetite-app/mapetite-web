@@ -4693,9 +4693,9 @@ else {
   ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
   // 8/11: profilo più utile per chi è collegato (dati dal cookie: "miei" = i propri salvati).
   { // Righe minime e codifica leggera (solo i caratteri vietati nei cookie): 16 posti stanno nei 4 KB del cookie.
-    const many = Array.from({ length: 16 }, (_, i) => ({ user_id: GIULIA, place_id: `g${i}`, name: i % 2 ? `Enoteca ${i}` : `Forno ${i}`, category: i % 2 ? "bar" : "cafe", tags: i % 3 ? ["Già visitato", ...(i === 4 ? ["Mi è piaciuto"] : [])] : ["Da provare"], created_at: `2026-10-${10 + i}` }));
+    const many = Array.from({ length: 16 }, (_, i) => ({ user_id: GIULIA, place_id: `g${i}`, name: i % 2 ? `Enoteca ${i}` : `Forno ${i}`, category: i % 2 ? "bar" : "bakery", tags: i % 3 ? ["Già visitato", ...(i === 4 ? ["Mi è piaciuto"] : [])] : ["Da provare"], created_at: `2026-10-${10 + i}` }));
     const light = (v) => JSON.stringify(v).replace(/[%;, \\\u0080-\uffff]/g, (c) => encodeURIComponent(c));
-    await soctx.addCookies([{ name: "e2e_social", value: light({ profili: [{ ...giulia, visitati: 10, da_provare: 6 }], salvati: many, seguo: [GIULIA], miei: ["g2", "g3"] }), url: BASE }]);
+    await soctx.addCookies([{ name: "e2e_social", value: light({ profili: [{ ...giulia, visitati: 10, da_provare: 6 }], salvati: many, seguo: [GIULIA], miei: ["g2", "g3", "zz9"] }), url: BASE }]);
     const saves = [];
     await soctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { saves.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); } return r.fulfill({ json: [] }); });
     await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
@@ -4705,7 +4705,7 @@ else {
     // Revisore 8/11: nessun numero di classifica inventato (solo 👍 senza classifica); prima card a 16 px dal bordo.
     { const badge = (await sp.getByTestId("piaciuto-badge").textContent())?.trim(); const x = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.x ?? -1;
       ok(badge === "👍" && Math.round(x) === 16, `profilo di un altro: 👍 senza numero se non c'è classifica, card a 16 px (${badge}, x=${Math.round(x)})`); }
-    { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Caffè8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
+    { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Forni8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
     ok((await sp.getByTestId("in-comune-posto").count()) === 2 && (await sp.getByTestId("salvato-anche-tu").count()) >= 1, "profilo di un altro: 'In comune' e i posti già tuoi segnati");
     ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 5 && (await sp.getByTestId("mostra-tutti-recenti").textContent()) === "Mostra tutti (10)", "profilo di un altro: 5 posti e 'Mostra tutti (10)', nessun limite fisso");
     await sp.getByTestId("mostra-tutti-recenti").click();
@@ -4721,7 +4721,7 @@ else {
     ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 8, "profilo di un altro: un tocco su un tipo mostra solo quei posti");
     await sp.screenshot({ path: `${OUT}/60c-profilo-altro-filtro.png`, caret: "initial" });
     const html = await sp.content();
-    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\"") && !html.includes("2026-10-") && !html.includes("created_at"), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', data della visita)");
+    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\"") && !html.includes("2026-10-") && !html.includes("created_at") && !html.includes("zz9"), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', date, salvati di chi guarda non in comune)");
     await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
     await setSocial(soctx, social);
     await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
@@ -4768,11 +4768,18 @@ else {
     if (r.request().method() === "PATCH") { profPatch = r.request().postDataJSON(); return profStatus === 204 ? r.fulfill({ status: 204, body: "" }) : r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key", details: null, hint: null } }); }
     return r.fulfill({ json: [] });
   });
+  // Revisore 8/11: "1 salvato · 1 provato" al singolare, tipo preferito al plurale come negli scaffali dei Salvati.
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", reviews: [], saved: [{ created_at: "2026-10-01", tags: ["Già visitato"], note: null, places: { id: "00000000-0000-4000-8000-000000000799", name: "Pizzeria Sola", category: "pizza_restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }] })), url: BASE }]);
+  await sp.goto(`${BASE}/profilo?singolare=1`, { waitUntil: "networkidle" }); // indirizzo diverso: il "#profilo-pubblico" dopo ricarica davvero
+  { const g = ((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ");
+    ok(g.includes("1 salvato") && g.includes("1 provato") && (await sp.getByTestId("vedono-tipo").innerText()).includes("Pizzerie"), `profilo: singolare con un posto, tipo al plurale (${g.trim()})`); }
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
   // Da Amici "Fatti trovare" porta qui: la riga "Profilo pubblico" di "Altro" si apre da sola.
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
   const ps = sp.getByTestId("profilo-social");
   ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
   ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
+  ok(((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ").includes("0 provati") && !/ci sono stato/i.test(await sp.getByTestId("guida-contatori").innerText()) && (await sp.getByTestId("vedono-provati").innerText()).includes("Provati"), "profilo: 'Provati' per i numeri, in testa e in 'Come ti vedono'");
   ok((await sp.getByTestId("come-ti-vedono-stato").textContent())?.includes("Privato") && (await sp.getByTestId("vedono-provati").textContent())?.includes("0") && (await sp.getByTestId("come-ti-vedono-link").getAttribute("href")) === "#profilo-pubblico", "profilo: 'Come ti vedono' dice 'Privato' e porta all'interruttore");
   await ps.locator("input[name=handle]").fill("@Lorenzo Mà!");
   ok((await ps.locator("input[name=handle]").inputValue()) === "lorenzoma", "profilo: il nome pubblico si ripulisce da solo (minuscole, niente spazi né accenti)");
@@ -4784,7 +4791,12 @@ else {
     ok(await f.isVisible() && vis.includes("bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && vis.includes("in comune") && vis.includes("Chi ti segue") && (await f.getByTestId("conferma-nota").innerText()).includes("restano solo tuoi") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
     profPatch = null;
     await f.getByTestId("conferma-pubblico-no").click();
-    ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura"); }
+    ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura");
+    // Revisore 8/11: il foglio e /privacy dicono le stesse cose (una sola fonte di testo).
+    const voci = vis.split("\n").map((t) => t.trim()).filter(Boolean); // letto prima di "Annulla", a foglio aperto
+    const priv = (await (await sp.request.get(`${BASE}/privacy`)).text()).replace(/&#x27;|&#39;/g, "'").toLowerCase();
+    const mancanti = voci.filter((v) => !priv.includes(v.toLowerCase()));
+    ok(voci.length >= 6 && mancanti.length === 0 && priv.includes("restano solo tuoi"), `foglio di conferma e /privacy con le stesse voci (${mancanti.join(" | ") || "tutte"})`); }
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   profStatus = 409;
   await sp.getByTestId("conferma-pubblico-si").click();

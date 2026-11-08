@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { CONTACT } from "../per-i-ristoratori/rivendica/mail";
+import { elenco, NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 export const metadata: Metadata = {
   title: "Privacy · Mapetite",
@@ -52,9 +53,10 @@ const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
     id: "profilo-pubblico",
     righe: [
       "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (Profilo → Impostazioni → Profilo pubblico), dopo un foglio che ti dice cosa vedranno gli altri.",
-      "Se è pubblico, chiunque abbia il link o ti cerchi per nome su Mapetite vede: nome, @nome, città, bio e quante persone segui e ti seguono; i posti che hai provato e quelli da provare, con le raccolte e i tipi di locale che salvi di più; quelli che ti sono piaciuti e la tua classifica; recensioni, foto e video che pubblichi, con il tuo nome. Chi ha l'accesso vede anche quali posti avete salvato tutti e due. Chi ti segue vede, tra le attività degli amici, i posti che salvi e quando li salvi e, nella pagina di un locale, che ci sei stato o lo vuoi provare.",
-      "I posti segnati \"Non fa per me\" non si vedono agli altri, nemmeno tra i provati. La pagina del tuo profilo non mostra date.",
-      "Mai, nemmeno con il profilo pubblico: le note, il giudizio \"Non fa per me\", i gusti che hai scelto, le prenotazioni, la tua posizione, l'email e la data delle visite che segni nel diario.",
+      // Stesse parole del foglio di conferma (src/lib/privacy-profilo.ts): una sola fonte.
+      `Se è pubblico, ${PUBBLICO_CHI.charAt(0).toLocaleLowerCase("it")}${PUBBLICO_CHI.slice(1)}: ${elenco(PUBBLICO_VEDONO)}`,
+      `${NON_FA_PER_ME_NOTA} La pagina del tuo profilo non mostra date.`,
+      `Mai, nemmeno con il profilo pubblico: ${PUBBLICO_MAI.join(", ")}.`,
       "Base giuridica: il tuo consenso. Lo revochi in un tocco spegnendo \"Profilo pubblico\": da quel momento profilo e posti non si vedono più e le tue recensioni tornano anonime (\"Un membro di Mapetite\"). Non possiamo cancellare quello che qualcuno ha già visto o copiato prima.",
       "Si possono seguire solo i profili pubblici. Mapetite non manda messaggi a tuo nome e non mostra a nessuno chi guarda il tuo profilo.",
     ],
