@@ -191,7 +191,10 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     // "che pochi conoscono" (resta nella ricerca); e se il titolo è comunque lungo, si torna a quello semplice.
     const breve = extra[0] ? (BREVE[extra[0]] ?? extra[0]) : "";
     const conExtra = `${cap(parola)} ${breve} ${aZona(dove)}`;
-    const titolo = breve && conExtra.length <= 40 ? conExtra : `${cap(parola)} che pochi conoscono ${aZona(dove)}`;
+    // Secondo revisore 8/11: anche il titolo semplice andava su 3 righe a 360 px ("Pizzerie che pochi conoscono a San
+    // Lorenzo"). Oltre 36 caratteri si toglie "che pochi conoscono": resta nella ricerca, la zona resta nel titolo.
+    const semplice = `${cap(parola)} che pochi conoscono ${aZona(dove)}`;
+    const titolo = breve && conExtra.length <= 40 ? conExtra : semplice.length <= 36 ? semplice : `${cap(parola)} ${aZona(dove)}`;
     add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} che pochi conoscono, fuori dai giri turistici,${extra.map((e) => ` ${e},`).join("")} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }

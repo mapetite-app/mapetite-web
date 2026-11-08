@@ -62,8 +62,18 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
   const pronto = useSyncExternalStore(noop, () => true, () => false);
   const pill = `${pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent!"} flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95`;
   return (
-    // Prima le ultime ricerche fatte su questo telefono (↻), poi tre idee giuste per l'ora nella tua città.
+    // Prima tre idee giuste per l'ora nella tua città, poi le ultime ricerche fatte su questo telefono (↻): in fondo,
+    // così quando il telefono le legge non spingono via le idee già visibili (secondo revisore 8/11).
     <div data-testid="home-suggerimenti" data-pronto={pronto ? "1" : "0"} className={`-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
+      {pillole(momento, gusto, tutte, weekend, citta).map(({ label }) => {
+        const q = `${label} a ${citta}`;
+        return (
+          <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
+            {/* Revisore 8/11: segnaposto con una barra grigia, non un bottone vuoto. */}
+            {pronto ? <span className="truncate">{label}</span> : <span aria-hidden className="h-2.5 w-16 rounded-full bg-border" />}
+          </Link>
+        );
+      })}
       {recenti.length > 0 && (
         <span data-testid="home-recenti" className="contents">
           {recenti.map((q) => (
@@ -74,14 +84,6 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
           ))}
         </span>
       )}
-      {pillole(momento, gusto, tutte, weekend, citta).map(({ label }) => {
-        const q = `${label} a ${citta}`;
-        return (
-          <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
-            <span className="truncate">{label}</span>
-          </Link>
-        );
-      })}
     </div>
   );
 }
