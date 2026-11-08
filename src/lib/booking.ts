@@ -523,7 +523,7 @@ export function bookingIcs(b: BookingRequest, now: Date = new Date()): string | 
   const details = [
     b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null,
     b.special ? `Richiesta: ${b.special}` : null,
-    b.confirmed ? "Prenotato (l'hai segnato tu)." : "Richiesta inviata: la conferma arriva dal locale.",
+    b.confirmed ? `Prenotato${b.piattaforma ? ` su ${b.piattaforma}` : ""} (l'hai segnato tu).` : `Non ancora prenotato: ${chiConferma(b)}.`,
   ].filter(Boolean).join("\n");
   const title = icsText(`Tavolo da ${b.placeName}`);
   lines.push(`SUMMARY:${title}`, `DESCRIPTION:${icsText(details)}`, `LOCATION:${icsText(b.placeName)}`);
@@ -602,8 +602,10 @@ export function chiConferma(b: Pick<BookingRequest, "piattaforma">): string {
 export function daConfermare(list: BookingRequest[], now: Date = new Date()): BookingRequest[] {
   const oggi = dateKey(now);
   const domani = dateKey(addDays(now, 1));
+  // Già prenotato lì quel giorno (con il sì): la richiesta ripetuta non si chiede più.
+  const fatti = new Set(list.filter((b) => b.confirmed && !b.outcome).map((b) => `${b.placeId}|${b.date}`));
   return list
-    .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani))
+    .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani) && !fatti.has(`${b.placeId}|${b.date}`))
     .sort((a, c) => `${a.date} ${a.time ?? ""}`.localeCompare(`${c.date} ${c.time ?? ""}`));
 }
 
@@ -640,8 +642,10 @@ export function prenotazioneTraPoco(list: BookingRequest[], now: Date = new Date
 // "Tra 2 ore", "Tra un'ora e mezza", "Tra 40 minuti" (a mezz'ore e a 5 minuti: niente falsa precisione).
 export function traQuanto(minuti: number): string {
   if (minuti < 55) return `Tra ${Math.max(5, Math.round(minuti / 5) * 5)} minuti`;
-  const mezz = Math.round(minuti / 30) / 2;
-  const ore = Math.floor(mezz);
-  if (mezz === ore) return ore === 1 ? "Tra un'ora" : `Tra ${ore} ore`;
-  return ore === 1 ? "Tra un'ora e mezza" : `Tra ${ore} ore e mezza`;
+  // A quarti d'ora (revisore 8/11: alle 18:15 per le 20:30 è "Tra 2 ore e 15", non "e mezza").
+  const quarti = Math.round(minuti / 15);
+  const ore = Math.floor(quarti / 4);
+  const resto = (quarti % 4) * 15;
+  const base = ore === 1 ? "Tra un'ora" : `Tra ${ore} ore`;
+  return resto === 0 ? base : resto === 30 ? `${base} e mezza` : `${base} e ${resto}`;
 }

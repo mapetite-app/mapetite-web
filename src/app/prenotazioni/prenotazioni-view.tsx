@@ -66,6 +66,12 @@ function downloadIcs(b: BookingRequest) {
   if (scaricaIcs(b)) signal("prenotazione_calendario", b);
 }
 
+// Il canale: "Prenotazione su TheFork" per le piattaforme, non "dal sito del locale".
+function viaDi(b: BookingRequest): { label: string; Icon: typeof Phone } {
+  if (b.via === "sito" && b.piattaforma) return { label: `Aperta su ${b.piattaforma}`, Icon: Globe };
+  return VIA[b.via] ?? VIA.copiato;
+}
+
 function DateTile({ date, muted }: { date: string | null; muted?: boolean }) {
   const d = date ? fromKey(date) : null;
   return (
@@ -124,7 +130,9 @@ function PlaceName({ b, className }: { b: BookingRequest; className: string }) {
 
 function UpcomingCard({ b }: { b: BookingRequest }) {
   const status = bookingStatus(b);
-  const via = VIA[b.via] ?? VIA.copiato;
+  const via = viaDi(b);
+  // Chi conferma dipende dal canale (revisore 8/11): su TheFork lo segna la persona, non il locale.
+  const pf = b.piattaforma;
   const when = [b.date ? capitalize(dayLabel(b.date)) : null, b.time ? `alle ${b.time}` : null].filter(Boolean).join(" ");
   return (
     <li data-testid="prenotazione-in-arrivo" data-stato={status} className="rounded-card border border-border bg-white p-4 shadow-card">
@@ -147,13 +155,13 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
             onClick={() => { updateBooking(b.id, { confirmed: true }); signal("prenotazione_confermata", b); }}
             className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
           >
-            <Check size={16} /> Il locale ha confermato
+            <Check size={16} /> {pf ? "Sì, ho prenotato" : "Il locale ha confermato"}
           </button>
-          <p className="mt-1.5 text-center text-xs font-sans text-text-muted">Toccalo quando il locale ti risponde: Mapetite non vede le sue risposte.</p>
+          <p className="mt-1.5 text-center text-xs font-sans text-text-muted">{pf ? `Toccalo se hai confermato su ${pf}: Mapetite non lo vede.` : "Toccalo quando il locale ti risponde: Mapetite non vede le sue risposte."}</p>
         </div>
       ) : (
         <p data-testid="prenotazione-confermata" className="mt-3 flex items-center gap-1.5 rounded-btn bg-surface px-3 py-2 text-sm font-sans text-text">
-          <Check size={16} className="shrink-0 text-success" aria-hidden /> Confermata dal locale.
+          <Check size={16} className="shrink-0 text-success" aria-hidden /> {pf ? `Prenotata su ${pf} (l'hai segnata tu).` : "Confermata dal locale (l'hai segnato tu)."}
           <button type="button" onClick={() => updateBooking(b.id, { confirmed: false })} className="ml-auto min-h-8 shrink-0 text-xs font-display font-semibold text-text-muted">
             Non ancora
           </button>
@@ -315,7 +323,7 @@ export default function PrenotazioniView() {
           )}
 
           <p className="mt-8 text-center text-xs font-sans leading-relaxed text-text-muted">
-            Mapetite non vede i tavoli liberi: la conferma arriva sempre dal locale.
+            Mapetite non vede i tavoli liberi: la conferma la dà il locale, o la piattaforma su cui hai prenotato.
           </p>
           {upcoming.length > 0 && (
             <Link

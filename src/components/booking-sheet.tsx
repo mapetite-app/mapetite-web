@@ -113,6 +113,10 @@ export default function BookingSheet({
   const [esito, setEsito] = useState<"si" | "dopo" | null>(null);
   // "Sì, ma un altro giorno o ora": si riapre il passo 1 per correggere, poi si segna prenotata.
   const [correggi, setCorreggi] = useState(false);
+  // Con la piattaforma: "Oppure scrivi al locale" apre il passo del messaggio.
+  const [scrivi, setScrivi] = useState(false);
+  // Dati copiati per il modulo della piattaforma: si dice solo dopo una copia riuscita (revisore 8/11).
+  const [copiaDati, setCopiaDati] = useState<"ok" | "ko" | null>(null);
   // Modulo di prenotazione del locale (TheFork, Quandoo…) trovato sul suo sito: un tocco e ci sei.
   const [canale, setCanale] = useState<{ sito: string; canale: Canale | null } | null>(null);
   useEffect(() => {
@@ -203,6 +207,17 @@ export default function BookingSheet({
     setCorreggi(false);
     trackFeature("prenotazione_segnata", { contesto: done.piattaforma ?? done.via, ...(Object.keys(patch).length ? { stato: "corretta" } : {}) });
   };
+  // Apre la piattaforma: con i dati della persona, prova a copiarli per il modulo e dice com'è andata.
+  const apriPiattaforma = (nome: string) => {
+    if (dati) {
+      try {
+        navigator.clipboard.writeText(datiDaIncollare(dati)).then(() => setCopiaDati("ok"), () => setCopiaDati("ko"));
+      } catch {
+        setCopiaDati("ko");
+      }
+    }
+    record("sito", nome);
+  };
   const copy = async () => {
     try { await navigator.clipboard.writeText(message); setCopied(true); setTimeout(() => setCopied(false), 2500); return true; } catch { return false; }
   };
@@ -246,6 +261,14 @@ export default function BookingSheet({
 
         {done && !correggi && esito === null ? (
           <div data-testid="prenota-hai-prenotato" className="mt-4">
+            {done.piattaforma && dati && (copiaDati === "ok" ? (
+              <p data-testid="prenota-dati-copiati" className="mb-3 rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">I tuoi dati sono negli appunti: incollali su {done.piattaforma}.</p>
+            ) : copiaDati === "ko" ? (
+              <div data-testid="prenota-dati-a-mano" className="mb-3 rounded-card bg-surface px-4 py-3">
+                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">I tuoi dati per {done.piattaforma}</p>
+                <p className="mt-1 select-all whitespace-pre-line text-sm font-sans text-text">{datiDaIncollare(dati)}</p>
+              </div>
+            ) : null)}
             {done.via === "telefono" && (
               <div className="mb-3 rounded-card bg-surface p-4">
                 <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa dire al telefono</p>
@@ -279,7 +302,7 @@ export default function BookingSheet({
                 onClick={() => { setEsito("dopo"); trackFeature("prenotazione_segnata", { stato: "non_ancora" }); }}
                 className="mt-2 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-white/85 underline underline-offset-2"
               >
-                Non ancora: aspetto la risposta
+                {done.piattaforma ? "Non ancora" : "Non ancora: aspetto la risposta"}
               </button>
             </div>
             <button
@@ -346,9 +369,9 @@ export default function BookingSheet({
               <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
             </div>
           </div>
-        ) : step === 1 || correggi ? (
+        ) : step === 1 || correggi || (modulo && !scrivi && custom == null && !modulo2) ? (
           <>
-            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">{correggi ? "Quando hai prenotato?" : "Passo 1 di 2 · quando e quanti"}</p>
+            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">{correggi ? "Quando hai prenotato?" : modulo ? `Quando e quanti · poi confermi su ${modulo.nome}` : "Passo 1 di 2 · quando e quanti"}</p>
             {ultima && (
               <p data-testid="prenota-come-ultima" className="mt-2 text-sm font-sans font-semibold text-accent">
                 ↻ Come l&apos;ultima volta{ultima.people ? `: ${ultima.people} ${ultima.people === 1 ? "persona" : "persone"}` : ""}{ultima.time ? `${ultima.people ? "" : ":"} alle ${ultima.time}` : ""}
@@ -448,9 +471,38 @@ export default function BookingSheet({
             </label>
             {disabled && (
               <p data-testid="prenota-manca" className="mt-3 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-accent">
-                Scegli {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")} per scrivere al locale.
+                Scegli {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")} {modulo && !correggi ? "per prenotare" : "per scrivere al locale"}.
               </p>
             )}
+            {modulo && !correggi ? (
+              <>
+                {/* Con la piattaforma (l'unica via che vede i tavoli liberi) un passo solo: TheFork è il
+                    pulsante principale, la nota subito sotto; il messaggio solo per chi sceglie di scrivere (revisore 8/11). */}
+                <a
+                  data-testid="prenota-piattaforma"
+                  href={modulo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={disabled}
+                  onClick={(e) => { if (disabled) { e.preventDefault(); return; } apriPiattaforma(modulo.nome); }}
+                  className={`${btn} mt-4 ${disabled ? "pointer-events-none bg-border text-text-muted" : "bg-accent text-white"}`}
+                >
+                  <Globe size={18} /> Prenota su {modulo.nome}
+                </a>
+                <p data-testid="prenota-piattaforma-nota" className="mt-1.5 text-center text-xs font-sans leading-relaxed text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì.</p>
+                {(wa || place.phone || place.websiteUri) && (
+                  <button
+                    type="button"
+                    data-testid="prenota-scrivi-locale"
+                    disabled={disabled}
+                    onClick={() => { setScrivi(true); setStep(2); }}
+                    className="mt-2 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-brand disabled:text-text-muted"
+                  >
+                    Oppure scrivi al locale →
+                  </button>
+                )}
+              </>
+            ) : (
             <button
               type="button"
               data-testid="prenota-avanti"
@@ -460,6 +512,7 @@ export default function BookingSheet({
             >
               {correggi ? "Segna prenotato" : "Avanti: il messaggio"}
             </button>
+            )}
             {correggi && (
               <button type="button" onClick={() => setCorreggi(false)} className="mt-1 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-text-muted">
                 Indietro
@@ -469,11 +522,11 @@ export default function BookingSheet({
         ) : (
           <>
             {/* Passo 2: riepilogo in una riga (tocco per cambiare), nome, messaggio, invio. */}
-            <p className="mt-1 text-xs font-sans text-text-muted">Passo 2 di 2 · scrivi al locale</p>
+            <p className="mt-1 text-xs font-sans text-text-muted">{modulo ? "Scrivi al locale" : "Passo 2 di 2 · scrivi al locale"}</p>
             <button
               type="button"
               data-testid="prenota-modifica"
-              onClick={() => setStep(1)}
+              onClick={() => { setStep(1); setScrivi(false); }}
               aria-label="Modifica giorno, ora e persone"
               className="mt-3 flex min-h-12 w-full items-center justify-between gap-2 rounded-card bg-surface px-4 text-left"
             >
@@ -598,37 +651,17 @@ export default function BookingSheet({
             />
 
             {/* Onestà sulla disponibilità: solo i dati Google, mai tavoli o orari inventati. */}
-            {/* Con il modulo della piattaforma la frase su chi conferma sta solo sotto il suo pulsante (revisore 8/11). */}
-            {(!modulo || (isToday && place.openNow != null) || riapre) && (
-              <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
-                {modulo ? "" : "Mapetite non vede i tavoli liberi: la conferma arriva dal locale."}
-                {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
-                {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
-              </p>
-            )}
+            {/* Qui si scrive al locale (la piattaforma ha il suo passo): la conferma la dà il locale. */}
+            <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
+              Mapetite non vede i tavoli liberi: la conferma arriva dal locale.
+              {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
+              {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
+            </p>
             {chiusoScelto && (
               <p data-testid="prenota-chiuso-2" className="mt-1 text-xs font-sans font-semibold text-error">A quell&apos;ora risulta chiuso (orari Google): controlla l&apos;orario prima di inviare.</p>
             )}
 
             <div className={`mt-3 flex flex-col gap-2 ${disabled ? "pointer-events-none opacity-40" : ""}`} aria-disabled={disabled}>
-              {/* Con il modulo della piattaforma (l'unica via che vede i tavoli liberi) è lui il pulsante
-                  principale, con la sua nota subito sotto; WhatsApp e Chiama restano come alternative (revisore 8/11). */}
-              {modulo && (
-                <>
-                  <a
-                    data-testid="prenota-piattaforma"
-                    href={modulo.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => { if (dati) void navigator.clipboard?.writeText(datiDaIncollare(dati)).catch(() => {}); record("sito", modulo.nome); }}
-                    className={`${btn} bg-accent text-white`}
-                  >
-                    <Globe size={18} /> Prenota su {modulo.nome}
-                  </a>
-                  <p data-testid="prenota-piattaforma-nota" className="text-center text-xs font-sans leading-relaxed text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì{dati ? ": i tuoi dati sono già copiati" : ""}.</p>
-                  {(wa || place.phone) && <p className="mt-1 text-xs font-display font-semibold text-text-muted">Oppure scrivi al locale</p>}
-                </>
-              )}
               {wa && (
                 <a
                   data-testid="prenota-whatsapp"
@@ -636,7 +669,7 @@ export default function BookingSheet({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => record("whatsapp")}
-                  className={`${btn} ${modulo ? "border border-border bg-white text-[#1f8f4e]" : "bg-[#1f8f4e] text-white"}`}
+                  className={`${btn} bg-[#1f8f4e] text-white`}
                 >
                   <MessageCircle size={18} /> Invia su WhatsApp
                 </a>
@@ -646,7 +679,7 @@ export default function BookingSheet({
                   data-testid="prenota-chiama"
                   href={telHref(place.phone)}
                   onClick={() => record("telefono")}
-                  className={`${btn} ${wa || modulo ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
+                  className={`${btn} ${wa ? "border border-border bg-white text-brand" : "bg-brand text-white"}`}
                 >
                   <Phone size={18} /> Chiama {place.phone}
                 </a>
