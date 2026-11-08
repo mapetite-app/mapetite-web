@@ -1,7 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, CalendarCheck, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
+import { BookOpen, CalendarCheck, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, Lock, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { GRIGLIA_CLASS, TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -26,6 +26,10 @@ import ProfiloAmati from "@/components/profilo-amati";
 import { amatiValidi } from "@/lib/tipi-locale";
 import { ATMOSPHERES, CUISINES, OCCASIONS, PRICE_RANGES } from "@/lib/preferences";
 import { pulisciMappa, SCOPERTE, tipoDa } from "@/lib/mappa-gusto";
+import { cityFromAddress } from "@/lib/city";
+import { categoryLabel } from "@/lib/category-label";
+import { topTypes } from "@/lib/social-view";
+import { profilePath } from "@/lib/handle";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -273,6 +277,16 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     .filter((p) => p.visite >= POSTO_FISSO)
     .sort((a, b) => b.visite - a.visite || a.name.localeCompare(b.name, "it"));
 
+  // "Come ti vedono" (8/11): gli stessi numeri che legge chi apre /u/<nome> (provati, città, tipo che salvi di più).
+  const citta = new Set(saved.flatMap((r) => (r.places && r.tags?.includes(STATE_DONE) ? [cityFromAddress(r.places.address)] : [])).filter(Boolean)).size;
+  const tipoTop = topTypes(saved.flatMap((r) => (r.places ? [{ category: r.places.category }] : [])), (c) => categoryLabel(c), 1)[0]?.tipo ?? null;
+  const pubblico = !("stato" in social) && social.is_public && social.handle ? social.handle : null;
+  const vedonoNumeri = [
+    { id: "provati", value: String(doneCount), label: doneCount === 1 ? "provato" : "provati" },
+    { id: "citta", value: String(citta), label: "città" },
+    ...(tipoTop ? [{ id: "tipo", value: tipoTop, label: "il tuo tipo" }] : []),
+  ];
+
   const REVIEWS_PREVIEW = 2;
   const icon = { size: 18, strokeWidth: 1.75 } as const;
   const row = "flex min-h-14 items-center gap-3 border-t border-border px-4 py-2 active:bg-surface";
@@ -353,6 +367,37 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             accesso, dentro lo stesso riquadro (revisore 5/11: due riquadri quasi omonimi confondevano). */}
         <ProfiloAmati iniziali={amati} />
       </section>
+
+      {/* Come ti vedono gli altri (8/11): i numeri che contano e la propria pagina pubblica a un tocco.
+          Da privato lo dice e porta all'interruttore (che chiede conferma prima di accendersi). */}
+      {!("stato" in social) && (
+        <section data-testid="come-ti-vedono" aria-labelledby="vedono-titolo" className="mb-6 rounded-card border border-[#e3e7e7] bg-white px-4 pb-3 pt-2 shadow-card">
+          <div className="flex items-center gap-1">
+            <h2 id="vedono-titolo" className="min-w-0 flex-1 font-title text-[22px] leading-tight text-text">Come ti vedono</h2>
+            <span data-testid="come-ti-vedono-stato" className={`inline-flex shrink-0 items-center gap-1 rounded-pill px-2.5 py-1 text-xs font-display font-semibold ${pubblico ? "bg-accent-light text-accent" : "bg-surface text-text-muted"}`}>
+              {pubblico ? <Globe size={12} aria-hidden /> : <Lock size={12} aria-hidden />}
+              {pubblico ? "Pubblico" : "Privato"}
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-3 gap-2">
+            {vedonoNumeri.map((n) => (
+              <div key={n.id} data-testid={`vedono-${n.id}`} className="flex min-w-0 flex-col items-center rounded-card bg-[#f0f2f2] px-1 py-2">
+                <dd className={`max-w-full truncate font-title font-semibold leading-tight text-brand ${n.id === "tipo" ? "text-[15px]" : "text-xl"}`}>{n.value}</dd>
+                <dt className="mt-0.5 text-[11px] font-display text-text-muted">{n.label}</dt>
+              </div>
+            ))}
+          </dl>
+          {pubblico ? (
+            <Link href={profilePath(pubblico)} data-testid="come-ti-vedono-link" className="mt-1 flex min-h-11 items-center gap-1 text-[14px] font-medium text-brand active:opacity-70">
+              Apri la tua pagina pubblica <ChevronRight aria-hidden size={16} />
+            </Link>
+          ) : (
+            <a href="#profilo-pubblico" data-testid="come-ti-vedono-link" className="mt-1 flex min-h-11 items-center gap-1 text-[14px] font-medium text-brand active:opacity-70">
+              Solo tu vedi i tuoi posti · Rendilo pubblico <ChevronRight aria-hidden size={16} />
+            </a>
+          )}
+        </section>
+      )}
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}
       <section aria-labelledby="mie-cose-titolo" data-testid="profilo-mie-cose" className="mb-6">

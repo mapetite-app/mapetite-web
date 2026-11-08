@@ -62,6 +62,7 @@ type FakeSocial = {
   profili?: PublicProfile[];
   salvati?: PublicSaved[];
   seguo?: string[];
+  miei?: string[]; // UUID dei locali salvati da chi guarda ("In comune", "Salva anche tu")
   mio?: MySocial;
   creator?: CreatorInfo[];
   scopritori?: ScopritoreRow[]; // assente = migrazione 20261016_scopritori non applicata
@@ -105,6 +106,21 @@ export async function followedIds(userId: string): Promise<string[] | InArrivo> 
     return { stato: "in-arrivo" };
   }
   return (data ?? []).map((r) => r.followed_id as string);
+}
+
+// UUID dei locali salvati da chi guarda (solo i propri, RLS): "In comune" e "Salva anche tu" sul
+// profilo di un altro. Se la lettura fallisce si torna a un insieme vuoto (nessun "In comune").
+export async function myPlaceIds(userId: string): Promise<Set<string>> {
+  const f = await fake();
+  if (f === "in-arrivo") return new Set();
+  if (f) return new Set(f.miei ?? []);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("saved_places").select("place_id").eq("user_id", userId).limit(2000);
+  if (error) {
+    console.error(`[social] miei salvati: ${error.code ?? ""} ${error.message}`);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.place_id as string));
 }
 
 // ── Profilo pubblico /u/<handle> ─────────────────────────────────────────────

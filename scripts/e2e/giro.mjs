@@ -4543,9 +4543,11 @@ else {
   { const n = async (id) => (await sp.getByTestId(`numero-${id}`).textContent())?.replace(/\s+/g, " ").trim();
     ok((await n("visitati")) === "1Provati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
   // Giro 1/11 (D36): uno stato, una parola. Per i posti di un'altra persona "Provati", come il titolo "Già provati".
-  ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) >= 1, "profilo pubblico: 'Provato/Provati' ovunque, mai 'Visitato'");
+  ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) === 0, "profilo pubblico: mai 'Visitato'; sotto 'Di recente' e 'Da provare' niente pillola di stato doppione");
   { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
-  ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok((await sp.getByRole("heading", { name: "Di recente", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Di recente' e 'Da provare' con i posti");
+  // 8/11: senza account niente "Salva anche tu" né "In comune"; con 3 posti niente ricerca; "Gli è piaciuto" solo con 👍 o classifica.
+  ok((await sp.getByTestId("salva-anche-tu").count()) === 0 && (await sp.getByTestId("profilo-in-comune").count()) === 0 && (await sp.getByTestId("cerca-posti-persona").count()) === 0 && (await sp.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico senza account: niente salva, niente 'In comune', niente ricerca con pochi posti");
   ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
   ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
   await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
@@ -4593,6 +4595,37 @@ else {
   await soctx.route("**/rest/v1/follows**", (r) => { follows.push({ method: r.request().method(), url: decodeURIComponent(r.request().url()), body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
   await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
   ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
+  // 8/11: profilo più utile per chi è collegato (dati dal cookie: "miei" = i propri salvati).
+  { // Righe minime e codifica leggera (solo i caratteri vietati nei cookie): 16 posti stanno nei 4 KB del cookie.
+    const many = Array.from({ length: 16 }, (_, i) => ({ user_id: GIULIA, place_id: `g${i}`, name: i % 2 ? `Enoteca ${i}` : `Forno ${i}`, category: i % 2 ? "bar" : "cafe", tags: i % 3 ? ["Già visitato", ...(i === 4 ? ["Mi è piaciuto"] : [])] : ["Da provare"], created_at: `2026-10-${10 + i}` }));
+    const light = (v) => JSON.stringify(v).replace(/[%;, \\\u0080-\uffff]/g, (c) => encodeURIComponent(c));
+    await soctx.addCookies([{ name: "e2e_social", value: light({ profili: [{ ...giulia, visitati: 10, da_provare: 6 }], salvati: many, seguo: [GIULIA], miei: ["g2", "g3"] }), url: BASE }]);
+    const saves = [];
+    await soctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { saves.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); } return r.fulfill({ json: [] }); });
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    const ordine = await sp.locator("[data-testid=profilo-posti] h2").allTextContents();
+    ok(ordine.join("|") === "Gli è piaciuto|Di recente|I suoi tipi|In comune · 2|Da provare", `profilo di un altro: sezioni nell'ordine giusto (${ordine.join(" | ")})`);
+    ok((await sp.getByTestId("piaciuto-card").count()) === 1 && (await sp.getByTestId("piaciuto-card").getAttribute("href")) === `/locali/${many[4].place_id}`, "profilo di un altro: 'Gli è piaciuto' con il posto segnato 👍");
+    { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Caffè8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
+    ok((await sp.getByTestId("in-comune-posto").count()) === 2 && (await sp.getByTestId("salvato-anche-tu").count()) >= 1, "profilo di un altro: 'In comune' e i posti già tuoi segnati");
+    ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 5 && (await sp.getByTestId("mostra-tutti-recenti").textContent()) === "Mostra tutti (10)", "profilo di un altro: 5 posti e 'Mostra tutti (10)', nessun limite fisso");
+    await sp.getByTestId("mostra-tutti-recenti").click();
+    ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 10, "profilo di un altro: 'Mostra tutti' li apre tutti");
+    { const first = await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").first().textContent(); ok(first.includes("Forno 14"), `profilo di un altro: 'Di recente' dal più recente (${first.slice(0, 30)})`); }
+    await sp.getByTestId("profilo-recenti").getByTestId("salva-anche-tu").first().click();
+    await sp.getByTestId("profilo-recenti").getByTestId("salvato-anche-tu").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok(saves.length === 1 && saves[0].user_id === ME && saves[0].place_id === "g14" && saves[0].tags?.[0] === "Da provare" && saves[0].note === null, "profilo di un altro: un tocco e lo salvi anche tu ('Da provare', senza nota)");
+    await sp.getByTestId("cerca-posti-persona").fill("enoteca 1");
+    ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 4, "profilo di un altro: con più di 15 posti la ricerca nei suoi posti");
+    await sp.getByTestId("togli-filtro").click();
+    await sp.getByTestId("tipo-persona").first().click();
+    ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 8, "profilo di un altro: un tocco su un tipo mostra solo quei posti");
+    await sp.screenshot({ path: `${OUT}/60c-profilo-altro-filtro.png`, caret: "initial" });
+    const html = await sp.content();
+    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\""), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', data della visita)");
+    await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+    await setSocial(soctx, social);
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
   await sp.getByTestId("segui").click();
   await sp.getByTestId("segui").getByText("Segui", { exact: true }).waitFor({ timeout: 4000 }).catch(() => {});
   ok(follows.some((f) => f.method === "DELETE" && f.url.includes(`follower_id=eq.${ME}`) && f.url.includes(`followed_id=eq.${GIULIA}`)) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "false", "smetti di seguire: cancella solo il proprio follow");
@@ -4641,14 +4674,22 @@ else {
   const ps = sp.getByTestId("profilo-social");
   ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
   ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
+  ok((await sp.getByTestId("come-ti-vedono-stato").textContent())?.includes("Privato") && (await sp.getByTestId("vedono-provati").textContent())?.includes("0") && (await sp.getByTestId("come-ti-vedono-link").getAttribute("href")) === "#profilo-pubblico", "profilo: 'Come ti vedono' dice 'Privato' e porta all'interruttore");
   await ps.locator("input[name=handle]").fill("@Lorenzo Mà!");
   ok((await ps.locator("input[name=handle]").inputValue()) === "lorenzoma", "profilo: il nome pubblico si ripulisce da solo (minuscole, niente spazi né accenti)");
   await ps.locator("input[name=display_name]").fill("Lorenzo");
   await ps.locator("input[name=city]").fill("Roma");
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
-  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Le note private non si vedono mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
+  { const f = sp.getByTestId("conferma-pubblico");
+    const vis = await f.getByTestId("conferma-visibile").innerText(); const mai = await f.getByTestId("conferma-mai").innerText();
+    ok(await f.isVisible() && vis.includes("città e bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
+    profPatch = null;
+    await f.getByTestId("conferma-pubblico-no").click();
+    ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura"); }
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   profStatus = 409;
-  await ps.getByRole("button", { name: "Salva" }).click();
+  await sp.getByTestId("conferma-pubblico-si").click();
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Note e “Non fa per me” mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
   await ps.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
   ok((await ps.getByRole("alert").textContent())?.includes("è già preso"), "profilo: nome già preso spiegato in italiano");
   profStatus = 204;
@@ -4657,6 +4698,15 @@ else {
   await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
   ok(profPatch?.handle === "lorenzoma" && profPatch?.is_public === true && profPatch?.display_name === "Lorenzo" && profPatch?.city === "Roma" && !("note" in (profPatch ?? {})), "profilo: salva nome pubblico, nome, città e 'pubblico'");
   ok(await ps.getByTestId("profilo-condividi").isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Pubblico") && await ps.getByTestId("vedi-profilo-pubblico").getAttribute("href") === "/u/lorenzoma", "profilo: dopo il salvataggio, condividi profilo e mappa");
+  // Revoca in un tocco: spento, si salva subito (senza "Salva"), e poi si riaccende con il foglio.
+  profPatch = null;
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  await ps.getByTestId("profilo-stato").getByText("Privato").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.is_public === false && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato"), "profilo: spegnere 'pubblico' vale subito, in un tocco");
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  await sp.getByTestId("conferma-pubblico-si").click();
+  await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.is_public === true && await ps.getByTestId("profilo-condividi").isVisible(), "profilo: riacceso dopo la conferma");
   await ps.scrollIntoViewIfNeeded();
   await ps.screenshot({ path: `${OUT}/64-profilo-impostazioni.png`, caret: "initial" });
   await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
@@ -6386,8 +6436,8 @@ else {
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
     const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
-    ok(orderG(await g.getByTestId("top-voce").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-top").textContent()).includes("Top Roma"), "profilo pubblico: 'I preferiti di Giulia' con la top di Roma in ordine");
-    await g.getByTestId("profilo-top").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-piaciuti").textContent()).includes("N.1"), "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine");
+    await g.getByTestId("profilo-piaciuti").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
@@ -6398,7 +6448,7 @@ else {
     ok(await g.getByTestId("raccolta-pubblica-non-trovata").isVisible(), "raccolta condivisa: nome inesistente → 'non disponibile'");
     await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
-    ok((await g.getByTestId("profilo-top").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica la top non compare");
+    ok((await g.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica (e senza 👍) 'Gli è piaciuto' non compare");
     await gc.close();
   }
 }

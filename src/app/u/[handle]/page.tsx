@@ -7,16 +7,16 @@ import CondividiLink from "@/components/condividi-link";
 import InvitoMapetite from "@/components/invito-mapetite";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import SocialInArrivo from "@/components/social-in-arrivo";
-import { PostoRiga } from "@/components/posto-persona";
-import { loadProfilePage, loadScopritori, loadVerdetti } from "@/lib/social";
+import ProfiloPosti from "@/components/profilo-posti";
+import { loadProfilePage, loadScopritori, loadVerdetti, myPlaceIds } from "@/lib/social";
 import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
-import { isVisited, mapSpots, plural, publicCollections } from "@/lib/social-view";
+import { likedPlaces, mapSpots, plural, publicCollections, recentVisited, topTypes } from "@/lib/social-view";
+import { categoryLabel } from "@/lib/category-label";
 import { collectionColor, publicCollectionPath } from "@/lib/raccolte";
 import { loadPublicRanks } from "@/lib/classifica-server";
 import { topByCity } from "@/lib/classifica";
 import { cityFromAddress } from "@/lib/city";
-import ClassificaLista from "@/components/classifica-lista";
 import CreatorBadge from "@/components/creator-badge";
 
 // Profilo pubblico di una persona (piano 5.1): si apre anche senza account (link condiviso).
@@ -87,16 +87,26 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const path = profilePath(profile.handle);
   const spots = mapSpots(places);
   const collections = publicCollections(places);
-  const visited = places.filter(isVisited);
-  const want = places.filter((p) => !isVisited(p)); // salvato e non ancora visitato = da provare
-  // Top per città (piano 4.3): solo i visitati messi in classifica; nascosta senza la migrazione.
+  // 8/11: "Gli è piaciuto", "Di recente", "I suoi tipi", "In comune", "Da provare". Tutto dalle righe
+  // già pubbliche (niente note, niente "Non fa per me", niente data della visita: resta privata).
+  const recent = recentVisited(places);
+  const want = places.filter((p) => !p.tags?.includes("Già visitato")); // salvato e non ancora visitato = da provare
+  // Classifica (piano 4.3): i primi 3 di ogni città aprono "Gli è piaciuto"; nascosta senza la migrazione.
   // Scopritori (5.6): badge "💎 Scopritore" solo se ha gemme e la migrazione è applicata.
-  // Verdetto Mapetite sulle righe (come le card degli amici): chi apre il link capisce perché andarci.
-  const [ranks, scopritori, verdetti] = await Promise.all([loadPublicRanks(profile.id), loadScopritori([profile.id]), loadVerdetti([...visited, ...want].slice(0, 60).map((p) => p.place_id))]);
+  const [ranks, scopritori, mine] = await Promise.all([
+    loadPublicRanks(profile.id),
+    loadScopritori([profile.id]),
+    viewer && !isMe ? myPlaceIds(viewer) : Promise.resolve(new Set<string>()),
+  ]);
   const scopritore = scopritori?.find((s) => s.id === profile.id && s.gemme > 0) ?? null;
   const tops = ranks
-    ? topByCity(visited.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 5).slice(0, 3)
+    ? topByCity(recent.flatMap((p) => (ranks.has(p.place_id) ? [{ ...p, city: cityFromAddress(p.address), score: ranks.get(p.place_id)! }] : [])), 3).flatMap(([, list]) => list.map((p) => p.place_id))
     : [];
+  const liked = likedPlaces(places, tops);
+  const tipi = topTypes(places, (c) => categoryLabel(c));
+  // Verdetto Mapetite sulle righe (come le card degli amici): chi apre il link capisce perché andarci.
+  const verdetti = await loadVerdetti([...liked, ...recent, ...want].map((p) => p.place_id));
+  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: p.tags, created_at: p.created_at });
   const stats = [
     { label: "Provati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },
@@ -157,6 +167,24 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
         </div>
       </header>
 
+      {places.length === 0 ? (
+        <p data-testid="profilo-vuoto" className="mx-4 mt-6 rounded-card border border-border bg-surface p-5 text-center text-sm font-sans text-text-muted">
+          {name} non ha ancora posti pubblici sulla mappa.
+        </p>
+      ) : (
+        <ProfiloPosti
+          isMe={isMe}
+          viewer={viewer}
+          all={places.map(posto)}
+          liked={liked.map(posto)}
+          recent={recent.map(posto)}
+          want={want.map(posto)}
+          tipi={tipi}
+          mine={[...mine]}
+          verdetti={verdetti}
+        />
+      )}
+
       {collections.length > 0 && (
         <section className="mt-6 px-4" aria-labelledby="raccolte-titolo">
           <h2 id="raccolte-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Raccolte</h2>
@@ -172,20 +200,6 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
                 <span className="truncate">{c.name}</span>
                 <span className="text-accent/70">· {c.count}</span>
               </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {tops.length > 0 && (
-        <section className="mt-6 px-4" aria-labelledby="top-titolo" data-testid="profilo-top">
-          <h2 id="top-titolo" className="mb-2 font-title text-xl font-semibold text-brand">I preferiti di {name}</h2>
-          <div className="space-y-4">
-            {tops.map(([city, list]) => (
-              <div key={city}>
-                <p className="mb-1.5 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">🏆 Top {city}</p>
-                <ClassificaLista testId="top-voce" voci={list.map((p) => ({ id: p.place_id, name: p.name, category: p.category, href: `/locali/${p.place_id}` }))} />
-              </div>
             ))}
           </div>
         </section>
@@ -207,35 +221,6 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
             <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-brand" /> Da provare</span>
           </p>
         </section>
-      )}
-
-      {places.length === 0 ? (
-        <p data-testid="profilo-vuoto" className="mx-4 mt-6 rounded-card border border-border bg-surface p-5 text-center text-sm font-sans text-text-muted">
-          {name} non ha ancora posti pubblici sulla mappa.
-        </p>
-      ) : (
-        <>
-          {visited.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="visitati-titolo">
-              <h2 id="visitati-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Già provati</h2>
-              <ul className="space-y-2">
-                {visited.slice(0, 30).map((s) => (
-                  <li key={s.place_id}><PostoRiga spot={s} verdict={verdetti[s.place_id] ?? null} /></li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {want.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="voglio-titolo">
-              <h2 id="voglio-titolo" className="mb-2 font-title text-xl font-semibold text-brand">Da provare</h2>
-              <ul className="space-y-2">
-                {want.slice(0, 30).map((s) => (
-                  <li key={s.place_id}><PostoRiga spot={s} verdict={verdetti[s.place_id] ?? null} /></li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
       )}
 
       {!viewer && <InvitoMapetite returnPath={path} />}

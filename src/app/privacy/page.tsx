@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // Platform → Branding). Solo ciò che l'app fa davvero: tabelle Supabase, eventi d'uso, fornitori.
 // Testo da far rileggere a un legale prima dell'apertura al pubblico.
 
-const SEZIONI: { titolo: string; righe: string[] }[] = [
+const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
   {
     titolo: "Chi siamo",
     righe: [
@@ -44,7 +44,18 @@ const SEZIONI: { titolo: string; righe: string[] }[] = [
       "Google: le ricerche passano da Google Maps (Places) per trovare i locali; l'accesso con Google passa da Google.",
       "Anthropic: il testo della ricerca, i gusti che hai scelto e le recensioni pubbliche dei locali servono all'AI per scrivere i verdetti. Non inviamo email né nome.",
       "Mapbox mostra la mappa; YouTube serve a leggere la descrizione dei video che salvi.",
-      "Altri utenti vedono il tuo profilo, i tuoi salvati e le tue recensioni solo se rendi pubblico il profilo.",
+      "Altri utenti vedono il tuo profilo, i tuoi salvati e le tue recensioni solo se rendi pubblico il profilo (vedi \"Profilo pubblico e amici\").",
+    ],
+  },
+  {
+    titolo: "Profilo pubblico e amici",
+    id: "profilo-pubblico",
+    righe: [
+      "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (Profilo → Impostazioni → Profilo pubblico), dopo un foglio che ti dice cosa vedranno gli altri.",
+      "Se è pubblico, chiunque abbia il link o ti cerchi per nome su Mapetite vede: nome, @nome, città e bio; i posti che hai provato e quelli da provare, con le raccolte, i tipi di locale che salvi di più e il giorno in cui li hai salvati; quelli che ti sono piaciuti e la tua classifica; quante persone segui e ti seguono; recensioni, foto e video che pubblichi, con il tuo nome. Chi è collegato vede anche quali posti avete salvato tutti e due. Chi ti segue vede i posti che salvi tra le attività degli amici e, nella pagina di un locale, che ci sei stato o lo vuoi provare.",
+      "Mai, nemmeno con il profilo pubblico: le note, i posti segnati \"Non fa per me\" come tali, i gusti che hai scelto, le prenotazioni, la tua posizione, l'email e il giorno delle visite.",
+      "Base giuridica: il tuo consenso. Lo revochi in un tocco spegnendo \"Profilo pubblico\": da quel momento profilo e posti non si vedono più e le tue recensioni tornano anonime (\"Un membro di Mapetite\"). Non possiamo cancellare quello che qualcuno ha già visto o copiato prima.",
+      "Si possono seguire solo i profili pubblici. Mapetite non manda messaggi a tuo nome e non mostra a nessuno chi guarda il tuo profilo.",
     ],
   },
   {
@@ -61,9 +72,9 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-6" data-testid="privacy">
       <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Mapetite</p>
       <h1 className="mt-1 font-title text-[28px] font-semibold leading-tight text-brand">Privacy</h1>
-      <p className="mt-2 text-sm font-sans text-text-muted">Ultimo aggiornamento: 31 ottobre 2026</p>
+      <p className="mt-2 text-sm font-sans text-text-muted">Ultimo aggiornamento: 8 novembre 2026</p>
       {SEZIONI.map((s) => (
-        <section key={s.titolo} className="mt-6">
+        <section key={s.titolo} id={s.id} className="mt-6 scroll-mt-4">
           <h2 className="font-title text-xl text-brand">{s.titolo}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {s.righe.map((r) => (
