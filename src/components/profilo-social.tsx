@@ -24,7 +24,8 @@ const VISIBILE = [
   "Chi ti segue: cosa salvi e quando, e dove sei stato",
 ];
 // Finché la migrazione 20261108_non_fa_per_me_privati non è applicata il posto resta tra i provati.
-const NON_FA_PER_ME_NOTA = "Un posto segnato “Non fa per me” può comparire tra i provati, senza il giudizio.";
+// Migrazione 20261108_non_fa_per_me_privati applicata l'8/11: i posti "Non fa per me" non si vedono più agli altri.
+const NON_FA_PER_ME_NOTA = "I posti segnati “Non fa per me” restano solo tuoi.";
 const MAI = ["note", "il giudizio “Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "data del diario"];
 export type MySocialInitial = {
   handle: string | null;

@@ -4781,7 +4781,7 @@ else {
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   { const f = sp.getByTestId("conferma-pubblico");
     const vis = await f.getByTestId("conferma-visibile").innerText(); const mai = await f.getByTestId("conferma-mai").innerText();
-    ok(await f.isVisible() && vis.includes("bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && vis.includes("in comune") && vis.includes("Chi ti segue") && (await f.getByTestId("conferma-nota").innerText()).includes("può comparire tra i provati") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
+    ok(await f.isVisible() && vis.includes("bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && vis.includes("in comune") && vis.includes("Chi ti segue") && (await f.getByTestId("conferma-nota").innerText()).includes("restano solo tuoi") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
     profPatch = null;
     await f.getByTestId("conferma-pubblico-no").click();
     ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura"); }
