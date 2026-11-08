@@ -2487,7 +2487,7 @@ export default function MapView({
       try {
         // D25 (prova dell'8/11): la stessa ricerca, nello stesso punto, negli ultimi minuti è già nel
         // telefono (ricarica, Indietro): si riusa senza chiamare Google né l'AI.
-        const memoKey = mondo ? chiaveRicerca("/api/search", { q: q.trim(), lat: arrotonda(at.lat), lng: arrotonda(at.lng) }) : null;
+        const memoKey = mondo ? chiaveRicerca("/api/search", { u: userId, q: q.trim(), lat: arrotonda(at.lat), lng: arrotonda(at.lng) }) : null;
         // Stessa forma libera della risposta di /api/search (res.json()).
         // Solo riaprendo la pagina (opts.daMemoria): una ricerca rifatta a mano chiede sempre risposte fresche.
         let data: Awaited<ReturnType<Response["json"]>> = memoKey && opts.daMemoria ? ricordata(memoKey) : null;
@@ -2697,7 +2697,7 @@ export default function MapView({
       // vivo un 502 lasciava una trattoria di Trastevere senza verdetto (VISIONE: il verdetto c'è SEMPRE).
       const fetchGroup = async (g: { places: unknown[]; token: string }): Promise<VerdictReply | null> => {
         // Verdetti già scritti per questa ricerca (ricarica, Indietro: D25): niente seconda chiamata all'AI.
-        const memoKey = chiaveRicerca("/api/search/synthesis", { q: searchedQuery, token: g.token });
+        const memoKey = chiaveRicerca("/api/search/synthesis", { u: userId, q: searchedQuery, token: g.token });
         const memo = daMemoria ? ricordata<VerdictReply>(memoKey) : null;
         if (memo) return memo;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -2984,14 +2984,15 @@ export default function MapView({
       Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
       ? { lat, lng }
       : undefined;
+    const ripetuta = aperturaRipetuta(window.location.href); // prima di togliere q e at dall'indirizzo
     params.delete("q");
     params.delete("at");
     const rest = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
     // D25: ricarica o Indietro. Se la ricerca è ancora nel telefono si riapre com'era (runAISearch la
     // ritrova senza Google); se è scaduta non si rifà da sola: la frase resta nel campo, un tocco la rilancia.
-    const inMemoria = center != null && ricordata(chiaveRicerca("/api/search", { q, lat: arrotonda(center.lat), lng: arrotonda(center.lng) })) != null;
-    if (!inMemoria && aperturaRipetuta()) {
+    const inMemoria = center != null && ricordata(chiaveRicerca("/api/search", { u: userId, q, lat: arrotonda(center.lat), lng: arrotonda(center.lng) })) != null;
+    if (!inMemoria && ripetuta) {
       setTimeout(() => { setWelcomeDismissed(true); setAiQuery(q); }, 0);
       return;
     }

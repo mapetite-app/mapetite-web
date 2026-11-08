@@ -48,11 +48,17 @@ export function arrotonda(n: number): number {
   return Math.round(n * 1e5) / 1e5;
 }
 
-// La pagina è stata ricaricata o riaperta con Indietro/Avanti (non un link nuovo).
-export function aperturaRipetuta(): boolean {
+// La pagina è stata ricaricata o riaperta con Indietro/Avanti (non un link nuovo). Revisore 8/11: il tipo di
+// caricamento vale per tutta la vita del documento, quindi dopo una ricarica della home anche la ricerca dal
+// campo (navigazione interna verso /mappa?q=) sembrava una ricarica e non partiva. Conta solo se il documento
+// è stato caricato proprio su questo indirizzo (`href` letto prima di togliere q e at), e una volta sola.
+let giaChiesta = false;
+export function aperturaRipetuta(href: string): boolean {
+  if (giaChiesta) return false;
+  giaChiesta = true;
   try {
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    return nav?.type === "reload" || nav?.type === "back_forward";
+    return (nav?.type === "reload" || nav?.type === "back_forward") && nav.name === href;
   } catch {
     return false;
   }

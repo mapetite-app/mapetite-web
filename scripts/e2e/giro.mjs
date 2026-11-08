@@ -991,6 +991,14 @@ ok(page.url().includes("/mappa") && (await page.getByTestId("titolo-risposta").t
   await page.getByLabel("Chiedi all'AI: cosa cerchi?").press("Enter");
   await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
   ok(chiamate === 1, `D25: rilanciata a mano, la ricerca chiama Google (${chiamate})`);
+  // Revisore 8/11: dopo una ricarica della home, la ricerca dal campo (navigazione interna) deve partire.
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByLabel("Cosa cerchi?").fill("enoteca a Monti dopo la ricarica");
+  await page.getByLabel("Cosa cerchi?").press("Enter");
+  await page.waitForURL(/\/mappa/, { timeout: 8000 }).catch(() => {});
+  await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok(chiamate === 2, `D25: home ricaricata, poi ricerca dal campo: parte (una chiamata in più, ${chiamate})`);
   // Verdetti arrivati prima di togliere i contatori (una richiesta in viaggio verrebbe gestita due volte).
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(1200);
