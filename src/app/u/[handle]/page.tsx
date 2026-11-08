@@ -8,6 +8,7 @@ import InvitoMapetite from "@/components/invito-mapetite";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import ProfiloPosti from "@/components/profilo-posti";
+import { OPINION_DISLIKE } from "@/lib/tags";
 import { loadProfilePage, loadScopritori, loadVerdetti, myPlaceIds } from "@/lib/social";
 import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
@@ -110,7 +111,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const verdetti = await loadVerdetti([...liked, ...recent, ...want].map((p) => p.place_id));
   // Al telefono solo questi campi: niente date (il giorno in cui un posto è segnato "provato" dice quando
   // la persona ci è stata), niente id o nome di chi l'ha salvato. L'ordine resta quello deciso qui.
-  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: p.tags });
+  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: (p.tags ?? []).filter((t) => t !== OPINION_DISLIKE) }); // anche se la vista lo togliesse già (revisore 8/11)
   const stats = [
     { label: "Provati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },

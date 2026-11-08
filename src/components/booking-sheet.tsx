@@ -470,8 +470,9 @@ export default function BookingSheet({
               />
             </label>
             {disabled && (
-              <p data-testid="prenota-manca" className="mt-3 rounded-btn bg-accent-light px-3 py-2 text-sm font-sans text-accent">
-                Scegli {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")} {modulo && !correggi ? "per prenotare" : "per scrivere al locale"}.
+              // Terzo revisore 8/11: non un errore corallo all'apertura, solo cosa manca.
+              <p data-testid="prenota-manca" className="mt-3 text-sm font-sans text-text-muted">
+                Manca ancora: {missing.map((m) => (m === "persone" ? "quante persone" : m === "giorno" ? "il giorno" : "l'ora")).join(", ")}.
               </p>
             )}
             {modulo && !correggi ? (
@@ -562,7 +563,7 @@ export default function BookingSheet({
                 ))}
                 <label className="mt-3 flex items-start gap-3 text-sm font-sans text-text">
                   <input type="checkbox" data-testid="prenota-dati-consenso" checked={modulo2.consenso} onChange={(e) => setModulo2({ ...modulo2, consenso: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0 accent-brand" />
-                  {accountPrenotazioni() ? "Usali per scrivere ai locali: restano su questo telefono e, con le prenotazioni, sul tuo account." : "Usali per scrivere ai locali: restano su questo telefono."}
+                  {accountPrenotazioni() ? "Usali per prenotare (messaggi ai locali e TheFork): restano su questo telefono e, con le prenotazioni, sul tuo account." : "Usali per prenotare (messaggi ai locali e TheFork): restano su questo telefono."}
                 </label>
                 {modulo2.telefono.trim() !== "" && !telefonoValido(modulo2.telefono) && (
                   <p className="mt-1 text-xs font-sans text-error">Controlla il numero.</p>

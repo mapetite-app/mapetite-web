@@ -4824,7 +4824,7 @@ else {
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   profStatus = 409;
   await sp.getByTestId("conferma-pubblico-si").click();
-  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Note e “Non fa per me” mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Mai: note, il giudizio “Non fa per me”"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
   await ps.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
   ok((await ps.getByRole("alert").textContent())?.includes("è già preso"), "profilo: nome già preso spiegato in italiano");
   profStatus = 204;
@@ -7195,7 +7195,7 @@ else {
   { const c = pp.getByTestId("prenotazione-in-arrivo").first();
     await c.waitFor({ timeout: 5000 }).catch(() => {});
     const t = (await c.textContent()) ?? "";
-    ok(t.includes("Aperta su TheFork") && !t.includes("dal sito del locale") && ((await c.getByTestId("prenotazione-conferma").textContent()) ?? "").includes("Sì, ho prenotato") && !t.includes("Il locale ha confermato"), `prenotazioni: per TheFork 'Aperta su TheFork' e 'Sì, ho prenotato' (${t.slice(0, 120)})`);
+    ok(t.includes("Richiesta su TheFork") && !t.includes("dal sito del locale") && ((await c.getByTestId("prenotazione-conferma").textContent()) ?? "").includes("Sì, ho prenotato") && !t.includes("Il locale ha confermato"), `prenotazioni: per TheFork 'Aperta su TheFork' e 'Sì, ho prenotato' (${t.slice(0, 120)})`);
     await c.getByTestId("prenotazione-conferma").click().catch(() => {});
     const conf = (await c.getByTestId("prenotazione-confermata").textContent().catch(() => "")) ?? "";
     const fondo = (await pp.getByText(/Mapetite non vede i tavoli liberi/).textContent().catch(() => "")) ?? "";

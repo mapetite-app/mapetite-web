@@ -6,7 +6,7 @@ import { Lock, Globe } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/handle";
-import { NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
+import { elenco, NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 // Impostazioni del profilo pubblico (piano 5.1) dentro /profilo: nome pubblico (handle), nome,
 // città, una riga su di sé e l'interruttore "Profilo pubblico" (spento di default).
@@ -160,7 +160,8 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
           </label>
           <p data-testid="privacy-testo" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
             {isPublic
-              ? "Chiunque abbia il link vedrà nome, città, i posti provati e da provare e le raccolte. Note e “Non fa per me” mai. Spegni e torni privato subito."
+              // Terzo revisore 8/11: lo stesso testo del foglio e di /privacy (src/lib/privacy-profilo.ts), non un riassunto diverso.
+              ? `${PUBBLICO_CHI}: ${elenco(PUBBLICO_VEDONO)} Mai: ${PUBBLICO_MAI.join(", ")}. ${PUBBLICO_REVOCA}`
               : "Spento: nessuno vede il tuo profilo né i tuoi posti. Note e “Non fa per me” restano sempre private."}{" "}
             <Link href="/privacy#profilo-pubblico" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
           </p>

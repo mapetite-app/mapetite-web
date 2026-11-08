@@ -68,7 +68,7 @@ function downloadIcs(b: BookingRequest) {
 
 // Il canale: "Prenotazione su TheFork" per le piattaforme, non "dal sito del locale".
 function viaDi(b: BookingRequest): { label: string; Icon: typeof Phone } {
-  if (b.via === "sito" && b.piattaforma) return { label: `Aperta su ${b.piattaforma}`, Icon: Globe };
+  if (b.via === "sito" && b.piattaforma) return { label: `Richiesta su ${b.piattaforma}`, Icon: Globe };
   return VIA[b.via] ?? VIA.copiato;
 }
 
