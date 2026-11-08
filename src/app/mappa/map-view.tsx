@@ -2761,6 +2761,7 @@ export default function MapView({
         const buoni = tutti.filter((p) => !esclusi.has(p.id) && !inFondo.has(p.name)).map((p) => p.id);
         const rimasti = buoni.length >= 2 ? buoni : tutti.filter((p) => !esclusi.has(p.id)).map((p) => p.id);
         // Revisori 8/11: riaprendo la ricerca dalla memoria il consiglio torna da lì, senza richiamare l'AI.
+        // (Secondo revisore 8/11: oggi alla ricarica il consiglio, che è in prova, non viene richiesto affatto; resta per quando si accende.)
         const consiglioKey = chiaveRicerca("/api/search/consiglio", { u: userId, q: searchedQuery, token: pending.token });
         type ConsiglioReply = { consiglio?: { id: string; perche: string } | null } | null;
         const consiglioMemo = daMemoria ? ricordata<{ consiglio?: { id: string; perche: string } | null }>(consiglioKey) : null;
