@@ -234,3 +234,11 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **OGGI nell'app:** i posti con molte più recensioni degli altri scendono (`mainstream.ts`), "💎 Poco conosciuto" sulle card, verdetto dal testo delle recensioni e non dal voto.
 - **DAVVERO, in futuro:** dire in chiaro chi scrive le recensioni ("Qui scrivono soprattutto romani", proposta 50) e "Da ordinare" con la prova (proposta 51): la trappola si riconosce in un colpo d'occhio. Poi i comportamenti di chi usa Mapetite (chi ci torna) come segnale più forte.
 - **Primo passo:** controllare se le recensioni che Google ci manda già dicono la lingua originale (campo `originalText.languageCode`), senza chiamate in più (team).
+
+## 23. Il primo accesso che chiede troppo (o nasconde le cose dietro gli inviti) fa chiudere l'app — 8/11
+- **Chi lo ha:** chi installa un'app di ristoranti per la prima volta, cioè ogni tester del gruppo chiuso che parte dopo l'8/11.
+- **Quanto pesa:** Beli, l'app più vicina per i giovani negli Stati Uniti, riceve proprio queste critiche: primo accesso difficile, funzioni che si sbloccano solo invitando amici ([mwm.ai](https://mwm.ai/de/apps/beli/1478375386)), confronti poco chiari ([Pratt IXD, 9/2026](https://ixd.prattsi.org/2026/09/a-design-critique-of-beli-restaurant-discovery-and-social-platform/)). Quanti abbandonano al primo accesso nelle app di ristoranti: dato non trovato.
+- **OGGI nell'app:** primo accesso di 7 domande saltabili, "Ecco cosa ho capito di te" correggibile con un tocco, nessuna funzione dietro inviti; oggi corretti gli ultimi difetti di testo (niente "Le tue uscite:", niente doppia "e").
+- **DAVVERO, in futuro:** misurare dove si fermano i tester (passo per passo, già tracciato con `benvenuto_*`) e accorciare quel passo; un tasto "Qualcosa non va?" per i tester (proposta 54).
+- **Primo passo:** dopo una settimana di tester, leggere in `/admin/numeri` a quale passo si esce.
+

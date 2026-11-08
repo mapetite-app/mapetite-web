@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 8/11/2026 (domenica, CEO che chiude — tema tester e primo accesso). Dal 9/11.
+
+### 53. "Questo mese ne provo 3": obiettivo legato ai tuoi "Da provare"
+- **Problema:** `PROBLEMI.md` 9 e 18: il "voglio andarci" non diventa una serata.
+- **Cosa fa:** in Salvati, una riga sola: "Questo mese: 1 di 3 provati" con i tre "Da provare" più vecchi e vicini; un tocco su "Ci sono stato" fa avanzare il conto. Si sceglie il numero (1, 3, 5) o si toglie.
+- **Da dove nasce:** Beli ha l'obiettivo annuale di posti da provare ([Stanford Daily](https://stanforddaily.com/2026/01/20/from-one-beli-to-another-bringing-the-social-aspect-back-to-eating-out/)), ma su posti qualsiasi; noi sui posti che hai scelto tu, non sui più famosi.
+- **Valore per l'utente:** i salvati diventano uscite. **Per il ristoratore:** domanda vera da chi l'ha già salvato (dato aggregato per il lato ristoratori).
+- **Sforzo:** S. **Costo Google/Haiku:** zero (solo dati già salvati).
+- **Stato proposto:** PRONTA dal 9/11.
+
+### 54. "Qualcosa non va?" per i tester
+- **Problema:** `PROBLEMI.md` 23: con il gruppo chiuso, i difetti che i tester incontrano si perdono in chat.
+- **Cosa fa:** nel Profilo (non su ogni schermata: una cosa principale per schermata), una riga "Qualcosa non va?" che apre un foglio con una frase e lo screenshot facoltativo; arriva in `/admin/numeri` con la pagina e l'ora.
+- **Da dove nasce:** nessuna delle app viste lo offre in chiaro; serve a noi per il test.
+- **Valore per l'utente:** si sente ascoltato. **Per il ristoratore:** nessuno diretto.
+- **Sforzo:** S. **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA dal 9/11.
+
 ## 7/11/2026 (sabato, CEO che chiude — tema scheda, primo accesso e demo). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 
 ### 50. "Qui scrivono soprattutto romani": chi ha scritto le recensioni, detto in chiaro
