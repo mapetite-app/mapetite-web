@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle } from "lucide-react";
+import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle, CalendarPlus } from "lucide-react";
 import {
   addBooking,
   bookingMessage,
@@ -12,8 +12,16 @@ import {
   dayLabel,
   lastBookingFor,
   loadBookings,
+  datiDaIncollare,
+  leggiDatiPrenotazione,
   missingDetails,
+  removeBooking,
+  salvaDatiPrenotazione,
+  telefonoValido,
+  type DatiPrenotazione,
+  scaricaIcs,
   subscribeBookings,
+  updateBooking,
   telHref,
   whatsappNumber,
   type BookingDetails,
@@ -26,19 +34,12 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { POSTO_FISSO, visiteDi } from "@/lib/diario";
 import type { Canale } from "@/lib/canale-prenotazione";
 
-// "Prenota su TheFork": bocciato due volte dal collaudo il 30/10 (regola del team: niente produzione).
-// Spento per tutti finché un revisore nuovo non lo approva; si prova con ?beta=prenota.
-const PIATTAFORMA_PER_TUTTI = false;
-// ?beta=prenota una volta lo accende su quel telefono (resta anche cambiando pagina).
+// "Prenota su TheFork": bocciato due volte dal collaudo il 30/10, corretto (sicurezza, link, Node 20) e,
+// l'8/11, chiusi i minori rimasti (modulo di un altro locale, tempo massimo per lettura, testo ripetuto).
+// Acceso per tutti su richiesta di Lorenzo (8/11: "è fondamentale"). Se non trova niente resta "dal sito".
+const PIATTAFORMA_PER_TUTTI = true;
 function piattaformaAccesa(): boolean {
-  if (PIATTAFORMA_PER_TUTTI) return true;
-  if (typeof window === "undefined") return false;
-  try {
-    if (new URLSearchParams(window.location.search).get("beta") === "prenota") localStorage.setItem("mapetite.beta.prenota", "1");
-    return localStorage.getItem("mapetite.beta.prenota") === "1";
-  } catch {
-    return false;
-  }
+  return PIATTAFORMA_PER_TUTTI;
 }
 
 // Foglio "Prenota" (piano 1.3): riepilogo modificabile e le vie che QUEL locale offre davvero
@@ -72,6 +73,7 @@ function rememberName(name: string) {
 }
 
 const subscribeNothing = () => () => {};
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function BookingSheet({
   place,
@@ -99,9 +101,17 @@ export default function BookingSheet({
     special: initial?.special ?? null,
   });
   const [name, setName] = useState<string>(() => (typeof window === "undefined" ? "" : readName()));
+  // "I tuoi dati per prenotare" (8/11): chiesti una volta, usati solo con il consenso (src/lib/booking.ts).
+  const [dati, setDati] = useState<DatiPrenotazione | null>(() => (typeof window === "undefined" ? null : leggiDatiPrenotazione()));
+  const [modulo2, setModulo2] = useState<{ nome: string; telefono: string; email: string; consenso: boolean } | null>(null);
   // Messaggio modificato a mano: non si riscrive più quando cambiano giorno/ora/persone.
   const [custom, setCustom] = useState<string | null>(null);
   const [done, setDone] = useState<BookingRequest | null>(null);
+  // Tornati da WhatsApp, dalla chiamata o da TheFork: "L'hai prenotato?" (Lorenzo, 8/11). "si" = la
+  // persona dice di aver prenotato (mai prima: Mapetite non vede la conferma); "dopo" = aspetta risposta.
+  const [esito, setEsito] = useState<"si" | "dopo" | null>(null);
+  // "Sì, ma un altro giorno o ora": si riapre il passo 1 per correggere, poi si segna prenotata.
+  const [correggi, setCorreggi] = useState(false);
   // Modulo di prenotazione del locale (TheFork, Quandoo…) trovato sul suo sito: un tocco e ci sei.
   const [canale, setCanale] = useState<{ sito: string; canale: Canale | null } | null>(null);
   useEffect(() => {
@@ -141,7 +151,7 @@ export default function BookingSheet({
   // "Cliente di parola" (PROPOSTE.md 3): dalle prenotazioni di questo telefono, spento finché l'utente non lo accende.
   const parola = useSyncExternalStore(subscribeBookings, () => clienteDiParola(loadBookings()), () => null);
   const [dicoParola, setDicoParola] = useState(false);
-  const message = custom ?? bookingMessage(details, name, undefined, dicoVolta ? volta : null, dicoParola ? parola : null);
+  const message = custom ?? bookingMessage(details, dati?.nome.trim() || name, undefined, dicoVolta ? volta : null, dicoParola ? parola : null, dati ? { nome: dati.nome, telefono: dati.telefono || null } : null);
   const missing = missingDetails(details);
   const wa = whatsappNumber(place.phone);
   const today = new Date();
@@ -169,6 +179,7 @@ export default function BookingSheet({
       via,
       phone: place.phone ?? null,
       piattaforma,
+      ...(dati ? { aNome: dati.nome.trim() || null, telCliente: dati.telefono.trim() || null } : {}),
       // Locale chiuso adesso (dati Google): alla riapertura il promemoria chiede se hanno risposto.
       riapre: place.openNow === false && (via === "whatsapp" || via === "copiato") ? prossimaAperturaData(place.orari, new Date())?.getTime() ?? null : null,
     });
@@ -177,6 +188,19 @@ export default function BookingSheet({
     if (via === "sito") track("sito", where, { fonte: "prenota", ...(piattaforma ? { contesto: piattaforma } : {}) });
     else if (via === "telefono" || via === "whatsapp") track("chiama", where, { fonte: "prenota", contesto: via });
     setDone(req);
+    // Il messaggio solo copiato non è ancora partito: niente "L'hai prenotato?".
+    setEsito(via === "copiato" ? "dopo" : null);
+  };
+  // "Sì, l'ho prenotato": la stessa prenotazione diventa "confermata" (lo dice la persona), con i dati
+  // eventualmente corretti. Niente prenotazione nuova: è la stessa richiesta.
+  const segnaPrenotata = (patch: Partial<BookingDetails> = {}) => {
+    if (!done) return;
+    const agg = { ...done, ...patch, confirmed: true };
+    updateBooking(done.id, { ...patch, confirmed: true });
+    setDone(agg);
+    setEsito("si");
+    setCorreggi(false);
+    trackFeature("prenotazione_segnata", { contesto: done.piattaforma ?? done.via, ...(Object.keys(patch).length ? { stato: "corretta" } : {}) });
   };
   const copy = async () => {
     try { await navigator.clipboard.writeText(message); setCopied(true); setTimeout(() => setCopied(false), 2500); return true; } catch { return false; }
@@ -219,7 +243,79 @@ export default function BookingSheet({
           </button>
         </div>
 
-        {done ? (
+        {done && !correggi && esito === null ? (
+          <div data-testid="prenota-hai-prenotato" className="mt-4">
+            {done.via === "telefono" && (
+              <div className="mb-3 rounded-card bg-surface p-4">
+                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa dire al telefono</p>
+                <p className="mt-1 text-sm font-sans leading-relaxed text-text">{message}</p>
+              </div>
+            )}
+            <div className="rounded-card bg-brand p-5 text-white">
+              <p className="font-title text-2xl font-semibold leading-tight">L&apos;hai prenotato?</p>
+              <p className="mt-1 text-sm font-sans leading-relaxed text-white/80">
+                {done.via === "whatsapp" ? "Quando il locale ti risponde, segnalo qui: te lo ricordo io." : done.via === "telefono" ? "Se al telefono ti hanno detto sì, segnalo qui: te lo ricordo io." : done.piattaforma ? `Se hai confermato su ${done.piattaforma}, segnalo qui: te lo ricordo io.` : "Se hai prenotato, segnalo qui: te lo ricordo io."}
+              </p>
+              <button
+                type="button"
+                data-testid="prenota-si"
+                onClick={() => segnaPrenotata()}
+                className={`${btn} mt-4 bg-accent text-white`}
+              >
+                <Check size={18} /> Sì, {done.date ? dayLabel(done.date) : ""}{done.time ? ` alle ${done.time}` : ""}{done.people ? ` per ${done.people}` : ""}
+              </button>
+              <button
+                type="button"
+                data-testid="prenota-si-altro"
+                onClick={() => { setDetails({ date: done.date, time: done.time, people: done.people, special: done.special }); setCorreggi(true); }}
+                className={`${btn} mt-2 border border-white/30 text-white`}
+              >
+                Sì, ma un altro giorno o ora
+              </button>
+              <button
+                type="button"
+                data-testid="prenota-non-ancora"
+                onClick={() => { setEsito("dopo"); trackFeature("prenotazione_segnata", { stato: "non_ancora" }); }}
+                className="mt-2 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-white/85 underline underline-offset-2"
+              >
+                Non ancora: aspetto la risposta
+              </button>
+            </div>
+            <button
+              type="button"
+              data-testid="prenota-lascia"
+              onClick={() => { removeBooking(done.id); trackFeature("prenotazione_segnata", { stato: "no" }); onClose(); }}
+              className="mt-1 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-text-muted"
+            >
+              No, non l&apos;ho prenotato
+            </button>
+          </div>
+        ) : done && !correggi && esito === "si" ? (
+          <div data-testid="prenota-segnata" className="mt-4">
+            <div className="rounded-card bg-brand p-5 text-white">
+              <p className="flex items-center gap-2 font-display text-lg font-semibold"><Check size={20} className="text-accent" /> Prenotato</p>
+              <p data-testid="prenota-segnata-quando" className="mt-1 font-title text-xl font-semibold leading-tight">
+                {done.date ? capitalize(dayLabel(done.date)) : ""}{done.time ? ` alle ${done.time}` : ""}{done.people ? ` · ${done.people} ${done.people === 1 ? "persona" : "persone"}` : ""}
+              </p>
+              <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
+                Te lo ricordo il giorno prima e il giorno stesso, in home e sulla mappa, con le indicazioni già pronte.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="prenota-calendario"
+              onClick={() => { if (scaricaIcs(done)) trackFeature("prenotazione_calendario", { fonte: "prenota" }); }}
+              className={`${btn} mt-4 bg-accent text-white`}
+            >
+              <CalendarPlus size={18} /> Aggiungi al calendario
+            </button>
+            <p className="mt-1 text-center text-xs font-sans text-text-muted">Con un avviso 2 ore prima.</p>
+            <button type="button" onClick={onClose} className={`${btn} mt-2 border border-border bg-white text-brand`}>Fatto</button>
+            <div className="mt-2 flex justify-center border-t border-border pt-3">
+              <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
+            </div>
+          </div>
+        ) : done && !correggi ? (
           <div data-testid="prenota-fatto" className="mt-4">
             <div className="rounded-card bg-brand p-5 text-white">
               <p className="flex items-center gap-2 font-display text-lg font-semibold"><Check size={20} className="text-accent" /> Prenotazione richiesta</p>
@@ -233,15 +329,9 @@ export default function BookingSheet({
                 La conferma arriva dal locale: Mapetite non vede i tavoli liberi.
               </p>
               <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                La trovi in &ldquo;Le mie prenotazioni&rdquo;: te la ricordo il giorno stesso in home e il giorno dopo ti chiedo com&apos;è andata.
+                La trovi in &ldquo;Le mie prenotazioni&rdquo;: quando ti confermano, segnala lì. Te la ricordo comunque il giorno stesso.
               </p>
             </div>
-            {done.via === "telefono" && (
-              <div className="mt-3 rounded-card bg-surface p-4">
-                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa dire al telefono</p>
-                <p className="mt-1 text-sm font-sans leading-relaxed text-text">{message}</p>
-              </div>
-            )}
             <button type="button" onClick={onClose} className={`${btn} mt-4 bg-accent text-white`}>Fatto</button>
             <Link
               href="/prenotazioni"
@@ -255,9 +345,9 @@ export default function BookingSheet({
               <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
             </div>
           </div>
-        ) : step === 1 ? (
+        ) : step === 1 || correggi ? (
           <>
-            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">Passo 1 di 2 · quando e quanti</p>
+            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">{correggi ? "Quando hai prenotato?" : "Passo 1 di 2 · quando e quanti"}</p>
             {ultima && (
               <p data-testid="prenota-come-ultima" className="mt-2 text-sm font-sans font-semibold text-accent">
                 ↻ Come l&apos;ultima volta{ultima.people ? `: ${ultima.people} ${ultima.people === 1 ? "persona" : "persone"}` : ""}{ultima.time ? `${ultima.people ? "" : ":"} alle ${ultima.time}` : ""}
@@ -277,6 +367,18 @@ export default function BookingSheet({
                   {d.label}
                 </button>
               ))}
+              {/* Su TheFork si può prenotare anche più avanti: un giorno qualsiasi. */}
+              {correggi && (
+                <input
+                  type="date"
+                  aria-label="Altro giorno"
+                  data-testid="prenota-altro-giorno"
+                  min={dateKey(today)}
+                  value={details.date ?? ""}
+                  onChange={(e) => setDetails((b) => ({ ...b, date: e.target.value || null }))}
+                  className="min-h-10 shrink-0 rounded-pill border border-border bg-white px-3 text-base font-sans text-text"
+                />
+              )}
             </div>
             {/* Ora */}
             <div className="-mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -352,11 +454,16 @@ export default function BookingSheet({
               type="button"
               data-testid="prenota-avanti"
               disabled={disabled}
-              onClick={() => setStep(2)}
+              onClick={() => (correggi ? segnaPrenotata({ date: details.date, time: details.time, people: details.people, special: details.special }) : setStep(2))}
               className={`${btn} mt-4 bg-accent text-white disabled:bg-border disabled:text-text-muted`}
             >
-              Avanti: il messaggio
+              {correggi ? "Segna prenotato" : "Avanti: il messaggio"}
             </button>
+            {correggi && (
+              <button type="button" onClick={() => setCorreggi(false)} className="mt-1 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-text-muted">
+                Indietro
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -376,18 +483,89 @@ export default function BookingSheet({
               </span>
               <span className="shrink-0 text-sm font-display font-semibold text-accent">Modifica</span>
             </button>
-            <div className="mt-3">
-              <label className="block">
-                <span className="text-xs font-sans text-text-muted">Il tuo nome</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="es. Giulia"
-                  autoComplete="given-name"
-                  className="mt-1 min-h-11 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text"
-                />
-              </label>
-            </div>
+            {dati && !modulo2 ? (
+              <div data-testid="prenota-dati" className="mt-3 flex min-h-12 items-center justify-between gap-2 rounded-card bg-surface px-4">
+                <span className="min-w-0 truncate py-2 text-sm font-sans text-text">
+                  A nome <span className="font-semibold">{dati.nome}</span>{dati.telefono ? ` · ${dati.telefono}` : ""}
+                </span>
+                <button type="button" data-testid="prenota-dati-modifica" onClick={() => setModulo2({ ...dati })} className="min-h-10 shrink-0 text-sm font-display font-semibold text-accent">Modifica</button>
+              </div>
+            ) : modulo2 ? (
+              <div data-testid="prenota-dati-modulo" className="mt-3 rounded-card bg-surface p-3">
+                <p className="text-sm font-display font-semibold text-text">I tuoi dati per prenotare</p>
+                {([["nome", "Nome e cognome", "es. Giulia Rossi", "name", "text"], ["telefono", "Cellulare", "es. 333 123 4567", "tel", "tel"], ["email", "Email (facoltativa)", "es. giulia@email.it", "email", "email"]] as const).map(([k, label, ph, ac, type]) => (
+                  <label key={k} className="mt-2 block">
+                    <span className="text-xs font-sans text-text-muted">{label}</span>
+                    <input
+                      type={type}
+                      value={modulo2[k]}
+                      onChange={(e) => setModulo2({ ...modulo2, [k]: e.target.value })}
+                      placeholder={ph}
+                      autoComplete={ac}
+                      className="mt-1 min-h-11 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text"
+                    />
+                  </label>
+                ))}
+                <label className="mt-3 flex items-start gap-3 text-sm font-sans text-text">
+                  <input type="checkbox" data-testid="prenota-dati-consenso" checked={modulo2.consenso} onChange={(e) => setModulo2({ ...modulo2, consenso: e.target.checked })} className="mt-0.5 h-5 w-5 shrink-0 accent-brand" />
+                  Usali per scrivere ai locali: restano su questo telefono.
+                </label>
+                {modulo2.telefono.trim() !== "" && !telefonoValido(modulo2.telefono) && (
+                  <p className="mt-1 text-xs font-sans text-error">Controlla il numero.</p>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    data-testid="prenota-dati-salva"
+                    disabled={!modulo2.consenso || modulo2.nome.trim().length < 2 || (modulo2.telefono.trim() !== "" && !telefonoValido(modulo2.telefono))}
+                    onClick={() => {
+                      const d: DatiPrenotazione = { ...modulo2, consenso: true };
+                      salvaDatiPrenotazione(d);
+                      rememberName(d.nome.split(" ")[0] ?? d.nome);
+                      setDati(leggiDatiPrenotazione() ?? d);
+                      setModulo2(null);
+                      setCustom(null);
+                      trackFeature("dati_prenotazione", { stato: "salvati" });
+                    }}
+                    className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
+                  >
+                    Salva
+                  </button>
+                  <button type="button" onClick={() => setModulo2(null)} className="min-h-11 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">Annulla</button>
+                </div>
+                {dati && (
+                  <button
+                    type="button"
+                    data-testid="prenota-dati-togli"
+                    onClick={() => { salvaDatiPrenotazione(null); setDati(null); setModulo2(null); setCustom(null); trackFeature("dati_prenotazione", { stato: "tolti" }); }}
+                    className="mt-1 min-h-10 text-xs font-display font-semibold text-text-muted underline underline-offset-2"
+                  >
+                    Togli i miei dati da questo telefono
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3">
+                <label className="block">
+                  <span className="text-xs font-sans text-text-muted">Il tuo nome</span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="es. Giulia"
+                    autoComplete="given-name"
+                    className="mt-1 min-h-11 w-full rounded-btn border border-border bg-white px-3 text-base font-sans text-text"
+                  />
+                </label>
+                <button
+                  type="button"
+                  data-testid="prenota-dati-aggiungi"
+                  onClick={() => setModulo2({ nome: name, telefono: "", email: "", consenso: false })}
+                  className="mt-1 min-h-10 text-sm font-display font-semibold text-accent"
+                >
+                  + Aggiungi cognome e cellulare per il locale
+                </button>
+              </div>
+            )}
 
             {volta && custom == null && (
               <label data-testid="prenota-volta" className="mt-3 flex min-h-11 items-center gap-3 text-sm font-sans text-text">
@@ -420,7 +598,8 @@ export default function BookingSheet({
 
             {/* Onestà sulla disponibilità: solo i dati Google, mai tavoli o orari inventati. */}
             <p data-testid="prenota-onesta" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
-              Mapetite non vede i tavoli liberi: la conferma arriva dal locale.
+              {/* Con il modulo della piattaforma la frase sui tavoli liberi sta già sotto i pulsanti (minore del 30/10). */}
+              {modulo ? `La prenotazione la confermi tu, su ${modulo.nome} o con il locale.` : "Mapetite non vede i tavoli liberi: la conferma arriva dal locale."}
               {isToday && place.openNow != null ? ` Adesso risulta ${place.openNow ? "aperto" : "chiuso"} (dati Google).` : ""}
               {riapre ? ` Riapre ${riapre}: la risposta arriverà probabilmente da allora.` : ""}
             </p>
@@ -459,7 +638,7 @@ export default function BookingSheet({
                   href={modulo.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => record("sito", modulo.nome)}
+                  onClick={() => { if (dati) void navigator.clipboard?.writeText(datiDaIncollare(dati)).catch(() => {}); record("sito", modulo.nome); }}
                   className={`${btn} ${wa || place.phone ? "border border-brand bg-white text-brand" : "bg-brand text-white"}`}
                 >
                   <Globe size={18} /> Prenota su {modulo.nome}
@@ -486,7 +665,7 @@ export default function BookingSheet({
                 <Copy size={16} /> {copied ? "Messaggio copiato" : "Copia il messaggio"}
               </button>
               {modulo ? (
-                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì (giorno e ora li scegli di nuovo).</p>
+                <p data-testid="prenota-piattaforma-nota" className="-mt-1 text-center text-xs font-sans text-text-muted">Su {modulo.nome} vedi i tavoli liberi e confermi lì (giorno e ora li scegli di nuovo){dati ? "; i tuoi dati sono già copiati, da incollare" : ""}.</p>
               ) : place.websiteUri && <p className="-mt-1 text-center text-xs font-sans text-text-muted">Sul sito il messaggio è già copiato: incollalo se serve.</p>}
               {!place.phone && !place.websiteUri && (
                 <p className="text-center text-xs font-sans text-text-muted">Google non ha telefono né sito di questo locale: copia il messaggio e mandalo come preferisci.</p>

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { avvisoDelGiorno, avvisoPrenotazioneDomani, inviaAvviso, pushConfigurato, type Avviso } from "@/lib/push-server";
+import { avvisoDelGiorno, avvisoPrenotazioneDomani, avvisoPrenotazioneOggi, inviaAvviso, pushConfigurato, type Avviso } from "@/lib/push-server";
 import { oggiRoma } from "@/lib/stasera";
 
-// Avviso del giorno (proposta 6), una volta al giorno dal cron di Vercel (vercel.json): a chi ha
+// Avviso del giorno (proposta 6; dall'8/11 prima il tavolo di oggi), una volta al giorno dal cron di Vercel (vercel.json): a chi ha
 // acceso gli avvisi e ha segnato un posto per oggi con "Quando ci vai?" (saved_places.piano_al).
 // Poi (proposta 36) "Ci vai domani?" a chi ha una prenotazione per domani sull'account e non ha ancora
 // risposto né disdetto. Al massimo UN avviso per persona al giorno: vince il posto di oggi. Nessuna chiamata Google o AI.
@@ -35,7 +35,27 @@ export async function GET(request: Request) {
     perUtente.set(r.user_id, nomi);
   }
   const avvisi = new Map<string, Avviso>();
-  for (const [u, nomi] of perUtente) avvisi.set(u, avvisoDelGiorno(nomi, sabato));
+  // Il tavolo di oggi (Lorenzo, 8/11) viene prima di tutto: è l'avviso più utile della giornata.
+  // Solo prenotazioni sull'account (consenso), ancora da fare e con l'ora non già passata.
+  const oraRoma = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+  const { data: prenOggi, error: errOggi } = await admin
+    .from("prenotazioni")
+    .select("user_id, dati")
+    .eq("giorno", oggi)
+    .is("cancellata_at", null)
+    .is("esito", null)
+    .is("disdetta_at", null)
+    .limit(2000);
+  if (errOggi) console.warn(`[cron-avvisi] lettura prenotazioni di oggi ${errOggi.code ?? ""}`);
+  let oggiN = 0;
+  for (const r of ((prenOggi ?? []) as { user_id: string; dati: Record<string, unknown> | null }[]).sort((a, c) => String(a.dati?.time ?? "").localeCompare(String(c.dati?.time ?? "")))) {
+    const d = r.dati ?? {};
+    const ora = typeof d.time === "string" && /^\d{2}:\d{2}$/.test(d.time) ? d.time : null;
+    if (avvisi.has(r.user_id) || d.dismissed || typeof d.placeName !== "string" || (ora && ora <= oraRoma)) continue;
+    avvisi.set(r.user_id, avvisoPrenotazioneOggi(d.placeName, ora));
+    oggiN++;
+  }
+  for (const [u, nomi] of perUtente) if (!avvisi.has(u)) avvisi.set(u, avvisoDelGiorno(nomi, sabato));
 
   const domani = new Date(`${oggi}T12:00:00Z`);
   domani.setUTCDate(domani.getUTCDate() + 1);
@@ -66,6 +86,6 @@ export async function GET(request: Request) {
     if (esito === "scaduta") scadute.push(s.id);
   }
   if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
-  console.log(`[cron-avvisi] ${oggi} persone=${avvisi.size} domani=${domaniN} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
+  console.log(`[cron-avvisi] ${oggi} persone=${avvisi.size} oggi=${oggiN} domani=${domaniN} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
   return NextResponse.json({ inviati, scadute: scadute.length });
 }

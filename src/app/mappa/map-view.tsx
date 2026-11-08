@@ -21,6 +21,7 @@ import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@
 import SalvatiLista from "@/components/salvati-lista";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
+import { PrenotazioneMappa } from "@/components/prenotazione-avvisi";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
@@ -3227,6 +3228,8 @@ export default function MapView({
             )}
           </button>
         </div>
+        {/* Il tavolo di oggi o di domani (Lorenzo, 8/11): Portami lì e Chiama anche dalla mappa. */}
+        {view === "all" && overlay.kind === "none" && aiSearch === null && !aiSearching && aiQuery.trim() === "" && <PrenotazioneMappa />}
         {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
         {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden) && (
           <div data-testid="errore-barra" className="pointer-events-auto flex flex-col items-start gap-2 self-start rounded-card bg-surface px-3 py-2 shadow-float">

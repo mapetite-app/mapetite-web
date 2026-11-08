@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
 
@@ -16,6 +16,40 @@ const VIA: Record<BookingRequest["via"], string> = {
   sito: "richiesta dal sito",
   copiato: "messaggio copiato",
 };
+
+// "Portami lì" (indicazioni con la destinazione già messa) e "Chiama": le due cose che servono il giorno
+// del tavolo. Le usano il promemoria in home, il banner sulla mappa e il foglio "Tra 2 ore".
+export function AzioniTavolo({ b, fonte, chiaro = false }: { b: BookingRequest; fonte: string; chiaro?: boolean }) {
+  const dir = portamiLiUrl(b);
+  if (!dir && !b.phone) return null;
+  const base = "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill px-3 text-sm font-display font-semibold active:scale-[0.98]";
+  return (
+    <div className="mt-3 flex gap-2">
+      {dir && (
+        <a
+          href={dir}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="portami-li"
+          onClick={() => track("percorso", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { fonte })}
+          className={`${base} bg-accent text-white`}
+        >
+          <Navigation size={15} /> Portami lì
+        </a>
+      )}
+      {b.phone && (
+        <a
+          href={telHref(b.phone)}
+          data-testid="promemoria-chiama"
+          onClick={() => track("chiama", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { fonte, contesto: "telefono" })}
+          className={`${base} ${chiaro ? "border border-border bg-white text-brand" : "border border-white/30 text-white"}`}
+        >
+          <Phone size={15} /> Chiama
+        </a>
+      )}
+    </div>
+  );
+}
 
 // "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
 // è già scritto; un tocco per mandarlo da dove era partita la richiesta. Senza numero si copia.
@@ -124,15 +158,15 @@ function Doppio({ group, domani }: { group: BookingRequest[]; domani: boolean })
 // di disdire. Il giorno prima una sola domanda: "Sì" chiude il promemoria (e l'avviso non parte),
 // "Non più" apre la disdetta già scritta. Chi ha già risposto non vede più niente fino al giorno stesso.
 function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; onNonPiu: () => void }) {
-  const dettagli = [b.time ? `alle ${b.time}` : null, b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null].filter(Boolean).join(" · ");
+  const dettagli = b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : "";
   return (
     <section data-testid="promemoria-domani" className="rounded-card bg-brand p-4 text-white shadow-card">
       <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-        <CalendarCheck size={14} /> Domani{dettagli ? ` ${dettagli}` : ""}
+        <CalendarCheck size={14} /> Domani{dettagli ? ` · ${dettagli}` : ""}
       </p>
-      <p data-testid="ci-vai-titolo" className="mt-1 flex min-w-0 font-title text-lg font-semibold leading-tight">
-        <span className="truncate">{b.placeName}</span>
-        <span className="shrink-0 whitespace-pre">: ci vai?</span>
+      {/* "Domani alle 21:00 da Nome" (Lorenzo, 8/11), poi la domanda. */}
+      <p data-testid="ci-vai-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
+        {quandoTavolo(b)} da {b.placeName}<span className="whitespace-pre">: ci vai?</span>
       </p>
       {!open ? (
         <div className="mt-3 flex gap-2">
@@ -211,42 +245,33 @@ export default function BookingReminder() {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                <CalendarCheck size={14} /> Oggi{b.time ? ` alle ${b.time}` : ""}
+                <CalendarCheck size={14} /> Oggi{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
               </p>
-              <p className="mt-1 truncate font-title text-lg font-semibold leading-tight">{b.placeName}</p>
+              {/* "Stasera alle 21:00 da Nome" (Lorenzo, 8/11): quando e dove in una riga. */}
+              <p data-testid="promemoria-oggi-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
+                {quandoTavolo(b, now)} da <span className="break-words">{b.placeName}</span>
+              </p>
               <p className="mt-0.5 text-sm font-sans text-white/80">
-                {b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"} · ` : ""}{VIA[b.via]}
+                {b.confirmed ? "Prenotato" : `${VIA[b.via]}: la conferma arriva dal locale`}
               </p>
             </div>
             <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
               <X size={16} />
             </button>
           </div>
-          <p className="mt-2 text-xs font-sans text-white/70">
-            La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.{" "}
-            <Link href="/prenotazioni" data-testid="promemoria-tutte" className="font-semibold text-white underline underline-offset-2">Le mie prenotazioni</Link>
-          </p>
-          <div className="mt-3 flex gap-2">
-            {b.lat != null && b.lng != null && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => track("percorso", { id: b.placeId, lat: b.lat!, lng: b.lng! }, { fonte: "promemoria" })}
-                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white"
-              >
-                <Navigation size={15} /> Percorso
-              </a>
-            )}
+          <AzioniTavolo b={b} fonte="promemoria" />
+          {/* Le azioni secondarie in una riga sola: il banner resta basso. */}
+          <div className="mt-1 flex items-center justify-between gap-2">
             <button
               type="button"
               data-testid="promemoria-non-vado"
               aria-expanded={cancelling === b.id}
               onClick={() => setCancelling(cancelling === b.id ? null : b.id)}
-              className="min-h-10 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white"
+              className="min-h-10 text-sm font-display font-semibold text-white/80 underline underline-offset-2"
             >
               Non vado più
             </button>
+            <Link href="/prenotazioni" data-testid="promemoria-tutte" className="flex min-h-10 items-center text-sm font-display font-semibold text-white/80 underline underline-offset-2">Le mie prenotazioni</Link>
           </div>
           {cancelling === b.id && <Disdetta b={b} />}
         </section>

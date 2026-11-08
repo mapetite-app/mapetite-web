@@ -43,6 +43,18 @@ export function avvisoPrenotazioneDomani(nome: string, ora: string | null): Avvi
   };
 }
 
+// Il giorno del tavolo (Lorenzo, 8/11): "Stasera alle 21:00 da Nome". Il tocco apre la home, dove c'è
+// il promemoria con "Portami lì" e "Chiama".
+export function avvisoPrenotazioneOggi(nome: string, ora: string | null): Avviso {
+  const sera = ora ? Number(ora.slice(0, 2)) >= 18 : true;
+  return {
+    title: `${sera ? "Stasera" : "Oggi"}${ora ? ` alle ${ora}` : ""} da ${nome}`,
+    body: "Indicazioni e numero del locale in un tocco.",
+    url: "/",
+    tag: "prenotazione-oggi",
+  };
+}
+
 /** Testo dell'avviso del giorno: "Stasera: Trattoria da Mario" o "Stasera: Da Mario e altri 2". */
 export function avvisoDelGiorno(nomi: string[], sabato: boolean): Avviso {
   const quando = sabato ? "Oggi" : "Stasera";
