@@ -5,7 +5,7 @@
 
 const KEY = "mapetite.ricerche";
 export const MEMORIA_MS = 20 * 60 * 1000;
-const MAX_VOCI = 8;
+const MAX_VOCI = 20; // ricerche e gruppi di verdetti insieme (2–3 gruppi a ricerca): revisore 8/11
 
 type Voce = { k: string; t: number; v: unknown };
 

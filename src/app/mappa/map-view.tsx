@@ -65,7 +65,6 @@ const LATO_ETICHETTA: Record<LabelSide, string> = {
   sopra: "bottom-full left-1/2 mb-0.5 -translate-x-1/2",
 };
 
-// Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 // D25: la ricerca nell'indirizzo (/mappa?q=…&at=lat,lng), senza nuova voce nella cronologia; null la toglie.
 function scriviRicercaInIndirizzo(q: string | null, at?: { lat: number; lng: number }) {
   if (typeof window === "undefined") return;
@@ -84,6 +83,7 @@ function scriviRicercaInIndirizzo(q: string | null, at?: { lat: number; lng: num
   window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
 }
 
+// Riepilogo dei filtri per l'intestazione dei risultati: "Pizzerie · entro 3 km · ★ 4,5+".
 function filtersSummary(f: Filters): string {
   f = withDefaults(f);
   const parts: string[] = [];
