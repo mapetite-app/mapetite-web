@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { afterLoginPath, safeNext, withNext } from "@/lib/next-path";
+import { haGiaIniziato } from "@/lib/supabase/primo-accesso";
 
 // Messaggi di Supabase Auth in italiano semplice (arrivano in inglese).
 function authErrorIt(error: { code?: string; message: string }): string {
@@ -48,15 +49,11 @@ export async function login(formData: FormData) {
 
   // Dopo l'accesso si torna dov'eri (`next`) oppure alla mappa (è lì che si usa l'app);
   // solo chi non ha ancora indicato i suoi gusti passa prima dall'onboarding, che poi
-  // prosegue verso `next`. Le preferenze restano in /me.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("onboarding_completed")
-    .eq("id", auth.user!.id)
-    .single();
+  // prosegue verso `next`. Chi ha già dei salvati non ci passa (D2). Le preferenze restano in /me.
+  const iniziato = await haGiaIniziato(supabase, auth.user!.id);
 
   revalidatePath("/", "layout");
-  redirect(afterLoginPath(next, Boolean(profile?.onboarding_completed)));
+  redirect(afterLoginPath(next, iniziato));
 }
 
 export async function signup(formData: FormData) {

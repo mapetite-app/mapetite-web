@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { afterLoginPath, safeNext, withNext } from "@/lib/next-path";
+import { haGiaIniziato } from "@/lib/supabase/primo-accesso";
 
 // Arrivo dal link dell'email di conferma (e da ogni link di Supabase con `?code=`).
 // Supabase ha già confermato l'email; qui si apre la sessione così il tester entra
@@ -37,10 +38,6 @@ export async function GET(request: NextRequest) {
     redirect(withNext(`/login?message=${encodeURIComponent("Email confermata. Accedi con la tua email e password.")}`, next));
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("onboarding_completed")
-    .eq("id", userId)
-    .single();
-  redirect(afterLoginPath(next, Boolean(profile?.onboarding_completed)));
+  // Chi ha già fatto il primo accesso o ha già dei salvati va dritto all'app (D2).
+  redirect(afterLoginPath(next, await haGiaIniziato(supabase, userId)));
 }

@@ -131,6 +131,17 @@ async function inquadratura(pg, esclusi = []) {
 const SERVER_PROP_KEYS = [...(readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8").match(/const PROP_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
 const droppedKeys = (evs) => evs.flatMap((e) => Object.keys(e.props ?? {}).filter((k) => !SERVER_PROP_KEYS.includes(k)).map((k) => `${e.type}.${k}`));
 
+// D2 (prova dell'8/11): dopo l'accesso chi ha già dei salvati non torna al primo accesso. Client Supabase finto.
+{
+  let pa = null;
+  try { pa = await import(new URL("../../src/lib/supabase/primo-accesso.ts", import.meta.url).href); } catch (e) { ok(false, `D2: modulo src/lib/supabase/primo-accesso.ts importabile (${e.message})`); }
+  if (pa) {
+    const finto = (fatto, salvati) => ({ from: (t) => ({ select: () => ({ eq: () => (t === "profiles" ? { maybeSingle: async () => ({ data: fatto == null ? null : { onboarding_completed: fatto } }) } : Promise.resolve({ count: salvati })) }) }) });
+    const casi = await Promise.all([pa.haGiaIniziato(finto(false, 5), "u"), pa.haGiaIniziato(finto(null, 3), "u"), pa.haGiaIniziato(finto(true, 0), "u"), pa.haGiaIniziato(finto(false, 0), "u"), pa.haGiaIniziato(finto(null, null), "u")]);
+    ok(casi.join(",") === "true,true,true,false,false", `D2: con salvati o primo accesso fatto si va all'app; solo chi è nuovo va al primo accesso (${casi.join(",")})`);
+  }
+}
+
 // 0. Ritorno dopo l'accesso: il parametro `next` accetta solo percorsi interni (niente open redirect).
 //    Node 22.18+ legge il .ts direttamente (tipi rimossi), senza server né rete.
 {
