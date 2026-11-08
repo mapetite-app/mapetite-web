@@ -3650,7 +3650,8 @@ export default function MapView({
       )}
 
       {/* Senza la card in basso, l'invito ad aggiungere alla Home resta per chi torna (ha già cercato). */}
-      {chipsOn && view === "all" && aiSearch === null && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+      {/* Prova dal vivo 8/11: mai sopra le card di una ricerca in arrivo. */}
+      {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
         <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div className="w-full max-w-md empty:hidden">
             <InstallHint />
