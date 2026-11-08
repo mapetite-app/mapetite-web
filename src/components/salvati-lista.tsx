@@ -97,7 +97,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
   const conFoto = recenti.find((p) => foto[p.id]);
   const emoji = g.icona ? [g.icona] : [...new Set(recenti.map((p) => getCategoryEmoji(p.category, p.name)))].slice(0, 4);
   const emojiVista = emoji.length === 1 ? (
-    <span className="flex h-full w-full items-center justify-center text-[26px] leading-none">{emoji[0]}</span>
+    <span className="flex h-full w-full items-center justify-center text-[23px] leading-none">{emoji[0]}</span>
   ) : (
     <span className="grid h-full w-full grid-cols-4 place-items-center px-1 text-[17px] leading-none">{emoji.map((e) => <span key={e}>{e}</span>)}</span>
   );
@@ -112,7 +112,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
         className="block w-[92px] text-left active:scale-[0.97]"
       >
         <span data-testid={cover} className="block">
-          <span aria-hidden className={`relative block h-[52px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
+          <span aria-hidden className={`relative block h-[44px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
             {conFoto ? <FotoCopertina src={foto[conFoto.id]}>{emojiVista}</FotoCopertina> : emojiVista}
           </span>
           <span className="mt-1 flex items-baseline gap-1 px-0.5">
@@ -283,6 +283,18 @@ export default function SalvatiLista({
   const [quartiere, setQuartiere] = useState<string | null>(null);
   const [vicino, setVicino] = useState(false);
   const [scheda, setScheda] = useState<"zone" | "tipi" | "raccolte">("zone");
+  // La fila delle città scorre? (misurata, così la sfumatura c'è solo quando serve)
+  const cittaRef = useRef<HTMLDivElement | null>(null);
+  const [cittaScorre, setCittaScorre] = useState(false);
+  useEffect(() => {
+    const el = cittaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const misura = () => setCittaScorre(el.scrollWidth > el.clientWidth + 1 + (el.dataset.scorre ? 28 : 0));
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    misura();
+    return () => ro.disconnect();
+  }, [all.length]);
   // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
   // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
   // Proposta 44 (4/11): con una raccolta accesa ("Romantico") si chiede solo a quella raccolta.
@@ -380,6 +392,7 @@ export default function SalvatiLista({
     if (vicinoOn && origin && raggio) return perStato.filter((p) => distanceMeters(origin, p) <= raggio);
     return perStato;
   }, [perStato, quartiere, quartieri, vicinoOn, origin, raggio]);
+  const perZonaIds = useMemo(() => new Set(perZona.map((p) => p.id)), [perZona]);
   // Con un tipo acceso, gli scaffali per zona contano solo quel tipo (e viceversa).
   const perTipo = useMemo(() => (tipo === null ? perStato : perStato.filter((p) => tipoDi.get(p.id) === tipo)), [perStato, tipo, tipoDi]);
   // Zona e tipo accesi, senza lo stato: per i conteggi delle pillole "Da provare" e "Visti".
@@ -419,11 +432,13 @@ export default function SalvatiLista({
   const scaffaleTipi = useMemo(() => raggruppa(perZona, (p) => tipoDi.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20).map((g) => ({ ...g, label: tipoPlurale(g.key) })), [perZona, tipoDi]);
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   // Con una città scelta, le raccolte di quella città (la raccolta accesa resta, anche se lì è vuota).
+  // Revisore 8/11: le copertine contano solo i posti rimasti con stato, zona e tipo accesi (i numeri dicono il vero),
+  // così la raccolta si aggiunge in qualunque ordine.
+  const perAltri = useMemo(() => (raccolta === null ? perTipo.filter((p) => perZonaIds.has(p.id)) : senzaStato.filter((p) => statoOn === null || hasStateOrTag(p.tags, statoOn))), [raccolta, perTipo, perZonaIds, senzaStato, statoOn]);
   const collections = useMemo(() => {
-    // Con uno stato acceso le copertine contano solo i posti in quello stato (i numeri dicono il vero).
-    const cs = summarizeCollections([...(statoOn !== null && raccolta === null ? base.filter((p) => hasStateOrTag(p.tags, statoOn)) : base)].reverse(), 4);
+    const cs = summarizeCollections([...perAltri].reverse(), 4);
     return activeTag !== null && !isStateTag(activeTag) && !cs.some((c) => c.name === activeTag) ? [...cs, { name: activeTag, count: 0, preview: [] }] : cs;
-  }, [base, activeTag, statoOn, raccolta]);
+  }, [perAltri, activeTag]);
   const icone = useMemo(() => iconeRaccolte(collections.map((c) => c.name)), [collections]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
   const kicker = useMemo(() => {
@@ -539,7 +554,7 @@ export default function SalvatiLista({
     // Revisore 8/11: la stessa parola della riga ("Ci sono stato"), non "Visti".
     { label: "Ci sono stato", short: "Ci sono stato", n: count(DONE), on: statoOn === DONE, tag: DONE },
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
-  ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
+  ].filter((p) => (p.n ?? 0) > 0 || p.on); // Revisore 8/11: niente "Da provare 0" né "Ci sono stato 0" (filtri morti).
   // Filtri accesi oltre alla città: sotto la fila compaiono "23 di 500" e "Azzera".
   const filtrando = searching || raccolta !== null || statoOn !== null || tipo !== null || zonaAccesa;
   const azzera = () => { onTag(null); setStatoLista(null); scrivi(""); setTipo(null); setQuartiere(null); setVicino(false); };
@@ -559,9 +574,9 @@ export default function SalvatiLista({
   const nVicino = sort !== "vicino" && scaffaleVicino.length >= 2 ? scaffaleVicino.length : 0;
   const vediZone = scaffali && !zonaAccesa && [nVicino, ...scaffaleZone.map((g) => g.n)].some((n) => filtraDavvero(n, perTipo.length));
   const vediTipi = scaffali && tipo === null && scaffaleTipi.some((g) => filtraDavvero(g.n, perZona.length));
-  // Le raccolte sono un altro modo di entrare: con zona o tipo accesi spariscono (i loro numeri non sarebbero di quel filtro).
   // Con una domanda scritta restano (revisore 4/11 sera): si sceglie a quale raccolta chiedere senza cancellarla.
-  const vediRaccolte = scaffaliOn && (!searching || domanda) && raccolta === null && !zonaAccesa && tipo === null;
+  // Raccolte: restano con zona, tipo e stato accesi finché qualcuna ha posti tra quelli rimasti.
+  const vediRaccolte = scaffaliOn && (!searching || domanda) && raccolta === null && (collections.length > 0 || (!zonaAccesa && tipo === null && statoOn === null));
   // Revisore 8/11: gli scaffali stanno in un riquadro solo con tre schede (Zone, Tipi, Raccolte) e una fila di
   // copertine basse, così all'apertura si vedono subito i primi posti della lista.
   const schede = ([vediZone && { key: "zone", label: "Zone" }, vediTipi && { key: "tipi", label: "Tipi" }, vediRaccolte && { key: "raccolte", label: "Raccolte" }] as const)
@@ -609,9 +624,11 @@ export default function SalvatiLista({
             in basso, la ricerca la lente nella fila dei filtri. */}
         {/* Lorenzo 5/11: con salvati in più città, in alto le città ("Tutte 14 · Roma 12 · Milano 2") al posto del
             conteggio. Scelta una città la lista è solo di quella; la stessa scelta vale sulla mappa (e ritorno). */}
-        <div className={`flex items-center justify-between gap-3 ${citta.length > 0 ? "h-11" : "h-5"}`}>
+        <div className={`flex items-center justify-between ${citta.length > 0 ? "h-11 gap-1" : "h-5 gap-3"}`}>
           {citta.length > 0 ? (
-            <div role="group" aria-label="Città" data-testid="salvati-citta" className="-ml-3 flex min-w-0 flex-1 items-center overflow-x-auto pl-3 [scrollbar-width:none]">
+            // Revisore 8/11: niente pillole tagliate di netto. Se la fila non entra, sfuma al bordo e ha il margine per
+            // arrivare intera all'ultima città scorrendo.
+            <div ref={cittaRef} role="group" aria-label="Città" data-testid="salvati-citta" data-scorre={cittaScorre ? "true" : undefined} className={`-ml-2.5 flex min-w-0 flex-1 items-center overflow-x-auto pl-2.5 [scrollbar-width:none] ${cittaScorre ? "pr-7 [mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" : ""}`}>
               {citta.map((c) => {
                 const on = (zonaOn?.nome ?? null) === c.nome;
                 return (
@@ -624,7 +641,7 @@ export default function SalvatiLista({
                     onClick={() => { onZona(on && c.nome !== null ? null : c.nome); if (c.nome !== null && !on) trackFeature("salvati_citta", { n: c.n }); }}
                     className="flex min-h-11 shrink-0 items-center active:scale-95"
                   >
-                    <span className={`flex h-8 items-center gap-1 rounded-pill px-3 text-[14px] ${on ? "bg-brand font-semibold text-white" : "font-medium text-[#33373d]"}`}>
+                    <span className={`flex h-8 items-center gap-[3px] rounded-pill px-[7px] text-[13.5px] ${on ? "bg-brand font-semibold text-white" : "font-medium text-[#33373d]"}`}>
                       {c.label} <span className={`text-[12px] font-semibold ${on ? "text-white/75" : "text-text-muted"}`}>{c.n}</span>
                     </span>
                   </button>
@@ -643,7 +660,7 @@ export default function SalvatiLista({
               aria-label="Ordina"
               value={sort}
               onChange={(e) => { const k = e.target.value as Ordine; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
-              className="min-h-11 appearance-none bg-transparent pl-2 pr-5 text-right focus:outline-none"
+              className="min-h-11 appearance-none bg-transparent pl-1 pr-5 text-right focus:outline-none"
             >
               <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
               <option value="recenti">Recenti</option>
@@ -809,7 +826,7 @@ export default function SalvatiLista({
         ) : (
           // Lorenzo 8/11: in alto solo gli stati e i filtri accesi (ognuno con la sua ✕); quartieri, tipi e raccolte
           // stanno negli scaffali sotto. Niente doppioni: la stessa scelta in un posto solo.
-          <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex flex-wrap items-center gap-1.5 px-4 py-0.5">
+          <div data-testid="salvati-comandi" className="-mx-4 mt-1.5 flex flex-wrap items-center gap-1.5 px-4 py-0.5">
             {attivi.length > 0 && (
               <div role="group" aria-label="Filtri accesi" data-testid="salvati-filtri-accesi" className="contents">
                 {attivi.map((f) => (
@@ -835,7 +852,7 @@ export default function SalvatiLista({
         {/* Scaffali (Lorenzo 8/11, libreria di Places e Albo): con 500 salvati il posto giusto in due tocchi.
             Revisore 8/11: un riquadro solo, tre schede e una fila di copertine; sotto, subito la lista. */}
         {schedaOn && (
-          <section data-testid="scaffali" aria-label="Scaffali" className="mt-2">
+          <section data-testid="scaffali" aria-label="Scaffali" className="mt-1">
             <div role="tablist" aria-label="Scaffali" className="flex gap-5">
               {schede.map((x) => (
                 <button
@@ -845,13 +862,13 @@ export default function SalvatiLista({
                   data-testid="scaffali-scheda"
                   aria-selected={schedaOn === x.key}
                   onClick={() => setScheda(x.key)}
-                  className={`min-h-11 border-b-2 font-display text-[14px] font-semibold ${schedaOn === x.key ? "border-brand text-text" : "border-transparent text-text-muted"}`}
+                  className={`min-h-9 border-b-2 font-display text-[14px] font-semibold ${schedaOn === x.key ? "border-brand text-text" : "border-transparent text-text-muted"}`}
                 >
                   {x.label}
                 </button>
               ))}
             </div>
-            <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-2 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+            <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {schedaOn === "zone" && (<>
                 {nVicino > 0 && (
                   <CopertinaScaffale
@@ -887,7 +904,7 @@ export default function SalvatiLista({
                     data-testid={collections.length === 0 ? "raccolte-vuote" : "raccolta-nuova"}
                     className="block w-[92px] active:scale-[0.97]"
                   >
-                    <span aria-hidden className="flex h-[52px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
+                    <span aria-hidden className="flex h-[44px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
                       <Plus size={20} className="text-text-muted" />
                     </span>
                     <span className="mt-1 block truncate px-0.5 text-[13px] font-medium text-[#33373d]">Nuova</span>
@@ -938,7 +955,7 @@ export default function SalvatiLista({
           </div>
         ) : (
           <>
-          <ul data-testid="salvati-lista-posti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+          <ul data-testid="salvati-lista-posti" className={`${schedaOn ? "mt-1.5" : "mt-2"} overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
             {list.slice(0, quanti).map((p, i, vis) => {
               const sez = sezioneDi?.get(p.id);
               const nuova = !!sez && (i === 0 || sezioneDi?.get(vis[i - 1].id)?.titolo !== sez.titolo);
