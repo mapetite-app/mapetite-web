@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   }
   const avvisi = new Map<string, Avviso>();
   // Il tavolo di oggi (Lorenzo, 8/11) viene prima di tutto: è l'avviso più utile della giornata.
-  // Solo prenotazioni sull'account (consenso), ancora da fare e con l'ora non già passata.
+  // Solo prenotazioni sull'account (consenso) con il sì della persona, ancora da fare e con l'ora non già passata.
   const oraRoma = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
   const { data: prenOggi, error: errOggi } = await admin
     .from("prenotazioni")
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   for (const r of ((prenOggi ?? []) as { user_id: string; dati: Record<string, unknown> | null }[]).sort((a, c) => String(a.dati?.time ?? "").localeCompare(String(c.dati?.time ?? "")))) {
     const d = r.dati ?? {};
     const ora = typeof d.time === "string" && /^\d{2}:\d{2}$/.test(d.time) ? d.time : null;
-    if (avvisi.has(r.user_id) || d.dismissed || typeof d.placeName !== "string" || (ora && ora <= oraRoma)) continue;
+    if (avvisi.has(r.user_id) || d.confirmed !== true || d.dismissed || typeof d.placeName !== "string" || (ora && ora <= oraRoma)) continue;
     avvisi.set(r.user_id, avvisoPrenotazioneOggi(d.placeName, ora));
     oggiN++;
   }
