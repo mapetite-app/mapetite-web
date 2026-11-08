@@ -934,7 +934,35 @@ ok((await page.getByTestId("ricerca-in-corso").textContent())?.includes("pizza n
 await shot("00b-ricerca-in-corso");
 searchDelay = 0;
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
-ok(page.url().includes("/mappa") && !page.url().includes("q=") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
+ok(page.url().includes("/mappa") && (await page.getByTestId("titolo-risposta").textContent())?.includes("pizza napoletana"), "home: il campo apre la mappa e la ricerca parte da sola");
+// D25 (prova dell'8/11): la ricerca resta nell'indirizzo e ricaricando torna com'era, senza un'altra chiamata a Google.
+{
+  ok(/pizza napoletana/.test(new URL(page.url()).searchParams.get("q") ?? "") && /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(new URL(page.url()).searchParams.get("at") ?? ""), `D25: dopo la ricerca l'indirizzo ha ?q= e &at= (${decodeURIComponent(page.url().replace(BASE, ""))})`);
+  let chiamate = 0, sintesi = 0;
+  await page.route("**/api/search", (r) => { chiamate++; return r.fallback(); });
+  await page.route("**/api/search/synthesis", (r) => { sintesi++; return r.fallback(); });
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok(chiamate === 0 && (await page.getByTestId("titolo-risposta").textContent().catch(() => ""))?.includes("pizza napoletana") && await page.getByText("Terrazza Uno").first().isVisible(), `D25: ricaricando la ricerca c'è ancora, senza chiamare Google (${chiamate} chiamate)`);
+  await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok(sintesi === 0 && await page.getByText("Vista vera sui tetti di Roma.").first().isVisible().catch(() => false), `D25: ricaricando i verdetti tornano dalla memoria, senza rifare l'AI (${sintesi} chiamate)`);
+  // Indietro dalla home: stessa ricerca, ancora senza Google.
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await page.goBack({ waitUntil: "networkidle" });
+  await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok(chiamate === 0 && await page.getByText("Terrazza Uno").first().isVisible().catch(() => false), `D25: tornando indietro la ricerca c'è ancora, senza chiamare Google (${chiamate})`);
+  // Memoria scaduta o svuotata: ricaricando non si rifà da sola la ricerca a pagamento, la frase resta nel campo.
+  await page.evaluate(() => sessionStorage.removeItem("mapetite.ricerche"));
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
+  ok(chiamate === 0 && (await page.getByLabel("Scrivi cosa cerchi").inputValue().catch(() => "")).includes("pizza napoletana"), `D25: memoria scaduta, ricaricando niente ricerca da sola; la frase resta da rilanciare (${chiamate})`);
+  await page.getByLabel("Scrivi cosa cerchi").press("Enter");
+  await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
+  ok(chiamate === 1, `D25: rilanciata a mano, la ricerca chiama Google (${chiamate})`);
+  await page.unroute("**/api/search");
+  await page.unroute("**/api/search/synthesis");
+}
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByTestId("home-suggerimenti").locator("[data-esempio]").first().click();
 await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 });
@@ -1254,7 +1282,8 @@ if (shared) {
   ok(/Rooftop romantico/i.test(await page.getByTestId("titolo-risposta").innerText()), "link ricerca: apre la stessa ricerca con il titolo");
   const at = new URL(shared.url).searchParams.get("at").split(",").map(Number);
   ok(body && Math.abs(body.lat - at[0]) < 1e-6 && Math.abs(body.lng - at[1]) < 1e-6, "link ricerca: cerca nel punto di chi ha condiviso");
-  ok(!new URL(page.url()).searchParams.has("q"), "link ricerca: dopo l'apertura 'q' sparisce dall'indirizzo (ricaricare non ripete)");
+  // D25: la ricerca resta nell'indirizzo; ricaricando la si ritrova dalla memoria del telefono (controlli più su).
+  ok(new URL(page.url()).searchParams.get("q")?.startsWith("Rooftop romantico") === true, "link ricerca: dopo l'apertura la richiesta resta nell'indirizzo (D25)");
   await shot("14-link-ricerca");
   // Link aperto a freddo: i risultati arrivano prima che la mappa sia pronta; la mappa deve
   // comunque spostarsi sui risultati (qui il punto è Milano, i risultati sono a Roma).
