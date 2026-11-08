@@ -146,13 +146,17 @@ const EXTRA: { re: RegExp; testo: string }[] = [
   { re: /senza glutine|celiac/i, testo: "con piatti senza glutine" },
   { re: /\bcon (il )?can[ei]\b|dog[- ]?friendly|\bpet[- ]?friendly/i, testo: "dove si entra con il cane" }, // non "messicani", "toscani", "hot dog" (revisore 7/11)
 ];
+// Forma corta per il titolo della card, valida per maschile e femminile ("trattorie a lume di candela").
+const BREVE: Record<string, string> = { "per una serata a due": "a lume di candela", "con tavoli all'aperto": "all'aperto" };
 function extraDi(q: string, tipo: string): string[] {
   return EXTRA.filter((e) => e.re.test(q) && !(tipo === "rooftop" && /vista|terrazza/.test(e.testo))).map((e) => e.testo).slice(0, 2);
 }
 
 // Zona scritta nella ricerca ("… a Monti", "… in Brera"): parola con la maiuscola dopo "a"/"in"/"al".
 function zonaDi(q: string): string | null {
-  const m = q.match(/\b(?:a|in|al|ai|zona)\s+([A-ZÀ-Ý][\p{L}']+(?:\s+[A-ZÀ-Ý][\p{L}']+)?)\s*$/u) ?? q.match(/\b(?:a|in|al|ai|zona)\s+([A-ZÀ-Ý][\p{L}']+)/u);
+  // Terzo revisore 8/11: anche "alla Garbatella", "all'Isola", "nel Centro Storico" (prima diventavano "a Roma").
+  const PRE = "(?:\\b(?:a|in|al|ai|alla|allo|alle|agli|nel|nella|zona)\\s+|\\ball')";
+  const m = q.match(new RegExp(`${PRE}([A-ZÀ-Ý][\\p{L}']+(?:\\s+[A-ZÀ-Ý][\\p{L}']+)?)\\s*$`, "u")) ?? q.match(new RegExp(`${PRE}([A-ZÀ-Ý][\\p{L}']+)`, "u"));
   return m ? m[1] : null;
 }
 
@@ -184,7 +188,17 @@ export function proposte(input: { gusto: MappaGusto | null; recenti: string[]; c
     const extra = extraDi(r, hit.tipo);
     zoneUsate.add(dove);
     // "che pochi conoscono" vale per maschile e femminile ("trattoria … poco conosciuto" no, revisore 7/11).
-    const titolo = `${cap(parola)}${extra[0] && extra[0].length <= 14 ? ` ${extra[0]}` : ""} che pochi conoscono ${aZona(dove)}`;
+    // Revisore 7/11 (notte): "per una serata a due" è troppo lungo per il titolo e "romantica" spariva. Forma corta.
+    // Revisore 8/11: "Trattorie per due che pochi conoscono a…" si tagliava sulla zona. Con l'aggiunta, niente
+    // "che pochi conoscono" (resta nella ricerca); e se il titolo è comunque lungo, si torna a quello semplice.
+    const breve = extra[0] ? (BREVE[extra[0]] ?? extra[0]) : "";
+    const conExtra = `${cap(parola)} ${breve} ${aZona(dove)}`;
+    // Secondo revisore 8/11: anche il titolo semplice andava su 3 righe a 360 px ("Pizzerie che pochi conoscono a San
+    // Lorenzo"). Oltre 36 caratteri si toglie "che pochi conoscono": resta nella ricerca, la zona resta nel titolo.
+    const semplice = `${cap(parola)} che pochi conoscono ${aZona(dove)}`;
+    // Terzo revisore 8/11: "Trattorie a Trastevere" sembrava Google Maps. Forma corta che tiene il senso: "da scoprire".
+    const corto = `${cap(parola)} da scoprire ${aZona(dove)}`;
+    const titolo = breve && conExtra.length <= 40 ? conExtra : semplice.length <= 36 ? semplice : corto.length <= 40 ? corto : `${cap(parola)} ${aZona(dove)}`;
     add({ emoji: tipo.emoji, titolo, perche: `Hai cercato «${r.length > 34 ? `${r.slice(0, 32)}…` : r}»`, q: `${cosa} che pochi conoscono, fuori dai giri turistici,${extra.map((e) => ` ${e},`).join("")} ${aZona(dove)}`, sfondo: tipo.sfondo, chiave: tipo.id, da: r });
     break;
   }
