@@ -9472,6 +9472,17 @@ else {
       ok(fr.includes("Esci a Monti e al Pigneto, ti concedi l'alta cucina.") && !/Pigneto e ti/.test(fr), `mappa del gusto: zone e spesa unite senza doppia 'e' (${fr})`); }
     { const fr = mg.fraseCapito({ v: 2, zone: [], su: [], giu: [], scoperta: null }, { citta: "Roma", priceRange: null, diete: [], occasions: [{ value: "aperitivo", label: "Aperitivo" }] }).map((x) => x.map((y) => y.t).join("")).join(" ");
       ok(fr.includes("Cerchi posti per l'aperitivo.") && !fr.includes(":"), `mappa del gusto: occasioni senza i due punti (${fr})`); }
+    { const { writeFileSync, mkdtempSync } = await import("fs"); const { tmpdir } = await import("os");
+      // home-proposte.ts importa "@/lib/…", che Node non risolve: copia con i percorsi veri (come per idee.ts).
+      const src = readFileSync(new URL("../../src/lib/home-proposte.ts", import.meta.url), "utf8").replace(/from "@\/lib\/([\w-]+)"/g, (_, m) => `from "${new URL(`../../src/lib/${m}.ts`, import.meta.url).href}"`);
+      const tmp = `${mkdtempSync(`${tmpdir()}/giro-hp-`)}/home-proposte.ts`; writeFileSync(tmp, src);
+      const hp = await import(`file://${tmp}`);
+      const p = hp.proposte({ gusto: null, recenti: ["trattoria romantica a Trastevere"], citta: "Roma", momento: "cena" });
+      ok(/^Trattori\w+ a lume di candela a Trastevere$/.test(p[0]?.titolo ?? ""), `home: il titolo della card da ricerca tiene 'romantica' in breve (${p[0]?.titolo})`);
+      // Secondo revisore 8/11: a 360 px oltre ~40 caratteri il titolo andava su 3 righe e la zona finiva nei puntini.
+      const casi = [["pizzeria a San Lorenzo", "San Lorenzo"], ["trattoria a Trastevere", "Trastevere"], ["enoteca alla Garbatella", "Garbatella"], ["sushi romantico a Prati", "Prati"]];
+      const lunghi = casi.map(([q, z]) => hp.proposte({ gusto: null, recenti: [q], citta: "Roma", momento: "cena" })[0]?.titolo ?? "").filter((t, i) => t && (t.length > 40 || !t.includes(casi[i][1])));
+      ok(lunghi.length === 0, `home: titoli da ricerca entro 40 caratteri e con la zona (${lunghi.join(" | ") || "tutti ok"})`); }
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");

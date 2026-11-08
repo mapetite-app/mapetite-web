@@ -20,7 +20,10 @@ const TONDO = "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl t
 const noop = () => () => {};
 function usePronto(): string {
   const pronto = useSyncExternalStore(noop, () => true, () => false);
-  return `transition-opacity duration-150 ${pronto ? "opacity-100" : "opacity-0"}`;
+  // Revisore 8/11: invisibili lasciavano un buco di 120 px sul 4G lento. Ora si vedono le card (contorni e colori)
+  // e il testo arriva quando il telefono ha letto le ricerche.
+  // Secondo revisore 8/11: i righi di testo diventano barre grigie (segnaposto come Places), non riquadri vuoti.
+  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! [&_.testo]:rounded-md [&_.testo]:bg-border/70";
 }
 
 function useRecenti(): string[] {
@@ -55,11 +58,23 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
   // Revisore 7/11: la ricerca da cui nasce una card "Per te" ("Hai cercato «…»") non torna anche come pillola ↻.
   const inCard = new Set(proposte({ gusto, recenti: tutte, citta, momento, weekend, escludi: chiaviPillole(momento, gusto, tutte, weekend) }).map((p) => p.da).filter(Boolean));
   const recenti = tutte.filter((q) => !inCard.has(q)).slice(0, 3);
-  const fade = usePronto();
-  const pill = "flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95";
+  // Revisore 7/11 (notte): sul 4G lento la riga restava vuota 1–2 s. Prima che il telefono legga le ricerche
+  // si vedono i contorni delle pillole (segnaposto), poi il testo: niente buco e niente cambio sotto gli occhi.
+  const pronto = useSyncExternalStore(noop, () => true, () => false);
+  const pill = `${pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent!"} flex min-h-11 max-w-[19rem] shrink-0 items-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-sans text-text active:scale-95`;
   return (
-    // Prima le ultime ricerche fatte su questo telefono (↻), poi tre idee giuste per l'ora nella tua città.
-    <div data-testid="home-suggerimenti" className={`${fade} -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
+    // Prima tre idee giuste per l'ora nella tua città, poi le ultime ricerche fatte su questo telefono (↻): in fondo,
+    // così quando il telefono le legge non spingono via le idee già visibili (secondo revisore 8/11).
+    <div data-testid="home-suggerimenti" data-pronto={pronto ? "1" : "0"} className={`-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]`}>
+      {pillole(momento, gusto, tutte, weekend, citta).map(({ label }) => {
+        const q = `${label} a ${citta}`;
+        return (
+          <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
+            {/* Revisore 8/11: segnaposto con una barra grigia, non un bottone vuoto. */}
+            {pronto ? <span className="truncate">{label}</span> : <span aria-hidden className="h-2.5 w-16 rounded-full bg-border" />}
+          </Link>
+        );
+      })}
       {recenti.length > 0 && (
         <span data-testid="home-recenti" className="contents">
           {recenti.map((q) => (
@@ -70,14 +85,6 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
           ))}
         </span>
       )}
-      {pillole(momento, gusto, tutte, weekend, citta).map(({ label }) => {
-        const q = `${label} a ${citta}`;
-        return (
-          <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
-            <span className="truncate">{label}</span>
-          </Link>
-        );
-      })}
     </div>
   );
 }
@@ -116,8 +123,8 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto, weekend 
               <span aria-hidden className={`${SERIF} w-6 shrink-0 text-center text-[28px] font-medium leading-none text-accent`}>{i + 1}</span>
               <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-2xl">{c.emoji}</span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-display font-semibold leading-tight text-text">{c.titolo}</span>
-                <span className="mt-0.5 line-clamp-2 text-xs font-sans leading-snug text-text-muted">{c.sotto}</span>
+                <span className="testo block text-[15px] font-display font-semibold leading-tight text-text">{c.titolo}</span>
+                <span className="testo mt-0.5 line-clamp-2 text-xs font-sans leading-snug text-text-muted">{c.sotto}</span>
               </span>
               <span aria-hidden className="text-lg text-text-muted">›</span>
             </Link>
@@ -167,10 +174,10 @@ export default function HomePerTe({
           >
             <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
             <span className="min-w-0 flex-1">
-              <span className={`${SERIF} line-clamp-2 text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
+              <span className={`testo ${SERIF} line-clamp-2 text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
               <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden>✦</span>
-                <span className="line-clamp-2 [text-wrap:pretty]">{p.perche}</span>
+                <span className="testo line-clamp-2 [text-wrap:pretty]">{p.perche}</span>
               </span>
             </span>
           </Link>
@@ -179,10 +186,10 @@ export default function HomePerTe({
         <Link href="/sorprendimi?da=home" data-testid="home-sorprendimi" className={CARD}>
           <span aria-hidden className={`${TONDO} bg-brand`}>🎲</span>
           <span className="min-w-0 flex-1">
-            <span className={`${SERIF} block text-[18px] font-medium leading-[1.15] text-text`}>Sorprendimi</span>
+            <span className={`testo ${SERIF} block text-[18px] font-medium leading-[1.15] text-text`}>Sorprendimi</span>
             <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
               <span aria-hidden>✦</span>
-              <span className="line-clamp-1">Un posto mai provato</span>
+              <span className="testo line-clamp-1">Un posto mai provato</span>
             </span>
           </span>
         </Link>
