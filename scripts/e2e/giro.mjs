@@ -401,7 +401,7 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   ok(titolo === `${["", "Un", "Due", "Tre"][n]} bar a Roma`, `frase sopra le card: numero, tipo e zona capiti dalla ricerca ('${titolo}')`);
   // Ogni pezzo del dettaglio è uno di quelli costruiti dai dati (src/lib/frase-risultati.ts): niente aggettivi della richiesta attribuiti a tutti.
   const pezzi = dettaglio.split(" · ").filter(Boolean);
-  ok(pezzi.length >= 1 && pezzi.every((x) => /^(Rooftop|Romantico) secondo le recensioni: 1 su \d+$|^\d+ poco conosciut[ieoa]$|^Tutti poco conosciuti$|^Senza i locali più famosi$/i.test(x)) && /rooftop secondo le recensioni: 1 su 2/i.test(dettaglio) && !/romantic[io] a|bar romantic/i.test(fr), `frase sopra le card: il dettaglio viene solo dalle recensioni e dai dati Google ('${dettaglio}')`);
+  ok(pezzi.length >= 1 && pezzi.every((x) => /^(Rooftop|Romantico) secondo le recensioni: 1 su \d+$|^\d+ poco conosciut[ieoa]$|^Tutti poco conosciuti$|^Senza i locali più famosi$|^Messo da parte .+,? molto famoso$|^Messi da parte .+ e (altri \d+ molto famosi|un altro molto famoso)$/i.test(x)) && /rooftop secondo le recensioni: 1 su 2/i.test(dettaglio) && !/romantic[io] a|bar romantic/i.test(fr), `frase sopra le card: il dettaglio viene solo dalle recensioni e dai dati Google ('${dettaglio}')`);
   const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=frase-risultati]").getBoundingClientRect(); const c = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: c.top, h: f.height }; });
   ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
@@ -411,7 +411,7 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   const sp = (x) => (x ?? "").replace(/\u00a0/g, " ");
   ok(fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, R] }).titolo === "Due ristoranti a Trastevere" && fraseRisultati({ n: 2, categoria: "ristorante", zona: "Trastevere", posti: [R, B] }).titolo === "Due posti a Trastevere", "frase: 'ristoranti' solo se lo sono tutti per Google, altrimenti 'posti'");
   ok(fraseRisultati({ n: 3, requisiti: { romantico: 2 }, inArrivo: true }).dettaglio === null && sp(fraseRisultati({ n: 3, requisiti: { romantico: 2 } }).dettaglio) === "Romantico secondo le recensioni: 2 su 3", "frase: i conteggi dalle recensioni solo a verdetti arrivati");
-  ok(sp(fraseRisultati({ n: 4, gemme: 1, famosiDaParte: 2 }).dettaglio) === "1 poco conosciuto · senza i locali più famosi" && fraseRisultati({ n: 0 }) === null && fraseRisultati({ n: 1, zona: "<b>x</b>" }).titolo === "Un posto", "frase: poco conosciuti e famosi messi da parte solo dai dati; niente frase senza posti; zona strana ignorata"); }
+  ok(sp(fraseRisultati({ n: 4, gemme: 1, famosiDaParte: 2 }).dettaglio) === "Senza i locali più famosi · 1 poco conosciuto" && sp(fraseRisultati({ n: 4, famosiDaParte: 3, famosiNomi: ["Trattoria Da Enzo al 29", "Nannarella"] }).dettaglio) === "Messi da parte Trattoria Da Enzo… e altri 2 molto famosi" && sp(fraseRisultati({ n: 4, famosiDaParte: 1, famosiNomi: ["Nannarella"] }).dettaglio) === "Messo da parte Nannarella, molto famoso" && sp(fraseRisultati({ n: 4, famosiDaParte: 2, famosiNomi: ["Nannarella", "Da Enzo"] }).dettaglio) === "Messi da parte Nannarella e un altro molto famoso" && !/\u00a0/.test(fraseRisultati({ n: 4, famosiDaParte: 3, famosiNomi: ["Nannarella"] }).dettaglio.split(" · ")[0]) && fraseRisultati({ n: 0 }) === null && fraseRisultati({ n: 1, zona: "<b>x</b>" }).titolo === "Un posto", "frase: poco conosciuti e famosi messi da parte solo dai dati; niente frase senza posti; zona strana ignorata"); }
 { const vis = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").nth(1).evaluate((li) => Math.round(window.innerWidth - li.getBoundingClientRect().left));
   ok(vis >= 32 && vis <= 56, `carosello: la card dopo si vede per circa 40 px (${vis} px)`); }
 // Barra (revisore del 1/11: "cena romantica a Tra…"): con i risultati la richiesta si legge intera su al massimo 2 righe, senza alzare la barra.
@@ -972,12 +972,17 @@ ok(page.url().includes("/mappa") && (await page.getByTestId("titolo-risposta").t
   let chiamate = 0, sintesi = 0;
   await page.route("**/api/search", (r) => { chiamate++; return r.fallback(); });
   await page.route("**/api/search/synthesis", (r) => { sintesi++; return r.fallback(); });
+  let altreAI = 0;
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  await page.route("**/api/search/consiglio", (r) => { altreAI++; return r.fallback(); });
+  await page.route("**/api/salvati/chiedi", (r) => { altreAI++; return r.fallback(); });
   await page.reload({ waitUntil: "networkidle" });
   await page.getByText("Terrazza Uno").first().waitFor({ timeout: 8000 }).catch(() => {});
   ok(chiamate === 0 && (await page.getByTestId("titolo-risposta").textContent().catch(() => ""))?.includes("pizza napoletana") && await page.getByText("Terrazza Uno").first().isVisible(), `D25: ricaricando la ricerca c'è ancora, senza chiamare Google (${chiamate} chiamate)`);
   await page.getByText("Vista vera sui tetti di Roma.").first().waitFor({ timeout: 5000 }).catch(() => {});
   ok(sintesi === 0 && await page.getByText("Vista vera sui tetti di Roma.").first().isVisible().catch(() => false), `D25: ricaricando i verdetti tornano dalla memoria, senza rifare l'AI (${sintesi} chiamate)`);
+  ok(altreAI === 0, `D25: ricaricando niente seconda chiamata al consiglio né a "Dai tuoi salvati" (${altreAI} chiamate)`);
   // Indietro dalla home: stessa ricerca, ancora senza Google.
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await page.goBack({ waitUntil: "networkidle" });
@@ -3480,11 +3485,26 @@ else {
   await v.getByTestId("barra-azioni").waitFor({ timeout: 4000 });
   // Semplificare (Lorenzo 17/10): locale non salvato, nessun "Da provare" doppione accanto a "Salva" della barra.
   ok((await v.getByTestId("stato-rapido").count()) === 0 && (await v.getByTestId("stato-salvato").count()) === 0, "scheda non salvata: niente scelte di stato doppie (si salva dalla barra)");
+  // Prova dal vivo 8/11: "Salva" della scheda salva in un tocco come "Da provare", senza finestra; tag e nota dall'avviso.
+  addMode = "ok";
+  await v.locator("button:text-is('Salva')").first().click();
+  await v.getByTestId("salvato-avviso").waitFor({ timeout: 4000 }).then(() => {}, () => {});
+  { const ins0 = writes.find((w) => w.m === "POST");
+    ok(await v.getByTestId("salvato-avviso").isVisible().catch(() => false) && (await v.locator("div.w-80").count()) === 0 && JSON.stringify(ins0?.body?.tags) === '["Da provare"]' && await v.locator("button:text-is('Salvato')").isVisible(),
+      "scheda: 'Salva' salva in un tocco come 'Da provare' (avviso 'Salvato', nessuna finestra)"); }
+  { const a = await v.getByTestId("salvato-avviso").boundingBox(); const b = await v.getByTestId("barra-azioni").boundingBox();
+    ok(!!a && !!b && a.y + a.height <= b.y + 1, "scheda: l'avviso 'Salvato' sta sopra la barra dei tasti, non la copre"); }
+  await v.screenshot({ path: `${OUT}/17b-salva-un-tocco.png`, caret: "initial" });
+  await v.locator("button:text-is('Salvato')").click();
+  await v.locator("button:text-is('Salva')").first().waitFor({ timeout: 4000 });
+  writes.length = 0;
+  // Se il salvataggio rapido non riesce, si apre la finestra con tag e nota (niente salvataggio perso).
+  addMode = "error";
   await v.locator("button:text-is('Salva')").first().click();
   const modal = v.locator("div.w-80");
   ok((await modal.getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "false", "salva dal pulsante: nessuno stato rimasto dalla scelta annullata");
   await modal.getByText("Salva locale").waitFor({ timeout: 3000 });
-  ok(true, "salva: si apre la finestra con tag e nota");
+  ok(true, "salva: se il salvataggio rapido non riesce, si apre la finestra con tag e nota");
   await modal.getByRole("button", { name: "Romantico" }).click();
   await modal.getByTestId("nuovo-tag").click();
   await modal.getByLabel("Nuovo tag").fill("da rifare");
@@ -3497,7 +3517,7 @@ else {
   await v.locator("button:text-is('Salvato')").waitFor({ timeout: 4000 });
   ok(vAdds.length > 0 && vAdds.every((b) => b?.googlePlaceId === "P1" && b?.firma === "firma-P1"), "salva: /api/places/add riceve la firma del server sui dati Google del risultato");
   const ins = writes.find((w) => w.m === "POST");
-  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
+  ok(!!ins && ins.body?.place_id === "11111111-2222-3333-4444-555555555555" && JSON.stringify(ins.body?.tags) === '["Da provare","Romantico","Da rifare"]' && ins.body?.note === "Tavolo vicino alla ringhiera",
     "salva: scrive in saved_places l'UUID Supabase con tag (anche quello nuovo scritto a mano) e nota");
   ok(await v.getByText("Le tue note").isVisible() && await v.getByText("Tavolo vicino alla ringhiera").isVisible(), "salva: tag e nota compaiono subito nella scheda");
   ok(await v.locator("a[aria-label^='Indicazioni']").first().evaluate((a) => [a, ...a.querySelectorAll("span")].every((el) => el.scrollWidth <= el.clientWidth + 1)), "salvato: la scritta 'Percorso' non viene tagliata");
@@ -3514,8 +3534,9 @@ else {
   writes.length = 0;
   await v.goto(`${BASE}/mappa?beta=salva`, { waitUntil: "networkidle" });
   await (await esempio(v)).click();
-  // Dalla scheda "Salva" apre il foglio (il segnalibro sulla card ora salva in un tocco).
+  // Dalla scheda "Salva" salva in un tocco; il foglio si apre solo se il salvataggio rapido non riesce.
   await apriCard(v, "Rooftop Tre");
+  addMode = "error";
   await v.locator("button:text-is('Salva')").first().click();
   const sheet = v.getByTestId("salva-foglio");
   await sheet.waitFor({ timeout: 3000 });
@@ -3542,6 +3563,7 @@ else {
   // Tag scritto senza Invio e "Fatto" toccato senza che il campo perda il fuoco (come su iPhone).
   await sheet.getByTestId("nuovo-tag").click();
   await sheet.getByLabel("Nuovo tag").fill("terrazza");
+  addMode = "ok";
   await sheet.getByRole("button", { name: "Fatto" }).evaluate((b) => b.click());
   await sheet.waitFor({ state: "detached", timeout: 4000 });
   const ins2 = writes.find((w) => w.m === "POST");
@@ -9548,6 +9570,13 @@ else {
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");
+    { const tl = await import(new URL("../../src/lib/tipi-locale.ts", import.meta.url).href).catch(() => null);
+      if (tl?.ordinePerOra) {
+        const scelti = ["trattoria", "pizzeria", "cocktail"];
+        ok(tl.ordinePerOra(scelti, 21 + 2)[0] === "cocktail" && tl.ordinePerOra(scelti, 18)[0] === "cocktail" && tl.ordinePerOra(scelti, 13)[0] === "trattoria" && tl.ordinePerOra(["cocktail", "brunch", "pizzeria"], 8)[0] === "brunch" && tl.ordinePerOra(["trattoria"], 3)[0] === "trattoria",
+          "primo accesso: la prima ricerca parte dal tipo scelto adatto all'ora (sera → cocktail bar, pranzo → trattoria, mattina → brunch; mai un tipo non scelto)");
+        ok(tl.oraDiRoma(new Date("2026-11-08T02:30:00Z")) === 3 && tl.oraDiRoma(new Date("2026-07-08T02:30:00Z")) === 4, "primo accesso: l'ora è quella di Roma (anche con l'ora legale)");
+      } else ok(false, "primo accesso: tipi-locale.ts caricabile dal giro"); }
     ok(JSON.stringify(mg.gustoPerAI({ v: 1, zone: [], su: [], giu: [], scoperta: null })) === "null", "mappa del gusto: profilo vuoto → niente all'AI");
     // Collaudo del 26/10, B1 e B3.
     { const v2 = mg.pulisciMappa({ v: 2, su: ["trattoria", "enoteca"], giu: [], zone: [], scoperta: null }, () => true);

@@ -1139,6 +1139,8 @@ export default function MapView({
   const [consiglioChiesto, setConsiglioChiesto] = useState<number | null>(null);
   // Ultima ricerca per cui si è già chiesto ai salvati: la domanda parte una volta sola per ricerca.
   const chiestoPer = useRef<number | null>(null);
+  // Ricerca riaperta dalla memoria del telefono (ricarica, Indietro): anche "Dai tuoi salvati" torna da lì (revisore 8/11).
+  const daMemoriaPer = useRef<number | null>(null);
   // Ultima ricerca a parole nel mondo (runAISearch): "Sorprendimi" e i filtri non chiedono ai salvati.
   const ricercaMondo = useRef<number | null>(null);
   // Schermata di benvenuto: sparisce alla prima interazione.
@@ -2175,6 +2177,7 @@ export default function MapView({
         vicino: aiSearch.filtri?.vicino_a_me === true,
         simileA: aiSearch.simileA ?? null,
         famosiDaParte: aiSearch.daParte?.turistici.length ?? 0,
+        famosiNomi: aiSearch.daParte?.turistici ?? [],
       }
     : null;
 
@@ -2421,7 +2424,14 @@ export default function MapView({
   }, [aiQuery, view]);
 
   // Nessuna chiamata Google; ogni errore (429, 503, rete) lascia solo i risultati, senza messaggi.
-  const chiediSalvati = async (q: string, ticket: number, at: { lat: number; lng: number }) => {
+  const chiediSalvati = async (q: string, ticket: number, at: { lat: number; lng: number }, daMemoria = false) => {
+    // Revisori 8/11: riaprendo la ricerca dalla memoria (ricarica, Indietro) niente seconda chiamata all'AI.
+    const memoKey = chiaveRicerca("/api/salvati/chiedi", { u: userId, q: q.trim() });
+    const memo = daMemoria ? ricordata<{ scelti?: unknown }>(memoKey) : null;
+    if (memo) {
+      if (searchSeq.current === ticket && Array.isArray(memo.scelti)) setDalSalvati({ ticket, at, scelti: memo.scelti });
+      return;
+    }
     try {
       const res = await fetch("/api/salvati/chiedi", {
         method: "POST",
@@ -2430,6 +2440,7 @@ export default function MapView({
       });
       if (!res.ok) return;
       const data = await res.json();
+      if (Array.isArray(data?.scelti)) ricorda(memoKey, { scelti: data.scelti });
       if (searchSeq.current !== ticket || !Array.isArray(data?.scelti)) return;
       setDalSalvati({ ticket, at, scelti: data.scelti });
     } catch {
@@ -2454,7 +2465,7 @@ export default function MapView({
     if (aiSearchId == null || !aiSearchQuery || chiestoPer.current === aiSearchId || ricercaMondo.current !== aiSearchId) return;
     if (view !== "all" || !salvatiRicercaOn || userId == null || savedPlaces.length < 3 || searchSeq.current !== aiSearchId) return;
     chiestoPer.current = aiSearchId;
-    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude });
+    void chiediSalvati(aiSearchQuery, aiSearchId, { lat: viewState.latitude, lng: viewState.longitude }, daMemoriaPer.current === aiSearchId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una volta per ricerca, quando ricerca e salvati ci sono
   }, [aiSearchId, aiSearchQuery, savedPlaces.length, view, salvatiRicercaOn, userId]);
 
@@ -2480,7 +2491,8 @@ export default function MapView({
     ricercaMondo.current = mondo && !opts.simile ? ticket : null;
     // L'avviso "A 250 m c'è…" non torna a coprire la mappa quando si chiude la ricerca.
     setNearbySaved(null);
-    if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at); }
+    daMemoriaPer.current = opts.daMemoria ? ticket : null;
+    if (mondo && !opts.simile && salvatiRicercaOn && userId != null && savedPlaces.length >= 3) { chiestoPer.current = ticket; void chiediSalvati(q, ticket, at, opts.daMemoria === true); }
     setLoadingVerdicts(false);
     setAiSearching(true);
       setAiError(null);
@@ -2748,14 +2760,22 @@ export default function MapView({
         const tutti = (pending.places as { id?: unknown; name?: unknown }[]).filter((p): p is { id: string; name: string } => typeof p.id === "string" && typeof p.name === "string");
         const buoni = tutti.filter((p) => !esclusi.has(p.id) && !inFondo.has(p.name)).map((p) => p.id);
         const rimasti = buoni.length >= 2 ? buoni : tutti.filter((p) => !esclusi.has(p.id)).map((p) => p.id);
-        void fetch("/api/search/consiglio", {
+        // Revisori 8/11: riaprendo la ricerca dalla memoria il consiglio torna da lì, senza richiamare l'AI.
+        // (Secondo revisore 8/11: oggi alla ricarica il consiglio, che è in prova, non viene richiesto affatto; resta per quando si accende.)
+        const consiglioKey = chiaveRicerca("/api/search/consiglio", { u: userId, q: searchedQuery, token: pending.token });
+        type ConsiglioReply = { consiglio?: { id: string; perche: string } | null } | null;
+        const consiglioMemo = daMemoria ? ricordata<{ consiglio?: { id: string; perche: string } | null }>(consiglioKey) : null;
+        (consiglioMemo ? Promise.resolve<ConsiglioReply>(consiglioMemo) : fetch("/api/search/consiglio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: searchedQuery, places: pending.places, token: pending.token, ids: rimasti,
             livelli: Object.assign({}, ...replies.map((r) => r?.livelli ?? {})),
           }),
-        }).then((r) => (r.ok ? r.json() : null)).then((d: { consiglio?: { id: string; perche: string } | null } | null) => {
+        }).then((r) => (r.ok ? r.json() : null)).then((d: ConsiglioReply) => {
+          if (d?.consiglio?.id) ricorda(consiglioKey, { consiglio: d.consiglio });
+          return d;
+        })).then((d: ConsiglioReply) => {
           if (searchSeq.current === id && d?.consiglio?.id) setConsiglio({ ticket: id, ...d.consiglio });
         }).catch(() => {}).finally(() => setConsiglioAtteso((t) => (t === id ? null : t)));
       }
@@ -3634,7 +3654,8 @@ export default function MapView({
       )}
 
       {/* Senza la card in basso, l'invito ad aggiungere alla Home resta per chi torna (ha già cercato). */}
-      {chipsOn && view === "all" && aiSearch === null && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
+      {/* Prova dal vivo 8/11: mai sopra le card di una ricerca in arrivo. */}
+      {chipsOn && view === "all" && aiSearch === null && !aiSearching && overlay.kind === "none" && recentOn && (JSON.parse(recentSearches) as string[]).length > 0 && (
         <div className="absolute inset-x-0 z-10 flex justify-center px-3" style={{ bottom: "calc(var(--nav-height-mobile) + var(--nav-sporgenza) + 0.5rem)" }}>
           <div className="w-full max-w-md empty:hidden">
             <InstallHint />
@@ -4144,8 +4165,8 @@ export default function MapView({
               // rapido, eviterebbe un doppione in places.
               onQuickSave={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : (st) => {
                 if (!userId) { askLoginToSave(selected, [st]); return; }
-                setPendingSaveTags([st]);
-                setPendingSavePlaceId(selected.id);
+                // Anche "Ci sono stato" in un tocco (prova dal vivo 8/11).
+                void quickSave(selected, [st]);
               }}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
@@ -4157,7 +4178,10 @@ export default function MapView({
                   userId={userId}
                   isSaved={isPlaceSaved(selected.id)}
                   onToggle={handleToggle}
-                  onSaveRequest={(googlePlaceId) => setPendingSavePlaceId(googlePlaceId)}
+                  // Prova dal vivo 8/11: "Salva" apriva la finestra vecchia e serviva un secondo "Salva". Ora un tocco
+                  // salva come "Da provare" (come Places e le card); tag e nota dall'avviso "Aggiungi nota".
+                  // Id UUID (locale nel database ma non salvato): resta la finestra, evita un doppione in places.
+                  onSaveRequest={(googlePlaceId) => { if (/^[0-9a-f-]{36}$/i.test(selected.id)) setPendingSavePlaceId(googlePlaceId); else void quickSave(selected); }}
                   onLoginRequest={/^[0-9a-f-]{36}$/i.test(selected.id) ? undefined : () => askLoginToSave(selected)}
                 />
               }

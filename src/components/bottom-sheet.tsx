@@ -103,7 +103,7 @@ export interface BottomSheetProps {
   // la pillola dice "· 2 tolti" invece di passare da 12 a 10 senza spiegazione (revisore del 1/11).
   removed?: readonly string[];
   // Dati veri per la frase sopra le card (src/lib/frase-risultati.ts); null = nessuna frase.
-  frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number } | null;
+  frase?: { categoria: string | null; zona: string | null; vicino: boolean; simileA: string | null; famosiDaParte: number; famosiNomi?: string[] } | null;
   // "Ti porterei da…" (richiesta 5 del 5/11): con una frase da chat l'AI sceglie un posto della lista
   // e dice perché, solo dai dati veri (src/lib/consiglio.ts). Prende il posto della frase sopra le card.
   consiglio?: { place: Place; perche: string } | null;

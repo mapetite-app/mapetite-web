@@ -17,6 +17,8 @@ export type DatiFrase = {
   requisiti?: Record<string, number>;
   gemme?: number;
   famosiDaParte?: number;
+  // Nomi dei famosi messi da parte (prova dal vivo 8/11: la frase che vende il differenziatore era dietro la pillola).
+  famosiNomi?: string[];
   // Verdetti ancora in arrivo: i conteggi dalle recensioni non sono finiti, non si mostrano.
   inArrivo?: boolean;
   // I posti in lista (dati Google): il tipo capito ("ristoranti") si scrive solo se lo sono tutti.
@@ -110,8 +112,18 @@ export function fraseRisultati(d: DatiFrase): { titolo: string; dettaglio: strin
     const g = d.gemme as number;
     pezzi.push(g === d.n && d.n > 1 ? `tutti poco conosciut${genere === "f" ? "e" : "i"}` : `${g} poco conosciut${g === 1 ? (genere === "f" ? "a" : "o") : genere === "f" ? "e" : "i"}`);
   }
-  if ((d.famosiDaParte ?? 0) > 0) pezzi.push("senza i locali più famosi");
+  // Prova dal vivo 8/11: "Ho messo da parte Nannarella…" si vedeva solo toccando la pillola. Ora va per primo e
+  // nomina il più famoso messo da parte (nome Google, accorciato), così si capisce senza toccare niente.
+  const famosi = d.famosiDaParte ?? 0;
+  if (famosi > 0) {
+    const primo = d.famosiNomi?.[0]?.trim();
+    const taglio = primo && primo.length > 20 ? primo.slice(0, 20) : null;
+    // Taglio sulla parola intera ("Trattoria Da Enzo…", non "Trattoria Da Enzo a…").
+    const nomeCorto = !primo ? null : taglio ? `${(taglio.lastIndexOf(" ") > 8 ? taglio.slice(0, taglio.lastIndexOf(" ")) : taglio).replace(/[\s,.'-]+$/, "")}…` : primo;
+    pezzi.unshift(!nomeCorto ? "senza i locali più famosi" : famosi === 1 ? `messo da parte ${nomeCorto}${nomeCorto.endsWith("…") ? "" : ","} molto famoso` : famosi === 2 ? `messi da parte ${nomeCorto} e un altro molto famoso` : `messi da parte ${nomeCorto} e altri ${famosi - 1} molto famosi`);
+  }
   // Ogni pezzo resta intero su una riga (spazi non divisibili): si va a capo solo tra un pezzo e l'altro.
-  const dettaglio = pezzi.slice(0, 2).map((x) => x.replace(/ /g, " ")).join(" · ");
+  // Il pezzo con il nome del famoso può andare a capo (revisore 8/11: con gli spazi fissi sbordava, "molto fam").
+  const dettaglio = pezzi.slice(0, 2).map((x) => (/^messi? da parte /.test(x) ? x : x.replace(/ /g, "\xa0"))).join(" · ");
   return { titolo, dettaglio: dettaglio ? dettaglio.charAt(0).toUpperCase() + dettaglio.slice(1) : null };
 }

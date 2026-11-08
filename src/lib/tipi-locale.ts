@@ -189,3 +189,22 @@ const GENERICI = new Set(["ristorante"]);
 /** I tipi amati come si dicono in una frase ("le pizzerie", "il sushi"); senza voce, l'etichetta. */
 export const amatiInFrase = (ids: string[]): string[] =>
   [...ids.filter((id) => !GENERICI.has(id)), ...ids.filter((id) => GENERICI.has(id))].map((id) => IN_FRASE[id] ?? PER_ID.get(id)?.label.toLowerCase()).filter((x): x is string => !!x);
+
+// Prova dal vivo 8/11: dopo il primo accesso la prima ricerca partiva sempre dal primo tipo (trattorie anche alle 3 di
+// notte, con i cocktail bar scelti). Ordine per l'ora di Roma: di mattina colazione e caffè, all'aperitivo e dopo cena
+// i posti da bere, a pranzo e a cena i posti da mangiare. Solo tra i tipi che la persona ha scelto: niente di inventato.
+const DA_BERE = new Set(["bere", "cocktail", "speakeasy", "vini-naturali", "pub", "birra-artigianale", "rooftop", "aperitivo", "lounge"]);
+const DA_MATTINA = new Set(["colazione", "specialty", "brunch", "pasticceria", "forno", "cioccolateria"]);
+export function ordinePerOra(ids: string[], ora: number): string[] {
+  const momento = ora >= 6 && ora < 11 ? "mattina" : (ora >= 17 && ora < 20) || ora >= 22 || ora < 6 ? "bere" : "mangiare";
+  const voto = (id: string) => {
+    if (momento === "mattina") return DA_MATTINA.has(id) ? 0 : DA_BERE.has(id) ? 2 : 1;
+    if (momento === "bere") return DA_BERE.has(id) ? 0 : DA_MATTINA.has(id) ? 2 : 1;
+    return DA_BERE.has(id) || DA_MATTINA.has(id) ? 1 : 0;
+  };
+  return [...ids].sort((a, b) => voto(a) - voto(b));
+}
+/** Ora di Roma (0–23), anche sul server che gira in UTC. */
+export function oraDiRoma(d = new Date()): number {
+  return Number(new Intl.DateTimeFormat("it-IT", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Rome" }).format(d)) % 24;
+}
