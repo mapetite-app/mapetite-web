@@ -36,20 +36,20 @@ async function savedSummary(supabase: Awaited<ReturnType<typeof createClient>>, 
 }
 
 // Nome, città e mappa del gusto per il saluto e le proposte. Senza colonne o senza profilo: niente.
-async function profilo(supabase: Awaited<ReturnType<typeof createClient>>, userId: string | null): Promise<{ nome: string | null; citta: string | null; gusto: MappaGusto | null }> {
+async function profilo(supabase: Awaited<ReturnType<typeof createClient>>, userId: string | null): Promise<{ nome: string | null; citta: string | null; gusto: MappaGusto | null; iniziato: boolean }> {
   const zonaNota = (z: string) => ZONE.some((x) => x.nome === z);
   if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER) {
     const raw = (await cookies()).get("e2e_gusto")?.value;
     try {
       const g = raw ? JSON.parse(decodeURIComponent(raw)) : null;
-      return { nome: g?.nome ?? null, citta: g?.city ?? null, gusto: g ? pulisciMappa(g, zonaNota) : null };
-    } catch { return { nome: null, citta: null, gusto: null }; }
+      return { nome: g?.nome ?? null, citta: g?.city ?? null, gusto: g ? pulisciMappa(g, zonaNota) : null, iniziato: Boolean(g) };
+    } catch { return { nome: null, citta: null, gusto: null, iniziato: false }; }
   }
-  if (!userId) return { nome: null, citta: null, gusto: null };
-  const { data, error } = await supabase.from("profiles").select("display_name, city, gusto").eq("id", userId).maybeSingle();
-  if (error || !data) return { nome: null, citta: null, gusto: null };
-  const r = data as { display_name?: string | null; city?: string | null; gusto?: unknown };
-  return { nome: r.display_name?.trim().split(/\s+/)[0] ?? null, citta: r.city ?? null, gusto: r.gusto ? pulisciMappa(r.gusto, zonaNota) : null };
+  if (!userId) return { nome: null, citta: null, gusto: null, iniziato: false };
+  const { data, error } = await supabase.from("profiles").select("display_name, city, gusto, onboarding_completed").eq("id", userId).maybeSingle();
+  if (error || !data) return { nome: null, citta: null, gusto: null, iniziato: false };
+  const r = data as { display_name?: string | null; city?: string | null; gusto?: unknown; onboarding_completed?: boolean | null };
+  return { nome: r.display_name?.trim().split(/\s+/)[0] ?? null, citta: r.city ?? null, gusto: r.gusto ? pulisciMappa(r.gusto, zonaNota) : null, iniziato: Boolean(r.onboarding_completed) || Boolean(r.gusto) };
 }
 
 // Home (mockup A del 21/10, scelto da Lorenzo): saluto con l'ora e il nome, un campo "Cosa cerchi?",
@@ -63,6 +63,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
   const { data } = await getUser();
   const loggedIn = !!data?.user;
   const userId = data?.user?.id ?? null;
+  // Solo in sviluppo (giro automatico): l'utente finto conta come entrato, con salvati e gusti dai cookie.
+  const utenteFinto = process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo");
   const [saved, prof] = await Promise.all([savedSummary(supabase, userId), profilo(supabase, userId)]);
   const now = new Date();
   const ora = momentoDi(now);
@@ -75,7 +77,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] px-4 pb-8 md:min-h-[calc(100dvh-3.5rem)]">
-      {!accountEliminato && <HomeIntro loggedIn={loggedIn} />}
+      {/* D3 (prova dell'8/11): l'intro solo a chi è nuovo davvero; chi ha già salvati o ha fatto il primo
+          accesso non la rivede su un telefono nuovo ("Come funziona" in fondo la riapre). */}
+      {!accountEliminato && <HomeIntro loggedIn={loggedIn} giaDentro={(loggedIn || utenteFinto) && (saved.total > 0 || prof.iniziato)} />}
       <div className="mx-auto w-full max-w-md">
         {accountEliminato && (
           <p role="status" data-testid="account-eliminato" className="mt-4 rounded-card border border-border bg-surface px-4 py-3 text-center text-sm text-text">

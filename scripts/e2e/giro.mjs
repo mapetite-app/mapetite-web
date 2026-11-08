@@ -880,6 +880,26 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
   ok(!ip.url().includes("intro="), "intro: chiusa, ?intro=1 sparisce dall'indirizzo");
   await ictx.close();
 
+  // D3 (prova dell'8/11): chi usa già l'app (salvati o primo accesso fatto) non vede l'intro su un telefono nuovo,
+  // nemmeno per un attimo; il telefono se la segna come vista. "Come funziona" la riapre comunque.
+  for (const [nome, cookie] of [["salvati", { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [{ tags: ["Da provare"], places: { category: "bar", name: "Bar Prova" } }], reviews: [] })) }], ["primo accesso fatto", { name: "e2e_gusto", value: encodeURIComponent(JSON.stringify({ zone: [], nome: "Giulia" })) }]]) {
+    const dctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await dctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
+    await dctx.addCookies([{ ...cookie, url: BASE }]);
+    const dp = await dctx.newPage();
+    dp.on("pageerror", (e) => errors.push(e.message));
+    let lampo = false;
+    await dp.goto(`${BASE}/`, { waitUntil: "commit" });
+    for (let t = 0; t < 20; t++) { if (await dp.getByTestId("intro").isVisible().catch(() => false)) lampo = true; await dp.waitForTimeout(100); }
+    await dp.waitForLoadState("networkidle");
+    ok(!lampo && (await dp.getByTestId("intro").count()) === 0 && await dp.getByLabel("Cosa cerchi?").isVisible(), `D3: con ${nome} niente intro sulla home (nemmeno un lampo)`);
+    ok((await dp.evaluate(() => localStorage.getItem("mapetite.intro"))) === "visto", `D3: con ${nome} il telefono segna l'intro come vista`);
+    await dp.getByRole("button", { name: "Come funziona" }).click();
+    ok(await dp.getByTestId("intro").isVisible(), `D3: con ${nome} 'Come funziona' riapre comunque l'intro`);
+    await dctx.close();
+  }
+  // Senza salvati né primo accesso (account nuovo davvero) l'intro resta: la controlla il blocco qui sopra.
+
   // Nessun lampo: prima che React parta (script dell'app bloccati) decide il CSS, guidato dallo script del layout.
   for (const seen of [false, true]) {
     const nctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
