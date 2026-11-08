@@ -9480,9 +9480,11 @@ else {
       const p = hp.proposte({ gusto: null, recenti: ["trattoria romantica a Trastevere"], citta: "Roma", momento: "cena" });
       ok(/^Trattori\w+ a lume di candela a Trastevere$/.test(p[0]?.titolo ?? ""), `home: il titolo della card da ricerca tiene 'romantica' in breve (${p[0]?.titolo})`);
       // Secondo revisore 8/11: a 360 px oltre ~40 caratteri il titolo andava su 3 righe e la zona finiva nei puntini.
-      const casi = [["pizzeria a San Lorenzo", "San Lorenzo"], ["trattoria a Trastevere", "Trastevere"], ["enoteca alla Garbatella", "Garbatella"], ["sushi romantico a Prati", "Prati"]];
-      const lunghi = casi.map(([q, z]) => hp.proposte({ gusto: null, recenti: [q], citta: "Roma", momento: "cena" })[0]?.titolo ?? "").filter((t, i) => t && (t.length > 40 || !t.includes(casi[i][1])));
-      ok(lunghi.length === 0, `home: titoli da ricerca entro 40 caratteri e con la zona (${lunghi.join(" | ") || "tutti ok"})`); }
+      // Terzo revisore 8/11: anche "alla Garbatella", "all'Isola" (prima "a Roma"); niente titolo da Google Maps senza "da scoprire".
+      const casi = [["pizzeria a San Lorenzo", "San Lorenzo", "cena"], ["trattoria a Trastevere", "Trastevere", "cena"], ["enoteca alla Garbatella", "alla Garbatella", "aperitivo"], ["vino all'Isola", "all'Isola", "aperitivo"], ["sushi romantico a Prati", "Prati", "cena"]];
+      const titoli = casi.map(([q, , momento]) => hp.proposte({ gusto: null, recenti: [q], citta: "Roma", momento })[0]).map((x) => (x?.da ? x.titolo : "(nessuna card)"));
+      const male = titoli.filter((t, i) => t.length > 40 || !t.includes(casi[i][1]) || !/che pochi conoscono|da scoprire|a lume|all'aperto|con /.test(t));
+      ok(male.length === 0, `home: titoli da ricerca entro 40 caratteri, con la zona giusta e la chicca detta (${titoli.join(" | ")})`); }
     const g = mg.gustiDaTipi(["gourmet", "pizza", "trattoria"], { occasions: [], priceRange: null });
     ok(g.priceRange === "€€" && g.cuisines.includes("pizza") && g.atmospheres.includes("raffinata"), `mappa del gusto: cucine, atmosfere e spesa ricavate dai tipi piaciuti (${JSON.stringify(g)})`);
     ok(mg.queryPerTe({ v: 1, zone: [], su: [], giu: [], scoperta: "chicche" }, "Roma") === null, "mappa del gusto: senza tipi piaciuti nessuna ricerca inventata");

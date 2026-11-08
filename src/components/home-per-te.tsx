@@ -23,7 +23,7 @@ function usePronto(): string {
   // Revisore 8/11: invisibili lasciavano un buco di 120 px sul 4G lento. Ora si vedono le card (contorni e colori)
   // e il testo arriva quando il telefono ha letto le ricerche.
   // Secondo revisore 8/11: i righi di testo diventano barre grigie (segnaposto come Places), non riquadri vuoti.
-  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! [&_.testo]:rounded-md [&_.testo]:bg-border/70";
+  return pronto ? "" : "pointer-events-none text-transparent! [&_*]:text-transparent! [&_.testo]:rounded-md [&_.testo]:bg-border/70 [&_.num]:text-border!";
 }
 
 function useRecenti(): string[] {
@@ -71,7 +71,7 @@ export function HomePillole({ momento, cittaProfilo, gusto, weekend = false }: {
         return (
           <Link key={q} href={`/mappa?q=${encodeURIComponent(q)}`} aria-label={q} data-esempio className={pill}>
             {/* Revisore 8/11: segnaposto con una barra grigia, non un bottone vuoto. */}
-            {pronto ? <span className="truncate">{label}</span> : <span aria-hidden className="h-2.5 w-16 rounded-full bg-border" />}
+            {pronto ? <span className="truncate">{label}</span> : <span aria-hidden className="h-2.5 w-24 rounded-full bg-border" />}
           </Link>
         );
       })}
@@ -120,7 +120,7 @@ export function HomeClassifiche({ momento, cittaProfilo, adesso, gusto, weekend 
               data-testid="home-classifica"
               className="flex min-h-[4.5rem] items-center gap-3 px-3.5 py-3 active:bg-surface"
             >
-              <span aria-hidden className={`${SERIF} w-6 shrink-0 text-center text-[28px] font-medium leading-none text-accent`}>{i + 1}</span>
+              <span aria-hidden className={`num ${SERIF} w-6 shrink-0 text-center text-[28px] font-medium leading-none text-accent`}>{i + 1}</span>
               <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-2xl">{c.emoji}</span>
               <span className="min-w-0 flex-1">
                 <span className="testo block text-[15px] font-display font-semibold leading-tight text-text">{c.titolo}</span>
@@ -174,7 +174,8 @@ export default function HomePerTe({
           >
             <span aria-hidden className={TONDO} style={{ background: `linear-gradient(160deg, ${p.sfondo})` }}>{p.emoji}</span>
             <span className="min-w-0 flex-1">
-              <span className={`testo ${SERIF} line-clamp-2 text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
+              {/* Due righe sempre riservate: il titolo che arriva dal telefono non allunga la card (terzo revisore 8/11, 16 px di salto). */}
+              <span className={`testo ${SERIF} line-clamp-2 min-h-[2.3em] text-[18px] font-medium leading-[1.15] text-text`}>{p.titolo}</span>
               <span className="mt-1 flex items-start gap-1 text-xs font-sans font-medium leading-snug text-[#c2410c]">
                 <span aria-hidden>✦</span>
                 <span className="testo line-clamp-2 [text-wrap:pretty]">{p.perche}</span>
