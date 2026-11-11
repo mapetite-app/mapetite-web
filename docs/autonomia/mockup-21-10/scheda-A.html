@@ -1,0 +1,38 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:var(--paper)}
+.hero{position:absolute;top:0;left:0;right:0;height:318px}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,0) 30%)}
+.cb{position:absolute;top:54px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;color:var(--text);font-size:17px;z-index:3}
+.cnt{position:absolute;right:16px;top:280px;background:rgba(0,0,0,.45);color:#fff;font-size:11.5px;padding:4px 9px;border-radius:999px;z-index:3;font-weight:500}
+.body{position:absolute;top:318px;left:0;right:0;padding:22px 22px 0}
+.k{color:var(--muted);font-size:10.5px}
+h1{font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.02;letter-spacing:-.02em;margin:8px 0 10px;color:#141414}
+.meta{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#4b5058}
+.meta .o{color:var(--ok);font-weight:600;display:flex;align-items:center;gap:6px}
+.v{margin-top:20px;border-top:1px solid #1c1c1e;border-bottom:1px solid #e3ddd2;padding:14px 0 16px}
+.v .t{display:flex;align-items:center;gap:7px;color:var(--brand);font-size:10.5px}
+.v p{font-family:var(--serif);font-style:italic;font-size:22px;line-height:1.24;margin-top:8px;color:#141414;letter-spacing:-.005em}
+.why{display:flex;align-items:center;gap:11px;margin-top:14px;font-size:13.5px;color:#3d4248}
+.why .a{width:34px;height:34px;border-radius:50%;border:2px solid var(--accent);flex:none}
+.why b{color:var(--accent);font-weight:600}
+.bar{position:absolute;left:16px;right:16px;bottom:30px;height:66px;background:var(--brand);border-radius:22px;display:flex;align-items:center;padding:8px;gap:8px;box-shadow:0 14px 30px rgba(26,60,64,.35)}
+.bar div{flex:1;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:7px;color:#fff;font-family:var(--display);font-weight:600;font-size:14.5px;background:rgba(255,255,255,.08)}
+.bar .p{flex:1.4;background:var(--accent)}
+.more{margin-top:16px;padding-top:14px;border-top:1px solid #e3ddd2;display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:#4b5058}
+</style></head><body><div class="screen">
+<div class="hero" data-crop="roof-main"></div>
+<div data-sb="dark"></div>
+<div class="cb" style="left:16px"><i data-i="x"></i></div><div class="cb" style="right:16px"><i data-i="share"></i></div>
+<div class="cnt">1 / 8</div>
+<div class="body">
+ <div class="caps k">Rooftop bar · €€€ · Trastevere</div>
+ <h1>Terrazza Gianicolo</h1>
+ <div class="meta"><span class="o"><span class="dot"></span>Aperto ora</span><span>·</span><span>650 m</span><span>·</span><span>fino alle 01:00</span></div>
+ <div class="v"><div class="t caps"><i data-i="spark" class="spark"></i>Il verdetto Mapetite</div>
+ <p>Tramonto sulle cupole e tavoli distanti: si parla senza alzare la voce. Cocktail curati, cucina semplice.</p></div>
+ <div class="why"><div class="a" data-crop="pin2"></div><span><b>Per te</b> · Come Altana Monti, che hai salvato</span></div>
+ <div class="more">Orari, menu, telefono<i data-i="chev"></i></div>
+</div>
+<div class="bar"><div class="p"><i data-i="cal"></i>Prenota</div><div><i data-i="walk"></i>8 min</div><div><i data-i="bookmark"></i>Salva</div></div>
+<div class="home-ind"></div>
+</div><script src="base.js"></script></body></html>

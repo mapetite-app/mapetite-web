@@ -1,0 +1,28 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.brand{position:absolute;top:210px;left:0;right:0;text-align:center}
+.mark{width:64px;height:64px;border-radius:20px;background:var(--brand);margin:0 auto;display:grid;place-items:center;color:var(--accent);font-size:32px;box-shadow:0 12px 28px rgba(26,60,64,.25)}
+.word{font-family:var(--display);font-weight:600;font-size:30px;color:var(--brand);letter-spacing:-.02em;margin-top:14px}
+.tag{font-size:14px;color:var(--muted);margin-top:4px}
+.week{position:absolute;top:60px;left:16px;right:16px;height:52px;border-radius:16px;background:var(--brand);color:#fff;display:flex;align-items:center;gap:12px;padding:0 14px 0 6px;font-size:14px;font-weight:500;overflow:hidden}
+.week .ph,.week .crop{width:40px;height:40px;border-radius:11px;--es:20px;flex:none}
+.week svg{margin-left:auto}
+.week b{font-family:var(--display);font-weight:600}
+.cards{position:absolute;left:16px;bottom:206px;display:flex;gap:10px}
+.cd{width:204px;height:76px;background:var(--surface);border-radius:18px;display:flex;align-items:center;gap:11px;padding:10px;flex:none}
+.cd .ph,.cd .crop{width:56px;height:56px;border-radius:13px;flex:none;--es:26px}
+.cd b{display:block;font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--text)}
+.cd span{font-size:12.5px;color:var(--muted)}
+.sbox{position:absolute;left:16px;right:16px;bottom:100px;height:94px;background:#fff;border-radius:22px;box-shadow:0 8px 30px rgba(0,0,0,.09);border:1px solid var(--border);padding:16px 18px;font-size:17px;color:#9a9ea5}
+.sbox .ln{display:flex;gap:10px;align-items:center}
+.sbox .mic{position:absolute;right:12px;bottom:12px;width:40px;height:40px;border-radius:50%;background:var(--surface);color:var(--brand);display:grid;place-items:center;font-size:18px}
+</style></head><body><div class="screen">
+<div data-sb=""></div>
+<div class="week"><div data-crop="pin1"></div><span><b>3 posti nuovi</b> nelle tue zone</span><i data-i="arrow"></i></div>
+<div class="brand"><div class="mark"><i data-i="pin"></i></div><div class="word">mapetite</div><div class="tag">I tuoi posti, quando servono.</div></div>
+<div class="cards">
+ <div class="cd"><div class="ph ph-trat" data-e="🍝"></div><div><b>5 posti per te</b><span>scelti dai tuoi gusti</span></div></div>
+ <div class="cd"><div class="ph ph-wine" data-e="🍷"></div><div><b>Da provare</b><span>18 salvati</span></div></div>
+</div>
+<div class="sbox"><div class="ln"><i data-i="spark" class="spark" style="font-size:19px"></i>Cosa cerchi stasera?</div><div class="mic"><i data-i="mic"></i></div></div>
+<div data-tabs="Assistente"></div><div class="home-ind"></div>
+</div><script src="base.js"></script></body></html>
