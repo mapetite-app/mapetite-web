@@ -16,7 +16,7 @@ export async function togliAmico(id: unknown): Promise<boolean> {
 
 // Dal profilo: il nome da mostrare, che serve per avere il link d'invito (chi lo riceve deve sapere chi è).
 export async function salvaNome(raw: unknown): Promise<boolean> {
-  const nome = typeof raw === "string" ? raw.trim().slice(0, 40) : "";
+  const nome = typeof raw === "string" ? Array.from(raw.trim()).slice(0, 40).join("") : "";
   if (!nome) return false;
   if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) return true;
   const supabase = await createClient();

@@ -9,8 +9,9 @@ import { trackFeature } from "@/lib/track";
 // L'invito di un amico rimasto senza risposta (revisore 14/11, terzo giro): chi chiudeva il primo accesso con
 // "Apri la mia mappa" senza toccare "Diventa amico" o "Non ora" lo perdeva. Il codice resta nel telefono e qui
 // si ripropone, finché non si risponde. Mai accettato in automatico.
+// Revisore 14/11 (quarto giro): se siete già amici, "Siete già amici" e basta (niente "Diventa amico").
 export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
-  const [invito, setInvito] = useState<{ codice: string; nome: string | null } | null>(null);
+  const [invito, setInvito] = useState<{ codice: string; nome: string | null; amico: boolean } | null>(null);
 
   useEffect(() => {
     const codice = readStoredInvite();
@@ -19,14 +20,22 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
     chiInvita(codice)
       .then((r) => {
         if (!vivo || r === "rete") return; // si riprova alla prossima apertura
-        if (r) setInvito({ codice, nome: r.nome });
+        if (r) setInvito({ codice, nome: r.nome, amico: r.amico });
         else clearStoredInvite(); // il codice non esiste più (per esempio dopo "Nuovo link")
+        if (r && r.amico) clearStoredInvite(); // già amici: non c'è niente da rispondere
       })
       .catch(() => {});
     return () => { vivo = false; };
   }, []);
 
   if (!invito) return null;
+  if (invito.amico) {
+    return (
+      <p data-testid="invito-gia-amici" className="mt-4 rounded-card border border-[#e3e7e7] bg-white p-4 text-[15px] font-sans text-text">
+        🤝 Tu e {invito.nome ?? "chi ti ha invitato"} siete già amici.
+      </p>
+    );
+  }
   return (
     <section data-testid="invito-sospeso" aria-label="Invito di un amico" className="mt-4 rounded-card border border-[#e3e7e7] bg-white p-4">
       <p className="font-display text-[15px] font-semibold text-text">💌 {invito.nome ?? "Un amico"} ti ha invitato</p>
@@ -36,6 +45,7 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
         nome={invito.nome}
         chiediNome={senzaNome}
         contesto="amici"
+        className=""
         nonOra={() => {
           trackFeature("invito_amico", { stato: "non_ora", contesto: "amici" });
           clearStoredInvite();
