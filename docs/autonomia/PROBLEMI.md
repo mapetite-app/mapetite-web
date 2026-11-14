@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 2/11/2026 (notte).
+Ultimo aggiornamento: 14/11/2026.
 
 ---
 
@@ -242,3 +242,9 @@ Ultimo aggiornamento: 2/11/2026 (notte).
 - **DAVVERO, in futuro:** misurare dove si fermano i tester (passo per passo, già tracciato con `benvenuto_*`) e accorciare quel passo; un tasto "Qualcosa non va?" per i tester (proposta 54).
 - **Primo passo:** dopo una settimana di tester, leggere in `/admin/numeri` a quale passo si esce.
 
+## 24. Troppa scelta, nessuna decisione: la cena con gli amici si decide in chat e finisce nel solito posto — 14/11
+- **Chi lo ha:** il cliente che esce in gruppo (chi propone passa la serata a mandare link, gli altri non rispondono o dicono "fai tu"); di riflesso il ristoratore nuovo o di quartiere, che perde contro "il solito posto" perché nessuno riesce a scegliere altro.
+- **Quanto pesa:** per un'indagine Doxa per Groupon (non recente) 6 uscite su 10 a pranzo o cena avvengono con amici ([Beverfood](https://www.beverfood.com/indagine-doxa-groupon-motivazioni-e-comportamenti-degli-italiani-al-ristorante-wd112488/)). Una ricerca TheFork del 2026 riportata da Mixerplanet dice che il 14% si sente indeciso quando le possibilità sono troppe e che si passano in media oltre 13 minuti sulle pagine delle recensioni prima di decidere ([Mixerplanet](https://www.mixerplanet.com/post-pdf/32317), letto solo dall'estratto della ricerca: pagina non raggiungibile da qui). Per TheFork e YouGov (dicembre 2025) 8 italiani su 10 sopra i 25 anni considerano determinante il parere di amici e familiari ([Ecoseven](https://www.ecoseven.net/lavoro/thefork-tra-recensioni-e-passaparola-ecco-come-gli-italiani-scelgono-il-ristorante/), anche questo dall'estratto). I gruppi usano i sondaggi di WhatsApp per scegliere ([Money.it](https://www.money.it/come-fare-sondaggio-su-whatsapp)), ma il sondaggio contiene solo parole ("pizzeria, giapponese…"), non i posti, e la chiusura a un'ora scelta è arrivata solo da poco ([Smartworld](https://www.smartworld.it/news/whatsapp-gruppi-novita-sondaggi-tutti-creazione-rapida.html)). Quanto ci mette un gruppo a decidere, e quante volte finisce nel solito posto: dato non trovato.
+- **OGGI nell'app:** liste di gruppo con voto (`/gruppi`: dal link d'invito chi non ha l'account deve registrarsi prima di vedere i posti), "Stasera dove andiamo?" sui propri salvati, verdetto su ogni card. Ma i risultati possono essere tanti e chi vota deve prima iscriversi.
+- **DAVVERO, in futuro:** "Tre, non trenta" (proposta 55): l'app restringe a 3 posti diversi tra loro, ognuno con il perché; "Manda al gruppo" (proposta 56): un link su WhatsApp con quei 3 posti, gli amici votano con un tocco senza app e senza account, il voto si chiude all'ora scelta. Per il ristoratore: comparire tra i 3 di un gruppo che ha già deciso di uscire è la domanda più qualificata che esista (VISIONE).
+- **Primo passo:** contare negli eventi quanti gruppi sono stati creati dal 16/10 e quanti hanno almeno 2 voti: se pochi, il freno è l'iscrizione (team).
