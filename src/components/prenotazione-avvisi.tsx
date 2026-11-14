@@ -107,7 +107,7 @@ export function PrenotazioneMappa() {
             updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" });
           }}
           onNonAncora={() => { updateBooking(chiedi.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "mappa" }); }}
-          altro={[{ label: "No, toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
+          altro={[{ label: "No, non prenoto: toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
         />
         )}
       </section>
