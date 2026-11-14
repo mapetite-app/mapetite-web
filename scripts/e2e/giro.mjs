@@ -4856,6 +4856,32 @@ else {
   await sp.getByTestId("persona").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
   ok(follows.some((f) => f.method === "POST" && f.body?.followed_id === MARCO), "amici: 'Segui' dai risultati della ricerca");
   await sp.screenshot({ path: `${OUT}/63-amici-cerca.png`, caret: "initial" });
+  // Lorenzo 14/11 ("non trovo nessuno"): un nome con lo spazio si cerca com'è scritto, non "giuliarossi".
+  searchUrl = null;
+  await sp.getByLabel("Cerca persone per nome").fill("Giulia Rossi");
+  await sp.waitForTimeout(700);
+  ok(!!searchUrl && searchUrl.includes('display_name.ilike."%Giulia Rossi%"'), `amici: 'Giulia Rossi' cerca il nome con lo spazio (${searchUrl?.split("or=")[1]?.slice(0, 90)})`);
+  await soctx.unroute("**/rest/v1/profili_pubblici**");
+  await soctx.route("**/rest/v1/profili_pubblici**", (r) => r.fulfill({ json: [] }));
+  await sp.getByLabel("Cerca persone per nome").fill("Nessuno Qui");
+  await sp.getByTestId("persone-nessuno").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await sp.getByTestId("persone-nessuno").textContent().catch(() => "")) ?? "").includes("Fatti trovare") && (await sp.getByTestId("persone-nessuno").getByRole("link").getAttribute("href")) === "/profilo#invita", "amici: nessun risultato spiega 'Fatti trovare' e porta al link d'invito");
+  // "Trova amici dalla rubrica": solo con il Contact Picker (Android). Qui Chromium da computer non ce l'ha.
+  await sp.getByLabel("Cerca persone per nome").fill("");
+  ok((await sp.getByTestId("trova-rubrica").count()) === 0, "amici: senza Contact Picker (iPhone, computer) niente 'Trova amici dalla rubrica'");
+  await soctx.addInitScript(() => { Object.defineProperty(navigator, "contacts", { configurable: true, value: { select: async () => [{ email: [" Giulia@Example.com "] }, { email: [] }] } }); });
+  let rubricaBody = null;
+  await soctx.route("**/rest/v1/rpc/trova_da_contatti**", (r) => { rubricaBody = r.request().postDataJSON(); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
+  await sp.reload({ waitUntil: "networkidle" });
+  ok(await sp.getByTestId("trova-rubrica-tasto").isVisible(), "amici (Android): 'Trova amici dalla rubrica' sotto la ricerca");
+  await sp.getByTestId("trova-rubrica-tasto").click();
+  await sp.getByTestId("trova-rubrica-risultati").waitFor({ timeout: 4000 }).catch(() => {});
+  // SHA-256 di "giulia@example.com" (minuscolo, senza spazi): l'email in chiaro non parte mai.
+  { const sent = JSON.stringify(rubricaBody ?? {});
+    const atteso = await sp.evaluate(async () => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("giulia@example.com"))), (b) => b.toString(16).padStart(2, "0")).join(""));
+    ok(Array.isArray(rubricaBody?.p_hash) && rubricaBody.p_hash.length === 1 && rubricaBody.p_hash[0] === atteso && !sent.includes("@"), `amici (Android): al server solo l'impronta SHA-256 dell'email, mai l'email (${sent.slice(0, 90)})`); }
+  ok(await sp.getByTestId("trova-rubrica-risultati").getByText("Marco", { exact: true }).isVisible(), "amici (Android): i contatti con 'Fatti trovare' compaiono con 'Segui'");
+  await sp.screenshot({ path: `${OUT}/63b-amici-rubrica.png`, caret: "initial" });
 
   // Impostazioni del profilo pubblico (in /profilo): spento di default, testo chiaro, nome ripulito.
   let profPatch = null;
@@ -8419,6 +8445,8 @@ else {
   ok(stored?.codice === "giulia.rm", `invito: codice ricordato nel telefono fino alla registrazione (${JSON.stringify(stored)})`);
   const og = await ip.locator('meta[property="og:title"]').getAttribute("content");
   ok(og === "Giulia ti invita su Mapetite", `invito: anteprima del link su WhatsApp con il nome (${og})`);
+  // Lorenzo 14/11: chi entra dal link personale diventa amico di chi l'ha mandato; lo si dice prima di "Inizia".
+  ok(((await ip.getByTestId("invito-amicizia").textContent()) ?? "").includes("diventi amico di Giulia"), `invito: prima di registrarsi si legge che si diventa amici (${await ip.getByTestId("invito-amicizia").textContent()})`);
   await ip.screenshot({ path: `${OUT}/invito-arrivo.png`, caret: "initial" });
   await ip.reload({ waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
@@ -8434,6 +8462,7 @@ else {
   // Codici generici e sconosciuti: testo neutro, mai un nome inventato.
   await ip.goto(`${BASE}/invito/tester`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Sei tra i primi a provare Mapetite" && !(await ip.getByTestId("invito-posti").count()), "invito: codice 'tester' per il gruppo di prova");
+  ok((await ip.getByTestId("invito-amicizia").textContent()) === "Gratis, in meno di un minuto.", "invito: il codice 'tester' non collega a nessuno (niente 'diventi amico')");
   await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
   await ip.goto(`${BASE}/invito/sconosciuto`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice senza profilo pubblico → testo neutro");
@@ -8451,7 +8480,7 @@ else {
   await ip.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
   const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
-  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
+  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm" && reg[0].props.stato === "collegato" && droppedKeys(reg).length === 0, `primo accesso: registrazione da invito contata con il codice e collegata all'amico (${JSON.stringify(reg.map((e) => e.props))})`);
   ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
   // Mappa del gusto (sprint 25/10): 4 passi a schermo intero. 1) città e zone.
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 7 con barra di avanzamento (una domanda per schermata, come Albo)");
@@ -8572,6 +8601,24 @@ else {
   ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
   await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
+  // Lorenzo 14/11: arrivato dal link di Giulia, la fine del primo accesso dice che siete amici e chiede
+  // "Fatti trovare" (spento di default, nome solo se acceso, cosa vedono gli altri un tocco più in là).
+  { const ft = ip.getByTestId("fatti-trovare");
+    ok(((await ft.getByTestId("invito-collegato").textContent()) ?? "").includes("Tu e Giulia siete amici"), `primo accesso da invito: 'Tu e Giulia siete amici' (${await ft.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);
+    const sw = ft.getByTestId("fatti-trovare-interruttore");
+    ok(!(await sw.isChecked()) && (await ft.getByTestId("fatti-trovare-nome").count()) === 0, "primo accesso: 'Fatti trovare' spento di default, nessun campo nome");
+    await ft.locator("label").first().click();
+    ok(await sw.isChecked() && await ft.getByTestId("fatti-trovare-nome").isVisible() && await ft.getByTestId("fatti-trovare-privacy").isVisible(), "primo accesso: acceso 'Fatti trovare' compaiono il nome e 'Cosa vedono gli altri'");
+    await ft.getByTestId("fatti-trovare-privacy").locator("summary").click();
+    { const t = (await ft.getByTestId("fatti-trovare-privacy").innerText()).replace(/\s+/g, " ");
+      ok(t.includes("Chi ha il link o ti cerca su Mapetite vede") && t.includes("Mai:") && t.includes("note"), `primo accesso: 'Cosa vedono gli altri' con lo stesso testo del profilo (${t.slice(0, 120)})`); }
+    { const ib = await ft.getByTestId("fatti-trovare-nome").boundingBox(); const fs = await ft.getByTestId("fatti-trovare-nome").evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+      ok(ib && ib.height >= 44 && fs >= 16, `primo accesso: campo nome alto ≥ 44 px e testo ≥ 16 px (niente zoom su iPhone) (${Math.round(ib?.height ?? 0)}, ${fs})`); }
+    await ft.getByTestId("fatti-trovare-nome").scrollIntoViewIfNeeded();
+    await ip.screenshot({ path: `${OUT}/benvenuto-4-fatti-trovare.png`, caret: "initial" });
+    await ft.locator("label").first().click();
+    ok(!(await sw.isChecked()) && (await ft.getByTestId("fatti-trovare-nome").count()) === 0, "primo accesso: spento di nuovo, il campo nome sparisce");
+    await ip.evaluate(() => window.scrollTo(0, 0)); }
   await ip.setViewportSize({ width: 360, height: 740 });
   { const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const ob = await ip.getByTestId("benvenuto-importa-si").boundingBox();
