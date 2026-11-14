@@ -18,6 +18,7 @@ import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 import { fotoUrl } from "@/lib/foto-utenti";
 import { quartiereDi, raggioVicino, tipoPlurale } from "@/lib/scaffali-salvati";
+import { mappaStatica } from "@/lib/mappa-statica";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
@@ -91,6 +92,31 @@ function FotoCopertina({ src, children }: { src: string; children: React.ReactNo
   return <img src={src} alt="" data-testid="scaffale-foto" loading="lazy" onError={() => setRotta(true)} className="absolute inset-0 h-full w-full object-cover" />;
 }
 
+// Copertina con la mappa (14/11, revisori dell'8/11: "copertine senza foto"): la zona vera dei posti del gruppo,
+// con un puntino per posto e l'emoji del gruppo in un tondo bianco. Se la mappa non arriva (rete, token) torna la
+// copertina di prima: la foto scattata dall'utente o le emoji.
+const COPERTINA_W = 112;
+const COPERTINA_H = 64;
+function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
+  const [rotta, setRotta] = useState(false);
+  const [pronta, setPronta] = useState(false);
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN), [posti]);
+  if (!mappa || rotta) return <>{fallback}</>;
+  return (
+    <>
+      {!pronta && fallback}
+      {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
+      <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${pronta ? "opacity-100" : "opacity-0"}`} />
+      {pronta && mappa.punti.map((pt, i) => (
+        <span key={i} data-testid="scaffale-puntino" className="absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
+      ))}
+      {pronta && badge && (
+        <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[13px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{badge}</span>
+      )}
+    </>
+  );
+}
+
 function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string }) {
   // I posti arrivano dal più vecchio al più nuovo: la copertina mostra i più recenti.
   const recenti = g.posti.slice(-12).reverse();
@@ -101,6 +127,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
   ) : (
     <span className="grid h-full w-full grid-cols-4 place-items-center px-1 text-[17px] leading-none">{emoji.map((e) => <span key={e}>{e}</span>)}</span>
   );
+  const vecchia = conFoto ? <FotoCopertina src={foto[conFoto.id]}>{emojiVista}</FotoCopertina> : emojiVista;
   return (
     <li className="shrink-0">
       <button
@@ -109,11 +136,12 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
         data-scaffale-key={g.key}
         aria-label={`${g.label}, ${g.n} ${g.n === 1 ? "posto" : "posti"}`}
         onClick={onTap}
-        className="block w-[92px] text-left active:scale-[0.97]"
+        className="block w-[112px] text-left active:scale-[0.97]"
       >
         <span data-testid={cover} className="block">
-          <span aria-hidden className={`relative block h-[44px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
-            {conFoto ? <FotoCopertina src={foto[conFoto.id]}>{emojiVista}</FotoCopertina> : emojiVista}
+          <span aria-hidden className={`relative block h-[64px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
+            {/* Tondo con l'emoji solo se il gruppo ne ha una sola (tipo, raccolta, "Vicino a te"): su una zona mista sarebbe a caso. */}
+            <MappaCopertina posti={recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} />
           </span>
           <span className="mt-1 flex items-baseline gap-1 px-0.5">
             <span data-testid="scaffale-nome" className="min-w-0 truncate text-[13px] font-medium text-[#33373d]">{g.label}</span>
@@ -853,6 +881,7 @@ export default function SalvatiLista({
             Revisore 8/11: un riquadro solo, tre schede e una fila di copertine; sotto, subito la lista. */}
         {schedaOn && (
           <section data-testid="scaffali" aria-label="Scaffali" className="mt-1">
+            <div className="flex items-center">
             <div role="tablist" aria-label="Scaffali" className="flex gap-5">
               {schede.map((x) => (
                 <button
@@ -867,6 +896,9 @@ export default function SalvatiLista({
                   {x.label}
                 </button>
               ))}
+            </div>
+            {/* Attribuzione delle copertine a mappa (termini Mapbox/OpenStreetMap), fuori dalle immagini. */}
+            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && <span data-testid="scaffali-attribuzione" className="ml-auto text-[10px] text-text-muted/80">© Mapbox © OpenStreetMap</span>}
             </div>
             <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {schedaOn === "zone" && (<>
@@ -902,9 +934,9 @@ export default function SalvatiLista({
                     href="/profilo?raccolta=nuova"
                     aria-label="Nuova raccolta"
                     data-testid={collections.length === 0 ? "raccolte-vuote" : "raccolta-nuova"}
-                    className="block w-[92px] active:scale-[0.97]"
+                    className="block w-[112px] active:scale-[0.97]"
                   >
-                    <span aria-hidden className="flex h-[44px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
+                    <span aria-hidden className="flex h-[64px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
                       <Plus size={20} className="text-text-muted" />
                     </span>
                     <span className="mt-1 block truncate px-0.5 text-[13px] font-medium text-[#33373d]">Nuova</span>
