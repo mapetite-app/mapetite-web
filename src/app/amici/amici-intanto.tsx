@@ -15,7 +15,7 @@ import type { MySavedRow } from "@/lib/raccolte-server";
 const DONE = STATE_TAGS[1];
 const MAX_CONSIGLI = 5;
 
-export default function AmiciIntanto({ userId, saved, codice = null }: { userId: string; saved: MySavedRow[]; codice?: string | null }) {
+export default function AmiciIntanto({ userId, saved, codice = null, senzaNome = false }: { userId: string; saved: MySavedRow[]; codice?: string | null; senzaNome?: boolean }) {
   // Prima i posti che ti sono piaciuti, poi gli altri dove sei stato; mai quelli che "non fanno per te".
   const consigli = saved
     .filter((r) => r.tags.includes(DONE) && !r.tags.includes(OPINION_DISLIKE))
@@ -24,7 +24,7 @@ export default function AmiciIntanto({ userId, saved, codice = null }: { userId:
 
   return (
     <div data-testid="amici-intanto" className="mt-5">
-      <InvitaAmico userId={userId} handle={null} codice={codice} vuoto />
+      <InvitaAmico userId={userId} handle={null} codice={codice} senzaNome={senzaNome} vuoto />
 
       {consigli.length > 0 && (
         <section aria-labelledby="consigli-titolo" className="-mt-3">

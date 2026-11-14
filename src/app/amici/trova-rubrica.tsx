@@ -42,7 +42,8 @@ export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; se
     setScelti(contatti.length);
     if (email.length === 0) { setTrovati([]); setStato("fatto"); return; }
     setStato("cerco");
-    const hash = await Promise.all(email.map(impronta));
+    // Solo impronte SHA-256 (64 cifre esadecimali): il server rifiuta tutto il resto (migrazione 20261114e).
+    const hash = (await Promise.all(email.map(impronta))).filter((h) => /^[0-9a-f]{64}$/.test(h));
     const client = await browserClient().catch(() => null);
     if (!client) { setStato("errore"); return; }
     const { data, error } = await client.rpc("trova_da_contatti", { p_hash: hash });
