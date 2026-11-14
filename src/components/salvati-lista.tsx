@@ -95,8 +95,8 @@ function FotoCopertina({ src, children }: { src: string; children: React.ReactNo
 // Copertina con la mappa (14/11, revisori dell'8/11: "copertine senza foto"): la zona vera dei posti del gruppo,
 // con un puntino per posto e l'emoji del gruppo in un tondo bianco. Se la mappa non arriva (rete, token) torna la
 // copertina di prima: la foto scattata dall'utente o le emoji.
-const COPERTINA_W = 112;
-const COPERTINA_H = 64;
+const COPERTINA_W = 124;
+const COPERTINA_H = 72;
 function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
@@ -107,17 +107,19 @@ function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: str
       {!pronta && fallback}
       {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
       <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${pronta ? "opacity-100" : "opacity-0"}`} />
-      {pronta && mappa.punti.map((pt, i) => (
+      {/* Velo teal leggero: la mappa chiara su fondo chiaro spariva (revisore 14/11). */}
+      {pronta && <span className="absolute inset-0 bg-brand/[0.06]" />}
+      {pronta && mappa.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55).map((pt, i) => (
         <span key={i} data-testid="scaffale-puntino" className="absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
       ))}
       {pronta && badge && (
-        <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[13px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{badge}</span>
+        <span className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[13px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{badge}</span>
       )}
     </>
   );
 }
 
-function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string }) {
+function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover, mappa = true }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string; mappa?: boolean }) {
   // I posti arrivano dal più vecchio al più nuovo: la copertina mostra i più recenti.
   const recenti = g.posti.slice(-12).reverse();
   const conFoto = recenti.find((p) => foto[p.id]);
@@ -136,12 +138,13 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
         data-scaffale-key={g.key}
         aria-label={`${g.label}, ${g.n} ${g.n === 1 ? "posto" : "posti"}`}
         onClick={onTap}
-        className="block w-[112px] text-left active:scale-[0.97]"
+        className="block w-[124px] text-left active:scale-[0.97]"
       >
         <span data-testid={cover} className="block">
-          <span aria-hidden className={`relative block h-[64px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
+          <span aria-hidden className={`relative block h-[72px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
             {/* Tondo con l'emoji solo se il gruppo ne ha una sola (tipo, raccolta, "Vicino a te"): su una zona mista sarebbe a caso. */}
-            <MappaCopertina posti={recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} />
+            {/* Sui tipi la mappa non distingue niente (tutte "Roma" con puntini sparsi, revisore 14/11): lì resta l'emoji. */}
+            {mappa ? <MappaCopertina posti={recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} /> : vecchia}
           </span>
           <span className="mt-1 flex items-baseline gap-1 px-0.5">
             <span data-testid="scaffale-nome" className="min-w-0 truncate text-[13px] font-medium text-[#33373d]">{g.label}</span>
@@ -181,7 +184,8 @@ type RigaProps = { p: Place; primo: boolean; foto?: string; fonte?: string; verd
 const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese, onTap }: RigaProps) {
   // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
   // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
-  const meta = cardFacts(p, null, true);
+  // Revisore 14/11: il quartiere (Trastevere, Brera) al posto della città quando si sa: la città sta già nelle pillole in alto.
+  const meta = useMemo(() => { const q = quartiereDi(p); return q ? [cardFacts(p, null, false), q].filter(Boolean).join(" · ") : cardFacts(p, null, true); }, [p]);
   // Revisore 3/11: oltre 50 km la distanza non serve ("474,6 km"); resta la città, intera.
   const dist = origin && distanceMeters(origin, p) < 50_000 ? distanceLabel(origin, p) : null;
   const done = p.tags?.includes(DONE);
@@ -854,7 +858,8 @@ export default function SalvatiLista({
         ) : (
           // Lorenzo 8/11: in alto solo gli stati e i filtri accesi (ognuno con la sua ✕); quartieri, tipi e raccolte
           // stanno negli scaffali sotto. Niente doppioni: la stessa scelta in un posto solo.
-          <div data-testid="salvati-comandi" className="-mx-4 mt-1.5 flex flex-wrap items-center gap-1.5 px-4 py-0.5">
+          // Revisore 14/11: una fila sola che scorre (con una zona accesa la sua pillola restava da sola su una riga).
+          <div data-testid="salvati-comandi" className="-mx-4 mt-1.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
             {attivi.length > 0 && (
               <div role="group" aria-label="Filtri accesi" data-testid="salvati-filtri-accesi" className="contents">
                 {attivi.map((f) => (
@@ -898,7 +903,7 @@ export default function SalvatiLista({
               ))}
             </div>
             {/* Attribuzione delle copertine a mappa (termini Mapbox/OpenStreetMap), fuori dalle immagini. */}
-            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && <span data-testid="scaffali-attribuzione" className="ml-auto text-[10px] text-text-muted/80">© Mapbox © OpenStreetMap</span>}
+            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && schedaOn !== "tipi" && <span data-testid="scaffali-attribuzione" className="ml-auto text-[10px] text-text-muted/80">© Mapbox © OpenStreetMap</span>}
             </div>
             <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {schedaOn === "zone" && (<>
@@ -915,7 +920,7 @@ export default function SalvatiLista({
                 ))}
               </>)}
               {schedaOn === "tipi" && scaffaleTipi.map((g) => (
-                <CopertinaScaffale key={g.key} g={g} fondo={FONDI.tipo} foto={fotoMie} onTap={() => scegli("tipo", g.n, () => setTipo(g.key))} />
+                <CopertinaScaffale key={g.key} g={g} fondo={FONDI.tipo} foto={fotoMie} mappa={false} onTap={() => scegli("tipo", g.n, () => setTipo(g.key))} />
               ))}
               {schedaOn === "raccolte" && (<>
                 {collections.map((c, i) => (
@@ -934,9 +939,9 @@ export default function SalvatiLista({
                     href="/profilo?raccolta=nuova"
                     aria-label="Nuova raccolta"
                     data-testid={collections.length === 0 ? "raccolte-vuote" : "raccolta-nuova"}
-                    className="block w-[112px] active:scale-[0.97]"
+                    className="block w-[124px] active:scale-[0.97]"
                   >
-                    <span aria-hidden className="flex h-[64px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
+                    <span aria-hidden className="flex h-[72px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
                       <Plus size={20} className="text-text-muted" />
                     </span>
                     <span className="mt-1 block truncate px-0.5 text-[13px] font-medium text-[#33373d]">Nuova</span>

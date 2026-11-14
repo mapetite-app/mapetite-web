@@ -8,9 +8,9 @@ export type Punto = { lat: number; lng: number };
 export type MappaStatica = { url: string; punti: { x: number; y: number }[] };
 
 const TILE = 512; // le immagini statiche Mapbox usano tessere da 512 px
-const ZOOM_MIN = 10;
+const ZOOM_MIN = 11.5;
 const ZOOM_MAX = 14.5; // più vicino si vedono due strade e nessun nome: la copertina non dice dove siamo
-const RAGGIO_GRUPPO_M = 6_000;
+const RAGGIO_GRUPPO_M = 2_500; // revisore 14/11: con 6 km i posti lontani finivano tagliati sul bordo
 
 const mx = (lng: number) => (lng + 180) / 360;
 const my = (lat: number) => {
@@ -28,7 +28,7 @@ function metri(a: Punto, b: Punto): number {
 }
 
 // Un gruppo sparso tra Roma e Milano non sta in una copertina: si tiene il nucleo più denso (il posto con più
-// vicini entro 6 km e quelli attorno). Meglio una zona leggibile che due città in un francobollo.
+// vicini entro 2,5 km e quelli attorno). Meglio una zona leggibile che due città in un francobollo.
 export function nucleo(punti: readonly Punto[]): Punto[] {
   const validi = punti.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && (p.lat !== 0 || p.lng !== 0));
   if (validi.length <= 1) return validi;
@@ -59,9 +59,10 @@ export function mappaStatica(punti: readonly Punto[], w: number, h: number, toke
   const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&access_token=${token}`;
   return {
     url,
+    // Con lo zoom al minimo un posto può cadere fuori: niente mezzi puntini sul bordo (revisore 14/11).
     punti: vista.map((p) => ({
       x: Math.round(((mx(p.lng) - cx) * scala + w / 2) / w * 1000) / 10,
       y: Math.round(((my(p.lat) - cy) * scala + h / 2) / h * 1000) / 10,
-    })),
+    })).filter((pt) => pt.x >= 5 && pt.x <= 95 && pt.y >= 6 && pt.y <= 94),
   };
 }
