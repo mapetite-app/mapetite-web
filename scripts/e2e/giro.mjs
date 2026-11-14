@@ -6115,6 +6115,24 @@ else {
     const vis = await riga.waitFor({ timeout: 5000 }).then(() => true, () => false);
     const ordine = await ap.getByTestId("promemoria-prenotazioni").evaluate((el) => [...el.children].map((c) => c.getAttribute("data-testid")));
     ok(vis && (await ap.getByTestId("promemoria-hai-prenotato").count()) === 0 && ordine.indexOf("promemoria-oggi") === 0 && ordine.indexOf("promemoria-da-confermare-riga") > 0 && ((await riga.textContent()) ?? "").includes("Terrazza Uno") && (await riga.getAttribute("href")) === "/prenotazioni", `home (revisore 14/11): prima il tavolo di stasera, la domanda sotto in una riga (${ordine.join(", ")})`); }
+  // Revisore 14/11 (sesto giro): tavolo di domani e "L'hai prenotato?" insieme → una sola scheda, la più urgente.
+  for (const entro of [false, true]) {
+    await ap.evaluate((entro) => {
+      const now = new Date(); const dom = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      // Entro 24 ore: domani alla stessa ora meno 5 minuti; oltre: domani alle 23:59 (o fra 25 ore, se prima).
+      const t = entro ? new Date(Math.max(dom.getTime(), now.getTime() + 86_400_000 - 300_000)) : new Date(Math.min(dom.getTime() + 86_340_000, now.getTime() + 25 * 3_600_000));
+      const k = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+      localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+        { id: "dm1", placeId: "P2", placeName: "Osteria Due", lat: 41.9, lng: 12.49, date: k(t), time: `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`, people: 2, special: null, via: "whatsapp", confirmed: true, createdAt: Date.now() - 86_400_000 },
+        { id: "tfn", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: null, time: null, people: null, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() },
+      ]));
+    }, entro);
+    await ap.reload({ waitUntil: "networkidle" });
+    await ap.getByTestId("promemoria-prenotazioni").waitFor({ timeout: 5000 }).catch(() => {});
+    const ordine = await ap.getByTestId("promemoria-prenotazioni").evaluate((el) => [...el.children].map((c) => c.getAttribute("data-testid"))).catch(() => []);
+    if (entro) ok(ordine.join(",") === "promemoria-domani,promemoria-da-confermare-riga", `home (revisore 14/11, sesto giro): tavolo entro 24 ore e domanda → la scheda del tavolo e la domanda in una riga (${ordine.join(", ")})`);
+    else ok(ordine.join(",") === "promemoria-hai-prenotato" && ((await ap.getByTestId("promemoria-altre-da-confermare").textContent().catch(() => "")) ?? "").trim() === "+1 da confermare", `home (revisore 14/11, sesto giro): tavolo fra più di 24 ore e domanda → solo 'L'hai prenotato?' con '+1 da confermare' (${ordine.join(", ")})`);
+  }
   await ap.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await ap.evaluate(() => {
     const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
