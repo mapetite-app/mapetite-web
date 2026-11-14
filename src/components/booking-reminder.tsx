@@ -236,7 +236,12 @@ export default function BookingReminder() {
   const doppiVisti = domandaPrima ? [] : doppi;
   const tavoliNascosti = domandaPrima ? tutteProssime.length + doppi.length : 0;
   const tavoloOggi = prossime.length > 0 || doppiVisti.length > 0;
+  // Revisore 14/11 (settimo giro): i tavoli nascosti sono già confermati, non "da confermare": riga a parte.
   const altreInRiga = altreDaChiedere + tavoliNascosti;
+  const rigaAltre = [
+    altreDaChiedere > 0 ? `+${altreDaChiedere} da confermare` : null,
+    tavoliNascosti > 0 ? (tavoliNascosti === 1 ? "1 tavolo prenotato" : `${tavoliNascosti} tavoli prenotati`) : null,
+  ].filter(Boolean).join(" · ");
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
       {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto?
@@ -277,7 +282,7 @@ export default function BookingReminder() {
           )}
           {altreInRiga > 0 && (
             <Link href="/prenotazioni" data-testid="promemoria-altre-da-confermare" className="mt-1 flex min-h-10 items-center border-t border-border pt-2 text-sm font-display font-semibold text-brand">
-              +{altreInRiga} da confermare
+              {rigaAltre}
             </Link>
           )}
         </section>
