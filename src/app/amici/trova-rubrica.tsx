@@ -65,7 +65,7 @@ export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; se
         <BookUser size={17} aria-hidden />
         {stato === "cerco" ? "Cerco…" : "Trova amici dalla rubrica"}
       </button>
-      <p className="mt-1.5 text-center text-xs font-sans text-text-muted">Scegli tu i contatti: parte solo un'impronta delle email, e non si salva.</p>
+      <p className="mt-1.5 text-center text-xs font-sans text-text-muted">Scegli tu i contatti: parte solo un&apos;impronta delle email, e non si salva.</p>
       {stato === "limite" && <p role="alert" className="mt-2 text-sm font-sans text-text-muted">Per oggi hai già cercato 3 volte: riprova domani.</p>}
       {stato === "errore" && <p role="alert" className="mt-2 text-sm font-sans text-text-muted">Non sono riuscito a cercare. Riprova tra poco.</p>}
       {stato === "fatto" && trovati.length === 0 && (
