@@ -103,7 +103,8 @@ const PUNTI_RACCOLTA = 60;
 function MappaCopertina({ posti, badge, fallback, minPunti = 1 }: { posti: Place[]; badge: string | null; fallback: React.ReactNode; minPunti?: number }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
-  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true, "quartieri"), [posti]);
+  // Revisore 14/11 (settimo giro): niente più "Rome" né "…'s Basilica" tagliato: la mappa arriva senza nessun nome.
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true), [posti]);
   const visibili = useMemo(() => mappa?.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55) ?? [], [mappa, badge]);
   if (!mappa || rotta || visibili.length < minPunti) return <>{fallback}</>;
   return (
@@ -111,8 +112,7 @@ function MappaCopertina({ posti, badge, fallback, minPunti = 1 }: { posti: Place
       {!pronta && fallback}
       {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
       <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 [filter:brightness(0.62)_contrast(4)] ${pronta ? "opacity-100" : "opacity-0"}`} />
-      {/* Revisore 14/11, quarto giro: copertine "slavate". Niente più velo bianco (i nomi dei quartieri sono spenti
-          nella mappa stessa). Lo stile chiaro di Mapbox ha strade bianche su grigio quasi bianco (4% di differenza):
+      {/* Revisore 14/11, quarto giro: copertine "slavate". Niente più velo bianco (nella mappa non ci sono nomi). Lo stile chiaro di Mapbox ha strade bianche su grigio quasi bianco (4% di differenza):
           prima si scurisce e poi si alza il contrasto, così isolati grigi e strade bianche si leggono. Puntini più grandi. */}
       {pronta && <span className="absolute inset-0 bg-brand/[0.05]" />}
       {pronta && visibili.map((pt, i) => (
