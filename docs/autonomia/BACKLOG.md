@@ -6,6 +6,14 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI SABATO 14/11 (10:05) — CEO apre
+Nessuna sessione dal 9 al 13/11 e nessun commento di Lorenzo sulla PR #141. Esito delle voci della #141 rispetto a `VISIONE.md`:
+- Idee che cercano solo la frase toccata: **VALIDATA** (fa quello che dici, i gusti cambiano l'ordine).
+- Salvati a scaffali: **DA RIVEDERE: copertine senza immagine** → torna PRONTA e si fa oggi (copertine a mappa, niente foto Google).
+- Profilo dell'amico: **DA RIVEDERE: mappa in fondo, card mezze vuote** → PRONTA, oggi.
+- Prenota con promemoria: **DA RIVEDERE: con TheFork i dati si inseriscono due volte, doppioni banner/foglio** → PRONTA, oggi.
+Voce della sessione: le tre schermate sopra 8,5 con un revisore separato, poi merge della #141 aggiornata.
+
 ## RICHIESTE DI LORENZO DELL'8/11 (in chat, domenica 11:20) — PREVALGONO SU TUTTO, DA ORA E NEI PROSSIMI GIORNI
 "Prendo l'app: perché la dovrei usare?" Obiettivo: darla a persone vere e dire "usatela". Serve un ciclo completo **cerca → scopri → guarda → salva → ritrova → prenota → ci vai**, con benefici che si vedono.
 1. **Ricerche e Idee che fanno quello che dici:** toccando "Cena romantica" si cercava "cena romantica, cucina romana, atmosfera intima" (gusti aggiunti in silenzio). Si cerca solo quello che c'è scritto; i gusti cambiano l'ordine, non la frase. Controllare tutte le idee e i suggerimenti allo stesso modo.
