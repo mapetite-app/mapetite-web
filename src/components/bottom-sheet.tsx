@@ -1199,7 +1199,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             );
           })}
           {/* In fondo al carosello, in una sola card: 👍/👎 in un tocco, poi l'email per chi vuole spiegare. */}
-          {title && showSearchFeedback && !loadingVerdicts && places.length > 0 && (
+          {title && showSearchFeedback && !loadingVerdicts && !treOn && places.length > 0 && (
             <li data-id="" className="w-[60vw] max-w-xs shrink-0 snap-center lg:w-auto lg:max-w-none">
               <div className="flex h-full min-h-[150px] flex-col justify-center gap-2 rounded-card bg-surface/95 p-4 shadow-float lg:min-h-0 lg:shadow-none">
                 <UtileFeedback contesto="ricerca" risultati={places.length} />

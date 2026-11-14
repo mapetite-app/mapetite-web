@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TheFork danno elenchi lunghi; Places sceglie a mano ma per tutti. Nessuno restringe sui gusti della persona e dice perché proprio quei tre.
 - **Valore per l'utente:** decidere in un minuto. **Per il ristoratore:** il posto di quartiere compare accanto a quello famoso invece di finire in fondo alla lista (la scelta dei 3 non usa il numero di recensioni: VISIONE).
 - **Sforzo:** S (solo scelta e ordine sui risultati già arrivati). **Costo Google/Haiku:** zero chiamate in più.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **Fatta il 14/11 sera** (branch `claude/busy-mendel-33jv1h`): tasto "Scegli tra 3" nei risultati, vedi BACKLOG.
 
 ### 56. "Manda al gruppo": i 3 posti su WhatsApp, si vota senza app
 - **Problema:** `PROBLEMI.md` 24: i sondaggi di WhatsApp contengono solo parole, non posti; le nostre liste di gruppo chiedono di iscriversi prima di vedere i posti.

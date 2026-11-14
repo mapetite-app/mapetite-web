@@ -31,6 +31,7 @@ export const MOTIVO_LABEL: Record<Motivo, string> = {
 
 // Sotto questo numero di posti la scelta non serve: si vedono già tutti.
 export const MIN_POSTI_TRE = 5;
+const VICINO_MAX_M = 3_000;
 
 export function scegliTre<T extends PostoTre>(
   posti: readonly T[],
@@ -58,9 +59,10 @@ export function scegliTre<T extends PostoTre>(
   const o = opz.origine;
   if (o) {
     const vicini = [...buoni].sort((a, b) => distanceMeters(o, a) - distanceMeters(o, b));
-    // Il più vicino davvero (non "il più vicino di un altro tipo"): se è già scelto, il secondo più vicino.
-    const v = vicini.find((p) => !preso(p));
-    if (v) scelti.push({ posto: v, motivo: "vicino" });
+    // Revisore 14/11 sera: "Il più vicino" solo se lo è davvero (il primo per distanza, non già scelto) ed è
+    // raggiungibile a piedi o quasi (entro 3 km): a 480 km è vero ma sembra un errore.
+    const v = vicini[0];
+    if (v && !preso(v) && distanceMeters(o, v) <= VICINO_MAX_M) scelti.push({ posto: v, motivo: "vicino" });
   }
   while (scelti.length < 3) {
     const d = primo(buoni);
