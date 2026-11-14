@@ -23,7 +23,7 @@ import {
 } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { AzioniTavolo, Disdetta } from "@/components/booking-reminder";
-import { DomandaPrenotato } from "@/components/domanda-prenotato";
+import { DomandaPrenotato, PerQuando } from "@/components/domanda-prenotato";
 
 // Promemoria che si vedono (Lorenzo, 8/11: "gli ricordi con un banner, con un pop-up"):
 // - PrenotazioneMappa: sulla mappa, il giorno stesso "Stasera alle 21:00 da…" con Portami lì e Chiama;
@@ -69,6 +69,7 @@ export function PrenotazioneMappa() {
   const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
   const [nascosti, setNascosti] = useState<string[] | null>(null);
   const [nonPiu, setNonPiu] = useState(false);
+  const [quandoId, setQuandoId] = useState<string | null>(null);
   useEffect(() => { const t = setTimeout(() => setNascosti(leggiLista(NASCOSTI_MAPPA)), 0); return () => clearTimeout(t); }, []);
   if (!ora || !nascosti) return null;
   const r = prenotazioneDaRicordare(list, ora);
@@ -88,16 +89,27 @@ export function PrenotazioneMappa() {
     return (
       <section data-testid="mappa-prenotazione" data-tipo="chiedi" className="pointer-events-auto rounded-card bg-brand p-3 text-white shadow-float">
         {/* Niente ✕ (revisore 14/11): "Non ancora" fa già la stessa cosa. */}
+        {quandoId === chiedi.id ? (
+          <>
+            <p className="font-title text-lg font-semibold leading-tight">{chiedi.placeName}</p>
+            <PerQuando b={chiedi} scuro onFatto={() => { setQuandoId(null); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" }); }} />
+          </>
+        ) : (
         <DomandaPrenotato
           b={chiedi}
           now={ora}
           scuro
           compatto
           ids={{ si: "mappa-hai-prenotato-si", nonAncora: "mappa-hai-prenotato-non-ancora" }}
-          onSi={() => { updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" }); }}
+          onSi={() => {
+            // Senza giorno o ora: prima "Per quando?", così il promemoria sa quando ricordarlo.
+            if (!chiedi.date || !chiedi.time) { setQuandoId(chiedi.id); return; }
+            updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" });
+          }}
           onNonAncora={() => { updateBooking(chiedi.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "mappa" }); }}
-          altro={[{ label: "No, non prenoto: toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
+          altro={[{ label: "No, toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
         />
+        )}
       </section>
     );
   }

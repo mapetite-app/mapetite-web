@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { CalendarCheck, Check, MoreHorizontal } from "lucide-react";
-import { quandoTavolo, type BookingRequest } from "@/lib/booking";
+import { dateKey, quandoTavolo, updateBooking, type BookingRequest } from "@/lib/booking";
 
 // "L'hai prenotato?" (revisore 14/11): la stessa frase e le stesse due azioni nel foglio Prenota,
 // nel promemoria in home e sul banner della mappa. "Sì" e "Non ancora" in vista; il resto
@@ -43,8 +43,8 @@ export function DomandaPrenotato({
 }) {
   const [aperto, setAperto] = useState(false);
   const quando = quandoTavolo(b, now);
-  // Compatto (banner sulla mappa, revisore 14/11): "Stasera 21:30 · 2", in una riga, senza spiegazione.
-  const persone = b.people ? (compatto ? `${b.people}` : `${b.people} ${b.people === 1 ? "persona" : "persone"}`) : null;
+  // Compatto (banner sulla mappa, revisore 14/11): "Stasera 21:30 · 2 persone", in una riga, senza spiegazione.
+  const persone = b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null;
   const riga = [conNome ? b.placeName : null, (compatto ? quando.replace(" alle ", " ") : quando) || null, persone].filter(Boolean).join(" · ");
   const muted = scuro ? "text-white/80" : "text-text-muted";
   return (
@@ -76,7 +76,18 @@ export function DomandaPrenotato({
           Non ancora
         </button>
       </div>
-      {altro.length > 0 && (
+      {/* Una sola voce (revisore 14/11): un link diretto, non un "Altro" che ne apre una. */}
+      {altro.length === 1 && (
+        <button
+          type="button"
+          data-testid={altro[0].testid}
+          onClick={altro[0].onClick}
+          className={`mt-1 min-h-10 text-sm font-display font-semibold underline underline-offset-2 ${muted}`}
+        >
+          {altro[0].label}
+        </button>
+      )}
+      {altro.length > 1 && (
         <>
           <button
             type="button"
@@ -104,6 +115,32 @@ export function DomandaPrenotato({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// "Sì" su una richiesta senza giorno o senza ora (TheFork aperto senza sceglierli): "Per quando?" qui,
+// così i promemoria sanno quando ricordarlo. Lo usano la home, la mappa e /prenotazioni.
+export function PerQuando({ b, scuro = false, onFatto }: { b: BookingRequest; scuro?: boolean; onFatto?: () => void }) {
+  const [date, setDate] = useState(b.date ?? "");
+  const [time, setTime] = useState(b.time ?? "");
+  const campo = "min-h-11 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text";
+  return (
+    <div data-testid="prenotazione-quando" className={`mt-2 rounded-btn p-3 ${scuro ? "bg-white/10" : "bg-surface"}`}>
+      <p className={`text-sm font-display font-semibold ${scuro ? "text-white" : "text-text"}`}>Per quando?</p>
+      <div className="mt-2 flex gap-2">
+        <input type="date" aria-label="Giorno" min={dateKey(new Date())} value={date} onChange={(e) => setDate(e.target.value)} className={campo} />
+        <input type="time" aria-label="Ora" value={time} onChange={(e) => setTime(e.target.value)} className={campo} />
+      </div>
+      <button
+        type="button"
+        data-testid="prenotazione-quando-salva"
+        disabled={!date || !time}
+        onClick={() => { updateBooking(b.id, { date, time, confirmed: true }); onFatto?.(); }}
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
+      >
+        <Check size={16} /> Segna prenotato
+      </button>
     </div>
   );
 }

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { CalendarPlus, Check, MessageCircle, MoreHorizontal, Navigation, Phone, Globe, Copy, Trash2, Undo2 } from "lucide-react";
 import {
   bookingStatus,
-  dateKey,
   dayLabel,
   fromKey,
   loadBookings,
@@ -17,6 +16,7 @@ import {
   type BookingRequest,
 } from "@/lib/booking";
 import { track } from "@/lib/track";
+import { PerQuando } from "@/components/domanda-prenotato";
 import PrenotazioniAccount from "@/components/prenotazioni-account";
 import type { StatoAccount } from "@/lib/prenotazioni-sync";
 import { useOptIn } from "@/lib/beta";
@@ -80,9 +80,16 @@ function DateTile({ date, muted }: { date: string | null; muted?: boolean }) {
       aria-hidden
       className={`flex w-14 shrink-0 flex-col items-center justify-center rounded-btn py-2 ${muted ? "bg-surface text-text-muted" : "bg-brand text-white"}`}
     >
-      <span className={`text-[11px] font-display font-semibold uppercase tracking-wide ${muted ? "" : "text-accent"}`}>{d ? WEEK[d.getDay()] : "—"}</span>
-      <span className="font-title text-2xl font-semibold leading-none">{d ? d.getDate() : "?"}</span>
-      <span className="mt-0.5 text-[11px] font-sans">{d ? MONTHS[d.getMonth()] : ""}</span>
+      {d ? (
+        <>
+          <span className={`text-[11px] font-display font-semibold uppercase tracking-wide ${muted ? "" : "text-accent"}`}>{WEEK[d.getDay()]}</span>
+          <span className="font-title text-2xl font-semibold leading-none">{d.getDate()}</span>
+          <span className="mt-0.5 text-[11px] font-sans">{MONTHS[d.getMonth()]}</span>
+        </>
+      ) : (
+        // Senza giorno (revisore 14/11): "Da fissare", non un "?" che sembra un errore.
+        <span data-testid="prenotazione-da-fissare" className="px-1 text-center text-[11px] font-display font-semibold uppercase leading-tight tracking-wide">Da fissare</span>
+      )}
     </div>
   );
 }
@@ -129,35 +136,9 @@ function PlaceName({ b, className }: { b: BookingRequest; className: string }) {
   return <span className={className}>{b.placeName}</span>;
 }
 
-// "Sì, ho prenotato" su una richiesta senza giorno (TheFork aperto dal foglio Prenota senza scegliere
-// prima il giorno): il giorno e l'ora si chiedono qui, così i promemoria sanno quando ricordarlo.
-function ConfermaConGiorno({ b, onFatto }: { b: BookingRequest; onFatto: () => void }) {
-  const [date, setDate] = useState(b.date ?? "");
-  const [time, setTime] = useState(b.time ?? "");
-  const campo = "min-h-11 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text";
-  return (
-    <div data-testid="prenotazione-quando" className="mt-3 rounded-btn bg-surface p-3">
-      <p className="text-sm font-display font-semibold text-text">Per quando?</p>
-      <div className="mt-2 flex gap-2">
-        <input type="date" aria-label="Giorno" min={dateKey(new Date())} value={date} onChange={(e) => setDate(e.target.value)} className={campo} />
-        <input type="time" aria-label="Ora" value={time} onChange={(e) => setTime(e.target.value)} className={campo} />
-      </div>
-      <button
-        type="button"
-        data-testid="prenotazione-quando-salva"
-        disabled={!date || !time}
-        onClick={() => { updateBooking(b.id, { date, time, confirmed: true }); signal("prenotazione_confermata", b); onFatto(); }}
-        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
-      >
-        <Check size={16} /> Segna prenotato
-      </button>
-    </div>
-  );
-}
-
 const VOCE = "flex min-h-11 w-full items-center gap-2 border-b border-border px-3 text-left text-sm font-display font-semibold text-text";
 
-function UpcomingCard({ b }: { b: BookingRequest }) {
+function UpcomingCard({ b, primo = true }: { b: BookingRequest; primo?: boolean }) {
   const status = bookingStatus(b);
   const via = viaDi(b);
   const [altro, setAltro] = useState(false);
@@ -225,7 +206,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
       </div>
       {/* Finché non è confermata (revisore 14/11): in vista solo "Sì, l'ho prenotato" e "Altro";
           Percorso e Calendario servono a tavolo fissato, quindi stanno in "Altro". */}
-      {!confermata && quando && <ConfermaConGiorno b={b} onFatto={() => setQuando(false)} />}
+      {!confermata && quando && <PerQuando b={b} onFatto={() => { signal("prenotazione_confermata", b); setQuando(false); }} />}
       {!confermata && !quando && (
         <div className="mt-3 flex gap-2">
           <button
@@ -235,7 +216,8 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
               if (!b.date || !b.time) { setQuando(true); return; }
               updateBooking(b.id, { confirmed: true }); signal("prenotazione_confermata", b);
             }}
-            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
+            // Corallo pieno solo sulla prima da confermare (revisore 14/11: niente muro corallo); le altre a contorno.
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-pill px-4 text-sm font-display font-semibold active:scale-[0.98] ${primo ? "min-h-11 bg-accent text-white" : "min-h-10 border border-accent bg-white text-accent"}`}
           >
             <Check size={16} /> Sì, l&apos;ho prenotato
           </button>
@@ -346,6 +328,8 @@ export default function PrenotazioniView() {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const { upcoming, past } = splitBookings(list);
+  // Il primo "Sì, l'ho prenotato" da confermare in corallo pieno, gli altri a contorno (revisore 14/11).
+  const primaDaConfermare = upcoming.find((b) => bookingStatus(b) === "inviata")?.id;
   const [sullAccount, setSullAccount] = useState(false);
   const accountAcceso = useOptIn("prenota-account");
   const onStato = useCallback((s: StatoAccount) => setSullAccount(s === "acceso"), []);
@@ -383,7 +367,7 @@ export default function PrenotazioniView() {
               </div>
             ) : (
               <ul className="flex flex-col gap-3">
-                {upcoming.map((b) => <UpcomingCard key={b.id} b={b} />)}
+                {upcoming.map((b) => <UpcomingCard key={b.id} b={b} primo={b.id === primaDaConfermare} />)}
               </ul>
             )}
           </section>
