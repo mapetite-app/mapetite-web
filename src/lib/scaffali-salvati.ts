@@ -19,6 +19,12 @@ export function quartiereDi(p: { lat: number; lng: number }): string | null {
   return best;
 }
 
+// Distanza da te al centro di un quartiere noto (per ordinare gli scaffali a parità di posti); Infinity se ignoto.
+export function distanzaQuartiere(origin: { lat: number; lng: number }, nome: string): number {
+  const z = ZONE.find((x) => x.nome === nome);
+  return z ? metri(origin, z) : Infinity;
+}
+
 // "Vicino a te": il raggio più stretto che tiene almeno 3 salvati (1, 2 o 5 km); null se entro 5 km non c'è niente.
 export const RAGGI_VICINO = [1_000, 2_000, 5_000] as const;
 export function raggioVicino(origin: { lat: number; lng: number }, posti: readonly { lat: number; lng: number }[]): number | null {

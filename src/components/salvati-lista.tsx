@@ -17,7 +17,7 @@ import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 import { fotoUrl } from "@/lib/foto-utenti";
-import { quartiereDi, raggioVicino, tipoPlurale } from "@/lib/scaffali-salvati";
+import { distanzaQuartiere, quartiereDi, raggioVicino, tipoPlurale } from "@/lib/scaffali-salvati";
 import { mappaStatica } from "@/lib/mappa-statica";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
@@ -157,7 +157,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
 }
 
 // Gruppi di una lista per chiave (quartiere, tipo), dal più pieno; i posti restano nell'ordine ricevuto.
-function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null): Gruppo[] {
+function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null, pari?: (a: Gruppo, b: Gruppo) => number): Gruppo[] {
   const m = new globalThis.Map<string, Place[]>();
   for (const p of lista) {
     const k = chiave(p);
@@ -167,7 +167,7 @@ function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null)
     else m.set(k, [p]);
   }
   return [...m.entries()].map(([key, posti]) => ({ key, label: key, n: posti.length, posti }))
-    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, "it"));
+    .sort((a, b) => b.n - a.n || (pari?.(a, b) ?? 0) || a.label.localeCompare(b.label, "it"));
 }
 
 // Tipo di locale (lo stesso della riga) e testo cercato; testi = testo di ogni salvato, calcolato una volta.
@@ -185,7 +185,10 @@ const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese
   // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
   // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
   // Revisore 14/11: il quartiere (Trastevere, Brera) al posto della città quando si sa: la città sta già nelle pillole in alto.
-  const meta = useMemo(() => { const q = quartiereDi(p); return q ? [cardFacts(p, null, false), q].filter(Boolean).join(" · ") : cardFacts(p, null, true); }, [p]);
+  // Revisore 14/11 (secondo giro): mai il quartiere tagliato a metà ("Trast… · 300 m"): se non entra intero va a capo
+  // in una riga nascosta e sparisce; fatti e distanza restano sempre.
+  const quartiere = useMemo(() => quartiereDi(p), [p]);
+  const meta = useMemo(() => cardFacts(p, null, quartiere === null), [p, quartiere]);
   // Revisore 3/11: oltre 50 km la distanza non serve ("474,6 km"); resta la città, intera.
   const dist = origin && distanceMeters(origin, p) < 50_000 ? distanceLabel(origin, p) : null;
   const done = p.tags?.includes(DONE);
@@ -205,10 +208,15 @@ const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese
         <span className={`min-w-0 flex-1 ${haChiuso ? "opacity-70" : ""}`}>
           {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
           <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-          {(meta || dist) && (
-            <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-[13px] text-text-muted">
-              <span className="min-w-0 truncate">{meta}</span>
-              {dist && <span data-testid="salvato-distanza" className="shrink-0">{meta ? "· " : ""}{dist}</span>}
+          {(meta || dist || quartiere) && (
+            <span data-testid="salvato-meta" className="mt-0.5 flex h-[18px] min-w-0 flex-wrap overflow-hidden text-[13px] leading-[18px] text-text-muted">
+              {(meta || dist) && (
+                <span className="flex min-w-0 max-w-full gap-1">
+                  {meta && <span className="min-w-0 truncate">{meta}</span>}
+                  {dist && <span data-testid="salvato-distanza" className="shrink-0">{meta ? "· " : ""}{dist}</span>}
+                </span>
+              )}
+              {quartiere && <span data-testid="salvato-quartiere" className={`shrink-0 whitespace-nowrap ${meta || dist ? "pl-1" : ""}`}>{meta || dist ? "· " : ""}{quartiere}</span>}
             </span>
           )}
           {verdict ? (
@@ -459,7 +467,8 @@ export default function SalvatiLista({
   const shown = useMemo(() => filtraLista(perZona, tipo, cercato, testi), [perZona, tipo, cercato, testi]);
   // Scaffali: quartieri (con il tipo acceso, solo i suoi posti), tipi (con la zona accesa, solo quelli lì).
   // Solo copertine con almeno 2 posti (revisore 8/11: niente "Monti 1").
-  const scaffaleZone = useMemo(() => raggruppa(perTipo, (p) => quartieri.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20), [perTipo, quartieri]);
+  // Revisore 14/11: a parità di posti prima i quartieri vicini a te (senza posizione, in ordine alfabetico).
+  const scaffaleZone = useMemo(() => raggruppa(perTipo, (p) => quartieri.get(p.id) ?? null, origin ? (a, b) => distanzaQuartiere(origin, a.key) - distanzaQuartiere(origin, b.key) : undefined).filter((g) => g.n >= 2).slice(0, 20), [perTipo, quartieri, origin]);
   const scaffaleVicino = useMemo(() => (origin && raggio ? perTipo.filter((p) => distanceMeters(origin, p) <= raggio) : []), [perTipo, origin, raggio]);
   const scaffaleTipi = useMemo(() => raggruppa(perZona, (p) => tipoDi.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20).map((g) => ({ ...g, label: tipoPlurale(g.key) })), [perZona, tipoDi]);
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
@@ -519,15 +528,16 @@ export default function SalvatiLista({
     const ordinati = sort === "recenti" ? [...shown].reverse() : [...shown];
     return ordinati.sort((a, b) => chiuso(a) - chiuso(b));
   }, [shown, origin, sort]);
-  // Sezioni (Lorenzo 8/11): con un tipo acceso la lista si divide per quartiere ("Trastevere", "Monti"…), con una
-  // zona accesa per tipo. Solo se aiuta: almeno 6 posti e 2 sezioni vere; i gruppi seguono l'ordine scelto (il
-  // primo posto della lista apre la prima sezione), "Altre zone" / "Altro" in fondo. Mai mentre si cerca.
+  // Sezioni (Lorenzo 8/11): con un tipo acceso la lista si divide per quartiere ("Trastevere", "Monti"…). Solo se
+  // aiuta: almeno 6 posti e 2 sezioni vere; i gruppi seguono l'ordine scelto (il primo posto della lista apre la
+  // prima sezione), "Altre zone" in fondo. Mai mentre si cerca. Revisore 14/11: con un quartiere acceso niente
+  // titoli per tipo, che ripetevano lo scaffale Tipi appena sopra: resta lo scaffale, che filtra.
   const zonaAccesa = quartiere !== null || vicinoOn;
-  const modoSezioni: "zona" | "tipo" | null = all.length < MIN_SCAFFALI || cercato.trim() !== "" ? null : tipo !== null && !zonaAccesa ? "zona" : zonaAccesa && tipo === null ? "tipo" : null;
+  const modoSezioni = all.length >= MIN_SCAFFALI && cercato.trim() === "" && tipo !== null && !zonaAccesa;
   const { list, sezioneDi } = useMemo(() => {
-    if (modoSezioni === null || ordinata.length < 6) return { list: ordinata, sezioneDi: null };
-    const resto = modoSezioni === "zona" ? "Altre zone" : "Altro";
-    const chiave = (p: Place) => (modoSezioni === "zona" ? quartieri.get(p.id) : tipoDi.get(p.id) && tipoPlurale(tipoDi.get(p.id)!)) || resto;
+    if (!modoSezioni || ordinata.length < 6) return { list: ordinata, sezioneDi: null };
+    const resto = "Altre zone";
+    const chiave = (p: Place) => quartieri.get(p.id) || resto;
     const gruppi = new globalThis.Map<string, Place[]>();
     for (const p of ordinata) {
       const k = chiave(p);
@@ -542,7 +552,7 @@ export default function SalvatiLista({
     const flat: Place[] = [];
     for (const k of ordine) for (const p of gruppi.get(k)!) { flat.push(p); sez.set(p.id, { titolo: k, n: gruppi.get(k)!.length }); }
     return { list: flat, sezioneDi: sez };
-  }, [ordinata, modoSezioni, quartieri, tipoDi]);
+  }, [ordinata, modoSezioni, quartieri]);
   // Un tocco su una riga apre la scheda con l'ordine della lista. Funzione stabile (le righe sono memo).
   const apri = useRef({ onOpen, ids: [] as string[] });
   useEffect(() => { apri.current = { onOpen, ids: list.map((x) => x.id) }; });
@@ -902,8 +912,6 @@ export default function SalvatiLista({
                 </button>
               ))}
             </div>
-            {/* Attribuzione delle copertine a mappa (termini Mapbox/OpenStreetMap), fuori dalle immagini. */}
-            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && schedaOn !== "tipi" && <span data-testid="scaffali-attribuzione" className="ml-auto text-[10px] text-text-muted/80">© Mapbox © OpenStreetMap</span>}
             </div>
             <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {schedaOn === "zone" && (<>
@@ -949,6 +957,8 @@ export default function SalvatiLista({
                 </li>
               </>)}
             </ul>
+            {/* Attribuzione delle copertine a mappa (termini Mapbox/OpenStreetMap): sotto lo scaffale, fuori dalle immagini. */}
+            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && schedaOn !== "tipi" && <p data-testid="scaffali-attribuzione" className="mt-0.5 text-right text-[10px] leading-tight text-text-muted/80">© Mapbox © OpenStreetMap</p>}
           </section>
         )}
 
