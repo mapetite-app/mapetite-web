@@ -100,19 +100,19 @@ const COPERTINA_H = 72;
 function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
-  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 12, undefined, true), [posti]);
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true, "quartieri"), [posti]);
   if (!mappa || rotta) return <>{fallback}</>;
   return (
     <>
       {!pronta && fallback}
       {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
-      <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${pronta ? "opacity-100" : "opacity-0"}`} />
-      {/* Velo: i nomi delle vie e dei quartieri della mappa si attenuano (finivano sotto i puntini, revisore 14/11,
-          terzo giro), con una punta di teal perché la mappa chiara su fondo chiaro non sparisca. */}
-      {pronta && <span className="absolute inset-0 bg-white/40" />}
-      {pronta && <span className="absolute inset-0 bg-brand/[0.06]" />}
+      <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 [filter:brightness(0.62)_contrast(4)] ${pronta ? "opacity-100" : "opacity-0"}`} />
+      {/* Revisore 14/11, quarto giro: copertine "slavate". Niente più velo bianco (i nomi dei quartieri sono spenti
+          nella mappa stessa). Lo stile chiaro di Mapbox ha strade bianche su grigio quasi bianco (4% di differenza):
+          prima si scurisce e poi si alza il contrasto, così isolati grigi e strade bianche si leggono. Puntini più grandi. */}
+      {pronta && <span className="absolute inset-0 bg-brand/[0.05]" />}
       {pronta && mappa.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55).map((pt, i) => (
-        <span key={i} data-testid="scaffale-puntino" className="absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
+        <span key={i} data-testid="scaffale-puntino" className="absolute h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
       ))}
       {pronta && badge && (
         <span className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[13px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{badge}</span>
@@ -647,6 +647,25 @@ export default function SalvatiLista({
   const schede = ([vediZone && { key: "zone", label: "Zone" }, vediTipi && { key: "tipi", label: "Tipi" }, vediRaccolte && { key: "raccolte", label: "Raccolte" }] as const)
     .filter((x): x is { key: "zone" | "tipi" | "raccolte"; label: string } => !!x);
   const schedaOn = schede.find((x) => x.key === scheda)?.key ?? schede[0]?.key ?? null;
+  // Revisore 14/11, quarto giro: toccando una zona si passa alla scheda Tipi ma la fila restava scorsa (prima
+  // copertina tagliata, senza margine). A ogni cambio di scheda o di filtro la fila torna all'inizio.
+  const scaffaleRef = useRef<HTMLUListElement | null>(null);
+  useEffect(() => {
+    if (scaffaleRef.current) scaffaleRef.current.scrollLeft = 0;
+  }, [schedaOn, quartiere, tipo, vicinoOn, raccolta, statoOn]);
+  // Fila dei filtri accesi e degli stati: se scorre, sfumatura a destra (a 360 "Ci sono stato" era tagliato secco).
+  const comandiRef = useRef<HTMLDivElement | null>(null);
+  const [comandiScorre, setComandiScorre] = useState(false);
+  useEffect(() => {
+    const el = comandiRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const misura = () => setComandiScorre(el.scrollWidth > el.clientWidth + 1 && el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    el.addEventListener("scroll", misura, { passive: true });
+    misura();
+    return () => { ro.disconnect(); el.removeEventListener("scroll", misura); };
+  }, [quartiere, tipo, vicinoOn, raccolta, statoOn, all.length]);
   const tipoAcceso = tipo === null ? null : { label: tipoPlurale(tipo), emoji: tipi.find((t) => t.label === tipo)?.emoji ?? "🍽️" };
   // Pillole dei filtri accesi, ognuna si toglie da sola (la ✕): zona, tipo, raccolta. Lo stato ha le sue due pillole.
   const attivi = [
@@ -892,7 +911,7 @@ export default function SalvatiLista({
           // Lorenzo 8/11: in alto solo gli stati e i filtri accesi (ognuno con la sua ✕); quartieri, tipi e raccolte
           // stanno negli scaffali sotto. Niente doppioni: la stessa scelta in un posto solo.
           // Revisore 14/11: una fila sola che scorre (con una zona accesa la sua pillola restava da sola su una riga).
-          <div data-testid="salvati-comandi" className="-mx-4 mt-1.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
+          <div ref={comandiRef} data-testid="salvati-comandi" data-scorre={comandiScorre ? "true" : undefined} className={`-mx-4 mt-1.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none] ${comandiScorre ? "[mask-image:linear-gradient(to_right,#000_calc(100%-36px),transparent)]" : ""}`}>
             {attivi.length > 0 && (
               <div role="group" aria-label="Filtri accesi" data-testid="salvati-filtri-accesi" className="contents">
                 {attivi.map((f) => (
@@ -936,7 +955,7 @@ export default function SalvatiLista({
               ))}
             </div>
             </div>
-            <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+            <ul ref={scaffaleRef} role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {schedaOn === "zone" && (<>
                 {nVicino > 0 && (
                   <CopertinaScaffale

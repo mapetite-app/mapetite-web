@@ -47,7 +47,7 @@ export function nucleo<T extends Punto>(punti: readonly T[], raggio = RAGGIO_GRU
 // raggio: quanto può essere largo il gruppo; la mappa grande del profilo ne tiene di più delle copertine.
 // baricentro: la vista si centra sulla media dei posti, non sul centro del riquadro che li contiene (revisore 14/11,
 // terzo giro: con un posto isolato a un lato il gruppo finiva in un angolo e i nomi delle vie stavano al centro).
-export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12, raggio = RAGGIO_GRUPPO_M, baricentro = false): MappaStatica | null {
+export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12, raggio = RAGGIO_GRUPPO_M, baricentro = false, spegni: "citta" | "quartieri" = "citta"): MappaStatica | null {
   const vista = nucleo(punti, raggio).slice(0, 12);
   if (!token || vista.length === 0) return null;
   const xs = vista.map((p) => mx(p.lng));
@@ -67,7 +67,10 @@ export function mappaStatica(punti: readonly Punto[], w: number, h: number, toke
   // Logo e attribuzione nel riquadro coprirebbero metà copertina: l'attribuzione è scritta sotto gli scaffali.
   // Revisore 14/11: "Rome" in inglese sulla mappa. Le immagini statiche non accettano la lingua (provato:
   // language=it è ignorato), quindi l'etichetta delle grandi città si spegne; i quartieri restano.
-  const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&setfilter=${SENZA_CITTA}&layer_id=settlement-major-label&access_token=${token}`;
+  // Copertine (revisore 14/11, quarto giro): i nomi dei quartieri ("TESTACCIO", "TR") finivano sotto i puntini e
+  // ripetevano l'etichetta scritta sotto: lì si spengono quelli (l'API ne filtra un livello solo per immagine).
+  const livello = spegni === "quartieri" ? "settlement-subdivision-label" : "settlement-major-label";
+  const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&setfilter=${SENZA_CITTA}&layer_id=${livello}&access_token=${token}`;
   const dentro = vista.map((p, i) => ({
     i,
     x: Math.round(((mx(p.lng) - cx) * scala + w / 2) / w * 1000) / 10,

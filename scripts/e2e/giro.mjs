@@ -2817,7 +2817,16 @@ else {
         await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Trastevere,/ }).click();
         ok((await S.getByTestId("salvati-sezione").count()) === 0 && (await S.getByTestId("scaffali-scheda").filter({ hasText: "Tipi" }).count()) === 1, `scaffali ${width}px: con Trastevere acceso c'è lo scaffale Tipi e niente titoli per tipo (niente doppione)`);
         ok((await S.getByTestId("salvato-quartiere").count()) === 0, `scaffali ${width}px: con Trastevere acceso le righe non ripetono il quartiere`);
-        await S.getByRole("button", { name: "Togli Trastevere" }).click(); }
+        await S.getByRole("button", { name: "Togli Trastevere" }).click();
+        // Revisore 14/11 (quarto giro): toccando una zona scorsa (terza copertina) la scheda Tipi parte dall'inizio,
+        // con la prima copertina intera e il suo margine.
+        await scheda("Zone");
+        await ps.evaluate(() => { const u = document.querySelector("[data-testid=scaffale-zone]"); if (u) u.scrollLeft = 220; });
+        await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Monti,/ }).click();
+        await ps.waitForTimeout(150);
+        const sc = await ps.evaluate(() => { const u = document.querySelector("[data-testid=scaffale-tipi]"); const li = u?.querySelector("li, button"); return u ? { sl: Math.round(u.scrollLeft), x: Math.round(li?.getBoundingClientRect().left ?? -1) } : null; });
+        ok(!!sc && sc.sl === 0 && sc.x >= 12, `scaffali ${width}px: dopo una zona scorsa la scheda Tipi riparte dall'inizio (scorrimento ${sc?.sl}, prima copertina a ${sc?.x}px)`);
+        await S.getByRole("button", { name: "Togli Monti" }).click(); }
       // In qualunque ordine (revisore 8/11): tipo, poi zona, poi raccolta, poi stato; la scheda Raccolte resta con zona e
       // tipo accesi e conta solo i posti rimasti.
       await scheda("Tipi");
