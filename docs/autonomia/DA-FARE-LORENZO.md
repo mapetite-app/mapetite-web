@@ -56,7 +56,7 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 10. **Prenotazioni vere: richieste a Quandoo e TheFork — APERTA dall'8/11, 10 minuti.** Bozze pronte in `PARTNER.md` (API partner o affiliate per disponibilità e prenotazione per conto dell'utente, con commissione). Sono l'unico modo pulito per l'"assistente che prenota da solo". Le mandi tu (Claude non contatta nessuno).
 
-11. **Privacy: avvocato ed età minima — APERTA dall'8/11, una decisione.** Prima di aprire l'app al pubblico: far rivedere `/privacy` (nuova sezione "Profilo pubblico e amici") e scegliere l'età minima alla registrazione (14 anni è il minimo in Italia per il consenso; oppure 16 o 18).
+11. **Privacy: avvocato ed età minima — APERTA dall'8/11, una decisione.** Prima di aprire l'app al pubblico: far rivedere `/privacy` (sezione "Profilo pubblico e amici", con le righe nuove del 14/11 su link d'invito che rende amici e "Trova amici dalla rubrica") e scegliere l'età minima alla registrazione (14 anni è il minimo in Italia per il consenso; oppure 16 o 18).
 
 ## Fatte
 
