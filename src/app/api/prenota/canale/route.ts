@@ -69,6 +69,10 @@ function scarica(u: URL, fine: number): Promise<Risposta> {
       res.on("error", chiudi);
     });
     req.on("timeout", () => req.destroy(new Error("tempo scaduto")));
+    // Tempo massimo per la lettura intera, non solo tra un pezzo e l'altro (minore del 30/10: un sito
+    // che manda la pagina a gocce teneva aperta la richiesta ben oltre i 3 secondi).
+    const scade = setTimeout(() => req.destroy(new Error("tempo scaduto")), Math.max(200, fine - Date.now()));
+    req.on("close", () => clearTimeout(scade));
     req.on("error", reject);
   });
 }
@@ -114,8 +118,11 @@ export async function GET(request: Request) {
   const m = memoria.get(chiave);
   if (m && Date.now() - m.at < DURATA) return NextResponse.json({ canale: m.canale }, CACHE);
   if (troppe(clientKey(request))) return NextResponse.json({ canale: null }, { status: 429 });
+  const t0 = Date.now();
   const pagina = await leggi(u);
   const canale = pagina ? canaleDaUrl(pagina.url) ?? trovaCanale(pagina.html, pagina.url) : null;
+  // Registro nel log di Vercel (BACKLOG 1/11: "serve sapere cosa legge"): solo il dominio, mai la pagina.
+  console.log(`[prenota-canale] ${u.hostname} letta=${pagina ? "si" : "no"} kb=${pagina ? Math.round(pagina.html.length / 1024) : 0} ms=${Date.now() - t0} canale=${canale?.piattaforma ?? "nessuno"}`);
   if (memoria.size > 2000) memoria.clear();
   memoria.set(chiave, { canale, at: Date.now() });
   return NextResponse.json({ canale }, CACHE);

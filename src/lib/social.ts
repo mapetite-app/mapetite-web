@@ -49,6 +49,8 @@ export type InArrivo = { stato: "in-arrivo" };
 // Creator e critici (piano 5.6b): lo decide solo Mapetite (migrazione 20261016_creator.sql).
 export type CreatorInfo = { id: string; tipo: string | null };
 
+// Righe pubbliche lette per un profilo (anche contaStati in social-view lo sa: oltre, valgono i contatori).
+export const MAX_POSTI_PROFILO = 300;
 const PROFILE_COLUMNS = "id, handle, display_name, bio, city, visitati, da_provare, seguaci, seguiti";
 const SAVED_COLUMNS = "user_id, handle, display_name, place_id, tags, created_at, name, category, address, lat, lng";
 
@@ -62,6 +64,7 @@ type FakeSocial = {
   profili?: PublicProfile[];
   salvati?: PublicSaved[];
   seguo?: string[];
+  miei?: string[]; // UUID dei locali salvati da chi guarda ("In comune", "Salva anche tu")
   mio?: MySocial;
   creator?: CreatorInfo[];
   scopritori?: ScopritoreRow[]; // assente = migrazione 20261016_scopritori non applicata
@@ -107,6 +110,21 @@ export async function followedIds(userId: string): Promise<string[] | InArrivo> 
   return (data ?? []).map((r) => r.followed_id as string);
 }
 
+// UUID dei locali salvati da chi guarda (solo i propri, RLS): "In comune" e "Salva anche tu" sul
+// profilo di un altro. Se la lettura fallisce si torna a un insieme vuoto (nessun "In comune").
+export async function myPlaceIds(userId: string): Promise<Set<string>> {
+  const f = await fake();
+  if (f === "in-arrivo") return new Set();
+  if (f) return new Set(f.miei ?? []);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("saved_places").select("place_id").eq("user_id", userId).limit(2000);
+  if (error) {
+    console.error(`[social] miei salvati: ${error.code ?? ""} ${error.message}`);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.place_id as string));
+}
+
 // ── Profilo pubblico /u/<handle> ─────────────────────────────────────────────
 export type ProfilePage =
   | InArrivo
@@ -140,7 +158,7 @@ export const loadProfilePage = cache(async (rawHandle: string): Promise<ProfileP
         .select(SAVED_COLUMNS)
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
-        .limit(300);
+        .limit(MAX_POSTI_PROFILO);
       if (sErr) logMissing("salvati_pubblici", sErr);
       places = (s as PublicSaved[] | null) ?? [];
     }

@@ -2,6 +2,7 @@ import { avvioStartupImages } from "@/lib/avvio";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import OfflineBanner from "@/components/offline-banner";
+import { PrenotazionePopup } from "@/components/prenotazione-avvisi";
 import NavBar from "@/components/nav-bar";
 import { getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
@@ -108,6 +109,8 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: VARIANTI_SCRIPT + INTRO_SCRIPT }} />
         <NavBar userId={userId} />
         <OfflineBanner />
+        {/* "Tra 2 ore da…" (Lorenzo, 8/11): all'apertura dell'app, una volta per prenotazione. */}
+        <PrenotazionePopup />
         {/*
           Pagine normali (non fixed): pb uguale all'altezza della navbar (safe area inclusa) evita che il contenuto finisca
           sotto la navbar mobile; md:pt-14 fa scendere il contenuto sotto

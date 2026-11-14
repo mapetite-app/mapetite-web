@@ -3,6 +3,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { isStateTag } from "@/lib/tags";
+import { quartiereDi } from "@/lib/scaffali-salvati";
 
 // Un posto di un'altra persona (profilo pubblico, feed degli amici). Solo dati pubblici:
 // nome, tipo, città, stato e raccolte. Mai la nota privata (non arriva nemmeno dal database).
@@ -12,41 +13,57 @@ type Spot = {
   category: string | null;
   address: string | null;
   tags: string[] | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
+// Revisore 14/11: come nei Salvati, il quartiere (Roma e Milano) prima della città.
 function meta(s: Spot): string {
-  return [categoryLabel(s.category), cityFromAddress(s.address)].filter(Boolean).join(" · ");
+  const q = s.lat != null && s.lng != null ? quartiereDi({ lat: Number(s.lat), lng: Number(s.lng) }) : null;
+  return [categoryLabel(s.category), q ?? cityFromAddress(s.address)].filter(Boolean).join(" · ");
+}
+
+// Revisore 14/11 (secondo giro): lo stato era detto in tre modi (testo "· Provato", pillola corallo, pillola teal
+// dei Salvati). Ora una sola forma, quella dei Salvati: teal per chi c'è stato, grigio per da provare.
+const STATO = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
+export function StatoPillola({ provato }: { provato: boolean }) {
+  return (
+    <span data-testid="posto-persona-stato" className={`${STATO} ${provato ? "bg-[#e3eded] text-brand" : "bg-[#f0f2f2] font-medium text-[#6b7075]"}`}>
+      <span aria-hidden className="text-[10px] leading-none">{provato ? "✓" : "📌"}</span>
+      {provato ? "Provato" : "Da provare"}
+    </span>
+  );
 }
 
 /** Riga compatta per le liste del profilo. */
-export function PostoRiga({ spot, verdict = null }: { spot: Spot; verdict?: string | null }) {
+// showState=false: sotto un titolo che dice già lo stato ("Di recente", "Da provare") la pillola è un doppione.
+export function PostoRiga({ spot, verdict = null, showState = true }: { spot: Spot; verdict?: string | null; showState?: boolean }) {
   const visited = !!spot.tags?.includes("Già visitato");
   const raccolte = (spot.tags ?? []).filter((t) => !isStateTag(t)).slice(0, 2);
   return (
     <Link
       href={`/locali/${spot.place_id}`}
       data-testid="posto-persona"
-      className="flex items-center gap-3 rounded-card border border-border bg-white p-3 shadow-card active:scale-[0.99] transition-transform duration-150"
+      className="flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white p-3 shadow-card active:scale-[0.99] transition-transform duration-150"
     >
-      <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
+      {/* Revisore 14/11: stesso linguaggio dei Salvati e del profilo (riquadro grigio, nome in serif, verdetto in corsivo). */}
+      <span aria-hidden className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] bg-[#f6f7f7] text-[26px] leading-none">
         {getCategoryEmoji(spot.category, spot.name)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-display text-[15px] font-semibold text-text">{spot.name}</span>
-        {meta(spot) && <span className="mt-0.5 block truncate text-xs font-sans text-text-muted">{meta(spot)}</span>}
-        {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 text-[13px] font-sans leading-snug text-text">{verdict}</span>}
-        {raccolte.length > 0 && (
-          <span className="mt-1 flex flex-wrap gap-1">
+        <span className="block truncate font-[family-name:var(--font-newsreader)] text-[19px] font-medium leading-tight tracking-[-0.01em] text-text">{spot.name}</span>
+        {meta(spot) && <span className="mt-0.5 block truncate text-[13px] font-sans text-text-muted">{meta(spot)}</span>}
+        {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 font-[family-name:var(--font-newsreader)] text-[15px] italic leading-snug text-[#4a4f55]">{verdict}</span>}
+        {(showState || raccolte.length > 0) && (
+          <span className="mt-1 flex flex-wrap gap-1.5">
+            {showState && <StatoPillola provato={visited} />}
             {raccolte.map((t) => (
-              <span key={t} className="max-w-full truncate rounded-pill bg-surface px-2 py-0.5 text-[11px] font-display font-medium text-brand">
+              <span key={t} className="inline-flex h-[22px] max-w-full items-center truncate rounded-pill bg-surface px-2 text-[11.5px] font-medium text-brand">
                 {t}
               </span>
             ))}
           </span>
         )}
-      </span>
-      <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-display font-semibold ${visited ? "bg-accent-light text-accent" : "bg-brand/10 text-brand"}`}>
-        {visited ? "✓ Provato" : "📌 Da provare"}
       </span>
     </Link>
   );

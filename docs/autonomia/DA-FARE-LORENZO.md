@@ -54,6 +54,10 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
    - L'account demo Sofia non c'è in produzione (prova dal vivo dell'8/11): dal computer `DEMO_PASSWORD='la-tua-password' node scripts/demo/crea-account-demo.mjs`. La password la scegli tu: per questo non la crea il team.
    - Le foto: alle 3 di notte dell'8/11 Google rispondeva "quota finita" su metà delle foto (la quota foto è a 100 al giorno, il tuo tetto è 200). Se vuoi le foto sicure in demo, alzala a 200 su console.cloud.google.com → Places API (New) → Quote. Decidi tu: il team non tocca le quote.
 
+10. **Prenotazioni vere: richieste a Quandoo e TheFork — APERTA dall'8/11, 10 minuti.** Bozze pronte in `PARTNER.md` (API partner o affiliate per disponibilità e prenotazione per conto dell'utente, con commissione). Sono l'unico modo pulito per l'"assistente che prenota da solo". Le mandi tu (Claude non contatta nessuno).
+
+11. **Privacy: avvocato ed età minima — APERTA dall'8/11, una decisione.** Prima di aprire l'app al pubblico: far rivedere `/privacy` (nuova sezione "Profilo pubblico e amici") e scegliere l'età minima alla registrazione (14 anni è il minimo in Italia per il consenso; oppure 16 o 18).
+
 ## Fatte
 
 - **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.

@@ -6,10 +6,16 @@ import { Lock, Globe } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/handle";
+import { elenco, NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 // Impostazioni del profilo pubblico (piano 5.1) dentro /profilo: nome pubblico (handle), nome,
 // città, una riga su di sé e l'interruttore "Profilo pubblico" (spento di default).
 // Scrive su profiles con la sessione dell'utente (RLS: solo il proprio profilo).
+// Privacy (8/11): accendere "pubblico" apre prima un foglio che dice cosa vedranno gli altri e cosa
+// mai (consenso informato); spegnerlo salva subito, in un tocco (revoca immediata).
+// Cosa vedono gli altri: deve restare uguale a quello che escono dalle viste pubbliche
+// (profili_pubblici, salvati_pubblici, classifica_pubblica, recensioni/foto/contenuti_pubblici) e
+// con la sezione "Profilo pubblico e amici" di /privacy (stesse voci, stesso ordine).
 export type MySocialInitial = {
   handle: string | null;
   display_name: string | null;
@@ -27,6 +33,7 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
   const [isPublic, setIsPublic] = useState(initial?.is_public ?? false);
   const [state, setState] = useState<"idle" | "salvo" | "fatto" | "errore">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [conferma, setConferma] = useState(false);
 
   if (!initial || !saved) {
     return (
@@ -43,10 +50,10 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
   const dirty =
     handle !== (saved.handle ?? "") || name !== (saved.display_name ?? "") || city !== (saved.city ?? "") || bio !== (saved.bio ?? "") || isPublic !== saved.is_public;
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async (e?: React.FormEvent, pub: boolean = isPublic) => {
+    e?.preventDefault();
     setError(null);
-    if (isPublic && handle === "") {
+    if (pub && handle === "") {
       setError("Per rendere pubblico il profilo scegli prima un nome pubblico.");
       return;
     }
@@ -62,7 +69,7 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
       display_name: name.trim().slice(0, 40) || null,
       city: city.trim().slice(0, 40) || null,
       bio: bio.trim().slice(0, 160) || null,
-      is_public: isPublic,
+      is_public: pub,
     };
     const { error: err } = await client.from("profiles").update({ ...next, updated_at: new Date().toISOString() }).eq("id", userId);
     if (err) {
@@ -134,7 +141,18 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
               role="switch"
               name="is_public"
               checked={isPublic}
-              onChange={(e) => { setIsPublic(e.target.checked); setState("idle"); }}
+              onChange={(e) => {
+                setState("idle");
+                if (e.target.checked) {
+                  // Già pubblico (spento e riacceso senza salvare): niente foglio, era già stato confermato.
+                  if (saved.is_public) setIsPublic(true);
+                  else setConferma(true);
+                } else {
+                  // Tornare privato: subito, senza "Salva" (revoca in un tocco).
+                  setIsPublic(false);
+                  if (saved.is_public) void save(undefined, false);
+                }
+              }}
               aria-checked={isPublic}
               className="peer sr-only"
             />
@@ -142,8 +160,10 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
           </label>
           <p data-testid="privacy-testo" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
             {isPublic
-              ? "Chiunque abbia il link vedrà nome, città, i posti dove sei stato o vuoi andare e le tue raccolte. Le note private non si vedono mai. Puoi tornare privato quando vuoi."
-              : "Spento: nessuno vede il tuo profilo né i tuoi posti. Se lo accendi, chi ha il link vedrà nome, città, i posti e le raccolte, mai le note private."}
+              // Terzo revisore 8/11: lo stesso testo del foglio e di /privacy (src/lib/privacy-profilo.ts), non un riassunto diverso.
+              ? `${PUBBLICO_CHI}: ${elenco(PUBBLICO_VEDONO)} Mai: ${PUBBLICO_MAI.join(", ")}. ${PUBBLICO_REVOCA}`
+              : "Spento: nessuno vede il tuo profilo né i tuoi posti. Note e “Non fa per me” restano sempre private."}{" "}
+            <Link href="/privacy#profilo-pubblico" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
           </p>
         </div>
 
@@ -157,6 +177,50 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
           {state === "salvo" ? "Salvo…" : state === "fatto" && !dirty ? "✓ Salvato" : "Salva"}
         </button>
       </form>
+
+      {conferma && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center" data-testid="conferma-pubblico">
+          <button type="button" aria-label="Annulla" onClick={() => setConferma(false)} className="absolute inset-0 bg-black/40" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conferma-pubblico-titolo"
+            className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-t-[24px] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3 shadow-float"
+          >
+            <span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+            <h3 id="conferma-pubblico-titolo" className="font-title text-lg font-semibold text-brand">Rendere pubblico il profilo?</h3>
+            <p className="mt-1 text-sm text-text">{PUBBLICO_CHI}:</p>
+            <ul data-testid="conferma-visibile" className="mt-2 space-y-1.5 rounded-card border border-border bg-surface px-4 py-3 text-sm text-text">
+              {PUBBLICO_VEDONO.map((c) => (
+                <li key={c} className="flex gap-2"><Globe size={14} aria-hidden className="mt-0.5 shrink-0 text-accent" />{c}</li>
+              ))}
+            </ul>
+            <p data-testid="conferma-mai" className="mt-3 flex gap-2 text-sm text-text">
+              <Lock size={14} aria-hidden className="mt-0.5 shrink-0 text-brand" />
+              <span><span className="font-semibold">Mai:</span> {PUBBLICO_MAI.join(", ")}.</span>
+            </p>
+            <p data-testid="conferma-nota" className="mt-2 text-xs text-text-muted">{NON_FA_PER_ME_NOTA} {PUBBLICO_REVOCA}</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                data-testid="conferma-pubblico-si"
+                onClick={() => { setConferma(false); setIsPublic(true); void save(undefined, true); }}
+                className="flex min-h-12 w-full items-center justify-center rounded-pill bg-accent px-5 text-sm font-display font-semibold text-white active:scale-[0.99]"
+              >
+                Rendi pubblico
+              </button>
+              <button
+                type="button"
+                data-testid="conferma-pubblico-no"
+                onClick={() => setConferma(false)}
+                className="flex min-h-12 w-full items-center justify-center rounded-pill border border-border px-5 text-sm font-display font-semibold text-brand active:scale-[0.99]"
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {live && saved.handle && (
         <div data-testid="profilo-condividi" className="mt-4 border-t border-border pt-4">

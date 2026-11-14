@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 14/11/2026 (sabato, CEO che chiude — tema scelta in gruppo e posti non di massa)
+
+### 55. "Tre, non trenta": la scelta ristretta a 3 posti diversi tra loro
+- **Problema:** `PROBLEMI.md` 24: davanti a troppe opzioni non si decide (il 14% si dice indeciso, oltre 13 minuti sulle recensioni secondo TheFork, dato letto solo dall'estratto).
+- **Cosa fa:** in fondo ai risultati e in "Stasera dove andiamo?", un tasto "Scegli tra 3": restano 3 posti che non si somigliano (per esempio uno vicino, uno nuovo per te, un 💎 poco conosciuto), ognuno con una riga "perché questo" presa dal verdetto già calcolato. Si torna alla lista con un tocco.
+- **Da dove nasce:** Google e TheFork danno elenchi lunghi; Places sceglie a mano ma per tutti. Nessuno restringe sui gusti della persona e dice perché proprio quei tre.
+- **Valore per l'utente:** decidere in un minuto. **Per il ristoratore:** il posto di quartiere compare accanto a quello famoso invece di finire in fondo alla lista (la scelta dei 3 non usa il numero di recensioni: VISIONE).
+- **Sforzo:** S (solo scelta e ordine sui risultati già arrivati). **Costo Google/Haiku:** zero chiamate in più.
+- **Stato proposto:** PRONTA.
+
+### 56. "Manda al gruppo": i 3 posti su WhatsApp, si vota senza app
+- **Problema:** `PROBLEMI.md` 24: i sondaggi di WhatsApp contengono solo parole, non posti; le nostre liste di gruppo chiedono di iscriversi prima di vedere i posti.
+- **Cosa fa:** dai "3" (proposta 55) o da una raccolta, "Manda al gruppo" crea un link con foto, nome, zona e verdetto dei posti; chi lo apre vota con un tocco senza account (basta un nome), vede chi ha votato cosa, e il voto si chiude all'ora scelta ("entro le 18"). Chi ha proposto riceve il vincitore e il tasto "Prenota". Iscriversi è un invito alla fine, mai un obbligo per votare.
+- **Da dove nasce:** WhatsApp ha i sondaggi ([Money.it](https://www.money.it/come-fare-sondaggio-su-whatsapp)) e sta aggiungendo la chiusura a orario ([Smartworld](https://www.smartworld.it/news/whatsapp-gruppi-novita-sondaggi-tutti-creazione-rapida.html)); Corner e Albo condividono liste, ma non fanno votare chi non ha l'app. Noi uniamo i due pezzi, con il verdetto onesto dentro.
+- **Valore per l'utente:** la serata decisa in chat in pochi minuti. **Per l'app:** ogni link porta amici nuovi che vedono Mapetite funzionare senza installarlo. **Per il ristoratore:** un gruppo già deciso a uscire che vota il suo locale (dato aggregato per il pannello).
+- **Sforzo:** M (pagina pubblica del voto, una tabella voti con limiti anti-abuso, riuso dei gruppi esistenti). **Costo Google/Haiku:** zero chiamate in più (foto solo dei 3 posti, entro la quota foto di 200/giorno).
+- **Stato proposto:** PRONTA (con un revisore di design: la pagina del voto deve stare in una schermata a 390×844).
+
+### 57. "Chiocciola Slow Food" sulla scheda, con un accordo con Slow Food Editore
+- **Problema:** VISIONE: far emergere i posti non di massa ma buoni; oggi lo deduciamo solo dalle recensioni Google (`PROBLEMI.md` 22).
+- **Cosa fa:** sulla scheda e sulla card, un segno discreto "Chiocciola Slow Food 2027" per i locali premiati dalla guida Osterie d'Italia, con link all'app ufficiale. Solo con dati avuti da Slow Food Editore per accordo: niente lettura delle loro pagine.
+- **Da dove nasce:** la guida 2027 premia 335 locali su 1.952 recensiti ([Dissapore](https://www.dissapore.com/ristoranti/le-migliori-osterie-ditalia-del-2027-secondo-slow-food-regione-per-regione/)) e ha un'app propria con acquisti interni ([App Store](https://apps.apple.com/app/id6752800992)). Nessuna app di salvataggio la mostra. È un segnale scritto da persone e non legato al numero di recensioni.
+- **Valore per l'utente:** la trattoria vera riconoscibile a colpo d'occhio. **Per il ristoratore:** il premio porta clienti tutto l'anno, non solo a chi compra la guida. **Per Slow Food:** lettori nuovi verso la guida e l'app.
+- **Sforzo:** L (accordo, poi S per mostrare il segno). **Costo Google/Haiku:** zero.
+- **Stato proposto:** DA DECIDERE LORENZO: "Scriviamo a Slow Food Editore per mostrare la Chiocciola sulle schede, con link alla loro app?" (bozza in `PARTNER.md`).
+
 ## 8/11/2026 (domenica, CEO che chiude — tema tester e primo accesso). Dal 9/11.
 
 ### 53. "Questo mese ne provo 3": obiettivo legato ai tuoi "Da provare"
