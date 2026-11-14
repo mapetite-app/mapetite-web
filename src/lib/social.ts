@@ -49,6 +49,8 @@ export type InArrivo = { stato: "in-arrivo" };
 // Creator e critici (piano 5.6b): lo decide solo Mapetite (migrazione 20261016_creator.sql).
 export type CreatorInfo = { id: string; tipo: string | null };
 
+// Righe pubbliche lette per un profilo (anche contaStati in social-view lo sa: oltre, valgono i contatori).
+export const MAX_POSTI_PROFILO = 300;
 const PROFILE_COLUMNS = "id, handle, display_name, bio, city, visitati, da_provare, seguaci, seguiti";
 const SAVED_COLUMNS = "user_id, handle, display_name, place_id, tags, created_at, name, category, address, lat, lng";
 
@@ -156,7 +158,7 @@ export const loadProfilePage = cache(async (rawHandle: string): Promise<ProfileP
         .select(SAVED_COLUMNS)
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
-        .limit(300);
+        .limit(MAX_POSTI_PROFILO);
       if (sErr) logMissing("salvati_pubblici", sErr);
       places = (s as PublicSaved[] | null) ?? [];
     }
