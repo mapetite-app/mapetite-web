@@ -1,7 +1,8 @@
 import { Link2 } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
 import NomePerInvito from "@/components/nome-per-invito";
-import { invitePath, myInviteCode } from "@/lib/invito";
+import NuovoLink from "@/components/nuovo-link";
+import { invitePath, isFriendCode, myInviteCode } from "@/lib/invito";
 
 // "Invita un amico" nel profilo e in Amici (piano 9.1): il proprio link /invito/<nome> da mandare su
 // WhatsApp o dove si vuole (menu di condivisione del telefono, altrimenti copia il link).
@@ -45,6 +46,7 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
         {senzaNome ? <NomePerInvito /> : <div className="relative mt-4">
           {condividi("w-full min-h-12 border-0 bg-accent! text-[15px] text-white!", "Manda il tuo link")}
           <p data-testid="invita-amico-link" data-path={path} className="mt-2 text-xs font-sans text-white/65">Il tuo link d&apos;invito si apre anche senza l&apos;app.</p>
+          {isFriendCode(codice) && <NuovoLink />}
         </div>}
         {privato && (
         <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
@@ -72,6 +74,7 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
         </p>
         {condividi("shrink-0 border-0", "Condividi")}
       </div>}
+      {!senzaNome && isFriendCode(codice) && <NuovoLink />}
       {privato && (
         <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
           Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.

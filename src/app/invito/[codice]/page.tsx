@@ -5,7 +5,7 @@ import InvitoArrivo from "@/components/invito-arrivo";
 import { loadProfilePage, viewerId, type PublicProfile } from "@/lib/social";
 import { isValidHandle, personName } from "@/lib/handle";
 import { cleanInviteCode, isFriendCode } from "@/lib/invito";
-import { anteprimaInvito, loadMySocial } from "@/lib/social";
+import { anteprimaInvito, loadMySocial, mioInvito } from "@/lib/social";
 import InvitoAccetta from "@/components/invito-accetta";
 
 // Pagina d'arrivo del link d'invito (piano 9.1): chi la apre capisce in una frase cos'è Mapetite
@@ -21,11 +21,13 @@ const GENERICI: Record<string, string> = {
   amici: "Ti hanno invitato su Mapetite",
 };
 
-// Link personale di un amico (codice "i-…", 14/11): il nome che si è scelto chi invita.
-async function amico(codice: string | null): Promise<string | null> {
+// Link personale di un amico (codice "i-…", 14/11): chi invita (null se il codice non esiste più, per
+// esempio dopo "Nuovo link") e il nome che si è scelto.
+// "errore": database o rete giù, non si sa (testo neutro, mai "non vale più").
+async function amico(codice: string | null): Promise<{ nome: string | null } | null | "errore"> {
   if (!isFriendCode(codice)) return null;
   const a = await anteprimaInvito(codice);
-  return a && a !== "errore" ? a.nome : null;
+  return a === "errore" ? a : a ? { nome: a.nome } : null;
 }
 
 async function inviter(codice: string | null): Promise<PublicProfile | null> {
@@ -36,8 +38,8 @@ async function inviter(codice: string | null): Promise<PublicProfile | null> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const codice = cleanInviteCode((await params).codice);
-  const [p, nomeAmico] = await Promise.all([inviter(codice), amico(codice)]);
-  const chi = p ? personName(p) : nomeAmico;
+  const [p, a] = await Promise.all([inviter(codice), amico(codice)]);
+  const chi = p ? personName(p) : a && a !== "errore" ? a.nome : null;
   const title = chi ? `${chi} ti invita su Mapetite` : "Un invito per te su Mapetite";
   const description = "La tua mappa dei locali: salva i posti che scopri sui social o dagli amici e ritrovali quando devi scegliere.";
   return {
@@ -55,12 +57,16 @@ const PUNTI = [
 
 export default async function InvitoPage({ params }: Props) {
   const codice = cleanInviteCode((await params).codice);
-  const [p, nomeAmico, viewer] = await Promise.all([inviter(codice), amico(codice), viewerId()]);
+  const [p, a, viewer] = await Promise.all([inviter(codice), amico(codice), viewerId()]);
+  const chiAmico = a === "errore" ? null : a;
   const loggedIn = !!viewer;
-  const name = p ? personName(p) : nomeAmico;
+  const name = p ? personName(p) : chiAmico?.nome ?? null;
   const perAmico = isFriendCode(codice);
-  // Già iscritto e link di un amico: "Diventa amico" qui, con il nome se ancora non ce l'ha.
-  const mio = loggedIn && perAmico && viewer ? await loadMySocial(viewer) : null;
+  // Già iscritto e link di un amico: "Diventa amico" qui, con il nome se ancora non ce l'ha. Solo se chi invita
+  // esiste e non sei tu (revisore 14/11, terzo giro: prima il tasto compariva anche su un codice inesistente o sul proprio).
+  const proprio = loggedIn && perAmico && !!chiAmico && (await mioInvito()) === codice;
+  const puoiAccettare = loggedIn && perAmico && !!chiAmico && !proprio;
+  const mio = puoiAccettare && viewer ? await loadMySocial(viewer) : null;
   const chiediNome = !!mio && ("stato" in mio || !mio.display_name?.trim());
   const posti = p ? p.visitati + p.da_provare : 0;
   const titolo = name ? `${name} ti ha invitato su Mapetite` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite";
@@ -111,15 +117,17 @@ export default async function InvitoPage({ params }: Props) {
       <div className="mt-auto px-6 pb-6 pt-8">
         {loggedIn ? (
           <>
-            {perAmico && codice ? (
+            {puoiAccettare && codice ? (
               <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} />
             ) : (
-              <p className="mb-3 text-center text-sm font-sans text-text-muted">Hai già un account: sei dentro.</p>
+              <p data-testid="invito-neutro" className="mb-3 text-center text-sm font-sans text-text-muted">
+                {proprio ? "Questo è il tuo link d'invito: mandalo a un amico." : perAmico && a !== "errore" ? "Questo invito non vale più: chiedi un link nuovo." : "Hai già un account: sei dentro."}
+              </p>
             )}
             <Link
               href="/mappa"
               data-testid="invito-apri"
-              className={perAmico ? "flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand" : "flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]"}
+              className={puoiAccettare ? "flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand" : "flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]"}
             >
               Apri la tua mappa
             </Link>
@@ -136,7 +144,7 @@ export default async function InvitoPage({ params }: Props) {
             {/* Solo il link personale di un amico (codice "i-…") propone l'amicizia, e la chiede con un tasto alla
                 fine del primo accesso: qui lo si dice prima (revisore 14/11). */}
             <p data-testid="invito-amicizia" className="mt-2 text-center text-[13px] font-sans text-text-muted">
-              {perAmico ? <>Gratis. Dopo, se vuoi, diventi amico di {name ?? "chi ti ha invitato"}.</> : "Gratis, in meno di un minuto."}
+              {perAmico && chiAmico ? <>Gratis. Dopo, se vuoi, diventi amico di {name ?? "chi ti ha invitato"}.</> : "Gratis, in meno di un minuto."}
             </p>
             <Link href="/login" className="mt-1 flex min-h-11 items-center justify-center text-sm font-display font-semibold text-brand">
               Hai già un account? Accedi

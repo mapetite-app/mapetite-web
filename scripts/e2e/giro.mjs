@@ -4947,14 +4947,29 @@ else {
   // Amici: chi segui, attività raggruppata, ricerca persone.
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
-  { const pr = sp.getByTestId("seguiti").getByTestId("amico-privato");
-    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
-    // Revisore 14/11 (secondo): l'amicizia si toglie da tutti e due i lati.
+  { const riga = sp.getByTestId("seguiti");
+    const pr = riga.locator('[data-testid="amico"][data-privato="1"]');
+    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0 && (await riga.getByText("Giulia").count()) === 1, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
+    // Revisore 14/11 (terzo giro): "Amici" quando vi seguite a vicenda, non "Chi segui".
+    ok(((await sp.getByTestId("seguiti-titolo").textContent()) ?? "").startsWith("Amici ·"), `amici: la sezione si chiama 'Amici' quando lo sono (${await sp.getByTestId("seguiti-titolo").textContent()})`);
+    // Revisore 14/11 (terzo giro): "Togli dagli amici" in un foglio dal basso (prima tagliato dalla riga che scorre).
     await pr.locator("button").first().click();
-    ok(await pr.getByTestId("togli-amico").isVisible(), "amici: toccando l'amico privato compare 'Togli dagli amici'");
-    await pr.getByTestId("togli-amico").click();
+    const foglio = sp.getByTestId("amico-foglio");
+    await foglio.waitFor({ timeout: 3000 }).catch(() => {});
+    const toccabile = await sp.getByTestId("togli-amico").evaluate((b) => { const r = b.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; return y > 0 && y < window.innerHeight && (document.elementFromPoint(x, y) === b || b.contains(document.elementFromPoint(x, y))); }).catch(() => false);
+    const colore = await sp.getByTestId("togli-amico").evaluate((b) => getComputedStyle(b).color).catch(() => "");
+    ok(await foglio.isVisible() && toccabile && (await foglio.getByTestId("togli-annulla").isVisible()) && /rgb\((1[5-9]\d|2\d\d), \d{1,2}, \d{1,2}\)/.test(colore), `amici: toccando l'amico si apre il foglio con 'Togli dagli amici' (rosso, toccabile senza scorrere) e 'Annulla' (${colore})`);
+    await sp.screenshot({ path: `${OUT}/62-amici-togli.png`, caret: "initial" });
+    await foglio.getByTestId("togli-annulla").click();
+    ok((await sp.getByTestId("amico-foglio").count()) === 0 && (await pr.count()) === 1, "amici: 'Annulla' chiude il foglio e l'amico resta");
+    // Anche l'amico con il profilo pubblico si toglie da qui (un'azione unica, i due "segui"), e il profilo è a un tocco.
+    await riga.locator('[data-testid="amico"]:not([data-privato])').first().locator("button").click();
+    ok((await sp.getByTestId("amico-foglio").getByTestId("amico-profilo").getAttribute("href")) === "/u/giulia.rm" && await sp.getByTestId("amico-foglio").getByTestId("togli-amico").isVisible(), "amici: anche l'amico con il profilo pubblico ha 'Togli dagli amici', con 'Apri il profilo'");
+    await sp.getByTestId("togli-annulla").click();
+    await pr.locator("button").first().click();
+    await sp.getByTestId("togli-amico").click();
     await sp.waitForTimeout(800);
-    ok((await sp.getByTestId("seguiti").getByTestId("amico-privato").count()) === 0, "amici: 'Togli dagli amici' lo toglie dalla riga"); }
+    ok((await riga.locator('[data-testid="amico"][data-privato="1"]').count()) === 0 && (await sp.getByTestId("amico-foglio").count()) === 0, "amici: 'Togli dagli amici' lo toglie dalla riga e chiude il foglio"); }
   { const att = sp.getByTestId("attivita");
     const first = (await att.first().innerText()).replace(/\s+/g, " ");
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
@@ -4970,6 +4985,23 @@ else {
     ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-gruppi").getAttribute("href")) === "/gruppi", "amici: ingresso compatto 'Liste di gruppo'");
     ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-invita").getAttribute("href")) === "/profilo#invita", "amici: 'Invita un amico' porta al proprio link d'invito"); }
   await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
+  // Revisore 14/11 (terzo giro): l'invito lasciato senza risposta nel primo accesso torna in Amici, mai accettato da solo.
+  ok((await sp.getByTestId("invito-sospeso").count()) === 0, "amici: senza un invito in sospeso nessun riquadro d'invito");
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  { const s = sp.getByTestId("invito-sospeso");
+    await s.waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await s.textContent().catch(() => "")) ?? "").includes("Giulia ti ha invitato") && await s.getByTestId("invito-si").isDisabled() && await s.getByTestId("invito-mio-nome").isVisible() && await s.getByTestId("invito-no").isVisible(), "amici: l'invito rimasto senza risposta si ripropone, con il nome da scrivere e 'Non ora'");
+    await s.getByTestId("invito-no").click();
+    ok((await sp.getByTestId("invito-sospeso").count()) === 0 && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: 'Non ora' chiude l'invito e lo dimentica");
+    await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+    await sp.reload({ waitUntil: "networkidle" });
+    await s.waitFor({ timeout: 4000 }).catch(() => {});
+    await s.getByTestId("invito-mio-nome").fill("Luca");
+    await s.getByTestId("invito-si").click();
+    await s.getByTestId("invito-accettato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await s.getByTestId("invito-accettato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici") && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: 'Diventa amico' dall'invito in sospeso, poi il codice si cancella");
+    await sp.screenshot({ path: `${OUT}/62-amici-invito-sospeso.png`, caret: "initial" }); }
   let searchUrl = null;
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
   await sp.getByLabel("Cerca persone per nome").fill("@Mar");
@@ -8633,6 +8665,13 @@ else {
     await acc.getByTestId("invito-si").click();
     await ip.getByTestId("invito-accettato").waitFor({ timeout: 4000 }).catch(() => {});
     ok(((await ip.getByTestId("invito-accettato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), "invito da già iscritto: un tocco e siete amici"); }
+  // Revisore 14/11 (terzo giro): "Diventa amico" solo se chi invita esiste e non sei tu.
+  await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-neutro").textContent()) ?? "").includes("non vale più"), "invito da già iscritto, codice che non esiste (più): niente 'Diventa amico', testo neutro");
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialInv, invito: COD_AMICO })), url: BASE }]);
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-neutro").textContent()) ?? "").includes("il tuo link"), "invito: il proprio link non propone di diventare amico di se stessi");
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialInv)), url: BASE }]);
   await ictx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await ip.evaluate((c) => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })), COD_AMICO);
   await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
@@ -8785,6 +8824,12 @@ else {
     ok((await ip.getByTestId("invito-collegato").count()) === 0, "primo accesso da invito: nessuna amicizia prima del sì");
     // Revisore 14/11 (secondo): chi accetta scrive il suo nome (l'amico vedeva "Qualcuno").
     ok(await ia.getByTestId("invito-si").isDisabled() && await ia.getByTestId("invito-mio-nome").isVisible(), "primo accesso da invito: 'Diventa amico' spento finché non scrivi il tuo nome");
+    // Revisore 14/11 (terzo giro): un solo campo nome. Acceso "Profilo pubblico" con l'invito in attesa, non ne compare un secondo.
+    { const ft = ip.getByTestId("fatti-trovare");
+      await ft.locator("label").first().click();
+      const campi = await ip.locator("input[autocomplete=name]").count();
+      ok(campi === 1 && (await ft.getByTestId("fatti-trovare-nome").count()) === 0 && ((await ft.getByTestId("fatti-trovare-indirizzo").textContent()) ?? "").includes("in alto"), `primo accesso da invito: un solo campo 'Il tuo nome' anche con 'Profilo pubblico' acceso (${campi})`);
+      await ft.locator("label").first().click(); }
     await ia.getByTestId("invito-mio-nome").fill("Luca");
     await ia.getByTestId("invito-si").click();
     await ia.getByTestId("invito-collegato").waitFor({ timeout: 4000 }).catch(() => {});
@@ -8799,6 +8844,8 @@ else {
     ok(!(await sw.isChecked()) && (await ft.getByTestId("fatti-trovare-nome").count()) === 0, "primo accesso: 'Profilo pubblico' spento di default, nessun campo nome");
     await ft.locator("label").first().click();
     ok(await sw.isChecked() && await ft.getByTestId("fatti-trovare-nome").isVisible() && await ft.getByTestId("fatti-trovare-privacy").isVisible(), "primo accesso: acceso 'Profilo pubblico' compaiono il nome e 'Cosa vedono gli altri'");
+    ok((await ft.getByTestId("fatti-trovare-nome").inputValue()) === "Luca", "primo accesso: il nome scritto per l'invito è lo stesso del profilo pubblico (un solo campo)");
+    await ft.getByTestId("fatti-trovare-nome").fill("");
     await ft.getByTestId("fatti-trovare-privacy").locator("summary").click();
     { const t = (await ft.getByTestId("fatti-trovare-privacy").innerText()).replace(/\s+/g, " ");
       ok(t.includes("Chi ha il link o ti cerca su Mapetite vede") && t.includes("Mai:") && t.includes("note"), `primo accesso: 'Cosa vedono gli altri' con lo stesso testo del profilo (${t.slice(0, 120)})`); }
@@ -8976,6 +9023,21 @@ else {
   ok(px <= 0, `profilo 360px: 'Invita un amico' senza scroll orizzontale (${px}px)`);
   await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico-360.png`, caret: "initial" });
+  await pp.setViewportSize({ width: 390, height: 844 });
+  // Revisore 14/11 (terzo giro): sotto il link d'invito tra amici un "Nuovo link" discreto, con conferma.
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialInv, invito: "i-0000000000dd" })), url: BASE }]);
+  await pp.goto(`${BASE}/profilo#invita`, { waitUntil: "networkidle" });
+  { const inv = pp.getByTestId("invita-amico");
+    await inv.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const nl = inv.getByTestId("nuovo-link");
+    const fs = await nl.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)).catch(() => 99);
+    ok((await inv.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/i-0000000000dd" && await nl.isVisible() && fs <= 13, `profilo: sotto il link tra amici c'è 'Nuovo link', discreto (${fs}px)`);
+    await nl.click();
+    ok(((await inv.getByTestId("nuovo-link-conferma").textContent().catch(() => "")) ?? "").includes("smetterà di funzionare"), "profilo: 'Nuovo link' chiede conferma (il link di prima smette di funzionare)");
+    await inv.getByTestId("nuovo-link-si").click();
+    await inv.getByTestId("nuovo-link-fatto").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await inv.getByTestId("nuovo-link-fatto").isVisible().catch(() => false), "profilo: confermato, 'Nuovo link' crea il link nuovo");
+    await pp.screenshot({ path: `${OUT}/invita-amico-nuovo-link.png`, caret: "initial" }); }
   // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
   await ictx.clearCookies({ name: "e2e_social" });
   await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
