@@ -168,7 +168,8 @@ async function rendiTrovabile(supabase: Client, userId: string, nome: string): P
 // Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
 // "Diventa amico" o "Non ora". Solo i codici casuali "i-…" (migrazione 20261114c_inviti_sicuri).
 export type ChiInvita = { nome: string | null } | null | "rete";
-export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "no"; motivo: string } | { stato: "rete" };
+// "nome": il database chiede prima il tuo nome (revisore 14/11, terzo giro: obbligatorio anche nel server).
+export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "nome" } | { stato: "no"; motivo: string } | { stato: "rete" };
 
 const fakeE2E = async () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo");
 const nomeFinto = (codice: string) => (codice.endsWith("0000000000aa") ? "Giulia" : null);
@@ -184,7 +185,7 @@ export async function chiInvita(raw: unknown): Promise<ChiInvita> {
 }
 
 // "nome": chi accetta e non ha ancora un nome lo sceglie qui (lo vedrà l'amico: revisore 14/11, prima
-// si vedeva "Qualcuno"). Si scrive solo se il profilo non ne ha già uno.
+// si vedeva "Qualcuno"). Si scrive solo se il profilo non ne ha già uno (vuoto o fatto di spazi conta come nessuno).
 export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<EsitoInvito> {
   const codice = cleanInviteCode(raw);
   if (!isFriendCode(codice)) return { stato: "no", motivo: "codice" };
@@ -194,8 +195,11 @@ export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<Es
   if (nome) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { error: nErr } = await supabase.from("profiles").update({ display_name: nome }).eq("id", user.id).is("display_name", null);
-      if (nErr) console.error("[invito] nome:", nErr.message);
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      if (!(prof?.display_name as string | null | undefined)?.trim()) {
+        const { error: nErr } = await supabase.from("profiles").update({ display_name: nome, updated_at: new Date().toISOString() }).eq("id", user.id);
+        if (nErr) console.error("[invito] nome:", nErr.message);
+      }
     }
   }
   const { data, error } = await supabase.rpc("accetta_invito", { p_codice: codice });
@@ -205,6 +209,7 @@ export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<Es
   }
   const r = data as { stato?: string; nome?: string | null } | null;
   if (r?.stato === "ok") return { stato: "ok", nome: r.nome ?? null };
+  if (r?.stato === "nome") return { stato: "nome" };
   return r?.stato === "anonimo" ? { stato: "rete" } : { stato: "no", motivo: r?.stato ?? "?" };
 }
 
