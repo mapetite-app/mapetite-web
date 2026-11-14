@@ -406,7 +406,8 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
 // Copertine mappa (src/lib/mappa-statica.ts, revisore 14/11, sesto giro): "Romantico" con 13 posti a Roma e 1 a Milano
 // mostrava Milano con un puntino (a parità vinceva il primo). Ora vince il nucleo più numeroso, a parità quello della
-// città con più posti (o della città scelta); la mappa del profilo arriva a 30 puntini.
+// città con più posti; la mappa del profilo arriva a 30 puntini. Revisore 14/11 (settimo giro): niente più
+// "preferisci" (la città scelta), che nessuno passava: con una città accesa i Salvati danno già solo i suoi posti.
 { const ms = await import(new URL("../../src/lib/mappa-statica.ts", import.meta.url).href);
   const MI = { lat: 45.4642, lng: 9.19, id: "mi" };
   const roma = Array.from({ length: 13 }, (_, i) => ({ lat: 41.89 + 0.004 * i, lng: 12.48, id: `r${i}` }));
@@ -415,11 +416,24 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   const sparsi = [MI, { lat: 41.89, lng: 12.48, id: "rA" }, { lat: 41.935, lng: 12.48, id: "rB" }];
   const n2 = ms.nucleo(sparsi);
   ok(n2.length === 1 && n2[0].id === "rA", `copertine mappa: a parità (un posto per nucleo) vince la città con più posti, non il primo della lista (${n2.map((p) => p.id).join(",")})`);
-  const n3 = ms.nucleo(sparsi, undefined, (p) => p.id === "mi");
-  ok(n3.length === 1 && n3[0].id === "mi", "copertine mappa: a parità vince la città scelta");
+  ok(ms.nucleo.length <= 2 && ms.nucleo(sparsi, undefined, () => true)[0].id === "rA", "copertine mappa: nucleo senza il parametro 'preferisci' che nessuno passava (a parità decide solo la città con più posti)");
   const fitti = Array.from({ length: 40 }, (_, i) => ({ lat: 41.89 + 0.0004 * (i % 7), lng: 12.48 + 0.0004 * Math.floor(i / 7) }));
-  const m12 = ms.mappaStatica(fitti, 124, 72, "tok"), m30 = ms.mappaStatica(fitti, 358, 140, "tok", 16, 5_000, false, "citta", { max: 30 });
-  ok(m12?.punti.length <= 12 && m30?.punti.length > 12 && m30.punti.length <= 30, `copertine mappa: 12 puntini nelle copertine, fino a 30 nella mappa del profilo (${m12?.punti.length}/${m30?.punti.length})`); }
+  const m12 = ms.mappaStatica(fitti, 124, 72, "tok"), m30 = ms.mappaStatica(fitti, 358, 140, "tok", 16, 5_000, false, { max: 30 });
+  ok(m12?.punti.length <= 12 && m30?.punti.length > 12 && m30.punti.length <= 30, `copertine mappa: 12 puntini nelle copertine, fino a 30 nella mappa del profilo (${m12?.punti.length}/${m30?.punti.length})`);
+  // Revisore 14/11 (settimo giro): "Rome" in inglese e "…'s Basilica" tagliato nelle copertine. Ogni mappa statica
+  // arriva senza nessun nome: un livello di testo trasparente in cima occupa lo spazio e Mapbox non piazza più i nomi.
+  { const sparsaRoma = [[41.9029, 12.4663], [41.8986, 12.4769], [41.899, 12.473], [41.906, 12.459], [41.895, 12.471], [41.901, 12.48], [41.893, 12.468]].map(([lat, lng]) => ({ lat, lng }));
+    const cop = ms.mappaStatica(sparsaRoma, 124, 72, "tok", 8, undefined, true);
+    const u = new URL(cop.url); const strato = JSON.parse(u.searchParams.get("addlayer") ?? "{}");
+    ok(strato.type === "symbol" && strato.paint?.["text-opacity"] === 0 && strato.layout?.["text-allow-overlap"] === true && !u.searchParams.has("layer_id") && !u.searchParams.has("setfilter") && new URL(m30.url).searchParams.has("addlayer") && cop.url.length < 1500, `copertine mappa: una sola immagine senza nomi, con il livello che li copre tutti (${strato.id}, ${cop.url.length} caratteri)`); }
+  // Revisore 14/11 (settimo giro): con un angolo riservato (la pillola "↗ Mappa" del profilo) nessun posto ci cade sotto
+  // e nessuno viene tolto: la mappa si sposta. Senza angolo il quarto posto ci finirebbe sotto.
+  { const pts = [{ lat: 41.889, lng: 12.469 }, { lat: 41.893, lng: 12.473 }, { lat: 41.88, lng: 12.48 }, { lat: 41.882, lng: 12.4905 }];
+    const A = { w: 132, h: 56 };
+    const sotto = (m) => m.punti.filter((p) => p.x * 3.58 > 358 - A.w && p.y * 1.4 > 140 - A.h).length;
+    const senza = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30 });
+    const con = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30, angolo: A });
+    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); } }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
@@ -2779,6 +2793,8 @@ else {
       const sc = await browser.newContext({ viewport: { width, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.889, longitude: 12.47 } });
       await sc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
       await sc.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rowsS.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rowsS }));
+      // Copertine con la mappa: immagini statiche finte (niente rete verso Mapbox nel giro).
+      await sc.route("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="248" height="144"><rect width="248" height="144" fill="#eeeeee"/><path d="M0 70H248M120 0V144" stroke="#fff" stroke-width="6"/></svg>' }));
       for (const t of ["place_synthesis", "profiles", "contenuti_locali", "foto_locali"]) await sc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
       const ps = await sc.newPage();
       await ps.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
@@ -2819,6 +2835,15 @@ else {
       ok((await ris()) === `${nPD} di 120 posti` && await S.getByRole("button", { name: "Togli Pizzerie" }).isVisible(), `scaffali ${width}px: tolta solo Trastevere restano Pizzerie e Da provare (${await ris()})`);
       await S.getByTestId("salvati-azzera").click();
       ok((await S.getByTestId("salvati-risultato").count()) === 0 && await S.getByTestId("scaffali").isVisible() && (await S.getByTestId("salvato-riga").count()) === 60, `scaffali ${width}px: 'Azzera' riporta scaffali e lista (60 righe disegnate)`);
+      // Revisore 14/11 (settimo giro): "Rome" e "…'s Basilica" tagliato nelle copertine. Ogni copertina con la mappa
+      // è una sola immagine senza nessun nome (raccolta "Romantico" sparsa su Roma compresa).
+      for (const [tab, lista] of [["Zone", "scaffale-zone"], ["Raccolte", "salvati-raccolte"]]) {
+        await scheda(tab);
+        await ps.waitForTimeout(400);
+        const cm = await S.getByTestId(lista).locator("[data-testid=scaffale-copertina], [data-testid=raccolta-cerchio]").evaluateAll((els) => els.map((e) => [...e.querySelectorAll("img[data-testid=scaffale-mappa]")].map((i) => { const u = new URL(i.src); return u.searchParams.has("addlayer") && !u.searchParams.has("layer_id"); })));
+        const conMappa = cm.filter((x) => x.length > 0);
+        ok(conMappa.length >= 1 && conMappa.every((x) => x.length === 1 && x[0]), `scaffali ${width}px: copertine ${tab} con la mappa in una sola immagine senza nomi (${conMappa.length} di ${cm.length})`);
+      }
       // Revisore 14/11 (secondo giro): (a) a parità di posti prima le zone vicine a te; (b) con un quartiere acceso
       // niente titoli per tipo sotto lo scaffale Tipi; (c) nessun quartiere tagliato a metà nelle righe;
       // (d) l'attribuzione della mappa sta sotto le copertine.
@@ -4737,11 +4762,21 @@ else {
   ok(await sp.getByTestId("profilo-mappa").isVisible(), "profilo pubblico: mappa dei suoi posti");
   { const n = await sp.getByTestId("profilo-mappa-puntino").count(); ok(n === 3, `profilo pubblico: un puntino per ogni posto (${n})`); }
   // Revisore 14/11 (sesto giro): niente nomi in inglese ("Colosseum", "City" tagliato) e niente puntini sotto "↗ Mappa".
-  { const srcs = await sp.getByTestId("mappa-senza-nomi").locator("img").evaluateAll((els) => els.map((e) => new URL(e.src).searchParams.get("layer_id")));
-    const strati = [...new Set(srcs)].sort().join(",");
-    ok(srcs.length === 6 && strati === "poi-label,settlement-major-label,settlement-subdivision-label", `profilo pubblico: mappa composta da tre immagini, ognuna senza un livello di nomi (luoghi, città, quartieri) (${strati})`);
+  // Settimo giro: una sola immagine senza nessun nome (prima tre composte, con l'ombra dei nomi).
+  { const srcs = await sp.getByTestId("profilo-mappa").locator("img").evaluateAll((els) => els.map((e) => new URL(e.src).searchParams.get("addlayer")));
+    ok(srcs.length === 1 && JSON.parse(srcs[0] ?? "{}").paint?.["text-opacity"] === 0, `profilo pubblico: mappa in una sola immagine, senza nomi (${srcs.length} immagini)`);
     const sotto = await sp.getByTestId("apri-mappa-persona").evaluate((a) => { const pill = [...a.querySelectorAll("span")].find((s) => s.textContent?.trim() === "Mappa")?.getBoundingClientRect(); if (!pill) return -1; return [...a.querySelectorAll("[data-testid=profilo-mappa-puntino]")].filter((d) => { const r = d.getBoundingClientRect(); return r.right > pill.left && r.left < pill.right && r.bottom > pill.top && r.top < pill.bottom; }).length; });
     ok(sotto === 0, `profilo pubblico: nessun puntino sotto la pillola 'Mappa' (${sotto})`); }
+  // Revisore 14/11 (settimo giro): un posto che cadrebbe sotto "↗ Mappa" non sparisce più: la mappa si inquadra
+  // lasciando libero l'angolo della pillola. Giulia con un quarto posto a sud-est (proprio lì sotto), poi si torna come prima.
+  { const sudEst = sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000009", "Enoteca Sud-Est", "wine_bar", ["Da provare"], "2026-10-08T09:00:00Z", 41.882, 12.4905);
+    await setSocial(soctx, { ...social, salvati: [...social.salvati, sudEst] });
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    const r = await sp.getByTestId("apri-mappa-persona").evaluate((a) => { const pill = [...a.querySelectorAll("span")].find((s) => s.textContent?.trim() === "Mappa")?.getBoundingClientRect(); const box = a.getBoundingClientRect(); const dots = [...a.querySelectorAll("[data-testid=profilo-mappa-puntino]")].map((d) => d.getBoundingClientRect()); return { n: dots.length, sotto: pill ? dots.filter((r) => r.right > pill.left && r.left < pill.right && r.bottom > pill.top && r.top < pill.bottom).length : -1, fuori: dots.filter((r) => r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom).length }; });
+    ok(r.n === 4 && r.sotto === 0 && r.fuori === 0, `profilo pubblico: un posto sotto la pillola 'Mappa' resta, la mappa gli fa spazio (${r.n} puntini su 4, ${r.sotto} sotto la pillola, ${r.fuori} fuori)`);
+    await sp.screenshot({ path: `${OUT}/60c-profilo-mappa-angolo.png`, clip: await sp.getByTestId("apri-mappa-persona").boundingBox() });
+    await setSocial(soctx, social);
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
   { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1; const h = (await sp.getByTestId("apri-mappa-persona").boundingBox())?.height ?? 0;
     ok((await y("segui")) < (await y("apri-mappa-persona")) && (await y("apri-mappa-persona")) < (await y("profilo-posti")) && h >= 120 && h <= 170 && (await sp.getByTestId("mappa-persona").count()) === 0, `profilo pubblico: mappa sotto Segui e sopra i posti, alta ~140 px, nessuna seconda mappa in fondo (${Math.round(h)})`); }
   ok(await sp.getByTestId("apri-mappa-persona").getAttribute("href") === "/u/giulia.rm/mappa", "profilo pubblico: tocco sulla mappa → la mappa completa");
