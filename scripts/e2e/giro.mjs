@@ -2271,7 +2271,8 @@ else {
     // con voto e prezzo quando ci sono; senza voto né prezzo niente "★" inventata.
     { const meta = async (n) => ((await righe.filter({ hasText: n }).innerText()) ?? "").split("\n").find((r) => r.includes(" · ")) ?? "";
       const [o, t, c] = [await meta("Osteria Due"), await meta("Terrazza Uno"), await meta("Caffè Milano")];
-      ok(o.startsWith("Osteria · ★ 4,5 · €€ · Roma") && t.startsWith("Bar · ★ 4,6 · €€ · Roma") && c.startsWith("Caffè · Milano") && !c.includes("★"), `salvati lista: tipo come nella scheda, voto e prezzo (${o} | ${t} | ${c})`); }
+      // 14/11: il quartiere al posto della città quando si sa (la città sta nelle pillole in alto).
+      ok(o.startsWith("Osteria · ★ 4,5 · €€ · Trastevere") && t.startsWith("Bar · ★ 4,6 · €€ · Monti") && c.startsWith("Caffè · Porta Romana") && !c.includes("★"), `salvati lista: tipo come nella scheda, voto e prezzo (${o} | ${t} | ${c})`); }
     const osteria = righe.filter({ hasText: "Osteria Due" });
     // Revisore 2/11: due stati soli. Senza tag di stato la riga dice "Da provare" (nel database non si scrive niente);
     // "Da provare" ha sempre 📌 (il segnalibro resta per Salva/Salvato).

@@ -23,6 +23,7 @@ export function MappaPunti({
   dotTestId,
   eager = false,
   margine = 16,
+  raggio,
 }: {
   punti: readonly PuntoPersona[];
   w: number;
@@ -32,6 +33,7 @@ export function MappaPunti({
   dotTestId?: string;
   eager?: boolean; // la mappa del profilo è sopra la piega: si carica subito
   margine?: number; // spazio attorno ai puntini (px), perché nessuno finisca sotto un badge
+  raggio?: number; // quanto può essere largo il gruppo (m); la mappa grande ne tiene di più delle copertine
 }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
@@ -43,8 +45,8 @@ export function MappaPunti({
   }, []);
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   // Le posizioni dei puntini non dipendono dal token: si calcolano sempre, l'immagine solo se c'è il token.
-  const geo = useMemo(() => mappaStatica(punti, w, h, token || "-", margine), [punti, w, h, token, margine]);
-  const vista = useMemo(() => nucleo(punti).slice(0, 12) as PuntoPersona[], [punti]); // stesso ordine di geo.punti
+  const geo = useMemo(() => mappaStatica(punti, w, h, token || "-", margine, raggio), [punti, w, h, token, margine, raggio]);
+  const vista = useMemo(() => nucleo(punti, raggio).slice(0, 12), [punti, raggio]); // geo.punti[].i punta qui
   if (!geo) return null;
   return (
     <span data-testid={testId} className={`absolute inset-0 overflow-hidden ${PAPER}`}>
@@ -56,7 +58,7 @@ export function MappaPunti({
         <span
           key={i}
           data-testid={dotTestId}
-          className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-white shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)] ${dot} ${vista[i]?.visited === false ? "bg-brand" : "bg-accent"}`}
+          className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-white shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)] ${dot} ${vista[pt.i]?.visited === false ? "bg-brand" : "bg-accent"}`}
           style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
         />
       ))}
@@ -80,7 +82,7 @@ export default function ProfiloMappa({ spots, href, name }: { spots: PuntoPerson
         className="relative block overflow-hidden rounded-card border border-border shadow-card active:scale-[0.99] transition-transform duration-150"
         style={{ aspectRatio: `${W} / ${H}` }}
       >
-        <MappaPunti punti={spots} w={W} h={H} dot="h-[11px] w-[11px] border-2" eager testId="profilo-mappa" dotTestId="profilo-mappa-puntino" />
+        <MappaPunti punti={spots} w={W} h={H} dot="h-[11px] w-[11px] border-2" eager testId="profilo-mappa" dotTestId="profilo-mappa-puntino" raggio={5_000} />
         <span className="absolute bottom-2 right-2 inline-flex min-h-8 items-center gap-1.5 rounded-pill bg-white/95 px-3 text-[13px] font-display font-semibold text-brand shadow-[0_1px_4px_rgba(0,0,0,0.15)]">
           <Maximize2 size={13} aria-hidden /> Mappa
         </span>

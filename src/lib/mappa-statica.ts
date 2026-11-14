@@ -5,7 +5,7 @@
 // Funzioni pure: centro e zoom si calcolano qui, così i puntini cadono esattamente dove sono i posti.
 
 export type Punto = { lat: number; lng: number };
-export type MappaStatica = { url: string; punti: { x: number; y: number }[] };
+export type MappaStatica = { url: string; punti: { x: number; y: number; i: number }[] }; // i = indice in nucleo(punti)
 
 const TILE = 512; // le immagini statiche Mapbox usano tessere da 512 px
 const ZOOM_MIN = 11;
@@ -29,21 +29,22 @@ function metri(a: Punto, b: Punto): number {
 
 // Un gruppo sparso tra Roma e Milano non sta in una copertina: si tiene il nucleo più denso (il posto con più
 // vicini entro 1,2 km e quelli attorno). Meglio una zona leggibile che due città in un francobollo.
-export function nucleo(punti: readonly Punto[]): Punto[] {
+export function nucleo<T extends Punto>(punti: readonly T[], raggio = RAGGIO_GRUPPO_M): T[] {
   const validi = punti.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && (p.lat !== 0 || p.lng !== 0));
   if (validi.length <= 1) return validi;
   let best = validi[0];
   let bestN = -1;
   for (const p of validi) {
-    const n = validi.filter((q) => metri(p, q) <= RAGGIO_GRUPPO_M).length;
+    const n = validi.filter((q) => metri(p, q) <= raggio).length;
     if (n > bestN) { bestN = n; best = p; }
   }
-  return validi.filter((q) => metri(best, q) <= RAGGIO_GRUPPO_M);
+  return validi.filter((q) => metri(best, q) <= raggio);
 }
 
 // Centro e zoom che fanno stare tutti i punti nel riquadro w×h con un margine; puntini in % del riquadro.
-export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12): MappaStatica | null {
-  const vista = nucleo(punti).slice(0, 12);
+// raggio: quanto può essere largo il gruppo; la mappa grande del profilo ne tiene di più delle copertine.
+export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12, raggio = RAGGIO_GRUPPO_M): MappaStatica | null {
+  const vista = nucleo(punti, raggio).slice(0, 12);
   if (!token || vista.length === 0) return null;
   const xs = vista.map((p) => mx(p.lng));
   const ys = vista.map((p) => my(p.lat));
@@ -57,7 +58,8 @@ export function mappaStatica(punti: readonly Punto[], w: number, h: number, toke
   const at = `${lngDi(cx).toFixed(5)},${latDi(cy).toFixed(5)},${z}`;
   // Logo e attribuzione nel riquadro coprirebbero metà copertina: l'attribuzione è scritta sotto gli scaffali.
   const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&access_token=${token}`;
-  const dentro = vista.map((p) => ({
+  const dentro = vista.map((p, i) => ({
+    i,
     x: Math.round(((mx(p.lng) - cx) * scala + w / 2) / w * 1000) / 10,
     y: Math.round(((my(p.lat) - cy) * scala + h / 2) / h * 1000) / 10,
   })).filter((pt) => pt.x >= 5 && pt.x <= 95 && pt.y >= 6 && pt.y <= 94);
