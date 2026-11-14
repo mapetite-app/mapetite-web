@@ -2,25 +2,29 @@
 
 import { useState } from "react";
 import { accettaInvito } from "@/app/onboarding/actions";
-import { clearStoredInvite } from "@/lib/invito";
+import { clearStoredInvite, testoInvitoNo } from "@/lib/invito";
 import { trackFeature } from "@/lib/track";
 
 // Chi ha già un account e apre il link personale di un amico (revisore 14/11: prima "sei dentro" e basta,
 // e i 7 utenti di oggi non potevano diventare amici di nessuno). Un tasto, e il nome se manca.
 // Usato anche in Amici per l'invito rimasto senza risposta nel primo accesso ("contesto": "amici", con "Non ora").
-export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void }) {
+// "className": il margine sotto (in Amici il riquadro ha già il suo spazio: niente vuoto in fondo).
+export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra, className = "mb-3" }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void; className?: string }) {
   const [mio, setMio] = useState("");
   // Il server può chiedere il nome anche se la pagina pensava di averlo (revisore 14/11, terzo giro).
   const [serveNome, setServeNome] = useState(chiediNome);
-  const [stato, setStato] = useState<"idle" | "salvo" | "amici" | "scaduto" | "errore" | "nome">("idle");
+  const [stato, setStato] = useState<"idle" | "salvo" | "amici" | "no" | "errore" | "nome">("idle");
+  // Perché l'invito non è andato: link scaduto, già usato tra voi due, o troppi amici da invito.
+  const [motivo, setMotivo] = useState("");
   if (stato === "amici") {
-    return <p data-testid="invito-accettato" className="mb-3 rounded-card bg-accent-light p-3 text-center text-[15px] font-sans text-text">🤝 Tu e {nome ?? "il tuo amico"} siete amici: vi trovate in Amici.</p>;
+    return <p data-testid="invito-accettato" className={`${className} rounded-card bg-accent-light p-3 text-center text-[15px] font-sans text-text`}>🤝 Tu e {nome ?? "il tuo amico"} siete amici: vi trovate in Amici.</p>;
   }
-  if (stato === "scaduto") {
-    return <p data-testid="invito-scaduto" className="mb-3 text-center text-sm font-sans text-text-muted">Questo invito non vale più: chiedi un link nuovo.</p>;
+  if (stato === "no") {
+    return <p data-testid="invito-scaduto" data-motivo={motivo} className={`${className} text-center text-sm font-sans text-text-muted`}>{testoInvitoNo(motivo, nome)}</p>;
   }
+  const senzaNome = serveNome && !mio.trim();
   return (
-    <div data-testid="invito-accetta" className="mb-3">
+    <div data-testid="invito-accetta" className={className}>
       {serveNome && (
         <input
           data-testid="invito-mio-nome"
@@ -37,17 +41,19 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
       <button
         type="button"
         data-testid="invito-si"
-        disabled={stato === "salvo" || (serveNome && !mio.trim())}
+        disabled={stato === "salvo" || senzaNome}
         onClick={async () => {
           setStato("salvo");
           const r = await accettaInvito(codice, mio).catch(() => ({ stato: "rete" as const }));
-          trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato, contesto });
+          trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato === "no" ? r.motivo : r.stato, contesto });
           if (r.stato === "rete") { setStato("errore"); return; }
           if (r.stato === "nome") { setServeNome(true); setStato("nome"); return; }
           clearStoredInvite();
-          setStato(r.stato === "ok" ? "amici" : "scaduto");
+          if (r.stato === "no") setMotivo(r.motivo);
+          setStato(r.stato === "ok" ? "amici" : "no");
         }}
-        className="flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98] disabled:opacity-60"
+        // Spento finché manca il nome: grigio chiaro con testo scuro, leggibile (prima corallo sbiadito, revisore 14/11).
+        className={`flex min-h-13 w-full items-center justify-center rounded-pill px-6 py-3.5 font-display text-base font-semibold active:scale-[0.98] ${senzaNome ? "bg-[#e3e7e7] text-text-muted" : "bg-accent text-white shadow-float disabled:opacity-80"}`}
       >
         {stato === "salvo" ? "Un attimo…" : `Diventa amico di ${nome ?? "chi ti ha invitato"}`}
       </button>

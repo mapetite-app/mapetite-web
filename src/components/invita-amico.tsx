@@ -49,9 +49,10 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
           {isFriendCode(codice) && <NuovoLink />}
         </div>}
         {privato && (
-        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
-          Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.
-        </a>
+        <p className="relative mt-3 text-[13px] font-sans text-white/85">
+          Gli amici vedono solo il nome.{" "}
+          <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="inline-flex min-h-11 items-center font-semibold text-white underline underline-offset-2">Mostra i posti</a>
+        </p>
       )}
     </section>
     );
@@ -75,10 +76,12 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
         {condividi("shrink-0 border-0", "Condividi")}
       </div>}
       {!senzaNome && isFriendCode(codice) && <NuovoLink />}
+      {/* Revisore 14/11 (quarto giro): una riga corta, sottolineato solo il link. */}
       {privato && (
-        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
-          Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.
-        </a>
+        <p className="relative mt-2 text-[13px] font-sans text-white/85">
+          Gli amici vedono solo il nome.{" "}
+          <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="inline-flex min-h-11 items-center font-semibold text-white underline underline-offset-2">Mostra i posti</a>
+        </p>
       )}
     </section>
   );

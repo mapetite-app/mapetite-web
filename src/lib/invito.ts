@@ -64,3 +64,11 @@ export function clearStoredInvite(): void {
     // ignorato
   }
 }
+
+// Perché un invito non è andato (revisore 14/11, quarto giro: prima ogni "no" diceva "chiedi un link nuovo",
+// anche quando un link nuovo non serviva a niente). Motivi da accetta_invito (migrazioni 20261114e/f).
+export function testoInvitoNo(motivo: string, nome: string | null): string {
+  if (motivo === "gia-usato") return "Avevate già usato un invito: per tornare amici rendete pubblico il profilo e seguitevi a vicenda.";
+  if (motivo === "troppi") return "Raggiunto il massimo di amici da invito.";
+  return `Questo invito non vale più: chiedi a ${nome ?? "chi te l'ha mandato"} un link nuovo.`;
+}
