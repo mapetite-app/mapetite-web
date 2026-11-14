@@ -639,6 +639,30 @@ export function prenotazioneTraPoco(list: BookingRequest[], now: Date = new Date
   return best;
 }
 
+// "Domani… ci vai?" subito dopo aver prenotato è una domanda inutile (revisore 14/11): la si fa solo
+// a una prenotazione fatta da almeno 12 ore.
+export const DOMANDA_DOPO_MS = 12 * 3_600_000;
+export function appenaPrenotata(b: Pick<BookingRequest, "createdAt">, now: Date = new Date()): boolean {
+  return typeof b.createdAt === "number" && now.getTime() - b.createdAt < DOMANDA_DOPO_MS;
+}
+
+// Il foglio "Tra 2 ore" aperto (revisore 14/11): finché c'è, il banner dello stesso tavolo in home e
+// sulla mappa si nasconde, per non dire la stessa cosa due volte. Stato della pagina, non salvato.
+let popupAperto: string | null = null;
+const popupListeners = new Set<() => void>();
+export function segnaPopupPrenotazione(id: string | null) {
+  if (popupAperto === id) return;
+  popupAperto = id;
+  popupListeners.forEach((l) => l());
+}
+export function popupPrenotazione(): string | null {
+  return popupAperto;
+}
+export function subscribePopupPrenotazione(cb: () => void): () => void {
+  popupListeners.add(cb);
+  return () => { popupListeners.delete(cb); };
+}
+
 // "Tra 2 ore", "Tra un'ora e mezza", "Tra 40 minuti" (a mezz'ore e a 5 minuti: niente falsa precisione).
 export function traQuanto(minuti: number): string {
   if (minuti < 55) return `Tra ${Math.max(5, Math.round(minuti / 5) * 5)} minuti`;
