@@ -425,7 +425,15 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   { const sparsaRoma = [[41.9029, 12.4663], [41.8986, 12.4769], [41.899, 12.473], [41.906, 12.459], [41.895, 12.471], [41.901, 12.48], [41.893, 12.468]].map(([lat, lng]) => ({ lat, lng }));
     const cop = ms.mappaStatica(sparsaRoma, 124, 72, "tok", 8, undefined, true);
     const u = new URL(cop.url); const strato = JSON.parse(u.searchParams.get("addlayer") ?? "{}");
-    ok(strato.type === "symbol" && strato.paint?.["text-opacity"] === 0 && strato.layout?.["text-allow-overlap"] === true && !u.searchParams.has("layer_id") && !u.searchParams.has("setfilter") && new URL(m30.url).searchParams.has("addlayer") && cop.url.length < 1500, `copertine mappa: una sola immagine senza nomi, con il livello che li copre tutti (${strato.id}, ${cop.url.length} caratteri)`); } }
+    ok(strato.type === "symbol" && strato.paint?.["text-opacity"] === 0 && strato.layout?.["text-allow-overlap"] === true && !u.searchParams.has("layer_id") && !u.searchParams.has("setfilter") && new URL(m30.url).searchParams.has("addlayer") && cop.url.length < 1500, `copertine mappa: una sola immagine senza nomi, con il livello che li copre tutti (${strato.id}, ${cop.url.length} caratteri)`); }
+  // Revisore 14/11 (settimo giro): con un angolo riservato (la pillola "↗ Mappa" del profilo) nessun posto ci cade sotto
+  // e nessuno viene tolto: la mappa si sposta. Senza angolo il quarto posto ci finirebbe sotto.
+  { const pts = [{ lat: 41.889, lng: 12.469 }, { lat: 41.893, lng: 12.473 }, { lat: 41.88, lng: 12.48 }, { lat: 41.882, lng: 12.4905 }];
+    const A = { w: 132, h: 56 };
+    const sotto = (m) => m.punti.filter((p) => p.x * 3.58 > 358 - A.w && p.y * 1.4 > 140 - A.h).length;
+    const senza = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30 });
+    const con = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30, angolo: A });
+    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); } }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
@@ -4757,6 +4765,16 @@ else {
     ok(srcs.length === 1 && JSON.parse(srcs[0] ?? "{}").paint?.["text-opacity"] === 0, `profilo pubblico: mappa in una sola immagine, senza nomi (${srcs.length} immagini)`);
     const sotto = await sp.getByTestId("apri-mappa-persona").evaluate((a) => { const pill = [...a.querySelectorAll("span")].find((s) => s.textContent?.trim() === "Mappa")?.getBoundingClientRect(); if (!pill) return -1; return [...a.querySelectorAll("[data-testid=profilo-mappa-puntino]")].filter((d) => { const r = d.getBoundingClientRect(); return r.right > pill.left && r.left < pill.right && r.bottom > pill.top && r.top < pill.bottom; }).length; });
     ok(sotto === 0, `profilo pubblico: nessun puntino sotto la pillola 'Mappa' (${sotto})`); }
+  // Revisore 14/11 (settimo giro): un posto che cadrebbe sotto "↗ Mappa" non sparisce più: la mappa si inquadra
+  // lasciando libero l'angolo della pillola. Giulia con un quarto posto a sud-est (proprio lì sotto), poi si torna come prima.
+  { const sudEst = sv(GIULIA, "giulia.rm", "Giulia", "44444444-0000-4000-8000-000000000009", "Enoteca Sud-Est", "wine_bar", ["Da provare"], "2026-10-08T09:00:00Z", 41.882, 12.4905);
+    await setSocial(soctx, { ...social, salvati: [...social.salvati, sudEst] });
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    const r = await sp.getByTestId("apri-mappa-persona").evaluate((a) => { const pill = [...a.querySelectorAll("span")].find((s) => s.textContent?.trim() === "Mappa")?.getBoundingClientRect(); const box = a.getBoundingClientRect(); const dots = [...a.querySelectorAll("[data-testid=profilo-mappa-puntino]")].map((d) => d.getBoundingClientRect()); return { n: dots.length, sotto: pill ? dots.filter((r) => r.right > pill.left && r.left < pill.right && r.bottom > pill.top && r.top < pill.bottom).length : -1, fuori: dots.filter((r) => r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom).length }; });
+    ok(r.n === 4 && r.sotto === 0 && r.fuori === 0, `profilo pubblico: un posto sotto la pillola 'Mappa' resta, la mappa gli fa spazio (${r.n} puntini su 4, ${r.sotto} sotto la pillola, ${r.fuori} fuori)`);
+    await sp.screenshot({ path: `${OUT}/60c-profilo-mappa-angolo.png`, clip: await sp.getByTestId("apri-mappa-persona").boundingBox() });
+    await setSocial(soctx, social);
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
   { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1; const h = (await sp.getByTestId("apri-mappa-persona").boundingBox())?.height ?? 0;
     ok((await y("segui")) < (await y("apri-mappa-persona")) && (await y("apri-mappa-persona")) < (await y("profilo-posti")) && h >= 120 && h <= 170 && (await sp.getByTestId("mappa-persona").count()) === 0, `profilo pubblico: mappa sotto Segui e sopra i posti, alta ~140 px, nessuna seconda mappa in fondo (${Math.round(h)})`); }
   ok(await sp.getByTestId("apri-mappa-persona").getAttribute("href") === "/u/giulia.rm/mappa", "profilo pubblico: tocco sulla mappa → la mappa completa");

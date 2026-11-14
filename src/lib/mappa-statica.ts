@@ -7,7 +7,8 @@
 export type Punto = { lat: number; lng: number };
 // i = indice in nucleo(punti).slice(0, max).
 export type MappaStatica = { url: string; punti: { x: number; y: number; i: number }[] };
-export type OpzioniMappa = { max?: number };
+// angolo: rettangolo in basso a destra (px del riquadro w×h) coperto da un pulsante, dove nessun puntino deve finire.
+export type OpzioniMappa = { max?: number; angolo?: { w: number; h: number } };
 
 const TILE = 512; // le immagini statiche Mapbox usano tessere da 512 px
 const ZOOM_MIN = 11;
@@ -88,18 +89,38 @@ export function mappaStatica<T extends Punto>(punti: readonly T[], w: number, h:
   // Larghezza da coprire attorno al centro scelto (col baricentro il lato più lontano conta doppio).
   const lx = 2 * Math.max(cx - x0, x1 - cx);
   const ly = 2 * Math.max(cy - y0, y1 - cy);
-  const zx = lx > 0 ? Math.log2((w - 2 * margine) / (lx * TILE)) : ZOOM_MAX;
-  const zy = ly > 0 ? Math.log2((h - 2 * margine) / (ly * TILE)) : ZOOM_MAX;
-  const z = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zx, zy)) * 100) / 100;
-  const scala = TILE * 2 ** z;
-  const at = `${lngDi(cx).toFixed(5)},${latDi(cy).toFixed(5)},${z}`;
+  // Inquadratura con un margine per lato: il centro dei posti va al centro dell'area libera, non dell'immagine.
+  const inquadra = (dx: number, dy: number) => {
+    const zx = lx > 0 ? Math.log2((w - 2 * margine - dx) / (lx * TILE)) : ZOOM_MAX;
+    const zy = ly > 0 ? Math.log2((h - 2 * margine - dy) / (ly * TILE)) : ZOOM_MAX;
+    const z = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zx, zy)) * 100) / 100;
+    const scala = TILE * 2 ** z;
+    const ix = cx + dx / 2 / scala;
+    const iy = cy + dy / 2 / scala;
+    const px = vista.map((p, i) => ({ i, x: (mx(p.lng) - ix) * scala + w / 2, y: (my(p.lat) - iy) * scala + h / 2 }));
+    return { z, ix, iy, px };
+  };
+  // Revisore 14/11 (settimo giro): sotto la pillola "↗ Mappa" del profilo i puntini sparivano. Se un posto ci cade
+  // sotto, si riserva alla pillola una striscia a destra o in basso (quella che lascia la mappa più vicina) e i posti
+  // stanno nel resto: nessuno viene tolto o spostato. Solo se lo zoom è già al minimo e non basta, il puntino si
+  // sposta appena fuori dalla pillola (sopra o a sinistra, il passo più corto).
+  const a = opz.angolo;
+  const sotto = (pt: { x: number; y: number }) => !!a && pt.x > w - a.w && pt.y > h - a.h;
+  let v = inquadra(0, 0);
+  if (a && v.px.some(sotto)) {
+    const prove = [inquadra(a.w, 0), inquadra(0, a.h)].sort((p, q) => Number(p.px.some(sotto)) - Number(q.px.some(sotto)) || q.z - p.z);
+    v = prove[0];
+  }
+  const { z, ix, iy } = v;
+  const px = !a ? v.px : v.px.map((pt) => !sotto(pt) ? pt : pt.y - (h - a.h) <= pt.x - (w - a.w) ? { ...pt, y: h - a.h } : { ...pt, x: w - a.w });
+  const at = `${lngDi(ix).toFixed(5)},${latDi(iy).toFixed(5)},${z}`;
   // Logo e attribuzione nel riquadro coprirebbero metà copertina: l'attribuzione è scritta sotto gli scaffali.
   // Nessun nome sulla mappa (COPRI_NOMI): il quartiere è già scritto sotto la copertina.
   const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&access_token=${token}&addlayer=${COPRI_NOMI}`;
-  const dentro = vista.map((p, i) => ({
-    i,
-    x: Math.round(((mx(p.lng) - cx) * scala + w / 2) / w * 1000) / 10,
-    y: Math.round(((my(p.lat) - cy) * scala + h / 2) / h * 1000) / 10,
+  const dentro = px.map((pt) => ({
+    i: pt.i,
+    x: Math.round(pt.x / w * 1000) / 10,
+    y: Math.round(pt.y / h * 1000) / 10,
   })).filter((pt) => pt.x >= 5 && pt.x <= 95 && pt.y >= 6 && pt.y <= 94);
   // Una mappa senza i suoi posti (o con meno della metà) non dice niente: meglio la copertina di prima.
   if (dentro.length === 0 || dentro.length * 2 < vista.length) return null;

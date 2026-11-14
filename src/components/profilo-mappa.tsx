@@ -27,7 +27,7 @@ export function MappaPunti({
   minPunti = 1,
   children = null,
   max = 12,
-  evita,
+  angolo,
 }: {
   punti: readonly PuntoPersona[];
   w: number;
@@ -41,7 +41,7 @@ export function MappaPunti({
   minPunti?: number; // sotto questo numero di puntini niente mappa (copertine delle raccolte: 3, revisore 14/11)
   children?: React.ReactNode; // sopra la mappa, solo se la mappa c'è (il tondo con l'emoji della raccolta)
   max?: number; // quanti puntini al massimo (copertine 12, mappa del profilo 30)
-  evita?: { x: number; y: number }; // angolo in basso a destra (in %) coperto da un pulsante: lì niente puntini
+  angolo?: { w: number; h: number }; // angolo in basso a destra (px di w×h) coperto da un pulsante: lì nessun puntino
 }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
@@ -49,10 +49,10 @@ export function MappaPunti({
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   // Le posizioni dei puntini non dipendono dal token: si calcolano sempre, l'immagine solo se c'è il token.
   // Senza nessun nome (src/lib/mappa-statica.ts, COPRI_NOMI): prima erano tre immagini composte, con l'ombra dei nomi.
-  const geo = useMemo(() => mappaStatica(punti, w, h, token || "-", margine, raggio, false, { max }), [punti, w, h, token, margine, raggio, max]);
+  // Revisore 14/11 (settimo giro): i posti sotto la pillola "Mappa" non si tolgono più, la mappa si inquadra attorno.
+  const geo = useMemo(() => mappaStatica(punti, w, h, token || "-", margine, raggio, false, { max, angolo }), [punti, w, h, token, margine, raggio, max, angolo]);
   const vista = useMemo(() => nucleo(punti, raggio).slice(0, max), [punti, raggio, max]); // geo.punti[].i punta qui
-  // Revisore 14/11 (sesto giro): niente puntini sotto la pillola "Mappa" (come le copertine dei Salvati).
-  const visibili = useMemo(() => geo?.punti.filter((pt) => !evita || pt.x < evita.x || pt.y < evita.y) ?? [], [geo, evita]);
+  const visibili = geo?.punti ?? [];
   // Pronta quando l'immagine è arrivata.
   const verifica = () => {
     const img = box.current?.querySelector("img");
@@ -83,9 +83,9 @@ export function MappaPunti({
 
 const W = 358;
 const H = 140;
-// La pillola "↗ Mappa" in basso a destra (circa 92×32 px a 8 px dal bordo): a 328 px di larghezza (telefono da 360)
-// copre da x ≈ 69% e y ≈ 62% in giù; con un po' di margine per il puntino.
-const EVITA_PILLOLA = { x: 66, y: 58 };
+// La pillola "↗ Mappa" in basso a destra: circa 92×32 px a 8 px dal bordo, più mezzo puntino (6 px). Il riquadro
+// si disegna largo 358 e si stringe col telefono: su uno da 320 (288 px, ×1,24) diventano circa 132×56 px di 358×140.
+const ANGOLO_PILLOLA = { w: 132, h: 56 };
 
 export default function ProfiloMappa({ spots, href, name }: { spots: PuntoPersona[]; href: string; name: string }) {
   if (spots.length === 0) return null;
@@ -100,7 +100,7 @@ export default function ProfiloMappa({ spots, href, name }: { spots: PuntoPerson
         className="relative block overflow-hidden rounded-card border border-border shadow-card active:scale-[0.99] transition-transform duration-150"
         style={{ aspectRatio: `${W} / ${H}` }}
       >
-        <MappaPunti punti={spots} w={W} h={H} dot="h-[11px] w-[11px] border-2" eager testId="profilo-mappa" dotTestId="profilo-mappa-puntino" raggio={5_000} max={30} evita={EVITA_PILLOLA} />
+        <MappaPunti punti={spots} w={W} h={H} dot="h-[11px] w-[11px] border-2" eager testId="profilo-mappa" dotTestId="profilo-mappa-puntino" raggio={5_000} max={30} angolo={ANGOLO_PILLOLA} />
         <span className="absolute bottom-2 right-2 inline-flex min-h-8 items-center gap-1.5 rounded-pill bg-white/95 px-3 text-[13px] font-display font-semibold text-brand shadow-[0_1px_4px_rgba(0,0,0,0.15)]">
           <Maximize2 size={13} aria-hidden /> Mappa
         </span>
