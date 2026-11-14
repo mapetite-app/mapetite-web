@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
 import { accettaInvito, chiInvita, completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
@@ -13,13 +12,9 @@ import SelettoreGusti, { contaScelti } from "@/components/selettore-gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
-import { clearStoredInvite, isFriendCode, readStoredInvite } from "@/lib/invito";
-import { cleanHandle } from "@/lib/handle";
-import { PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
+import { clearStoredInvite, isFriendCode, readStoredInvite, testoInvitoNo } from "@/lib/invito";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-// Anteprima del @nome che nasce dal nome (stessa regola di rendiTrovabile in actions.ts, senza il numero).
-const handleDaNome = (nome: string) => cleanHandle(nome).replace(/^[._]+|[._]+$/g, "").slice(0, 16);
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -125,6 +120,9 @@ const PASSO_DIETE = 4;
 const PASSO_OCCASIONI = 5;
 const PASSO_SPESA = 6;
 const PASSO_CAPITO = 7;
+// L'invito di un amico (revisore 14/11, quarto giro): un passo a sé dopo "Ecco cosa ho capito", solo se c'è un
+// invito. Fuori da STEPS: non entra nel contatore "N di 7" (è una domanda in più solo per chi arriva da un link).
+const PASSO_INVITO = TOTAL;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
@@ -239,10 +237,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
   // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
-  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" | "nome" } | null>(null);
-  const [trova, setTrova] = useState(false);
-  // Un solo campo "Il tuo nome" (revisore 14/11, terzo giro: prima due, uno per l'invito e uno per il profilo
-  // pubblico): sta nella card dell'invito finché aspetta una risposta, altrimenti sotto "Profilo pubblico".
+  // "no": la persona ha detto "Non ora"; "scaduto": il database ha detto di no (motivo: link scaduto, già usato, troppi).
+  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" | "nome" | "no"; motivo?: string } | null>(null);
+  // Un solo campo "Il tuo nome", nel passo dell'invito. "Profilo pubblico" non sta più nel primo accesso
+  // (revisore 14/11, quarto giro: l'ultima schermata era troppo carica): è in Amici, un riquadro discreto.
   const [mioNome, setMioNome] = useState("");
   const nomeRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -301,44 +299,45 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     chiInvita(codice)
       .then((r) => {
         if (!vivo || r === "rete") return; // rete o database giù: il codice resta e si riprova alla prossima apertura
-        if (r) setInvito({ codice, nome: r.nome, stato: "chiedi" });
+        // Già amici (non succede a chi si è appena iscritto, ma il link può essere vecchio): niente da chiedere.
+        if (r && !r.amico) setInvito({ codice, nome: r.nome, stato: "chiedi" });
         else clearStoredInvite();
       })
       .catch(() => {});
     return () => { vivo = false; };
   }, []);
 
-  // L'invito aspetta ancora un sì o un no (allora il campo nome sta nella sua card).
-  const invitoAperto = !!invito && invito.stato !== "amici" && invito.stato !== "scaduto";
+  // L'invito aspetta ancora un sì o un no: dopo la frase c'è il suo passo.
+  const invitoAperto = !!invito && invito.stato !== "amici" && invito.stato !== "scaduto" && invito.stato !== "no";
 
   const rispondiInvito = async (si: boolean) => {
     if (!invito) return;
     if (!si) {
       trackFeature("invito_amico", { stato: "non_ora" });
       clearStoredInvite();
-      setInvito(null);
+      setInvito({ ...invito, stato: "no" });
       return;
     }
     setInvito({ ...invito, stato: "salvo" });
     const r = await accettaInvito(invito.codice, mioNome.trim()).catch(() => ({ stato: "rete" as const }));
-    trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato });
+    trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato === "no" ? r.motivo : r.stato });
     if (r.stato === "rete") { setInvito({ ...invito, stato: "errore" }); return; }
     if (r.stato === "nome") { setInvito({ ...invito, stato: "nome" }); nomeRef.current?.focus(); return; }
     clearStoredInvite();
-    // Revisore 14/11: niente sparizioni silenziose: si dice che l'invito non vale più.
+    // Revisore 14/11: niente sparizioni silenziose, e il motivo vero (scaduto, già usato tra voi, troppi amici).
     if (r.stato === "ok") setInvito({ ...invito, nome: r.nome ?? invito.nome, stato: "amici" });
-    else setInvito({ ...invito, stato: "scaduto" });
+    else setInvito({ ...invito, stato: "scaduto", motivo: r.motivo });
   };
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
   // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
-  const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
+  const passoMostrato = step <= PASSO_AMATI ? step + 1 : Math.min(step, TOTAL - 1);
   // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
   // la barra avanza di mezzo passo, così il tocco si vede.
   const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / (TOTAL - 1)) * 100;
-  const config = STEPS[step];
+  const config = STEPS[Math.min(step, TOTAL - 1)];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
   // Solo le card votate: "Non lo conosco" spingeva verso i famosi (collaudo del 24/10, VISIONE).
@@ -389,13 +388,6 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   };
 
   const finish = async (dest: "importa" | null) => {
-    if (trova && !mioNome.trim()) {
-      // L'avviso sta sotto il campo (revisore 14/11: in fondo era mezzo coperto) e il cursore va lì.
-      setError("nome");
-      nomeRef.current?.focus();
-      nomeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      return;
-    }
     setSubmitting(dest ?? "mappa");
     setError(null);
     trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
@@ -408,7 +400,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined, trovabile: trova && mioNome.trim() ? { nome: mioNome.trim() } : null });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -449,7 +441,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   useEffect(() => {
     if (!correggi) return;
     const el = document.querySelector("[data-testid=capito-righe]");
-    const fondo = document.querySelector("[data-testid=benvenuto-fine]")?.closest(".fixed")?.getBoundingClientRect().top ?? window.innerHeight;
+    const fondo = document.querySelector("[data-testid=benvenuto-fine], [data-testid=capito-avanti]")?.closest(".fixed")?.getBoundingClientRect().top ?? window.innerHeight;
     const cima = document.querySelector("[data-testid=benvenuto] > .sticky")?.getBoundingClientRect().bottom ?? 0;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -514,12 +506,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
       {/* Contenuto */}
       {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
-      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step === PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
+      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
-          {step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
+          {step === PASSO_INVITO ? `${invito?.nome ?? "Un amico"} ti ha invitato` : step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
         </h1>
-        {config.subtitle && (
+        {config.subtitle && step !== PASSO_INVITO && (
           <p className="mb-5 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mb-3">
             {step === PASSO_SCOPERTA && !scoperta && dedotta ? "L'ho scelto dai tuoi 👍: cambialo se non è così." : config.subtitle}
           </p>
@@ -772,45 +764,6 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
-            {/* L'amico che ti ha invitato: una domanda sola, in cima, con il suo nome (revisore 14/11). */}
-            {invito && (
-              <section data-testid="invito-amico" className="mb-5 flex items-center gap-3 rounded-card bg-brand p-4 text-white shadow-card">
-                <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl">{invito.stato === "amici" ? "🤝" : "💌"}</span>
-                {invito.stato === "amici" ? (
-                  <p data-testid="invito-collegato" className="min-w-0 flex-1 text-[15px] font-sans leading-snug">
-                    {invito.nome ? <>Tu e <span className="font-semibold">{invito.nome}</span> siete amici</> : "Siete amici"}: vi trovate in Amici.
-                  </p>
-                ) : invito.stato === "scaduto" ? (
-                  <p data-testid="invito-scaduto" className="min-w-0 flex-1 text-[15px] font-sans leading-snug">Questo invito non vale più. Chiedi a {invito.nome ?? "chi te l'ha mandato"} un link nuovo.</p>
-                ) : (
-                  <div className="min-w-0 flex-1">
-                    <p data-testid="invito-domanda" className="text-[15px] font-sans font-medium leading-snug">{invito.nome ?? "Un amico"} ti ha invitato</p>
-                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : invito.stato === "nome" ? "Prima scrivi il tuo nome." : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}</p>
-                    {/* Il proprio nome, perché l'amico sappia chi ha accettato (prima vedeva "Qualcuno"). È l'unico
-                        campo nome della schermata: vale anche per "Profilo pubblico" qui sotto. */}
-                    <input
-                      ref={nomeRef}
-                      data-testid="invito-mio-nome"
-                      value={mioNome}
-                      onChange={(e) => { setMioNome(e.target.value); setError(null); }}
-                      maxLength={40}
-                      autoComplete="name"
-                      placeholder="Il tuo nome"
-                      aria-label="Il tuo nome, lo vedrà chi ti ha invitato"
-                      className="mt-2.5 block min-h-11 w-full rounded-btn border-0 bg-white px-3 text-[16px] font-sans text-text outline-none placeholder:text-text-muted"
-                    />
-                    <div className="mt-2.5 flex gap-2">
-                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo" || !mioNome.trim()} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
-                        {invito.stato === "salvo" ? "Un attimo…" : "Diventa amico"}
-                      </button>
-                      <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill px-3 font-display text-sm font-semibold text-white/85">
-                        Non ora
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
             {frase.length > 0 ? (
               <>
                 {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
@@ -869,68 +822,44 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             {frase.length > 0 && (
               <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
             )}
-            {/* Lorenzo 14/11: gli amici non si trovavano perché nessuno era pubblico. Qui, una volta sola, il
-                profilo pubblico: spento di default; il titolo dice la verità (lo vede chiunque, revisore 14/11),
-                il @nome che nasce si vede prima, cosa vedono gli altri un tocco più in là. */}
-            <section data-testid="fatti-trovare" className="mt-6 rounded-card border border-border bg-white p-4 shadow-card">
-              <label className="flex cursor-pointer items-center justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block font-display text-[15px] font-semibold text-text">Profilo pubblico</span>
-                  <span className="block text-[13px] font-sans text-text-muted">Gli amici ti trovano per nome. Lo vede chiunque abbia il link o ti cerchi.</span>
-                </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  data-testid="fatti-trovare-interruttore"
-                  checked={trova}
-                  onChange={(e) => {
-                    setTrova(e.target.checked);
-                    setError(null);
-                    if (e.target.checked) trackFeature("fatti_trovare_on", { contesto: invito ? "invito" : "primo_accesso" });
-                  }}
-                  aria-checked={trova}
-                  className="peer sr-only"
-                />
-                <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-pill bg-border transition-colors duration-150 peer-checked:bg-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-card after:transition-transform after:duration-150 peer-checked:after:translate-x-5" />
-              </label>
-              {trova && (
-                <>
-                  {/* Con l'invito in attesa il nome si scrive una volta sola, nella card in alto. */}
-                  {!invitoAperto && (
-                    <label className="mt-3 block text-sm font-display font-semibold text-text">
-                      Il tuo nome
-                      <input
-                        ref={nomeRef}
-                        data-testid="fatti-trovare-nome"
-                        value={mioNome}
-                        onChange={(e) => { setMioNome(e.target.value); setError(null); }}
-                        maxLength={40}
-                        autoComplete="name"
-                        placeholder="es. Giulia Rossi"
-                        aria-invalid={!!error && !mioNome.trim()}
-                        aria-describedby="fatti-trovare-indirizzo"
-                        className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
-                      />
-                    </label>
-                  )}
-                  <p id="fatti-trovare-indirizzo" data-testid="fatti-trovare-indirizzo" className="mt-1.5 text-xs font-sans text-text-muted">
-                    {error && !mioNome.trim()
-                      ? <span role="alert" className="text-error">{invitoAperto ? "Scrivi il tuo nome in alto, o spegni “Profilo pubblico”." : "Scrivi il tuo nome, o spegni “Profilo pubblico”."}</span>
-                      : <>{invitoAperto && !mioNome.trim() ? "Il nome è quello che scrivi in alto. " : ""}Il tuo indirizzo: mapetite…/u/{handleDaNome(mioNome) || "nome"}{mioNome.trim() ? " (se è preso, aggiungo un numero)" : ""}</>}
-                  </p>
-                  {/* Stesso testo del profilo e di /privacy (src/lib/privacy-profilo.ts): consenso informato, una sola fonte. */}
-                  <details data-testid="fatti-trovare-privacy" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">
-                    <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-brand">Cosa vedono gli altri</summary>
-                    <p>{PUBBLICO_CHI}:</p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">{PUBBLICO_VEDONO.map((v) => <li key={v}>{v}</li>)}</ul>
-                    <p className="mt-1.5">Mai: {PUBBLICO_MAI.join(", ")}. {PUBBLICO_REVOCA}{" "}
-                      <Link href="/privacy#profilo-pubblico" target="_blank" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
-                    </p>
-                  </details>
-                </>
-              )}
-            </section>
           </div>
+        )}
+
+        {/* L'invito di un amico, un passo a sé (una domanda per schermata, come Albo): il nome di chi invita nel
+            titolo, il tuo nome (lo vedrà lui), "Diventa amico" e "Non ora" in basso. */}
+        {step === PASSO_INVITO && invito && (
+          <section data-testid="invito-amico" className="flex flex-col gap-4">
+            {invito.stato === "amici" ? (
+              <p data-testid="invito-collegato" className="flex items-start gap-3 rounded-card bg-brand p-4 text-[15px] font-sans leading-snug text-white shadow-card">
+                <span aria-hidden className="text-2xl">🤝</span>
+                <span>{invito.nome ? <>Tu e <span className="font-semibold">{invito.nome}</span> siete amici</> : "Siete amici"}: vi trovate in Amici.</span>
+              </p>
+            ) : invito.stato === "scaduto" ? (
+              <p data-testid="invito-scaduto" data-motivo={invito.motivo ?? ""} className="rounded-card border border-border bg-white p-4 text-[15px] font-sans leading-snug text-text">{testoInvitoNo(invito.motivo ?? "", invito.nome)}</p>
+            ) : invito.stato === "no" ? (
+              <p data-testid="invito-non-ora" className="text-[15px] font-sans text-text-muted">Va bene. Gli amici li trovi quando vuoi in Amici.</p>
+            ) : (
+              <>
+                <p data-testid="invito-domanda" className="text-[15px] font-sans text-text-muted">
+                  {invito.stato === "errore" ? <span role="alert" className="text-error">Non ci sono riuscito: riprova.</span> : invito.stato === "nome" ? <span role="alert" className="text-error">Prima scrivi il tuo nome.</span> : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}
+                </p>
+                <label className="block text-sm font-display font-semibold text-text">
+                  Il tuo nome
+                  <input
+                    ref={nomeRef}
+                    data-testid="invito-mio-nome"
+                    value={mioNome}
+                    onChange={(e) => { setMioNome(e.target.value); setError(null); }}
+                    maxLength={40}
+                    autoComplete="name"
+                    placeholder="es. Giulia Rossi"
+                    aria-invalid={invito.stato === "nome"}
+                    className="mt-1.5 block min-h-12 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
+                  />
+                </label>
+              </>
+            )}
+          </section>
         )}
       </div>
 
@@ -978,6 +907,20 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               {tornaFrase ? "Torna alla frase" : risposto || step === 0 ? "Continua" : step === PASSO_DIETE ? "Mangio di tutto" : "Salta"}
             </button>
             </>
+          ) : invitoAperto && step === PASSO_CAPITO ? (
+            <button type="button" data-testid="capito-avanti" onClick={() => setStep(PASSO_INVITO)} className={TASTO_PIENO}>
+              Continua <ArrowRight size={18} aria-hidden />
+            </button>
+          ) : invitoAperto && invito && step === PASSO_INVITO ? (
+            <>
+              {/* Spento finché manca il nome, ma leggibile (revisore 14/11: corallo sbiadito non si leggeva). */}
+              <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo" || !mioNome.trim()} className={`${TASTO} ${mioNome.trim() ? "bg-accent text-white shadow-float" : "bg-[#e3e7e7] text-text-muted"} disabled:opacity-100`}>
+                {invito.stato === "salvo" ? "Un attimo…" : `Diventa amico${invito.nome ? ` di ${invito.nome}` : ""}`}
+              </button>
+              <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-[15px] font-semibold text-text-muted">
+                Non ora
+              </button>
+            </>
           ) : (
             <>
               <button type="button" data-testid="benvenuto-fine" onClick={() => finish(null)} disabled={!!submitting} className={TASTO_PIENO}>
@@ -996,7 +939,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </button>
             </>
           )}
-          {error && error !== "nome" && <p className="mt-3 text-center text-sm text-error">{error}</p>}
+          {error && <p className="mt-3 text-center text-sm text-error">{error}</p>}
         </div>
       </div>
     </div>

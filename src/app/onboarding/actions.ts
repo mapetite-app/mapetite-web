@@ -11,7 +11,6 @@ import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-loc
 import { safeNext, withNext } from "@/lib/next-path";
 import { cleanInviteCode, isFriendCode } from "@/lib/invito";
 import { anteprimaInvito } from "@/lib/social";
-import { cleanHandle, isValidHandle } from "@/lib/handle";
 
 interface OnboardingData {
   cuisines: string[];
@@ -27,8 +26,6 @@ interface OnboardingData {
   // Mappa del gusto (sprint 25/10): zone, tipi di posto 👍/👎, "famosi o chicche?", diete.
   gusto?: unknown;
   diete?: unknown;
-  // "Fatti trovare dagli amici" (Lorenzo 14/11): il nome da mostrare; presente solo se l'interruttore è acceso.
-  trovabile?: { nome?: unknown } | null;
 }
 
 export async function completeOnboarding({
@@ -41,7 +38,6 @@ export async function completeOnboarding({
   next,
   gusto: gustoRaw,
   diete: dieteRaw,
-  trovabile,
 }: OnboardingData): Promise<{ error: string } | { login: string } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
@@ -124,50 +120,13 @@ export async function completeOnboarding({
     if (dErr) console.error("[onboarding] diete:", dErr.message);
   }
 
-  // "Fatti trovare dagli amici": nome da mostrare, nome pubblico ricavato dal nome e profilo pubblico.
-  // Errori solo nei log: i gusti sono già salvati e il profilo si sistema da /profilo.
-  // Revisore 14/11: se non riesce, la persona lo deve sapere (prima finiva solo nei log). I gusti sono
-  // già salvati: rimane qui con l'errore e un nuovo tocco riprova.
-  const nome = typeof trovabile?.nome === "string" ? trovabile.nome.trim().slice(0, 40) : "";
-  if (nome) {
-    const esito = await rendiTrovabile(supabase, user.id, nome);
-    if (esito) {
-      console.error("[onboarding] profilo pubblico:", esito);
-      return { error: "Gusti salvati, ma non sono riuscito a rendere pubblico il profilo. Riprova, o spegni “Profilo pubblico”." };
-    }
-  }
-
   goOn(gusti, citta, dest, back, mappa);
-}
-
-type Client = Awaited<ReturnType<typeof createClient>>;
-const RISERVATI = ["mapetite", "admin", "tester", "amici", "supporto", "support", "staff", "ufficiale"];
-
-// Nome pubblico libero a partire dal nome: "Giulia Rossi" → giuliarossi, poi giuliarossi2, 3… se è preso.
-// Chi ha già un nome pubblico lo tiene. Ritorna un messaggio d'errore, o null se è andata.
-async function rendiTrovabile(supabase: Client, userId: string, nome: string): Promise<string | null> {
-  const { data: prof } = await supabase.from("profiles").select("handle").eq("id", userId).maybeSingle();
-  const attuale = isValidHandle(prof?.handle) ? prof!.handle : null;
-  let base = cleanHandle(nome).replace(/^[._]+|[._]+$/g, "").slice(0, 16);
-  // Mai un @nome che sembri ufficiale (revisore 14/11): niente "mapetite", "admin", "tester"…
-  if (base.length < 3) base = `persona${Math.floor(100 + Math.random() * 900)}`;
-  if (RISERVATI.some((r) => base.startsWith(r))) base = `persona${Math.floor(100 + Math.random() * 900)}`;
-  const candidati = attuale ? [attuale] : [base, ...Array.from({ length: 6 }, (_, i) => `${base}${i + 2}`), `${base}${Math.floor(1000 + Math.random() * 9000)}`];
-  for (const handle of candidati) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ display_name: nome, handle, is_public: true, updated_at: new Date().toISOString() })
-      .eq("id", userId)
-      .select("id");
-    if (!error) return data && data.length > 0 ? null : "profilo non trovato";
-    if (error.code !== "23505") return error.message;
-  }
-  return "nessun nome pubblico libero";
 }
 
 // Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
 // "Diventa amico" o "Non ora". Solo i codici casuali "i-…" (migrazione 20261114c_inviti_sicuri).
-export type ChiInvita = { nome: string | null } | null | "rete";
+// "amico": chi guarda è già amico di chi invita (allora niente "Diventa amico").
+export type ChiInvita = { nome: string | null; amico: boolean } | null | "rete";
 // "nome": il database chiede prima il tuo nome (revisore 14/11, terzo giro: obbligatorio anche nel server).
 export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "nome" } | { stato: "no"; motivo: string } | { stato: "rete" };
 
@@ -177,11 +136,11 @@ const nomeFinto = (codice: string) => (codice.endsWith("0000000000aa") ? "Giulia
 export async function chiInvita(raw: unknown): Promise<ChiInvita> {
   const codice = cleanInviteCode(raw);
   if (!isFriendCode(codice)) return null;
-  if (await fakeE2E()) return codice.endsWith("ffffffffffff") ? null : { nome: nomeFinto(codice) };
+  if (await fakeE2E()) return codice.endsWith("ffffffffffff") ? null : { nome: nomeFinto(codice), amico: codice.endsWith("00000000a1a1") };
   const p = await anteprimaInvito(codice);
   // Errore del database o rete: "rete", così il telefono tiene il codice e riprova (revisore 14/11).
   if (p === "errore") return "rete";
-  return p ? { nome: p.nome } : null;
+  return p ? { nome: p.nome, amico: p.amico } : null;
 }
 
 // "nome": chi accetta e non ha ancora un nome lo sceglie qui (lo vedrà l'amico: revisore 14/11, prima
@@ -189,8 +148,14 @@ export async function chiInvita(raw: unknown): Promise<ChiInvita> {
 export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<EsitoInvito> {
   const codice = cleanInviteCode(raw);
   if (!isFriendCode(codice)) return { stato: "no", motivo: "codice" };
-  const nome = typeof nomeRaw === "string" ? nomeRaw.trim().slice(0, 40) : "";
-  if (await fakeE2E()) return { stato: "ok", nome: nomeFinto(codice) };
+  // Troncato per caratteri veri (emoji comprese), non per unità UTF-16 (revisore 14/11).
+  const nome = typeof nomeRaw === "string" ? Array.from(nomeRaw.trim()).slice(0, 40).join("") : "";
+  if (await fakeE2E()) {
+    // Giro automatico: codici finti per gli esiti "già usato" e "troppi".
+    if (codice.endsWith("00000000a5a5")) return { stato: "no", motivo: "gia-usato" };
+    if (codice.endsWith("00000000a7a7")) return { stato: "no", motivo: "troppi" };
+    return { stato: "ok", nome: nomeFinto(codice) };
+  }
   const supabase = await createClient();
   if (nome) {
     const { data: { user } } = await supabase.auth.getUser();

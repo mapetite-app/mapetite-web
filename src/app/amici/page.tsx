@@ -13,6 +13,7 @@ import CercaPersone from "./cerca-persone";
 import AmicoRiga from "./amico";
 import InvitoSospeso from "./invito-sospeso";
 import CreatorListe from "./creator-liste";
+import InvitaAmico from "@/components/invita-amico";
 
 // Amici (piano 5.2): chi segui, cosa ha salvato o dove è stato, e la ricerca delle persone.
 // Stile Places "People": riga di avatar in alto, poi attività con le card dei locali.
@@ -52,6 +53,10 @@ export default async function AmiciPage() {
     ? await Promise.all([loadScopritori(seguo), loadMyGems(viewer), loadVerdetti(feed.attivita.map((s) => s.place_id))])
     : [null, null, {} as Record<string, string>];
   const hasCreators = creators.some((c) => c.places.length > 0);
+  // Nessun amico e nessuno seguito (revisore 14/11, quarto giro): lo stato vuoto è l'invito, non una frase.
+  const vuota = feed.stato !== "in-arrivo" && feed.seguiti.length === 0 && amici.length === 0;
+  const codiceInvito = vuota ? await mioInvito() : null;
+  const privato = feed.stato !== "in-arrivo" && !feed.mio?.is_public;
   const creatorSection = (
     <div id="creator" className="scroll-mt-4">
       <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
@@ -87,13 +92,11 @@ export default async function AmiciPage() {
                 <span aria-hidden>⭐</span> Creator da seguire
               </a>
             )}
-            {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo). */}
-            <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
-              <span aria-hidden>💌</span> Invita un amico
-            </Link>
-            {!feed.mio?.is_public && (
-              <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className={chip}>
-                <span aria-hidden>🙋</span> Fatti trovare
+            {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo).
+                Con la pagina vuota l'invito è già sotto, a tutta larghezza: niente doppione. */}
+            {!vuota && (
+              <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
+                <span aria-hidden>💌</span> Invita un amico
               </Link>
             )}
           </nav>
@@ -125,12 +128,9 @@ export default async function AmiciPage() {
 
           <section className="mt-6" aria-labelledby="attivita-titolo">
             <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
-            {feed.seguiti.length === 0 && amici.length === 0 ? (
-              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center">
-                <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
-                <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
-                  Cerca un amico per nome in alto, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
-                </p>
+            {vuota ? (
+              <div data-testid="amici-vuoto" className="mt-2">
+                <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
               </div>
             ) : feed.attivita.length === 0 ? (
               <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center text-sm font-sans text-text-muted">
@@ -167,6 +167,21 @@ export default async function AmiciPage() {
               </ul>
             )}
           </section>
+
+          {/* "Fatti trovare" (revisore 14/11, quarto giro): uscito dal primo accesso, qui un riquadro discreto. Il
+              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri. */}
+          {privato && (
+            <section data-testid="amici-fatti-trovare" className="mt-6 flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white px-4 py-3">
+              <span aria-hidden className="text-xl">🙋</span>
+              <p className="min-w-0 flex-1 text-[13px] font-sans leading-snug text-text-muted">
+                <span className="block font-display text-[14px] font-semibold text-text">Fatti trovare</span>
+                Gli amici ti cercano per nome solo con il profilo pubblico.
+              </p>
+              <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className="inline-flex min-h-11 shrink-0 items-center px-1 font-display text-sm font-semibold text-brand">
+                Rendi pubblico
+              </Link>
+            </section>
+          )}
 
           {feed.seguiti.length > 0 && creatorSection}
         </>
