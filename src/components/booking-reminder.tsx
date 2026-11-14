@@ -263,7 +263,7 @@ export default function BookingReminder() {
                 updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" });
               }}
               onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
-              altro={[{ label: "No, toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
+              altro={[{ label: "No, non prenoto: toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
             />
           )}
           {altreDaChiedere > 0 && (

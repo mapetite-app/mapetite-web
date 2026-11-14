@@ -383,8 +383,8 @@ export default function BookingSheet({
                 ↻ Come l&apos;ultima volta{ultima.people ? `: ${ultima.people} ${ultima.people === 1 ? "persona" : "persone"}` : ""}{ultima.time ? `${ultima.people ? "" : ":"} alle ${ultima.time}` : ""}
               </p>
             )}
-            {/* Giorno */}
-            <p className="mt-3 text-sm font-display font-semibold text-text">Quando</p>
+            {/* Giorno. Nel passo "Per quando?" l'etichetta "Quando" ripeteva il titolo appena sopra (revisore 14/11). */}
+            {!correggi && <p data-testid="prenota-etichetta-quando" className="mt-3 text-sm font-display font-semibold text-text">Quando</p>}
             <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {days.map((d) => (
                 <button
