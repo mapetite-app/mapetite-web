@@ -600,16 +600,20 @@ export function chiConferma(b: Pick<BookingRequest, "piattaforma">): string {
 
 // Richieste partite ma senza risposta della persona, oggi o domani: "L'hai prenotato?" (Sì / Non ancora)
 // al posto del promemoria. Solo quelle senza un altro promemoria in corso ("ti hanno risposto?").
+const SENZA_GIORNO_MS = 14 * 86_400_000;
 export function daConfermare(list: BookingRequest[], now: Date = new Date()): BookingRequest[] {
   const oggi = dateKey(now);
   const domani = dateKey(addDays(now, 1));
   // Già prenotato lì quel giorno (con il sì): la richiesta ripetuta non si chiede più.
   const fatti = new Set(list.filter((b) => b.confirmed && !b.outcome).map((b) => `${b.placeId}|${b.date}`));
   return list
-    .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani) && !fatti.has(`${b.placeId}|${b.date}`))
+    // Anche le richieste senza giorno (TheFork aperto senza sceglierlo, revisore 14/11): partite da meno
+    // di 14 giorni, altrimenti restavano per sempre in /prenotazioni senza che nessuno lo chiedesse.
+    .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani || (b.date == null && now.getTime() - b.createdAt < SENZA_GIORNO_MS)) && !fatti.has(`${b.placeId}|${b.date}`))
     // "Non ancora": la domanda torna dopo 3 ore, non a ogni apertura.
     .filter((b) => b.nonAncora == null || now.getTime() - b.nonAncora > 3 * 3_600_000)
-    .sort((a, c) => `${a.date} ${a.time ?? ""}`.localeCompare(`${c.date} ${c.time ?? ""}`));
+    // Prima quelle con il giorno (le più urgenti), poi quelle senza.
+    .sort((a, c) => `${a.date ?? "9999"} ${a.time ?? ""}`.localeCompare(`${c.date ?? "9999"} ${c.time ?? ""}`));
 }
 
 // Il banner della mappa: la prossima prenotazione di oggi (fino a un'ora dopo l'ora del tavolo),

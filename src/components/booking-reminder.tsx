@@ -6,7 +6,7 @@ import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide
 import { appenaPrenotata, bookingReminders, cancelMessage, daConfermare, dateKey, doubleBookings, loadBookings, popupPrenotazione, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, subscribePopupPrenotazione, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
-import { DomandaPrenotato } from "@/components/domanda-prenotato";
+import { DomandaPrenotato, PerQuando } from "@/components/domanda-prenotato";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
 // "Stasera alle 21:00 da …", dal giorno dopo "Com'è andata?". In home e nel profilo.
@@ -198,6 +198,7 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
 
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [quandoId, setQuandoId] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
   const rem = bookingReminders(list);
@@ -225,6 +226,8 @@ export default function BookingReminder() {
   const altreDaChiedere = tutteDaChiedere.length - chiedi.length;
   if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0 && chiedi.length === 0) return null;
   const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
+  // Con un tavolo vero oggi viene prima lui (revisore 14/11): la domanda scende sotto, in una riga sola.
+  const tavoloOggi = prossime.some(({ domani }) => !domani) || doppi.some(({ domani }) => !domani);
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
       {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto?
@@ -242,16 +245,27 @@ export default function BookingReminder() {
         </section>
       ))}
       {/* Richiesta partita, senza risposta della persona: "L'hai prenotato?" al posto del promemoria. */}
-      {chiedi.map((b) => (
+      {!tavoloOggi && chiedi.map((b) => (
         <section key={`c-${b.id}`} data-testid="promemoria-hai-prenotato" className="rounded-card border border-border bg-surface p-4 shadow-card">
-          <DomandaPrenotato
-            b={b}
-            now={now}
-            ids={{ si: "hai-prenotato-si", nonAncora: "hai-prenotato-non-ancora" }}
-            onSi={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }}
-            onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
-            altro={[{ label: "No, non prenoto: toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
-          />
+          {quandoId === b.id ? (
+            <>
+              <p className="font-title text-xl font-semibold leading-tight text-text">{b.placeName}</p>
+              <PerQuando b={b} onFatto={() => { setQuandoId(null); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }} />
+            </>
+          ) : (
+            <DomandaPrenotato
+              b={b}
+              now={now}
+              ids={{ si: "hai-prenotato-si", nonAncora: "hai-prenotato-non-ancora" }}
+              onSi={() => {
+                // Senza giorno o ora (TheFork aperto senza sceglierli): prima "Per quando?".
+                if (!b.date || !b.time) { setQuandoId(b.id); return; }
+                updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" });
+              }}
+              onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
+              altro={[{ label: "No, toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
+            />
+          )}
           {altreDaChiedere > 0 && (
             <Link href="/prenotazioni" data-testid="promemoria-altre-da-confermare" className="mt-1 flex min-h-10 items-center border-t border-border pt-2 text-sm font-display font-semibold text-brand">
               +{altreDaChiedere} da confermare
@@ -300,6 +314,13 @@ export default function BookingReminder() {
           {cancelling === b.id && <Disdetta b={b} />}
         </section>
       )))}
+      {/* Sotto il tavolo di oggi, le richieste da confermare in una riga sola (revisore 14/11). */}
+      {tavoloOggi && tutteDaChiedere.length > 0 && (
+        <Link href="/prenotazioni" data-testid="promemoria-da-confermare-riga" className="flex min-h-11 items-center justify-between gap-2 rounded-card border border-border bg-surface px-4 text-sm font-display font-semibold text-brand shadow-card">
+          <span className="min-w-0 truncate">L&apos;hai prenotato? {tutteDaChiedere.length === 1 ? tutteDaChiedere[0].placeName : `${tutteDaChiedere.length} da confermare`}</span>
+          <span className="shrink-0 text-accent">Rispondi</span>
+        </Link>
+      )}
       {howWasIt.slice(0, 1).map((b) => (
         <section key={b.id} data-testid="promemoria-com-e-andata" className="rounded-card border border-border bg-surface p-4 shadow-card">
           <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Com&apos;è andata?</p>
