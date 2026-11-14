@@ -404,6 +404,22 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   ok(pezzi.length >= 1 && pezzi.every((x) => /^(Rooftop|Romantico) secondo le recensioni: 1 su \d+$|^\d+ poco conosciut[ieoa]$|^Tutti poco conosciuti$|^Senza i locali più famosi$|^Messo da parte .+,? molto famoso$|^Messi da parte .+ e (altri \d+ molto famosi|un altro molto famoso)$/i.test(x)) && /rooftop secondo le recensioni: 1 su 2/i.test(dettaglio) && !/romantic[io] a|bar romantic/i.test(fr), `frase sopra le card: il dettaglio viene solo dalle recensioni e dai dati Google ('${dettaglio}')`);
   const g = await page.evaluate(() => { const f = document.querySelector("[data-testid=frase-risultati]").getBoundingClientRect(); const c = document.querySelector("ul.snap-x li [data-testid=card-risultato]").getBoundingClientRect(); return { fb: f.bottom, ct: c.top, h: f.height }; });
   ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
+// Copertine mappa (src/lib/mappa-statica.ts, revisore 14/11, sesto giro): "Romantico" con 13 posti a Roma e 1 a Milano
+// mostrava Milano con un puntino (a parità vinceva il primo). Ora vince il nucleo più numeroso, a parità quello della
+// città con più posti (o della città scelta); la mappa del profilo arriva a 30 puntini.
+{ const ms = await import(new URL("../../src/lib/mappa-statica.ts", import.meta.url).href);
+  const MI = { lat: 45.4642, lng: 9.19, id: "mi" };
+  const roma = Array.from({ length: 13 }, (_, i) => ({ lat: 41.89 + 0.004 * i, lng: 12.48, id: `r${i}` }));
+  const n1 = ms.nucleo([MI, ...roma]);
+  ok(n1.length >= 3 && n1.every((p) => p.id.startsWith("r")), `copertine mappa: 13 posti a Roma e 1 a Milano (primo) → il nucleo è a Roma (${n1.map((p) => p.id).join(",")})`);
+  const sparsi = [MI, { lat: 41.89, lng: 12.48, id: "rA" }, { lat: 41.935, lng: 12.48, id: "rB" }];
+  const n2 = ms.nucleo(sparsi);
+  ok(n2.length === 1 && n2[0].id === "rA", `copertine mappa: a parità (un posto per nucleo) vince la città con più posti, non il primo della lista (${n2.map((p) => p.id).join(",")})`);
+  const n3 = ms.nucleo(sparsi, undefined, (p) => p.id === "mi");
+  ok(n3.length === 1 && n3[0].id === "mi", "copertine mappa: a parità vince la città scelta");
+  const fitti = Array.from({ length: 40 }, (_, i) => ({ lat: 41.89 + 0.0004 * (i % 7), lng: 12.48 + 0.0004 * Math.floor(i / 7) }));
+  const m12 = ms.mappaStatica(fitti, 124, 72, "tok"), m30 = ms.mappaStatica(fitti, 358, 140, "tok", 16, 5_000, false, "citta", { max: 30 });
+  ok(m12?.punti.length <= 12 && m30?.punti.length > 12 && m30.punti.length <= 30, `copertine mappa: 12 puntini nelle copertine, fino a 30 nella mappa del profilo (${m12?.punti.length}/${m30?.punti.length})`); }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
@@ -2211,6 +2227,8 @@ else {
       const tondi = await L.locator("header a, header button").count();
       ok(tondi === 2 && (await L.locator("header").getByRole("button", { name: "Cerca" }).count()) === 0 && (await L.locator("header").getByTestId("salvati-lista-mappa").count()) === 0, `salvati lista: in alto solo 'Stasera' e un '+' (${tondi} pulsanti)`); }
     ok((await L.getByTestId("raccolta-cerchio").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).join("|") === "Amici, 1 posto|Romantico, 1 posto", "salvati lista: le raccolte vere come copertine, con la maiuscola (Amici, Romantico)");
+    // Revisore 14/11 (sesto giro): una raccolta con meno di 3 puntini non mostra una mappa con un puntino solo, ma l'emoji.
+    ok((await L.getByTestId("raccolta-cerchio").locator("[data-testid=scaffale-mappa]").count()) === 0, "salvati lista: raccolte con 1 posto → l'emoji, non una mappa con un puntino");
     // Giro del 1/11 e revisore: copertine basse (64 px) con il mosaico dei posti e il nome dentro, numero piccolo accanto,
     // "Nuova" ultima e intera nello schermo, "Stasera" pulsante piccolo nella riga di "Filtri".
     { const cop = L.getByTestId("raccolta-copertina");
@@ -4698,6 +4716,8 @@ else {
   // Giro 1/11 (D36): uno stato, una parola. Per i posti di un'altra persona "Provati", come il titolo "Già provati".
   ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) === 0, "profilo pubblico: mai 'Visitato'; sotto 'Di recente' e 'Da provare' niente pillola di stato doppione");
   { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("2 posti") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come copertine (senza gli stati)"); }
+  // Revisore 14/11 (sesto giro): sotto i 3 puntini la copertina della raccolta è l'emoji, non una mappa quasi vuota.
+  ok((await sp.getByTestId("raccolta-copertina-mappa").count()) === 0 && (await sp.getByTestId("profilo-raccolte").innerText()).length > 0, "profilo pubblico: raccolte con 1-2 posti → l'emoji, niente mappa con uno o due puntini");
   // Revisore 14/11: le raccolte stanno sopra la lista dei posti (prima erano un'etichetta grigia in fondo).
   { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1;
     ok((await y("profilo-raccolte-sezione")) > 0 && (await y("profilo-raccolte-sezione")) < (await y("profilo-lista")), "profilo pubblico: 'Raccolte' sopra 'I suoi posti'"); }
