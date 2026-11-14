@@ -5,12 +5,16 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { CalendarCheck, Navigation, X } from "lucide-react";
 import {
+  appenaPrenotata,
   loadBookings,
+  popupPrenotazione,
   portamiLiUrl,
   prenotazioneDaRicordare,
   prenotazioneTraPoco,
   quandoTavolo,
+  segnaPopupPrenotazione,
   subscribeBookings,
+  subscribePopupPrenotazione,
   traQuanto,
   updateBooking,
   type BookingRequest,
@@ -59,11 +63,13 @@ const NASCOSTI_MAPPA = "mapetite.prenota.mappa-nascosti";
 export function PrenotazioneMappa() {
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
   const ora = useOra();
+  const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
   const [nascosti, setNascosti] = useState<string[] | null>(null);
   useEffect(() => { const t = setTimeout(() => setNascosti(leggiLista(NASCOSTI_MAPPA)), 0); return () => clearTimeout(t); }, []);
   if (!ora || !nascosti) return null;
   const r = prenotazioneDaRicordare(list, ora);
-  if (!r || nascosti.includes(`${r.b.id}:${r.domani ? "d" : "o"}`)) return null;
+  // Con il foglio "Tra 2 ore" aperto il banner dello stesso tavolo aspetta (revisore 14/11: niente doppioni).
+  if (!r || r.b.id === popup || nascosti.includes(`${r.b.id}:${r.domani ? "d" : "o"}`)) return null;
   const { b, domani } = r;
   const chiudi = () => { const k = `${b.id}:${domani ? "d" : "o"}`; aggiungiLista(NASCOSTI_MAPPA, k); setNascosti([...nascosti, k]); };
   return (
@@ -71,7 +77,8 @@ export function PrenotazioneMappa() {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-            <CalendarCheck size={13} /> {domani ? "Domani" : "Oggi"}{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
+            {/* Il giorno sta già nel titolo ("Stasera alle 21:00 da…"): sopra solo "Il tuo tavolo" e le persone. */}
+            <CalendarCheck size={13} /> Il tuo tavolo{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
           </p>
           <p data-testid="mappa-prenotazione-titolo" className="mt-0.5 font-title text-base font-semibold leading-tight">
             {quandoTavolo(b, ora)} da {b.placeName}
@@ -82,7 +89,8 @@ export function PrenotazioneMappa() {
         </button>
       </div>
       {domani ? (
-        !b.ciVado && (
+        // "Ci vai?" non subito dopo aver prenotato (revisore 14/11): da 12 ore dopo.
+        !b.ciVado && !appenaPrenotata(b, ora) && (
           <button
             type="button"
             data-testid="mappa-ci-vado"
@@ -114,6 +122,10 @@ export function PrenotazionePopup() {
   const r = ora && mostrate && !SENZA_POPUP.test(pathname) ? prenotazioneTraPoco(list, ora, chiuso ? [...mostrate, chiuso] : mostrate) : null;
   // Mostrato = ricordato subito: anche ricaricando non torna.
   useEffect(() => { if (r) aggiungiLista(POPUP_KEY, r.b.id); }, [r?.b.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Aperto: il banner dello stesso tavolo (home, mappa) si nasconde finché il foglio c'è.
+  const aperto = mounted && r ? r.b.id : null;
+  useEffect(() => { segnaPopupPrenotazione(aperto); }, [aperto]);
+  useEffect(() => () => segnaPopupPrenotazione(null), []);
   if (!mounted || !r) return null;
   const { b, minuti } = r;
   const dir = portamiLiUrl(b);

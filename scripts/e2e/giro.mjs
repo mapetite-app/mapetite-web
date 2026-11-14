@@ -5036,6 +5036,51 @@ else {
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await s.unroute("**/rest/v1/saved_places**");
+  // Revisore 14/11: con TheFork i dati non si inseriscono due volte. Senza dati detti prima "Prenota su TheFork" è
+  // subito attivo (niente giorno, ora, persone né "Richiesta"); giorno e ora si chiedono dopo, in "L'hai prenotato?".
+  await s.route("**/api/prenota/canale**", (r) => r.fulfill({ json: { canale: { piattaforma: "thefork", nome: "TheFork", url: "https://www.thefork.it/ristorante/trattoria-scheda-r9" } } }));
+  await s.route("https://www.thefork.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<title>TheFork</title>" }));
+  await bar.getByTestId("prenota-scheda").click();
+  { const fp = s.getByTestId("foglio-prenota");
+    await fp.waitFor({ timeout: 3000 });
+    await s.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await s.getByTestId("prenota-piattaforma").isVisible().catch(() => false) && (await s.getByTestId("prenota-piattaforma").getAttribute("aria-disabled")) == null && (await s.getByTestId("prenota-persone").count()) === 0 && (await s.getByTestId("prenota-manca").count()) === 0 && (await fp.getByText("Richiesta (facoltativa)").count()) === 0 && (await fp.getByRole("button", { name: "Domani" }).count()) === 0, "prenota su TheFork senza dati: pulsante subito attivo, niente giorno, ora, persone né 'Richiesta' (si scelgono su TheFork)");
+    await fp.screenshot({ path: `${OUT}/62e-prenota-thefork-subito.png` }).catch(() => {});
+    { const [pop] = await Promise.all([s.waitForEvent("popup", { timeout: 4000 }).catch(() => null), s.getByTestId("prenota-piattaforma").click()]); if (pop) await pop.close(); }
+    await s.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 }).catch(() => {});
+    { const sv = await s.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+      ok(sv.length === 1 && sv[0].piattaforma === "TheFork" && sv[0].date === null && sv[0].time === null && sv[0].people === null && ((await s.getByTestId("prenota-si").textContent().catch(() => "")) ?? "").trim() === "Sì, l'ho prenotato" && (await s.getByTestId("prenota-si-altro").count()) === 0, `prenota su TheFork senza dati: salvata senza giorno, ora e persone non scelti; 'L'hai prenotato?' con 'Sì, l'ho prenotato' (${JSON.stringify(sv[0] ?? null).slice(0, 140)})`); }
+    await s.getByTestId("prenota-si").click().catch(() => {});
+    ok(((await s.getByTestId("prenota-passo").textContent().catch(() => "")) ?? "").includes("Quando hai prenotato?") && (await s.getByTestId("prenota-persone").textContent().catch(() => "")) === "2" && await s.getByTestId("prenota-avanti").isDisabled().catch(() => false) && (await fp.getByText("Richiesta (facoltativa)").count()) === 0, "prenota su TheFork: dopo 'Sì' si chiedono giorno e ora (persone già a 2), 'Segna prenotato' spento finché mancano");
+    await fp.screenshot({ path: `${OUT}/62f-prenota-thefork-quando.png` }).catch(() => {});
+    await fp.getByRole("button", { name: "Domani" }).click().catch(() => {});
+    await fp.getByRole("button", { name: "20:30" }).click().catch(() => {});
+    await s.getByTestId("prenota-avanti").click().catch(() => {});
+    await s.getByTestId("prenota-segnata").waitFor({ timeout: 3000 }).catch(() => {});
+    const { sv, domani } = await s.evaluate(() => { const x = new Date(); x.setDate(x.getDate() + 1); return { sv: JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"), domani: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }; });
+    ok(sv.length === 1 && sv[0].confirmed === true && sv[0].date === domani && sv[0].time === "20:30" && sv[0].people === 2 && ((await s.getByTestId("prenota-segnata-quando").textContent().catch(() => "")) ?? "").includes("alle 20:30"), `prenota su TheFork: giorno e ora scelti dopo, la stessa prenotazione è segnata (${sv[0]?.date} ${sv[0]?.time})`);
+    await fp.getByRole("button", { name: "Fatto" }).click().catch(() => {}); }
+  // "Domani… ci vai?" non subito dopo aver prenotato (revisore 14/11): né in home né sulla mappa; da 12 ore dopo sì.
+  { const hp = await sctx.newPage();
+    hp.on("pageerror", (e) => errors.push(e.message));
+    await hp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    await hp.waitForTimeout(600);
+    const homeSubito = await hp.getByTestId("promemoria-domani").count();
+    await hp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await hp.getByTestId("mappa-prenotazione").waitFor({ timeout: 6000 }).catch(() => {});
+    const mappaTitolo = (await hp.getByTestId("mappa-prenotazione-titolo").textContent().catch(() => "")) ?? "";
+    const mappaCiVado = await hp.getByTestId("mappa-ci-vado").count();
+    ok(homeSubito === 0 && mappaTitolo.startsWith("Domani alle 20:30") && mappaCiVado === 0, `ci vai domani: appena prenotato niente domanda (home ${homeSubito}, mappa 'Sì, ci vado' ${mappaCiVado}), il promemoria della mappa resta (${mappaTitolo})`);
+    await hp.evaluate(() => { const l = JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"); l[0].createdAt = Date.now() - 13 * 3_600_000; localStorage.setItem("mapetite.prenotazioni", JSON.stringify(l)); });
+    await hp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const dom = hp.getByTestId("promemoria-domani");
+    await dom.waitFor({ timeout: 5000 }).catch(() => {});
+    const occhiello = ((await dom.locator("p").first().textContent().catch(() => "")) ?? "").trim();
+    ok(await dom.getByTestId("ci-vai-si").isVisible().catch(() => false) && occhiello === "Il tuo tavolo · 2 persone" && ((await dom.getByTestId("ci-vai-titolo").textContent().catch(() => "")) ?? "").startsWith("Domani alle 20:30"), `ci vai domani: da 12 ore dopo la domanda c'è; sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (${occhiello})`);
+    await hp.close(); }
+  await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
+  await s.unroute("**/api/prenota/canale**");
+  await s.unroute("https://www.thefork.it/**");
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
   await s.waitForTimeout(300);
@@ -5719,6 +5764,9 @@ else {
   const msg = await ap.getByTestId("prenota-messaggio").inputValue();
   ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
   ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
+  // Revisore 14/11: una via principale (WhatsApp), Chiama e Sito piccoli sulla stessa riga, niente "Copia il messaggio".
+  { const [w, c, si] = [await ap.getByTestId("prenota-whatsapp").boundingBox(), await ap.getByTestId("prenota-chiama").boundingBox(), await ap.getByTestId("prenota-sito").boundingBox()];
+    ok(!!w && !!c && !!si && Math.abs(c.y - si.y) < 2 && c.y > w.y + w.height - 1 && c.height < w.height && (await ap.getByTestId("prenota-copia").count()) === 0 && ((await ap.getByTestId("prenota-chiama").textContent()) ?? "").trim() === "Chiama" && ((await ap.getByTestId("prenota-sito").textContent()) ?? "").trim() === "Sito", `prenota passo 2: WhatsApp principale, 'Chiama' e 'Sito' sulla stessa riga sotto, niente 'Copia il messaggio' (${Math.round(c?.y ?? 0)}/${Math.round(si?.y ?? 0)})`); }
   ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
   ok((await ap.getByTestId("prenota-riepilogo").textContent()).includes("2 persone") && (await ap.getByTestId("prenota-avanti").count()) === 0,
     "prenota in 2 passi: con i dati già detti in chat si parte dal passo 2 (riepilogo in una riga + messaggio)");
@@ -5758,18 +5806,22 @@ else {
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
   { const bottoni = await ap.getByTestId("foglio-prenota").locator("a[data-testid^=prenota-]").evaluateAll((els) => els.map((e) => e.dataset.testid));
-    // Revisore 8/11: con la piattaforma (l'unica che vede i tavoli liberi) un passo solo: giorno, ora, persone e
-    // "Prenota su TheFork" principale con la nota sotto; il messaggio solo con "Oppure scrivi al locale".
+    // Revisore 8/11 e 14/11: con la piattaforma (l'unica che vede i tavoli liberi) una cosa sola: "Prenota su TheFork"
+    // principale e subito attivo, la nota sotto; giorno, ora e persone si scelgono su TheFork (non qui due volte),
+    // niente "Richiesta" che non arriverebbe a nessuno; il messaggio solo con "Oppure scrivi al locale".
     const nota = await ap.getByTestId("prenota-piattaforma-nota").boundingBox();
     const pb = await ap.getByTestId("prenota-piattaforma").boundingBox();
     const sb = await ap.getByTestId("prenota-scrivi-locale").boundingBox();
     const bg = await ap.getByTestId("prenota-piattaforma").evaluate((e) => getComputedStyle(e).backgroundColor);
-    ok(bottoni.join() === "prenota-piattaforma" && (await ap.getByTestId("prenota-messaggio").count()) === 0 && (await ap.getByTestId("prenota-persone").count()) === 1 && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && ((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("vedi i tavoli liberi") && !((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("copiat") && bg === "rgb(255, 107, 74)" && !!nota && !!pb && !!sb && nota.y > pb.y && sb.y > nota.y, `prenota su piattaforma: un passo solo, 'Prenota su TheFork' principale con la nota sotto, niente messaggio (${bottoni.join(", ")})`); }
+    ok(bottoni.join() === "prenota-piattaforma" && (await ap.getByTestId("prenota-messaggio").count()) === 0 && (await ap.getByTestId("prenota-persone").count()) === 0 && (await ap.getByTestId("foglio-prenota").getByText("Richiesta (facoltativa)").count()) === 0 && (await ap.getByTestId("prenota-piattaforma").getAttribute("aria-disabled")) == null && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && ((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("vedi i tavoli liberi") && !((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("copiat") && bg === "rgb(255, 107, 74)" && !!nota && !!pb && !!sb && nota.y > pb.y && sb.y > nota.y, `prenota su piattaforma: un passo solo, 'Prenota su TheFork' principale e attivo con la nota sotto, niente persone, 'Richiesta' né messaggio (${bottoni.join(", ")})`); }
   await ashot("53b-prenota-thefork");
-  // "Oppure scrivi al locale": il passo del messaggio, senza TheFork; "Modifica" torna al passo con TheFork.
+  // "Oppure scrivi al locale": il passo del messaggio, senza TheFork; "Modifica" torna a giorno/ora/persone
+  // (servono al messaggio) e "← Prenota su TheFork" torna al pulsante della piattaforma.
   await ap.getByTestId("prenota-scrivi-locale").click();
-  ok(await ap.getByTestId("prenota-messaggio").isVisible() && await ap.getByTestId("prenota-whatsapp").isVisible() && (await ap.getByTestId("prenota-piattaforma").count()) === 0 && ((await ap.getByTestId("prenota-onesta").textContent()) ?? "").includes("la conferma arriva dal locale"), "prenota su piattaforma: 'Oppure scrivi al locale' apre il messaggio con WhatsApp e Chiama (la conferma la dà il locale)");
+  ok(await ap.getByTestId("prenota-messaggio").isVisible() && await ap.getByTestId("prenota-whatsapp").isVisible() && (await ap.getByTestId("prenota-piattaforma").count()) === 0 && (await ap.getByTestId("prenota-sito").count()) === 0 && ((await ap.getByTestId("prenota-onesta").textContent()) ?? "").includes("la conferma arriva dal locale"), "prenota su piattaforma: 'Oppure scrivi al locale' apre il messaggio con WhatsApp e Chiama, senza il sito (la conferma la dà il locale)");
   await ap.getByTestId("prenota-modifica").click();
+  ok(await ap.getByTestId("prenota-avanti").isVisible() && (await ap.getByTestId("prenota-persone").count()) === 1 && (await ap.getByTestId("prenota-piattaforma").count()) === 0, "prenota su piattaforma: per scrivere al locale 'Modifica' torna a giorno, ora e persone");
+  await ap.getByTestId("prenota-torna-piattaforma").click();
   await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 3000 });
   { const [pop] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-piattaforma").click()]);
     ok(pop.url().startsWith("https://www.thefork.it/ristorante/terrazza-uno-r123"), `prenota su piattaforma: apre il modulo di TheFork (${pop.url()})`);
@@ -5791,7 +5843,7 @@ else {
   { const [dl] = await Promise.all([ap.waitForEvent("download", { timeout: 5000 }), ap.getByTestId("prenota-calendario").click()]);
     const { readFileSync } = await import("fs");
     const f = readFileSync(await dl.path(), "utf8").replace(/\r\n /g, "");
-    ok(f.includes("BEGIN:VALARM") && f.includes("TRIGGER:-PT2H") && f.includes("T213000") && f.includes("Prenotato (l'hai segnato tu)"), "prenota: subito dopo 'Sì', 'Aggiungi al calendario' scarica il .ics con l'avviso 2 ore prima"); }
+    ok(f.includes("BEGIN:VALARM") && f.includes("TRIGGER:-PT2H") && f.includes("T213000") && f.includes("Prenotato su TheFork (l'hai segnato tu)"), "prenota: subito dopo 'Sì', 'Aggiungi al calendario' scarica il .ics con l'avviso 2 ore prima"); }
   await ap.getByRole("button", { name: "Fatto" }).click();
   await actx.unroute("**/api/prenota/canale**");
   await actx.unroute("https://www.thefork.it/**");
@@ -5871,6 +5923,8 @@ else {
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 });
   ok((await ap.getByTestId("promemoria-oggi-titolo").textContent()) === "Stasera alle 21:00 da Terrazza Uno", `home: promemoria 'Stasera alle 21:00 da Terrazza Uno' (${await ap.getByTestId("promemoria-oggi-titolo").textContent()})`);
+  { const occhiello = ((await ap.getByTestId("promemoria-oggi").locator("p").first().textContent()) ?? "").trim();
+    ok(occhiello === "Il tuo tavolo · 2 persone", `home: sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (niente 'Oggi' due volte) (${occhiello})`); }
   ok((await ap.getByTestId("promemoria-oggi").getByTestId("portami-li").getAttribute("href")) === "https://www.google.com/maps/dir/?api=1&destination=41.9%2C12.49", "home: 'Portami lì' apre le indicazioni con la destinazione già messa");
   ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
   await ashot("56-home-promemoria");
@@ -5923,7 +5977,7 @@ else {
   // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
-    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t4", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() }]));
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t4", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() - 86_400_000 }]));
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   { const dom = ap.getByTestId("promemoria-domani");
@@ -5946,7 +6000,7 @@ else {
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
     localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
-      { id: "d1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() },
+      { id: "d1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() - 86_400_000 },
       { id: "d2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d, time: "20:30", people: 2, special: null, via: "whatsapp", confirmed: true, phone: "+39 333 123 4567", createdAt: Date.now() },
     ]));
   });
@@ -5995,7 +6049,8 @@ else {
   await ap.getByTestId("prenota-scheda").waitFor({ timeout: 4000 });
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
-  ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  { const manca = (await ap.getByTestId("prenota-manca").textContent()) ?? "";
+    ok(manca.includes("il giorno") && manca.includes("l'ora") && !manca.includes("quante persone") && (await ap.getByTestId("prenota-persone").textContent()) === "2", `mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale; le persone partono da 2, non da '–' (${manca})`); }
   ok(await ap.getByTestId("prenota-avanti").isDisabled() && (await ap.getByTestId("prenota-messaggio").count()) === 0, "prenota in 2 passi: senza dati si parte dal passo 1 e 'Avanti' resta spento");
   { const f = ap.getByTestId("foglio-prenota");
     await f.getByRole("button", { name: "Oggi", exact: true }).click();
@@ -6016,7 +6071,9 @@ else {
       await alt.getByRole("button", { name: /Rooftop Tre/ }).click();
       const nuovo = ap.getByRole("dialog", { name: /Prenota da Rooftop Tre/ });
       const aperto = await nuovo.waitFor({ timeout: 4000 }).then(() => true, () => false);
-      ok(aperto && (await nuovo.getByRole("button", { name: "21:00", exact: true }).getAttribute("aria-pressed")) === "true", "prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con le 21:00 già scelte");
+      // Con le persone da 2 (revisore 14/11) i dati sono completi: il foglio parte dal riepilogo del passo 2.
+      const riep = (await nuovo.getByTestId("prenota-riepilogo").textContent().catch(() => "")) ?? "";
+      ok(aperto && riep.includes("21:00") && riep.includes("2 persone") && riep.includes("oggi"), `prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con oggi, le 21:00 e 2 persone già scelte (${riep})`);
       await nuovo.getByRole("button", { name: "Chiudi" }).click().catch(() => {});
     } }
   await ap.evaluate((v) => { if (v != null) localStorage.setItem("mapetite.prenotazioni", v); }, prenPrima);
@@ -7071,6 +7128,7 @@ else {
   ok((await past.count()) === 2 && (await past.nth(0).textContent()).includes("Rooftop Tre") && (await past.nth(1).textContent()).includes("Pub Fuori Tema"), "prenotazioni: 'Passate' dalla più recente");
   const u1 = up.nth(1);
   const t1 = await u1.textContent();
+  ok(((await pp.locator("main > p").first().textContent()) ?? "").trim() === "I tuoi tavoli, salvati su questo telefono.", "prenotazioni: sottotitolo 'I tuoi tavoli, salvati su questo telefono.'");
   ok(t1.includes("alle 21:00") && t1.includes("2 persone") && t1.includes("in terrazza") && t1.includes("Inviata su WhatsApp") && /\d\d\/\d\d/.test(t1), `prenotazioni: giorno, ora, persone, richiesta e come è stata inviata (${t1.slice(0, 90)}…)`);
   ok((await u1.getAttribute("data-stato")) === "inviata" && (await up.nth(0).getAttribute("data-stato")) === "confermata" && (await up.nth(0).textContent()).includes("Oggi"), "prenotazioni: stato 'Richiesta inviata' e 'Confermata'");
   ok((await up.nth(0).getByRole("link", { name: "Osteria Pigneto" }).getAttribute("href")) === `/locali/${UUID}` && (await u1.getByRole("link", { name: "Terrazza Uno" }).count()) === 0, "prenotazioni: il nome apre la scheda solo con l'id Mapetite (l'id Google non ha pagina)");
@@ -7085,6 +7143,16 @@ else {
   await pp.waitForTimeout(200);
   const stored = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
   ok((await u1.getAttribute("data-stato")) === "confermata" && stored.find((b) => b.id === "u1")?.confirmed === true, "prenotazioni: 'Il locale ha confermato' → Confermata, salvato nel telefono");
+  { const t = (await u1.textContent()) ?? "";
+    ok(t.includes("Confermata dal locale") && !t.includes("Inviata su WhatsApp") && !t.includes("l'hai segnat") && (await u1.getByRole("button", { name: "Non ancora" }).count()) === 0 && (await u1.getByTestId("prenotazione-annulla-conferma").count()) === 0, `prenotazioni (revisore 14/11): una sola riga di stato, niente 'Non ancora' in vista (${t.slice(0, 120)})`); }
+  // "Annulla conferma" sta in "Altro", con "Togli".
+  await u1.getByTestId("prenotazione-altro").click();
+  ok(await u1.getByTestId("prenotazione-annulla-conferma").isVisible() && await u1.getByRole("button", { name: /Togli la prenotazione/ }).isVisible(), "prenotazioni: 'Altro' apre 'Annulla conferma' e 'Togli'");
+  await u1.getByTestId("prenotazione-annulla-conferma").click();
+  await pp.waitForTimeout(200);
+  ok((await u1.getAttribute("data-stato")) === "inviata" && !(await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").find((b) => b.id === "u1")?.confirmed)) && ((await u1.textContent()) ?? "").includes("Inviata su WhatsApp"), "prenotazioni: 'Annulla conferma' la riporta a richiesta inviata");
+  await u1.getByTestId("prenotazione-conferma").click();
+  await pp.waitForTimeout(200);
   ok(pEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_confermata" && e.googlePlaceId === "P1"), "prenotazioni: conferma registrata con il locale");
 
   // Aggiungi al calendario: file .ics generato nel browser
@@ -7189,7 +7257,7 @@ else {
   await pp.reload({ waitUntil: "networkidle" });
   await pp.getByTestId("prenotazione-in-arrivo").first().waitFor({ timeout: 5000 });
   { const w = await width(); ok(w <= 360, `prenotazioni a 360 px: niente scorrimento orizzontale (${w}px)`); }
-  { const b = await up.nth(0).getByRole("button", { name: /Togli la prenotazione/ }).boundingBox(); const c = await up.nth(0).boundingBox(); ok(!!b && !!c && b.x + b.width <= c.x + c.width - 8, `prenotazioni a 360 px: i pulsanti stanno dentro la card (${Math.round((b?.x ?? 0) + (b?.width ?? 0))}/${Math.round((c?.x ?? 0) + (c?.width ?? 0))})`); }
+  { const b = await up.nth(0).getByTestId("prenotazione-altro").boundingBox(); const c = await up.nth(0).boundingBox(); ok(!!b && !!c && b.x + b.width <= c.x + c.width - 8, `prenotazioni a 360 px: i pulsanti stanno dentro la card (${Math.round((b?.x ?? 0) + (b?.width ?? 0))}/${Math.round((c?.x ?? 0) + (c?.width ?? 0))})`); }
   await pshot("84-prenotazioni-360");
   await pp.setViewportSize({ width: 390, height: 844 });
 
@@ -7218,8 +7286,25 @@ else {
     await c.getByTestId("prenotazione-conferma").click().catch(() => {});
     const conf = (await c.getByTestId("prenotazione-confermata").textContent().catch(() => "")) ?? "";
     const fondo = (await pp.getByText(/Mapetite non vede i tavoli liberi/).textContent().catch(() => "")) ?? "";
-    ok(conf.includes("Prenotata su TheFork (l'hai segnata tu)") && !conf.includes("dal locale") && !fondo.includes("sempre dal locale"), `prenotazioni: dopo il sì 'Prenotata su TheFork (l'hai segnata tu)', nessuna conferma attribuita al locale (${conf})`);
+    const tutto = (await c.textContent()) ?? "";
+    ok(conf.trim() === "Prenotata su TheFork" && !conf.includes("dal locale") && !fondo.includes("sempre dal locale") && !tutto.includes("Richiesta su TheFork"), `prenotazioni: dopo il sì una sola riga 'Prenotata su TheFork' (non anche 'Richiesta su TheFork'), nessuna conferma attribuita al locale (${conf})`);
     await pp.screenshot({ path: `${OUT}/56f-prenotazioni-thefork.png`, caret: "initial" }); }
+  // TheFork aperto senza giorno (dal foglio Prenota): "Sì, ho prenotato" chiede giorno e ora, così i promemoria sanno quando.
+  await pp.evaluate(() => {
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "tf3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: null, time: null, people: null, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() }]));
+  });
+  await pp.goto(`${BASE}/prenotazioni`, { waitUntil: "networkidle" });
+  { const c = pp.getByTestId("prenotazione-in-arrivo").first();
+    await c.waitFor({ timeout: 5000 }).catch(() => {});
+    await c.getByTestId("prenotazione-conferma").click().catch(() => {});
+    const chiede = await c.getByTestId("prenotazione-quando").isVisible().catch(() => false) && await c.getByTestId("prenotazione-quando-salva").isDisabled().catch(() => false);
+    const { domani } = await pp.evaluate(() => { const x = new Date(); x.setDate(x.getDate() + 1); return { domani: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }; });
+    await c.getByLabel("Giorno").fill(domani).catch(() => {});
+    await c.getByLabel("Ora").fill("20:30").catch(() => {});
+    await c.getByTestId("prenotazione-quando-salva").click().catch(() => {});
+    await pp.waitForTimeout(200);
+    const v = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]")[0]);
+    ok(chiede && v?.confirmed === true && v?.date === domani && v?.time === "20:30" && ((await c.getByTestId("prenotazione-confermata").textContent().catch(() => "")) ?? "").includes("Prenotata su TheFork"), `prenotazioni: TheFork senza giorno → 'Sì, ho prenotato' chiede giorno e ora, poi la segna (${v?.date} ${v?.time})`); }
   await pctx.close();
 }
 
@@ -7239,6 +7324,7 @@ else {
   await vp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await vp.getByTestId("popup-prenotazione").waitFor({ timeout: 6000 }).catch(() => {});
   ok(((await vp.getByTestId("popup-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Tra 2 ore da Trattoria Vera", "promemoria: 2 ore prima, aprendo l'app, foglio 'Tra 2 ore da Trattoria Vera'");
+  ok(await vp.getByTestId("popup-prenotazione").isVisible().catch(() => false) && (await vp.getByTestId("promemoria-oggi").count()) === 0, "promemoria (revisore 14/11): con il foglio 'Tra 2 ore' aperto il banner dello stesso tavolo in home non c'è (niente doppione)");
   ok((await vp.getByTestId("popup-portami-li").getAttribute("href").catch(() => "")) === "https://www.google.com/maps/dir/?api=1&destination=41.889%2C12.469&destination_place_id=ChIJabcdefghijklmnop" && await vp.getByTestId("popup-ho-disdetto").isVisible().catch(() => false), "promemoria: nel foglio 'Portami lì' (destinazione e locale già messi) e 'Ho disdetto'");
   await vp.screenshot({ path: `${OUT}/56b-popup-tra-2-ore.png` });
   await vp.getByTestId("popup-prenotazione").getByRole("button", { name: "Chiudi" }).click().catch(() => {});
@@ -7249,6 +7335,8 @@ else {
   await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await vp.getByTestId("mappa-prenotazione").waitFor({ timeout: 8000 }).catch(() => {});
   ok(((await vp.getByTestId("mappa-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Stasera alle 21:00 da Trattoria Vera" && await vp.getByTestId("mappa-prenotazione").getByTestId("portami-li").isVisible().catch(() => false), "mappa: banner 'Stasera alle 21:00 da…' con Portami lì");
+  { const occhiello = ((await vp.getByTestId("mappa-prenotazione").locator("p").first().textContent().catch(() => "")) ?? "").trim();
+    ok(occhiello === "Il tuo tavolo · 2 persone", `mappa: sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (${occhiello})`); }
   { const w = await vp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `mappa: banner della prenotazione senza scorrimento orizzontale (${w}px)`); }
   await vp.screenshot({ path: `${OUT}/56c-mappa-prenotazione.png` });
   await vp.getByTestId("mappa-prenotazione").getByRole("button", { name: "Nascondi il promemoria" }).click().catch(() => {});

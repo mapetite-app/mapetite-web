@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { CalendarPlus, Check, MessageCircle, Navigation, Phone, Globe, Copy, Trash2 } from "lucide-react";
+import { CalendarPlus, Check, MessageCircle, MoreHorizontal, Navigation, Phone, Globe, Copy, Trash2, Undo2 } from "lucide-react";
 import {
   bookingStatus,
+  dateKey,
   dayLabel,
   fromKey,
   loadBookings,
@@ -86,7 +87,7 @@ function DateTile({ date, muted }: { date: string | null; muted?: boolean }) {
   );
 }
 
-function RemoveButton({ b, confirmText }: { b: BookingRequest; confirmText: string }) {
+function RemoveButton({ b, confirmText, voce = false }: { b: BookingRequest; confirmText: string; voce?: boolean }) {
   const [asking, setAsking] = useState(false);
   if (asking) {
     return (
@@ -112,7 +113,7 @@ function RemoveButton({ b, confirmText }: { b: BookingRequest; confirmText: stri
       type="button"
       onClick={() => setAsking(true)}
       aria-label={`Togli la prenotazione da ${b.placeName}`}
-      className="flex min-h-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
+      className={voce ? "flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm font-display font-semibold text-text" : "flex min-h-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"}
     >
       <Trash2 size={15} className="shrink-0" /> Togli
     </button>
@@ -128,12 +129,41 @@ function PlaceName({ b, className }: { b: BookingRequest; className: string }) {
   return <span className={className}>{b.placeName}</span>;
 }
 
+// "Sì, ho prenotato" su una richiesta senza giorno (TheFork aperto dal foglio Prenota senza scegliere
+// prima il giorno): il giorno e l'ora si chiedono qui, così i promemoria sanno quando ricordarlo.
+function ConfermaConGiorno({ b, onFatto }: { b: BookingRequest; onFatto: () => void }) {
+  const [date, setDate] = useState(b.date ?? "");
+  const [time, setTime] = useState(b.time ?? "");
+  const campo = "min-h-11 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text";
+  return (
+    <div data-testid="prenotazione-quando" className="mt-3 rounded-btn bg-surface p-3">
+      <p className="text-sm font-display font-semibold text-text">Per quando hai prenotato?</p>
+      <div className="mt-2 flex gap-2">
+        <input type="date" aria-label="Giorno" min={dateKey(new Date())} value={date} onChange={(e) => setDate(e.target.value)} className={campo} />
+        <input type="time" aria-label="Ora" value={time} onChange={(e) => setTime(e.target.value)} className={campo} />
+      </div>
+      <button
+        type="button"
+        data-testid="prenotazione-quando-salva"
+        disabled={!date || !time}
+        onClick={() => { updateBooking(b.id, { date, time, confirmed: true }); signal("prenotazione_confermata", b); onFatto(); }}
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
+      >
+        <Check size={16} /> Segna prenotato
+      </button>
+    </div>
+  );
+}
+
 function UpcomingCard({ b }: { b: BookingRequest }) {
   const status = bookingStatus(b);
   const via = viaDi(b);
+  const [altro, setAltro] = useState(false);
+  const [quando, setQuando] = useState(false);
   // Chi conferma dipende dal canale (revisore 8/11): su TheFork lo segna la persona, non il locale.
   const pf = b.piattaforma;
   const when = [b.date ? capitalize(dayLabel(b.date)) : null, b.time ? `alle ${b.time}` : null].filter(Boolean).join(" ");
+  const confermata = status !== "inviata";
   return (
     <li data-testid="prenotazione-in-arrivo" data-stato={status} className="rounded-card border border-border bg-white p-4 shadow-card">
       <div className="flex gap-3">
@@ -142,31 +172,36 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           <PlaceName b={b} className="block truncate font-title text-lg font-semibold leading-tight text-text" />
           <p className="mt-0.5 text-sm font-sans font-semibold text-brand">{when || "Giorno da definire"}</p>
           <p className="mt-0.5 text-sm font-sans text-text-muted">{[people(b.people), b.special].filter(Boolean).join(" · ")}</p>
-          <p className="mt-1 flex items-center gap-1 text-xs font-sans text-text-muted">
-            <via.Icon size={12} aria-hidden /> {via.label}
-          </p>
+          {/* Una sola riga di stato (revisore 14/11): com'è partita la richiesta, oppure che è prenotata. */}
+          {confermata ? (
+            <p data-testid="prenotazione-confermata" className="mt-1 flex items-center gap-1 text-xs font-sans font-semibold text-success">
+              <Check size={12} aria-hidden /> {pf ? `Prenotata su ${pf}` : "Confermata dal locale"}
+            </p>
+          ) : (
+            <p data-testid="prenotazione-via" className="mt-1 flex items-center gap-1 text-xs font-sans text-text-muted">
+              <via.Icon size={12} aria-hidden /> {via.label}
+            </p>
+          )}
         </div>
       </div>
-      {status === "inviata" ? (
+      {!confermata && (quando ? (
+        <ConfermaConGiorno b={b} onFatto={() => setQuando(false)} />
+      ) : (
         <div className="mt-3">
           <button
             type="button"
             data-testid="prenotazione-conferma"
-            onClick={() => { updateBooking(b.id, { confirmed: true }); signal("prenotazione_confermata", b); }}
+            onClick={() => {
+              if (!b.date || !b.time) { setQuando(true); return; }
+              updateBooking(b.id, { confirmed: true }); signal("prenotazione_confermata", b);
+            }}
             className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
           >
             <Check size={16} /> {pf ? "Sì, ho prenotato" : "Il locale ha confermato"}
           </button>
           <p className="mt-1.5 text-center text-xs font-sans text-text-muted">{pf ? `Toccalo se hai confermato su ${pf}: Mapetite non lo vede.` : "Toccalo quando il locale ti risponde: Mapetite non vede le sue risposte."}</p>
         </div>
-      ) : (
-        <p data-testid="prenotazione-confermata" className="mt-3 flex items-center gap-1.5 rounded-btn bg-surface px-3 py-2 text-sm font-sans text-text">
-          <Check size={16} className="shrink-0 text-success" aria-hidden /> {pf ? `Prenotata su ${pf} (l'hai segnata tu).` : "Confermata dal locale (l'hai segnato tu)."}
-          <button type="button" onClick={() => updateBooking(b.id, { confirmed: false })} className="ml-auto min-h-8 shrink-0 text-xs font-display font-semibold text-text-muted">
-            Non ancora
-          </button>
-        </p>
-      )}
+      ))}
       <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
         {b.lat != null && b.lng != null ? (
           <a
@@ -189,11 +224,37 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
         >
           <CalendarPlus size={15} className="shrink-0" /> Calendario
         </button>
-        <RemoveButton
-          b={b}
-          confirmText={b.confirmed ? "La togli da qui. Se non ci vai più, avvisa il locale." : "La togli dall'elenco. Se l'avevi già inviata, avvisa il locale."}
-        />
+        <button
+          type="button"
+          data-testid="prenotazione-altro"
+          aria-expanded={altro}
+          aria-label={`Altro per ${b.placeName}`}
+          onClick={() => setAltro(!altro)}
+          className="flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
+        >
+          <MoreHorizontal size={18} className="shrink-0" /> Altro
+        </button>
       </div>
+      {/* "Altro" (revisore 14/11): le azioni rare fuori dalla vista, un tocco più in là. */}
+      {altro && (
+        <div data-testid="prenotazione-altro-menu" className="mt-2 overflow-hidden rounded-btn border border-border bg-white">
+          {confermata && (
+            <button
+              type="button"
+              data-testid="prenotazione-annulla-conferma"
+              onClick={() => { updateBooking(b.id, { confirmed: false }); signal("prenotazione_confermata", b, { stato: "annullata" }); setAltro(false); }}
+              className="flex min-h-11 w-full items-center gap-2 border-b border-border px-3 text-left text-sm font-display font-semibold text-text"
+            >
+              <Undo2 size={15} className="shrink-0 text-text-muted" /> Annulla conferma
+            </button>
+          )}
+          <RemoveButton
+            b={b}
+            voce
+            confirmText={b.confirmed ? "La togli da qui. Se non ci vai più, avvisa il locale." : "La togli dall'elenco. Se l'avevi già inviata, avvisa il locale."}
+          />
+        </div>
+      )}
     </li>
   );
 }
@@ -286,7 +347,7 @@ export default function PrenotazioniView() {
     <main className="mx-auto w-full max-w-lg px-4 pb-10 pt-6">
       <h1 className="font-title text-3xl font-semibold leading-tight text-text">Le mie prenotazioni</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">
-        Le richieste che hai mandato ai locali, salvate {sullAccount ? "sul telefono e sul tuo account" : "su questo telefono"}.
+        I tuoi tavoli, salvati {sullAccount ? "sul telefono e sul tuo account" : "su questo telefono"}.
       </p>
 
       {!mounted ? (

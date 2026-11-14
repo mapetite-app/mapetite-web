@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { bookingReminders, cancelMessage, chiConferma, daConfermare, dateKey, doubleBookings, loadBookings, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { appenaPrenotata, bookingReminders, cancelMessage, chiConferma, daConfermare, dateKey, doubleBookings, loadBookings, popupPrenotazione, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, subscribePopupPrenotazione, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
 
@@ -167,7 +167,8 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
   return (
     <section data-testid="promemoria-domani" className="rounded-card bg-brand p-4 text-white shadow-card">
       <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-        <CalendarCheck size={14} /> Domani{dettagli ? ` · ${dettagli}` : ""}
+        {/* Il giorno sta già nel titolo ("Domani alle 21:00 da…"): sopra solo "Il tuo tavolo" (revisore 14/11). */}
+        <CalendarCheck size={14} /> Il tuo tavolo{dettagli ? ` · ${dettagli}` : ""}
       </p>
       {/* "Domani alle 21:00 da Nome" (Lorenzo, 8/11), poi la domanda. */}
       <p data-testid="ci-vai-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
@@ -208,14 +209,17 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
+  const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
   const rem = bookingReminders(list);
   const { howWasIt, risposta } = rem;
   // Promemoria e doppioni solo per i tavoli con il sì della persona (revisore 8/11): un tocco su
   // "Prenota su TheFork" o su WhatsApp non è ancora una prenotazione.
-  const today = rem.today.filter((b) => b.confirmed);
-  const tomorrow = rem.tomorrow.filter((b) => b.confirmed);
-  // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
+  // Con il foglio "Tra 2 ore" aperto il banner dello stesso tavolo aspetta (revisore 14/11: niente doppioni).
+  const today = rem.today.filter((b) => b.confirmed && b.id !== popup);
+  // "Domani… ci vai?" non subito dopo aver prenotato (revisore 14/11): solo da 12 ore dopo.
   const now = new Date();
+  const tomorrow = rem.tomorrow.filter((b) => b.confirmed && !appenaPrenotata(b, now));
+  // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
   const todayKey = dateKey(now);
   const tomorrowD = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowKey = dateKey(tomorrowD);
@@ -284,7 +288,7 @@ export default function BookingReminder() {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                <CalendarCheck size={14} /> Oggi{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
+                <CalendarCheck size={14} /> Il tuo tavolo{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
               </p>
               {/* "Stasera alle 21:00 da Nome" (Lorenzo, 8/11): quando e dove in una riga. */}
               <p data-testid="promemoria-oggi-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
