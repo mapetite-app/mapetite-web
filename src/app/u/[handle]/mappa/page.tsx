@@ -63,7 +63,7 @@ export default async function MappaPersonaPage({ params }: Props) {
         <Link href={profilePath(profile.handle)} className="flex min-w-0 flex-1 items-center gap-2.5">
           <Avatar person={profile} size={40} />
           <span className="min-w-0">
-            <span className="block truncate font-title text-lg font-semibold leading-tight text-text">La mappa di {name}</span>
+            <span className="block truncate font-[family-name:var(--font-newsreader)] text-[22px] font-medium leading-tight tracking-[-0.01em] text-text">La mappa di {name}</span>
             <span className="block truncate text-xs font-sans text-text-muted">
               {plural(visitedCount, "provato", "provati")} · {plural(places.length - visitedCount, "da provare", "da provare")}
             </span>

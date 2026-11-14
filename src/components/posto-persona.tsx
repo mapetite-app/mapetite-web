@@ -27,15 +27,16 @@ export function PostoRiga({ spot, verdict = null, showState = true }: { spot: Sp
     <Link
       href={`/locali/${spot.place_id}`}
       data-testid="posto-persona"
-      className="flex items-center gap-3 rounded-card border border-border bg-white p-3 shadow-card active:scale-[0.99] transition-transform duration-150"
+      className="flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white p-3 shadow-card active:scale-[0.99] transition-transform duration-150"
     >
-      <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
+      {/* Revisore 14/11: stesso linguaggio dei Salvati e del profilo (riquadro grigio, nome in serif, verdetto in corsivo). */}
+      <span aria-hidden className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] bg-[#f6f7f7] text-[26px] leading-none">
         {getCategoryEmoji(spot.category, spot.name)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-display text-[15px] font-semibold text-text">{spot.name}</span>
-        {meta(spot) && <span className="mt-0.5 block truncate text-xs font-sans text-text-muted">{meta(spot)}</span>}
-        {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 text-[13px] font-sans leading-snug text-text">{verdict}</span>}
+        <span className="block truncate font-[family-name:var(--font-newsreader)] text-[19px] font-medium leading-tight tracking-[-0.01em] text-text">{spot.name}</span>
+        {meta(spot) && <span className="mt-0.5 block truncate text-[13px] font-sans text-text-muted">{meta(spot)}</span>}
+        {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 font-[family-name:var(--font-newsreader)] text-[15px] italic leading-snug text-[#4a4f55]">{verdict}</span>}
         {raccolte.length > 0 && (
           <span className="mt-1 flex flex-wrap gap-1">
             {raccolte.map((t) => (

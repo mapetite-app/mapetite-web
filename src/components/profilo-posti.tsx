@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BookmarkCheck, BookmarkPlus, Search, X } from "lucide-react";
+import { BookmarkCheck, BookmarkPlus, Search } from "lucide-react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { matchesQuery } from "@/lib/social-view";
-import { quartiereDi, tipoPlurale } from "@/lib/scaffali-salvati";
+import { quartiereDi } from "@/lib/scaffali-salvati";
 import { MappaPunti } from "@/components/profilo-mappa";
 
-// I posti di una persona sul suo profilo pubblico (8/11), in quest'ordine: "Gli è piaciuto", "Raccolte",
-// "Di recente", "I suoi tipi", "In comune", "Da provare". Solo dati della vista salvati_pubblici
+// I posti di una persona sul suo profilo pubblico. Revisore 14/11 (secondo giro): tre sezioni sole,
+// "I suoi preferiti", "Raccolte" e una lista unica "I suoi posti" con le pillole Tutti / Provati /
+// Da provare / In comune; un posto tra i preferiti non si ripete nella lista. Solo dati della vista salvati_pubblici
 // (mai note né "Non fa per me"). Ogni posto apre la sua scheda; chi guarda con l'accesso lo salva
 // anche lui con un tocco ("Da provare", come il pulsante della pagina del locale).
 // Revisore 14/11: stesso linguaggio dei Salvati (nomi in serif, righe in un unico riquadro, Salva dentro la riga).
@@ -30,13 +31,16 @@ export type PostoPersona = {
 
 export type RaccoltaPersona = { name: string; count: number; href: string };
 
-const ANTEPRIMA = 5; // righe per sezione prima di "Mostra tutti"
+const ANTEPRIMA = 6; // righe prima di "Mostra tutti"
 const CERCA_DA = 15; // la ricerca compare solo con più di 15 posti
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
 const LINE = "border-[#e3e7e7]";
 const CHIP = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-white px-3.5 text-[14px] font-sans font-medium text-text shadow-card active:scale-95";
 const FILA = "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]";
+const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-brand px-3.5 text-[14px] font-sans font-medium text-white shadow-card active:scale-95";
+
+type Filtro = "tutti" | "provati" | "da-provare" | "in-comune";
 
 type SalvaStato = "salvo" | "errore";
 
@@ -66,7 +70,6 @@ export default function ProfiloPosti({
   liked,
   recent,
   want,
-  tipi,
   mine: mineInit,
   verdetti,
   posizioni = {},
@@ -78,7 +81,6 @@ export default function ProfiloPosti({
   liked: PostoPersona[];
   recent: PostoPersona[];
   want: PostoPersona[];
-  tipi: { tipo: string; count: number }[];
   mine: string[];
   verdetti: Record<string, string>;
   posizioni?: Record<string, number>; // place_id → posizione nella sua classifica di quella città (1, 2, 3)
@@ -87,11 +89,16 @@ export default function ProfiloPosti({
   const [mine, setMine] = useState(() => new Set(mineInit));
   const [stato, setStato] = useState<Record<string, SalvaStato>>({});
   const [query, setQuery] = useState("");
-  const [tipo, setTipo] = useState<string | null>(null);
-  const [aperte, setAperte] = useState<Record<string, boolean>>({});
+  const [filtro, setFiltro] = useState<Filtro>("tutti");
+  const [aperta, setAperta] = useState(false);
   const canSave = !!viewer && !isMe;
-  // "In comune" con i propri salvati di partenza: un posto appena salvato qui non sposta la sezione.
+  // "In comune" con i propri salvati di partenza: un posto appena salvato qui non sposta la pillola.
   const comuni = useMemo(() => (canSave ? all.filter((p) => mineInit.includes(p.place_id)) : []), [all, mineInit, canSave]);
+  // Lista unica: prima i provati (dal più recente), poi i da provare; senza i preferiti già in alto.
+  const resto = useMemo(() => {
+    const top = new Set(liked.map((p) => p.place_id));
+    return [...recent, ...want].filter((p) => !top.has(p.place_id));
+  }, [liked, recent, want]);
   // Copertine delle raccolte: la zona vera dei suoi posti di quella raccolta (come gli scaffali dei Salvati).
   const copertine = useMemo(
     () => Object.fromEntries(raccolte.map((r) => {
@@ -178,182 +185,155 @@ export default function ProfiloPosti({
     <ul className={`overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>{rows.map((p, i) => riga(p, i === 0, showState))}</ul>
   );
 
-  function lista(id: string, rows: PostoPersona[]) {
-    const open = !!aperte[id];
-    const shown = open ? rows : rows.slice(0, ANTEPRIMA);
-    return (
-      <>
-        {elenco(shown)}
-        {rows.length > ANTEPRIMA && (
-          <button
-            type="button"
-            data-testid={`mostra-tutti-${id}`}
-            onClick={() => setAperte((a) => ({ ...a, [id]: !open }))}
-            className="mt-2 flex min-h-11 w-full items-center justify-center rounded-pill border border-border bg-white text-sm font-display font-semibold text-brand active:scale-[0.99]"
-          >
-            {open ? "Mostra meno" : `Mostra tutti (${rows.length})`}
-          </button>
-        )}
-      </>
-    );
-  }
-
-  const filtrati = query.trim() || tipo
-    ? all.filter((p) => (!tipo || categoryLabel(p.category) === tipo) && matchesQuery([p.name, categoryLabel(p.category), cityFromAddress(p.address)].filter(Boolean).join(" "), query))
-    : null;
+  const isProvato = (p: PostoPersona) => !!p.tags?.includes("Già visitato");
+  const gruppi: Record<Filtro, PostoPersona[]> = {
+    tutti: resto,
+    provati: resto.filter(isProvato),
+    "da-provare": resto.filter((p) => !isProvato(p)),
+    "in-comune": comuni,
+  };
+  const pillole: { id: Filtro; label: string }[] = [
+    { id: "tutti", label: "Tutti" },
+    { id: "provati", label: "Provati" },
+    { id: "da-provare", label: "Da provare" },
+    { id: "in-comune", label: "In comune" },
+  ];
+  // Una pillola solo se ha posti; "Provati" e "Da provare" solo se non coincidono con "Tutti" (doppione).
+  const visibili = pillole.filter((f) => f.id === "tutti" || (f.id === "in-comune" ? comuni.length > 0 : gruppi[f.id].length > 0 && gruppi[f.id].length < resto.length));
+  const cercando = query.trim().length > 0;
+  // La ricerca guarda tutti i suoi posti (anche i preferiti), dentro la pillola scelta.
+  const fonte = !cercando ? gruppi[filtro] : filtro === "tutti" ? all : filtro === "in-comune" ? comuni : all.filter((p) => isProvato(p) === (filtro === "provati"));
+  const righe = cercando ? fonte.filter((p) => matchesQuery([p.name, categoryLabel(p.category), luogo(p), cityFromAddress(p.address)].filter(Boolean).join(" "), query)) : fonte;
+  const mostrate = aperta || cercando ? righe : righe.slice(0, ANTEPRIMA);
+  // Lo stato sulla riga solo dove la pillola non lo dice già.
+  const conStato = filtro === "tutti" || filtro === "in-comune";
   const suoi = isMe ? "tuoi" : "suoi";
 
   return (
     <div data-testid="profilo-posti">
-      {all.length > CERCA_DA && (
-        <div className="mt-6 px-4">
-          <label className="flex min-h-11 items-center gap-2 rounded-pill border border-border bg-white px-4 focus-within:border-brand">
-            <Search size={16} aria-hidden className="shrink-0 text-text-muted" />
-            <span className="sr-only">Cerca nei {suoi} posti</span>
-            <input
-              type="search"
-              data-testid="cerca-posti-persona"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Cerca nei ${suoi} ${all.length} posti`}
-              className="min-w-0 flex-1 bg-transparent text-[15px] font-sans text-text outline-none"
-            />
-          </label>
-        </div>
+      {liked.length > 0 && (
+        <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
+          <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "I tuoi preferiti" : "I suoi preferiti"}</Titolo></div>
+          {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
+          <ul className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+            {liked.map((p) => {
+              const verdict = verdetti[p.place_id];
+              const meta = metaDi(p);
+              // Numero solo se viene dalla sua classifica (posizione nella città di quel posto).
+              const pos = posizioni[p.place_id];
+              const citta = cityFromAddress(p.address);
+              return (
+                <li key={p.place_id} className="relative flex w-[70%] max-w-[260px] shrink-0 snap-start">
+                  <Link
+                    href={`/locali/${p.place_id}`}
+                    data-testid="piaciuto-card"
+                    className={`flex w-full flex-col overflow-hidden rounded-card border ${LINE} bg-white shadow-card active:scale-[0.99] transition-transform duration-150`}
+                  >
+                    <span aria-hidden className={`flex h-[92px] items-center justify-center ${PAPER} text-[46px] leading-none`}>{getCategoryEmoji(p.category, p.name)}</span>
+                    <span className="flex flex-1 flex-col p-3">
+                      <span className="flex items-start gap-2">
+                        <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
+                        <span
+                          data-testid="piaciuto-badge"
+                          title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Tra i suoi preferiti"}
+                          className="mt-0.5 inline-flex shrink-0 items-center rounded-pill bg-accent-light px-2 py-0.5 text-[12px] font-display font-semibold text-accent"
+                        >
+                          {pos ? `👍 N.${pos}` : "👍"}
+                        </span>
+                      </span>
+                      {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
+                      {verdict && <span data-testid="piaciuto-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>}
+                    </span>
+                  </Link>
+                  <span className="absolute right-2 top-2">{salvaBtn(p, true)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
-      {filtrati ? (
-        <section className="mt-5 px-4" aria-labelledby="filtrati-titolo" data-testid="posti-filtrati">
-          <Titolo
-            id="filtrati-titolo"
-            extra={
-              <button type="button" data-testid="togli-filtro" onClick={() => { setQuery(""); setTipo(null); }} className="inline-flex min-h-10 items-center gap-1 text-sm font-display font-semibold text-accent">
-                <X size={14} aria-hidden /> Tutti
-              </button>
-            }
-          >
-            {tipo ? tipoPlurale(tipo) : "Risultati"} · {filtrati.length}
-          </Titolo>
-          {filtrati.length === 0 ? (
-            <p className="rounded-card border border-border bg-surface p-4 text-center text-sm font-sans text-text-muted">Nessun posto così.</p>
+      {raccolte.length > 0 && (
+        <section className="mt-6" aria-labelledby="raccolte-titolo" data-testid="profilo-raccolte-sezione">
+          <div className="px-4"><Titolo id="raccolte-titolo">Raccolte</Titolo></div>
+          <ul data-testid="profilo-raccolte" className="flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+            {raccolte.map((r) => {
+              const c = copertine[r.name];
+              return (
+                <li key={r.name} className="w-[148px] shrink-0 snap-start">
+                  <Link href={r.href} data-testid="raccolta-pubblica-link" className="block active:scale-[0.98] transition-transform duration-150">
+                    <span className={`relative block h-[96px] overflow-hidden rounded-[16px] border ${LINE} ${PAPER}`}>
+                      <span aria-hidden className="absolute inset-0 flex items-center justify-center gap-1 text-[28px] leading-none">{c?.emoji.map((e) => <span key={e}>{e}</span>)}</span>
+                      {c && c.punti.length > 0 && (
+                        <>
+                          <MappaPunti punti={c.punti} w={148} h={96} margine={26} testId="raccolta-copertina-mappa" />
+                          <span aria-hidden className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{c.emoji[0]}</span>
+                        </>
+                      )}
+                    </span>
+                    <span className={`${SERIF} mt-1.5 block truncate text-[17px] font-medium leading-tight text-text`}>{r.name}</span>
+                    <span className="block text-[12px] text-text-muted">{r.count === 1 ? "1 posto" : `${r.count} posti`}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {resto.length + comuni.length > 0 && (
+        <section className="mt-6 px-4" aria-labelledby="posti-titolo" data-testid="profilo-lista">
+          <Titolo id="posti-titolo">I {suoi} posti</Titolo>
+          {all.length > CERCA_DA && (
+            <label className="mb-2 flex min-h-11 items-center gap-2 rounded-pill border border-border bg-white px-4 focus-within:border-brand">
+              <Search size={16} aria-hidden className="shrink-0 text-text-muted" />
+              <span className="sr-only">Cerca nei {suoi} posti</span>
+              <input
+                type="search"
+                data-testid="cerca-posti-persona"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Cerca nei ${suoi} ${all.length} posti`}
+                className="min-w-0 flex-1 bg-transparent text-[15px] font-sans text-text outline-none"
+              />
+            </label>
+          )}
+          {visibili.length > 1 && (
+            <div className={`${FILA} mb-3`} role="group" aria-label="Quali posti">
+              {visibili.map((f) => {
+                const on = filtro === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    data-testid={`filtro-${f.id}`}
+                    aria-pressed={on}
+                    onClick={() => { setFiltro(f.id); setAperta(false); }}
+                    className={on ? CHIP_ON : CHIP}
+                  >
+                    {f.label}
+                    <span className={`font-display font-semibold ${on ? "text-white/80" : "text-accent"}`}>{gruppi[f.id].length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {righe.length === 0 ? (
+            <p data-testid="posti-nessuno" className="rounded-card border border-border bg-surface p-4 text-center text-sm font-sans text-text-muted">Nessun posto così.</p>
           ) : (
-            elenco(filtrati, true)
+            elenco(mostrate, conStato)
+          )}
+          {righe.length > ANTEPRIMA && !cercando && (
+            <button
+              type="button"
+              data-testid="mostra-tutti-lista"
+              onClick={() => setAperta((v) => !v)}
+              className="mt-2 flex min-h-11 w-full items-center justify-center rounded-pill border border-border bg-white text-sm font-display font-semibold text-brand active:scale-[0.99]"
+            >
+              {aperta ? "Mostra meno" : `Mostra tutti (${righe.length})`}
+            </button>
           )}
         </section>
-      ) : (
-        <>
-          {liked.length > 0 && (
-            <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
-              <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "I tuoi preferiti" : "I suoi preferiti"}</Titolo></div>
-              {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
-              <ul className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-                {liked.map((p) => {
-                  const verdict = verdetti[p.place_id];
-                  const meta = metaDi(p);
-                  // Numero solo se viene dalla sua classifica (posizione nella città di quel posto).
-                  const pos = posizioni[p.place_id];
-                  const citta = cityFromAddress(p.address);
-                  return (
-                    <li key={p.place_id} className="relative flex w-[70%] max-w-[260px] shrink-0 snap-start">
-                      <Link
-                        href={`/locali/${p.place_id}`}
-                        data-testid="piaciuto-card"
-                        className={`flex w-full flex-col overflow-hidden rounded-card border ${LINE} bg-white shadow-card active:scale-[0.99] transition-transform duration-150`}
-                      >
-                        <span aria-hidden className={`flex h-[92px] items-center justify-center ${PAPER} text-[46px] leading-none`}>{getCategoryEmoji(p.category, p.name)}</span>
-                        <span className="flex flex-1 flex-col p-3">
-                          <span className="flex items-start gap-2">
-                            <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-                            <span
-                              data-testid="piaciuto-badge"
-                              title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Tra i suoi preferiti"}
-                              className="mt-0.5 inline-flex shrink-0 items-center rounded-pill bg-accent-light px-2 py-0.5 text-[12px] font-display font-semibold text-accent"
-                            >
-                              {pos ? `👍 N.${pos}` : "👍"}
-                            </span>
-                          </span>
-                          {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
-                          {verdict && <span data-testid="piaciuto-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>}
-                        </span>
-                      </Link>
-                      <span className="absolute right-2 top-2">{salvaBtn(p, true)}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {raccolte.length > 0 && (
-            <section className="mt-6" aria-labelledby="raccolte-titolo" data-testid="profilo-raccolte-sezione">
-              <div className="px-4"><Titolo id="raccolte-titolo">Raccolte</Titolo></div>
-              <ul data-testid="profilo-raccolte" className="flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-                {raccolte.map((r) => {
-                  const c = copertine[r.name];
-                  return (
-                    <li key={r.name} className="w-[148px] shrink-0 snap-start">
-                      <Link href={r.href} data-testid="raccolta-pubblica-link" className="block active:scale-[0.98] transition-transform duration-150">
-                        <span className={`relative block h-[96px] overflow-hidden rounded-[16px] border ${LINE} ${PAPER}`}>
-                          <span aria-hidden className="absolute inset-0 flex items-center justify-center gap-1 text-[28px] leading-none">{c?.emoji.map((e) => <span key={e}>{e}</span>)}</span>
-                          {c && c.punti.length > 0 && (
-                            <>
-                              <MappaPunti punti={c.punti} w={148} h={96} margine={26} testId="raccolta-copertina-mappa" />
-                              <span aria-hidden className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{c.emoji[0]}</span>
-                            </>
-                          )}
-                        </span>
-                        <span className={`${SERIF} mt-1.5 block truncate text-[17px] font-medium leading-tight text-text`}>{r.name}</span>
-                        <span className="block text-[12px] text-text-muted">{r.count === 1 ? "1 posto" : `${r.count} posti`}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {recent.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="recenti-titolo" data-testid="profilo-recenti">
-              <Titolo id="recenti-titolo">Di recente</Titolo>
-              {lista("recenti", recent)}
-            </section>
-          )}
-
-          {tipi.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="tipi-titolo" data-testid="profilo-tipi">
-              <Titolo id="tipi-titolo">I {suoi} tipi</Titolo>
-              <div className={FILA}>
-                {tipi.map((t) => (
-                  <button key={t.tipo} type="button" data-testid="tipo-persona" onClick={() => setTipo(t.tipo)} className={CHIP}>
-                    {tipoPlurale(t.tipo)}
-                    <span className="font-display font-semibold text-accent">{t.count}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {comuni.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="comune-titolo" data-testid="profilo-in-comune">
-              <Titolo id="comune-titolo">In comune · {comuni.length}</Titolo>
-              <div className={FILA}>
-                {comuni.map((p) => (
-                  <Link key={p.place_id} href={`/locali/${p.place_id}`} data-testid="in-comune-posto" className={`${CHIP} max-w-[240px]`}>
-                    <span aria-hidden>{getCategoryEmoji(p.category, p.name)}</span>
-                    <span className="truncate">{p.name}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {want.length > 0 && (
-            <section className="mt-6 px-4" aria-labelledby="voglio-titolo" data-testid="profilo-da-provare">
-              <Titolo id="voglio-titolo">Da provare</Titolo>
-              {lista("da-provare", want)}
-            </section>
-          )}
-        </>
       )}
     </div>
   );

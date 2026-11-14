@@ -15,6 +15,7 @@ import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
 import { likedPlaces, mapSpots, plural, publicCollections, recentVisited, topTypes } from "@/lib/social-view";
 import { categoryLabel } from "@/lib/category-label";
+import { tipoPlurale } from "@/lib/scaffali-salvati";
 import { publicCollectionPath } from "@/lib/raccolte";
 import { loadPublicRanks } from "@/lib/classifica-server";
 import { topByCity } from "@/lib/classifica";
@@ -25,6 +26,9 @@ import CreatorBadge from "@/components/creator-badge";
 // Solo se la persona ha scelto di renderlo pubblico; mai note private, mai gusti dichiarati.
 
 type Props = { params: Promise<{ handle: string }> };
+
+// "bar, forni e pizzerie"
+const elenco = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle } = await params;
@@ -94,7 +98,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const path = profilePath(profile.handle);
   const spots = mapSpots(places);
   const collections = publicCollections(places);
-  // 8/11: "Gli è piaciuto", "Di recente", "I suoi tipi", "In comune", "Da provare". Tutto dalle righe
+  // 14/11: "I suoi preferiti", "Raccolte", "I suoi posti" (pillole Tutti / Provati / Da provare / In comune). Tutto dalle righe
   // già pubbliche (niente note, niente "Non fa per me", niente data della visita: resta privata).
   const recent = recentVisited(places);
   const want = places.filter((p) => !p.tags?.includes("Già visitato")); // salvato e non ancora visitato = da provare
@@ -119,10 +123,10 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   // la persona ci è stata), niente id o nome di chi l'ha salvato. L'ordine resta quello deciso qui.
   const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, lat: p.lat, lng: p.lng, tags: (p.tags ?? []).filter((t) => t !== OPINION_DISLIKE) }); // anche se la vista lo togliesse già (revisore 8/11)
   const stats = [
-    { label: "Provati", value: profile.visitati, id: "visitati" },
-    { label: "Da provare", value: profile.da_provare, id: "da-provare" },
-    { label: "Seguaci", value: profile.seguaci, id: "seguaci" },
-    { label: "Seguiti", value: profile.seguiti, id: "seguiti" },
+    { label: "provati", value: profile.visitati, id: "visitati" },
+    { label: "da provare", value: profile.da_provare, id: "da-provare" },
+    { label: profile.seguaci === 1 ? "seguace" : "seguaci", value: profile.seguaci, id: "seguaci" },
+    { label: profile.seguiti === 1 ? "seguito" : "seguiti", value: profile.seguiti, id: "seguiti" },
   ];
 
   return (
@@ -151,14 +155,20 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
         </div>
         {profile.bio && <p data-testid="profilo-bio" className="mt-3 text-[15px] font-sans leading-relaxed text-text">{profile.bio}</p>}
 
-        <dl data-testid="profilo-numeri" className="mt-4 grid grid-cols-4 gap-2">
-          {stats.map((s) => (
-            <div key={s.id} data-testid={`numero-${s.id}`} className="flex flex-col items-center rounded-card border border-border bg-surface px-1 py-2.5">
-              <dd className="font-title text-xl font-semibold leading-none text-brand">{s.value}</dd>
-              <dt className="mt-1 text-[11px] font-display leading-tight text-text-muted">{s.label}</dt>
-            </div>
+        {/* Revisore 14/11: i numeri in una riga di testo (prima 4 caselle), poi i tipi che salva di più. */}
+        <p data-testid="profilo-numeri" className="mt-3 flex flex-wrap items-baseline gap-x-1.5 text-[14px] leading-5 font-sans text-text-muted">
+          {stats.map((s, i) => (
+            <span key={s.id} data-testid={`numero-${s.id}`} className="whitespace-nowrap">
+              <span className="font-semibold text-text">{s.value}</span> {s.label}
+              {i < stats.length - 1 && <span aria-hidden className="ml-1.5">·</span>}
+            </span>
           ))}
-        </dl>
+        </p>
+        {tipi.length > 0 && (
+          <p data-testid="profilo-tipi" className="mt-1 text-[14px] font-sans text-text-muted">
+            Salva soprattutto <span className="text-text">{elenco(tipi.slice(0, 3).map((t) => tipoPlurale(t.tipo).toLowerCase()))}</span>
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           {isMe ? (
@@ -192,7 +202,6 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           liked={liked.map(posto)}
           recent={recent.map(posto)}
           want={want.map(posto)}
-          tipi={tipi}
           mine={places.flatMap((p) => (mine.has(p.place_id) ? [p.place_id] : []))} // solo quelli in comune: gli altri salvati di chi guarda non lasciano il server
           verdetti={verdetti}
           posizioni={posizioni}
