@@ -5,8 +5,9 @@
 // Funzioni pure: centro e zoom si calcolano qui, così i puntini cadono esattamente dove sono i posti.
 
 export type Punto = { lat: number; lng: number };
-export type MappaStatica = { url: string; punti: { x: number; y: number; i: number }[] }; // i = indice in nucleo(punti).slice(0, max)
-export type OpzioniMappa<T extends Punto = Punto> = { max?: number; preferisci?: (p: T) => boolean };
+// i = indice in nucleo(punti).slice(0, max). senzaNomi: le tre immagini da comporre (vedi SENZA_NOMI).
+export type MappaStatica = { url: string; punti: { x: number; y: number; i: number }[]; senzaNomi?: string[] };
+export type OpzioniMappa<T extends Punto = Punto> = { max?: number; preferisci?: (p: T) => boolean; senzaNomi?: boolean };
 
 const TILE = 512; // le immagini statiche Mapbox usano tessere da 512 px
 const ZOOM_MIN = 11;
@@ -14,6 +15,13 @@ const ZOOM_MAX = 14.5; // più vicino si vedono due strade e nessun nome: la cop
 const RAGGIO_GRUPPO_M = 1_200; // revisori 14/11: con 6 e 2,5 km i posti lontani finivano fuori dal riquadro (copertine vuote)
 
 const SENZA_CITTA = encodeURIComponent('["==",["get","class"],"nessuna"]');
+
+// Profilo (revisore 14/11, sesto giro: "Colosseum" in inglese, "City" di "Vatican City" tagliato dal bordo). L'API
+// statica spegne un solo livello per immagine (provato: due layer_id → 422; addlayer e setfilter insieme → 422). Allora
+// si chiedono tre immagini identiche tranne un livello di nomi spento in ciascuna (luoghi, città, quartieri) e il
+// telefono le compone (ImmagineSenzaNomi in profilo-mappa.tsx): un nome che manca anche in una sola immagine sparisce.
+// Anche i quartieri: in un'immagine statica un nome vicino al bordo resta tagliato a metà ("TRASTEVE…").
+const SENZA_NOMI = ["poi-label", "settlement-major-label", "settlement-subdivision-label"].map((l) => `setfilter=${SENZA_CITTA}&layer_id=${l}`);
 
 const mx = (lng: number) => (lng + 180) / 360;
 const my = (lat: number) => {
@@ -96,6 +104,7 @@ export function mappaStatica<T extends Punto>(punti: readonly T[], w: number, h:
   if (dentro.length === 0 || dentro.length * 2 < vista.length) return null;
   return {
     url,
+    ...(opz.senzaNomi ? { senzaNomi: SENZA_NOMI.map((f) => `${base}&${f}`) } : {}),
     // Con lo zoom al minimo un posto può cadere fuori: niente mezzi puntini sul bordo (revisore 14/11).
     punti: dentro,
   };

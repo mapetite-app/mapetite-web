@@ -4734,6 +4734,12 @@ else {
   // Revisore 14/11: la mappa è l'immagine del profilo, subito sotto Segui/Condividi (statica, con un puntino per posto).
   ok(await sp.getByTestId("profilo-mappa").isVisible(), "profilo pubblico: mappa dei suoi posti");
   { const n = await sp.getByTestId("profilo-mappa-puntino").count(); ok(n === 3, `profilo pubblico: un puntino per ogni posto (${n})`); }
+  // Revisore 14/11 (sesto giro): niente nomi in inglese ("Colosseum", "City" tagliato) e niente puntini sotto "↗ Mappa".
+  { const srcs = await sp.getByTestId("mappa-senza-nomi").locator("img").evaluateAll((els) => els.map((e) => new URL(e.src).searchParams.get("layer_id")));
+    const strati = [...new Set(srcs)].sort().join(",");
+    ok(srcs.length === 6 && strati === "poi-label,settlement-major-label,settlement-subdivision-label", `profilo pubblico: mappa composta da tre immagini, ognuna senza un livello di nomi (luoghi, città, quartieri) (${strati})`);
+    const sotto = await sp.getByTestId("apri-mappa-persona").evaluate((a) => { const pill = [...a.querySelectorAll("span")].find((s) => s.textContent?.trim() === "Mappa")?.getBoundingClientRect(); if (!pill) return -1; return [...a.querySelectorAll("[data-testid=profilo-mappa-puntino]")].filter((d) => { const r = d.getBoundingClientRect(); return r.right > pill.left && r.left < pill.right && r.bottom > pill.top && r.top < pill.bottom; }).length; });
+    ok(sotto === 0, `profilo pubblico: nessun puntino sotto la pillola 'Mappa' (${sotto})`); }
   { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1; const h = (await sp.getByTestId("apri-mappa-persona").boundingBox())?.height ?? 0;
     ok((await y("segui")) < (await y("apri-mappa-persona")) && (await y("apri-mappa-persona")) < (await y("profilo-posti")) && h >= 120 && h <= 170 && (await sp.getByTestId("mappa-persona").count()) === 0, `profilo pubblico: mappa sotto Segui e sopra i posti, alta ~140 px, nessuna seconda mappa in fondo (${Math.round(h)})`); }
   ok(await sp.getByTestId("apri-mappa-persona").getAttribute("href") === "/u/giulia.rm/mappa", "profilo pubblico: tocco sulla mappa → la mappa completa");
