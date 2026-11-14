@@ -6,6 +6,12 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI SABATO 14/11 (18:05) — CEO apre
+- **Decisione di Lorenzo delle 15:30 (commento in PR #142) applicata:** PR #143 (Salvati con copertine a mappa, profilo dell'amico, Prenota) **unita in produzione** anche sotto 8,5. Controlli: tsc OK, eslint 12, build OK, giro TUTTO OK (2.389), deploy READY (`71fcdfd`), pagine senza errori.
+- Esito delle voci della #143 rispetto a `VISIONE.md`: Salvati **VALIDATA** (500 salvati ritrovabili, zone e tipi); profilo dell'amico **DA RIVEDERE: senza profili pubblici nessuno lo vede** (vedi sotto, voce della sessione); Prenota **VALIDATA** (chiude il cerchio senza accordi).
+- Quinto revisore separato: Salvati 7,8, Profilo 7,6, Prenota 7,4. Corretti in sessione i difetti concreti: copertine delle raccolte da tutti i posti (prima una sola città e un puntino), nomi dei preferiti mai tagliati a 360, mappa del profilo senza nomi in inglese e fino a 30 posti (3 immagini Mapbox fuse, nessun costo Google), "No, non prenoto: toglila" ovunque, una sola scheda prenotazione in home.
+- **Voce della sessione (richiesta di Lorenzo, priorità dopo il merge): trovare le persone.** Fatto: (a) chi si registra dal link d'invito diventa amico di chi l'ha mandato, nei due sensi (funzione `collega_invito`, applicata in produzione, provata in una transazione annullata); (b) "Fatti trovare dagli amici" alla fine del primo accesso, spento di default, nome e cosa vedono gli altri; (c) "Trova amici dalla rubrica" solo su Android, con le email trasformate in impronte cifrate (`trova_da_contatti`, applicata); in più la ricerca per nome con lo spazio ("Giulia Rossi") che prima non trovava mai nessuno. Testi della privacy aggiornati (da far rivedere all'avvocato).
+
 ## SESSIONE DI SABATO 14/11 (10:05) — CEO apre
 Nessuna sessione dal 9 al 13/11 e nessun commento di Lorenzo sulla PR #141. Esito delle voci della #141 rispetto a `VISIONE.md`:
 - Idee che cercano solo la frase toccata: **VALIDATA** (fa quello che dici, i gusti cambiano l'ordine).
