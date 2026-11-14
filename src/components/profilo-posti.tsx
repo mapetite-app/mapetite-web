@@ -34,6 +34,7 @@ export type RaccoltaPersona = { name: string; count: number; href: string };
 
 const ANTEPRIMA = 6; // righe prima di "Mostra tutti"
 const CERCA_DA = 15; // la ricerca compare solo con più di 15 posti
+const PUNTI_RACCOLTA = 60; // copertina di una raccolta: al massimo 60 posti per scegliere la zona
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
 const LINE = "border-[#e3e7e7]";
@@ -102,11 +103,12 @@ export default function ProfiloPosti({
     const top = new Set(liked.map((p) => p.place_id));
     return [...recent, ...want].filter((p) => !top.has(p.place_id));
   }, [liked, recent, want]);
-  // Copertine delle raccolte: la zona vera dei suoi posti di quella raccolta (come gli scaffali dei Salvati).
+  // Copertine delle raccolte: la zona vera dei suoi posti di quella raccolta (come gli scaffali dei Salvati), da tutti
+  // i suoi posti con coordinate della raccolta (al massimo 60), non dai primi; sotto i 3 puntini resta l'emoji.
   const copertine = useMemo(
     () => Object.fromEntries(raccolte.map((r) => {
       const posti = all.filter((p) => p.tags?.includes(r.name));
-      return [r.name, { punti: conCoordinate(posti), emoji: [...new Set(posti.map((p) => getCategoryEmoji(p.category, p.name)))].slice(0, 3) }];
+      return [r.name, { punti: conCoordinate(posti).slice(0, PUNTI_RACCOLTA), emoji: [...new Set(posti.map((p) => getCategoryEmoji(p.category, p.name)))].slice(0, 3) }];
     })),
     [raccolte, all],
   );
@@ -253,8 +255,11 @@ export default function ProfiloPosti({
                   >
                     <span aria-hidden className={`flex h-[92px] items-center justify-center ${PAPER} text-[46px] leading-none`}>{getCategoryEmoji(p.category, p.name)}</span>
                     <span className="flex flex-1 flex-col p-3">
-                      <span className="flex items-start gap-2">
-                        <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
+                      {/* Revisore 14/11 (sesto giro): a 360 px con due card "Fatamorgana" diventava "Fatamorgar" (tagliato
+                          dal 👍 accanto). Il nome prende la larghezza che gli serve e il 👍 va sotto se non ci sta;
+                          una parola più larga della card va a capo invece di essere tagliata. */}
+                      <span className="flex flex-wrap items-start gap-x-2 gap-y-1">
+                        <span data-testid="piaciuto-nome" className={`${SERIF} line-clamp-2 min-w-0 max-w-full flex-[1_1_auto] text-[19px] font-medium leading-tight tracking-[-0.01em] text-text [overflow-wrap:anywhere]`}>{p.name}</span>
                         {badgeDi(p)}
                       </span>
                       {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
@@ -282,10 +287,9 @@ export default function ProfiloPosti({
                     <span className={`relative block h-[96px] overflow-hidden rounded-[16px] border ${LINE} ${PAPER}`}>
                       <span aria-hidden className="absolute inset-0 flex items-center justify-center gap-1 text-[28px] leading-none">{c?.emoji.map((e) => <span key={e}>{e}</span>)}</span>
                       {c && c.punti.length > 0 && (
-                        <>
-                          <MappaPunti punti={c.punti} w={148} h={96} margine={26} testId="raccolta-copertina-mappa" />
+                        <MappaPunti punti={c.punti} w={148} h={96} margine={26} minPunti={3} testId="raccolta-copertina-mappa" dotTestId="raccolta-copertina-puntino">
                           <span aria-hidden className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{c.emoji[0]}</span>
-                        </>
+                        </MappaPunti>
                       )}
                     </span>
                     <span className={`${SERIF} mt-1.5 block truncate text-[17px] font-medium leading-tight text-text`}>{r.name}</span>

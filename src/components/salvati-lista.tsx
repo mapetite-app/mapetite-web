@@ -97,21 +97,25 @@ function FotoCopertina({ src, children }: { src: string; children: React.ReactNo
 const ZONA_VICINA_M = 30_000;
 const COPERTINA_W = 124;
 const COPERTINA_H = 72;
-function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
+const PUNTI_RACCOLTA = 60;
+// minPunti (revisore 14/11, sesto giro): una raccolta con un puntino solo non dice dove sono i suoi posti; sotto
+// i 3 puntini visibili resta l'emoji.
+function MappaCopertina({ posti, badge, fallback, minPunti = 1 }: { posti: Place[]; badge: string | null; fallback: React.ReactNode; minPunti?: number }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
-  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true, "quartieri"), [posti]);
-  if (!mappa || rotta) return <>{fallback}</>;
+  // Revisore 14/11 (settimo giro): niente più "Rome" né "…'s Basilica" tagliato: la mappa arriva senza nessun nome.
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true), [posti]);
+  const visibili = useMemo(() => mappa?.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55) ?? [], [mappa, badge]);
+  if (!mappa || rotta || visibili.length < minPunti) return <>{fallback}</>;
   return (
     <>
       {!pronta && fallback}
       {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
       <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 [filter:brightness(0.62)_contrast(4)] ${pronta ? "opacity-100" : "opacity-0"}`} />
-      {/* Revisore 14/11, quarto giro: copertine "slavate". Niente più velo bianco (i nomi dei quartieri sono spenti
-          nella mappa stessa). Lo stile chiaro di Mapbox ha strade bianche su grigio quasi bianco (4% di differenza):
+      {/* Revisore 14/11, quarto giro: copertine "slavate". Niente più velo bianco (nella mappa non ci sono nomi). Lo stile chiaro di Mapbox ha strade bianche su grigio quasi bianco (4% di differenza):
           prima si scurisce e poi si alza il contrasto, così isolati grigi e strade bianche si leggono. Puntini più grandi. */}
       {pronta && <span className="absolute inset-0 bg-brand/[0.05]" />}
-      {pronta && mappa.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55).map((pt, i) => (
+      {pronta && visibili.map((pt, i) => (
         <span key={i} data-testid="scaffale-puntino" className="absolute h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
       ))}
       {pronta && badge && (
@@ -121,7 +125,8 @@ function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: str
   );
 }
 
-function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover, mappa = true }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string; mappa?: boolean }) {
+// puntiMappa: i posti da cui parte la mappa, se non sono i 12 più recenti del gruppo (raccolte: tutti, fino a 60).
+function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover, mappa = true, puntiMappa, minPunti }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string; mappa?: boolean; puntiMappa?: Place[]; minPunti?: number }) {
   // I posti arrivano dal più vecchio al più nuovo: la copertina mostra i più recenti.
   const recenti = g.posti.slice(-12).reverse();
   const conFoto = recenti.find((p) => foto[p.id]);
@@ -146,7 +151,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
           <span aria-hidden className={`relative block h-[72px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
             {/* Tondo con l'emoji solo se il gruppo ne ha una sola (tipo, raccolta, "Vicino a te"): su una zona mista sarebbe a caso. */}
             {/* Sui tipi la mappa non distingue niente (tutte "Roma" con puntini sparsi, revisore 14/11): lì resta l'emoji. */}
-            {mappa ? <MappaCopertina posti={recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} /> : vecchia}
+            {mappa ? <MappaCopertina posti={puntiMappa ?? recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} minPunti={minPunti} /> : vecchia}
           </span>
           <span className="mt-1 flex items-baseline gap-1 px-0.5">
             <span data-testid="scaffale-nome" className="min-w-0 truncate text-[13px] font-medium text-[#33373d]">{g.label}</span>
@@ -504,6 +509,22 @@ export default function SalvatiLista({
     return activeTag !== null && !isStateTag(activeTag) && !cs.some((c) => c.name === activeTag) ? [...cs, { name: activeTag, count: 0, preview: [] }] : cs;
   }, [perAltri, activeTag]);
   const icone = useMemo(() => iconeRaccolte(collections.map((c) => c.name)), [collections]);
+  // Mappa delle copertine (revisore 14/11, sesto giro): da TUTTI i posti con coordinate della raccolta, non dai 4 della
+  // copertina ("Romantico", 13 posti a Roma e 1 a Milano, mostrava Milano con un puntino). Al massimo i 60 più recenti
+  // per raccolta. Con una città scelta perAltri ha già solo i posti di quella città: il nucleo è lì.
+  const puntiRaccolte = useMemo(() => {
+    const m = new globalThis.Map<string, Place[]>();
+    for (let i = perAltri.length - 1; i >= 0; i--) {
+      const p = perAltri[i];
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+      for (const t of new Set(p.tags ?? [])) {
+        if (isStateTag(t)) continue;
+        const l = m.get(t) ?? [];
+        if (l.length < PUNTI_RACCOLTA) { l.push(p); m.set(t, l); }
+      }
+    }
+    return m;
+  }, [perAltri]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
   const kicker = useMemo(() => {
     const byCity = new globalThis.Map<string, number>();
@@ -981,6 +1002,8 @@ export default function SalvatiLista({
                     foto={fotoMie}
                     testId="raccolta-cerchio"
                     cover="raccolta-copertina"
+                    puntiMappa={puntiRaccolte.get(c.name) ?? []}
+                    minPunti={3}
                     onTap={() => scegli("raccolta", c.count, () => scegliRaccolta(c.name))}
                   />
                 ))}

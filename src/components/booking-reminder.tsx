@@ -225,9 +225,23 @@ export default function BookingReminder() {
   const chiedi = tutteDaChiedere.slice(0, 1);
   const altreDaChiedere = tutteDaChiedere.length - chiedi.length;
   if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0 && chiedi.length === 0) return null;
-  const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
-  // Con un tavolo vero oggi viene prima lui (revisore 14/11): la domanda scende sotto, in una riga sola.
-  const tavoloOggi = prossime.some(({ domani }) => !domani) || doppi.some(({ domani }) => !domani);
+  const tutteProssime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
+  // Una sola scheda tra il tavolo e "L'hai prenotato?" (revisore 14/11, sesto giro: "Domani alle 20:30…: ci vai?" e
+  // la domanda erano due schede piene una sopra l'altra). Vince la più urgente: il tavolo se è entro 24 ore (la
+  // domanda scende in una riga sola sotto), altrimenti la domanda (i tavoli finiscono nel suo "+N da confermare").
+  const entro24 = (b: BookingRequest) => b.date === todayKey || new Date(`${b.date}T${b.time ?? "20:00"}`).getTime() - now.getTime() <= 24 * 3_600_000;
+  const tavoloUrgente = tutteProssime.some(({ b }) => entro24(b)) || doppi.some(({ group }) => group.some(entro24));
+  const domandaPrima = chiedi.length > 0 && !tavoloUrgente;
+  const prossime = domandaPrima ? [] : tutteProssime;
+  const doppiVisti = domandaPrima ? [] : doppi;
+  const tavoliNascosti = domandaPrima ? tutteProssime.length + doppi.length : 0;
+  const tavoloOggi = prossime.length > 0 || doppiVisti.length > 0;
+  // Revisore 14/11 (settimo giro): i tavoli nascosti sono già confermati, non "da confermare": riga a parte.
+  const altreInRiga = altreDaChiedere + tavoliNascosti;
+  const rigaAltre = [
+    altreDaChiedere > 0 ? `+${altreDaChiedere} da confermare` : null,
+    tavoliNascosti > 0 ? (tavoliNascosti === 1 ? "1 tavolo prenotato" : `${tavoliNascosti} tavoli prenotati`) : null,
+  ].filter(Boolean).join(" · ");
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
       {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto?
@@ -263,17 +277,17 @@ export default function BookingReminder() {
                 updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" });
               }}
               onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
-              altro={[{ label: "No, toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
+              altro={[{ label: "No, non prenoto: toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
             />
           )}
-          {altreDaChiedere > 0 && (
+          {altreInRiga > 0 && (
             <Link href="/prenotazioni" data-testid="promemoria-altre-da-confermare" className="mt-1 flex min-h-10 items-center border-t border-border pt-2 text-sm font-display font-semibold text-brand">
-              +{altreDaChiedere} da confermare
+              {rigaAltre}
             </Link>
           )}
         </section>
       ))}
-      {doppi.map(({ group, domani }) => (
+      {doppiVisti.map(({ group, domani }) => (
         <Doppio key={group.map((b) => b.id).join()} group={group} domani={domani} />
       ))}
       {prossime.map(({ b, domani }) => (domani ? (
