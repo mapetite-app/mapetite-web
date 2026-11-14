@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MapPin, Maximize2 } from "lucide-react";
+import { MapPin } from "lucide-react";
 import Avatar from "@/components/avatar";
 import SeguiButton from "@/components/segui-button";
 import CondividiLink from "@/components/condividi-link";
 import InvitoMapetite from "@/components/invito-mapetite";
-import MappaPersonaLazy from "@/components/mappa-persona-lazy";
+import ProfiloMappa from "@/components/profilo-mappa";
+import ProfiloIndietro from "@/components/profilo-indietro";
 import SocialInArrivo from "@/components/social-in-arrivo";
 import ProfiloPosti from "@/components/profilo-posti";
 import { OPINION_DISLIKE } from "@/lib/tags";
@@ -14,7 +15,7 @@ import { ScopritoreBadge } from "@/components/scopritore";
 import { personName, profileMapPath, profilePath } from "@/lib/handle";
 import { likedPlaces, mapSpots, plural, publicCollections, recentVisited, topTypes } from "@/lib/social-view";
 import { categoryLabel } from "@/lib/category-label";
-import { collectionColor, publicCollectionPath } from "@/lib/raccolte";
+import { publicCollectionPath } from "@/lib/raccolte";
 import { loadPublicRanks } from "@/lib/classifica-server";
 import { topByCity } from "@/lib/classifica";
 import { cityFromAddress } from "@/lib/city";
@@ -38,16 +39,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-function TopBar() {
+// Chi guarda con l'accesso (arriva da Amici) ha la freccia Indietro; chi apre il link da fuori vede il marchio.
+function TopBar({ indietro = false }: { indietro?: boolean }) {
   return (
-    <div className="flex items-center justify-between px-4 pt-4">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1.5 rounded-pill bg-brand px-3 py-1.5 font-display text-xs font-semibold text-white"
-      >
-        <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
-        Mapetite
-      </Link>
+    <div className="flex min-h-11 items-center justify-between px-4 pt-3">
+      {indietro ? (
+        <ProfiloIndietro />
+      ) : (
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-pill bg-brand px-3 py-1.5 font-display text-xs font-semibold text-white"
+        >
+          <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
+          Mapetite
+        </Link>
+      )}
     </div>
   );
 }
@@ -111,7 +117,7 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
   const verdetti = await loadVerdetti([...liked, ...recent, ...want].map((p) => p.place_id));
   // Al telefono solo questi campi: niente date (il giorno in cui un posto è segnato "provato" dice quando
   // la persona ci è stata), niente id o nome di chi l'ha salvato. L'ordine resta quello deciso qui.
-  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, tags: (p.tags ?? []).filter((t) => t !== OPINION_DISLIKE) }); // anche se la vista lo togliesse già (revisore 8/11)
+  const posto = (p: (typeof places)[number]) => ({ place_id: p.place_id, name: p.name, category: p.category, address: p.address, lat: p.lat, lng: p.lng, tags: (p.tags ?? []).filter((t) => t !== OPINION_DISLIKE) }); // anche se la vista lo togliesse già (revisore 8/11)
   const stats = [
     { label: "Provati", value: profile.visitati, id: "visitati" },
     { label: "Da provare", value: profile.da_provare, id: "da-provare" },
@@ -121,9 +127,9 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
 
   return (
     <main className="mx-auto min-h-dvh max-w-md bg-bg pb-10" data-testid="profilo-pubblico">
-      <TopBar />
+      <TopBar indietro={!!viewer && !isMe} />
 
-      <header className="px-4 pt-5">
+      <header className="px-4 pt-3">
         <div className="flex items-center gap-4">
           <Avatar person={profile} size={72} />
           <div className="min-w-0">
@@ -170,6 +176,8 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
             testId="condividi-profilo"
           />
         </div>
+        {/* Revisore 14/11: la mappa è l'immagine del profilo, subito sotto Segui (prima stava in fondo). */}
+        <ProfiloMappa spots={spots.map((s) => ({ lat: s.lat, lng: s.lng, visited: s.visited }))} href={profileMapPath(profile.handle)} name={name} />
       </header>
 
       {places.length === 0 ? (
@@ -188,45 +196,8 @@ export default async function ProfiloPubblicoPage({ params }: Props) {
           mine={places.flatMap((p) => (mine.has(p.place_id) ? [p.place_id] : []))} // solo quelli in comune: gli altri salvati di chi guarda non lasciano il server
           verdetti={verdetti}
           posizioni={posizioni}
+          raccolte={collections.map((c) => ({ ...c, href: publicCollectionPath(profile.handle, c.name) }))}
         />
-      )}
-
-      {collections.length > 0 && (
-        <section className="mt-6 px-4" aria-labelledby="raccolte-titolo">
-          <h2 id="raccolte-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">Raccolte</h2>
-          <div data-testid="profilo-raccolte" className="mt-2 flex flex-wrap gap-1.5">
-            {collections.map((c) => (
-              <Link
-                key={c.name}
-                href={publicCollectionPath(profile.handle, c.name)}
-                data-testid="raccolta-pubblica-link"
-                className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-pill bg-accent-light px-3 py-1 text-[13px] font-display font-medium text-accent active:scale-95"
-              >
-                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: collectionColor(c.name) }} />
-                <span className="truncate">{c.name}</span>
-                <span className="text-accent/70">· {c.count}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {spots.length > 0 && (
-        <section className="mt-6 px-4" aria-labelledby="mappa-titolo">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 id="mappa-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">La mappa di {name}</h2>
-            <Link href={profileMapPath(profile.handle)} data-testid="apri-mappa-persona" className="inline-flex min-h-10 items-center gap-1 text-sm font-display font-semibold text-accent">
-              <Maximize2 size={14} aria-hidden /> Apri
-            </Link>
-          </div>
-          <div className="h-56">
-            <MappaPersonaLazy spots={spots} className="h-full w-full" />
-          </div>
-          <p className="mt-2 flex items-center gap-3 text-xs font-sans text-text-muted">
-            <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" /> Provati</span>
-            <span className="inline-flex items-center gap-1"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-brand" /> Da provare</span>
-          </p>
-        </section>
       )}
 
       {!viewer && <InvitoMapetite returnPath={path} />}

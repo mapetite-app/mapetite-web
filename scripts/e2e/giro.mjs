@@ -4664,16 +4664,22 @@ else {
     ok((await n("visitati")) === "1Provati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
   // Giro 1/11 (D36): uno stato, una parola. Per i posti di un'altra persona "Provati", come il titolo "Già provati".
   ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) === 0, "profilo pubblico: mai 'Visitato'; sotto 'Di recente' e 'Da provare' niente pillola di stato doppione");
-  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
+  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("2 posti") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come copertine (senza gli stati)"); }
+  // Revisore 14/11: le raccolte stanno sopra "Di recente" (prima erano un'etichetta grigia in fondo).
+  { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1;
+    ok((await y("profilo-raccolte-sezione")) > 0 && (await y("profilo-raccolte-sezione")) < (await y("profilo-recenti")), "profilo pubblico: 'Raccolte' sopra 'Di recente'"); }
+  ok((await sp.getByTestId("profilo-indietro").count()) === 0, "profilo pubblico senza account: niente freccia Indietro (c'è il marchio Mapetite)");
   ok((await sp.getByRole("heading", { name: "Di recente", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Di recente' e 'Da provare' con i posti");
   // 8/11: senza account niente "Salva anche tu" né "In comune"; con 3 posti niente ricerca; "Gli è piaciuto" solo con 👍 o classifica.
   ok((await sp.getByTestId("salva-anche-tu").count()) === 0 && (await sp.getByTestId("profilo-in-comune").count()) === 0 && (await sp.getByTestId("cerca-posti-persona").count()) === 0 && (await sp.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico senza account: niente salva, niente 'In comune', niente ricerca con pochi posti");
   ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
   ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
-  await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
-  ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");
-  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
-  ok((await sp.getByTestId("pin-persona").count()) === 3, `profilo pubblico: un pin per ogni posto (${await sp.getByTestId("pin-persona").count()})`);
+  // Revisore 14/11: la mappa è l'immagine del profilo, subito sotto Segui/Condividi (statica, con un puntino per posto).
+  ok(await sp.getByTestId("profilo-mappa").isVisible(), "profilo pubblico: mappa dei suoi posti");
+  { const n = await sp.getByTestId("profilo-mappa-puntino").count(); ok(n === 3, `profilo pubblico: un puntino per ogni posto (${n})`); }
+  { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1; const h = (await sp.getByTestId("apri-mappa-persona").boundingBox())?.height ?? 0;
+    ok((await y("segui")) < (await y("apri-mappa-persona")) && (await y("apri-mappa-persona")) < (await y("profilo-posti")) && h >= 120 && h <= 170 && (await sp.getByTestId("mappa-persona").count()) === 0, `profilo pubblico: mappa sotto Segui e sopra i posti, alta ~140 px, nessuna seconda mappa in fondo (${Math.round(h)})`); }
+  ok(await sp.getByTestId("apri-mappa-persona").getAttribute("href") === "/u/giulia.rm/mappa", "profilo pubblico: tocco sulla mappa → la mappa completa");
   ok(await sp.getByTestId("segui").getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: 'Segui' porta a Crea un account e poi torna qui");
   ok(await sp.getByTestId("invito-crea-mappa").getByText("Crea la tua mappa su Mapetite").isVisible() && await sp.getByTestId("invito-crea-mappa").getByRole("link", { name: "Crea la tua mappa, è gratis" }).getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: invito 'Crea la tua mappa su Mapetite' in fondo");
   await sp.waitForTimeout(500);
@@ -4715,6 +4721,8 @@ else {
   await soctx.route("**/rest/v1/follows**", (r) => { follows.push({ method: r.request().method(), url: decodeURIComponent(r.request().url()), body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
   await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
   ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
+  // Revisore 14/11: chi arriva da Amici ha la freccia Indietro in alto.
+  ok(await sp.getByTestId("profilo-indietro").isVisible() && (await sp.getByTestId("profilo-indietro").getAttribute("href")) === "/amici", "profilo di un amico: freccia Indietro verso Amici");
   // 8/11: profilo più utile per chi è collegato (dati dal cookie: "miei" = i propri salvati).
   { // Righe minime e codifica leggera (solo i caratteri vietati nei cookie): 16 posti stanno nei 4 KB del cookie.
     const many = Array.from({ length: 16 }, (_, i) => ({ user_id: GIULIA, place_id: `g${i}`, name: i % 2 ? `Enoteca ${i}` : `Forno ${i}`, category: i % 2 ? "bar" : "bakery", tags: i % 3 ? ["Già visitato", ...(i === 4 ? ["Mi è piaciuto"] : [])] : ["Da provare"], created_at: `2026-10-${10 + i}` }));
@@ -4730,6 +4738,17 @@ else {
     { const badge = (await sp.getByTestId("piaciuto-badge").textContent())?.trim(); const x = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.x ?? -1;
       ok(badge === "👍" && Math.round(x) === 16, `profilo di un altro: 👍 senza numero se non c'è classifica, card a 16 px (${badge}, x=${Math.round(x)})`); }
     { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Forni8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
+    // Revisore 14/11: stesso linguaggio dei Salvati. Nomi in serif, Salva dentro la riga, tipi e "In comune" su una fila
+    // scorrevole con lo stesso chip bianco, card "Gli è piaciuto" al 70% con l'emoji grande in alto.
+    { const r = sp.getByTestId("profilo-recenti");
+      const font = await r.getByTestId("posto-persona").first().locator("span span").first().evaluate((e) => getComputedStyle(e).fontFamily);
+      const lista = await r.locator("ul").first().boundingBox(); const btn = await r.getByTestId("salva-anche-tu").first().boundingBox();
+      ok(/newsreader/i.test(font) && btn && lista && btn.x + btn.width <= lista.x + lista.width && btn.x > lista.x, `profilo di un altro: nomi in serif e Salva dentro la riga (${font.slice(0, 30)})`); }
+    { const ys = await sp.getByTestId("tipo-persona").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+      const bg = await sp.getByTestId("in-comune-posto").first().evaluate((e) => getComputedStyle(e).backgroundColor);
+      const bgTipo = await sp.getByTestId("tipo-persona").first().evaluate((e) => getComputedStyle(e).backgroundColor);
+      ok(new Set(ys).size === 1 && bg === bgTipo, `profilo di un altro: 'I suoi tipi' su una fila, 'In comune' con lo stesso chip (${bg} / ${bgTipo})`); }
+    { const w = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.width ?? 0; ok(w >= 240 && w <= 280, `profilo di un altro: card 'Gli è piaciuto' al 70% (${Math.round(w)} px)`); }
     ok((await sp.getByTestId("in-comune-posto").count()) === 2 && (await sp.getByTestId("salvato-anche-tu").count()) >= 1, "profilo di un altro: 'In comune' e i posti già tuoi segnati");
     ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 5 && (await sp.getByTestId("mostra-tutti-recenti").textContent()) === "Mostra tutti (10)", "profilo di un altro: 5 posti e 'Mostra tutti (10)', nessun limite fisso");
     await sp.getByTestId("mostra-tutti-recenti").click();
@@ -6641,7 +6660,7 @@ else {
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
     const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
-    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("piaciuto-badge").allTextContents()).join("|") === "👍 N.1 in classifica|👍 N.2 in classifica|👍 N.3 in classifica", "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine");
+    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("piaciuto-badge").allTextContents()).join("|") === "👍 N.1|👍 N.2|👍 N.3" && (await g.getByTestId("piaciuto-badge").first().getAttribute("title")) === "N.1 nella sua classifica di Roma", "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine (👍 N.1 accanto al nome)");
     await g.getByTestId("profilo-piaciuti").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
@@ -6656,7 +6675,7 @@ else {
       await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, salvati: [...socialG.salvati, mil] })), url: BASE }]);
       await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
       const b = (await g.getByTestId("piaciuto-badge").allTextContents()).join("|");
-      ok(b === "👍 N.1 in classifica|👍 N.2 in classifica|👍 N.3 in classifica|👍 N.1 in classifica" && (await g.getByTestId("piaciuto-card").last().textContent()).includes("Milano"), `profilo pubblico: con due città il N.1 di Milano resta N.1 (${b})`); }
+      ok(b === "👍 N.1|👍 N.2|👍 N.3|👍 N.1" && (await g.getByTestId("piaciuto-card").last().textContent()).includes("Osteria Cinque") && (await g.getByTestId("piaciuto-badge").last().getAttribute("title")) === "N.1 nella sua classifica di Milano", `profilo pubblico: con due città il N.1 di Milano resta N.1 (${b})`); }
     await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica (e senza 👍) 'Gli è piaciuto' non compare");
