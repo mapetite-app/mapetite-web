@@ -24,6 +24,8 @@ export function MappaPunti({
   eager = false,
   margine = 16,
   raggio,
+  minPunti = 1,
+  children = null,
 }: {
   punti: readonly PuntoPersona[];
   w: number;
@@ -34,6 +36,8 @@ export function MappaPunti({
   eager?: boolean; // la mappa del profilo è sopra la piega: si carica subito
   margine?: number; // spazio attorno ai puntini (px), perché nessuno finisca sotto un badge
   raggio?: number; // quanto può essere largo il gruppo (m); la mappa grande ne tiene di più delle copertine
+  minPunti?: number; // sotto questo numero di puntini niente mappa (copertine delle raccolte: 3, revisore 14/11)
+  children?: React.ReactNode; // sopra la mappa, solo se la mappa c'è (il tondo con l'emoji della raccolta)
 }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
@@ -47,7 +51,7 @@ export function MappaPunti({
   // Le posizioni dei puntini non dipendono dal token: si calcolano sempre, l'immagine solo se c'è il token.
   const geo = useMemo(() => mappaStatica(punti, w, h, token || "-", margine, raggio), [punti, w, h, token, margine, raggio]);
   const vista = useMemo(() => nucleo(punti, raggio).slice(0, 12), [punti, raggio]); // geo.punti[].i punta qui
-  if (!geo) return null;
+  if (!geo || geo.punti.length < minPunti) return null;
   return (
     <span data-testid={testId} className={`absolute inset-0 overflow-hidden ${PAPER}`}>
       {token && !rotta && (
@@ -62,6 +66,7 @@ export function MappaPunti({
           style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
         />
       ))}
+      {children}
     </span>
   );
 }
