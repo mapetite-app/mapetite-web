@@ -5,7 +5,7 @@ import Avatar from "@/components/avatar";
 import AmiciIntanto from "./amici-intanto";
 import { loadMySaved } from "@/lib/raccolte-server";
 import { PostoCard } from "@/components/posto-persona";
-import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, viewerId } from "@/lib/social";
+import { loadAmici, loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, mioInvito, viewerId } from "@/lib/social";
 import ScopritoriAmici from "./scopritori-amici";
 import { personName, profilePath } from "@/lib/handle";
 import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
@@ -37,6 +37,8 @@ export default async function AmiciPage() {
 
   const [feed, creators] = await Promise.all([loadFeed(viewer), loadCreatorLists(viewer)]);
   const seguo = feed.stato === "in-arrivo" ? [] : feed.seguiti.map((p) => p.id);
+  // Amici con il profilo privato (ci si segue a vicenda dopo un invito, 14/11): si vedono per nome, mai i posti.
+  const amiciPrivati = feed.stato === "in-arrivo" ? [] : (await loadAmici()).filter((a) => !a.is_public && !seguo.includes(a.id));
   // Scopritori (5.6): null senza la migrazione 20261016_scopritori → la sezione non compare.
   const [scopritori, mieGemme, verdetti] = seguo.length > 0 && feed.stato !== "in-arrivo"
     ? await Promise.all([loadScopritori(seguo), loadMyGems(viewer), loadVerdetti(feed.attivita.map((s) => s.place_id))])
@@ -58,7 +60,7 @@ export default async function AmiciPage() {
 
       {feed.stato === "in-arrivo" ? (
         // Revisore 2/11: niente più "Gli amici arrivano presto" a tutta pagina: le cose vere che si fanno già.
-        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} />
+        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} codice={await mioInvito()} />
       ) : (
         <>
           {/* Trova persone: la ricerca per nome, come "Search by name" di Places. */}
@@ -90,9 +92,9 @@ export default async function AmiciPage() {
           {/* Senza nessuno da seguire, i creator sono il primo passo: vengono subito. */}
           {feed.seguiti.length === 0 && creatorSection}
 
-          {feed.seguiti.length > 0 && (
+          {feed.seguiti.length + amiciPrivati.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">
-              <h2 id="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Chi segui · {feed.seguiti.length}</h2>
+              <h2 id="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Chi segui · {feed.seguiti.length + amiciPrivati.length}</h2>
               <ul data-testid="seguiti" className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
                 {feed.seguiti.map((p) => (
                   <li key={p.id} className="shrink-0">
@@ -100,6 +102,15 @@ export default async function AmiciPage() {
                       <Avatar person={p} size={52} />
                       <span className="w-full truncate text-[11px] font-display text-text">{personName(p)}</span>
                     </Link>
+                  </li>
+                ))}
+                {amiciPrivati.map((a) => (
+                  <li key={a.id} data-testid="amico-privato" className="shrink-0">
+                    <span title="Profilo privato: vedi il suo nome, non i suoi posti" className="flex w-16 flex-col items-center gap-1 text-center">
+                      <Avatar person={a} size={52} />
+                      <span className="w-full truncate text-[11px] font-display text-text">{personName(a)}</span>
+                      <span className="text-[10px] font-sans text-text-muted">Privato</span>
+                    </span>
                   </li>
                 ))}
               </ul>

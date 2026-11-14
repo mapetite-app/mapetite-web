@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
-import { collegaInvito, completeOnboarding, skipOnboarding } from "./actions";
+import { accettaInvito, chiInvita, completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
@@ -13,10 +13,13 @@ import SelettoreGusti, { contaScelti } from "@/components/selettore-gusti";
 import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
-import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
+import { clearStoredInvite, isFriendCode, readStoredInvite } from "@/lib/invito";
+import { cleanHandle } from "@/lib/handle";
 import { elenco, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
+// Anteprima del @nome che nasce dal nome (stessa regola di rendiTrovabile in actions.ts, senza il numero).
+const handleDaNome = (nome: string) => cleanHandle(nome).replace(/^[._]+|[._]+$/g, "").slice(0, 16);
 
 // Risposte in corso, conservate sul telefono (decisione 13b del backlog): se al salvataggio
 // l'accesso è scaduto si passa dal login e, tornati qui, le risposte sono ancora tutte al loro
@@ -235,9 +238,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
-  const [amico, setAmico] = useState<{ nome: string | null } | null>(null);
+  // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
+  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" } | null>(null);
   const [trova, setTrova] = useState(false);
   const [trovaNome, setTrovaNome] = useState("");
+  const nomeRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
@@ -282,22 +287,41 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   }, [confermaRifai]);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
-  // Lorenzo 14/11: chi arriva dal link di un amico diventa subito suo amico, in entrambi i sensi.
-  // Senza rete il codice resta nel telefono e si riprova alla prossima apertura.
+  // Arrivato da un link d'invito: la registrazione si conta una volta. Se è il link personale di un amico
+  // (codice "i-…") la fine del primo accesso chiede "Diventa amico" o "Non ora" (revisore 14/11: prima
+  // si diventava amici da soli, senza un sì). Il codice resta nel telefono finché non si risponde.
   useEffect(() => {
     const codice = readStoredInvite();
     if (!codice) return;
+    trackFeature("invito_registrato", { contesto: isFriendCode(codice) ? "amico" : codice });
+    if (!isFriendCode(codice)) { clearStoredInvite(); return; }
     let vivo = true;
-    collegaInvito(codice)
+    chiInvita(codice)
       .then((r) => {
-        if (r.stato === "rete") return;
-        trackFeature("invito_registrato", { contesto: codice, stato: r.stato === "ok" ? "collegato" : "non_collegato" });
-        clearStoredInvite();
-        if (r.stato === "ok" && vivo) setAmico({ nome: r.nome });
+        if (!vivo) return;
+        if (r) setInvito({ codice, nome: r.nome, stato: "chiedi" });
+        else clearStoredInvite();
       })
       .catch(() => {});
     return () => { vivo = false; };
   }, []);
+
+  const rispondiInvito = async (si: boolean) => {
+    if (!invito) return;
+    if (!si) {
+      trackFeature("invito_amico", { stato: "non_ora" });
+      clearStoredInvite();
+      setInvito(null);
+      return;
+    }
+    setInvito({ ...invito, stato: "salvo" });
+    const r = await accettaInvito(invito.codice).catch(() => ({ stato: "rete" as const }));
+    trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato });
+    if (r.stato === "rete") { setInvito({ ...invito, stato: "errore" }); return; }
+    clearStoredInvite();
+    if (r.stato === "ok") setInvito({ ...invito, nome: r.nome ?? invito.nome, stato: "amici" });
+    else setInvito(null);
+  };
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
@@ -359,7 +383,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
   const finish = async (dest: "importa" | null) => {
     if (trova && !trovaNome.trim()) {
-      setError("Scrivi il tuo nome, o spegni “Fatti trovare”.");
+      // L'avviso sta sotto il campo (revisore 14/11: in fondo era mezzo coperto) e il cursore va lì.
+      setError("nome");
+      nomeRef.current?.focus();
+      nomeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
     setSubmitting(dest ?? "mappa");
@@ -738,6 +765,30 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
 
         {step === PASSO_CAPITO && (
           <div data-testid="benvenuto-capito">
+            {/* L'amico che ti ha invitato: una domanda sola, in cima, con il suo nome (revisore 14/11). */}
+            {invito && (
+              <section data-testid="invito-amico" className="mb-5 flex items-center gap-3 rounded-card bg-brand p-4 text-white shadow-card">
+                <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl">{invito.stato === "amici" ? "🤝" : "💌"}</span>
+                {invito.stato === "amici" ? (
+                  <p data-testid="invito-collegato" className="min-w-0 flex-1 text-[15px] font-sans leading-snug">
+                    {invito.nome ? <>Tu e <span className="font-semibold">{invito.nome}</span> siete amici</> : "Siete amici"}: vi trovate in Amici.
+                  </p>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <p data-testid="invito-domanda" className="text-[15px] font-sans font-medium leading-snug">{invito.nome ?? "Un amico"} ti ha invitato</p>
+                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : "Da amici vi vedete per nome in Amici."}</p>
+                    <div className="mt-2.5 flex gap-2">
+                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
+                        {invito.stato === "salvo" ? "Un attimo…" : "Diventa amico"}
+                      </button>
+                      <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill px-3 font-display text-sm font-semibold text-white/85">
+                        Non ora
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
             {frase.length > 0 ? (
               <>
                 {/* La frase da amico: solo ciò che hai scelto, parole chiave sottolineate in corallo.
@@ -796,26 +847,25 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             {frase.length > 0 && (
               <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
             )}
-            {/* Lorenzo 14/11: gli amici non si trovavano perché nessuno era pubblico. Qui, una volta sola,
-                nome e interruttore; spento di default, con cosa vedono gli altri scritto sotto. */}
+            {/* Lorenzo 14/11: gli amici non si trovavano perché nessuno era pubblico. Qui, una volta sola, il
+                profilo pubblico: spento di default; il titolo dice la verità (lo vede chiunque, revisore 14/11),
+                il @nome che nasce si vede prima, cosa vedono gli altri un tocco più in là. */}
             <section data-testid="fatti-trovare" className="mt-6 rounded-card border border-border bg-white p-4 shadow-card">
-              {amico && (
-                <p data-testid="invito-collegato" className="mb-3 flex items-center gap-2 border-b border-border pb-3 text-[15px] font-sans text-text">
-                  <span aria-hidden className="text-lg">🤝</span>
-                  <span className="min-w-0">{amico.nome ? <>Tu e <span className="font-semibold">{amico.nome}</span> siete amici</> : "Sei amico di chi ti ha invitato"}</span>
-                </p>
-              )}
               <label className="flex cursor-pointer items-center justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="block font-display text-[15px] font-semibold text-text">Fatti trovare dagli amici</span>
-                  <span className="block text-[13px] font-sans text-text-muted">Ti cercano per nome e vedono i posti che salvi.</span>
+                  <span className="block font-display text-[15px] font-semibold text-text">Profilo pubblico</span>
+                  <span className="block text-[13px] font-sans text-text-muted">Gli amici ti trovano per nome. Lo vede chiunque su Mapetite.</span>
                 </span>
                 <input
                   type="checkbox"
                   role="switch"
                   data-testid="fatti-trovare-interruttore"
                   checked={trova}
-                  onChange={(e) => { setTrova(e.target.checked); if (e.target.checked) trackFeature("fatti_trovare_on", { contesto: amico ? "invito" : "primo_accesso" }); }}
+                  onChange={(e) => {
+                    setTrova(e.target.checked);
+                    setError(null);
+                    if (e.target.checked) trackFeature("fatti_trovare_on", { contesto: invito ? "invito" : "primo_accesso" });
+                  }}
                   aria-checked={trova}
                   className="peer sr-only"
                 />
@@ -826,17 +876,25 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <label className="mt-3 block text-sm font-display font-semibold text-text">
                     Il tuo nome
                     <input
+                      ref={nomeRef}
                       data-testid="fatti-trovare-nome"
                       value={trovaNome}
-                      onChange={(e) => setTrovaNome(e.target.value)}
+                      onChange={(e) => { setTrovaNome(e.target.value); setError(null); }}
                       maxLength={40}
-                      autoComplete="given-name"
+                      autoComplete="name"
                       placeholder="es. Giulia Rossi"
-                      className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand"
+                      aria-invalid={!!error && !trovaNome.trim()}
+                      aria-describedby="fatti-trovare-indirizzo"
+                      className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
                     />
                   </label>
+                  <p id="fatti-trovare-indirizzo" data-testid="fatti-trovare-indirizzo" className="mt-1.5 text-xs font-sans text-text-muted">
+                    {error && !trovaNome.trim()
+                      ? <span role="alert" className="text-error">Scrivi il tuo nome, o spegni “Profilo pubblico”.</span>
+                      : <>Il tuo indirizzo: mapetite…/u/{handleDaNome(trovaNome) || "nome"}{trovaNome.trim() ? " (se è preso, aggiungo un numero)" : ""}</>}
+                  </p>
                   {/* Stesso testo del profilo e di /privacy (src/lib/privacy-profilo.ts): consenso informato, una sola fonte. */}
-                  <details data-testid="fatti-trovare-privacy" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
+                  <details data-testid="fatti-trovare-privacy" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">
                     <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-brand">Cosa vedono gli altri</summary>
                     <p>{PUBBLICO_CHI}: {elenco(PUBBLICO_VEDONO)} Mai: {PUBBLICO_MAI.join(", ")}. {PUBBLICO_REVOCA}{" "}
                       <Link href="/privacy#profilo-pubblico" target="_blank" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
@@ -911,7 +969,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </button>
             </>
           )}
-          {error && <p className="mt-3 text-center text-sm text-error">{error}</p>}
+          {error && error !== "nome" && <p className="mt-3 text-center text-sm text-error">{error}</p>}
         </div>
       </div>
     </div>

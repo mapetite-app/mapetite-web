@@ -32,6 +32,11 @@ export function myInviteCode(p: { handle?: string | null; id: string }): string 
 
 export const invitePath = (code: string) => `/invito/${code}`;
 
+// Codice d'invito tra amici (14/11, sera): casuale e segreto, creato nel database (mio_invito). Solo questo
+// rende amici; il @nome e "u-…" restano link che contano gli arrivi e basta.
+export const FRIEND_CODE_RE = /^i-[0-9a-f]{12}$/;
+export const isFriendCode = (code: string | null | undefined): code is string => !!code && FRIEND_CODE_RE.test(code);
+
 // Codice salvato nel telefono, se non scaduto (null altrimenti). Solo nel browser.
 export function readStoredInvite(now = Date.now()): string | null {
   try {

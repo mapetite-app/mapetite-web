@@ -78,7 +78,7 @@ export default function CercaPersone({ viewerId, seguo }: { viewerId: string; se
           {results && results.length === 0 && state !== "errore" && (
             // Lorenzo 14/11: chi non si trova di solito non ha acceso "Fatti trovare": il link d'invito lo collega lo stesso.
             <p data-testid="persone-nessuno" className="text-sm font-sans text-text-muted">
-              Nessuno con questo nome. Forse non ha acceso “Fatti trovare”:{" "}
+              Nessuno con questo nome. Forse ha il profilo privato:{" "}
               <Link href="/profilo#invita" className="font-semibold text-brand underline underline-offset-2">mandagli il tuo link</Link>.
             </p>
           )}

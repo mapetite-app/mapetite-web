@@ -4,7 +4,8 @@ import Avatar from "@/components/avatar";
 import InvitoArrivo from "@/components/invito-arrivo";
 import { loadProfilePage, viewerId, type PublicProfile } from "@/lib/social";
 import { isValidHandle, personName } from "@/lib/handle";
-import { cleanInviteCode } from "@/lib/invito";
+import { cleanInviteCode, isFriendCode } from "@/lib/invito";
+import { anteprimaInvito } from "@/lib/social";
 
 // Pagina d'arrivo del link d'invito (piano 9.1): chi la apre capisce in una frase cos'è Mapetite
 // e ha un solo pulsante, "Inizia". Se il codice è il nome di una persona con profilo pubblico
@@ -19,6 +20,12 @@ const GENERICI: Record<string, string> = {
   amici: "Ti hanno invitato su Mapetite",
 };
 
+// Link personale di un amico (codice "i-…", 14/11): il nome che si è scelto chi invita.
+async function amico(codice: string | null): Promise<string | null> {
+  if (!isFriendCode(codice)) return null;
+  return (await anteprimaInvito(codice))?.nome ?? null;
+}
+
 async function inviter(codice: string | null): Promise<PublicProfile | null> {
   if (!codice || !isValidHandle(codice)) return null;
   const data = await loadProfilePage(codice);
@@ -27,8 +34,9 @@ async function inviter(codice: string | null): Promise<PublicProfile | null> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const codice = cleanInviteCode((await params).codice);
-  const p = await inviter(codice);
-  const title = p ? `${personName(p)} ti invita su Mapetite` : "Un invito per te su Mapetite";
+  const [p, nomeAmico] = await Promise.all([inviter(codice), amico(codice)]);
+  const chi = p ? personName(p) : nomeAmico;
+  const title = chi ? `${chi} ti invita su Mapetite` : "Un invito per te su Mapetite";
   const description = "La tua mappa dei locali: salva i posti che scopri sui social o dagli amici e ritrovali quando devi scegliere.";
   return {
     title,
@@ -45,9 +53,10 @@ const PUNTI = [
 
 export default async function InvitoPage({ params }: Props) {
   const codice = cleanInviteCode((await params).codice);
-  const [p, viewer] = await Promise.all([inviter(codice), viewerId()]);
+  const [p, nomeAmico, viewer] = await Promise.all([inviter(codice), amico(codice), viewerId()]);
   const loggedIn = !!viewer;
-  const name = p ? personName(p) : null;
+  const name = p ? personName(p) : nomeAmico;
+  const perAmico = isFriendCode(codice);
   const posti = p ? p.visitati + p.da_provare : 0;
   const titolo = name ? `${name} ti ha invitato su Mapetite` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite";
 
@@ -115,10 +124,10 @@ export default async function InvitoPage({ params }: Props) {
             >
               Inizia
             </Link>
-            {/* Lorenzo 14/11: chi si registra da un link personale diventa amico di chi l'ha mandato (collega_invito):
-                lo si dice prima, non dopo. I codici generici (tester, amici) non collegano a nessuno. */}
-            <p data-testid="invito-amicizia" className="mt-2 text-center text-xs font-sans text-text-muted">
-              {codice && !GENERICI[codice] ? <>Gratis. Entrando da qui diventi amico di {name ?? "chi ti ha invitato"}.</> : "Gratis, in meno di un minuto."}
+            {/* Solo il link personale di un amico (codice "i-…") propone l'amicizia, e la chiede con un tasto alla
+                fine del primo accesso: qui lo si dice prima (revisore 14/11). */}
+            <p data-testid="invito-amicizia" className="mt-2 text-center text-[13px] font-sans text-text-muted">
+              {perAmico ? <>Gratis. Dopo, se vuoi, diventi amico di {name ?? "chi ti ha invitato"}.</> : "Gratis, in meno di un minuto."}
             </p>
             <Link href="/login" className="mt-1 flex min-h-11 items-center justify-center text-sm font-display font-semibold text-brand">
               Hai già un account? Accedi

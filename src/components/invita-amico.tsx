@@ -12,8 +12,9 @@ import { invitePath, myInviteCode } from "@/lib/invito";
 // per gli amici, una frase vera (niente promesse su funzioni che non ci sono) e l'invito a tutta larghezza.
 // Lorenzo 14/11: chi si registra dal link diventa tuo amico (collega_invito); se il tuo profilo è privato
 // però non ti vede: una riga lo dice e porta a "Fatti trovare".
-export default function InvitaAmico({ userId, handle, vuoto = false, privato = false }: { userId: string; handle: string | null; vuoto?: boolean; privato?: boolean }) {
-  const path = invitePath(myInviteCode({ handle, id: userId }));
+// Revisore 14/11: il link che rende amici usa il codice casuale "i-…" (mio_invito); senza, quello vecchio.
+export default function InvitaAmico({ userId, handle, codice = null, vuoto = false, privato = false }: { userId: string; handle: string | null; codice?: string | null; vuoto?: boolean; privato?: boolean }) {
+  const path = invitePath(codice ?? myInviteCode({ handle, id: userId }));
   const condividi = (cls: string, label: string) => (
     <CondividiLink
       path={path}
@@ -45,8 +46,8 @@ export default function InvitaAmico({ userId, handle, vuoto = false, privato = f
           <p data-testid="invita-amico-link" data-path={path} className="mt-2 text-xs font-sans text-white/65">Il tuo link d&apos;invito si apre anche senza l&apos;app.</p>
         </div>
         {privato && (
-        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
-          Chi entra dal link diventa tuo amico. Per farti vedere, accendi “Fatti trovare”.
+        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
+          Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.
         </a>
       )}
     </section>
@@ -71,8 +72,8 @@ export default function InvitaAmico({ userId, handle, vuoto = false, privato = f
         {condividi("shrink-0 border-0", "Condividi")}
       </div>
       {privato && (
-        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
-          Chi entra dal link diventa tuo amico. Per farti vedere, accendi “Fatti trovare”.
+        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
+          Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.
         </a>
       )}
     </section>

@@ -12,7 +12,7 @@ import { trackFeature } from "@/lib/track";
 // "Trova amici dalla rubrica" (Lorenzo 14/11), solo dove il browser ha il Contact Picker (Chrome su Android;
 // Safari su iPhone no, e lì il tasto non compare). La persona sceglie i contatti nel selettore del telefono;
 // qui le email diventano impronte SHA-256 e solo quelle vanno al server (trova_da_contatti), che risponde con
-// chi ha acceso "Fatti trovare". Niente viene salvato, né qui né sul server.
+// chi ha il profilo pubblico. Niente viene salvato, né qui né sul server (solo quante ricerche al giorno: max 3).
 
 type Person = { id: string; handle: string; display_name: string | null; city: string | null };
 type ContactsNav = Navigator & { contacts?: { select: (props: string[], opts: { multiple: boolean }) => Promise<{ email?: string[] }[]> } };
@@ -26,7 +26,7 @@ async function impronta(email: string): Promise<string> {
 
 export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; seguo: string[] }) {
   const disponibile = useSyncExternalStore(() => () => {}, haPicker, () => false);
-  const [stato, setStato] = useState<"idle" | "cerco" | "fatto" | "errore">("idle");
+  const [stato, setStato] = useState<"idle" | "cerco" | "fatto" | "errore" | "limite">("idle");
   const [trovati, setTrovati] = useState<Person[]>([]);
   const [scelti, setScelti] = useState(0);
   if (!disponibile) return null;
@@ -38,7 +38,7 @@ export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; se
     } catch {
       return; // selettore chiuso
     }
-    const email = [...new Set(contatti.flatMap((c) => c.email ?? []).map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@")))].slice(0, 1000);
+    const email = [...new Set(contatti.flatMap((c) => c.email ?? []).map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@")))].slice(0, 200);
     setScelti(contatti.length);
     if (email.length === 0) { setTrovati([]); setStato("fatto"); return; }
     setStato("cerco");
@@ -46,7 +46,7 @@ export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; se
     const client = await browserClient().catch(() => null);
     if (!client) { setStato("errore"); return; }
     const { data, error } = await client.rpc("trova_da_contatti", { p_hash: hash });
-    if (error) { setStato("errore"); return; }
+    if (error) { setStato(error.message.includes("troppe") ? "limite" : "errore"); return; }
     const r = (data as Person[] | null) ?? [];
     setTrovati(r);
     setStato("fatto");
@@ -65,11 +65,12 @@ export default function TrovaRubrica({ viewerId, seguo }: { viewerId: string; se
         <BookUser size={17} aria-hidden />
         {stato === "cerco" ? "Cerco…" : "Trova amici dalla rubrica"}
       </button>
-      <p className="mt-1.5 text-center text-xs font-sans text-text-muted">Scegli tu i contatti: le email si confrontano cifrate e non si salvano.</p>
+      <p className="mt-1.5 text-center text-xs font-sans text-text-muted">Scegli tu i contatti: parte solo un'impronta delle email, e non si salva.</p>
+      {stato === "limite" && <p role="alert" className="mt-2 text-sm font-sans text-text-muted">Per oggi hai già cercato 3 volte: riprova domani.</p>}
       {stato === "errore" && <p role="alert" className="mt-2 text-sm font-sans text-text-muted">Non sono riuscito a cercare. Riprova tra poco.</p>}
       {stato === "fatto" && trovati.length === 0 && (
         <p data-testid="trova-rubrica-vuoto" className="mt-2 text-sm font-sans text-text-muted">
-          {scelti === 0 ? "Nessun contatto scelto." : "Nessuno dei contatti scelti è su Mapetite con “Fatti trovare”."}{" "}
+          {scelti === 0 ? "Nessun contatto scelto." : "Nessuno dei contatti scelti è su Mapetite con il profilo pubblico."}{" "}
           <Link href="/profilo#invita" className="font-semibold text-brand underline underline-offset-2">Mandagli il tuo link</Link>
         </p>
       )}

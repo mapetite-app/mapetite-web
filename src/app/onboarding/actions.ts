@@ -9,7 +9,8 @@ import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } f
 import { ZONE } from "@/lib/gusti";
 import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
-import { cleanInviteCode } from "@/lib/invito";
+import { cleanInviteCode, isFriendCode } from "@/lib/invito";
+import { anteprimaInvito } from "@/lib/social";
 import { cleanHandle, isValidHandle } from "@/lib/handle";
 
 interface OnboardingData {
@@ -125,10 +126,15 @@ export async function completeOnboarding({
 
   // "Fatti trovare dagli amici": nome da mostrare, nome pubblico ricavato dal nome e profilo pubblico.
   // Errori solo nei log: i gusti sono già salvati e il profilo si sistema da /profilo.
+  // Revisore 14/11: se non riesce, la persona lo deve sapere (prima finiva solo nei log). I gusti sono
+  // già salvati: rimane qui con l'errore e un nuovo tocco riprova.
   const nome = typeof trovabile?.nome === "string" ? trovabile.nome.trim().slice(0, 40) : "";
   if (nome) {
     const esito = await rendiTrovabile(supabase, user.id, nome);
-    if (esito) console.error("[onboarding] fatti trovare:", esito);
+    if (esito) {
+      console.error("[onboarding] profilo pubblico:", esito);
+      return { error: "Gusti salvati, ma non sono riuscito a rendere pubblico il profilo. Riprova, o spegni “Profilo pubblico”." };
+    }
   }
 
   goOn(gusti, citta, dest, back, mappa);
@@ -145,38 +151,46 @@ async function rendiTrovabile(supabase: Client, userId: string, nome: string): P
   if (base.length < 3) base = `${base}${base ? "." : ""}mapetite`.slice(0, 16);
   const candidati = attuale ? [attuale] : [base, ...Array.from({ length: 6 }, (_, i) => `${base}${i + 2}`), `${base}${Math.floor(1000 + Math.random() * 9000)}`];
   for (const handle of candidati) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update({ display_name: nome, handle, is_public: true, updated_at: new Date().toISOString() })
-      .eq("id", userId);
-    if (!error) return null;
+      .eq("id", userId)
+      .select("id");
+    if (!error) return data && data.length > 0 ? null : "profilo non trovato";
     if (error.code !== "23505") return error.message;
   }
   return "nessun nome pubblico libero";
 }
 
-// Invito che collega da solo (Lorenzo 14/11): chi si è registrato dal link di un amico diventa suo amico,
-// in entrambi i sensi (funzione collega_invito, migrazione 20261114_invito_amici). "rete" = da riprovare.
-export type EsitoInvito = { stato: "ok"; nome: string | null; pubblico: boolean } | { stato: "no" } | { stato: "rete" };
+// Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
+// "Diventa amico" o "Non ora". Solo i codici casuali "i-…" (migrazione 20261114c_inviti_sicuri).
+export type ChiInvita = { nome: string | null } | null;
+export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "no"; motivo: string } | { stato: "rete" };
 
-export async function collegaInvito(raw: unknown): Promise<EsitoInvito> {
+const fakeE2E = async () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo");
+const nomeFinto = (codice: string) => (codice.endsWith("0000000000aa") ? "Giulia" : null);
+
+export async function chiInvita(raw: unknown): Promise<ChiInvita> {
   const codice = cleanInviteCode(raw);
-  if (!codice) return { stato: "no" };
-  // Giro automatico: nessuna scrittura, il nome arriva dal codice.
-  if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
-    const n = codice.split(/[._-]/)[0];
-    return codice === "nessuno" ? { stato: "no" } : { stato: "ok", nome: n.charAt(0).toUpperCase() + n.slice(1), pubblico: true };
-  }
+  if (!isFriendCode(codice)) return null;
+  if (await fakeE2E()) return codice.endsWith("ffffffffffff") ? null : { nome: nomeFinto(codice) };
+  const p = await anteprimaInvito(codice);
+  return p ? { nome: p.nome } : null;
+}
+
+export async function accettaInvito(raw: unknown): Promise<EsitoInvito> {
+  const codice = cleanInviteCode(raw);
+  if (!isFriendCode(codice)) return { stato: "no", motivo: "codice" };
+  if (await fakeE2E()) return { stato: "ok", nome: nomeFinto(codice) };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("collega_invito", { p_codice: codice });
+  const { data, error } = await supabase.rpc("accetta_invito", { p_codice: codice });
   if (error) {
-    console.error("[invito] collega:", error.code, error.message);
-    // Funzione non ancora nel database: non si riprova all'infinito.
-    return error.code === "PGRST202" || error.code === "42883" ? { stato: "no" } : { stato: "rete" };
+    console.error("[invito] accetta:", error.code, error.message);
+    return { stato: "rete" };
   }
-  const r = data as { stato?: string; nome?: string | null; pubblico?: boolean } | null;
-  if (r?.stato === "anonimo") return { stato: "rete" };
-  return r?.stato === "ok" ? { stato: "ok", nome: r.nome ?? null, pubblico: !!r.pubblico } : { stato: "no" };
+  const r = data as { stato?: string; nome?: string | null } | null;
+  if (r?.stato === "ok") return { stato: "ok", nome: r.nome ?? null };
+  return r?.stato === "anonimo" ? { stato: "rete" } : { stato: "no", motivo: r?.stato ?? "?" };
 }
 
 // Dopo l'ultima schermata.

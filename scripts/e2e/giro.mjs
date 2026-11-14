@@ -4644,6 +4644,8 @@ else {
       sv(MARCO, "marco", "Marco", "44444444-0000-4000-8000-000000000008", "Osteria Milano", "restaurant", ["Da provare"], oggi, 45.48, 9.19),
     ],
     seguo: [GIULIA],
+    // Amici reciproci da invito (14/11): Pietro ha il profilo privato (solo il nome), Giulia è già tra chi segui.
+    amici: [{ id: "00000000-0000-4000-8000-0000000009b7", display_name: "Pietro", handle: null, is_public: false }, { id: GIULIA, display_name: "Giulia", handle: "giulia.rm", is_public: true }],
     mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
     // Verdetti Mapetite (18/10): sulle card del feed come la riga di descrizione di Places. Osteria Milano è di chi non segui.
     verdetti: { [LOC_SOC]: "Cucina romana vera, tavoli fuori nel vicolo.", "44444444-0000-4000-8000-000000000008": "Non deve comparire" },
@@ -4857,6 +4859,8 @@ else {
   // Amici: chi segui, attività raggruppata, ricerca persone.
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
+  { const pr = sp.getByTestId("seguiti").getByTestId("amico-privato");
+    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta"); }
   { const att = sp.getByTestId("attivita");
     const first = (await att.first().innerText()).replace(/\s+/g, " ");
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
@@ -4891,7 +4895,7 @@ else {
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => r.fulfill({ json: [] }));
   await sp.getByLabel("Cerca persone per nome").fill("Nessuno Qui");
   await sp.getByTestId("persone-nessuno").waitFor({ timeout: 4000 }).catch(() => {});
-  ok(((await sp.getByTestId("persone-nessuno").textContent().catch(() => "")) ?? "").includes("Fatti trovare") && (await sp.getByTestId("persone-nessuno").getByRole("link").getAttribute("href")) === "/profilo#invita", "amici: nessun risultato spiega 'Fatti trovare' e porta al link d'invito");
+  ok(((await sp.getByTestId("persone-nessuno").textContent().catch(() => "")) ?? "").includes("profilo privato") && (await sp.getByTestId("persone-nessuno").getByRole("link").getAttribute("href")) === "/profilo#invita", "amici: nessun risultato spiega 'Fatti trovare' e porta al link d'invito");
   // "Trova amici dalla rubrica": solo con il Contact Picker (Android). Qui Chromium da computer non ce l'ha.
   await sp.getByLabel("Cerca persone per nome").fill("");
   ok((await sp.getByTestId("trova-rubrica").count()) === 0, "amici: senza Contact Picker (iPhone, computer) niente 'Trova amici dalla rubrica'");
@@ -8471,7 +8475,9 @@ if (fakeUser) {
 if (!fakeUser) console.log("SKIP  invito: dev server senza E2E_FAKE_USER");
 else {
   const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
-  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true } };
+  // Link personale da amico (14/11): codice casuale "i-…"; il nome arriva dall'anteprima (anteprima_invito).
+  const COD_AMICO = "i-0000000000aa";
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null } } };
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const ievents = [];
   await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
@@ -8503,7 +8509,8 @@ else {
   const og = await ip.locator('meta[property="og:title"]').getAttribute("content");
   ok(og === "Giulia ti invita su Mapetite", `invito: anteprima del link su WhatsApp con il nome (${og})`);
   // Lorenzo 14/11: chi entra dal link personale diventa amico di chi l'ha mandato; lo si dice prima di "Inizia".
-  ok(((await ip.getByTestId("invito-amicizia").textContent()) ?? "").includes("diventi amico di Giulia"), `invito: prima di registrarsi si legge che si diventa amici (${await ip.getByTestId("invito-amicizia").textContent()})`);
+  // Revisore 14/11: il @nome non rende amici (chiunque lo conosce); solo il codice casuale del link personale.
+  ok((await ip.getByTestId("invito-amicizia").textContent()) === "Gratis, in meno di un minuto.", `invito con il @nome: nessuna promessa di amicizia (${await ip.getByTestId("invito-amicizia").textContent()})`);
   await ip.screenshot({ path: `${OUT}/invito-arrivo.png`, caret: "initial" });
   await ip.reload({ waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
@@ -8520,6 +8527,11 @@ else {
   await ip.goto(`${BASE}/invito/tester`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Sei tra i primi a provare Mapetite" && !(await ip.getByTestId("invito-posti").count()), "invito: codice 'tester' per il gruppo di prova");
   ok((await ip.getByTestId("invito-amicizia").textContent()) === "Gratis, in meno di un minuto.", "invito: il codice 'tester' non collega a nessuno (niente 'diventi amico')");
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato su Mapetite" && ((await ip.getByTestId("invito-amicizia").textContent()) ?? "").includes("se vuoi, diventi amico di Giulia"), `invito da amico (codice casuale): nome di chi invita e amicizia proposta, non imposta (${await ip.getByTestId("invito-amicizia").textContent()})`);
+  { const fs = await ip.getByTestId("invito-amicizia").evaluate((e) => parseFloat(getComputedStyle(e).fontSize)); ok(fs >= 13, `invito: la riga sull'amicizia si legge (${fs}px)`); }
+  await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice casuale sconosciuto → testo neutro, nessun nome");
   await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
   await ip.goto(`${BASE}/invito/sconosciuto`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice senza profilo pubblico → testo neutro");
@@ -8528,7 +8540,7 @@ else {
   await ip.waitForTimeout(300);
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite" && arrivi().length === nArr, "invito: codice non valido → pagina neutra, nessun conteggio");
   ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === "sconosciuto", "invito: si ricorda l'ultimo codice valido");
-  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
   await ip.getByTestId("invito-inizia").click();
   await ip.waitForURL(/\/signup/, { timeout: 5000 }).then(() => ok(true, "invito: 'Inizia' apre la registrazione"), () => ok(false, "invito: 'Inizia' apre la registrazione"));
 
@@ -8537,8 +8549,8 @@ else {
   await ip.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
   const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
-  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm" && reg[0].props.stato === "collegato" && droppedKeys(reg).length === 0, `primo accesso: registrazione da invito contata con il codice e collegata all'amico (${JSON.stringify(reg.map((e) => e.props))})`);
-  ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
+  ok(reg.length === 1 && reg[0].props.contesto === "amico" && droppedKeys(reg).length === 0, `primo accesso: registrazione da invito contata, senza il codice segreto nei segnali (${JSON.stringify(reg.map((e) => e.props))})`);
+  ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === COD_AMICO, "primo accesso: il codice dell'amico resta finché non si risponde");
   // Mappa del gusto (sprint 25/10): 4 passi a schermo intero. 1) città e zone.
   ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 7 con barra di avanzamento (una domanda per schermata, come Albo)");
   ok(await ip.getByTestId("benvenuto-avanti").isDisabled(), "primo accesso: senza città 'Continua' non va avanti (per saltare tutto c'è 'Salta' in alto, niente doppioni)");
@@ -8660,17 +8672,37 @@ else {
   await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
   // Lorenzo 14/11: arrivato dal link di Giulia, la fine del primo accesso dice che siete amici e chiede
   // "Fatti trovare" (spento di default, nome solo se acceso, cosa vedono gli altri un tocco più in là).
+  // Revisore 14/11: niente amicizia automatica. In cima "Giulia ti ha invitato" con "Diventa amico" / "Non ora".
+  { const ia = ip.getByTestId("invito-amico");
+    await ia.waitFor({ timeout: 4000 }).catch(() => {});
+    const top = await ia.boundingBox().catch(() => null);
+    ok(((await ia.getByTestId("invito-domanda").textContent().catch(() => "")) ?? "").includes("Giulia ti ha invitato") && await ia.getByTestId("invito-si").isVisible() && await ia.getByTestId("invito-no").isVisible() && !!top && top.y + top.height < 600, `primo accesso da invito: in cima 'Giulia ti ha invitato' con 'Diventa amico' e 'Non ora' (${Math.round(top?.y ?? -1)})`);
+    ok((await ip.getByTestId("invito-collegato").count()) === 0, "primo accesso da invito: nessuna amicizia prima del sì");
+    await ia.getByTestId("invito-si").click();
+    await ia.getByTestId("invito-collegato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await ia.getByTestId("invito-collegato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), `primo accesso: toccato 'Diventa amico' → 'Tu e Giulia siete amici' (${await ia.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);
+    const ev = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_amico");
+    ok(ev.length === 1 && ev[0].props.stato === "amici" && droppedKeys(ev).length === 0, `primo accesso: risposta all'invito contata (${JSON.stringify(ev.map((e) => e.props))})`);
+    ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: dopo la risposta il codice d'invito si cancella dal telefono");
+    await ip.screenshot({ path: `${OUT}/benvenuto-4-invito-amico.png`, caret: "initial" }); }
   { const ft = ip.getByTestId("fatti-trovare");
-    ok(((await ft.getByTestId("invito-collegato").textContent()) ?? "").includes("Tu e Giulia siete amici"), `primo accesso da invito: 'Tu e Giulia siete amici' (${await ft.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);
+    ok(((await ft.locator("label").first().textContent()) ?? "").includes("Profilo pubblico") && ((await ft.locator("label").first().textContent()) ?? "").includes("chiunque"), "primo accesso: la card dice 'Profilo pubblico' e che lo vede chiunque (revisore 14/11)");
     const sw = ft.getByTestId("fatti-trovare-interruttore");
-    ok(!(await sw.isChecked()) && (await ft.getByTestId("fatti-trovare-nome").count()) === 0, "primo accesso: 'Fatti trovare' spento di default, nessun campo nome");
+    ok(!(await sw.isChecked()) && (await ft.getByTestId("fatti-trovare-nome").count()) === 0, "primo accesso: 'Profilo pubblico' spento di default, nessun campo nome");
     await ft.locator("label").first().click();
-    ok(await sw.isChecked() && await ft.getByTestId("fatti-trovare-nome").isVisible() && await ft.getByTestId("fatti-trovare-privacy").isVisible(), "primo accesso: acceso 'Fatti trovare' compaiono il nome e 'Cosa vedono gli altri'");
+    ok(await sw.isChecked() && await ft.getByTestId("fatti-trovare-nome").isVisible() && await ft.getByTestId("fatti-trovare-privacy").isVisible(), "primo accesso: acceso 'Profilo pubblico' compaiono il nome e 'Cosa vedono gli altri'");
     await ft.getByTestId("fatti-trovare-privacy").locator("summary").click();
     { const t = (await ft.getByTestId("fatti-trovare-privacy").innerText()).replace(/\s+/g, " ");
       ok(t.includes("Chi ha il link o ti cerca su Mapetite vede") && t.includes("Mai:") && t.includes("note"), `primo accesso: 'Cosa vedono gli altri' con lo stesso testo del profilo (${t.slice(0, 120)})`); }
     { const ib = await ft.getByTestId("fatti-trovare-nome").boundingBox(); const fs = await ft.getByTestId("fatti-trovare-nome").evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
       ok(ib && ib.height >= 44 && fs >= 16, `primo accesso: campo nome alto ≥ 44 px e testo ≥ 16 px (niente zoom su iPhone) (${Math.round(ib?.height ?? 0)}, ${fs})`); }
+    // Senza nome "Apri la mia mappa" non parte: l'avviso sta sotto il campo e il cursore va lì.
+    await ip.getByTestId("benvenuto-fine").click();
+    await ip.waitForTimeout(500);
+    ok(new URL(ip.url()).pathname === "/onboarding" && ((await ft.getByTestId("fatti-trovare-indirizzo").textContent()) ?? "").includes("Scrivi il tuo nome") && await ft.getByTestId("fatti-trovare-nome").evaluate((e) => e === document.activeElement), "primo accesso: profilo pubblico senza nome → avviso sotto il campo, cursore nel campo, si resta qui");
+    await ft.getByTestId("fatti-trovare-nome").fill("Giulia Rossi");
+    ok(((await ft.getByTestId("fatti-trovare-indirizzo").textContent()) ?? "").includes("/u/giuliarossi"), `primo accesso: si vede l'indirizzo pubblico che nasce dal nome (${await ft.getByTestId("fatti-trovare-indirizzo").textContent()})`);
+    await ft.getByTestId("fatti-trovare-nome").fill("");
     await ft.getByTestId("fatti-trovare-nome").scrollIntoViewIfNeeded();
     await ip.screenshot({ path: `${OUT}/benvenuto-4-fatti-trovare.png`, caret: "initial" });
     await ft.locator("label").first().click();

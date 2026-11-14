@@ -52,15 +52,15 @@ const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
     titolo: "Profilo pubblico e amici",
     id: "profilo-pubblico",
     righe: [
-      "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (\"Fatti trovare dagli amici\" alla fine del primo accesso, oppure Profilo → Impostazioni → Profilo pubblico), dopo aver letto cosa vedranno gli altri.",
+      "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (\"Profilo pubblico\" alla fine del primo accesso, oppure Profilo → Impostazioni → Profilo pubblico), dopo aver letto cosa vedranno gli altri.",
       // Stesse parole del foglio di conferma (src/lib/privacy-profilo.ts): una sola fonte.
       `Se è pubblico, ${PUBBLICO_CHI.charAt(0).toLocaleLowerCase("it")}${PUBBLICO_CHI.slice(1)}: ${elenco(PUBBLICO_VEDONO)}`,
       `${NON_FA_PER_ME_NOTA} La pagina del tuo profilo non mostra date.`,
       `Mai, nemmeno con il profilo pubblico: ${PUBBLICO_MAI.join(", ")}.`,
       "Base giuridica: il tuo consenso. Lo revochi in un tocco spegnendo \"Profilo pubblico\": da quel momento profilo e posti non si vedono più e le tue recensioni tornano anonime (\"Un membro di Mapetite\"). Non possiamo cancellare quello che qualcuno ha già visto o copiato prima.",
       "Si possono seguire solo i profili pubblici. Mapetite non manda messaggi a tuo nome e non mostra a nessuno chi guarda il tuo profilo.",
-      "Link d'invito: se ti registri dal link personale di un amico, diventate amici (vi seguite a vicenda); lo leggi sulla pagina dell'invito prima di iniziare. Puoi smettere di seguirlo quando vuoi. Cosa vedete l'uno dell'altro dipende solo dal profilo pubblico.",
-      "Trova amici dalla rubrica (solo Android): scegli tu i contatti nel selettore del telefono. Le loro email vengono trasformate sul telefono in un'impronta cifrata (SHA-256) e solo quella arriva al server, che risponde con chi ha il profilo pubblico. Né le impronte né i contatti vengono conservati.",
+      "Link d'invito: il tuo link personale contiene un codice casuale. Chi si registra da lì vede il tuo nome e può scegliere \"Diventa amico\" (oppure \"Non ora\"): da amici vi seguite a vicenda e vi vedete per nome in Amici, anche con il profilo privato; i posti solo se il profilo è pubblico. Un solo invito per account, nei primi 7 giorni. Smetti di seguire quando vuoi.",
+      "Trova amici dalla rubrica (solo Android): scegli tu i contatti nel selettore del telefono. Le loro email diventano sul telefono un'impronta (SHA-256) e solo quella arriva al server, che risponde con chi ha il profilo pubblico. Un'impronta non è una cifratura: chi conosce un'email può calcolarla, per questo le ricerche sono al massimo 3 al giorno da 200 contatti. Né le impronte né i contatti vengono conservati.",
     ],
   },
   {
