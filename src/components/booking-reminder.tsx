@@ -3,19 +3,14 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { appenaPrenotata, bookingReminders, cancelMessage, chiConferma, daConfermare, dateKey, doubleBookings, loadBookings, popupPrenotazione, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, subscribePopupPrenotazione, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { appenaPrenotata, bookingReminders, cancelMessage, daConfermare, dateKey, doubleBookings, loadBookings, popupPrenotazione, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, subscribePopupPrenotazione, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
+import { DomandaPrenotato } from "@/components/domanda-prenotato";
 
 // Promemoria delle prenotazioni richieste (salvate nel telefono): il giorno stesso
 // "Stasera alle 21:00 da …", dal giorno dopo "Com'è andata?". In home e nel profilo.
 const EMPTY: BookingRequest[] = [];
-const VIA: Record<BookingRequest["via"], string> = {
-  whatsapp: "richiesta su WhatsApp",
-  telefono: "richiesta per telefono",
-  sito: "richiesta dal sito",
-  copiato: "messaggio copiato",
-};
 
 // "Portami lì" (indicazioni con la destinazione già messa) e "Chiama": le due cose che servono il giorno
 // del tavolo. Le usano il promemoria in home, il banner sulla mappa e il foglio "Tra 2 ore".
@@ -51,14 +46,9 @@ export function AzioniTavolo({ b, fonte, chiaro = false }: { b: BookingRequest; 
   );
 }
 
-// Il canale in parole: "Richiesta su WhatsApp", "Richiesta per telefono"…
-function viaDi(b: BookingRequest): string {
-  return VIA[b.via].charAt(0).toUpperCase() + VIA[b.via].slice(1);
-}
-
 // "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
 // è già scritto; un tocco per mandarlo da dove era partita la richiesta. Senza numero si copia.
-function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
+export function Disdetta({ b, titolo }: { b: BookingRequest; titolo?: string }) {
   const [copied, setCopied] = useState(false);
   let name = "";
   try { name = window.localStorage.getItem("mapetite.nome") ?? ""; } catch { /* storage non disponibile */ }
@@ -234,49 +224,31 @@ export default function BookingReminder() {
   const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
-      {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto? */}
+      {/* Richiesta mandata a locale chiuso (orari Google): ora ha riaperto, ti hanno risposto?
+          Stessa domanda e stesse due azioni del foglio Prenota e della mappa (revisore 14/11). */}
       {risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => (
         <section key={`r-${b.id}`} data-testid="promemoria-risposta" className="rounded-card border border-border bg-surface p-4 shadow-card">
-          <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">Hanno riaperto</p>
-          <p className="mt-1 font-title text-lg font-semibold leading-tight text-text">{b.placeName}: ti hanno risposto?</p>
-          <p className="mt-0.5 text-sm font-sans text-text-muted">{VIA[b.via]}{b.time ? ` · tavolo alle ${b.time}` : ""}</p>
-          <div className="mt-3 flex gap-2">
-            <button type="button" data-testid="risposta-confermata" onClick={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_risposta", { stato: "confermata" }); }} className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95">
-              Sì, confermato
-            </button>
-            <button type="button" data-testid="risposta-non-ancora" onClick={() => { updateBooking(b.id, { dismissedRisposta: true }); trackFeature("prenotazione_risposta", { stato: "non_ancora" }); }} className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95">
-              Non ancora
-            </button>
-          </div>
+          <DomandaPrenotato
+            b={b}
+            now={now}
+            sopra="Hanno riaperto"
+            ids={{ si: "risposta-confermata", nonAncora: "risposta-non-ancora" }}
+            onSi={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_risposta", { stato: "confermata" }); }}
+            onNonAncora={() => { updateBooking(b.id, { dismissedRisposta: true }); trackFeature("prenotazione_risposta", { stato: "non_ancora" }); }}
+          />
         </section>
       ))}
-      {/* Richiesta partita, senza risposta della persona: "Hai prenotato da …?" al posto del promemoria. */}
+      {/* Richiesta partita, senza risposta della persona: "L'hai prenotato?" al posto del promemoria. */}
       {chiedi.map((b) => (
         <section key={`c-${b.id}`} data-testid="promemoria-hai-prenotato" className="rounded-card border border-border bg-surface p-4 shadow-card">
-          <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-            <CalendarCheck size={14} /> {quandoTavolo(b, now)}{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
-          </p>
-          <p data-testid="hai-prenotato-titolo" className="mt-1 font-title text-lg font-semibold leading-tight text-text">Hai prenotato da {b.placeName}?</p>
-          <p data-testid="hai-prenotato-canale" className="mt-0.5 text-sm font-sans text-text-muted">{b.piattaforma ? `Se hai confermato su ${b.piattaforma}, segnalo qui.` : `${viaDi(b)}: ${chiConferma(b)}.`}</p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              data-testid="hai-prenotato-si"
-              onClick={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }}
-              className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
-            >
-              Sì, {quandoTavolo(b, now).toLowerCase()}
-            </button>
-            <button
-              type="button"
-              data-testid="hai-prenotato-no"
-              onClick={() => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); }}
-              className="min-h-11 rounded-pill border border-border bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95"
-            >
-              {/* Revisore 14/11: "No" da solo sembrava "non ancora" e cancellava la richiesta in attesa di risposta. */}
-              No, non prenoto
-            </button>
-          </div>
+          <DomandaPrenotato
+            b={b}
+            now={now}
+            ids={{ si: "hai-prenotato-si", nonAncora: "hai-prenotato-non-ancora" }}
+            onSi={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }}
+            onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
+            altro={[{ label: "No, non prenoto: toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
+          />
         </section>
       ))}
       {doppi.map(({ group, domani }) => (

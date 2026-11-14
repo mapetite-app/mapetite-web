@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { CalendarCheck, Navigation, X } from "lucide-react";
 import {
   appenaPrenotata,
+  daConfermare,
+  removeBooking,
   loadBookings,
   popupPrenotazione,
   portamiLiUrl,
@@ -20,7 +22,8 @@ import {
   type BookingRequest,
 } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
-import { AzioniTavolo } from "@/components/booking-reminder";
+import { AzioniTavolo, Disdetta } from "@/components/booking-reminder";
+import { DomandaPrenotato } from "@/components/domanda-prenotato";
 
 // Promemoria che si vedono (Lorenzo, 8/11: "gli ricordi con un banner, con un pop-up"):
 // - PrenotazioneMappa: sulla mappa, il giorno stesso "Stasera alle 21:00 da…" con Portami lì e Chiama;
@@ -65,13 +68,47 @@ export function PrenotazioneMappa() {
   const ora = useOra();
   const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
   const [nascosti, setNascosti] = useState<string[] | null>(null);
+  const [nonPiu, setNonPiu] = useState(false);
   useEffect(() => { const t = setTimeout(() => setNascosti(leggiLista(NASCOSTI_MAPPA)), 0); return () => clearTimeout(t); }, []);
   if (!ora || !nascosti) return null;
   const r = prenotazioneDaRicordare(list, ora);
   // Con il foglio "Tra 2 ore" aperto il banner dello stesso tavolo aspetta (revisore 14/11: niente doppioni).
-  if (!r || r.b.id === popup || nascosti.includes(`${r.b.id}:${r.domani ? "d" : "o"}`)) return null;
-  const { b, domani } = r;
-  const chiudi = () => { const k = `${b.id}:${domani ? "d" : "o"}`; aggiungiLista(NASCOSTI_MAPPA, k); setNascosti([...nascosti, k]); };
+  const tavolo = r && r.b.id !== popup && !nascosti.includes(`${r.b.id}:${r.domani ? "d" : "o"}`) ? r : null;
+  // Senza un tavolo da ricordare: la richiesta ancora senza risposta, con la stessa domanda della home
+  // e del foglio Prenota ("L'hai prenotato?", Sì / Non ancora; revisore 14/11).
+  const chiedi = !tavolo ? daConfermare(list, ora).find((b) => !nascosti.includes(`${b.id}:c`)) ?? null : null;
+  if (!tavolo && !chiedi) return null;
+  const chiudiKey = (k: string) => { aggiungiLista(NASCOSTI_MAPPA, k); setNascosti([...nascosti, k]); };
+  const xBtn = (k: string) => (
+    <button type="button" aria-label="Nascondi il promemoria" onClick={() => chiudiKey(k)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
+      <X size={15} />
+    </button>
+  );
+  if (chiedi) {
+    return (
+      <section data-testid="mappa-prenotazione" data-tipo="chiedi" className="pointer-events-auto rounded-card bg-brand p-3 text-white shadow-float">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <DomandaPrenotato
+              b={chiedi}
+              now={ora}
+              scuro
+              ids={{ si: "mappa-hai-prenotato-si", nonAncora: "mappa-hai-prenotato-non-ancora" }}
+              onSi={() => { updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" }); }}
+              onNonAncora={() => { updateBooking(chiedi.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "mappa" }); }}
+              altro={[{ label: "No, non prenoto: toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
+            />
+          </div>
+          {xBtn(`${chiedi.id}:c`)}
+        </div>
+      </section>
+    );
+  }
+  const { b, domani } = tavolo!;
+  const k = `${b.id}:${domani ? "d" : "o"}`;
+  // Il giorno prima: la stessa domanda della home, "…: ci vai?" con Sì, ci vado / Non più.
+  // "Ci vai?" non subito dopo aver prenotato (revisore 14/11): da 12 ore dopo.
+  const chiediVai = domani && !b.ciVado && !appenaPrenotata(b, ora);
   return (
     <section data-testid="mappa-prenotazione" className="pointer-events-auto rounded-card bg-brand p-3 text-white shadow-float">
       <div className="flex items-start justify-between gap-2">
@@ -81,25 +118,39 @@ export function PrenotazioneMappa() {
             <CalendarCheck size={13} /> Il tuo tavolo{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
           </p>
           <p data-testid="mappa-prenotazione-titolo" className="mt-0.5 font-title text-base font-semibold leading-tight">
-            {quandoTavolo(b, ora)} da {b.placeName}
+            {quandoTavolo(b, ora)} da {b.placeName}{chiediVai ? <span className="whitespace-pre">: ci vai?</span> : null}
           </p>
         </div>
-        <button type="button" aria-label="Nascondi il promemoria" onClick={chiudi} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
-          <X size={15} />
-        </button>
+        {xBtn(k)}
       </div>
       {domani ? (
-        // "Ci vai?" non subito dopo aver prenotato (revisore 14/11): da 12 ore dopo.
-        !b.ciVado && !appenaPrenotata(b, ora) && (
-          <button
-            type="button"
-            data-testid="mappa-ci-vado"
-            onClick={() => { updateBooking(b.id, { ciVado: Date.now() }); trackFeature("ci_vai_domani", { stato: "si", fonte: "mappa" }); chiudi(); }}
-            className="mt-2 min-h-10 w-full rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
-          >
-            Sì, ci vado
-          </button>
-        )
+        chiediVai && (nonPiu ? (
+          <>
+            <Disdetta b={b} />
+            <button type="button" onClick={() => setNonPiu(false)} className="mt-1 min-h-10 text-sm font-display font-semibold text-white/80 underline underline-offset-2">
+              Indietro
+            </button>
+          </>
+        ) : (
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              data-testid="mappa-ci-vado"
+              onClick={() => { updateBooking(b.id, { ciVado: Date.now() }); trackFeature("ci_vai_domani", { stato: "si", fonte: "mappa" }); chiudiKey(k); }}
+              className="min-h-10 flex-1 rounded-pill bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
+            >
+              Sì, ci vado
+            </button>
+            <button
+              type="button"
+              data-testid="mappa-non-piu"
+              onClick={() => { setNonPiu(true); trackFeature("ci_vai_domani", { stato: "non_piu", fonte: "mappa" }); }}
+              className="min-h-10 flex-1 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white active:scale-95"
+            >
+              Non più
+            </button>
+          </div>
+        ))
       ) : (
         <AzioniTavolo b={b} fonte="mappa" />
       )}

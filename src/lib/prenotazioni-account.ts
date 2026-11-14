@@ -53,6 +53,8 @@ export function pulisciPrenotazione(v: unknown): PrenotazioneAccount | null {
   };
   const ciVado = t(o.ciVado);
   if (ciVado != null) out.ciVado = ciVado;
+  const nonAncora = t(o.nonAncora);
+  if (nonAncora != null) out.nonAncora = nonAncora;
   // "I tuoi dati per prenotare" (8/11): solo se la persona li ha dati con il consenso, testo semplice.
   const aNome = s(o.aNome, 60);
   if (aNome && !/[<>]/.test(aNome)) out.aNome = aNome;
