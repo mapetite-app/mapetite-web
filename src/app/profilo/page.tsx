@@ -521,7 +521,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             )}
             {/* Invito (piano 9.1): il proprio link personale. */}
             <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
-              <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
+              <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} privato={!("stato" in social) && !(social.is_public && social.handle)} />
             </ProfiloSezione>
             {/* Profilo pubblico: solo quando la parte social c'è davvero (niente righe "in arrivo", revisore 1/11). */}
             {!("stato" in social) && (

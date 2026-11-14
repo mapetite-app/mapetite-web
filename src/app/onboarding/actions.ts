@@ -9,6 +9,8 @@ import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } f
 import { ZONE } from "@/lib/gusti";
 import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
+import { cleanInviteCode } from "@/lib/invito";
+import { cleanHandle, isValidHandle } from "@/lib/handle";
 
 interface OnboardingData {
   cuisines: string[];
@@ -24,6 +26,8 @@ interface OnboardingData {
   // Mappa del gusto (sprint 25/10): zone, tipi di posto 👍/👎, "famosi o chicche?", diete.
   gusto?: unknown;
   diete?: unknown;
+  // "Fatti trovare dagli amici" (Lorenzo 14/11): il nome da mostrare; presente solo se l'interruttore è acceso.
+  trovabile?: { nome?: unknown } | null;
 }
 
 export async function completeOnboarding({
@@ -36,6 +40,7 @@ export async function completeOnboarding({
   next,
   gusto: gustoRaw,
   diete: dieteRaw,
+  trovabile,
 }: OnboardingData): Promise<{ error: string } | { login: string } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
@@ -118,7 +123,60 @@ export async function completeOnboarding({
     if (dErr) console.error("[onboarding] diete:", dErr.message);
   }
 
+  // "Fatti trovare dagli amici": nome da mostrare, nome pubblico ricavato dal nome e profilo pubblico.
+  // Errori solo nei log: i gusti sono già salvati e il profilo si sistema da /profilo.
+  const nome = typeof trovabile?.nome === "string" ? trovabile.nome.trim().slice(0, 40) : "";
+  if (nome) {
+    const esito = await rendiTrovabile(supabase, user.id, nome);
+    if (esito) console.error("[onboarding] fatti trovare:", esito);
+  }
+
   goOn(gusti, citta, dest, back, mappa);
+}
+
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+// Nome pubblico libero a partire dal nome: "Giulia Rossi" → giuliarossi, poi giuliarossi2, 3… se è preso.
+// Chi ha già un nome pubblico lo tiene. Ritorna un messaggio d'errore, o null se è andata.
+async function rendiTrovabile(supabase: Client, userId: string, nome: string): Promise<string | null> {
+  const { data: prof } = await supabase.from("profiles").select("handle").eq("id", userId).maybeSingle();
+  const attuale = isValidHandle(prof?.handle) ? prof!.handle : null;
+  let base = cleanHandle(nome).replace(/^[._]+|[._]+$/g, "").slice(0, 16);
+  if (base.length < 3) base = `${base}${base ? "." : ""}mapetite`.slice(0, 16);
+  const candidati = attuale ? [attuale] : [base, ...Array.from({ length: 6 }, (_, i) => `${base}${i + 2}`), `${base}${Math.floor(1000 + Math.random() * 9000)}`];
+  for (const handle of candidati) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: nome, handle, is_public: true, updated_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (!error) return null;
+    if (error.code !== "23505") return error.message;
+  }
+  return "nessun nome pubblico libero";
+}
+
+// Invito che collega da solo (Lorenzo 14/11): chi si è registrato dal link di un amico diventa suo amico,
+// in entrambi i sensi (funzione collega_invito, migrazione 20261114_invito_amici). "rete" = da riprovare.
+export type EsitoInvito = { stato: "ok"; nome: string | null; pubblico: boolean } | { stato: "no" } | { stato: "rete" };
+
+export async function collegaInvito(raw: unknown): Promise<EsitoInvito> {
+  const codice = cleanInviteCode(raw);
+  if (!codice) return { stato: "no" };
+  // Giro automatico: nessuna scrittura, il nome arriva dal codice.
+  if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
+    const n = codice.split(/[._-]/)[0];
+    return codice === "nessuno" ? { stato: "no" } : { stato: "ok", nome: n.charAt(0).toUpperCase() + n.slice(1), pubblico: true };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("collega_invito", { p_codice: codice });
+  if (error) {
+    console.error("[invito] collega:", error.code, error.message);
+    // Funzione non ancora nel database: non si riprova all'infinito.
+    return error.code === "PGRST202" || error.code === "42883" ? { stato: "no" } : { stato: "rete" };
+  }
+  const r = data as { stato?: string; nome?: string | null; pubblico?: boolean } | null;
+  if (r?.stato === "anonimo") return { stato: "rete" };
+  return r?.stato === "ok" ? { stato: "ok", nome: r.nome ?? null, pubblico: !!r.pubblico } : { stato: "no" };
 }
 
 // Dopo l'ultima schermata.

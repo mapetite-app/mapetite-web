@@ -115,7 +115,11 @@ export default async function InvitoPage({ params }: Props) {
             >
               Inizia
             </Link>
-            <p className="mt-2 text-center text-xs font-sans text-text-muted">Gratis, in meno di un minuto.</p>
+            {/* Lorenzo 14/11: chi si registra da un link personale diventa amico di chi l'ha mandato (collega_invito):
+                lo si dice prima, non dopo. I codici generici (tester, amici) non collegano a nessuno. */}
+            <p data-testid="invito-amicizia" className="mt-2 text-center text-xs font-sans text-text-muted">
+              {codice && !GENERICI[codice] ? <>Gratis. Entrando da qui diventi amico di {name ?? "chi ti ha invitato"}.</> : "Gratis, in meno di un minuto."}
+            </p>
             <Link href="/login" className="mt-1 flex min-h-11 items-center justify-center text-sm font-display font-semibold text-brand">
               Hai già un account? Accedi
             </Link>

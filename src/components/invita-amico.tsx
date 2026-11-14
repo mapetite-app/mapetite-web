@@ -10,7 +10,9 @@ import { invitePath, myInviteCode } from "@/lib/invito";
 // Titolo in Inter medio, non Poppins.
 // Revisore 2/11 (quinto giro): in Amici, senza amici, è lo stato vuoto della pagina ("vuoto"): tre posti
 // per gli amici, una frase vera (niente promesse su funzioni che non ci sono) e l'invito a tutta larghezza.
-export default function InvitaAmico({ userId, handle, vuoto = false }: { userId: string; handle: string | null; vuoto?: boolean }) {
+// Lorenzo 14/11: chi si registra dal link diventa tuo amico (collega_invito); se il tuo profilo è privato
+// però non ti vede: una riga lo dice e porta a "Fatti trovare".
+export default function InvitaAmico({ userId, handle, vuoto = false, privato = false }: { userId: string; handle: string | null; vuoto?: boolean; privato?: boolean }) {
   const path = invitePath(myInviteCode({ handle, id: userId }));
   const condividi = (cls: string, label: string) => (
     <CondividiLink
@@ -42,7 +44,12 @@ export default function InvitaAmico({ userId, handle, vuoto = false }: { userId:
           {condividi("w-full min-h-12 border-0 bg-accent! text-[15px] text-white!", "Manda il tuo link")}
           <p data-testid="invita-amico-link" data-path={path} className="mt-2 text-xs font-sans text-white/65">Il tuo link d&apos;invito si apre anche senza l&apos;app.</p>
         </div>
-      </section>
+        {privato && (
+        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
+          Chi entra dal link diventa tuo amico. Per farti vedere, accendi “Fatti trovare”.
+        </a>
+      )}
+    </section>
     );
   }
 
@@ -63,6 +70,11 @@ export default function InvitaAmico({ userId, handle, vuoto = false }: { userId:
         </p>
         {condividi("shrink-0 border-0", "Condividi")}
       </div>
+      {privato && (
+        <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
+          Chi entra dal link diventa tuo amico. Per farti vedere, accendi “Fatti trovare”.
+        </a>
+      )}
     </section>
   );
 }

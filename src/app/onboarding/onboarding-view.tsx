@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from "lucide-react";
-import { completeOnboarding, skipOnboarding } from "./actions";
+import { collegaInvito, completeOnboarding, skipOnboarding } from "./actions";
 import { CUISINES, OCCASIONS, ATMOSPHERES, PRICE_RANGES } from "@/lib/preferences";
 import { DIETE, SCOPERTE, TIPI, capito, fraseCapito, dieteValide, pulisciMappa, scopertaDedotta, type Scoperta } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
@@ -13,6 +14,7 @@ import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, readStoredInvite } from "@/lib/invito";
+import { elenco, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 
@@ -232,6 +234,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
+  // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
+  const [amico, setAmico] = useState<{ nome: string | null } | null>(null);
+  const [trova, setTrova] = useState(false);
+  const [trovaNome, setTrovaNome] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
@@ -276,11 +282,21 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   }, [confermaRifai]);
 
   // Arrivato da un link d'invito: la registrazione è fatta, il pannello lo conta una volta.
+  // Lorenzo 14/11: chi arriva dal link di un amico diventa subito suo amico, in entrambi i sensi.
+  // Senza rete il codice resta nel telefono e si riprova alla prossima apertura.
   useEffect(() => {
     const codice = readStoredInvite();
     if (!codice) return;
-    trackFeature("invito_registrato", { contesto: codice });
-    clearStoredInvite();
+    let vivo = true;
+    collegaInvito(codice)
+      .then((r) => {
+        if (r.stato === "rete") return;
+        trackFeature("invito_registrato", { contesto: codice, stato: r.stato === "ok" ? "collegato" : "non_collegato" });
+        clearStoredInvite();
+        if (r.stato === "ok" && vivo) setAmico({ nome: r.nome });
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
   }, []);
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
@@ -342,6 +358,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   };
 
   const finish = async (dest: "importa" | null) => {
+    if (trova && !trovaNome.trim()) {
+      setError("Scrivi il tuo nome, o spegni “Fatti trovare”.");
+      return;
+    }
     setSubmitting(dest ?? "mappa");
     setError(null);
     trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
@@ -354,7 +374,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined, trovabile: trova && trovaNome.trim() ? { nome: trovaNome.trim() } : null });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -776,6 +796,55 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             {frase.length > 0 && (
               <p className="mt-4 text-xs font-sans text-text-muted">Da ora ricerca, verdetti e ordine dei risultati tengono conto di questo.</p>
             )}
+            {/* Lorenzo 14/11: gli amici non si trovavano perché nessuno era pubblico. Qui, una volta sola,
+                nome e interruttore; spento di default, con cosa vedono gli altri scritto sotto. */}
+            <section data-testid="fatti-trovare" className="mt-6 rounded-card border border-border bg-white p-4 shadow-card">
+              {amico && (
+                <p data-testid="invito-collegato" className="mb-3 flex items-center gap-2 border-b border-border pb-3 text-[15px] font-sans text-text">
+                  <span aria-hidden className="text-lg">🤝</span>
+                  <span className="min-w-0">{amico.nome ? <>Tu e <span className="font-semibold">{amico.nome}</span> siete amici</> : "Sei amico di chi ti ha invitato"}</span>
+                </p>
+              )}
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block font-display text-[15px] font-semibold text-text">Fatti trovare dagli amici</span>
+                  <span className="block text-[13px] font-sans text-text-muted">Ti cercano per nome e vedono i posti che salvi.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  data-testid="fatti-trovare-interruttore"
+                  checked={trova}
+                  onChange={(e) => { setTrova(e.target.checked); if (e.target.checked) trackFeature("fatti_trovare_on", { contesto: amico ? "invito" : "primo_accesso" }); }}
+                  aria-checked={trova}
+                  className="peer sr-only"
+                />
+                <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-pill bg-border transition-colors duration-150 peer-checked:bg-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-card after:transition-transform after:duration-150 peer-checked:after:translate-x-5" />
+              </label>
+              {trova && (
+                <>
+                  <label className="mt-3 block text-sm font-display font-semibold text-text">
+                    Il tuo nome
+                    <input
+                      data-testid="fatti-trovare-nome"
+                      value={trovaNome}
+                      onChange={(e) => setTrovaNome(e.target.value)}
+                      maxLength={40}
+                      autoComplete="given-name"
+                      placeholder="es. Giulia Rossi"
+                      className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand"
+                    />
+                  </label>
+                  {/* Stesso testo del profilo e di /privacy (src/lib/privacy-profilo.ts): consenso informato, una sola fonte. */}
+                  <details data-testid="fatti-trovare-privacy" className="mt-2 text-xs font-sans leading-relaxed text-text-muted">
+                    <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-brand">Cosa vedono gli altri</summary>
+                    <p>{PUBBLICO_CHI}: {elenco(PUBBLICO_VEDONO)} Mai: {PUBBLICO_MAI.join(", ")}. {PUBBLICO_REVOCA}{" "}
+                      <Link href="/privacy#profilo-pubblico" target="_blank" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
+                    </p>
+                  </details>
+                </>
+              )}
+            </section>
           </div>
         )}
       </div>
