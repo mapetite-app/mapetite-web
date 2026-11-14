@@ -6140,7 +6140,7 @@ else {
     await ap.getByTestId("promemoria-prenotazioni").waitFor({ timeout: 5000 }).catch(() => {});
     const ordine = await ap.getByTestId("promemoria-prenotazioni").evaluate((el) => [...el.children].map((c) => c.getAttribute("data-testid"))).catch(() => []);
     if (entro) ok(ordine.join(",") === "promemoria-domani,promemoria-da-confermare-riga", `home (revisore 14/11, sesto giro): tavolo entro 24 ore e domanda → la scheda del tavolo e la domanda in una riga (${ordine.join(", ")})`);
-    else ok(ordine.join(",") === "promemoria-hai-prenotato" && ((await ap.getByTestId("promemoria-altre-da-confermare").textContent().catch(() => "")) ?? "").trim() === "+1 da confermare", `home (revisore 14/11, sesto giro): tavolo fra più di 24 ore e domanda → solo 'L'hai prenotato?' con '+1 da confermare' (${ordine.join(", ")})`);
+    else ok(ordine.join(",") === "promemoria-hai-prenotato" && ((await ap.getByTestId("promemoria-altre-da-confermare").textContent().catch(() => "")) ?? "").trim() === "1 tavolo prenotato", `home (revisore 14/11, settimo giro): tavolo fra più di 24 ore e domanda → solo 'L'hai prenotato?' con '1 tavolo prenotato', non 'da confermare' (${ordine.join(", ")})`);
   }
   await ap.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await ap.evaluate(() => {
