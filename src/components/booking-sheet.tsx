@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { DomandaPrenotato } from "@/components/domanda-prenotato";
 import { X, Phone, Globe, Copy, Check, Minus, Plus, MessageCircle, CalendarPlus } from "lucide-react";
 import {
   accountPrenotazioni,
@@ -221,7 +222,7 @@ export default function BookingSheet({
     // Si salvano solo quelli già detti (in chat o dalla scheda): il resto si chiede in "L'hai prenotato?".
     record("sito", nome, { date: initial?.date ?? null, time: initial?.time ?? null, people: initial?.people ?? null, special: null });
   };
-  // "Sì, l'ho prenotato": con giorno e ora già noti un tocco; senza, si chiedono adesso (passo "Quando hai prenotato?").
+  // "Sì, l'ho prenotato": con giorno e ora già noti un tocco; senza, si chiedono adesso (passo "Per quando?").
   const chiediQuando = () => {
     if (!done) return;
     setDetails({ date: done.date, time: done.time ?? details.time, people: done.people ?? details.people ?? 2, special: done.special });
@@ -232,7 +233,6 @@ export default function BookingSheet({
   };
 
   if (!mounted) return null;
-  const viaLabel = done?.via === "whatsapp" ? "su WhatsApp" : done?.via === "telefono" ? "per telefono" : done?.via === "sito" ? (done.piattaforma ? `su ${done.piattaforma}` : "dal sito") : "con il messaggio copiato";
   const disabled = missing.length > 0;
   const btn = "flex min-h-12 w-full items-center justify-center gap-2 rounded-pill px-4 text-[15px] font-display font-semibold active:scale-[0.98]";
   const secondario = "flex min-h-11 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-[0.98]";
@@ -273,71 +273,35 @@ export default function BookingSheet({
 
         {done && !correggi && esito === null ? (
           <div data-testid="prenota-hai-prenotato" className="mt-4">
-            {done.piattaforma && dati && (copiaDati === "ok" ? (
-              <p data-testid="prenota-dati-copiati" className="mb-3 rounded-card bg-surface px-4 py-3 text-sm font-sans text-text">I tuoi dati sono negli appunti: incollali su {done.piattaforma}.</p>
-            ) : copiaDati === "ko" ? (
-              <div data-testid="prenota-dati-a-mano" className="mb-3 rounded-card bg-surface px-4 py-3">
-                <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">I tuoi dati per {done.piattaforma}</p>
-                <p className="mt-1 select-all whitespace-pre-line text-sm font-sans text-text">{datiDaIncollare(dati)}</p>
-              </div>
-            ) : null)}
             {done.via === "telefono" && (
               <div className="mb-3 rounded-card bg-surface p-4">
                 <p className="text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Cosa dire al telefono</p>
                 <p className="mt-1 text-sm font-sans leading-relaxed text-text">{message}</p>
               </div>
             )}
+            {/* Stessa domanda e stesse due azioni del promemoria in home e sulla mappa (revisore 14/11). */}
             <div className="rounded-card bg-brand p-5 text-white">
-              <p className="font-title text-2xl font-semibold leading-tight">L&apos;hai prenotato?</p>
-              <p className="mt-1 text-sm font-sans leading-relaxed text-white/80">
-                {done.via === "whatsapp" ? "Quando il locale ti risponde, segnalo qui: te lo ricordo io." : done.via === "telefono" ? "Se al telefono ti hanno detto sì, segnalo qui: te lo ricordo io." : done.piattaforma ? `Se hai confermato su ${done.piattaforma}, segnalo qui: te lo ricordo io.` : "Se hai prenotato, segnalo qui: te lo ricordo io."}
-              </p>
-              {done.date && done.time ? (
-                <>
-                  <button
-                    type="button"
-                    data-testid="prenota-si"
-                    onClick={() => segnaPrenotata()}
-                    className={`${btn} mt-4 bg-accent text-white`}
-                  >
-                    <Check size={18} /> Sì, {dayLabel(done.date)} alle {done.time}{done.people ? ` per ${done.people}` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="prenota-si-altro"
-                    onClick={chiediQuando}
-                    className={`${btn} mt-2 border border-white/30 text-white`}
-                  >
-                    Sì, ma un altro giorno o ora
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  data-testid="prenota-si"
-                  onClick={chiediQuando}
-                  className={`${btn} mt-4 bg-accent text-white`}
-                >
-                  <Check size={18} /> Sì, l&apos;ho prenotato
-                </button>
-              )}
-              <button
-                type="button"
-                data-testid="prenota-non-ancora"
-                onClick={() => { setEsito("dopo"); trackFeature("prenotazione_segnata", { stato: "non_ancora" }); }}
-                className="mt-2 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-white/85 underline underline-offset-2"
+              <DomandaPrenotato
+                b={done}
+                scuro
+                conNome={false}
+                ids={{ si: "prenota-si", nonAncora: "prenota-non-ancora" }}
+                onSi={() => (done.date && done.time ? segnaPrenotata() : chiediQuando())}
+                onNonAncora={() => { setEsito("dopo"); trackFeature("prenotazione_segnata", { stato: "non_ancora" }); }}
+                altro={[
+                  ...(done.date && done.time ? [{ label: "Sì, ma un altro giorno o ora", testid: "prenota-si-altro", onClick: chiediQuando }] : []),
+                  { label: "No, non prenoto: toglila", testid: "prenota-lascia", onClick: () => { removeBooking(done.id); trackFeature("prenotazione_segnata", { stato: "no" }); onClose(); } },
+                ]}
               >
-                {done.piattaforma ? "Non ancora" : "Non ancora: aspetto la risposta"}
-              </button>
+                {/* TheFork con i dati della persona: una riga sola, non un riquadro in più. */}
+                {done.piattaforma && dati && copiaDati === "ok" && (
+                  <p data-testid="prenota-dati-copiati" className="mt-2 text-xs font-sans text-white/80">I tuoi dati sono negli appunti: incollali su {done.piattaforma}.</p>
+                )}
+                {done.piattaforma && dati && copiaDati === "ko" && (
+                  <p data-testid="prenota-dati-a-mano" className="mt-2 select-all whitespace-pre-line rounded-btn bg-white/10 px-3 py-2 text-xs font-sans text-white">{datiDaIncollare(dati)}</p>
+                )}
+              </DomandaPrenotato>
             </div>
-            <button
-              type="button"
-              data-testid="prenota-lascia"
-              onClick={() => { removeBooking(done.id); trackFeature("prenotazione_segnata", { stato: "no" }); onClose(); }}
-              className="mt-1 flex min-h-11 w-full items-center justify-center text-sm font-display font-semibold text-text-muted"
-            >
-              No, non l&apos;ho prenotato
-            </button>
           </div>
         ) : done && !correggi && esito === "si" ? (
           <div data-testid="prenota-segnata" className="mt-4">
@@ -347,7 +311,7 @@ export default function BookingSheet({
                 {done.date ? capitalize(dayLabel(done.date)) : ""}{done.time ? ` alle ${done.time}` : ""}{done.people ? ` · ${done.people} ${done.people === 1 ? "persona" : "persone"}` : ""}
               </p>
               <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                Te lo ricordo il giorno prima e il giorno stesso, in home e sulla mappa, con le indicazioni già pronte.
+                Te lo ricordo il giorno prima e il giorno stesso, con le indicazioni.
               </p>
             </div>
             <button
@@ -358,7 +322,6 @@ export default function BookingSheet({
             >
               <CalendarPlus size={18} /> Aggiungi al calendario
             </button>
-            <p className="mt-1 text-center text-xs font-sans text-text-muted">Con un avviso 2 ore prima.</p>
             <button type="button" onClick={onClose} className={`${btn} mt-2 border border-border bg-white text-brand`}>Fatto</button>
             <div className="mt-2 flex justify-center border-t border-border pt-3">
               <UtileFeedback contesto="prenota" chiave={`prenota:${done.id}`} />
@@ -368,17 +331,9 @@ export default function BookingSheet({
           <div data-testid="prenota-fatto" className="mt-4">
             <div className="rounded-card bg-brand p-5 text-white">
               <p className="flex items-center gap-2 font-display text-lg font-semibold"><Check size={20} className="text-accent" /> Prenotazione richiesta</p>
-              <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                {done.piattaforma ? `Hai aperto ${done.piattaforma} per ${place.name}` : `Hai scritto a ${place.name} ${viaLabel}`}
-                {done.people ? ` per ${done.people} ${done.people === 1 ? "persona" : "persone"}` : ""}
-                {done.date ? `, ${dayLabel(done.date)}` : ""}
-                {done.time ? ` alle ${done.time}` : ""}.
-              </p>
-              <p className="mt-2 text-sm font-sans font-semibold leading-relaxed text-white">
-                {done.piattaforma ? `La conferma la dà ${done.piattaforma}, non Mapetite.` : "La conferma arriva dal locale: Mapetite non vede i tavoli liberi."}
-              </p>
-              <p className="mt-2 text-sm font-sans leading-relaxed text-white/85">
-                La trovi in &ldquo;Le mie prenotazioni&rdquo;: quando ti confermano, segnalo lì o dal promemoria in home.
+              {/* Un solo avviso (revisore 14/11): chi conferma e dove ritrovarla, in una frase. */}
+              <p data-testid="prenota-fatto-testo" className="mt-2 text-sm font-sans leading-relaxed text-white/85">
+                {done.piattaforma ? `Confermi tu su ${done.piattaforma}, poi` : "Risponde il locale: quando conferma,"} segnalo in &ldquo;Le mie prenotazioni&rdquo;.
               </p>
             </div>
             <button type="button" onClick={onClose} className={`${btn} mt-4 bg-accent text-white`}>Fatto</button>
@@ -422,7 +377,7 @@ export default function BookingSheet({
           </div>
         ) : step === 1 || correggi ? (
           <>
-            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">{correggi ? "Quando hai prenotato?" : "Passo 1 di 2 · quando e quanti"}</p>
+            <p data-testid="prenota-passo" className="mt-1 text-xs font-sans text-text-muted">{correggi ? "Per quando?" : "Passo 1 di 2 · quando e quanti"}</p>
             {ultima && !correggi && (
               <p data-testid="prenota-come-ultima" className="mt-2 text-sm font-sans font-semibold text-accent">
                 ↻ Come l&apos;ultima volta{ultima.people ? `: ${ultima.people} ${ultima.people === 1 ? "persona" : "persone"}` : ""}{ultima.time ? `${ultima.people ? "" : ":"} alle ${ultima.time}` : ""}

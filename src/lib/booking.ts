@@ -277,6 +277,7 @@ export type BookingRequest = BookingDetails & {
   dismissedRisposta?: boolean;
   disdetta?: number | null; // "Non vado più" toccato (ms): distingue la disdetta dal "Non ci sono andato" (dal 29/10)
   piattaforma?: string | null; // "Prenota su TheFork" (via "sito"): il nome della piattaforma (dal 30/10)
+  nonAncora?: number | null; // "L'hai prenotato? Non ancora" (ms, 14/11): la domanda torna dopo 3 ore
   ciVado?: number | null;  // "Ci vai domani? Sì" (ms, proposta 36): il promemoria del giorno prima non torna (dal 1/11)
   modificataAt?: number;   // ultima modifica fatta sul telefono (ms): tra due telefoni vince la più recente (dal 31/10)
   aNome?: string | null;   // "a nome …" (I tuoi dati per prenotare, con consenso; dall'8/11)
@@ -597,7 +598,7 @@ export function chiConferma(b: Pick<BookingRequest, "piattaforma">): string {
   return b.piattaforma ? `la conferma la dà ${b.piattaforma}` : "la conferma arriva dal locale";
 }
 
-// Richieste partite ma senza risposta della persona, oggi o domani: "Hai prenotato da …?" (Sì / No)
+// Richieste partite ma senza risposta della persona, oggi o domani: "L'hai prenotato?" (Sì / Non ancora)
 // al posto del promemoria. Solo quelle senza un altro promemoria in corso ("ti hanno risposto?").
 export function daConfermare(list: BookingRequest[], now: Date = new Date()): BookingRequest[] {
   const oggi = dateKey(now);
@@ -606,6 +607,8 @@ export function daConfermare(list: BookingRequest[], now: Date = new Date()): Bo
   const fatti = new Set(list.filter((b) => b.confirmed && !b.outcome).map((b) => `${b.placeId}|${b.date}`));
   return list
     .filter((b) => !b.confirmed && !b.dismissed && !b.outcome && b.disdetta == null && (b.date === oggi || b.date === domani) && !fatti.has(`${b.placeId}|${b.date}`))
+    // "Non ancora": la domanda torna dopo 3 ore, non a ogni apertura.
+    .filter((b) => b.nonAncora == null || now.getTime() - b.nonAncora > 3 * 3_600_000)
     .sort((a, c) => `${a.date} ${a.time ?? ""}`.localeCompare(`${c.date} ${c.time ?? ""}`));
 }
 

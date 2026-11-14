@@ -137,7 +137,7 @@ function ConfermaConGiorno({ b, onFatto }: { b: BookingRequest; onFatto: () => v
   const campo = "min-h-11 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base font-sans text-text";
   return (
     <div data-testid="prenotazione-quando" className="mt-3 rounded-btn bg-surface p-3">
-      <p className="text-sm font-display font-semibold text-text">Per quando hai prenotato?</p>
+      <p className="text-sm font-display font-semibold text-text">Per quando?</p>
       <div className="mt-2 flex gap-2">
         <input type="date" aria-label="Giorno" min={dateKey(new Date())} value={date} onChange={(e) => setDate(e.target.value)} className={campo} />
         <input type="time" aria-label="Ora" value={time} onChange={(e) => setTime(e.target.value)} className={campo} />
@@ -162,7 +162,8 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
   const [quando, setQuando] = useState(false);
   // Chi conferma dipende dal canale (revisore 8/11): su TheFork lo segna la persona, non il locale.
   const pf = b.piattaforma;
-  const when = [b.date ? capitalize(dayLabel(b.date)) : null, b.time ? `alle ${b.time}` : null].filter(Boolean).join(" ");
+  // Il giorno è già nel riquadro della data (revisore 14/11: niente data ripetuta): qui solo l'ora.
+  const when = b.date ? (b.time ? `Alle ${b.time}` : "Ora da definire") : "Giorno da definire";
   const confermata = status !== "inviata";
   return (
     <li data-testid="prenotazione-in-arrivo" data-stato={status} className="rounded-card border border-border bg-white p-4 shadow-card">
@@ -170,12 +171,13 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
         <DateTile date={b.date} />
         <div className="min-w-0 flex-1">
           <PlaceName b={b} className="block truncate font-title text-lg font-semibold leading-tight text-text" />
-          <p className="mt-0.5 text-sm font-sans font-semibold text-brand">{when || "Giorno da definire"}</p>
-          <p className="mt-0.5 text-sm font-sans text-text-muted">{[people(b.people), b.special].filter(Boolean).join(" · ")}</p>
+          <p data-testid="prenotazione-quando-riga" className="mt-0.5 text-sm font-sans text-text">
+            <span className="font-semibold">{when}</span>{[people(b.people), b.special].filter(Boolean).map((x) => ` · ${x}`).join("")}
+          </p>
           {/* Una sola riga di stato (revisore 14/11): com'è partita la richiesta, oppure che è prenotata. */}
           {confermata ? (
-            <p data-testid="prenotazione-confermata" className="mt-1 flex items-center gap-1 text-xs font-sans font-semibold text-success">
-              <Check size={12} aria-hidden /> {pf ? `Prenotata su ${pf}` : "Confermata dal locale"}
+            <p data-testid="prenotazione-confermata" className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-brand px-2.5 py-1 text-xs font-display font-semibold text-white">
+              <Check size={12} aria-hidden /> {pf ? `Prenotata su ${pf}` : "Prenotata"}
             </p>
           ) : (
             <p data-testid="prenotazione-via" className="mt-1 flex items-center gap-1 text-xs font-sans text-text-muted">
@@ -197,9 +199,8 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
             }}
             className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
           >
-            <Check size={16} /> {pf ? "Sì, ho prenotato" : "Il locale ha confermato"}
+            <Check size={16} /> Sì, l&apos;ho prenotato
           </button>
-          <p className="mt-1.5 text-center text-xs font-sans text-text-muted">{pf ? `Toccalo se hai confermato su ${pf}: Mapetite non lo vede.` : "Toccalo quando il locale ti risponde: Mapetite non vede le sue risposte."}</p>
         </div>
       ))}
       <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
