@@ -433,7 +433,18 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
     const sotto = (m) => m.punti.filter((p) => p.x * 3.58 > 358 - A.w && p.y * 1.4 > 140 - A.h).length;
     const senza = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30 });
     const con = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30, angolo: A });
-    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); } }
+    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); }
+  // Sessione 14/11 sera: nelle copertine dei Salvati (124×72) i puntini sotto il tondo con l'emoji si toglievano.
+  // Ora la copertina si inquadra attorno al tondo (35×35 in basso a destra): nessun posto sotto, nessuno tolto.
+  { const T = { w: 35, h: 35 };
+    const trovaCaso = () => { for (let k = 0; k < 400; k++) { const r = (n) => Math.abs(Math.sin(k * 12.9898 + n * 78.233) * 43758.5453) % 1;
+      const pts = Array.from({ length: 5 }, (_, j) => ({ lat: 41.89 + r(j) * 0.008, lng: 12.47 + r(j + 9) * 0.01 }));
+      const s0 = ms.mappaStatica(pts, 124, 72, "tok", 8, undefined, true);
+      if (s0 && s0.punti.some((p) => p.x * 1.24 > 124 - T.w && p.y * 0.72 > 72 - T.h)) return [pts, s0.punti.length]; } return [null, 0]; };
+    const [pts, prima] = trovaCaso();
+    const sottoT = (m) => m ? m.punti.filter((p) => p.x * 1.24 > 124 - T.w && p.y * 0.72 > 72 - T.h).length : -1;
+    const con = pts && ms.mappaStatica(pts, 124, 72, "tok", 8, undefined, true, { angolo: T });
+    ok(!!pts && !!con && sottoT(con) === 0 && con.punti.length === prima, `copertine dei Salvati: nessun puntino sotto il tondo con l'emoji e nessun posto tolto (${con ? con.punti.length : 0} puntini su ${prima}, ${sottoT(con)} sotto)`); } }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);

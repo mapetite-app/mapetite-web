@@ -98,14 +98,18 @@ const ZONA_VICINA_M = 30_000;
 const COPERTINA_W = 124;
 const COPERTINA_H = 72;
 const PUNTI_RACCOLTA = 60;
+// Tondo con l'emoji in basso a destra: 24 px a 6 px dal bordo, più mezzo puntino (5 px).
+const ANGOLO_TONDO = { w: 35, h: 35 };
 // minPunti (revisore 14/11, sesto giro): una raccolta con un puntino solo non dice dove sono i suoi posti; sotto
 // i 3 puntini visibili resta l'emoji.
 function MappaCopertina({ posti, badge, fallback, minPunti = 1 }: { posti: Place[]; badge: string | null; fallback: React.ReactNode; minPunti?: number }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
   // Revisore 14/11 (settimo giro): niente più "Rome" né "…'s Basilica" tagliato: la mappa arriva senza nessun nome.
-  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true), [posti]);
-  const visibili = useMemo(() => mappa?.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55) ?? [], [mappa, badge]);
+  // Sessione 14/11 sera: prima i puntini sotto il tondo con l'emoji si toglievano (sparivano posti dalla copertina).
+  // Ora la mappa si inquadra attorno al tondo, come la pillola "Mappa" del profilo: nessun posto tolto.
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 8, undefined, true, badge ? { angolo: ANGOLO_TONDO } : {}), [posti, badge]);
+  const visibili = mappa?.punti ?? [];
   if (!mappa || rotta || visibili.length < minPunti) return <>{fallback}</>;
   return (
     <>
