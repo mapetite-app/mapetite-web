@@ -2,6 +2,31 @@
 
 Bilancio della settimana, scritto dalla prima sessione del sabato (regola del team gstack). Fonti: `git log` di `main`, PR, `BACKLOG.md`, database di produzione.
 
+## Settimana 7–13/11 (scritta sabato 14/11 alle 18:50, sessione delle 18:05)
+
+### Cosa è stato fatto
+- **In produzione (5 PR unite il 7 e l'8/11: #136–#140):** primo accesso e home approvati (8,6); demo provata dal vivo in produzione; la ricerca resta ricaricando; chi ha già salvati salta il primo accesso; famosi messi da parte in vista; Salva in un tocco dalla scheda; prima ricerca adatta all'ora.
+- **Fermo:** le richieste di Lorenzo dell'8/11 (Salvati a scaffali, profilo dell'amico, Prenota con promemoria) sono rimaste in tre PR mai unite (#141, #142, #143), bocciate quattro volte dai revisori tra 7,0 e 8,2.
+- **Nessuna sessione dal 9 al 13/11** (motivo non scritto da nessuna parte: probabilmente limiti di utilizzo).
+
+### Cosa è andato
+- **Le richieste di Lorenzo sono state prese tutte**, con commit separati per schermata e il giro che è cresciuto (2.389 controlli).
+- **Decisione rapida quando serviva:** Lorenzo il 14/11 ha sbloccato il merge sotto 8,5 in chat.
+
+### Cosa non è andato
+1. **Cinque giorni senza nessuna sessione** e nessuna traccia del perché: Lorenzo non lo sa.
+2. **La regola "alla terza bocciatura si ferma e si scrive a Lorenzo" (retro del 7/11) non è stata applicata:** le tre schermate sono passate da revisore a revisore per tre sessioni, sempre tra 7,5 e 8,2, senza una notifica a Lorenzo. È stato Lorenzo a doverlo chiedere.
+3. **Il social era rotto alla radice e nessuno l'ha visto:** 7 profili, 0 pubblici, 0 follow. Abbiamo rifatto la grafica del profilo dell'amico per una settimana mentre nessuno poteva trovare nessuno.
+
+### 3 cambi per la settimana dopo
+- **Prima di rifare una schermata si guarda il database di produzione:** se la funzione non è usata (0 righe), si capisce perché prima di ritoccarne la grafica.
+- **Alla terza bocciatura della stessa voce: notifica a Lorenzo con i voti e una domanda sola** ("la metto lo stesso?"), nella sessione stessa.
+- **Ogni sessione che parte scrive in BACKLOG perché la precedente non c'è stata**, se sono passati più di 24 ore.
+
+### Revisione dei documenti del team
+- **`PROPOSTE.md`:** nuove 55–57 (14/11: "Tre, non trenta", "Manda al gruppo", Chiocciola Slow Food); nessuna fatta in settimana fuori dalle richieste dell'8/11.
+- **`COMPETITOR.md`, `PROBLEMI.md`, `PARTNER.md`:** aggiornati il 14/11 dalla sessione delle 10:05; nessun contatto partito, giusto così.
+
 ## Settimana 1–6/11 (scritta sabato 7/11)
 
 ### Cosa è stato fatto
