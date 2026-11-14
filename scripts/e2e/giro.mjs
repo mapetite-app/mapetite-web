@@ -4732,8 +4732,8 @@ else {
     await soctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { saves.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); } return r.fulfill({ json: [] }); });
     await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     const ordine = await sp.locator("[data-testid=profilo-posti] h2").allTextContents();
-    ok(ordine.join("|") === "Gli è piaciuto|Di recente|I suoi tipi|In comune · 2|Da provare", `profilo di un altro: sezioni nell'ordine giusto (${ordine.join(" | ")})`);
-    ok((await sp.getByTestId("piaciuto-card").count()) === 1 && (await sp.getByTestId("piaciuto-card").getAttribute("href")) === `/locali/${many[4].place_id}`, "profilo di un altro: 'Gli è piaciuto' con il posto segnato 👍");
+    ok(ordine.join("|") === "I suoi preferiti|Di recente|I suoi tipi|In comune · 2|Da provare", `profilo di un altro: sezioni nell'ordine giusto (${ordine.join(" | ")})`);
+    ok((await sp.getByTestId("piaciuto-card").count()) === 1 && (await sp.getByTestId("piaciuto-card").getAttribute("href")) === `/locali/${many[4].place_id}`, "profilo di un altro: 'I suoi preferiti' con il posto segnato 👍");
     // Revisore 8/11: nessun numero di classifica inventato (solo 👍 senza classifica); prima card a 16 px dal bordo.
     { const badge = (await sp.getByTestId("piaciuto-badge").textContent())?.trim(); const x = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.x ?? -1;
       ok(badge === "👍" && Math.round(x) === 16, `profilo di un altro: 👍 senza numero se non c'è classifica, card a 16 px (${badge}, x=${Math.round(x)})`); }

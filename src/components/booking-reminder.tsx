@@ -273,7 +273,8 @@ export default function BookingReminder() {
               onClick={() => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); }}
               className="min-h-11 rounded-pill border border-border bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95"
             >
-              No
+              {/* Revisore 14/11: "No" da solo sembrava "non ancora" e cancellava la richiesta in attesa di risposta. */}
+              No, non prenoto
             </button>
           </div>
         </section>

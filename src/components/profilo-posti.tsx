@@ -244,7 +244,7 @@ export default function ProfiloPosti({
         <>
           {liked.length > 0 && (
             <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
-              <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "Ti è piaciuto" : "Gli è piaciuto"}</Titolo></div>
+              <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "I tuoi preferiti" : "I suoi preferiti"}</Titolo></div>
               {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
               <ul className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
                 {liked.map((p) => {
@@ -266,7 +266,7 @@ export default function ProfiloPosti({
                             <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
                             <span
                               data-testid="piaciuto-badge"
-                              title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Gli è piaciuto"}
+                              title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Tra i suoi preferiti"}
                               className="mt-0.5 inline-flex shrink-0 items-center rounded-pill bg-accent-light px-2 py-0.5 text-[12px] font-display font-semibold text-accent"
                             >
                               {pos ? `👍 N.${pos}` : "👍"}
