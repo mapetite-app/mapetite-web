@@ -87,20 +87,17 @@ export function PrenotazioneMappa() {
   if (chiedi) {
     return (
       <section data-testid="mappa-prenotazione" data-tipo="chiedi" className="pointer-events-auto rounded-card bg-brand p-3 text-white shadow-float">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <DomandaPrenotato
-              b={chiedi}
-              now={ora}
-              scuro
-              ids={{ si: "mappa-hai-prenotato-si", nonAncora: "mappa-hai-prenotato-non-ancora" }}
-              onSi={() => { updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" }); }}
-              onNonAncora={() => { updateBooking(chiedi.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "mappa" }); }}
-              altro={[{ label: "No, non prenoto: toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
-            />
-          </div>
-          {xBtn(`${chiedi.id}:c`)}
-        </div>
+        {/* Niente ✕ (revisore 14/11): "Non ancora" fa già la stessa cosa. */}
+        <DomandaPrenotato
+          b={chiedi}
+          now={ora}
+          scuro
+          compatto
+          ids={{ si: "mappa-hai-prenotato-si", nonAncora: "mappa-hai-prenotato-non-ancora" }}
+          onSi={() => { updateBooking(chiedi.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: chiedi.piattaforma ?? chiedi.via, fonte: "mappa" }); }}
+          onNonAncora={() => { updateBooking(chiedi.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "mappa" }); }}
+          altro={[{ label: "No, non prenoto: toglila", testid: "mappa-hai-prenotato-no", onClick: () => { removeBooking(chiedi.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "mappa" }); } }]}
+        />
       </section>
     );
   }

@@ -219,7 +219,10 @@ export default function BookingReminder() {
   const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
   // La richiesta in attesa di risposta ha già la sua scheda ("Hanno riaperto"): niente doppione.
   const inRisposta = new Set(risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => b.id));
-  const chiedi = daConfermare(list, now).filter((b) => !inRisposta.has(b.id)).slice(0, 2);
+  // Una sola domanda alla volta in home (revisore 14/11): le altre in una riga che porta a /prenotazioni.
+  const tutteDaChiedere = daConfermare(list, now).filter((b) => !inRisposta.has(b.id));
+  const chiedi = tutteDaChiedere.slice(0, 1);
+  const altreDaChiedere = tutteDaChiedere.length - chiedi.length;
   if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0 && chiedi.length === 0) return null;
   const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
@@ -249,6 +252,11 @@ export default function BookingReminder() {
             onNonAncora={() => { updateBooking(b.id, { nonAncora: Date.now() }); trackFeature("prenotazione_segnata", { stato: "non_ancora", fonte: "promemoria" }); }}
             altro={[{ label: "No, non prenoto: toglila", testid: "hai-prenotato-no", onClick: () => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); } }]}
           />
+          {altreDaChiedere > 0 && (
+            <Link href="/prenotazioni" data-testid="promemoria-altre-da-confermare" className="mt-1 flex min-h-10 items-center border-t border-border pt-2 text-sm font-display font-semibold text-brand">
+              +{altreDaChiedere} da confermare
+            </Link>
+          )}
         </section>
       ))}
       {doppi.map(({ group, domani }) => (
