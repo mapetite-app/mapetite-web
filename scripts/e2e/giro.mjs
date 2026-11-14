@@ -406,7 +406,8 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   ok(g.fb <= g.ct + 1 && g.h <= 56, `frase sopra le card: subito sopra la prima card, al massimo 2-3 righe brevi (${Math.round(g.h)} px)`); }
 // Copertine mappa (src/lib/mappa-statica.ts, revisore 14/11, sesto giro): "Romantico" con 13 posti a Roma e 1 a Milano
 // mostrava Milano con un puntino (a parità vinceva il primo). Ora vince il nucleo più numeroso, a parità quello della
-// città con più posti (o della città scelta); la mappa del profilo arriva a 30 puntini.
+// città con più posti; la mappa del profilo arriva a 30 puntini. Revisore 14/11 (settimo giro): niente più
+// "preferisci" (la città scelta), che nessuno passava: con una città accesa i Salvati danno già solo i suoi posti.
 { const ms = await import(new URL("../../src/lib/mappa-statica.ts", import.meta.url).href);
   const MI = { lat: 45.4642, lng: 9.19, id: "mi" };
   const roma = Array.from({ length: 13 }, (_, i) => ({ lat: 41.89 + 0.004 * i, lng: 12.48, id: `r${i}` }));
@@ -415,8 +416,7 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
   const sparsi = [MI, { lat: 41.89, lng: 12.48, id: "rA" }, { lat: 41.935, lng: 12.48, id: "rB" }];
   const n2 = ms.nucleo(sparsi);
   ok(n2.length === 1 && n2[0].id === "rA", `copertine mappa: a parità (un posto per nucleo) vince la città con più posti, non il primo della lista (${n2.map((p) => p.id).join(",")})`);
-  const n3 = ms.nucleo(sparsi, undefined, (p) => p.id === "mi");
-  ok(n3.length === 1 && n3[0].id === "mi", "copertine mappa: a parità vince la città scelta");
+  ok(ms.nucleo.length <= 2 && ms.nucleo(sparsi, undefined, () => true)[0].id === "rA", "copertine mappa: nucleo senza il parametro 'preferisci' che nessuno passava (a parità decide solo la città con più posti)");
   const fitti = Array.from({ length: 40 }, (_, i) => ({ lat: 41.89 + 0.0004 * (i % 7), lng: 12.48 + 0.0004 * Math.floor(i / 7) }));
   const m12 = ms.mappaStatica(fitti, 124, 72, "tok"), m30 = ms.mappaStatica(fitti, 358, 140, "tok", 16, 5_000, false, "citta", { max: 30 });
   ok(m12?.punti.length <= 12 && m30?.punti.length > 12 && m30.punti.length <= 30, `copertine mappa: 12 puntini nelle copertine, fino a 30 nella mappa del profilo (${m12?.punti.length}/${m30?.punti.length})`); }
