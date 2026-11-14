@@ -239,10 +239,11 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
   // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
-  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" } | null>(null);
-  const [mioNome, setMioNome] = useState("");
+  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" | "nome" } | null>(null);
   const [trova, setTrova] = useState(false);
-  const [trovaNome, setTrovaNome] = useState("");
+  // Un solo campo "Il tuo nome" (revisore 14/11, terzo giro: prima due, uno per l'invito e uno per il profilo
+  // pubblico): sta nella card dell'invito finché aspetta una risposta, altrimenti sotto "Profilo pubblico".
+  const [mioNome, setMioNome] = useState("");
   const nomeRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -307,6 +308,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     return () => { vivo = false; };
   }, []);
 
+  // L'invito aspetta ancora un sì o un no (allora il campo nome sta nella sua card).
+  const invitoAperto = !!invito && invito.stato !== "amici" && invito.stato !== "scaduto";
+
   const rispondiInvito = async (si: boolean) => {
     if (!invito) return;
     if (!si) {
@@ -316,10 +320,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       return;
     }
     setInvito({ ...invito, stato: "salvo" });
-    const nomeScelto = (trova && trovaNome.trim()) || mioNome.trim();
-    const r = await accettaInvito(invito.codice, nomeScelto).catch(() => ({ stato: "rete" as const }));
+    const r = await accettaInvito(invito.codice, mioNome.trim()).catch(() => ({ stato: "rete" as const }));
     trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato });
     if (r.stato === "rete") { setInvito({ ...invito, stato: "errore" }); return; }
+    if (r.stato === "nome") { setInvito({ ...invito, stato: "nome" }); nomeRef.current?.focus(); return; }
     clearStoredInvite();
     // Revisore 14/11: niente sparizioni silenziose: si dice che l'invito non vale più.
     if (r.stato === "ok") setInvito({ ...invito, nome: r.nome ?? invito.nome, stato: "amici" });
@@ -385,7 +389,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   };
 
   const finish = async (dest: "importa" | null) => {
-    if (trova && !trovaNome.trim()) {
+    if (trova && !mioNome.trim()) {
       // L'avviso sta sotto il campo (revisore 14/11: in fondo era mezzo coperto) e il cursore va lì.
       setError("nome");
       nomeRef.current?.focus();
@@ -404,7 +408,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined, trovabile: trova && trovaNome.trim() ? { nome: trovaNome.trim() } : null });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined, trovabile: trova && mioNome.trim() ? { nome: mioNome.trim() } : null });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -781,22 +785,22 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                 ) : (
                   <div className="min-w-0 flex-1">
                     <p data-testid="invito-domanda" className="text-[15px] font-sans font-medium leading-snug">{invito.nome ?? "Un amico"} ti ha invitato</p>
-                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}</p>
-                    {/* Il proprio nome, perché l'amico sappia chi ha accettato (prima vedeva "Qualcuno"). */}
-                    {!(trova && trovaNome.trim()) && (
-                      <input
-                        data-testid="invito-mio-nome"
-                        value={mioNome}
-                        onChange={(e) => setMioNome(e.target.value)}
-                        maxLength={40}
-                        autoComplete="name"
-                        placeholder="Il tuo nome"
-                        aria-label="Il tuo nome, lo vedrà chi ti ha invitato"
-                        className="mt-2.5 block min-h-11 w-full rounded-btn border-0 bg-white px-3 text-[16px] font-sans text-text outline-none placeholder:text-text-muted"
-                      />
-                    )}
+                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : invito.stato === "nome" ? "Prima scrivi il tuo nome." : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}</p>
+                    {/* Il proprio nome, perché l'amico sappia chi ha accettato (prima vedeva "Qualcuno"). È l'unico
+                        campo nome della schermata: vale anche per "Profilo pubblico" qui sotto. */}
+                    <input
+                      ref={nomeRef}
+                      data-testid="invito-mio-nome"
+                      value={mioNome}
+                      onChange={(e) => { setMioNome(e.target.value); setError(null); }}
+                      maxLength={40}
+                      autoComplete="name"
+                      placeholder="Il tuo nome"
+                      aria-label="Il tuo nome, lo vedrà chi ti ha invitato"
+                      className="mt-2.5 block min-h-11 w-full rounded-btn border-0 bg-white px-3 text-[16px] font-sans text-text outline-none placeholder:text-text-muted"
+                    />
                     <div className="mt-2.5 flex gap-2">
-                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo" || !((trova && trovaNome.trim()) || mioNome.trim())} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
+                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo" || !mioNome.trim()} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
                         {invito.stato === "salvo" ? "Un attimo…" : "Diventa amico"}
                       </button>
                       <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill px-3 font-display text-sm font-semibold text-white/85">
@@ -891,25 +895,28 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               </label>
               {trova && (
                 <>
-                  <label className="mt-3 block text-sm font-display font-semibold text-text">
-                    Il tuo nome
-                    <input
-                      ref={nomeRef}
-                      data-testid="fatti-trovare-nome"
-                      value={trovaNome}
-                      onChange={(e) => { setTrovaNome(e.target.value); setError(null); }}
-                      maxLength={40}
-                      autoComplete="name"
-                      placeholder="es. Giulia Rossi"
-                      aria-invalid={!!error && !trovaNome.trim()}
-                      aria-describedby="fatti-trovare-indirizzo"
-                      className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
-                    />
-                  </label>
+                  {/* Con l'invito in attesa il nome si scrive una volta sola, nella card in alto. */}
+                  {!invitoAperto && (
+                    <label className="mt-3 block text-sm font-display font-semibold text-text">
+                      Il tuo nome
+                      <input
+                        ref={nomeRef}
+                        data-testid="fatti-trovare-nome"
+                        value={mioNome}
+                        onChange={(e) => { setMioNome(e.target.value); setError(null); }}
+                        maxLength={40}
+                        autoComplete="name"
+                        placeholder="es. Giulia Rossi"
+                        aria-invalid={!!error && !mioNome.trim()}
+                        aria-describedby="fatti-trovare-indirizzo"
+                        className="mt-1 block min-h-11 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
+                      />
+                    </label>
+                  )}
                   <p id="fatti-trovare-indirizzo" data-testid="fatti-trovare-indirizzo" className="mt-1.5 text-xs font-sans text-text-muted">
-                    {error && !trovaNome.trim()
-                      ? <span role="alert" className="text-error">Scrivi il tuo nome, o spegni “Profilo pubblico”.</span>
-                      : <>Il tuo indirizzo: mapetite…/u/{handleDaNome(trovaNome) || "nome"}{trovaNome.trim() ? " (se è preso, aggiungo un numero)" : ""}</>}
+                    {error && !mioNome.trim()
+                      ? <span role="alert" className="text-error">{invitoAperto ? "Scrivi il tuo nome in alto, o spegni “Profilo pubblico”." : "Scrivi il tuo nome, o spegni “Profilo pubblico”."}</span>
+                      : <>{invitoAperto && !mioNome.trim() ? "Il nome è quello che scrivi in alto. " : ""}Il tuo indirizzo: mapetite…/u/{handleDaNome(mioNome) || "nome"}{mioNome.trim() ? " (se è preso, aggiungo un numero)" : ""}</>}
                   </p>
                   {/* Stesso testo del profilo e di /privacy (src/lib/privacy-profilo.ts): consenso informato, una sola fonte. */}
                   <details data-testid="fatti-trovare-privacy" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">
