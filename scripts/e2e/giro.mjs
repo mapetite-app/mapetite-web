@@ -2271,8 +2271,10 @@ else {
     // con voto e prezzo quando ci sono; senza voto né prezzo niente "★" inventata.
     { const meta = async (n) => ((await righe.filter({ hasText: n }).getByTestId("salvato-meta").textContent()) ?? "").replace(/\s*·\s*/g, " · ").trim();
       const [o, t, c] = [await meta("Osteria Due"), await meta("Terrazza Uno"), await meta("Caffè Milano")];
-      // 14/11: il quartiere al posto della città quando si sa (la città sta nelle pillole in alto).
-      ok(o.startsWith("Osteria · ★ 4,5 · €€ · Trastevere") && t.startsWith("Bar · ★ 4,6 · €€ · Monti") && c.startsWith("Caffè · Porta Romana") && !c.includes("★"), `salvati lista: tipo come nella scheda, voto e prezzo (${o} | ${t} | ${c})`); }
+      // 14/11: il quartiere al posto della città quando si sa (la città sta nelle pillole in alto); terzo giro: pezzi
+      // in ordine di importanza (tipo · distanza · quartiere · voto · prezzo), così sui telefoni stretti cade il prezzo.
+      const pezzi = (m) => m.replace(/ · \d[\d,]* k?m(?= ·|$)/, "");
+      ok(pezzi(o) === "Osteria · Trastevere · ★ 4,5 · €€" && pezzi(t) === "Bar · Monti · ★ 4,6 · €€" && pezzi(c).startsWith("Caffè · Porta Romana") && !c.includes("★"), `salvati lista: tipo come nella scheda, quartiere, voto e prezzo (${o} | ${t} | ${c})`); }
     const osteria = righe.filter({ hasText: "Osteria Due" });
     // Revisore 2/11: due stati soli. Senza tag di stato la riga dice "Da provare" (nel database non si scrive niente);
     // "Da provare" ha sempre 📌 (il segnalibro resta per Salva/Salvato).
@@ -2805,14 +2807,16 @@ else {
         const C = { Trastevere: [41.8885, 12.4695], Monti: [41.8945, 12.4930], Testaccio: [41.8775, 12.4760], Pigneto: [41.8890, 12.5290], Prati: [41.9080, 12.4600] };
         const d = (k) => Math.hypot(C[k][0] - 41.889, (C[k][1] - 12.47) * 0.745);
         const nz = await nomi("scaffale-zone"); const cz = await conti("scaffale-zone");
-        const fuori = nz.filter((k, i) => i > 0 && C[k] && C[nz[i - 1]] && cz[i] === cz[i - 1] && d(k) < d(nz[i - 1]));
-        ok(fuori.length === 0, `scaffali ${width}px: a parità di posti prima le zone vicine (${nz.map((k, i) => `${k} ${cz[i]}`).join(", ")})`);
+        // Terzo giro: prima le zone vicine dalla più vicina, non solo a parità di posti.
+        const fuori = nz.filter((k, i) => i > 0 && C[k] && C[nz[i - 1]] && d(k) < d(nz[i - 1]));
+        ok(fuori.length === 0 && nz[0] === "Trastevere", `scaffali ${width}px: prima le zone vicine, dalla più vicina (${nz.map((k, i) => `${k} ${cz[i]}`).join(", ")})`);
         const att = await ps.evaluate(() => { const a = document.querySelector("[data-testid=scaffali-attribuzione]"); const u = document.querySelector("[data-testid=scaffale-zone]"); return a && u ? a.getBoundingClientRect().top >= u.getBoundingClientRect().bottom - 1 : null; });
         ok(att !== false, `scaffali ${width}px: attribuzione della mappa sotto le copertine (${att === null ? "senza chiave Mapbox" : "sotto"})`);
-        const q = await ps.evaluate(() => { const qs = [...document.querySelectorAll("[data-testid=salvato-quartiere]")].map((e) => { const m = e.closest("[data-testid=salvato-meta]").getBoundingClientRect(); const r = e.getBoundingClientRect(); return { vis: r.top < m.bottom - 1, tagliato: r.top < m.bottom - 1 && r.right > m.right + 0.5 }; }); return { vis: qs.filter((x) => x.vis).length, tagliati: qs.filter((x) => x.tagliato).length }; });
-        ok(q.tagliati === 0 && q.vis > 0, `scaffali ${width}px: quartiere nelle righe intero o assente, mai tagliato (${q.vis} in vista, ${q.tagliati} tagliati)`);
+        const q = await ps.evaluate(() => { const qs = [...document.querySelectorAll("[data-testid=salvato-quartiere]")].map((e) => { const m = e.closest("[data-testid=salvato-meta]").getBoundingClientRect(); const r = e.getBoundingClientRect(); return { vis: r.top < m.bottom - 1, tagliato: r.top < m.bottom - 1 && r.right > m.right + 0.5 }; }); return { tot: qs.length, vis: qs.filter((x) => x.vis).length, tagliati: qs.filter((x) => x.tagliato).length }; });
+        ok(q.tagliati === 0 && q.vis >= Math.min(q.tot, 10), `scaffali ${width}px: quartiere nelle righe intero e in vista anche sui telefoni stretti (${q.vis} di ${q.tot} in vista, ${q.tagliati} tagliati)`);
         await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Trastevere,/ }).click();
         ok((await S.getByTestId("salvati-sezione").count()) === 0 && (await S.getByTestId("scaffali-scheda").filter({ hasText: "Tipi" }).count()) === 1, `scaffali ${width}px: con Trastevere acceso c'è lo scaffale Tipi e niente titoli per tipo (niente doppione)`);
+        ok((await S.getByTestId("salvato-quartiere").count()) === 0, `scaffali ${width}px: con Trastevere acceso le righe non ripetono il quartiere`);
         await S.getByRole("button", { name: "Togli Trastevere" }).click(); }
       // In qualunque ordine (revisore 8/11): tipo, poi zona, poi raccolta, poi stato; la scheda Raccolte resta con zona e
       // tipo accesi e conta solo i posti rimasti.

@@ -6,7 +6,6 @@ import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, Sparkles, Squar
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
-import { cardFacts } from "@/components/bottom-sheet";
 import { cityFromAddress } from "@/lib/city";
 import { categoryLabel } from "@/lib/category-label";
 import { cercaSalvati, testoSalvato } from "@/lib/cerca-salvati";
@@ -95,19 +94,22 @@ function FotoCopertina({ src, children }: { src: string; children: React.ReactNo
 // Copertina con la mappa (14/11, revisori dell'8/11: "copertine senza foto"): la zona vera dei posti del gruppo,
 // con un puntino per posto e l'emoji del gruppo in un tondo bianco. Se la mappa non arriva (rete, token) torna la
 // copertina di prima: la foto scattata dall'utente o le emoji.
+const ZONA_VICINA_M = 30_000;
 const COPERTINA_W = 124;
 const COPERTINA_H = 72;
 function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
   const [rotta, setRotta] = useState(false);
   const [pronta, setPronta] = useState(false);
-  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN), [posti]);
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN, 12, undefined, true), [posti]);
   if (!mappa || rotta) return <>{fallback}</>;
   return (
     <>
       {!pronta && fallback}
       {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
       <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${pronta ? "opacity-100" : "opacity-0"}`} />
-      {/* Velo teal leggero: la mappa chiara su fondo chiaro spariva (revisore 14/11). */}
+      {/* Velo: i nomi delle vie e dei quartieri della mappa si attenuano (finivano sotto i puntini, revisore 14/11,
+          terzo giro), con una punta di teal perché la mappa chiara su fondo chiaro non sparisca. */}
+      {pronta && <span className="absolute inset-0 bg-white/40" />}
       {pronta && <span className="absolute inset-0 bg-brand/[0.06]" />}
       {pronta && mappa.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55).map((pt, i) => (
         <span key={i} data-testid="scaffale-puntino" className="absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
@@ -157,7 +159,7 @@ function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina
 }
 
 // Gruppi di una lista per chiave (quartiere, tipo), dal più pieno; i posti restano nell'ordine ricevuto.
-function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null, pari?: (a: Gruppo, b: Gruppo) => number): Gruppo[] {
+function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null): Gruppo[] {
   const m = new globalThis.Map<string, Place[]>();
   for (const p of lista) {
     const k = chiave(p);
@@ -167,7 +169,7 @@ function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null,
     else m.set(k, [p]);
   }
   return [...m.entries()].map(([key, posti]) => ({ key, label: key, n: posti.length, posti }))
-    .sort((a, b) => b.n - a.n || (pari?.(a, b) ?? 0) || a.label.localeCompare(b.label, "it"));
+    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, "it"));
 }
 
 // Tipo di locale (lo stesso della riga) e testo cercato; testi = testo di ogni salvato, calcolato una volta.
@@ -180,17 +182,30 @@ const FONTE_LABEL: Record<string, string> = { Instagram: "Reel Instagram", TikTo
 
 // Una riga della lista. A parte (memo): mentre si scrive nel campo le righe già in vista non si ridisegnano,
 // si ridisegna solo la lista filtrata quando è pronta (useDeferredValue). Con 500 salvati scrivere non scatta.
-type RigaProps = { p: Place; primo: boolean; foto?: string; fonte?: string; verdict: string | null; origin: { lat: number; lng: number } | null; daMese: string | null; onTap: (p: Place) => void };
-const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese, onTap }: RigaProps) {
-  // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
-  // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
+type RigaProps = { p: Place; primo: boolean; foto?: string; fonte?: string; verdict: string | null; origin: { lat: number; lng: number } | null; daMese: string | null; senzaQuartiere?: boolean; onTap: (p: Place) => void };
+const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese, senzaQuartiere = false, onTap }: RigaProps) {
+  // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là): tipo dal nome
+  // quando lo dice (categoryLabel con il nome, come scheda e card).
   // Revisore 14/11: il quartiere (Trastevere, Brera) al posto della città quando si sa: la città sta già nelle pillole in alto.
-  // Revisore 14/11 (secondo giro): mai il quartiere tagliato a metà ("Trast… · 300 m"): se non entra intero va a capo
-  // in una riga nascosta e sparisce; fatti e distanza restano sempre.
-  const quartiere = useMemo(() => quartiereDi(p), [p]);
-  const meta = useMemo(() => cardFacts(p, null, quartiere === null), [p, quartiere]);
+  // Revisore 14/11 (terzo giro): sui telefoni stretti il quartiere spariva da tutte le righe. I pezzi stanno in
+  // ordine di importanza (tipo · distanza · quartiere · voto · prezzo) e quando la riga non basta cadono dalla
+  // fine, interi: prima il prezzo, poi il voto. Mai un pezzo tagliato a metà ("Trast…").
+  // Con un quartiere acceso il quartiere non si ripete su ogni riga: sta già nel filtro in alto.
+  const quartiere = useMemo(() => (senzaQuartiere ? null : quartiereDi(p)), [p, senzaQuartiere]);
+  const tipoLocale = categoryLabel(p.category, p.name);
+  const citta = quartiere || senzaQuartiere ? null : cityFromAddress(p.address);
+  const voto = p.rating != null ? `★ ${p.rating.toFixed(1).replace(".", ",")}` : null;
+  const prezzo = p.priceLevel != null && p.priceLevel > 0 ? "€".repeat(Math.min(p.priceLevel, 4)) : null;
   // Revisore 3/11: oltre 50 km la distanza non serve ("474,6 km"); resta la città, intera.
   const dist = origin && distanceMeters(origin, p) < 50_000 ? distanceLabel(origin, p) : null;
+  const pezzi = ([
+    tipoLocale && { k: "tipo", t: tipoLocale },
+    dist && { k: "distanza", t: dist },
+    quartiere && { k: "quartiere", t: quartiere },
+    citta && { k: "citta", t: citta },
+    voto && { k: "voto", t: voto },
+    prezzo && { k: "prezzo", t: prezzo },
+  ].filter(Boolean) as { k: string; t: string }[]);
   const done = p.tags?.includes(DONE);
   const liked = p.tags?.includes(OPINION_LIKE);
   const haChiuso = p.businessStatus === "CLOSED_PERMANENTLY";
@@ -208,15 +223,16 @@ const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese
         <span className={`min-w-0 flex-1 ${haChiuso ? "opacity-70" : ""}`}>
           {/* Il nome ha tutta la riga (giro 1/11, D35): lo stato sta sotto, non a destra. */}
           <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-          {(meta || dist || quartiere) && (
+          {pezzi.length > 0 && (
+            // Una riga sola (h-[18px], overflow nascosto): i pezzi che non entrano vanno a capo e non si vedono.
             <span data-testid="salvato-meta" className="mt-0.5 flex h-[18px] min-w-0 flex-wrap overflow-hidden text-[13px] leading-[18px] text-text-muted">
-              {(meta || dist) && (
-                <span className="flex min-w-0 max-w-full gap-1">
-                  {meta && <span className="min-w-0 truncate">{meta}</span>}
-                  {dist && <span data-testid="salvato-distanza" className="shrink-0">{meta ? "· " : ""}{dist}</span>}
-                </span>
-              )}
-              {quartiere && <span data-testid="salvato-quartiere" className={`shrink-0 whitespace-nowrap ${meta || dist ? "pl-1" : ""}`}>{meta || dist ? "· " : ""}{quartiere}</span>}
+              {pezzi.map((x, i) => (
+                <span
+                  key={x.k}
+                  data-testid={x.k === "quartiere" ? "salvato-quartiere" : x.k === "distanza" ? "salvato-distanza" : undefined}
+                  className={i === 0 ? "min-w-0 max-w-full truncate" : "shrink-0 whitespace-nowrap pl-1"}
+                >{i > 0 ? "· " : ""}{x.t}</span>
+              ))}
             </span>
           )}
           {verdict ? (
@@ -467,8 +483,15 @@ export default function SalvatiLista({
   const shown = useMemo(() => filtraLista(perZona, tipo, cercato, testi), [perZona, tipo, cercato, testi]);
   // Scaffali: quartieri (con il tipo acceso, solo i suoi posti), tipi (con la zona accesa, solo quelli lì).
   // Solo copertine con almeno 2 posti (revisore 8/11: niente "Monti 1").
-  // Revisore 14/11: a parità di posti prima i quartieri vicini a te (senza posizione, in ordine alfabetico).
-  const scaffaleZone = useMemo(() => raggruppa(perTipo, (p) => quartieri.get(p.id) ?? null, origin ? (a, b) => distanzaQuartiere(origin, a.key) - distanzaQuartiere(origin, b.key) : undefined).filter((g) => g.n >= 2).slice(0, 20), [perTipo, quartieri, origin]);
+  // Revisore 14/11 (terzo giro): prima i quartieri vicini a te, dal più vicino (quelli con almeno 2 posti, entro
+  // 30 km: a Milano i quartieri di Roma non sono "vicini"); poi gli altri, dal più pieno. Senza posizione: dal più pieno.
+  const scaffaleZone = useMemo(() => {
+    const gruppi = raggruppa(perTipo, (p) => quartieri.get(p.id) ?? null).filter((g) => g.n >= 2);
+    if (!origin) return gruppi.slice(0, 20);
+    const d = new globalThis.Map(gruppi.map((g) => [g.key, distanzaQuartiere(origin, g.key)]));
+    const vicini = gruppi.filter((g) => (d.get(g.key) ?? Infinity) <= ZONA_VICINA_M).sort((a, b) => (d.get(a.key) ?? 0) - (d.get(b.key) ?? 0));
+    return [...vicini, ...gruppi.filter((g) => !vicini.includes(g))].slice(0, 20);
+  }, [perTipo, quartieri, origin]);
   const scaffaleVicino = useMemo(() => (origin && raggio ? perTipo.filter((p) => distanceMeters(origin, p) <= raggio) : []), [perTipo, origin, raggio]);
   const scaffaleTipi = useMemo(() => raggruppa(perZona, (p) => tipoDi.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20).map((g) => ({ ...g, label: tipoPlurale(g.key) })), [perZona, tipoDi]);
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
@@ -1014,7 +1037,7 @@ export default function SalvatiLista({
                       <span className="shrink-0 text-[12px] font-semibold text-text-muted">{sez.n}</span>
                     </li>
                   )}
-                  <Riga p={p} primo={i === 0 || nuova} foto={fotoMie[p.id]} fonte={reels[p.id]} verdict={verdicts[p.id]?.verdict ?? null} origin={origin} daMese={daQuando(p)} onTap={apriRiga} />
+                  <Riga p={p} primo={i === 0 || nuova} foto={fotoMie[p.id]} fonte={reels[p.id]} verdict={verdicts[p.id]?.verdict ?? null} origin={origin} daMese={daQuando(p)} senzaQuartiere={quartiere !== null} onTap={apriRiga} />
                 </Fragment>
               );
             })}

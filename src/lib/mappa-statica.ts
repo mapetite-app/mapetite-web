@@ -43,16 +43,22 @@ export function nucleo<T extends Punto>(punti: readonly T[], raggio = RAGGIO_GRU
 
 // Centro e zoom che fanno stare tutti i punti nel riquadro w×h con un margine; puntini in % del riquadro.
 // raggio: quanto può essere largo il gruppo; la mappa grande del profilo ne tiene di più delle copertine.
-export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12, raggio = RAGGIO_GRUPPO_M): MappaStatica | null {
+// baricentro: la vista si centra sulla media dei posti, non sul centro del riquadro che li contiene (revisore 14/11,
+// terzo giro: con un posto isolato a un lato il gruppo finiva in un angolo e i nomi delle vie stavano al centro).
+export function mappaStatica(punti: readonly Punto[], w: number, h: number, token: string | undefined, margine = 12, raggio = RAGGIO_GRUPPO_M, baricentro = false): MappaStatica | null {
   const vista = nucleo(punti, raggio).slice(0, 12);
   if (!token || vista.length === 0) return null;
   const xs = vista.map((p) => mx(p.lng));
   const ys = vista.map((p) => my(p.lat));
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const cx = (x0 + x1) / 2;
-  const cy = (y0 + y1) / 2;
-  const zx = x1 > x0 ? Math.log2((w - 2 * margine) / ((x1 - x0) * TILE)) : ZOOM_MAX;
-  const zy = y1 > y0 ? Math.log2((h - 2 * margine) / ((y1 - y0) * TILE)) : ZOOM_MAX;
+  const media = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+  const cx = baricentro ? media(xs) : (x0 + x1) / 2;
+  const cy = baricentro ? media(ys) : (y0 + y1) / 2;
+  // Larghezza da coprire attorno al centro scelto (col baricentro il lato più lontano conta doppio).
+  const lx = 2 * Math.max(cx - x0, x1 - cx);
+  const ly = 2 * Math.max(cy - y0, y1 - cy);
+  const zx = lx > 0 ? Math.log2((w - 2 * margine) / (lx * TILE)) : ZOOM_MAX;
+  const zy = ly > 0 ? Math.log2((h - 2 * margine) / (ly * TILE)) : ZOOM_MAX;
   const z = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zx, zy)) * 100) / 100;
   const scala = TILE * 2 ** z;
   const at = `${lngDi(cx).toFixed(5)},${latDi(cy).toFixed(5)},${z}`;
