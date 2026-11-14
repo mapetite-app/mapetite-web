@@ -694,7 +694,7 @@ await page.unroute("**/api/search");
   ok(new Set(tipi.map((id) => sei.find((x) => x.id === id)?.category)).size === 3, "scegli tra 3: tre tipi diversi (non tre trattorie)");
   const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
   const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-  ok(titolo === "Tre, diversi tra loro" && /^Su 6: il più in tema, uno poco conosciuto e /.test(det), `scegli tra 3: la frase sopra le card dice come sono scelti ('${titolo}' · '${det}')`);
+  ok(titolo === "Tre, diversi tra loro" && /^Su 6: il più in tema, un 💎 e (il più vicino|un altro tipo)$/.test(det), `scegli tra 3: la frase sopra le card dice come sono scelti ('${titolo}' · '${det}')`);
   ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 0, "scegli tra 3: accesa, gli altri filtri si nascondono (una cosa per volta)");
   await shot("05c-scegli-tra-3");
@@ -703,6 +703,19 @@ await page.unroute("**/api/search");
   ok((await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 6 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 0 && (await tre.innerText()).trim() === "Scegli tra 3", "scegli tra 3: 'Tutti i 6' torna alla lista intera");
   ok(chiamate === 1, `scegli tra 3: nessuna ricerca in più (${chiamate} chiamata)`);
   await page.unroute("**/api/search");
+  // Revisore 14/11 sera: con tutte trattorie nessuna card dice "un altro tipo" (era "Diverso dagli altri", falso).
+  { const tutte = sei.slice(0, 5).map((x) => ({ ...x, category: "trattoria", userRatingCount: 900 }));
+    await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
+    await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(page)).click();
+    await page.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+    await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+    await page.waitForTimeout(300);
+    const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+    const dd = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
+    ok(m.length === 3 && !m.includes("Un altro tipo") && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
+    await page.unroute("**/api/search"); }
   // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await (await esempio(page)).click();

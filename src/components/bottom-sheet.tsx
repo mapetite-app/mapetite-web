@@ -393,6 +393,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Si accende per questa lista: con una ricerca nuova (altri posti) torna spenta da sola.
   const allKey = allPlaces.map((p) => p.id).join(",");
   const [treDi, setTreDi] = useState<string | null>(null);
+  // Su quanti posti si sceglie: quelli della lista com'è (con un filtro rapido acceso, solo i rimasti).
+  const treTra = (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces).length;
   const treLista = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     return scegliTre(list, { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
@@ -647,11 +649,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <button
           type="button"
           data-testid="scegli-tre"
-          aria-pressed={treOn}
-          onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: allPlaces.length }); setTreDi(treOn ? null : allKey); }}
+          aria-label={treOn ? `Torna a tutti i ${treTra} posti` : "Scegli tra 3: tre posti diversi tra loro"}
+          onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: treTra }); setTreDi(treOn ? null : allKey); }}
           className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
-          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {allPlaces.length}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTra}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
         </button>
       )}
       {!treOn && quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
@@ -773,8 +775,14 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   if (variant === "b") {
     const nuova = pillSlot != null && title != null;
     // Con "Scegli tra 3" la frase dice come sono stati scelti, solo con i perché davvero usati.
-    const perche = treLista.map((t) => ({ tema: "il più in tema", gemma: "uno poco conosciuto", vicino: "il più vicino", diverso: "uno di un altro tipo" })[t.motivo]);
-    const fraseOggi = nuova && treOn ? { titolo: "Tre, diversi tra loro", dettaglio: `Su ${allPlaces.length}: ${perche.slice(0, -1).join(", ")} e ${perche[perche.length - 1]}` } : nuova && frase ? fraseRisultati({
+    // Breve, motivi uguali raggruppati ("e due di altri tipi"); "diversi tra loro" solo se i tipi lo sono davvero.
+    const contaMotivi = treLista.reduce<Record<string, number>>((m, t) => ({ ...m, [t.motivo]: (m[t.motivo] ?? 0) + 1 }), {});
+    const perche = (["tema", "gemma", "vicino", "diverso", "altro"] as const).filter((k) => contaMotivi[k]).map((k) => {
+      const n = contaMotivi[k];
+      return { tema: "il più in tema", gemma: n > 1 ? "due 💎" : "un 💎", vicino: "il più vicino", diverso: n > 1 ? "due di altri tipi" : "un altro tipo", altro: n > 1 ? "altri due in tema" : "un altro in tema" }[k];
+    });
+    const tipiDiversi = new Set(treLista.map((t) => t.posto.category ?? "")).size === treLista.length;
+    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: `Su ${treTra}: ${perche.length > 1 ? `${perche.slice(0, -1).join(", ")} e ${perche[perche.length - 1]}` : perche[0]}` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,
       ...frase,

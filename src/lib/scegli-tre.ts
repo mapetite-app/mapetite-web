@@ -19,12 +19,14 @@ export type PostoTre = {
   businessStatus?: string | null;
 };
 
-export type Motivo = "tema" | "gemma" | "vicino" | "diverso";
+export type Motivo = "tema" | "gemma" | "vicino" | "diverso" | "altro";
 export const MOTIVO_LABEL: Record<Motivo, string> = {
   tema: "Il più in tema",
   gemma: "💎 Poco conosciuto",
   vicino: "Il più vicino",
-  diverso: "Diverso dagli altri",
+  diverso: "Un altro tipo",
+  // Revisore 14/11 sera: se non c'è un tipo nuovo il posto non si chiama "diverso" (l'app non dice cose false).
+  altro: "Anche in tema",
 };
 
 // Sotto questo numero di posti la scelta non serve: si vedono già tutti.
@@ -63,7 +65,7 @@ export function scegliTre<T extends PostoTre>(
   while (scelti.length < 3) {
     const d = primo(buoni);
     if (!d) break;
-    scelti.push({ posto: d, motivo: "diverso" });
+    scelti.push({ posto: d, motivo: tipi().has(d.category ?? "") ? "altro" : "diverso" });
   }
   return scelti.slice(0, 3);
 }
